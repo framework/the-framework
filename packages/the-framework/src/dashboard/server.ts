@@ -187,7 +187,7 @@ export function startDashboard(opts: DashboardOptions): Promise<Dashboard> {
         hello: hello => bridgeQuestions().recordHello(hello),
         answer: sessionId => {
           const pending = bridgeQuestions().pendingAnswer(sessionId)
-          return pending ? { id: pending.id, label: pending.label } : undefined
+          return pending ? { id: pending.id, text: pending.text } : undefined
         },
         answered: (sessionId, id, ok, note) => bridgeQuestions().resolveAnswer(sessionId, id, ok, note),
         ...(opts.bridgeSessions ? { sessions: opts.bridgeSessions } : {}),

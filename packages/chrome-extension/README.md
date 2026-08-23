@@ -5,10 +5,15 @@ dashboard (#1237). A cloud run hands off and ends, so when the session later ask
 is nothing streaming back and the question is stranded on claude.ai. This carries it home.
 
 It reads the session page you are already signed into, and since v0.7.0 it also carries your
-answer back: pick an option in the dashboard, confirm the send, and the extension types that
-label into the session's composer and submits it. It only ever types a label the session itself
-offered, the pick has to be confirmed in the dashboard, and a queued pick can be withdrawn until
-the extension collects it.
+answer back: answer the question in the dashboard — the same panel a local agent's question
+gets, multi-select included — and the extension types the answer into the session's composer and
+submits it. What it types is composed by the daemon from labels the session itself offered (the
+same "You paused to ask … The user chose …" a local agent is re-prompted with; a `stop` option
+tells the session the user is taking over), and a queued answer can be withdrawn until the
+extension collects it.
+
+With the bridge on, a cloud session started by The Framework is allowed to park on a question at
+all (#1554); with it off, the session is told to decide alone, since nothing could answer it.
 
 ## Set it up
 
@@ -52,11 +57,12 @@ catches the session's own DOM changes immediately; the slow interval is only a b
 node check.mjs
 ```
 
-Fourteen cases: the ten extraction ones, including the four that broke it on a real session
+Fifteen cases: the ten extraction ones, including the four that broke it on a real session
 (`<code>` with no `<pre>`, content behind a shadow root, an indentation the parser had not
-guessed, and our own protocol spec appearing on the page as a decoy), three for the answer
-delivery: fill and click send, the Enter fallback, and refusing a page with no composer, and
-one for the panel's collapse toggle folding it down to a compact `TF` tab and back.
+guessed, and our own protocol spec appearing on the page as a decoy), one pinning that a block's
+`multi`/`default`/`stop` reach the daemon whole, three for the answer delivery: fill and click
+send, the Enter fallback, and refusing a page with no composer, and one for the panel's collapse
+toggle folding it down to a compact `TF` tab and back.
 
 After editing any file here, reload the extension on `chrome://extensions` AND reload the open
 claude.ai tabs: reloading the extension does not re-inject content scripts, and an orphaned

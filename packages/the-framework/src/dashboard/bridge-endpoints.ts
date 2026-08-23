@@ -1,5 +1,8 @@
 import { timingSafeEqual } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import type { BridgeOption, BridgeQuestion } from './bridge-question.js'
+
+export type { BridgeOption, BridgeQuestion } from './bridge-question.js'
 
 /**
  * The browser bridge (#1237): the one endpoint an extension running in the user's own Claude
@@ -30,21 +33,10 @@ export const BRIDGE_PREFIX = '/_bridge'
  * which reads as a framework bug and burns a debugging session. The extension's manifest must
  * carry the same number; a test keeps the two in lockstep.
  */
-export const EXPECTED_EXTENSION_VERSION = '0.8.1'
+export const EXPECTED_EXTENSION_VERSION = '0.9.0'
 
 /** The header the extension states its version in. Lowercase, as node presents all headers. */
 export const EXTENSION_VERSION_HEADER = 'x-tf-extension-version'
-
-/** A question a cloud session is parked on, as reported by the bridge. */
-export interface BridgeQuestion {
-  /** The cloud session that asked, which joins back to an agent through `AgentMeta.sessionId`. */
-  sessionId: string
-  title: string
-  options: { label: string; detail?: string }[]
-  recommended?: string
-  /** When the daemon accepted it. Set here, never by the caller. */
-  receivedAt: string
-}
 
 /**
  * One thing a cloud session did, as scraped from its page (#1237).
@@ -100,8 +92,12 @@ export interface BridgeHandlers {
    * somebody happens to be looking at claude.ai. This is how a tab gets opened for them.
    */
   sessions?: () => Promise<BridgeSession[]>
-  /** The answer queued in the dashboard for that session, waiting to be delivered (#1237). */
-  answer?: (sessionId: string) => { id: string; label: string } | undefined
+  /**
+   * The answer queued in the dashboard for that session, waiting to be delivered (#1237): `text`
+   * is exactly what the extension types into the composer, composed by the daemon from labels the
+   * session itself offered (#1554).
+   */
+  answer?: (sessionId: string) => { id: string; text: string } | undefined
   /** The extension's word on what a delivery attempt did. */
   answered?: (sessionId: string, id: string, ok: boolean, note?: string) => void
   now?: () => Date
@@ -197,14 +193,24 @@ function validate(body: unknown, now: Date): BridgeQuestion | string {
   if (typeof title !== 'string' || !title.trim() || title.length > MAX_TITLE) return `title must be a string of 1 to ${MAX_TITLE} characters`
   if (!Array.isArray(raw.options) || raw.options.length === 0) return 'options must be a non-empty array'
   if (raw.options.length > MAX_OPTIONS) return `options must hold at most ${MAX_OPTIONS} entries`
-  const options: { label: string; detail?: string }[] = []
+  const options: BridgeOption[] = []
   for (const entry of raw.options) {
     if (typeof entry !== 'object' || entry === null) return 'each option must be an object'
-    const { label, detail } = entry as Record<string, unknown>
+    const { label, detail, default: preset, stop } = entry as Record<string, unknown>
     if (typeof label !== 'string' || !label.trim() || label.length > MAX_LABEL) return `each option needs a label of 1 to ${MAX_LABEL} characters`
     if (detail !== undefined && (typeof detail !== 'string' || detail.length > MAX_DETAIL)) return `an option detail must be a string of at most ${MAX_DETAIL} characters`
-    options.push({ label, ...(typeof detail === 'string' && detail ? { detail } : {}) })
+    if (preset !== undefined && typeof preset !== 'boolean') return 'an option default must be a boolean'
+    if (stop !== undefined && typeof stop !== 'boolean') return 'an option stop must be a boolean'
+    options.push({
+      label,
+      ...(typeof detail === 'string' && detail ? { detail } : {}),
+      ...(preset === true ? { default: true } : {}),
+      ...(stop === true ? { stop: true } : {}),
+    })
   }
+  if (new Set(options.map(o => o.label)).size !== options.length) return 'option labels must be distinct'
+  const multi = raw.multi
+  if (multi !== undefined && typeof multi !== 'boolean') return 'multi must be a boolean'
   const recommended = raw.recommended
   if (recommended !== undefined && (typeof recommended !== 'string' || recommended.length > MAX_LABEL)) {
     return 'recommended must be a string naming one of the option labels'
@@ -218,6 +224,7 @@ function validate(body: unknown, now: Date): BridgeQuestion | string {
     title,
     options,
     ...(typeof recommended === 'string' && recommended ? { recommended } : {}),
+    ...(multi === true ? { multi: true } : {}),
     receivedAt: now.toISOString(),
   }
 }

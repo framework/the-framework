@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import type { OpenQuestion } from '../../src/index.js'
 import { onOpenQuestions } from '../rpc/reads.js'
+import { bridgeSend } from './CloudAgentNotice.js'
 import { usePolled } from '../lib/use-async.js'
 import { AnsweredChoice } from './AnsweredChoice.js'
 import { ChoicePanel } from './ChoicePanel.js'
@@ -115,6 +116,7 @@ export function OpenQuestions({
                       onAnswered={pick =>
                         setAnswered(prev => new Map(prev).set(key, { question, pick }))
                       }
+                      send={question.bridge ? bridgeSend(question.bridge.sessionId) : undefined}
                     />
                   </div>
                 )}

@@ -10,7 +10,8 @@ const onBridgeAnswer = vi.fn(async () => null as unknown)
 vi.mock('../rpc/reads.js', () => ({ onBridgeQuestion, onBridgeEvents, onBridgeAnswer }))
 const sendBridgeAnswer = vi.fn(async () => ({ ok: true }) as { ok: boolean; error?: string })
 const sendBridgeAnswerCancel = vi.fn(async () => undefined)
-vi.mock('../rpc/control.js', () => ({ sendBridgeAnswer, sendBridgeAnswerCancel }))
+const sendChoice = vi.fn(async () => undefined)
+vi.mock('../rpc/control.js', () => ({ sendBridgeAnswer, sendBridgeAnswerCancel, sendChoice }))
 
 const { CloudAgentNotice, CloudMirrorRow, scrubMirrorText } = await import('./CloudAgentNotice.js')
 
@@ -25,6 +26,7 @@ afterEach(() => {
   sendBridgeAnswer.mockReset()
   sendBridgeAnswer.mockResolvedValue({ ok: true })
   sendBridgeAnswerCancel.mockReset()
+  sendChoice.mockReset()
 })
 
 const URL = 'https://claude.ai/code/session_01ABCdefGHIjklMNO?from=cli&m=0'
@@ -40,94 +42,122 @@ const QUESTION = {
 
 describe('CloudAgentNotice (#610)', () => {
   test('says the session is still being created before the hand-off lands', () => {
-    render(<CloudAgentNotice target="web" events={[]} />)
+    render(<CloudAgentNotice target="web" events={[]} projectId="p" agentId="a" />)
     expect(screen.getByRole('status').textContent).toMatch(/Starting a Claude Code cloud session/i)
     expect(screen.queryByRole('link')).toBeNull()
   })
 
   test('links through to the cloud session once the driver reports it', () => {
-    render(<CloudAgentNotice target="web" events={[handOff()]} />)
+    render(<CloudAgentNotice target="web" events={[handOff()]} projectId="p" agentId="a" />)
     expect(screen.getByRole('link', { name: /Open the session/i }).getAttribute('href')).toBe(URL)
   })
 
   test('offers the teleport command, which is how the work comes back to this machine', () => {
-    render(<CloudAgentNotice target="web" events={[handOff()]} />)
+    render(<CloudAgentNotice target="web" events={[handOff()]} projectId="p" agentId="a" />)
     expect(screen.getByRole('status').textContent).toMatch(/claude --teleport session_01ABCdefGHIjklMNO/)
   })
 
   test('says the cloud session opens its own PR, since nothing streams back here', () => {
-    render(<CloudAgentNotice target="web" events={[handOff()]} />)
+    render(<CloudAgentNotice target="web" events={[handOff()]} projectId="p" agentId="a" />)
     expect(screen.getByRole('status').textContent).toMatch(/opens its own pull request/i)
   })
 
-  test('says the session asks its questions over there, since none can be answered here (#1225)', () => {
-    render(<CloudAgentNotice target="web" events={[handOff()]} />)
-    expect(screen.getByRole('status').textContent).toMatch(/asks its questions.*over there, not here/i)
+  test('says a question it parks on shows here once the bridge carries it (#1554)', () => {
+    render(<CloudAgentNotice target="web" events={[handOff()]} projectId="p" agentId="a" />)
+    expect(screen.getByRole('status').textContent).toMatch(/a question it parks on shows here/i)
   })
 
   test('renders nothing for the other targets', () => {
     for (const target of ['local', 'actions', 'remote'] as const) {
-      const { container } = render(<CloudAgentNotice target={target} events={[handOff()]} />)
+      const { container } = render(<CloudAgentNotice target={target} events={[handOff()]} projectId="p" agentId="a" />)
       expect(container.firstChild).toBeNull()
     }
-    expect(render(<CloudAgentNotice events={[]} />).container.firstChild).toBeNull()
+    expect(render(<CloudAgentNotice events={[]} projectId="p" agentId="a" />).container.firstChild).toBeNull()
   })
 })
 
 describe('the parked question the bridge reports (#1237)', () => {
   test('shows the question and its options once the bridge has one', async () => {
     onBridgeQuestion.mockResolvedValue(QUESTION)
-    render(<CloudAgentNotice target="web" events={[handOff()]} />)
+    render(<CloudAgentNotice target="web" events={[handOff()]} projectId="p" agentId="a" />)
     await waitFor(() => expect(screen.getByText(QUESTION.title)).toBeTruthy())
-    expect(screen.getByText('One page, both routes')).toBeTruthy()
-    expect(screen.getByText('Cross-project only')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /One page, both routes/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Cross-project only/ })).toBeTruthy()
     expect(screen.getByText(/recommended/i)).toBeTruthy()
+    // The gate a local agent gets (#1554): same panel, same heading.
+    expect(screen.getByRole('region', { name: QUESTION.title })).toBeTruthy()
+    expect(screen.getByText('Your call')).toBeTruthy()
   })
 
   test('is asked for by cloud session id, which is what the bridge can see', async () => {
     onBridgeQuestion.mockResolvedValue(QUESTION)
-    render(<CloudAgentNotice target="web" events={[handOff()]} />)
+    render(<CloudAgentNotice target="web" events={[handOff()]} projectId="p" agentId="a" />)
     await waitFor(() => expect(onBridgeQuestion).toHaveBeenCalledWith('session_01ABCdefGHIjklMNO'))
   })
 
   test('keeps the link out as the manual way to answer', async () => {
     onBridgeQuestion.mockResolvedValue(QUESTION)
-    render(<CloudAgentNotice target="web" events={[handOff()]} />)
+    render(<CloudAgentNotice target="web" events={[handOff()]} projectId="p" agentId="a" />)
     const link = await screen.findByRole('link', { name: /Answer it in the session/i })
     expect(link.getAttribute('href')).toBe(URL)
   })
 
   test('shows nothing extra when no question is parked, so an ordinary run is unchanged', async () => {
-    render(<CloudAgentNotice target="web" events={[handOff()]} />)
+    render(<CloudAgentNotice target="web" events={[handOff()]} projectId="p" agentId="a" />)
     await waitFor(() => expect(onBridgeQuestion).toHaveBeenCalled())
     expect(screen.queryByRole('link', { name: /Answer it in the session/i })).toBeNull()
   })
 
   test('never asks before the hand-off lands: there is no session to ask about', () => {
-    render(<CloudAgentNotice target="web" events={[]} />)
+    render(<CloudAgentNotice target="web" events={[]} projectId="p" agentId="a" />)
     expect(onBridgeQuestion).not.toHaveBeenCalled()
   })
 })
 
 describe('answering from the dashboard (#1237)', () => {
-  const ANSWER = { id: 'a1', sessionId: 'session_01ABCdefGHIjklMNO', label: 'Cross-project only', queuedAt: '', state: 'queued' as const }
+  const ANSWER = {
+    id: 'a1',
+    sessionId: 'session_01ABCdefGHIjklMNO',
+    labels: ['Cross-project only'],
+    text: 'You paused to ask: "Where should the tickets page live?". The user chose: Cross-project only. Continue with that decision.',
+    queuedAt: '',
+    state: 'queued' as const,
+  }
 
-  test('a pick has to be confirmed before anything is sent', async () => {
+  test('one click answers, through the bridge rather than the control log (#1554)', async () => {
     onBridgeQuestion.mockResolvedValue(QUESTION)
-    render(<CloudAgentNotice target="web" events={[handOff()]} />)
-    const send = await screen.findByRole('button', { name: /Pick an answer/i })
-    expect((send as HTMLButtonElement).disabled).toBe(true)
-    fireEvent.click(screen.getByRole('button', { name: /Cross-project only/i }))
-    const confirm = screen.getByRole('button', { name: /Send .Cross-project only./i })
-    expect(sendBridgeAnswer).not.toHaveBeenCalled()
-    fireEvent.click(confirm)
-    await waitFor(() => expect(sendBridgeAnswer).toHaveBeenCalledWith('session_01ABCdefGHIjklMNO', 'Cross-project only'))
+    render(<CloudAgentNotice target="web" events={[handOff()]} projectId="p" agentId="a" />)
+    fireEvent.click(await screen.findByRole('button', { name: /Cross-project only/i }))
+    await waitFor(() => expect(sendBridgeAnswer).toHaveBeenCalledWith('session_01ABCdefGHIjklMNO', ['Cross-project only']))
+    expect(sendChoice).not.toHaveBeenCalled()
+  })
+
+  test('a multi-select posts the checked subset as labels (#1554)', async () => {
+    onBridgeQuestion.mockResolvedValue({
+      ...QUESTION,
+      multi: true,
+      recommended: undefined,
+      options: [{ label: 'Lint', default: true }, { label: 'Tests' }, { label: 'Docs' }],
+    })
+    render(<CloudAgentNotice target="web" events={[handOff()]} projectId="p" agentId="a" />)
+    await screen.findByRole('region', { name: QUESTION.title })
+    fireEvent.click(screen.getByLabelText('Tests'))
+    fireEvent.click(screen.getByRole('button', { name: /Accept 2 selected/i }))
+    await waitFor(() => expect(sendBridgeAnswer).toHaveBeenCalledWith('session_01ABCdefGHIjklMNO', ['Lint', 'Tests']))
+  })
+
+  test('a refused pick shows the daemon\'s reason on the panel', async () => {
+    onBridgeQuestion.mockResolvedValue(QUESTION)
+    sendBridgeAnswer.mockResolvedValue({ ok: false, error: 'that session has no parked question' })
+    render(<CloudAgentNotice target="web" events={[handOff()]} projectId="p" agentId="a" />)
+    fireEvent.click(await screen.findByRole('button', { name: /Cross-project only/i }))
+    await waitFor(() => expect(screen.getByText(/that session has no parked question/)).toBeTruthy())
   })
 
   test('a queued answer shows as on its way, and can still be withdrawn', async () => {
     onBridgeQuestion.mockResolvedValue(QUESTION)
     onBridgeAnswer.mockResolvedValue(ANSWER)
-    render(<CloudAgentNotice target="web" events={[handOff()]} />)
+    render(<CloudAgentNotice target="web" events={[handOff()]} projectId="p" agentId="a" />)
     await waitFor(() => expect(screen.getByText(/Sending .Cross-project only./i)).toBeTruthy())
     // The question card yields to the sending state, so a second pick cannot race the first.
     expect(screen.queryByText(QUESTION.title)).toBeNull()
@@ -137,7 +167,7 @@ describe('answering from the dashboard (#1237)', () => {
 
   test('a delivered answer reads as answered, with the question gone', async () => {
     onBridgeAnswer.mockResolvedValue({ ...ANSWER, state: 'sent' })
-    render(<CloudAgentNotice target="web" events={[handOff()]} />)
+    render(<CloudAgentNotice target="web" events={[handOff()]} projectId="p" agentId="a" />)
     await waitFor(() => expect(screen.getByText(/Answered .Cross-project only./i)).toBeTruthy())
     expect(screen.queryByRole('button', { name: /Cancel/i })).toBeNull()
   })
@@ -145,7 +175,7 @@ describe('answering from the dashboard (#1237)', () => {
   test('a failed delivery says so and offers the question again', async () => {
     onBridgeQuestion.mockResolvedValue(QUESTION)
     onBridgeAnswer.mockResolvedValue({ ...ANSWER, state: 'failed', note: 'no composer on the page' })
-    render(<CloudAgentNotice target="web" events={[handOff()]} />)
+    render(<CloudAgentNotice target="web" events={[handOff()]} projectId="p" agentId="a" />)
     await waitFor(() => expect(screen.getByText(/failed: no composer on the page/i)).toBeTruthy())
     expect(screen.getByText(QUESTION.title)).toBeTruthy()
   })
@@ -197,7 +227,7 @@ describe('the mirror row at the log tail (#1265)', () => {
     onBridgeEvents.mockResolvedValue([
       { sessionId: 'session_01ABCdefGHIjklMNO', seq: 0, role: 'agent', text: 'Reading the repo', receivedAt: '' },
     ])
-    render(<CloudAgentNotice target="web" events={[handOff()]} />)
+    render(<CloudAgentNotice target="web" events={[handOff()]} projectId="p" agentId="a" />)
     await waitFor(() => expect(onBridgeQuestion).toHaveBeenCalled())
     expect(screen.queryByText(/Reading the repo/)).toBeNull()
   })

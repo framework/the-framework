@@ -79,3 +79,5 @@ export {
 // dashboard labels the connection with it, so they must agree on what "local" means — the browser
 // kept its own looser copy, which answered `false` for every 127.0.0.0/8 address but the first.
 export { isLoopbackHost } from './loopback-host.js'
+// A bridged question as the gate panel renders it (#1554): pure, so the client projects it itself.
+export { bridgeChoiceRequest } from './dashboard/bridge-question.js'

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { continuationPrompt, takeoverPrompt } from '../turn-gate.js'
 import type { BridgeEvent, BridgeHello, BridgeQuestion } from './bridge-endpoints.js'
 
 /**
@@ -11,7 +12,14 @@ import type { BridgeEvent, BridgeHello, BridgeQuestion } from './bridge-endpoint
 export interface BridgeAnswer {
   id: string
   sessionId: string
-  label: string
+  /** The label(s) picked — one, or a `multi` question's subset (possibly none). */
+  labels: string[]
+  /**
+   * What the extension types into the session (#1554): the same continuation a local gate
+   * re-prompts with, so a cloud session hears its answer exactly as a local one does — and, on a
+   * `stop` pick, that the user is taking over, since nothing of ours can end a session over there.
+   */
+  text: string
   queuedAt: string
   state: 'queued' | 'sent' | 'failed'
   note?: string
@@ -148,17 +156,23 @@ export class BridgeQuestions {
   }
 
   /**
-   * Queue an answer picked in the dashboard (#1237). Refuses anything but a label of the
-   * question currently parked, so the only text this can ever put in a composer is one the
-   * session itself offered.
+   * Queue an answer picked in the dashboard (#1237). Refuses anything but labels of the question
+   * currently parked — exactly one unless the question is `multi` — so the only text this can
+   * ever put in a composer is composed from what the session itself offered.
    */
-  queueAnswer(sessionId: string, label: string): BridgeAnswer | string {
+  queueAnswer(sessionId: string, labels: string[]): BridgeAnswer | string {
     const question = this.bySession.get(sessionId)
     if (!question) return 'that session has no parked question'
-    if (!question.options.some(option => option.label === label)) return 'that label is not one of the question options'
-    const answer: BridgeAnswer = { id: randomUUID(), sessionId, label, queuedAt: new Date().toISOString(), state: 'queued' }
-    this.answersBySession.set(sessionId, answer)
-    return answer
+    const picked = question.options.filter(option => labels.includes(option.label))
+    if (picked.length !== labels.length || new Set(labels).size !== labels.length) return 'every label must be one of the question options'
+    if (!question.multi && picked.length !== 1) return 'pick exactly one option'
+    // Worded as a local gate's answer is (await-gate.ts): the labels joined, `(none)` for an
+    // empty multi-select, and a stopping pick hands the session over instead of continuing it.
+    const answer = picked.length ? picked.map(option => option.label).join(', ') : '(none)'
+    const text = picked.some(option => option.stop) ? takeoverPrompt(question.title, answer) : continuationPrompt(question.title, answer)
+    const queued: BridgeAnswer = { id: randomUUID(), sessionId, labels, text, queuedAt: new Date().toISOString(), state: 'queued' }
+    this.answersBySession.set(sessionId, queued)
+    return queued
   }
 
   /** Withdraw a queued answer. Too late once the extension has delivered it. */
@@ -215,7 +229,7 @@ export class BridgeQuestions {
 
 /** What makes two reports the same question: the text shown, not when it arrived. */
 function fingerprint(question: BridgeQuestion): string {
-  return JSON.stringify([question.title, question.options, question.recommended ?? null])
+  return JSON.stringify([question.title, question.options, question.recommended ?? null, question.multi ?? false])
 }
 
 /**

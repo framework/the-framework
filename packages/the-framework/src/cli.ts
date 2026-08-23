@@ -49,7 +49,7 @@ import { appendControl, resetControl, watchControl, type ControlWatcher } from '
 import { AgentMessageQueue } from './agent-messages.js'
 import { createGateKeepalive } from './gate-keepalive.js'
 import { nodeGitRunner } from './project.js'
-import { ensureDaemonToken, readDaemonToken, readPreferences } from './registry.js'
+import { ensureDaemonToken, readDaemonToken, readPreferences, type Preferences } from './registry.js'
 import { DEFAULT_SPEND_OFFSET } from './preference-defaults.js'
 import {
   planMaintenanceSweep,
@@ -1158,11 +1158,18 @@ async function driveAgent(opts: AgentOptions, io: CliIO): Promise<number> {
   // cloud session is created under, so there is no token of ours and no repo config. The
   // session clones this repo's remote at its current branch, so local commits that were never
   // pushed are not in it — say so once here rather than let the cloud session look stale.
+  // Whether the cloud session may park on a gate (#1554): with the browser bridge (#1237) on, the
+  // extension carries its question to the dashboard and types the answer back, so it is told the
+  // gates work; with the bridge off it is told to decide alone (#1234), because nothing could
+  // answer it. Read here, once, at hand-off: the session's instructions cannot change after it.
+  let bridged = false
   if (opts.target === 'web' && !fake) {
     io.out('◆ run on: Claude Code on the web (a cloud session on your own account)')
     if (!(await githubSlugFor(cwd))) {
       io.out('  no GitHub remote here, so the CLI uploads a bundle of this repo instead.')
     }
+    bridged = (await readPreferences().catch((): Preferences => ({}))).bridge === true
+    io.out(bridged ? '  the browser bridge is on: questions it asks show in the dashboard.' : '  the browser bridge is off: it decides its own questions.')
   }
 
   const driver: Driver = fake
@@ -1258,6 +1265,7 @@ async function driveAgent(opts: AgentOptions, io: CliIO): Promise<number> {
     ...sharedAgentOptions,
     kind,
     ...(opts.target ? { location: opts.target } : {}),
+    ...(bridged ? { bridge: true } : {}),
     prompt: isResearch ? presets.research.render(intent) : intent,
     // Resume the stopped leg's conversation (#720/#1467); the prompt above is the continuation
     // message, which `runAgent` then sends verbatim.

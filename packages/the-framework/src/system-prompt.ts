@@ -1,6 +1,6 @@
 import { renderTemplate } from './prompt-template.js'
 import { DATA_BRANCH_PROTOCOL, SYSTEM_PROMPT, TICKETING_FORMAT, TODO_FORMAT } from './prompts.generated.js'
-import { AWAIT_PROTOCOL, BROWSER_PROTOCOL, HANDS_OFF_PROTOCOL, SIGNAL_PROTOCOL } from './turn-gate.js'
+import { AWAIT_PROTOCOL, BROWSER_PROTOCOL, HANDS_OFF_PROTOCOL, SIGNAL_PROTOCOL, UNATTENDED_PROTOCOL } from './turn-gate.js'
 
 // No Node imports here, deliberately. This module composes the prompt and the
 // dashboard renders it in the browser (#520), so reading the user's SYSTEM.md off
@@ -194,12 +194,19 @@ export interface SystemPromptOptions {
    */
   browser?: boolean | undefined
   /**
-   * This agent hands off to a remote session nothing local can steer (#1231), so the await gates
-   * are not available in it (#1234). Appends {@link HANDS_OFF_PROTOCOL} right after the await
-   * protocol it amends, so an ambiguous prompt takes its most plausible reading and says so,
-   * instead of parking a cloud session forever on a question nobody attached can answer.
+   * This agent hands off to a remote session whose workspace nothing local sees (#1231), so it
+   * has to land its own work: appends {@link HANDS_OFF_PROTOCOL}, the commit-and-open-a-PR rule.
    */
   handsOff?: boolean | undefined
+  /**
+   * Nothing can answer this agent's gates (#1234): a hand-off with the browser bridge (#1237)
+   * off. Appends {@link UNATTENDED_PROTOCOL} right after the await protocol it amends, so an
+   * ambiguous prompt takes its most plausible reading and says so, instead of parking a cloud
+   * session forever on a question nobody attached can answer. With the bridge on the gates are
+   * left available: the session parks, the extension carries the question to the dashboard, and
+   * the answer is typed back (#1554).
+   */
+  unattended?: boolean | undefined
 }
 
 /**
@@ -263,8 +270,10 @@ export function composeAgentSystem(opts: AgentSystemOptions = {}): string {
   // Ahead of the protocols, so the signal protocol stays the last thing in the channel (#547).
   const browser = opts.browser ? [BROWSER_PROTOCOL] : []
   // Right after the await protocol it amends (#1234): the gates are taught, then declared
-  // unavailable, which keeps the emit contract intact for the parser while telling the agent
-  // not to reach for it. The signal protocol stays last (#547).
+  // unanswerable, which keeps the emit contract intact for the parser while telling the agent
+  // not to reach for it. Then the hand-off's land-everything rule, and the signal protocol
+  // stays last (#547).
+  const unattended = opts.unattended ? [UNATTENDED_PROTOCOL] : []
   const handsOff = opts.handsOff ? [HANDS_OFF_PROTOCOL] : []
-  return [...(promptBlock ? [promptBlock] : []), ...browser, AWAIT_PROTOCOL, ...handsOff, SIGNAL_PROTOCOL].join('\n\n')
+  return [...(promptBlock ? [promptBlock] : []), ...browser, AWAIT_PROTOCOL, ...unattended, ...handsOff, SIGNAL_PROTOCOL].join('\n\n')
 }

@@ -52,7 +52,7 @@ For every other driver the framing is invisible plumbing. Here it is the first t
 
 #### User story
 
-The user clicks a `web` run and it works. They should not have to discover, from a run that timed out with nothing to show, that a dialog they cannot see is waiting for an answer.
+The user starts a `web` agent and it works. They should not have to discover, from an agent that timed out with nothing to show, that a dialog they cannot see is waiting for an answer.
 
 #### Business logic
 

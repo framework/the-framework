@@ -21,11 +21,11 @@ The user watches an agent work and wants a single story: what the framework did,
 
 Three sources feed one stream. The Framework narrates its own steps (framework-level log lines and status). The wrapped coding-agent CLI's own progress is forwarded verbatim as driver events and is never gated on — The Framework reports it but never makes decisions from individual tool calls. Framework-level status (the agent settled, usage so far, the agent ended) completes the picture.
 
-An agent opens by announcing which driver is wrapped, the workspace it is working in, whether this is the fake driver, a link into the wrapped CLI's session when one can be built, and the model the driver was started with. Once the wrapped CLI reports its real session id — which is not known at start — that id and its refreshed link are announced, and re-announced whenever the id changes, since each Claude Code prompt opens a fresh session. The full system prompt sent to the coding agent is published once as its own event, purely so the user can read the prompt that is otherwise hidden; nothing gates on it. What the agent was asked to do is published once as the agent opens.
+An agent starts by announcing which driver is wrapped, the workspace it is working in, whether this is the fake driver, a link into the wrapped CLI's session when one can be built, and the model the driver was started with. That announcement is made again whenever the agent starts a further stretch of work, such as being continued after it settled. Once the wrapped CLI reports its real session id — which is not known at start — that id and its refreshed link are announced, and re-announced whenever the id changes, since each Claude Code prompt opens a fresh session. The full system prompt sent to the coding agent is published once as its own event, purely so the user can read the prompt that is otherwise hidden; nothing gates on it. What the agent was asked to do is published once when it starts.
 
 #### Rationale
 
-The model is recorded per opening rather than once for the agent's lifetime: a continued agent announces itself again and may run a different model, so readers take the most recent value rather than the first.
+The model is recorded with each such announcement rather than once for the agent's lifetime: a continued agent may run a different model, so readers take the most recent value rather than the first.
 
 ### Facts about the agent travel as events
 
@@ -102,7 +102,7 @@ The user wants to look at the app the agent built, and to watch (and take over) 
 
 When a serve command is configured, a successful agent boots the built app and publishes its URL and the command that started it; the app is kept running so the user can open the preview, and is torn down when the daemon stops.
 
-The agent's browser preview publishes only the loopback port it listens on. The dashboard never talks to that port directly: it reaches the stream through the daemon, which proxies to it, so the agent's browser stays unreachable from the network. The page the browser is currently showing is published separately as a URL — for the first real page and again on every navigation — so the transcript can host the live preview where it happened rather than only in the side rail; it is re-published after each opening so the row survives the dashboard's most-recent-opening slice, and repeats of the same URL are folded in place instead of stacking.
+The agent's browser preview publishes only the loopback port it listens on. The dashboard never talks to that port directly: it reaches the stream through the daemon, which proxies to it, so the agent's browser stays unreachable from the network. The page the browser is currently showing is published separately as a URL — for the first real page and again on every navigation — so the transcript can host the live preview where it happened rather than only in the side rail; it is re-published each time the agent announces a new stretch of work, so it survives the dashboard's habit of showing only the most recent stretch, and repeats of the same URL are folded in place instead of stacking.
 
 Frames never enter the event log, in either case: someone will type a password into that pane.
 

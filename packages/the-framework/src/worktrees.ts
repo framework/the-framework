@@ -10,6 +10,7 @@ import {
   worktreeClean,
   isWorktreeRoot,
   currentBranch,
+  agentBranchName,
   removeWorktree,
   deleteBranch,
   pruneWorktrees,
@@ -57,8 +58,12 @@ export interface PruneResult {
 export type RemoveResult =
   | {
       ok: true
-      /** The run branch went with the checkout, because it held nothing the remote lacks (#1650). */
-      branchDeleted?: string
+      /**
+       * Branches that went with the checkout: the branch it was on, when that held nothing the
+       * remote lacks (#1650); the run-id branch the agent branched away from, when everything on
+       * it is in the branch that stays (#1657). Absent when nothing went.
+       */
+      branchesDeleted?: string[]
     }
   | { ok: false; error: string }
 
@@ -231,11 +236,25 @@ export async function removeProjectWorktree(
     await removeWorktree(cwd, path)
     await pruneWorktrees(cwd)
     // After the checkout: git refuses to delete a branch a worktree still has checked out.
+    // The run-id branch the run started on (#1657). The system prompt has the agent *create*
+    // `tf-<name>` rather than be renamed onto it, so the checkout ends elsewhere and the run-id
+    // branch stays behind at the commit the run began from — one per run, forever. It goes when
+    // the checkout's branch contains it: then everything it holds is held again by a branch that
+    // either stays or (an empty one, above) is itself inside the remote. A run-id branch the agent
+    // committed on and then abandoned for a branch from elsewhere is not contained, and stays.
+    // Decided before anything is deleted: the containment reads both refs.
+    const runBranch = agentBranchName(agentId)
+    const runBranchGoes = runBranch !== branch && (await branchContains(cwd, branch, runBranch))
+    const deleted: string[] = []
     if (emptyBranch) {
       await deleteBranch(cwd, branch)
-      return { ok: true, branchDeleted: branch }
+      deleted.push(branch)
     }
-    return { ok: true }
+    if (runBranchGoes) {
+      await deleteBranch(cwd, runBranch)
+      deleted.push(runBranch)
+    }
+    return deleted.length ? { ok: true, branchesDeleted: deleted } : { ok: true }
   } catch (err) {
     return { ok: false, error: errorMessage(err) }
   }
@@ -272,6 +291,15 @@ async function branchHoldsNothing(cwd: string, path: string, branch: string): Pr
         .split('\n')
         .map(line => line.trim())
         .some(name => name !== '' && !name.endsWith(`/${branch}`)),
+    () => false,
+  )
+}
+
+/** Whether `inner` exists and is an ancestor of (or equal to) `outer` — everything on it is on `outer` too. */
+async function branchContains(cwd: string, outer: string, inner: string): Promise<boolean> {
+  const git = nodeGitRunner()
+  return git(['merge-base', '--is-ancestor', `refs/heads/${inner}`, `refs/heads/${outer}`], cwd).then(
+    () => true,
     () => false,
   )
 }

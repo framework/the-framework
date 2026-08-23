@@ -40,6 +40,7 @@ import { tailEvents, tailAgentEvents } from './dashboard-rpc/events-tail.js'
 import { resolveUserDir } from './agent-archive.js'
 import { withDataBranch } from './data-branch.js'
 import { removeProjectWorktree } from './worktrees.js'
+import { describeDeleted } from './merged-worktrees.js'
 import { reconcileBranchLinks } from './branch-links.js'
 import { scopedKey, parseScopedKey, keyBelongsTo } from './runtime-keys.js'
 import { addProject, listProjects, projectId } from './registry.js'
@@ -607,8 +608,8 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
         // never depends on the caller having one.
         const outcome = await removeProjectWorktree(projectCwd, agentId ?? agentIdFromWorktreeDir(basename(worktree)))
         if (!outcome.ok) console.log(`[framework] keeping worktree ${worktree}: ${outcome.error}`)
-        else if (outcome.branchDeleted)
-          console.log(`[framework] removed worktree ${worktree} and its branch ${outcome.branchDeleted}: the branch held nothing the remote lacks`)
+        else if (outcome.branchesDeleted)
+          console.log(`[framework] removed worktree ${worktree} and ${describeDeleted(outcome.branchesDeleted)}: nothing on it is missing elsewhere`)
       } catch {
         // A worktree we could not retire is a worktree left on disk, which is the safe direction.
       }

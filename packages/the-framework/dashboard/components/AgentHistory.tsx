@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Plus, ChevronDown, Cloud, MonitorSmartphone, Settings, LayoutDashboard, FolderGit2, Ticket } from 'lucide-react'
 import type { AgentMeta, AgentStatus, RecentAgent, ProjectSummary } from '../../src/index.js'
-import { DRIVER_LABELS, driverFromImpl } from '../../src/client.js'
+import { DRIVER_LABELS, driverFromImpl, cloudRunState, type CloudRunState } from '../../src/client.js'
 import { Button, buttonVariants } from './ui/button.js'
 import { Badge } from './ui/badge.js'
 import { cn } from '../lib/utils.js'
@@ -257,6 +257,7 @@ export function AgentHistory({
                       waiting={row.agent.settledAt !== undefined}
                       remote={row.agent.target === 'remote'}
                       cloud={row.agent.target === 'web'}
+                      cloudState={cloudRunState(row.agent, Date.now())}
                       {...(row.agent.remoteLabel ? { remoteLabel: row.agent.remoteLabel } : {})}
                       onClick={row.onClick}
                     />
@@ -528,6 +529,7 @@ function AgentHistoryRow({
   publishing = false,
   remote = false,
   cloud = false,
+  cloudState,
   remoteLabel,
 }: {
   status: AgentStatus
@@ -547,19 +549,25 @@ function AgentHistoryRow({
   remote?: boolean
   /** A Claude Code cloud session (#1263): the row gets a cloud glyph beside the agent logo. */
   cloud?: boolean
+  /** What that session is doing (#1668), once the local half is over; undefined = the status is the word. */
+  cloudState?: CloudRunState | undefined
   /** The device's label, for the glyph's tooltip. */
   remoteLabel?: string | undefined
 }) {
-  // Only a live agent can be waiting on you; a finished one is just finished.
-  const parked = waiting && status === 'running'
+  // Only a live agent can be waiting on you; a finished one is just finished — except a web run
+  // whose cloud session the bridge reports as parked (#1668).
+  const parked = (waiting && status === 'running') || cloudState === 'waiting'
   const picked = driverFromImpl(driver)
   // A web agent's local process ends at the hand-off by design, so its `done` is about this
   // machine, not the session (#1264): the cloud side keeps working and opens its own PR. Saying
-  // "done" under ten working cloud agents is the lie the demo would put on camera.
-  const inCloud = cloud && status === 'done'
+  // "done" under ten working cloud agents is the lie the demo would put on camera — and "in cloud"
+  // over a run whose PR merged two days ago is the opposite lie (#1668), so the word comes from
+  // what is known of the session: waiting, in cloud, its PR, merged, or finally done.
+  const inCloud = cloudState === 'in-cloud'
+  const cloudWord = cloudState === 'merged' ? 'merged' : cloudState === 'pr' ? 'pr open' : undefined
   // "In cloud" outranks "publishing…": a web agent's local half is over either way, and the cloud
   // side owns its own push/PR, so the cloud word is the truer one for that row.
-  const publishingNow = publishing && !inCloud
+  const publishingNow = publishing && !cloud
   // The title only fades + carries a tooltip when it actually overflows the fixed-width rail; a
   // short one shows plainly. Measured here since CSS cannot tell. The rail width is fixed, so
   // intent is the only thing that changes the answer.
@@ -592,8 +600,8 @@ function AgentHistoryRow({
           <span className={cn('inline-block h-2 w-2 shrink-0 rounded-full', parked ? 'bg-muted-foreground' : 'animate-pulse bg-primary')} />
         )}
         {publishingNow && <span className="inline-block h-2 w-2 shrink-0 animate-pulse rounded-full bg-success" />}
-        <Badge className={cn('shrink-0 border-transparent px-0 text-[10px] uppercase', parked || publishingNow ? 'text-muted-foreground' : inCloud ? 'text-primary' : STATUS_TONE[status])}>
-          {parked ? 'waiting' : inCloud ? 'in cloud' : publishingNow ? 'publishing…' : status}
+        <Badge className={cn('shrink-0 border-transparent px-0 text-[10px] uppercase', parked || publishingNow ? 'text-muted-foreground' : inCloud ? 'text-primary' : cloudWord ? 'text-success' : STATUS_TONE[status])}>
+          {parked ? 'waiting' : inCloud ? 'in cloud' : cloudWord ? cloudWord : publishingNow ? 'publishing…' : status}
         </Badge>
         <span className="truncate text-xs font-normal text-muted-foreground">{subtitle}</span>
         {/* Right cluster: a device glyph when the run is relayed to a connected device (#1067),

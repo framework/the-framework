@@ -46,6 +46,7 @@ export function Agents({
               <AgentRow
                 key={`${a.projectId}:${a.agentId}`}
                 label={activeLabel(a)}
+                cloud={a.cloud}
                 at={a.updatedAt}
                 projectName={a.projectName}
                 onOpen={() => onSelectAgent(a.projectId, a.agentId)}
@@ -60,12 +61,15 @@ export function Agents({
 
 function AgentRow({
   label,
+  cloud,
   at,
   projectName,
   onOpen,
 }: {
   /** The session's one-liner, the same the sidebar shows. */
   label: string
+  /** A web run's cloud side at work (#1668): say where it is, since no local process backs the row. */
+  cloud?: 'in-cloud' | 'waiting' | undefined
   /** ISO: the session's last activity. */
   at: string | undefined
   projectName: string
@@ -83,6 +87,7 @@ function AgentRow({
       >
         <span aria-hidden className="shrink-0 text-muted-foreground/50">•</span>
         <span className="min-w-0 flex-1 truncate text-sm">{label}</span>
+        {cloud && <span className="shrink-0 text-[10px] uppercase text-muted-foreground">{cloud === 'waiting' ? 'waiting' : 'in cloud'}</span>}
         <span className="shrink-0 text-xs text-muted-foreground">{projectName}</span>
         {at && (
           <Tooltip>

@@ -10,7 +10,7 @@ Adoption: the pass that matches a cloud session's actual `claude/*` branch back 
 - **What is learned lands as one commit** - the branch (first time only) and the PR (once known) are recorded onto the agent's archive on the data branch; nothing learned, nothing written.
 - **The armed draft PR finally opens** - an agent set to open a PR whose session pushed work but never opened one gets its draft PR opened by this pass.
 - **"None" and "could not tell" never look alike** - a PR listing that fails records the branch but opens nothing this pass, so a transient failure can never produce a second PR on a branch that already has one.
-- **Bounded and quiet** - only settled `web`-target agents started within the last 48 hours are asked about, the archive is read by that window so old history costs nothing, and only adoptions and failures are logged.
+- **Bounded and quiet** - only settled `web`-target agents started within the adoption window (48 hours, shared with the cloud state rule in `cloud-run-state`) are asked about, the archive is read by that window so old history costs nothing, and only adoptions and failures are logged.
 
 ## Business logic
 

@@ -250,3 +250,30 @@ test('buildHotTickets ignores a finished run and another project\'s ticket (#111
     'only beta reads as implementing; alpha\'s same-named ticket is in no lane and drops off',
   )
 })
+
+test('buildOverview lists a web run whose cloud side is still at work, and says where it is (#1668)', async () => {
+  const now = Date.parse('2026-08-23T20:00:00Z')
+  const at = (hoursAgo: number) => new Date(now - hoursAgo * 60 * 60 * 1000).toISOString()
+  const web = (id: string, over: Partial<AgentMeta>): AgentMeta =>
+    ({ version: 1, status: 'done', id, startedAt: at(1), updatedAt: at(1), target: 'web', intent: id, ...over }) as AgentMeta
+  const overview = await buildOverview([project('a', '/a')], {
+    liveAgents: async () => [],
+    agents: async () => [
+      web('working', { sessionId: 'session_01Work' }),
+      web('parked', { sessionId: 'session_01Park' }),
+      web('opened', { sessionId: 'session_01Pr', pr: { number: 3, url: 'u' } }),
+      web('stale', { startedAt: at(49), updatedAt: at(49) }),
+      web('stopped', { status: 'stopped' }),
+    ],
+    waiting: sessionId => sessionId === 'session_01Park',
+    now: () => now,
+    queue: async () => [],
+  })
+  assert.deepEqual(
+    overview.active.map(r => ({ id: r.agentId, cloud: r.cloud, cwd: r.cwd })),
+    [
+      { id: 'working', cloud: 'in-cloud', cwd: '/a' },
+      { id: 'parked', cloud: 'waiting', cwd: '/a' },
+    ],
+  )
+})

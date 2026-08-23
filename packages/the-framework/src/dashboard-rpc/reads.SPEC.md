@@ -46,7 +46,7 @@ The user starts an agent and sees it appear in the sidebar as running straight a
 
 #### Business logic
 
-The list is the project's archived agents, plus every agent currently live in its own worktree, plus the agents this daemon is relaying from devices — which exist only in the daemon's memory and would otherwise be lost on a reload. There is exactly one row per agent id: a relayed copy beats a local one, and a live copy beats an archived one, because the live copy is the current truth. Nothing is filtered out by status, so an agent whose record was just corrected does not flicker out of the list for a poll.
+The list is the project's archived agents, plus every agent currently live in its own worktree, plus the agents this daemon is relaying from devices — which exist only in the daemon's memory and would otherwise be lost on a reload. There is exactly one row per agent id: a relayed copy beats a local one, and a live copy beats an archived one, because the live copy is the current truth. Nothing is filtered out by status, so an agent whose record was just corrected does not flicker out of the list for a poll. A `web`-target agent whose cloud session the browser bridge reports as parked on a question is marked as waiting on the way out — the record on disk cannot know, only the daemon does — so its row says "waiting" rather than "in cloud".
 
 ### Where an agent is working
 

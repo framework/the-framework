@@ -1,6 +1,8 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { onProjectFiles, onProjectFileStatus, onAgentWorktree } from './reads.js'
+import { onProjectFiles, onProjectFileStatus, onAgentWorktree, markCloudWaiting } from './reads.js'
+import { bridgeQuestions, resetBridgeQuestions } from '../dashboard/bridge-store.js'
+import type { AgentMeta } from '../store/index.js'
 import { provideTestContext } from './test-context.js'
 
 // A project id nobody registered has no local path, so these reads have no checkout to answer
@@ -25,4 +27,14 @@ test('onAgentWorktree refuses a run id that could escape the worktrees dir', asy
   // The id names a directory, so it is guarded here as it is everywhere else it reaches a path.
   provideTestContext()
   assert.equal(await onAgentWorktree('project-that-does-not-exist', '../../etc'), null)
+})
+
+test('a web run whose session the bridge holds a question for is handed to the dashboard as waiting (#1668)', async () => {
+  resetBridgeQuestions()
+  bridgeQuestions().record({ sessionId: 'session_01Park', title: 'Where?', options: [{ label: 'Here' }], receivedAt: '' })
+  const web = (sessionId: string): AgentMeta => ({ status: 'done', id: 'r', startedAt: '', updatedAt: '', target: 'web', sessionId }) as AgentMeta
+  assert.equal(markCloudWaiting(web('session_01Park')).cloudWaiting, true)
+  assert.equal(markCloudWaiting(web('session_01Other')).cloudWaiting, undefined)
+  assert.equal(markCloudWaiting({ ...web('session_01Park'), target: 'local' }).cloudWaiting, undefined)
+  resetBridgeQuestions()
 })

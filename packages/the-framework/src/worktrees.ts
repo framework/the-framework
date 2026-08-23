@@ -23,6 +23,7 @@ import {
 } from './store/index.js'
 import { pushAgentBranch } from './dashboard/agent-handoff.js'
 import { dataWorktreePath, withDataBranch } from './data-branch.js'
+import { isRunBranch } from './branch-names.js'
 import { nodeGitRunner } from './project.js'
 
 /** A retained worktree and the agent that left it behind (#752). */
@@ -52,7 +53,13 @@ export interface PruneResult {
 }
 
 /** The outcome of {@link removeProjectWorktree}. */
-export type RemoveResult = { ok: true } | { ok: false; error: string }
+export type RemoveResult =
+  | {
+      ok: true
+      /** The run branch went with the checkout, because it held nothing the remote lacks (#1650). */
+      branchDeleted?: string
+    }
+  | { ok: false; error: string }
 
 /** Surface-specific work {@link removeProjectWorktree} does once removal is decided on. */
 export interface RemoveWorktreeOptions {
@@ -167,7 +174,7 @@ export async function removeProjectWorktree(
       // recorded anchor). Anything short of that proof — no anchor recorded, the anchor's object
       // gone, a tree or tip that moved — falls through to the ordinary rule below, which is never
       // worse than what every web run got before.
-    } else if (await branchHoldsNothing(cwd, path, branch)) {
+    } else if (isRunBranch(branch) && (await branchHoldsNothing(cwd, path, branch))) {
       // A run that committed nothing (#1650) — a triage that wrote only to the data branch, a run
       // stopped before its first commit — leaves a branch whose tip is a commit the remote already
       // has. The rule is satisfied before any push: what the checkout holds *is* on the remote.
@@ -175,7 +182,10 @@ export async function removeProjectWorktree(
       // is what jammed the next triage on it ("branch already exists — triage pending"), on any
       // repo where the stale-branch release (#1293) could not prove it dead: no PR ever carried
       // the name, so the branch looked like an agent still working toward its handoff. The branch
-      // goes with the checkout. It is not the last copy of anything, by construction.
+      // goes with the checkout. It is not the last copy of anything, by construction. Only a
+      // branch the framework minted, though: a leftover checkout can sit on the user's own branch
+      // (one was found on `main`), and deleting that is not this code's call even when it holds
+      // nothing — git's refusal to delete a checked-out branch must never be the guard.
       emptyBranch = true
     } else if (meta?.handoff && !meta.handoff.push) {
       // A publish-nothing session's checkout goes only once everything it holds is already on
@@ -213,7 +223,10 @@ export async function removeProjectWorktree(
     await removeWorktree(cwd, path)
     await pruneWorktrees(cwd)
     // After the checkout: git refuses to delete a branch a worktree still has checked out.
-    if (emptyBranch) await deleteBranch(cwd, branch)
+    if (emptyBranch) {
+      await deleteBranch(cwd, branch)
+      return { ok: true, branchDeleted: branch }
+    }
     return { ok: true }
   } catch (err) {
     return { ok: false, error: errorMessage(err) }
@@ -236,15 +249,21 @@ async function webCheckoutCovered(path: string, branch: string, anchor: string):
 
 /**
  * Whether a run's branch holds nothing the remote lacks (#1650): the tree is clean and the tip is
- * reachable from some remote-tracking branch — a commit `origin` already has, so nothing on the
- * branch is unique to it. Read from the local remote-tracking refs, which are only ever behind the
- * remote: a tip they do not cover yet answers false, and the caller falls back to the push.
+ * reachable from some remote-tracking branch *other than the branch's own* — a commit `origin`
+ * already has under another name, so nothing on the branch is unique to it. Its own remote copy
+ * does not count: a pushed branch with a PR contains its own tip and is exactly the branch that
+ * must stay. Read from the local remote-tracking refs, which are only ever behind the remote: a
+ * tip they do not cover yet answers false, and the caller falls back to the push.
  */
 async function branchHoldsNothing(cwd: string, path: string, branch: string): Promise<boolean> {
   if (!(await worktreeClean(path))) return false
   const git = nodeGitRunner()
-  return git(['branch', '--remotes', '--contains', `refs/heads/${branch}`], cwd).then(
-    out => out.trim() !== '',
+  return git(['branch', '--remotes', '--contains', `refs/heads/${branch}`, '--format=%(refname:short)'], cwd).then(
+    out =>
+      out
+        .split('\n')
+        .map(line => line.trim())
+        .some(name => name !== '' && !name.endsWith(`/${branch}`)),
     () => false,
   )
 }

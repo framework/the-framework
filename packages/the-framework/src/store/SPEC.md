@@ -1,0 +1,13 @@
+The Framework's persisted orchestration state: everything it durably remembers about agents, and the checkouts they work in.
+
+The record is the event log: each agent appends its orchestration events, one line per event, to `.the-framework/events.jsonl` in its own checkout, and every surface (the dashboard, the terminal) is a projection of that stream — a restart rehydrates by replaying the log rather than syncing a second state model. Beside the log sits the agent meta (`agent.json`), a snapshot folded from the events so lists and polls answer without replaying anyone's log. The driver's own chat transcript is deliberately not persisted; only The Framework's events are.
+
+Agents run concurrently because each gets its own git worktree under `.the-framework/branches/`, in a directory named as its agent branch (born `tf-agent-<agent id>`, renamed to `tf-<session name>` once the agent names its session). A fresh worktree is handed the parent checkout's `node_modules` trees by symlink — instant, no extra disk — and the links are hidden from git so the agent's `git add -A` cannot commit them. Teardown never loses work: leftover edits are committed on the agent branch before the checkout is removed, and a checkout is only reclaimed once its branch tip is on the remote — one retention question, "is this recoverable?", in place of asking how the agent ended.
+
+A finished agent's history is archived as `<agent id>.jsonl` + `<agent id>.json`: lastingly under `agents/<user>/` at the root of the data branch's checkout — on the branch so it survives cleans and stays out of code history, per user so two machines write side by side — and transiently under the untracked `.the-framework/agents/` for agents without a worktree and for crash rescue. The history a project shows is every user's archive plus the transient one, with live agents prepended and winning over their own archived copies (a continued agent is both at once), newest first by agent id — the id is the start time made filesystem-safe, so id order is time order and old records are skipped by filename alone.
+
+The store also owns finding things again — an agent id resolves to the checkout to act on (a live agent's own checkout, else its worktree directory, else the project root) and to the events journal to tail (an ended agent's archived log wins over the root journal), one shared resolution so surfaces cannot drift — and healing: an agent whose meta says `running` while its owning process is provably gone is flipped to `stopped`, handed the `end` event its process never wrote so parked questions expire, and archived.
+
+## Before modifying/creating SPEC.md files
+
+You must always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

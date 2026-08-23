@@ -1,111 +1,47 @@
-# Now/soon
+## Massive
 
-## Foundational features
+- SPEC.md
 
-- SDD
-  - SPEC.md
-- Memory
-  - MEM.md
-- Autonomous AI
-  - Quick-win & low-uncertainty tickets
-  - Automatic bug fixing
-    - GitHub CI red
-    - Sentry red
-    - Production errors (e.g. Cloudflare logs)
-  - Plan tickets (aka spike)
-    - Agents can access tickets
-    - Bonus: tickets dashboard
-  - Refactoring
-    - Bug fixing?
-    - Maintenance
-    - Human readability
-    - Security
+## Significant
+
+- Auto-planning => auto quick-win/low-uncertainty
+- [Auto Maintenance](https://github.com/framework/the-framework/discussions/1674) (TODO/soon)
+- MEMORY.md
+
+## Niceties
+
 - Enhanced system prompt
   - No implicit decisions
   - No laziness
-
-## Niceties
-
-- High-quality prompts & loops
-  - Advanced planning
-  - Market research
-  - Bootstrap
-  - ...
+  - Human readable agent messages (TODO/soon)
+  - AC (Acceptance Criteria) (TODO/maybe)
+- Auto bug fixing (TODO/maybe)
+  - GitHub CI red
+  - Sentry red
+  - Production errors (e.g. Cloudflare logs)
+- Presets
+  - High-quality presets
+  - Bring your presets
 - Notifications
-- Bring your own prompts
-- Discord bot
-  - Auto record team conversations
-  - Auto create tickets from conversations
-  - Directives
 - Swarm of local machines
 
+## Candidates
 
-# Candidates
+- [Let users drive agents via GitHub](https://github.com/framework/the-framework/discussions/1676)
+- 10x better better PR descriptions: one-sentence description, TLDR, problems, solutions, flows (business logic), details
+  - Maybe via enhanced system prompt?
+- Advanced planning (like Traycer)
+- `Auto`-model chooser (use cheap model to analyze prompt and select the right model)
 
-## Foundational features
+## Open Questions
 
 - "Programs" => mix of skills/loops/on-going-work
-  - Codebase health
-    - Show a "health progress bar"?
-    - Dogfood on TF?
-    - Checks
-      - Code quality?
-        - Architecural split?
-        - Dead code elmination?
-        - Simplicity?
-      - Proper tests?
+- Make everything modular with powerful extensions
+- Make most features headless: no need for dashboard, nor TF's code — new agent capabilities are simply teached via AGENTS.md
 
-## Niceties
+## Postponed
 
-- `Auto`-model chooser (use cheap model to analyze prompt and select the right model)
-- 10x better better PR descriptions: one-sentence description, TLDR, problems, solutions, flows (business logic), details
-- Maintenance
-  - Root `MAINTENANCE.md`: lists all files (the file structure)
-  - A `.maintenance.md` per file: lists all functions
-  - Three ratings: maintainability, human readability, security
-  - High-quality prompts:
-    - [Highly-effective code refactoring prompt](https://gist.github.com/brillout/8abfd310bad5df422ae56c5c9066ffc5)
-      - Let's break this prompt in two: one for maintainability (e.g. DRY), and a second one for readability (so that humans can easily read the code)
-        - Try the readability prompt on brand-the-framework (it has lots of potential for top-down code structure refactoring)
-    - Security audit (TODO: develop scurity audit prompt)
-
-
-# MVP
-
-## MVP - YC
-
-- Fix blocking bugs
-- Dogfood TF
-- Showcase 20 quick-wins being worked concurrently (CC web) and autonomously
-
-## MVP - users
-
-- Fix major UX paper cuts
-- Make each feature opt-outable
-
-
-# Postponed
-
-## Foundational features
-
-- Autonomous PM
-  - Autonomous feature suggestions after autonomous:
-    - Market research
-    - Competitor research
-    - Reading of user feedback
-  - Business memory such as `PROJECT_GOAL.md` or `BRAINSTORMING.md`
-
-## features
-
-- Mobile app
-- Scaling
-  - For large codebases: `CODEBASE_OVERVIEW.md`
-- Sandbox
-  - Complex implementation?
-    - Not sure how secrets (e.g. production env vars) can sandboxed from AI
-    - Ideally sandboxing happens on a directory-level (spanning over multiple repositories), so that AI can access multiple repos at once.
-- TLDR thinking out loud
-  - VALUE-MEDIUM
-  - Show TLDR of the model's thinking (=> nice overview of all the thinking done during this session)
-  - Also show live thinking (same thinking-out-loud as Claude Code => just forward the Claude Code CLI output)
-  - Show nice lists of used skills, opened URLs, commands ran
+- [Better Claude Code Web](https://github.com/framework/the-framework/discussions/1672)
+- [Autonomous Product Management](https://github.com/framework/the-framework/discussions/1673)
+- For large codebases: `CODEBASE_OVERVIEW.md`
+- [Discord Bot](https://github.com/framework/the-framework/discussions/1675)

@@ -369,7 +369,9 @@ test('a run-id branch carrying a commit the kept branch lacks stays (#1657)', as
     await git(['config', 'user.name', 't'], path)
     await git(['add', '-A'], path)
     await git(['commit', '-q', '-m', 'early work on the run-id branch'], path)
-    await git(['checkout', '-q', '-b', 'tf-other', 'main'], path)
+    // From the init commit, not from `main`: CI's `git init` names its branch `master`.
+    const init = (await git(['rev-parse', 'HEAD'], repo)).trim()
+    await git(['checkout', '-q', '-b', 'tf-other', init], path)
     await writeFile(join(path, 'other.txt'), 'later\n')
     await git(['add', '-A'], path)
     await git(['commit', '-q', '-m', 'later work elsewhere'], path)

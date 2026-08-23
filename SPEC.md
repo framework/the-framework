@@ -2,7 +2,7 @@ The Framework: autonomous AI programming. Humans make the important decisions; c
 
 Three top-level pieces, one product:
 
-- `packages/the-framework` — the product itself, published as the npm package `framework`: one CLI (`the-framework`) that runs a foreground daemon, the agent lifecycle it orchestrates, and the browser dashboard it serves — the product's only user interface.
+- `packages/framework` — the product itself, published as the npm package `framework`: one CLI (`the-framework`) that runs a foreground daemon, the agent lifecycle it orchestrates, and the browser dashboard it serves — the product's only user interface.
 - `packages/chrome-extension` — the Claude web bridge, a companion Chrome extension: when an agent's task was handed to a Claude Code cloud session on claude.ai, it carries the question that session is parked on into the local dashboard, and types the answer picked there back into the session.
 - `packages/the-framework.ai` — the marketing website at https://the-framework.ai.
 

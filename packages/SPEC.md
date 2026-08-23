@@ -1,6 +1,6 @@
 The three deliverables The Framework ships, one directory each:
 
-- `the-framework/` — the product: the `framework` npm package (CLI, daemon, agent lifecycle, dashboard).
+- `framework/` — the product: the `framework` npm package (CLI, daemon, agent lifecycle, dashboard).
 - `chrome-extension/` — the Claude web bridge, a companion Chrome extension that connects Claude Code cloud sessions on claude.ai back to the local dashboard.
 - `the-framework.ai/` — the marketing website.
 

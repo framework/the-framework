@@ -16,7 +16,7 @@ const here = dirname(fileURLToPath(import.meta.url))
 // directory deliberately has no package.json of its own, so resolve through the package that
 // actually depends on it.
 const require_ = createRequire(import.meta.url)
-const { JSDOM } = require_(require_.resolve('jsdom', { paths: [join(here, '../the-framework')] }))
+const { JSDOM } = require_(require_.resolve('jsdom', { paths: [join(here, '../framework')] }))
 
 const block = JSON.stringify(
   {

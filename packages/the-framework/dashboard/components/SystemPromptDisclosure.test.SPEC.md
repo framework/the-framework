@@ -1,0 +1,5 @@
+What the tests cover: opening the "Enhanced System Prompt" disclosure shows the real wrapped system prompt, and shows the "no extra system prompt" message instead when the agent runs transparent; the summary line reads as fully enabled only when both switches are on, and as not fully enabled when either the built-in block or the framework integration is off — with that state also spelled out in words, not carried by the status dot alone; turning an agent's built-in block off still leaves a non-empty prompt; both checkboxes read as on by default, unticking anti-laziness turns vanilla on and unticking the integration turns transparent on; under transparent the anti-laziness row shows as off and locked whatever the vanilla setting says; the integration row is read-only wherever the caller cannot switch it; and an agent that carries the browser preview section shows a longer prompt than the same agent without it.
+
+## Before modifying/creating SPEC.md files
+
+You must always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

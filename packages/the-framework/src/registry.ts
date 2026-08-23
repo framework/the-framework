@@ -138,6 +138,16 @@ export interface Preferences {
    */
   autoPmConcurrency?: number
   /**
+   * The project the Routine work card's "Run now" targets (#1647), by project id. Absent = the
+   * first registered project, which is what the card showed before this existed.
+   *
+   * A setting rather than card state, because the pick decides which repo spends quota and gets
+   * branches pushed, and card state forgot it on the most common navigation there is — open a
+   * run, come back — so the next click landed on the first project, the user's real one. An id
+   * that no longer names a registered project reads as absent.
+   */
+  autoPmProject?: string
+  /**
    * How far the automatic-consumption limit sits from the quota boundary, in percentage points
    * (#960). Absent defaults to {@link DEFAULT_SPEND_OFFSET} — a half-day cushion ahead of the
    * boundary — rather than sitting exactly on it (#960 Edit).
@@ -383,6 +393,12 @@ function sanitizePreferences(value: unknown): Preferences {
   const concurrency = input['autoPmConcurrency']
   if (typeof concurrency === 'number' && Number.isFinite(concurrency))
     preferences.autoPmConcurrency = Math.min(Math.max(Math.round(concurrency), 1), MAX_AUTO_PM_CONCURRENCY)
+  // `autoPmProject` (#1647) is a project id, kept as a bounded free-form string rather than checked
+  // against the project list for the reason the opt-out names are not checked against the
+  // catalog: the card validates it against the projects it shows, and an id of a project removed
+  // since simply falls back there. Empty is dropped, which is exactly what absent means.
+  const routineProject = input['autoPmProject']
+  if (typeof routineProject === 'string' && routineProject.trim()) preferences.autoPmProject = routineProject.trim().slice(0, 100)
   return preferences
 }
 

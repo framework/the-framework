@@ -322,6 +322,18 @@ test('writePreferences round-trips and clamps the spend-limit slider (#960)', as
   assert.deepEqual(await readPreferences(fs, ENV), {})
 })
 
+test('writePreferences keeps the routine card\'s picked project, trimmed, and drops an empty one (#1647)', async () => {
+  const fs = memFs({ [FILE]: JSON.stringify({ projects: [APP_A], preferences: {} }) })
+  await writePreferences({ autoPmProject: ' tf-1334-dogfood-f8nvbw ' }, fs, ENV)
+  assert.deepEqual(await readPreferences(fs, ENV), { autoPmProject: 'tf-1334-dogfood-f8nvbw' })
+  // Not checked against the project list here: the card validates the id against the projects it
+  // shows, so a project removed since falls back there rather than being erased on read.
+  await writePreferences({ autoPmProject: '' }, fs, ENV)
+  assert.deepEqual(await readPreferences(fs, ENV), {})
+  await writePreferences({ autoPmProject: 42 as never }, fs, ENV)
+  assert.deepEqual(await readPreferences(fs, ENV), {})
+})
+
 test('writePreferences round-trips and clamps the concurrent-agents setting (#1204)', async () => {
   const fs = memFs({ [FILE]: JSON.stringify({ projects: [APP_A], preferences: {} }) })
   await writePreferences({ autoPmConcurrency: 4 }, fs, ENV)

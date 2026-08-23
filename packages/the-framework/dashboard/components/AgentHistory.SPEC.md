@@ -62,7 +62,7 @@ The user needs to know which view they are looking at.
 
 #### Business logic
 
-Overview leads home and carries the count of items in the user's interventions list as a badge, with a tooltip spelling it out. Tickets opens the cross-project ticket view, and is offered only where there is a ticket view to route to. Projects expands in place into an indented list of every registered project — selecting one navigates into it — and ends with an "Add project" item that opens the add-project dialog. Each project carries a dot: red when the daemon has recorded errors for it, with the errors named on hover and read out to assistive technology; filled when the project is activated; muted when it is not.
+Overview leads home and carries the count of items in the user's interventions list as a badge, with a tooltip spelling it out ("N items in your Human Queue"). Tickets opens the cross-project ticket view, and is offered only where there is a ticket view to route to. Projects expands in place into an indented list of every registered project — selecting one navigates into it — and ends with an "Add project" item that opens the add-project dialog. Each project carries a dot: red when the daemon has recorded errors for it, with the errors named on hover and read out to assistive technology; filled when the project is activated; muted when it is not.
 
 Exactly one of these carries the active highlight: New while a project's start screen is open, Overview while the Overview is, Tickets while the ticket view is, and the corresponding row while an agent is selected. While the user follows a just-started agent whose id is not known yet, the highlight sits on the newest running row rather than on New.
 

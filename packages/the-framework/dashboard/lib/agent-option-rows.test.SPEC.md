@@ -1,0 +1,5 @@
+What the tests cover: the publish ladder offers Push branch, Open PR and Auto-merge in that order and reaches `pr` by default, with Auto-merge off by default; ticking or unticking a rung writes the handoff level that rung stands for, so unticking one lowers the ladder instead of leaving an upper rung armed with nothing beneath it; Open PR is disabled while Push branch is off and Auto-merge while Open PR is off, and every rung above a disarmed one reads as off; ordinary options write only their own preference. Also covered: Transparent makes Disable system prompt, Post-merge cleanup and Browser read as off and disabled while staying available itself; Browser is offered only under the Claude Code driver — an unrecognised stored driver counts as not-Claude and keeps Browser disabled, even though the Transparent row's wording falls back to naming Claude Code; and the Transparent row names the driver actually selected.
+
+## Before modifying/creating SPEC.md files
+
+You must always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

@@ -217,7 +217,7 @@ test('a run branch holding nothing the remote lacks goes with its checkout, unpu
     const now = new Date().toISOString()
     await mkdir(join(path, '.the-framework'), { recursive: true })
     await writeFile(join(path, '.the-framework', 'agent.json'), JSON.stringify({ status: 'done', id: RUN_ID, startedAt: now, updatedAt: now }))
-    assert.deepEqual(await removeProjectWorktree(repo, RUN_ID), { ok: true, branchDeleted: branch })
+    assert.deepEqual(await removeProjectWorktree(repo, RUN_ID), { ok: true, branchesDeleted: [branch] })
     await assert.rejects(() => stat(path), 'the checkout is gone')
     await assert.rejects(() => git(['rev-parse', '--verify', `refs/remotes/origin/${branch}`], repo), 'nothing reached origin')
     await assert.rejects(() => git(['rev-parse', '--verify', `refs/heads/${branch}`], repo), 'and the branch went with the checkout')
@@ -276,7 +276,9 @@ test("a leftover checkout on a branch the framework did not mint keeps that bran
     await git(['checkout', '-q', '-b', 'release'], path)
     await mkdir(join(repo, '.git', 'info'), { recursive: true })
     await writeFile(join(repo, '.git', 'info', 'exclude'), '.the-framework/\n')
-    assert.deepEqual(await removeProjectWorktree(repo, RUN_ID), { ok: true })
+    // The user's branch stays; the run-id branch it was cut from is ours and holds nothing
+    // `release` does not, so that one goes (#1657).
+    assert.deepEqual(await removeProjectWorktree(repo, RUN_ID), { ok: true, branchesDeleted: [agentBranchName(RUN_ID)] })
     await assert.rejects(() => stat(path), 'the checkout is gone')
     await git(['rev-parse', '--verify', 'refs/heads/release'], repo)
   } finally {
@@ -306,6 +308,73 @@ test("a branches/ directory that is not a git worktree is refused before any git
     assert.match(await git(['status', '--porcelain'], repo), /index\.html/, "the user's edit is still uncommitted")
     assert.equal((await git(['ls-remote', '--heads', 'origin'], repo)).trim(), '', 'and nothing was pushed')
     assert.equal((await stat(worktree)).isDirectory(), true, 'the directory is left where it is')
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})
+
+test('the run-id branch the agent branched away from goes with the checkout when the kept branch contains it (#1657)', async () => {
+  // The system prompt has the agent create `tf-<name>` rather than be renamed onto it, so every
+  // run leaves `tf-agent-<id>` behind at the commit it started from — nine of them on the rig.
+  const { repo, path, branch: runBranch } = await repoWithDirtyWorktree()
+  const git = nodeGitRunner()
+  try {
+    await git(['push', '-q', 'origin', 'HEAD:main'], repo)
+    await git(['checkout', '-q', '-b', 'tf-cool-name'], path)
+    await git(['config', 'user.email', 't@t'], path)
+    await git(['config', 'user.name', 't'], path)
+    await git(['add', '-A'], path)
+    await git(['commit', '-q', '-m', 'work'], path)
+    assert.deepEqual(await removeProjectWorktree(repo, RUN_ID), { ok: true, branchesDeleted: [runBranch] })
+    assert.match(await git(['show', 'tf-cool-name:index.html'], repo), /Welcome!/, 'the work branch stays, pushed')
+    assert.match(await git(['show', 'refs/remotes/origin/tf-cool-name:index.html'], repo), /Welcome!/)
+    await assert.rejects(() => git(['rev-parse', '--verify', `refs/heads/${runBranch}`], repo), 'the run-id branch is gone')
+    await assert.rejects(() => git(['rev-parse', '--verify', `refs/remotes/origin/${runBranch}`], repo), 'and was never pushed')
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})
+
+test('a commitless triage leaves neither its pinned branch nor its run-id branch (#1650, #1657)', async () => {
+  // The rig case in full: the checkout ends on an empty `tf-triage-quick`, branched off an
+  // equally empty run-id branch. Both hold nothing; both go; nothing is pushed.
+  const { repo, path, branch: runBranch } = await repoWithDirtyWorktree()
+  const git = nodeGitRunner()
+  try {
+    await git(['push', '-q', 'origin', 'HEAD:main'], repo)
+    await git(['checkout', '--', '.'], path)
+    await git(['checkout', '-q', '-b', 'tf-triage-quick'], path)
+    await mkdir(join(repo, '.git', 'info'), { recursive: true })
+    await writeFile(join(repo, '.git', 'info', 'exclude'), '.the-framework/\n')
+    const now = new Date().toISOString()
+    await mkdir(join(path, '.the-framework'), { recursive: true })
+    await writeFile(join(path, '.the-framework', 'agent.json'), JSON.stringify({ status: 'done', id: RUN_ID, startedAt: now, updatedAt: now }))
+    assert.deepEqual(await removeProjectWorktree(repo, RUN_ID), { ok: true, branchesDeleted: ['tf-triage-quick', runBranch] })
+    assert.equal((await git(['branch', '--list', 'tf-*'], repo)).trim(), '', 'no tf- branch is left')
+    assert.equal((await git(['ls-remote', '--heads', 'origin', 'tf-*'], repo)).trim(), '', 'and none reached origin')
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})
+
+test('a run-id branch carrying a commit the kept branch lacks stays (#1657)', async () => {
+  // The agent committed on the run-id branch, then branched from main and went on from there.
+  // The run-id branch holds something the kept branch does not, so it is not the framework's
+  // to delete.
+  const { repo, path, branch: runBranch } = await repoWithDirtyWorktree()
+  const git = nodeGitRunner()
+  try {
+    await git(['push', '-q', 'origin', 'HEAD:main'], repo)
+    await git(['config', 'user.email', 't@t'], path)
+    await git(['config', 'user.name', 't'], path)
+    await git(['add', '-A'], path)
+    await git(['commit', '-q', '-m', 'early work on the run-id branch'], path)
+    await git(['checkout', '-q', '-b', 'tf-other', 'main'], path)
+    await writeFile(join(path, 'other.txt'), 'later\n')
+    await git(['add', '-A'], path)
+    await git(['commit', '-q', '-m', 'later work elsewhere'], path)
+    assert.deepEqual(await removeProjectWorktree(repo, RUN_ID), { ok: true })
+    assert.match(await git(['show', `${runBranch}:index.html`], repo), /Welcome!/, 'the early commit is still on the run-id branch')
   } finally {
     await rm(repo, { recursive: true, force: true })
   }

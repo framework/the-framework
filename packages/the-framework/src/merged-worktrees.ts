@@ -23,8 +23,8 @@ import { repoHasRemote, worktreePath } from './store/index.js'
 export interface RemovedWorktree {
   /** The agent id, which is also the worktree's directory name. */
   agentId: string
-  /** The run branch that went with it, when it held nothing the remote lacks (#1650). */
-  branchDeleted?: string
+  /** Branches that went with it: one holding nothing the remote lacks (#1650), a run-id branch the kept branch contains (#1657). */
+  branchesDeleted?: string[]
 }
 
 /** A worktree the sweep tried to reclaim and could not, and why. */
@@ -87,10 +87,15 @@ export async function removeMergedWorktrees(cwd: string, deps: MergedSweepDeps =
   }
   for (const row of rows) {
     const outcome = await withAgentLock(worktreePath(cwd, row.agentId), () => remove(cwd, row.agentId))
-    if (outcome.ok) result.removed.push({ agentId: row.agentId, ...(outcome.branchDeleted ? { branchDeleted: outcome.branchDeleted } : {}) })
+    if (outcome.ok) result.removed.push({ agentId: row.agentId, ...(outcome.branchesDeleted ? { branchesDeleted: outcome.branchesDeleted } : {}) })
     else result.failed.push({ agentId: row.agentId, error: outcome.error })
   }
   return result
+}
+
+/** `its branch x` / `its branches x and y`, for the removal line. */
+export function describeDeleted(branches: readonly string[]): string {
+  return branches.length === 1 ? `its branch ${branches[0]}` : `its branches ${branches.join(' and ')}`
 }
 
 /** A running sweep, in the shape the daemon's other background services use. */
@@ -144,8 +149,8 @@ export function startMergedWorktreeSweep(opts: MergedSweepOptions): MergedWorktr
       for (const item of removed) {
         announced.delete(item.agentId)
         opts.log(
-          item.branchDeleted
-            ? `[framework] removed the worktree for session ${item.agentId} and its branch ${item.branchDeleted}: the branch held nothing the remote lacks. The session is kept.`
+          item.branchesDeleted
+            ? `[framework] removed the worktree for session ${item.agentId} and ${describeDeleted(item.branchesDeleted)}: nothing on it is missing elsewhere. The session is kept.`
             : `[framework] removed the worktree for session ${item.agentId}: its branch is on the remote. The branch and the session are kept.`,
         )
       }

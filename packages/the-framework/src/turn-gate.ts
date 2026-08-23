@@ -1,5 +1,5 @@
 import type { FrameworkEvent } from './events.js'
-import { PROTOCOLS_BROWSER, PROTOCOLS_AWAIT, PROTOCOLS_HANDS_OFF, PROTOCOLS_SIGNAL, PROTOCOLS_UNATTENDED } from './prompts.generated.js'
+import { PROTOCOLS_BROWSER, PROTOCOLS_AWAIT, PROTOCOLS_HANDS_OFF, PROTOCOLS_SIGNAL } from './prompts.generated.js'
 import type { ChoicesOption } from './await-gate.js'
 import type { MultiSelectOption } from './await-gate.js'
 
@@ -22,14 +22,6 @@ export const AWAIT_PROTOCOL = PROTOCOLS_AWAIT
  */
 export const HANDS_OFF_PROTOCOL = PROTOCOLS_HANDS_OFF
 
-/**
- * Told to a hands-off agent nothing can answer (#1234): the await gates {@link AWAIT_PROTOCOL}
- * just taught have nobody attached to take them, so an ambiguous prompt takes its most plausible
- * reading instead of parking forever. Left out once the browser bridge (#1237) is on, because
- * then a gate the cloud session parks on reaches the dashboard and is answered from it (#1554).
- * The text lives in `prompts/protocols/unattended.md`.
- */
-export const UNATTENDED_PROTOCOL = PROTOCOLS_UNATTENDED
 
 /**
  * Told to the agent only when the agent has a browser (#824): that it has one, and that anything

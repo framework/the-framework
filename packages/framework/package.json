@@ -13,14 +13,14 @@
     "turnkey"
   ],
   "license": "MIT",
-  "homepage": "https://github.com/framework/the-framework/tree/main/packages/the-framework#readme",
+  "homepage": "https://github.com/framework/the-framework/tree/main/packages/framework#readme",
   "bugs": {
     "url": "https://github.com/framework/the-framework/issues"
   },
   "repository": {
     "type": "git",
     "url": "https://github.com/framework/the-framework",
-    "directory": "packages/the-framework"
+    "directory": "packages/framework"
   },
   "type": "module",
   "engines": {

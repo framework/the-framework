@@ -1,0 +1,7 @@
+Defuses GitHub's issue-closing grammar in pull-request text. A PR whose text says `close #1164` — or any closing keyword GitHub accepts (`close`/`fix`/`resolve`, each tense and plural, any case) followed directly by an issue reference, including the cross-repo `owner/repo#123` form — closes that issue the moment the PR merges. That is wanted when the PR completes the issue, and wrong when the PR delivers something short of the work: a plan agent's PR lands a plan whose own text can honestly say "…then close #1164", and merging the plan would quietly close the ticket's issue with the work still undone.
+
+The rewrite does not forbid the phrase — the sentence is true — it breaks the adjacency GitHub's parser needs by inserting "the ticket" between keyword and reference: `close #1164` becomes `close the ticket #1164`. The words keep their meaning and the reference stays live — clickable, and still cross-referenced onto the issue's own timeline, so the issue is still told a pull request mentioned it; only the closing authority is removed. A reference already inside backticks is a code sample GitHub does not act on and is left alone; a reference with no keyword before it is never touched; a word that merely ends in a keyword is not one. The rewrite is idempotent by construction: after it, the keyword is followed by the filler rather than a reference, so a second pass finds nothing to change.
+
+## Before modifying/creating SPEC.md files
+
+You must always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

@@ -1,0 +1,5 @@
+What the tests cover: the agent's opening event records the driver, the workspace, whether the driver is the fake one, and the model the driver was started with — recording no model when none was chosen, since the coding agent's own default is not knowable from here. The driver's session id is published as soon as the turn starts announcing it, so a turn that is stopped or crashes mid-flight cannot take the agent's resume handle down with it; that early announcement is used for the publication only and never appears as its own transcript row, and a turn ending with the same id does not publish it a second time. A turn ending with a session id nobody has seen yet still publishes it. Finally, a turn reporting the commit a task was handed off from publishes it as its own event — the only way the daemon can later recognise which cloud branch belongs to this agent — while a turn from any other driver publishes none.
+
+## Before modifying/creating SPEC.md files
+
+You must always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

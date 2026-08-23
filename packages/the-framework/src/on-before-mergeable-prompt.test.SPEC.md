@@ -1,0 +1,5 @@
+What the tests cover: the on-before-mergeable prompt (the extra turn sent after an agent signals ready for merge) queues its follow-ups to the agent queue file (`TODO_AGENTS.md`, derived from the shared constant rather than a copied literal) and points at the quality presets by their `.the-framework/presets/` file paths; its business-knowledge section names exactly the business-knowledge docs the built-in system prompt lists, so the agent is never told to read one set of files and update another; no `${{ }}` fragment nests inside another, which would truncate rendering at run time; a render names the session on every queued entry and leaves no unrendered fragment; absent settings read as off and render deterministically; and rendering without a session name throws an error naming the missing value instead of queueing entries about "undefined".
+
+## Before modifying/creating SPEC.md files
+
+You must always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

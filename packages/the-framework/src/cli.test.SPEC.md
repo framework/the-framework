@@ -1,0 +1,29 @@
+What the tests cover for the framework's command-line entry point and one agent's lifecycle.
+
+**The command surface.** Only `--port`, `--host`, `--help`, `--version` and the daemon's `--agent <path>` are accepted; every retired flag and verb — including the old positional build command, `stop`, `doctor`, `maintain`, `worktrees` and `prompt` — is a usage error, as is any bare word, a missing value after an option, and a `--port` that is not a non-negative integer. `--help` prints usage and exits 0, a usage error exits 2, and `--version` prints the real package version rather than the `unknown` placeholder that marks a failed read.
+
+**Reading the agent spec.** The spec is what carries an agent: its prompt, checkout, agent id, continuation flag and kind all round-trip, and the kind decides the flow (research, verbatim prompt, or build). Untrusted values are re-checked rather than believed: an unknown driver falls back to Claude Code, an undefined handoff level is dropped, a blank driver session id counts as saying nothing, and a ticket path that escapes the tickets directory or names another file is discarded. Defaults hold where the spec is silent: the backlog loop on, unattended off, the on-before-mergeable step and the browser off, no run target, and the agent records itself.
+
+**Configuration layering.** A value the spec omits is left for `the-framework.yml` to decide, and nobody deciding resolves the handoff to the pull-request rung — which is what makes the handoff zero-config. The spec's own value beats the file in both directions: it can turn a mode on that the file left off *and* turn one off that the file switched on. The resolved config also reports which layer decided each value.
+
+**Refusals.** An agent whose repository records a different layout marker is refused before writing anything. An unreadable agent spec is refused rather than running something else. A prompt agent with no prompt is refused. Asking to resume a driver session is refused for a build agent and honored on the prompt path the dashboard's continuation uses. An agent runs no driver preflight of its own, because the dashboard already ran one before spawning it.
+
+**Running an agent end to end, offline.** A build agent narrates what it was asked for, runs the build framing, and finishes with a done line — with no separate review pass. Transparent mode runs the same prompt raw: none of the build framing, scope phase or production-grade pass appears. A prompt agent finishes on the direct path.
+
+**Steering.** An agent spawned with an agent id is steerable and one without is not, and an agent that does not record itself is never steerable since there is no control channel to tail. Only an agent the dashboard started stays open for live chat. End to end: a parked choice gate is answered over the control channel with the recommended option, the resolution is attributed to the user rather than to an automatic accept, and a Stop over the same channel ends the agent.
+
+**What the agent records.** When the agent announces its session name, the framework-owned branch is renamed to `tf-<session name>` and the rename is recorded as a branch event. The browser preview's page is withheld until the driver session opens, emitted immediately on later navigations, and re-announced after every subsequent session so a continuation's transcript still has a row to host the preview.
+
+**Continuations.** An agent whose recorded meta says it was a build re-enters the build flow when it is continued, even though the continuation arrives as a prompt start — and its meta keeps both the build kind and the original label rather than adopting the continuation message. A prompt agent's continuation stays on the prompt path with no build framing.
+
+**Quality follow-ups.** The on-before-mergeable step queues its follow-ups as TODO entries in a single child agent rather than running the quality presets itself; the entries name the maintainability and security-audit presets scoped to the changes the named agent introduced, fully rendered. It materializes those preset files first so the queued entries resolve. It reports how it went instead of throwing, and a failure is reported to the terminal. The child agent runs vanilla so it stays on the agent's branch, and its spec carries no on-before-mergeable step of its own. Every decline is recorded in the archived event log — a fake agent that never signalled ready for merge is recorded as skipped with that reason — while an agent that never asked for the step records nothing about it.
+
+**Run targets.** An `actions` agent with no GitHub token anywhere — neither in the environment nor from the `gh` CLI — ends as failed with an exit code of 2 rather than hanging with its status stuck at running, and the recorded reason names both ways to supply the token.
+
+**Driver settings and the session link.** A headless agent runs at the permission mode that lets installs, builds and tests actually run. Browser tooling is folded into the driver options only when the browser is enabled, without mutating the base options. A setting the chosen driver cannot honor is announced, and nothing is announced when the settings really do apply. A live Claude Code agent gets Claude Code's own entry point as its session link; a fake agent and a Codex agent get none.
+
+**The startup footer.** It prints how to reach the help and the version immediately, before the registry answers, then announces a newer release once it does. An unreachable registry costs it nothing. It offers neither a stop command nor a positional build command.
+
+## Before modifying/creating SPEC.md files
+
+You must always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

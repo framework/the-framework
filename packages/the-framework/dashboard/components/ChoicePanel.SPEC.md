@@ -60,7 +60,7 @@ The user picks an option and wants to know the agent has it.
 
 #### Business logic
 
-Once a pick is posted and the daemon accepts it, the options are disabled and the panel reports first that the choice is being sent, then that it has been sent and is waiting for the agent to pick it up. The panel disappears only when the agent's own event stream reports the gate resolved. A gate that is asked again starts over with fresh state.
+Once a pick is posted and the daemon accepts it, the options are disabled and the panel reports first that the choice is being sent, then that it has been sent and is waiting for the agent to pick it up. The panel disappears only when the agent's own event stream reports the gate resolved — or, for a gate carried in by the Claude web bridge, when the surface around it swaps the question for the state of the answer on its way to the cloud session. A gate that is asked again starts over with fresh state.
 
 #### Rationale
 

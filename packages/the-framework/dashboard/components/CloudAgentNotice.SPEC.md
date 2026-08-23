@@ -52,7 +52,7 @@ The cloud session parks asking a question and the user answers it without leavin
 
 #### Business logic
 
-When the Claude web bridge reports that the session is parked on a question, the notice renders it in the very same gate panel a local agent's question gets: the "Your call" heading, the question, its options with their detail text, the recommended one marked, and — when the session asked for several answers at once — tick boxes with an Accept button. Answering is the one click answering a local gate is.
+When the Claude web bridge reports that the session is parked on a question, the notice renders it in the very same gate panel a local agent's question gets: the "Your call" heading, the question, its options with their detail text, the recommended one marked, and — when the session asked for several answers at once — tick boxes with an Accept button. Answering it takes the single click a local gate takes.
 
 What differs is only where the answer goes. A local agent's pick is written to its control channel; this one is queued for the browser extension, which types it into the user's own claude.ai tab. A link to answer it in the session stays available for whoever prefers to do it over there. The automatic-acceptance countdown does not run here: the question is answered by the user or not at all.
 

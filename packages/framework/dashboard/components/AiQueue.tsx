@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { ProjectQueue } from '../../src/index.js'
-import { agentOptionsFromPreferences } from '../../src/client.js'
-import { ListTodo, Loader2, Play } from 'lucide-react'
+import { agentOptionsFromPreferences, MAX_AUTO_PM_CONCURRENCY } from '../../src/client.js'
+import { FastForward, ListTodo, Loader2, Play } from 'lucide-react'
 import { queueEntryLabel } from '../lib/queue-entry.js'
 import { usePreferences } from '../lib/preferences.js'
 import { useStartAgent } from '../lib/use-start-agent.js'
@@ -18,7 +18,9 @@ import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 // (#1144) — reading the plan, not starting it. The play button STARTS it: one agent, on that entry
 // alone, the same work the drain sweep would get to (#855) but on your click. The project header
 // stays a header — a project name that jumped to the launcher was the odd redirect #1139 called
-// out, and that is still true.
+// out, and that is still true — but it carries the project's batch act: a fan-out button that
+// starts one agent per top entry, as many as the count beside it says, each pinned to its own
+// entry the way the sweep pins a drain batch (#1204).
 //
 // Its own file rather than inline in DashboardPage, like every other card on the Overview:
 // DashboardPage has no test file, and opening tickets and starting runs are behaviour worth pinning.
@@ -32,6 +34,20 @@ import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
  */
 export function workOnEntryPrompt(entry: string): string {
   return `Open TODO_AGENTS.md and work on this one open entry only, then check it off. Do not start any other entry. The entry:\n\n${entry}`
+}
+
+/** How many agents the fan-out button starts until its count says otherwise. */
+export const DEFAULT_FAN_OUT_COUNT = 3
+
+/**
+ * What the fan-out button promises, sized to what a click would actually start: the count beside
+ * the button, capped at the entries the project has open. Exported so the tests assert against
+ * this and not a copy.
+ */
+export function fanOutLabel(count: number): string {
+  return count === 1
+    ? 'Spin up an agent working on the top entry'
+    : `Spin up ${count} agents working on the top ${count} entries`
 }
 
 export function AiQueue({
@@ -55,9 +71,18 @@ export function AiQueue({
   // Which entry is in flight, keyed by content rather than index: the list is polled and can
   // shift under a click, and only the clicked row's button should spin.
   const [starting, setStarting] = useState<string | null>(null)
+  // Which project's fan-out is in flight. Its own flag rather than `busy`, because the batch is a
+  // sequence of starts and `busy` drops between two of them — a gap a second click could slip into.
+  const [fanningOut, setFanningOut] = useState<string | null>(null)
+  // The count beside each project's fan-out button. Per project, since queues differ in depth;
+  // plain component state, since it parameterizes the next click rather than recording a setting.
+  const [fanOutCounts, setFanOutCounts] = useState<Record<string, number>>({})
+  const inFlight = busy || fanningOut !== null
+
+  const fanOutCount = (projectId: string) => fanOutCounts[projectId] ?? DEFAULT_FAN_OUT_COUNT
 
   const agentEntry = async (projectId: string, entry: string) => {
-    if (busy) return
+    if (inFlight) return
     const key = `${projectId}\n${entry}`
     const prompt = workOnEntryPrompt(entry)
     setStarting(key)
@@ -70,6 +95,28 @@ export function AiQueue({
     // sweep's fan-out, which lands in the Agents card. With no id yet the shell lands on the
     // project and adopts the running agent once the poll surfaces it.
     if (result) onAgentStarted(projectId, prompt, result.agentId)
+  }
+
+  const fanOutProject = async (project: ProjectQueue) => {
+    if (inFlight) return
+    // The top of the queue, one agent per entry: the same order the drain sweep picks in, and each
+    // prompt pinned to its own entry for the same reason the sweep pins a batch (#1204) — several
+    // agents told "the first open entry" would all implement the same one.
+    const entries = project.items
+      .filter(item => !item.done)
+      .slice(0, fanOutCount(project.projectId))
+      .map(item => item.text)
+    setFanningOut(project.projectId)
+    for (const entry of entries) {
+      // One after another, the way the sweep spawns its batch: each start allocates a worktree and
+      // an id of its own. The batch ends at the first refusal — whatever refused this start is not
+      // going to take the next one a moment later, and the refusal stays on screen under the list.
+      const result = await start(project.projectId, workOnEntryPrompt(entry), 'prompt', { ...agentOptionsFromPreferences(preferences), unattended: true })
+      if (!result) break
+    }
+    setFanningOut(null)
+    // No navigation, unlike the single play button (#1191): a batch is the sweep's fan-out fired
+    // by hand, and it lands in the Agents card sitting right above this one.
   }
 
   const withOpen = queue.filter(q => q.open > 0)
@@ -94,6 +141,59 @@ export function AiQueue({
                 <div className="flex w-full items-center gap-2">
                   <span className="truncate text-sm font-medium">{q.projectName}</span>
                   <span className="ml-auto shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs tabular-nums text-muted-foreground">{q.open}</span>
+                  {/* The project's batch act: how many, then the button the count qualifies. */}
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <input
+                          type="number"
+                          min={1}
+                          max={MAX_AUTO_PM_CONCURRENCY}
+                          step={1}
+                          value={fanOutCount(q.projectId)}
+                          aria-label="How many agents to spin up"
+                          onChange={event => {
+                            // Clamped like the routine panel's concurrency box: a number input
+                            // still hands back whatever was typed, and an emptied box is mid-edit
+                            // rather than a count — `Number('')` is 0, and the clamp would turn a
+                            // cleared field into a saved 1.
+                            const typed = event.target.value.trim()
+                            if (!typed) return
+                            const next = Math.round(Number(typed))
+                            if (!Number.isFinite(next)) return
+                            setFanOutCounts(counts => ({
+                              ...counts,
+                              [q.projectId]: Math.min(Math.max(next, 1), MAX_AUTO_PM_CONCURRENCY),
+                            }))
+                          }}
+                          className="h-7 w-11 shrink-0 rounded border border-border bg-background px-1 text-center text-xs tabular-nums text-foreground"
+                        />
+                      }
+                    />
+                    <TooltipContent>How many agents to spin up — one per entry, from the top of the queue.</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={fanOutLabel(Math.min(fanOutCount(q.projectId), q.open))}
+                          disabled={inFlight}
+                          onClick={() => void fanOutProject(q)}
+                          className="shrink-0 text-muted-foreground hover:text-foreground"
+                        />
+                      }
+                    >
+                      {fanningOut === q.projectId ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                      ) : (
+                        <FastForward className="h-3.5 w-3.5" aria-hidden />
+                      )}
+                    </TooltipTrigger>
+                    <TooltipContent>{fanOutLabel(Math.min(fanOutCount(q.projectId), q.open))}</TooltipContent>
+                  </Tooltip>
                 </div>
                 <ul className="mt-1.5 space-y-1 pl-0.5">
                   {q.items
@@ -141,7 +241,7 @@ export function AiQueue({
                                   variant="ghost"
                                   size="icon-sm"
                                   aria-label="Spin up an agent working on this entry"
-                                  disabled={busy}
+                                  disabled={inFlight}
                                   onClick={() => void agentEntry(q.projectId, item.text)}
                                   className="shrink-0 text-muted-foreground hover:text-foreground"
                                 />

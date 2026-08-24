@@ -1,11 +1,11 @@
 Topics: [system-prompt]
 GitHub: [#1416](https://github.com/gemstack-land/the-framework/issues/1416)
 
-# New gate: let agent gauge self-confidence
+# New gate: let agent gauge uncertainty
 
 ## TLDR
 
-Add a gate where the agent gauges its own confidence and the framework branches on it. Example from the OP: CI red → agent fixes → if the agent is confident, auto-merge; otherwise ask the user for choices and/or a review.
+Add a gate where the agent gauges its own uncertainty and the framework branches on it. Example from the OP: CI red → agent fixes → if the agent is confident, auto-merge; otherwise ask the user for choices and/or a review.
 
 ## Why it matters
 

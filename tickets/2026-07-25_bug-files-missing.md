@@ -6,11 +6,11 @@ GitHub: [#1142](https://github.com/gemstack-land/the-framework/issues/1142)
 
 ## TLDR
 
-The `Files` element is missing in the dashboard (screenshot in the issue). Suspected to be related to #1140 (project list not refreshing after a directory is removed/renamed). Low priority, post-MVP.
+The `Files` element is missing in the dashboard (screenshot in the issue). Root cause located (triage 2026-08-24): the tab hides whenever the file list is empty (`RightRail.tsx:106`), so a moved/renamed directory (#1140) or a failed listing drops it silently. Low priority, post-MVP.
 
 ## Why it matters
 
-If the suspicion holds, this is a visible symptom of stale project/directory state — fixing #1140 should be checked against this view, or this reveals a second refresh path with the same class of bug.
+A hidden tab is indistinguishable from "no files": the hide-on-empty behaviour at `RightRail.tsx:106` silently swallows both the stale-directory case (#1140) and any failed listing. Fixing #1140 alone won't cover the failed-listing path — the hide-on-empty rendering is the thing to change (show an empty/error state instead).
 
 ## Source
 

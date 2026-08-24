@@ -5,11 +5,11 @@ GitHub: [#1266](https://github.com/gemstack-land/the-framework/issues/1266)
 
 ## TLDR
 
-Umbrella, from live-testing choices in both modes: local and web sessions answer questions through different transports (choice gate + sendChoice vs the extension bridge), and each grew its own UI — the right-rail "Your call" panel locally, a pick-then-send block for web. Same capability, unrelated looks. Direction: the session view is ONE timeline of typed rows, interactive in place identically in both modes — question rows render choices inline as real radios/checkboxes + an Answer button (one component; only the submit path differs, with a "via claude.ai" chip and open-session fallback; the right-rail Choices tab stays as a shortcut bound to the same state), browser rows embed the live browser pane at that point, the CC-web mirror is one live boxed row at the hand-off point (#1265), and row-kind colors make QUESTION / BROWSER / CLOUD scan at a glance.
+Umbrella, from live-testing choices in both modes: local and web sessions answer questions through different transports (choice gate + sendChoice vs the extension bridge), and each grew its own UI — the right-rail "Your call" panel locally, a pick-then-send block for web. Same capability, unrelated looks. Direction: the session view is ONE timeline of typed rows, interactive in place identically in both modes — question rows render choices inline as real radios/checkboxes + an Answer button (one component; only the submit path differs, with a "via claude.ai" chip and open-session fallback; the right-rail Choices tab stays as a shortcut bound to the same state), browser rows embed the live browser pane at that point, the CC-web mirror is one live boxed row at the hand-off point (#1265), and row-kind colors make QUESTION / BROWSER / CLOUD scan at a glance. Triage (2026-08-24): children #1263–#1265 are all done — what's left of the umbrella is the polish: inline question rows and row-kind colours.
 
 ## Why it matters
 
-Every new row kind multiplies the inconsistency between the two modes unless there's one row design. Children: #1263 (sidebar agent logo + cloud badge) and #1264 (honest "In cloud" status) — both already closed — plus #1265. Post-demo work except #1263/#1264.
+Every new row kind multiplies the inconsistency between the two modes unless there's one row design. Children #1263 (sidebar agent logo + cloud badge), #1264 (honest "In cloud" status), and #1265 (mirror as a live log row) are all closed; remaining scope is the polish above.
 
 ## Source
 

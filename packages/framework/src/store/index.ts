@@ -65,7 +65,6 @@ export {
 } from './worktree.js'
 export {
   linkDependencies,
-  excludeDependencyLinks,
   findDependencyDirs,
   nodeLinkFs,
   type LinkFs,

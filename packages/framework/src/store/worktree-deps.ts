@@ -1,7 +1,4 @@
 import { join, relative } from 'node:path'
-import { nodeFs, type NodeFs } from '../node-fs.js'
-import { excludeFromGit } from '../git-exclude.js'
-import { nodeGitRunner, type GitRunner } from '../project.js'
 import { FRAMEWORK_DIR } from './agent-store.js'
 
 /**
@@ -9,14 +6,22 @@ import { FRAMEWORK_DIR } from './agent-store.js'
  * `git worktree add` hands the agent an empty one and every command in it fails.
  *
  * Three ways to fix that: copy the tree (correct, but gigabytes per agent), install
- * into each worktree (correct, but real latency on every start), or symlink the
+ * into each worktree (correct, but real latency on every start), or link the
  * parent checkout's trees in (instant, no extra disk, one store shared by N runs).
- * We symlink. The one case it is wrong for is an agent that changes the lockfile —
- * that needs its own install regardless, and the agent runs the install itself.
+ * We link — but each *entry* of a dependency directory, into a real directory of
+ * the worktree's own, never the directory itself (#1262). A directory link made the
+ * parent's tree the worktree's modules directory in the package manager's eyes:
+ * an agent that changed a dependency and ran `pnpm install` had pnpm resolve
+ * through the link and rewrite — or, under `CI=true`, purge outright — the parent
+ * checkout's real `node_modules`, and every later agent died at boot. With a real
+ * directory holding links, an install in the worktree writes into the worktree.
  *
- * Directory symlinks are what make this work in a pnpm workspace: linking
- * `packages/foo/node_modules` as a whole means the `.pnpm` symlinks inside it
- * still resolve against their real location in the parent checkout.
+ * The package manager's own state (`.pnpm`, `.modules.yaml`, and the like — every
+ * dot-entry but `.bin`) is deliberately not linked: it is what tells the package
+ * manager "this tree is mine, installed here", and the worktree's is not. The
+ * packages still resolve without it — a package entry in a pnpm tree is a relative
+ * link into `.pnpm`, and a link to that link resolves where the target lives, in
+ * the parent checkout. `.bin` is linked because an agent runs the project's tools.
  */
 
 /** The dependency directory mirrored into a worktree. */
@@ -28,6 +33,12 @@ const MAX_DEPTH = 2
 
 /** Directory names never descended into while scanning for dependency trees. */
 const SKIP = new Set([NODE_MODULES, '.git', FRAMEWORK_DIR, 'dist', 'build', 'coverage'])
+
+/** The one dot-entry of a dependency directory that is linked: the project's executables. */
+const BIN = '.bin'
+
+/** The package manager's private state in a dependency directory: never linked (see above). */
+const isPrivate = (name: string): boolean => name.startsWith('.') && name !== BIN
 
 /** The filesystem this module needs. Injectable so the scan is testable. */
 export interface LinkFs {
@@ -91,53 +102,29 @@ export async function findDependencyDirs(repo: string, fs: LinkFs = nodeLinkFs()
 }
 
 /**
- * Symlink `repo`'s dependency trees into `worktree` at the same relative paths.
- * Returns the paths linked. Best-effort throughout: a worktree with no deps is a
- * worse run, not a failed one, so a link that cannot be made is skipped rather
- * than thrown. An existing entry is left alone (the agent may have installed already).
+ * Mirror `repo`'s dependency trees into `worktree` at the same relative paths: a real
+ * directory per tree, holding a link per entry (the package manager's private state
+ * left out, see above). Returns the trees mirrored. Best-effort throughout: a worktree
+ * with no deps is a worse run, not a failed one, so a link that cannot be made is
+ * skipped rather than thrown. A tree already present is left alone (the agent may
+ * have installed already).
  */
 export async function linkDependencies(repo: string, worktree: string, fs: LinkFs = nodeLinkFs()): Promise<string[]> {
   const linked: string[] = []
   for (const rel of await findDependencyDirs(repo, fs)) {
-    const target = join(repo, rel)
-    const link = join(worktree, rel)
+    const source = join(repo, rel)
+    const dir = join(worktree, rel)
     try {
-      if (await fs.entryExists(link)) continue
-      const parent = join(link, '..')
-      if (!(await fs.isDirectory(parent))) await fs.mkdir(parent)
-      await fs.symlinkDir(target, link)
+      if (await fs.entryExists(dir)) continue
+      await fs.mkdir(dir)
+      for (const name of await fs.readdir(source)) {
+        if (isPrivate(name)) continue
+        await fs.symlinkDir(join(source, name), join(dir, name)).catch(() => {})
+      }
       linked.push(rel)
     } catch {
-      // Raced, or a filesystem that refuses the link: the agent still starts.
+      // Raced, or a filesystem that refuses the directory: the agent still starts.
     }
   }
   return linked
-}
-
-/** The exclude rule that covers a linked tree. Deliberately slash-free: see below. */
-const EXCLUDE_RULE = NODE_MODULES
-
-/**
- * Make git ignore the dependency links (#738). A repo's `.gitignore` says `node_modules/`, and
- * a trailing slash matches a *directory* only — the links {@link linkDependencies} makes are
- * symlinks, so they are not covered, and they show up as untracked in every agent's worktree.
- * That is not cosmetic: the agent runs `git add -A`, so the agent would commit dangling absolute
- * symlinks into its branch and onto the PR.
- *
- * A slash-free `node_modules` in the repo-level exclude ({@link excludeFromGit}) covers the
- * symlink form in every worktree, and the main checkout is unaffected in practice: its
- * `node_modules` is a real directory, already ignored by the same name.
- *
- * Best-effort: an agent whose links are merely untracked is still an agent.
- */
-export async function excludeDependencyLinks(
-  repo: string,
-  fs: NodeFs = nodeFs(),
-  agent: GitRunner = nodeGitRunner(),
-): Promise<void> {
-  try {
-    await excludeFromGit(repo, EXCLUDE_RULE, fs, agent)
-  } catch {
-    // Not a repo, or an unwritable git dir: the links just stay visible to git status.
-  }
 }

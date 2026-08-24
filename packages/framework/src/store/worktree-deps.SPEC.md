@@ -1,10 +1,16 @@
-Gives a fresh worktree a working dependency tree, so an agent can run the project's commands the moment it starts, and keeps that tree invisible to git so the agent never commits it.
+Gives a fresh worktree a working dependency tree, so an agent can run the project's commands the moment it starts — shared with the parent checkout, yet safe for the agent to install into.
+
+## User story
+
+- The user starts an agent and it works immediately: it can run the tests, the build, the linter. It does not sit for a minute installing, and starting ten agents does not fill the disk.
+- An agent changes a dependency and installs. That install must land in the agent's own checkout — never rewrite, and never delete, the dependencies of the user's checkout, which every later agent is handed.
 
 ## Business logic — TL;DR
 
-- **Dependencies are shared, not copied** - the parent checkout's `node_modules` directories are linked into the worktree at the same relative paths, instantly and at no extra disk cost.
-- **Workspace packages get their own link** - every `node_modules` down to two levels below the repo root is linked, so a monorepo's packages work too.
-- **The links are hidden from git** - the repo is told to ignore them, or the agent would commit dangling links onto its branch and into its pull request.
+- **Dependencies are shared, not copied** - each of the parent checkout's dependency directories is mirrored into the worktree at the same relative path, instantly and at no extra disk cost.
+- **A real directory of links, never a linked directory** - the worktree gets a directory of its own holding one link per dependency entry, so an install inside the worktree writes into the worktree.
+- **The package manager's private state stays behind** - the entries that mark a tree as the package manager's own install are not linked; the packages resolve without them.
+- **Workspace packages get their own tree** - every dependency directory down to two levels below the repo root is mirrored, so a monorepo's packages work too.
 - **Never fatal** - a link that cannot be made is skipped; a worktree with missing dependencies is a worse agent, not a failed one.
 
 ## Business logic
@@ -13,33 +19,35 @@ Gives a fresh worktree a working dependency tree, so an agent can run the projec
 
 #### User story
 
-The user starts an agent and it works immediately: it can run the tests, the build, the linter. It does not sit for a minute installing, and starting ten agents does not fill the disk.
+See `## User story`: the agent works immediately, and ten agents cost no extra disk.
 
 #### Business logic
 
-Dependency directories are ignored by git, so a new worktree is handed an empty one and every command in it fails. Instead of copying or installing, the parent checkout's dependency directories are linked into the worktree at the same relative paths. Anything already present at a link's location is left alone, since the agent may have installed for itself already, and any missing parent directory is created first.
+Dependency directories are ignored by git, so a new worktree is handed an empty one and every command in it fails. Instead of copying or installing, each of the parent checkout's dependency directories is mirrored into the worktree at the same relative path: a real directory is created there, and inside it one link per entry of the parent's directory, pointing at that entry. A tree already present in the worktree is left alone, since the agent may have installed for itself already, and any missing parent directory is created first.
 
-The scan looks for a dependency directory at the repo root and at every directory down to two levels below it, which covers a workspace's per-package dependencies without walking the whole tree. Dependency directories, the git directory, the framework's own directory, build outputs and dot-directories are never descended into. The result is ordered, so linking happens in a stable order.
+The scan looks for a dependency directory at the repo root and at every directory down to two levels below it, which covers a workspace's per-package dependencies without walking the whole tree. Dependency directories, the git directory, the framework's own directory, build outputs and dot-directories are never descended into. The result is ordered, so mirroring happens in a stable order.
 
 #### Rationale
 
-Three options existed: copy the tree (correct, but gigabytes per agent), install into each worktree (correct, but real waiting on every start), or link the parent checkout's trees in (instant, no extra disk, one store shared by all agents). Linking wins. The one case it is wrong for is an agent that changes the dependency manifest — and that agent needs its own install anyway, which it runs itself.
+Three options existed: copy the tree (correct, but gigabytes per agent), install into each worktree (correct, but real waiting on every start), or link the parent checkout's trees in (instant, no extra disk, one store shared by all agents). Linking wins.
 
-Whole directories are linked, rather than their contents, because that is what makes a workspace resolve: the links inside a package's dependency directory still point at their real location in the parent checkout.
-
-### The links are hidden from git
+### A real directory of links, never a linked directory
 
 #### User story
 
-The agent's pull request contains its work and nothing else — no dependency directories, no broken links pointing at a path that only exists on the machine the agent ran on.
+See `## User story`: an agent's install must stay in the agent's checkout.
 
 #### Business logic
 
-A repo's ignore rules normally name the dependency directory with a trailing slash, which matches a real directory only. The linked trees are links, not directories, so those rules do not cover them and they show up as untracked in every agent's worktree. That matters because the agent stages everything it changed, so it would commit those links onto its branch and into its pull request.
+The worktree's dependency directory is a directory of its own, not a link to the parent's. When an agent installs in its worktree — which an agent that changes a dependency must — the package manager rewrites the entries of the worktree's directory and leaves the parent checkout's untouched. After the worktree is removed, the parent checkout's dependencies are exactly as they were.
 
-A rule without the trailing slash is therefore added to the repo's own local exclusions, covering the link form in every worktree. The main checkout is unaffected, because its dependency directory is a real directory already ignored under the same name.
+The package manager's private state — every dot-entry of a dependency directory except the executables directory — is not linked. The executables directory is, because an agent runs the project's tools.
 
-This is best-effort as well: on a project that is not a git repo, or where the exclusion cannot be written, the links simply stay visible to git status.
+#### Rationale
+
+Linking the directory itself made the parent's tree the worktree's install in the package manager's eyes: it resolved through the link, rewrote the parent checkout's workspace links to point into the worktree — which dangled once the worktree was removed — or, when told it was running unattended, purged the parent's tree outright. Either way every later agent died at boot. The private state is what tells the package manager "this tree is mine, installed here", so it stays out of the worktree; the packages resolve without it, because a package entry is itself a relative link into the package manager's store, and a link to that link resolves where the target lives — in the parent checkout.
+
+Since the worktree's dependency directory is a real directory, the repo's own ignore rule for dependency directories covers it, and git never sees the links.
 
 ## Before modifying/creating SPEC.md files
 

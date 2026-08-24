@@ -3,7 +3,6 @@ import type { AutoPmJob, AutoPmOnly, AutoPmOutcome, ProjectSummary } from '../..
 import {
   AUTO_PM_ROUTINES,
   DEFAULT_AUTO_PM_CONCURRENCY,
-  MAX_AUTO_PM_CONCURRENCY,
   agentOptionsFromPreferences,
 } from '../../src/client.js'
 import { CalendarClock, ChevronDown, Play } from 'lucide-react'
@@ -404,19 +403,18 @@ export function RoutineWork({
                   id="auto-pm-concurrency"
                   type="number"
                   min={1}
-                  max={MAX_AUTO_PM_CONCURRENCY}
                   step={1}
                   value={concurrency}
                   onChange={event => {
-                    // Clamped here as well as in the store, because a number input still hands
+                    // Floored here as well as in the store, because a number input still hands
                     // back whatever was typed. An emptied box is mid-edit rather than a setting:
-                    // it has to be caught by hand, since `Number('')` is 0, not NaN, and the clamp
+                    // it has to be caught by hand, since `Number('')` is 0, not NaN, and the floor
                     // below would turn a cleared field into a saved 1.
                     const typed = event.target.value.trim()
                     if (!typed) return
                     const next = Math.round(Number(typed))
                     if (!Number.isFinite(next)) return
-                    updatePreferences({ autoPmConcurrency: Math.min(Math.max(next, 1), MAX_AUTO_PM_CONCURRENCY) })
+                    updatePreferences({ autoPmConcurrency: Math.max(next, 1) })
                   }}
                   className="w-16 rounded border border-border bg-background px-2 py-1 text-sm text-foreground"
                 />

@@ -4,7 +4,7 @@ What an unset preference means, and the bounds shared by the controls that write
 
 - **Notifications are a 2×2** - two delivery methods (browser, Discord) crossed with two categories ("needs you", plain activity); a notification is delivered only when its method and its category are both on.
 - **Defaults follow reach** - browser and "needs you" fire unless turned off; anything reaching outward (Discord) or merely informative (plain activity) is opt-in.
-- **Shared bounds** - the slider that moves the unattended-work spend limit reaches at most 50 percentage points either way from the quota boundary, and defaults to half a day's allowance ahead of it; Auto PM runs 2 agents at once by default, 10 at most.
+- **Shared bounds** - the slider that moves the unattended-work spend limit reaches at most 50 percentage points either way from the quota boundary, and defaults to half a day's allowance ahead of it; Auto PM runs 2 agents at once by default.
 
 ## Business logic
 
@@ -26,11 +26,11 @@ The composition used to be open-coded per call site, which let one site get a ca
 
 #### Business logic
 
-The slider that offsets the unattended-work spend limit from the quota boundary is bounded at ±50 percentage points, and its default position is half a day's worth of the week's allowance ahead of the boundary (100/14 points). The number of agents Auto PM's draining routine may keep going at once defaults to 2 and is capped at 10. These numbers live here because the control that writes each value runs in the browser while the sanitizer that clamps it runs in the daemon — both must import the same number.
+The slider that offsets the unattended-work spend limit from the quota boundary is bounded at ±50 percentage points, and its default position is half a day's worth of the week's allowance ahead of the boundary (100/14 points). The number of agents Auto PM's draining routine may keep going at once defaults to 2, with no upper bound. These numbers live here because the control that writes each value runs in the browser while the sanitizer that clamps it runs in the daemon — both must import the same number.
 
 #### Rationale
 
-A default spend limit sitting exactly on the boundary stops unattended work the moment the account is precisely on pace — which is normal jitter, not overspending. The half-day cushion gives it room to breathe without meaningfully loosening the policy. Auto PM's default of 2 (not 1) is the smallest value that makes the overlap feature visible at all while staying conservative about quota.
+A default spend limit sitting exactly on the boundary stops unattended work the moment the account is precisely on pace — which is normal jitter, not overspending. The half-day cushion gives it room to breathe without meaningfully loosening the policy. Auto PM's default of 2 (not 1) is the smallest value that makes the overlap feature visible at all while staying conservative about quota. The agent count has no upper bound because how many agents to run at once is the user's call — the week's allowance is what actually paces unattended work.
 
 ## Before modifying/creating SPEC.md files
 

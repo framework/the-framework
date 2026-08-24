@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { ProjectQueue } from '../../src/index.js'
-import { agentOptionsFromPreferences, MAX_AUTO_PM_CONCURRENCY } from '../../src/client.js'
+import { agentOptionsFromPreferences } from '../../src/client.js'
 import { FastForward, ListTodo, Loader2, Play } from 'lucide-react'
 import { queueEntryLabel } from '../lib/queue-entry.js'
 import { usePreferences } from '../lib/preferences.js'
@@ -148,14 +148,13 @@ export function AiQueue({
                         <input
                           type="number"
                           min={1}
-                          max={MAX_AUTO_PM_CONCURRENCY}
                           step={1}
                           value={fanOutCount(q.projectId)}
                           aria-label="How many agents to spin up"
                           onChange={event => {
-                            // Clamped like the routine panel's concurrency box: a number input
+                            // Floored like the routine panel's concurrency box: a number input
                             // still hands back whatever was typed, and an emptied box is mid-edit
-                            // rather than a count — `Number('')` is 0, and the clamp would turn a
+                            // rather than a count — `Number('')` is 0, and the floor would turn a
                             // cleared field into a saved 1.
                             const typed = event.target.value.trim()
                             if (!typed) return
@@ -163,7 +162,7 @@ export function AiQueue({
                             if (!Number.isFinite(next)) return
                             setFanOutCounts(counts => ({
                               ...counts,
-                              [q.projectId]: Math.min(Math.max(next, 1), MAX_AUTO_PM_CONCURRENCY),
+                              [q.projectId]: Math.max(next, 1),
                             }))
                           }}
                           className="h-7 w-11 shrink-0 rounded border border-border bg-background px-1 text-center text-xs tabular-nums text-foreground"

@@ -7,7 +7,6 @@ import {
   AUTO_PM_DRAIN_JOB,
   AUTO_PM_MAINTENANCE_JOB,
   DEFAULT_AUTO_PM_CONCURRENCY,
-  MAX_AUTO_PM_CONCURRENCY,
 } from '../../src/client.js'
 import { hoverTooltip } from '../test-utils.js'
 
@@ -512,17 +511,19 @@ describe('RoutineWork (#1159)', () => {
     const box = (await screen.findByLabelText('Concurrent agents')) as HTMLInputElement
     // The default rather than 1, so the number on screen is the number the sweep would use.
     expect(box.value).toBe(String(DEFAULT_AUTO_PM_CONCURRENCY))
-    expect(box.max).toBe(String(MAX_AUTO_PM_CONCURRENCY))
+    // No maximum: how many agents to run at once is the user's call.
+    expect(box.max).toBe('')
   })
 
-  test('typing a concurrency writes it, clamped to the cap', async () => {
+  test('typing a concurrency writes it, floored at one', async () => {
     renderCard()
     const box = await screen.findByLabelText('Concurrent agents')
     fireEvent.change(box, { target: { value: '5' } })
     expect(updatePreferences).toHaveBeenCalledWith({ autoPmConcurrency: 5 })
-    // The store clamps too, but a number input still hands back whatever was typed into it.
+    // No upper bound: a big count is written as typed.
     fireEvent.change(box, { target: { value: '999' } })
-    expect(updatePreferences).toHaveBeenCalledWith({ autoPmConcurrency: MAX_AUTO_PM_CONCURRENCY })
+    expect(updatePreferences).toHaveBeenCalledWith({ autoPmConcurrency: 999 })
+    // The store floors too, but a number input still hands back whatever was typed into it.
     fireEvent.change(box, { target: { value: '0' } })
     expect(updatePreferences).toHaveBeenCalledWith({ autoPmConcurrency: 1 })
     // An emptied box is not a preference: it must not write NaN into the home file.

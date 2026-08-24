@@ -16,7 +16,7 @@ What the tests cover: the "Routine work" card's rows, its Run now paths, and the
 
 **Trigger routine now.** It fires the sweep instead of waiting out the countdown, and stays available with the schedule off, where its hover says auto-run stays off. Its answer is reported: a single project's message plainly, several projects' messages each prefixed by folder name, and "not running the sweep" for a dashboard without one. The sweep-backed Run now clicks report their outcome the same way.
 
-**Concurrent agents.** The box shows the daemon's default until it is set, up to the allowed maximum; typing writes the value clamped to that maximum and to a minimum of one, and emptying the box writes nothing. The sentence under it follows the number rather than promising an idle machine.
+**Concurrent agents.** The box shows the daemon's default until it is set and offers no maximum; typing writes the value floored at one — any higher count is written as typed — and emptying the box writes nothing. The sentence under it follows the number rather than promising an idle machine.
 
 ## Before modifying/creating SPEC.md files
 

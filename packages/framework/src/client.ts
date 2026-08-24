@@ -53,7 +53,7 @@ export { interventionKey, activityKey } from './dashboard/keys.js'
 // GitHub reach take an empty backlog for a real one. Pure, and its only import is a type.
 export { SeenTracker } from './dashboard/keyed-watcher.js'
 export type { ProjectionRead } from './dashboard/projects.js'
-export { NOTIFICATION_DEFAULTS, MAX_SPEND_OFFSET, DEFAULT_SPEND_OFFSET, DEFAULT_AUTO_PM_CONCURRENCY, MAX_AUTO_PM_CONCURRENCY, notifies, notifyMethodEnabled, notifyCategoryEnabled, type NotifyMethod, type NotifyCategory } from './preference-defaults.js'
+export { NOTIFICATION_DEFAULTS, MAX_SPEND_OFFSET, DEFAULT_SPEND_OFFSET, DEFAULT_AUTO_PM_CONCURRENCY, notifies, notifyMethodEnabled, notifyCategoryEnabled, type NotifyMethod, type NotifyCategory } from './preference-defaults.js'
 // The preferences -> run options mapping (#858), shared with the daemon so an unattended agent
 // starts with the same settings a launcher-started one would. Pure field logic, no Node imports.
 export { agentOptionsFromPreferences, handoffFromPreferences, preferencesFromFileConfig } from './agent-options.js'

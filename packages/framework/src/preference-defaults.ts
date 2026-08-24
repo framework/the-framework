@@ -98,10 +98,3 @@ export const DEFAULT_SPEND_OFFSET = 100 / (7 * 2)
  * number that shows it while staying conservative about quota.
  */
 export const DEFAULT_AUTO_PM_CONCURRENCY = 2
-
-/**
- * The most agents the routine may be asked to keep going at once (#1204). Like
- * {@link MAX_SPEND_OFFSET}, the control that writes the value is in the browser and the sanitizer
- * that clamps it is in the daemon, so the bound has to be one number both can import.
- */
-export const MAX_AUTO_PM_CONCURRENCY = 10

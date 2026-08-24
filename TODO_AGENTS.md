@@ -29,6 +29,7 @@
 - [ ] Create tickets/2026-07-25_improve-add-project.plan.md
 - [ ] Create tickets/2026-07-21_dogfooding-tf-user-feedback.plan.md
 - [ ] Create tickets/2026-07-20_git-as-database-all-in.plan.md
+- [ ] Create tickets/2026-07-19_dogfooding-rom.plan.md
 
 
 ## Priority 4

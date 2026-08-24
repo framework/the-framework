@@ -2,9 +2,25 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { CloudDriver } from './driver/cloud.js'
 import { createDriverEventHandler, emitSessionStart } from './agent-telemetry.js'
-import { metaFromEvents } from './store/index.js'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { AgentStore, type AgentMeta } from './store/index.js'
 import { CLAUDE_CODE_SESSION_LINK } from './session-link.js'
 import type { FrameworkEvent } from './events.js'
+
+/** The meta after `events`, folded the way a live run folds them: appended to a real store. */
+async function foldLive(events: readonly FrameworkEvent[], at: string): Promise<AgentMeta> {
+  const cwd = await mkdtemp(join(tmpdir(), 'tf-session-link-'))
+  try {
+    const store = await AgentStore.open(cwd, { now: at, clock: () => at })
+    for (const event of events) await store.append(event)
+    await store.close()
+    return store.snapshot()
+  } finally {
+    await rm(cwd, { recursive: true, force: true })
+  }
+}
 
 // #1317: a web agent's meta dead-ended on the generic https://claude.ai/code — recorded by the
 // opening `session` event before any session existed — even though the CloudDriver had the real
@@ -40,7 +56,7 @@ test('a cloud run meta ends with the real session URL, not the generic entry poi
   const session = await driver.start({ cwd: '/repo', onEvent: handler.onDriverEvent })
   await session.prompt('go')
 
-  const meta = metaFromEvents(events, '2026-01-01T00:00:00.000Z')
+  const meta = await foldLive(events, '2026-01-01T00:00:00.000Z')
   assert.equal(meta.sessionLink, URL, 'the meta must carry the deep link once the hand-off knows it')
   // The opening event still honestly says what was known before the session existed.
   const opening = events.find(e => e.kind === 'session')

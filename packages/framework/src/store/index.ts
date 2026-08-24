@@ -2,7 +2,6 @@ export {
   AgentStore,
   nodeStoreFs,
   applyEventToMeta,
-  metaFromEvents,
   listAgents,
   readAllAgents as readAllAgents,
   findAgent,

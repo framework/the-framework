@@ -5,7 +5,6 @@ import { hostname } from 'node:os'
 import {
   AgentStore,
   applyEventToMeta,
-  metaFromEvents,
   listAgents,
   readLiveMeta,
   readLiveMetas,
@@ -72,6 +71,16 @@ const RUN: FrameworkEvent[] = [
   { kind: 'session-update', sessionId: 'sess-123', sessionLink: 'https://ex.com/s/sess-123' },
   { kind: 'end', ok: true },
 ]
+
+/** The meta after `events`, folded the way a live run folds them: appended to a real store. */
+async function foldLive(events: readonly FrameworkEvent[], at: string): Promise<AgentMeta> {
+  const store = await AgentStore.open(CWD, { fs: memFs(), now: at, clock: () => at })
+  for (const event of events) await store.append(event)
+  return store.snapshot()
+}
+
+/** A run three events in: opened and working, nothing decided yet. What the fold tests refine from. */
+const BASE = await foldLive(RUN.slice(0, 3), AT)
 
 test('fresh open truncates the log and writes an initial meta snapshot', async () => {
   const fs = memFs({ [EVENTS]: 'stale\n' })
@@ -155,16 +164,8 @@ test('loadEvents on a never-run workspace yields an empty array', async () => {
   assert.deepEqual(await store.loadEvents(), [])
 })
 
-test('metaFromEvents reconstructs the same snapshot as live appends', async () => {
-  const meta = metaFromEvents(RUN, AT)
-  assert.equal(meta.intent, 'a blog with comments')
-  assert.equal(meta.status, 'done')
-  assert.equal(meta.startedAt, AT)
-})
-
 test('applyEventToMeta records the model per leg — the latest session event wins, an unrecorded one clears it (#1438)', () => {
-  const base = metaFromEvents(RUN.slice(0, 3), AT)
-  const first = applyEventToMeta(base, { kind: 'session', driver: 'claude', workspace: '/w', fake: false, model: 'fable' }, AT)
+  const first = applyEventToMeta(BASE, { kind: 'session', driver: 'claude', workspace: '/w', fake: false, model: 'fable' }, AT)
   assert.equal(first.model, 'fable')
   // A continuation leg may run a different model: fold, don't pin.
   const second = applyEventToMeta(first, { kind: 'session', driver: 'claude', workspace: '/w', fake: false, model: 'sonnet' }, AT)
@@ -175,32 +176,29 @@ test('applyEventToMeta records the model per leg — the latest session event wi
 })
 
 test('applyEventToMeta mirrors the merge arming onto the meta, so a mid-run tab can read it (#1382)', () => {
-  const base = metaFromEvents(RUN.slice(0, 3), AT)
-  const armed = applyEventToMeta(base, { kind: 'handoff-armed', push: true, pr: true, merge: true }, AT)
+  const armed = applyEventToMeta(BASE, { kind: 'handoff-armed', push: true, pr: true, merge: true }, AT)
   assert.deepEqual(armed.handoff, { push: true, pr: true, merge: true })
   // A pre-#1382 event has no merge field: the mirror stays shaped like the event, not padded.
-  const old = applyEventToMeta(base, { kind: 'handoff-armed', push: true, pr: false }, AT)
+  const old = applyEventToMeta(BASE, { kind: 'handoff-armed', push: true, pr: false }, AT)
   assert.deepEqual(old.handoff, { push: true, pr: false })
 })
 
 test('applyEventToMeta folds the handoff report onto the meta, so list surfaces can tell publishing from done (#1455)', () => {
-  const base = metaFromEvents(RUN.slice(0, 3), AT)
-  assert.equal(base.handoffReport, undefined, 'no report until the epilogue speaks')
-  const done = applyEventToMeta(base, { kind: 'handoff', outcome: 'done', pushed: true }, AT)
+  assert.equal(BASE.handoffReport, undefined, 'no report until the epilogue speaks')
+  const done = applyEventToMeta(BASE, { kind: 'handoff', outcome: 'done', pushed: true }, AT)
   assert.equal(done.handoffReport, 'done')
-  const skipped = applyEventToMeta(base, { kind: 'handoff', outcome: 'skipped', reason: 'not-armed' }, AT)
+  const skipped = applyEventToMeta(BASE, { kind: 'handoff', outcome: 'skipped', reason: 'not-armed' }, AT)
   assert.equal(skipped.handoffReport, 'skipped')
-  const failed = applyEventToMeta(base, { kind: 'handoff', outcome: 'failed', step: 'push', error: 'boom' }, AT)
+  const failed = applyEventToMeta(BASE, { kind: 'handoff', outcome: 'failed', step: 'push', error: 'boom' }, AT)
   assert.equal(failed.handoffReport, 'failed')
 })
 
 test('applyEventToMeta folds the skip reason onto the meta, so the sweep can free a dead claim (#1583)', () => {
-  const base = metaFromEvents(RUN.slice(0, 3), AT)
-  assert.equal(base.handoffSkip, undefined)
-  const skipped = applyEventToMeta(base, { kind: 'handoff', outcome: 'skipped', reason: 'no-commits' }, AT)
+  assert.equal(BASE.handoffSkip, undefined)
+  const skipped = applyEventToMeta(BASE, { kind: 'handoff', outcome: 'skipped', reason: 'no-commits' }, AT)
   assert.equal(skipped.handoffSkip, 'no-commits')
   // A handoff that ran carries no skip: the field means "why nothing happened", nothing else.
-  const done = applyEventToMeta(base, { kind: 'handoff', outcome: 'done', pushed: true }, AT)
+  const done = applyEventToMeta(BASE, { kind: 'handoff', outcome: 'done', pushed: true }, AT)
   assert.equal(done.handoffSkip, undefined)
   // And a later leg that published clears a stale skip — a resumed run's second handoff can
   // publish after its first skipped, and the release must not act on leg one's reason.
@@ -209,34 +207,30 @@ test('applyEventToMeta folds the skip reason onto the meta, so the sweep can fre
 })
 
 test('applyEventToMeta folds the merge outcome onto the meta, so the CI watch can find its PRs (#1418)', () => {
-  const base = metaFromEvents(RUN.slice(0, 3), AT)
-  assert.equal(base.mergeOutcome, undefined)
-  const watched = applyEventToMeta(base, { kind: 'handoff', outcome: 'done', pushed: true, merge: { outcome: 'watched' } }, AT)
+  assert.equal(BASE.mergeOutcome, undefined)
+  const watched = applyEventToMeta(BASE, { kind: 'handoff', outcome: 'done', pushed: true, merge: { outcome: 'watched' } }, AT)
   assert.equal(watched.mergeOutcome, 'watched')
   // The already-open skip carries a merge too (#1216): a rerun finding its predecessor's PR.
-  const armed = applyEventToMeta(base, { kind: 'handoff', outcome: 'skipped', reason: 'already-open', merge: { outcome: 'auto-armed' } }, AT)
+  const armed = applyEventToMeta(BASE, { kind: 'handoff', outcome: 'skipped', reason: 'already-open', merge: { outcome: 'auto-armed' } }, AT)
   assert.equal(armed.mergeOutcome, 'auto-armed')
-  const noMerge = applyEventToMeta(base, { kind: 'handoff', outcome: 'done', pushed: true }, AT)
+  const noMerge = applyEventToMeta(BASE, { kind: 'handoff', outcome: 'done', pushed: true }, AT)
   assert.equal(noMerge.mergeOutcome, undefined, 'a handoff without a merge half folds nothing')
 })
 
 test('applyEventToMeta marks a thrown run as failed', () => {
-  const base = metaFromEvents(RUN.slice(0, 3), AT)
-  const failed = applyEventToMeta(base, { kind: 'end', ok: false, detail: 'boom' }, AT)
+  const failed = applyEventToMeta(BASE, { kind: 'end', ok: false, detail: 'boom' }, AT)
   assert.equal(failed.status, 'failed')
 })
 
 test('applyEventToMeta marks a user-stopped run as stopped, not failed (#218)', () => {
-  const base = metaFromEvents(RUN.slice(0, 3), AT)
-  const stopped = applyEventToMeta(base, { kind: 'end', ok: false, stopped: true }, AT)
+  const stopped = applyEventToMeta(BASE, { kind: 'end', ok: false, stopped: true }, AT)
   assert.equal(stopped.status, 'stopped')
 })
 
 test('applyEventToMeta tracks whether the run is working or parked on the user (#785)', () => {
-  const base = metaFromEvents(RUN.slice(0, 3), AT)
-  assert.equal(base.settledAt, undefined, 'a working run is not parked')
+  assert.equal(BASE.settledAt, undefined, 'a working run is not parked')
 
-  const parked = applyEventToMeta(base, { kind: 'settled' }, AT)
+  const parked = applyEventToMeta(BASE, { kind: 'settled' }, AT)
   assert.equal(parked.settledAt, AT)
   assert.equal(parked.status, 'running', 'still live: it holds the project and takes messages')
 
@@ -245,16 +239,15 @@ test('applyEventToMeta tracks whether the run is working or parked on the user (
   assert.equal(working.settledAt, undefined)
 
   // An agent that has ended is not waiting on anyone.
-  const ended = applyEventToMeta(applyEventToMeta(base, { kind: 'settled' }, AT), { kind: 'end', ok: true }, AT)
+  const ended = applyEventToMeta(applyEventToMeta(BASE, { kind: 'settled' }, AT), { kind: 'end', ok: true }, AT)
   assert.equal(ended.settledAt, undefined)
   assert.equal(ended.status, 'done')
 })
 
 test('applyEventToMeta records the session name + ready-for-merge lifecycle signals (#326)', () => {
-  const base = metaFromEvents(RUN.slice(0, 3), AT)
-  assert.equal(base.sessionName, undefined)
-  assert.equal(base.readyForMerge, undefined)
-  const named = applyEventToMeta(base, { kind: 'session-name', name: 'add-comments' }, AT)
+  assert.equal(BASE.sessionName, undefined)
+  assert.equal(BASE.readyForMerge, undefined)
+  const named = applyEventToMeta(BASE, { kind: 'session-name', name: 'add-comments' }, AT)
   assert.equal(named.sessionName, 'add-comments')
   const ready = applyEventToMeta(named, { kind: 'ready-for-merge' }, AT)
   assert.equal(ready.readyForMerge, true)
@@ -262,9 +255,8 @@ test('applyEventToMeta records the session name + ready-for-merge lifecycle sign
 })
 
 test('applyEventToMeta records the ticket a run is implementing (#1117)', () => {
-  const base = metaFromEvents(RUN.slice(0, 3), AT)
-  assert.equal(base.ticket, undefined, 'a run nobody linked to a ticket says nothing')
-  const on = applyEventToMeta(base, { kind: 'ticket', path: 'tickets/2026-07-25_login.md' }, AT)
+  assert.equal(BASE.ticket, undefined, 'a run nobody linked to a ticket says nothing')
+  const on = applyEventToMeta(BASE, { kind: 'ticket', path: 'tickets/2026-07-25_login.md' }, AT)
   assert.equal(on.ticket, 'tickets/2026-07-25_login.md')
   // It is a fact about why the agent exists, so it outlives the work: a reader looking at a finished
   // run still gets to see which ticket it was.
@@ -273,9 +265,8 @@ test('applyEventToMeta records the ticket a run is implementing (#1117)', () => 
 })
 
 test('applyEventToMeta tracks the pending choice gate a run is parked on (#636)', () => {
-  const base = metaFromEvents(RUN.slice(0, 3), AT)
-  assert.equal(base.pendingChoice, undefined)
-  const asked = applyEventToMeta(base, { kind: 'choice', id: 'g1', title: 'Cache the auth store?', options: [{ id: 'y', label: 'Yes' }] }, AT)
+  assert.equal(BASE.pendingChoice, undefined)
+  const asked = applyEventToMeta(BASE, { kind: 'choice', id: 'g1', title: 'Cache the auth store?', options: [{ id: 'y', label: 'Yes' }] }, AT)
   assert.deepEqual(asked.pendingChoice, { id: 'g1', title: 'Cache the auth store?' })
   // A resolve for a different gate id leaves it parked; the matching resolve clears it.
   const other = applyEventToMeta(asked, { kind: 'choice-resolved', id: 'other', picked: 'y', by: 'user' }, AT)
@@ -285,8 +276,7 @@ test('applyEventToMeta tracks the pending choice gate a run is parked on (#636)'
 })
 
 test('applyEventToMeta clears a pending choice when the run ends (#636)', () => {
-  const base = metaFromEvents(RUN.slice(0, 3), AT)
-  const asked = applyEventToMeta(base, { kind: 'choice', id: 'g1', title: 'q?', options: [{ id: 'y', label: 'Yes' }] }, AT)
+  const asked = applyEventToMeta(BASE, { kind: 'choice', id: 'g1', title: 'q?', options: [{ id: 'y', label: 'Yes' }] }, AT)
   const ended = applyEventToMeta(asked, { kind: 'end', ok: true }, AT)
   assert.equal(ended.pendingChoice, undefined)
 })
@@ -891,17 +881,15 @@ test('startedAtFromAgentId inverts agentIdFromStartedAt, and refuses foreign ids
 test('applyEventToMeta records the pull request a session opened (E6)', () => {
   // The number is a fact about the agent, so the agent writes it down — rather than every later
   // surface re-deriving it from branch names and creation times.
-  const base = metaFromEvents(RUN.slice(0, 3), AT)
-  assert.equal(base.pr, undefined, 'a session with no PR says nothing')
-  const on = applyEventToMeta(base, { kind: 'pull-request', number: 42, url: 'https://x/pull/42' }, AT)
+  assert.equal(BASE.pr, undefined, 'a session with no PR says nothing')
+  const on = applyEventToMeta(BASE, { kind: 'pull-request', number: 42, url: 'https://x/pull/42' }, AT)
   assert.deepEqual(on.pr, { number: 42, url: 'https://x/pull/42' })
   // It must outlive the agent: every read of it happens after the session has ended.
   assert.deepEqual(applyEventToMeta(on, { kind: 'end', ok: true }, AT).pr, { number: 42, url: 'https://x/pull/42' })
 })
 
 test('applyEventToMeta records the branch a branch event names (#1277)', () => {
-  const base = metaFromEvents(RUN.slice(0, 3), AT)
-  const on = applyEventToMeta(base, { kind: 'branch', branch: 'tf-agent-r1' }, AT)
+  const on = applyEventToMeta(BASE, { kind: 'branch', branch: 'tf-agent-r1' }, AT)
   assert.equal(on.branch, 'tf-agent-r1')
   // A rename mid-run replaces it: the meta always names the branch the work is on now.
   const renamed = applyEventToMeta(on, { kind: 'branch', branch: 'tf-cool-name' }, AT)

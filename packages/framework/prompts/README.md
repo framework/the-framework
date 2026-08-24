@@ -6,7 +6,6 @@ is written in TypeScript any more, so prompting can change without touching the 
 | file | what it is |
 |---|---|
 | `system_prompt.md` | The built-in system prompt (#326). Rom's doc. |
-| `extend_prompt.md` | The prompt a build session opens with (#1347): deliver the intent within the existing codebase (#185). `${{ tf.prompt }}` is the user's intent. |
 | `protocols/await.md` | How to emit an awaited choice so the turn-boundary gate can detect it (#337/#339). |
 | `protocols/signal.md` | How to emit `setSessionName()` / `setReadyForMerge()` (#326). |
 | `presets/*.md` | One file per preset button: research (#331), readability (#360), maintainability (#361), security_audit (#461), ux (#472). |

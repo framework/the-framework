@@ -4,7 +4,6 @@ import { createAgentControls, emitSessionStart, endStopDetail } from './agent-te
 import { createTurnSignalEmitter } from './turn-gate.js'
 import { runAwaitRounds } from './await-gate.js'
 import { runTodoLoop, type TodoLoopResult } from './todo-loop.js'
-import { extendPrompt } from './steps.js'
 import { type ChoicePick, type ChoiceRequest, type FrameworkEvent } from './events.js'
 import type { AgentMessages } from './agent-messages.js'
 import { isHandsOff, type AgentLocation } from './agent-location.js'
@@ -195,7 +194,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<RunAgentResult> {
   try {
     const rounds = await runAwaitRounds({
       session,
-      prompt: openingPrompt(opts, kind, resuming),
+      prompt: openingPrompt(opts, resuming),
       emitTurnSignals,
       requestChoice: opts.requestChoice,
       emit,
@@ -271,20 +270,19 @@ export async function runAgent(opts: RunAgentOptions): Promise<RunAgentResult> {
 }
 
 /**
- * The first thing the agent is sent.
+ * The first thing the agent is sent: the user's text rendered through the system prompt's own
+ * `# User prompt` slot — the one place the user prompt is framed, for a build and a prompt
+ * session alike (#1683 review: the build wrapper that used to sit beside it said nothing the
+ * system prompt did not).
  *
  * A resumed session (#720/#1467) gets the text verbatim: the `--resume`d transcript already
  * carries the framing, so composing it again would stack a second preamble onto a conversation
- * that lived through the first. So does a transparent or prompt-less session, which is what
- * "raw `claude -p`" means. A build extends the existing codebase (#185) — a project is a repo
- * that already exists, so the greenfield from-scratch framing is gone (#1683 review).
+ * that lived through the first. So does a transparent or vanilla session — no built-in prompt
+ * means no slot to render into.
  */
-function openingPrompt(opts: RunAgentOptions, kind: AgentKind, resuming: boolean): string {
-  if (resuming || opts.transparent) return opts.prompt
-  if (kind === 'prompt') {
-    return opts.vanilla ? opts.prompt : renderSystemPrompt({ prompt: opts.prompt }).user
-  }
-  return extendPrompt(opts.prompt)
+function openingPrompt(opts: RunAgentOptions, resuming: boolean): string {
+  if (resuming || opts.transparent || opts.vanilla) return opts.prompt
+  return renderSystemPrompt({ prompt: opts.prompt }).user
 }
 
 /** The live-chat phase a build reaches after its backlog, sharing the rounds' own loop. */

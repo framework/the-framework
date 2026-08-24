@@ -11,9 +11,12 @@ import { renderTemplate } from './prompt-template.js'
  * name the system prompt gives the user's prompt.
  */
 
+/** Fill the user's intent into a compiled build-opening template. */
+const fill = (template: string, intent: string): string => renderTemplate(template, { tf: { prompt: intent } })
+
 /** The greenfield build prompt (`prompts/build_prompt.md`). The stack is the agent's call (#545). */
 export function buildPrompt(intent: string): string {
-  return renderTemplate(BUILD_PROMPT, { tf: { prompt: intent } })
+  return fill(BUILD_PROMPT, intent)
 }
 
 /**
@@ -21,7 +24,7 @@ export function buildPrompt(intent: string): string {
  * holds source at build time (#185).
  */
 export function extendPrompt(intent: string): string {
-  return renderTemplate(EXTEND_PROMPT, { tf: { prompt: intent } })
+  return fill(EXTEND_PROMPT, intent)
 }
 
 /**
@@ -29,7 +32,7 @@ export function extendPrompt(intent: string): string {
  * the workspace empty (#182).
  */
 export function scaffoldPrompt(intent: string): string {
-  return renderTemplate(SCAFFOLD_PROMPT, { tf: { prompt: intent } })
+  return fill(SCAFFOLD_PROMPT, intent)
 }
 
 const IGNORED_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.next', '.turbo', '.cache', '.vite'])

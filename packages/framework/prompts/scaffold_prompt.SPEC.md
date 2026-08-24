@@ -2,7 +2,11 @@ The scaffold retry prompt: the hard directive sent when a build's opening turn l
 
 ## Business logic
 
-A build agent sometimes stalls rather than scaffolding — waiting for code that does not exist, or refusing because the directory is empty. This retry states plainly that no app exists yet and the agent must create the entire app from scratch now: an empty directory is expected, not a reason to refuse or wait, and the agent is not to stop until the requested features exist and the app runs. The user's intent fills the first line.
+Sent as a retry when the opening build turn produced no source — the agent stalled waiting for code that does not exist, or refused because the directory is empty; the user's intent fills the `${{ tf.prompt }}` slot. The prompt file beside this spec is itself the prose of what the agent is told.
+
+## Rationale
+
+Its insistence that an empty directory is expected — not a reason to refuse or wait — exists because that stall is exactly how the failed builds looked.
 
 ## Before modifying/creating SPEC.md files
 

@@ -2,7 +2,11 @@ The greenfield build prompt: the opening prompt of a build agent whose workspace
 
 ## Business logic
 
-It frames a from-scratch, end-to-end build of the user's intent: the workspace may be empty, and if so the agent is to scaffold the whole project — package manifest with scripts, all config, every source file — install the dependencies, and make the app run, then summarize what it built in one short paragraph. The user's intent fills the first line; the stack is deliberately left to the agent.
+Sent as the opening prompt when the workspace holds no source at build time; the user's intent fills the `${{ tf.prompt }}` slot. The prompt file beside this spec is itself the prose of what the agent is told.
+
+## Rationale
+
+The stack is deliberately not prescribed — it is the agent's call.
 
 ## Before modifying/creating SPEC.md files
 

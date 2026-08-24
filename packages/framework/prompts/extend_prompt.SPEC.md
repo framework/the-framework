@@ -2,7 +2,11 @@ The existing-codebase prompt: the opening prompt of a build agent whose workspac
 
 ## Business logic
 
-It names the one thing the agent cannot infer — this codebase already exists — and the work to deliver, then asks for a one-paragraph summary of what changed. Nothing more: the how-to-behave rules it once carried (do not re-scaffold, read the existing code first, smallest coherent change set) were dropped as babysitting a capable agent, and it never suggests the workspace might be empty, because it is not.
+Sent as the opening prompt when the workspace already holds source at build time; the user's intent fills the `${{ tf.prompt }}` slot. The prompt file beside this spec is itself the prose of what the agent is told.
+
+## Rationale
+
+It names the one thing the agent cannot infer — that this codebase already exists — and nothing more: the how-to-behave rules it once carried (do not re-scaffold, read the existing code first, smallest coherent change set) were dropped as babysitting a capable agent, and it never suggests the workspace might be empty, because it is not.
 
 ## Before modifying/creating SPEC.md files
 

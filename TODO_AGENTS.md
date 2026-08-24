@@ -40,6 +40,7 @@
 - [ ] Create tickets/2026-07-10_cli.plan.md
 - [ ] Create tickets/2026-07-10_database.plan.md
 - [ ] Create tickets/2026-07-10_system-prompt.plan.md
+- [ ] Create tickets/2026-07-07_background-jobs.plan.md
 
 
 ## Priority 4

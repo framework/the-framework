@@ -605,10 +605,18 @@ async function createSession({ repo, branch, prompt }) {
 
   const bare = String(repo).split('/').pop() ?? repo
   const repoWanted = [String(repo).toLowerCase(), bare.toLowerCase()]
-  let repoChip = menuTriggers().find(t => repoWanted.includes(t.text.toLowerCase()))
+  // The chips render a beat after the composer, and the page remembers the last repo picked: it
+  // may already show ours (nothing to pick), another one (its chip is the picker), or the bare
+  // "Select repo" trigger. Wait for whichever appears rather than reading an unfinished page.
+  const repoChipOf = () => menuTriggers().find(t => repoWanted.includes(t.text.toLowerCase()))
+  const pickerOf = () =>
+    menuTriggers().find(t => /select repo|add repo|repositor/i.test(t.text)) ??
+    menuTriggers().find(t => t.via === 'combobox' && t.text)
+  const seen = await waitFor(() => repoChipOf() ?? pickerOf(), MENU_WAIT_MS)
+  let repoChip = repoChipOf()
   let repoNote = repoChip ? `repo already ${repoChip.text}` : ''
   if (!repoChip) {
-    const trigger = menuTriggers().find(t => /select repo|add repo|repositor/i.test(t.text))
+    const trigger = seen ? pickerOf() : undefined
     if (!trigger) return { ok: false, note: `no repo picker on the page (${JSON.stringify(probeNewSession().triggers)})` }
     const pick = await chooseFrom(trigger, repoWanted, 'repo')
     if (!pick.ok) return pick

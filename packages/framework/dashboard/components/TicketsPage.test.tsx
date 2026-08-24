@@ -252,3 +252,90 @@ describe('TicketsPage grouping (#1144)', () => {
     await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith('p2', expect.any(String), 'r9'))
   })
 })
+
+// The page-wide spin-up button: the row's play button lifted to the page's heading — one
+// unattended agent working exactly the shown (filtered) set, one agent per project when the
+// shown set spans several.
+describe('TicketsPage spin up the shown set', () => {
+  test('the header button works the whole shown set: one start, every shown file on the prompt', async () => {
+    onAllTickets.mockResolvedValue([
+      {
+        projectId: 'p1',
+        projectName: 'Alpha',
+        tickets: [ticket({ file: 'a.md', title: 'First' }), ticket({ file: 'b.md', title: 'Second' })],
+      },
+    ])
+    const { sendStart } = await import('../rpc/control.js')
+    vi.mocked(sendStart).mockClear().mockResolvedValue({ ok: true, agentId: 'a1' })
+    const onAgentStarted = vi.fn()
+    render(<TicketsPage onOpenTicket={() => {}} onAgentStarted={onAgentStarted} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Spin up an agent working on all 2 tickets shown below' }))
+    // The exact ask (#1187), files in the shown order — and no `ticket` on the options: with
+    // several files, no single ticket is "the" one the agent implements.
+    const prompt = 'Work on all of the following tickets:\n- tickets/a.md\n- tickets/b.md\nDo not start any other ticket.'
+    await waitFor(() => expect(sendStart).toHaveBeenCalledWith('p1', prompt, 'prompt', { unattended: true }))
+    expect(sendStart).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith('p1', prompt, 'a1'))
+  })
+
+  test('the header button starts only what the filters show — one shown ticket is the row\'s own start', async () => {
+    onAllTickets.mockResolvedValue([
+      {
+        projectId: 'p1',
+        projectName: 'Alpha',
+        tickets: [ticket({ file: 'lock.md', title: 'Improve the lock' }), ticket({ file: 'other.md', title: 'Something else' })],
+      },
+    ])
+    window.history.replaceState(null, '', '/tickets?q=lock')
+    const { sendStart } = await import('../rpc/control.js')
+    vi.mocked(sendStart).mockClear().mockResolvedValue({ ok: true, agentId: 'a2' })
+    render(<TicketsPage onOpenTicket={() => {}} />)
+    // Filtered to one, the label goes singular and the start degrades to the row's exact ask,
+    // `ticket` riding the options as it does there (#1117).
+    fireEvent.click(await screen.findByRole('button', { name: 'Spin up an agent working on the ticket shown below' }))
+    await waitFor(() =>
+      expect(sendStart).toHaveBeenCalledWith('p1', 'Work on tickets/lock.md. Do not start any other ticket.', 'prompt', {
+        unattended: true,
+        ticket: 'tickets/lock.md',
+      }),
+    )
+    expect(sendStart).toHaveBeenCalledTimes(1)
+  })
+
+  test('a shown set spanning projects says so on the label and fans out one agent per project', async () => {
+    onAllTickets.mockResolvedValue([
+      {
+        projectId: 'p1',
+        projectName: 'Alpha',
+        tickets: [ticket({ file: 'a.md', title: 'First' }), ticket({ file: 'b.md', title: 'Second' })],
+      },
+      { projectId: 'p2', projectName: 'Beta', tickets: [ticket({ file: 'c.md', title: 'Third' })] },
+    ])
+    const { sendStart } = await import('../rpc/control.js')
+    vi.mocked(sendStart).mockClear().mockResolvedValue({ ok: true, agentId: 'a3' })
+    const onAgentStarted = vi.fn()
+    render(<TicketsPage onOpenTicket={() => {}} onAgentStarted={onAgentStarted} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Spin up 2 agents working on all 3 tickets shown below' }))
+    // Each project's agent is told its own shown files, nothing cross-repo.
+    const alphaPrompt = 'Work on all of the following tickets:\n- tickets/a.md\n- tickets/b.md\nDo not start any other ticket.'
+    await waitFor(() => expect(sendStart).toHaveBeenCalledTimes(2))
+    expect(sendStart).toHaveBeenCalledWith('p1', alphaPrompt, 'prompt', { unattended: true })
+    expect(sendStart).toHaveBeenCalledWith('p2', 'Work on tickets/c.md. Do not start any other ticket.', 'prompt', {
+      unattended: true,
+      ticket: 'tickets/c.md',
+    })
+    // The shell is pointed at one agent, not bounced through all of them.
+    await waitFor(() => expect(onAgentStarted).toHaveBeenCalledTimes(1))
+    expect(onAgentStarted).toHaveBeenCalledWith('p1', alphaPrompt, 'a3')
+  })
+
+  test('nothing shown, no button: an empty shown set is not an offer', async () => {
+    onAllTickets.mockResolvedValue([
+      { projectId: 'p1', projectName: 'Alpha', tickets: [ticket({ file: 'a.md', title: 'First' })] },
+    ])
+    window.history.replaceState(null, '', '/tickets?q=zzz-no-match')
+    render(<TicketsPage onOpenTicket={() => {}} />)
+    await screen.findByText(/1 ticket hidden by the current filters/i)
+    expect(screen.queryByRole('button', { name: /spin up an agent/i })).toBeNull()
+  })
+})

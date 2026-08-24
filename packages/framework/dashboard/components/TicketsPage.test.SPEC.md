@@ -6,6 +6,8 @@ Filtering: searching narrows the rows, updates the shown/total tally beside the 
 
 Grouping: the flat mode renders one cross-project list ordered across projects, with each row naming its project and no per-project update controls; opening a flat row still identifies its own project and file; and a flat row's start button runs the work agent in that row's own project, unattended, with the ticket named on it.
 
+The page-wide spin-up button: it starts one unattended agent told exactly the shown files and nothing else, and reports that agent to the shell; filters narrow what it starts, a single shown ticket degrading to the row start's own one-ticket ask with the ticket named on the agent; a shown set spanning projects counts the agents on the button's label and fans out one start per project, each told only its own project's shown files, with the shell pointed at the first started agent only; and with nothing shown the button is absent.
+
 ## Before modifying/creating SPEC.md files
 
 You must always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

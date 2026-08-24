@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Play } from 'lucide-react'
 import type { ProjectTickets } from '../../src/index.js'
 import { onAllTickets } from '../rpc/reads.js'
 import { sendStart } from '../rpc/control.js'
@@ -16,8 +17,21 @@ import {
 } from '../lib/ticket-filter.js'
 import { ScrollArea } from './ui/scroll-area.js'
 import { Button } from './ui/button.js'
+import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import { TicketFilterBar } from './TicketFilterBar.js'
 import { TicketsPanel, TicketRow, planPrompt, workOnTicketPrompt } from './TicketsPanel.js'
+
+/**
+ * The prompt the page-wide spin-up button fires per project: work every one of that project's
+ * shown tickets, nothing else. One shown ticket degrades to `workOnTicketPrompt`'s exact
+ * sentence — one ask, one wording, however many rows it was made for. Exported so the test
+ * asserts the exact ask rather than a copy (#1187).
+ */
+export function workOnTicketsPrompt(files: string[]): string {
+  const [only] = files
+  if (only !== undefined && files.length === 1) return workOnTicketPrompt(only)
+  return ['Work on all of the following tickets:', ...files.map(f => `- tickets/${f}`), 'Do not start any other ticket.'].join('\n')
+}
 
 /** Stable initial for the cross-project tickets poll, so it does not churn on every render. */
 const EMPTY_GROUPS: ProjectTickets[] = []
@@ -94,31 +108,105 @@ export function TicketsPage({
     )
     if (result?.ok) onAgentStarted?.(projectId, prompt, result.agentId)
   }
+  // The page-wide spin-up: one unattended agent per project among the shown tickets, each told to
+  // work exactly its project's shown files in the shown order and nothing else. Per project
+  // because an agent runs inside one repo; a batch of one project — the common case, and the only
+  // one the button calls "an agent" — is a single start. A batch of one *file* rides the same
+  // options the row's own start sends, `ticket` included (#1117); with several files no single
+  // ticket is "the" one the agent implements, so the option stays off and the prompt carries them.
+  const startShown = async (batches: { projectId: string; files: string[] }[]) => {
+    const started = await run(async () => {
+      let first: { projectId: string; prompt: string; agentId?: string | undefined } | undefined
+      for (const { projectId, files } of batches) {
+        const prompt = workOnTicketsPrompt(files)
+        const [only] = files
+        const result = await sendStart(projectId, prompt, 'prompt', {
+          unattended: true,
+          ...(only !== undefined && files.length === 1 ? { ticket: `tickets/${only}` } : {}),
+        })
+        // Surfaces the daemon's own reason via useAction; the agents already started stay started.
+        if (!result.ok) return result
+        first ??= { projectId, prompt, agentId: result.agentId }
+      }
+      return { ok: true as const, first }
+    }, 'The agent could not be started.')
+    if (started?.ok && started.first) onAgentStarted?.(started.first.projectId, started.first.prompt, started.first.agentId)
+  }
 
   // A project deselected in the Project facet disappears entirely — its section would otherwise
   // just say "N hidden by filters", which is noise about a choice the reader made on purpose.
   const shownGroups = view.filters.projects.length > 0 ? groups.filter(g => view.filters.projects.includes(g.projectId)) : groups
   const flatRows = sortRows(visible, view.sort)
 
+  // What the spin-up button acts on: one batch per project among the shown rows, files in the
+  // page's own sort order — the set is exactly the tally's "shown", so the button never starts
+  // work on a ticket the reader cannot see below it.
+  const byProject = new Map<string, string[]>()
+  for (const r of flatRows) {
+    const files = byProject.get(r.projectId)
+    if (files) files.push(r.ticket.file)
+    else byProject.set(r.projectId, [r.ticket.file])
+  }
+  const shownBatches = [...byProject].map(([projectId, files]) => ({ projectId, files }))
+  // The label is the spend readout: it says how many agents one click costs, and goes plural the
+  // moment the shown set spans projects — "an agent" only ever promises a single start.
+  const spinUpLabel =
+    shownBatches.length > 1
+      ? `Spin up ${shownBatches.length} agents working on all ${flatRows.length} tickets shown below`
+      : flatRows.length === 1
+        ? 'Spin up an agent working on the ticket shown below'
+        : `Spin up an agent working on all ${flatRows.length} tickets shown below`
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="space-y-2 border-b border-border px-6 py-3">
-        <div>
-          <h1 className="text-base font-semibold">
-            Tickets
-            {/* Shown/total beside the name it counts (#1144 follow-up) — it describes the page's
-                content, not the toolbar's controls. Unfiltered it reads n/n, doubling as the
-                backlog's total, which the page otherwise says nowhere. */}
-            {loaded && rows.length > 0 && (
-              <span className="ml-2 text-xs font-normal text-muted-foreground">
-                {visible.length}/{rows.length}
-              </span>
-            )}
-          </h1>
-          <p className="text-xs text-muted-foreground">
-            Every project&apos;s <code className="rounded bg-muted px-1">tickets/</code> backlog — what the agent plans from.
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+          <div>
+            <h1 className="text-base font-semibold">
+              Tickets
+              {/* Shown/total beside the name it counts (#1144 follow-up) — it describes the page's
+                  content, not the toolbar's controls. Unfiltered it reads n/n, doubling as the
+                  backlog's total, which the page otherwise says nowhere. */}
+              {loaded && rows.length > 0 && (
+                <span className="ml-2 text-xs font-normal text-muted-foreground">
+                  {visible.length}/{rows.length}
+                </span>
+              )}
+            </h1>
+            <p className="text-xs text-muted-foreground">
+              Every project&apos;s <code className="rounded bg-muted px-1">tickets/</code> backlog — what the agent plans from.
+            </p>
+          </div>
+          {/* The whole shown set as one start: the row's play button lifted to the page. Rendered
+              only over a non-empty shown set — "all 0 tickets" is not an offer, and the list below
+              already explains an empty one. */}
+          {loaded && flatRows.length > 0 && (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0 gap-1.5"
+                    disabled={busy}
+                    onClick={() => void startShown(shownBatches)}
+                  />
+                }
+              >
+                <Play className="h-3.5 w-3.5" aria-hidden />
+                {busy ? 'Starting…' : spinUpLabel}
+              </TooltipTrigger>
+              <TooltipContent>
+                {shownBatches.length > 1
+                  ? "An agent works inside one project, so each project's shown tickets get their own unattended agent."
+                  : 'One unattended agent, told to work exactly what the current filters show and start nothing else.'}
+              </TooltipContent>
+            </Tooltip>
+          )}
         </div>
+        {/* Page-level start failures land here, above the toolbar, so grouped mode shows them too —
+            the header owns a start of its own now, not just the flat rows'. */}
+        {error && <p className="text-xs text-danger">{error}</p>}
         <TicketFilterBar
           view={view}
           rows={rows}
@@ -140,7 +228,6 @@ export function TicketsPage({
             // per-project Update bars here — those belong to the sections, and grouped mode is a
             // menu click away.
             <div className="space-y-2">
-              {error && <p className="text-xs text-danger">{error}</p>}
               {filtered && rows.length - visible.length > 0 && (
                 <div className="flex items-center gap-3 text-xs text-muted-foreground">
                   <span>

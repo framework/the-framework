@@ -1,0 +1,15 @@
+# Bug analysis: packages/framework/dashboard/lib/resume-command.ts
+
+## Business logic (high-level)
+
+Builds the copyable one-liner that reopens an agent's driver conversation in the user's own terminal (#1195): `mkdir -p <dir> && cd <dir> && claude --resume <id>`. The mkdir is load-bearing (SPEC rationale: the CLI matches a session by the cwd it ran in, and a cleanly finished agent's worktree is gone; an empty directory at the original path suffices). Fallbacks per SPEC: no `sessionId` → null (nothing to copy); id but no `workspace` → the bare id, so the caller can label which of the two it copied. No permission-mode flag by decision.
+
+The one real problem: `dir` (the recorded `SessionInfo.workspace`, which is `opts.cwd` — an absolute path rooted in the user's repo checkout, see src/agent-telemetry.ts L35) is interpolated into the shell line *unquoted*. The framework's own path components (`.the-framework/branches/<generated-name>`) are shell-safe, but the repo prefix is wherever the user keeps the repo. A path containing a space — routine on macOS (`/Users/John Doe/…`, `/Volumes/My Drive/…`) — makes the pasted command wrong: `mkdir -p` creates two bogus directories, `cd` fails, and the `&&` chain stops before `claude --resume` (fails safe, but the feature simply does not work for those users). Paths with `$`, quotes, `&`, `;` etc. would additionally be interpreted by the shell — not attacker-controlled (the daemon recorded its own cwd under the user's chosen repo path), so this is a correctness break rather than an injection vector. The session id side is safe (driver-generated UUID-ish token).
+
+## Functions (low-level)
+
+- `buildResumeCommand(session)` — accepts `Pick<SessionInfo,'sessionId'|'workspace'> | null | undefined`. Null/undefined/absent id → null; id without dir → id; both → the one-liner. Empty-string id is treated as absent (`!id`), empty-string dir likewise (`!dir`) — both correct readings of "not recorded". Verdict: bug found (quoting), otherwise correct.
+
+## Bugs found
+
+1. `L24`: the workspace path is embedded in the shell command without quoting, so any repo checkout whose absolute path contains a space (or another shell-significant character) yields a command that creates the wrong directories and never reaches `claude --resume`. Trigger: repo at `/Users/John Doe/proj`, copy the resume command, paste it — `cd` fails with "No such file or directory". Contradicts the feature's whole intent (a working one-liner; SPEC: "the command recreates the directory the agent ran in, changes into it, and resumes"). Severity: minor (feature dead for affected paths, fails without side effects beyond two junk directories). Confidence: high that the command breaks on such paths; medium that users hit it (spaceless paths are common among developers, spaced ones common on stock macOS). Fix: quote the path — e.g. `` const q = `'${dir.replaceAll("'", `'\\''`)}'` `` (or double-quote it) and emit `mkdir -p ${q} && cd ${q} && claude --resume ${id}`; update the test's expected strings.

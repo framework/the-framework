@@ -8,6 +8,7 @@ import { sendStart } from '../rpc/control.js'
 import { onTicketsMeta } from '../rpc/reads.js'
 import { Button } from './ui/button.js'
 import { Badge } from './ui/badge.js'
+import { Checkbox } from './ui/checkbox.js'
 import { useAction } from '../lib/use-action.js'
 import { useLoaded } from '../lib/use-async.js'
 import { formatRelative, formatAge, formatDateTime } from '../lib/format-date.js'
@@ -53,6 +54,8 @@ export function TicketRow({
   ticket,
   projectName,
   busy,
+  selected,
+  onToggleSelect,
   onOpen,
   onStartWork,
   onOpenPlan,
@@ -65,6 +68,11 @@ export function TicketRow({
   projectName?: string | undefined
   /** Disables the session-starting buttons while a session start is in flight. */
   busy: boolean
+  /** Whether the row is picked for the surrounding page's bulk actions — the page owns the
+   *  selection, the row only shows and toggles it. Without a toggle handler no checkbox
+   *  renders, like the click-to-filter handlers: selection is a page feature, not the row's. */
+  selected?: boolean | undefined
+  onToggleSelect?: (() => void) | undefined
   onOpen: () => void
   /** The start column: spin up an agent implementing this one ticket. */
   onStartWork: () => void
@@ -78,7 +86,16 @@ export function TicketRow({
 }) {
   return (
     <li className="flex items-stretch transition-colors hover:bg-accent/60">
-      {/* The start column, the row's left edge: one click spins up an agent implementing this
+      {/* The selection checkbox, the row's left edge — GitHub's list idiom: pick some rows and the
+          page's bulk actions narrow to them. Never disabled: selecting is page state, not an
+          action, so it costs nothing and can be changed any time. A sibling of the open button
+          like every control on the row. */}
+      {onToggleSelect && (
+        <div className="flex w-8 shrink-0 items-center justify-center">
+          <Checkbox checked={selected ?? false} onCheckedChange={() => onToggleSelect()} aria-label={`Select ${ticket.title}`} />
+        </div>
+      )}
+      {/* The start column: one click spins up an agent implementing this
           ticket — the AI Queue card's play button (#855), offered where the backlog is read
           instead of only after queueing. A sibling of the open button like every control on the
           row (an interactive control nested in a button is invalid HTML): starting is not opening. */}
@@ -256,6 +273,8 @@ export function TicketsPanel({
   tickets,
   loaded,
   hiddenByFilter = 0,
+  isSelected,
+  onToggleSelect,
   onOpen,
   onOpenPlan,
   onAgentStarted,
@@ -266,6 +285,12 @@ export function TicketsPanel({
   projectId: string | null
   tickets: WorkspaceTicket[]
   loaded: boolean
+  /** Whether a row's ticket is picked for the surrounding page's bulk actions — the selection
+   *  lives on the page (it spans projects), the panel only threads it to its rows by file.
+   *  Absent on a page with nothing to scope to a selection, and the rows then carry no
+   *  checkbox, like the click-to-filter handlers. */
+  isSelected?: ((file: string) => boolean) | undefined
+  onToggleSelect?: ((file: string) => void) | undefined
   /** How many of this project's tickets the caller's filters hid (#1144/#1230). An empty
    *  `tickets` with some hidden reads as "filtered", not as "nothing here" — the import prompt
    *  offers work that has already been done. */
@@ -387,6 +412,8 @@ export function TicketsPanel({
             key={ticket.file}
             ticket={ticket}
             busy={busy}
+            selected={isSelected?.(ticket.file) ?? false}
+            onToggleSelect={onToggleSelect ? () => onToggleSelect(ticket.file) : undefined}
             onOpen={() => onOpen(ticket.file)}
             onStartWork={() => void startWork(ticket.file)}
             onOpenPlan={onOpenPlan ? () => onOpenPlan(ticket.file) : undefined}

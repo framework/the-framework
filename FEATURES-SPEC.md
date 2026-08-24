@@ -101,6 +101,7 @@ happens while nobody is at the keyboard.
 - Queue a ticket into the AI queue
 - Queue every ticket the filters show into the AI queue, in one click from the page heading
 - Queue a plan for every unplanned ticket the filters show, from the same heading
+- Select tickets row by row (a checkbox per row) — while any are selected, the heading's queue buttons act on just the selected tickets
 - Tickets carry a GitHub issue link, so merging closes the issue
 
 ## Handoff and what lands in git

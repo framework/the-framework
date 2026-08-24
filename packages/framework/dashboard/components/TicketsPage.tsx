@@ -39,7 +39,8 @@ function initialView(): TicketsView {
 // faceted filters (priority/topics/stage/effort/uncertainty/project/unlinked), sort with
 // direction, and Group by project (each section its own poll-independent TicketsPanel) vs a flat
 // cross-project list — the one view that can answer "what is the single highest-priority ticket
-// anywhere".
+// anywhere". Rows are selectable (GitHub's list idiom): while any shown row is ticked, the
+// heading's queue buttons narrow from the whole shown set to just the selected tickets.
 export function TicketsPage({
   onOpenTicket,
   onOpenTicketPlan,
@@ -170,31 +171,61 @@ export function TicketsPage({
   const shownGroups = view.filters.projects.length > 0 ? groups.filter(g => view.filters.projects.includes(g.projectId)) : groups
   const flatRows = sortRows(visible, view.sort)
 
-  // What the queue-add buttons act on — the shown rows minus what each add would waste. Both
-  // skip claimed tickets: a ticket some agent already holds (#1420) is being worked, and its
-  // entry would outlive that work as queue noise. The plan add also skips planned tickets,
-  // whose plan already exists. In the shown order, each row carrying its own project, so a
-  // cross-project view needs no special case: every entry lands on its own project's queue.
-  const targets = flatRows.filter(r => !r.ticket.locked)
-  const claimedShown = flatRows.length - targets.length
+  // The row selection (GitHub's list idiom): tick some rows and the queue buttons narrow to just
+  // them. Keyed project + file, since the page spans projects and two projects can share a
+  // filename. Only shown selected rows count — a selected ticket the filters hide is neither
+  // acted on nor counted, and comes back with its row — so what the buttons act on is always
+  // visible below. A key whose ticket is gone lingers in the set harmlessly: it intersects
+  // nothing shown.
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
+  const toggleSelected = (key: string) =>
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (!next.delete(key)) next.add(key)
+      return next
+    })
+  const selectedShown = flatRows.filter(r => selected.has(`${r.projectId}/${r.ticket.file}`))
+  const hasSelection = selectedShown.length > 0
+
+  // What the queue-add buttons act on — the shown rows, narrowed to the selected ones the moment
+  // any row is selected, minus what each add would waste. Both skip claimed tickets: a ticket
+  // some agent already holds (#1420) is being worked, and its entry would outlive that work as
+  // queue noise. The plan add also skips planned tickets, whose plan already exists. In the
+  // shown order, each row carrying its own project, so a cross-project view needs no special
+  // case: every entry lands on its own project's queue.
+  const scope = hasSelection ? selectedShown : flatRows
+  const targets = scope.filter(r => !r.ticket.locked)
+  const claimedShown = scope.length - targets.length
   const planTargets = targets.filter(r => !r.ticket.planned)
-  const planSkipped = flatRows.length - planTargets.length
-  // One flip per shown set and per button: once this exact set is queued the button says so and
-  // rests, and any change to the set — a filter, a poll bringing new tickets — arms it again.
+  const planSkipped = scope.length - planTargets.length
+  // One flip per acted-on set and per button: once this exact set is queued the button says so and
+  // rests, and any change to the set — a filter, a poll bringing new tickets, a selection — arms
+  // it again.
   const queueKey = targets.map(r => `${r.projectId}/${r.ticket.file}`).join('\n')
   const queuedShown = queuedKey === queueKey
   const planKey = planTargets.map(r => `${r.projectId}/${r.ticket.file}`).join('\n')
   const plansQueuedShown = plansQueuedKey === planKey
-  // The labels count what the click adds — and stop saying "all" the moment their count differs
-  // from the shown tally, never promising a ticket they will skip.
-  const queueLabel =
-    targets.length === 1
+  // The labels count what the click adds — saying "selected" while a selection narrows the
+  // buttons, and stopping saying "all" the moment their count differs from the set's tally,
+  // never promising a ticket they will skip.
+  const queueLabel = hasSelection
+    ? targets.length === 1
+      ? `Add the ${claimedShown > 0 ? 'one unclaimed ' : ''}selected ticket to the AI queue`
+      : claimedShown > 0
+        ? `Add the ${targets.length} unclaimed selected tickets to the AI queue`
+        : `Add the ${targets.length} selected tickets to the AI queue`
+    : targets.length === 1
       ? `Add the ${claimedShown > 0 ? 'one unclaimed ' : ''}ticket shown below to the AI queue`
       : claimedShown > 0
         ? `Add the ${targets.length} unclaimed tickets shown below to the AI queue`
         : `Add all ${targets.length} tickets shown below to the AI queue`
-  const planLabel =
-    planTargets.length === 1
+  const planLabel = hasSelection
+    ? planTargets.length === 1
+      ? `Queue a plan for the ${planSkipped > 0 ? 'one unplanned ' : ''}selected ticket`
+      : planSkipped > 0
+        ? `Queue plans for the ${planTargets.length} unplanned selected tickets`
+        : `Queue plans for the ${planTargets.length} selected tickets`
+    : planTargets.length === 1
       ? `Queue a plan for the ${planSkipped > 0 ? 'one unplanned ' : ''}ticket shown below`
       : planSkipped > 0
         ? `Queue plans for the ${planTargets.length} unplanned tickets shown below`
@@ -220,12 +251,26 @@ export function TicketsPage({
               Every project&apos;s <code className="rounded bg-muted px-1">tickets/</code> backlog — what the agent plans from.
             </p>
           </div>
-          {/* The whole shown set onto the queue: the detail page's Queue action lifted to the
-              page, and its plan sibling — the [Plan tickets] preset's entries for the same set.
-              Each renders only when it has something to add — "all 0 tickets" is not an offer,
-              the list below already explains an empty set, and an all-claimed (or, for plans,
-              all-planned) one has nothing left to ask for. */}
+          {/* The whole shown set onto the queue — or, with rows ticked, just the selected ones:
+              the detail page's Queue action lifted to the page, and its plan sibling — the [Plan
+              tickets] preset's entries for the same set. Each renders only when it has something
+              to add — "all 0 tickets" is not an offer, the list below already explains an empty
+              set, and an all-claimed (or, for plans, all-planned) one has nothing left to ask
+              for. */}
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            {/* The selection's own readout and exit: while any row is ticked the buttons stop
+                speaking for the shown set, so the count says what took over and the clear hands
+                the page back without hunting down every ticked box. */}
+            {hasSelection && (
+              <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="tabular-nums">
+                  {selectedShown.length} selected
+                </span>
+                <Button variant="outline" size="xs" onClick={() => setSelected(new Set())}>
+                  Clear selection
+                </Button>
+              </span>
+            )}
             {loaded && planTargets.length > 0 && (
               <Tooltip>
                 <TooltipTrigger
@@ -251,9 +296,10 @@ export function TicketsPage({
                   )}
                 </TooltipTrigger>
                 <TooltipContent>
-                  Each ticket gets its plan asked for on the AI queue — the same &quot;Create tickets/….plan.md&quot; entry the
+                  Each {hasSelection ? 'selected ' : ''}ticket gets its plan asked for on the AI queue — the same &quot;Create tickets/….plan.md&quot; entry the
                   Plan tickets preset queues — worked highest priority first and, within a priority, in the order shown below.
                   Tickets already planned, already queued, or held by an agent stay as they are.
+                  {hasSelection && ' The rest of the shown set stays put.'}
                 </TooltipContent>
               </Tooltip>
             )}
@@ -282,9 +328,10 @@ export function TicketsPage({
                   )}
                 </TooltipTrigger>
                 <TooltipContent>
-                  {'Every ticket joins the AI queue — the work the framework picks up on its own, worked highest priority first and, within a priority, in the order shown below. A ticket already queued stays as it is.'}
-                  {claimedShown === 1 && ' The claimed ticket shown is left to the agent holding it.'}
-                  {claimedShown > 1 && ` The ${claimedShown} claimed tickets shown are left to the agents holding them.`}
+                  {`Every ${hasSelection ? 'selected ' : ''}ticket joins the AI queue — the work the framework picks up on its own, worked highest priority first and, within a priority, in the order shown below. A ticket already queued stays as it is.`}
+                  {hasSelection && ' The rest of the shown set stays put.'}
+                  {claimedShown === 1 && ` The claimed ticket ${hasSelection ? 'selected' : 'shown'} is left to the agent holding it.`}
+                  {claimedShown > 1 && ` The ${claimedShown} claimed tickets ${hasSelection ? 'selected' : 'shown'} are left to the agents holding them.`}
                 </TooltipContent>
               </Tooltip>
             )}
@@ -337,6 +384,8 @@ export function TicketsPage({
                         ticket={r.ticket}
                         projectName={r.projectName}
                         busy={busy}
+                        selected={selected.has(`${r.projectId}/${r.ticket.file}`)}
+                        onToggleSelect={() => toggleSelected(`${r.projectId}/${r.ticket.file}`)}
                         onOpen={() => onOpenTicket(r.projectId, r.ticket.file)}
                         onStartWork={() => void startWork(r.projectId, r.ticket.file)}
                         onOpenPlan={onOpenTicketPlan ? () => onOpenTicketPlan(r.projectId, r.ticket.file) : undefined}
@@ -362,6 +411,8 @@ export function TicketsPage({
                       tickets={sorted.map(r => r.ticket)}
                       loaded
                       hiddenByFilter={g.tickets.length - groupRows.length}
+                      isSelected={file => selected.has(`${g.projectId}/${file}`)}
+                      onToggleSelect={file => toggleSelected(`${g.projectId}/${file}`)}
                       onOpen={file => onOpenTicket(g.projectId, file)}
                       onOpenPlan={onOpenTicketPlan ? file => onOpenTicketPlan(g.projectId, file) : undefined}
                       onAgentStarted={(intent, agentId) => onAgentStarted?.(g.projectId, intent, agentId)}

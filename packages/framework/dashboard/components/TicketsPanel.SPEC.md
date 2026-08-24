@@ -6,7 +6,7 @@ The user wants to read a project's backlog at a glance — what each ticket is, 
 
 ## Business logic — TL;DR
 
-- **A ticket is one row** - title, project (in the cross-project list), topics, claim, effort, uncertainty, priority, age, plan, and the GitHub item behind it, all on one line; the row opens the ticket's detail page.
+- **A ticket is one row** - title, project (in the cross-project list), topics, claim, effort, uncertainty, priority, age, plan, and the GitHub item behind it, all on one line; the row opens the ticket's detail page. Where the surrounding page selects tickets for its bulk actions, the row also leads with that selection's checkbox.
 - **Start work from the row** - a play control on the row's left edge starts an unattended agent on that one ticket and nothing else, with the ticket named on the agent.
 - **The plan column is either a plan or an offer to write one** - a planned ticket links to its plan; an unplanned one offers to start an agent that writes it.
 - **Claimed rows say who holds them** - a ticket an agent has claimed shows a hammer and the holder's name, meaning an agent is planning or implementing it.
@@ -31,6 +31,8 @@ See `## User story`.
 Every ticket occupies a single line. The title takes whatever width the row has to spare and truncates when it runs out; clicking it opens the ticket's detail page. In the flat cross-project list the row also names its project, since there is no section heading saying it. The rest of the line, from left to right: the ticket's topics, its claim, its effort and uncertainty estimates, its priority — coloured by how urgent it is, and spelled out as "Priority: 8" — and its age, with the exact date and time on hover. Priority, age and the plan column keep fixed widths, and a ticket with no GitHub item still reserves that column's width, so the columns line up down the whole list regardless of what any one ticket carries.
 
 Where the surrounding page supports filtering, a row's topics and its claim marker are clickable: a topic filters the page to that topic, the claim marker filters to claimed tickets. Where the page has no filters, they are plain labels.
+
+Where the surrounding page selects tickets for its bulk actions — the Tickets page's queue buttons — the row's left edge leads with a checkbox showing and toggling that selection. The selection itself belongs to the page (it can span projects); the row only reports the toggle, navigates nowhere on it, and never disables the box — selecting is state, not an action. Where the page selects nothing, no checkbox renders.
 
 ### Start work from the row
 

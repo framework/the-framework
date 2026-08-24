@@ -455,3 +455,121 @@ describe('TicketsPage queue plans for the shown set', () => {
     expect(screen.getByRole('button', { name: 'Add the ticket shown below to the AI queue' })).toBeTruthy()
   })
 })
+
+// Row selection (GitHub's list idiom): every row carries a checkbox, and while any is ticked the
+// heading's queue buttons speak for — and act on — just the selected tickets.
+describe('TicketsPage selection scopes the queue buttons', () => {
+  const threeTickets = () =>
+    onAllTickets.mockResolvedValue([
+      {
+        projectId: 'p1',
+        projectName: 'Alpha',
+        tickets: [
+          ticket({ file: 'a.md', title: 'First', priority: '7' }),
+          ticket({ file: 'b.md', title: 'Second' }),
+          ticket({ file: 'c.md', title: 'Third' }),
+        ],
+      },
+    ])
+
+  test('selected tickets are what the queue-add adds — the rest of the shown set stays put', async () => {
+    threeTickets()
+    const { sendQueueTicket } = await controls()
+    render(<TicketsPage onOpenTicket={() => {}} />)
+    await screen.findByText('First')
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select First' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Third' }))
+    expect(screen.getByText('2 selected')).toBeTruthy()
+    // The label stops speaking for the shown set and counts the selection instead.
+    fireEvent.click(screen.getByRole('button', { name: 'Add the 2 selected tickets to the AI queue' }))
+    await screen.findByRole('button', { name: 'Queued' })
+    expect(sendQueueTicket).toHaveBeenCalledTimes(2)
+    expect(sendQueueTicket).toHaveBeenCalledWith('p1', 'First', { file: 'a.md', priority: '7' })
+    expect(sendQueueTicket).toHaveBeenCalledWith('p1', 'Third', { file: 'c.md' })
+    // Changing the selection is changing the set: the rested button arms again for the new one.
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Second' }))
+    expect(await screen.findByRole('button', { name: 'Add the 3 selected tickets to the AI queue' })).toBeTruthy()
+  })
+
+  test('the plan button narrows to the selection the same way', async () => {
+    threeTickets()
+    const { sendQueueTicketPlan } = await controls()
+    render(<TicketsPage onOpenTicket={() => {}} />)
+    await screen.findByText('First')
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Second' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Queue a plan for the selected ticket' }))
+    await screen.findByRole('button', { name: 'Plans queued' })
+    expect(sendQueueTicketPlan).toHaveBeenCalledTimes(1)
+    expect(sendQueueTicketPlan).toHaveBeenCalledWith('p1', { file: 'b.md' })
+  })
+
+  test('clearing the selection hands the buttons back to the whole shown set', async () => {
+    threeTickets()
+    render(<TicketsPage onOpenTicket={() => {}} />)
+    await screen.findByText('First')
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select First' }))
+    expect(screen.getByRole('button', { name: 'Add the selected ticket to the AI queue' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Clear selection' }))
+    expect(screen.queryByText(/selected/)).toBeNull()
+    expect(screen.getByRole('button', { name: 'Add all 3 tickets shown below to the AI queue' })).toBeTruthy()
+  })
+
+  test('a claimed ticket in the selection is still skipped, and the label counts without it', async () => {
+    onAllTickets.mockResolvedValue([
+      {
+        projectId: 'p1',
+        projectName: 'Alpha',
+        tickets: [
+          ticket({ file: 'a.md', title: 'First' }),
+          ticket({ file: 'b.md', title: 'Second', locked: true, lockedBy: 'agent-1' }),
+        ],
+      },
+    ])
+    const { sendQueueTicket } = await controls()
+    render(<TicketsPage onOpenTicket={() => {}} />)
+    await screen.findByText('First')
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select First' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Second' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add the one unclaimed selected ticket to the AI queue' }))
+    await screen.findByRole('button', { name: 'Queued' })
+    expect(sendQueueTicket).toHaveBeenCalledTimes(1)
+    expect(sendQueueTicket).toHaveBeenCalledWith('p1', 'First', { file: 'a.md' })
+  })
+
+  test('a selected ticket the filters hide is neither counted nor acted on, and stays selected', async () => {
+    threeTickets()
+    const { sendQueueTicket } = await controls()
+    render(<TicketsPage onOpenTicket={() => {}} />)
+    await screen.findByText('Second')
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Second' }))
+    // Hide the selected row: the selection has nothing shown, so the buttons speak for the
+    // shown set again and the selection readout goes quiet.
+    fireEvent.change(screen.getByRole('textbox', { name: /search tickets/i }), { target: { value: 'First' } })
+    await waitFor(() => expect(screen.queryByText('Second')).toBeNull())
+    expect(screen.queryByText('1 selected')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Add the ticket shown below to the AI queue' }))
+    await screen.findByRole('button', { name: 'Queued' })
+    expect(sendQueueTicket).toHaveBeenCalledTimes(1)
+    expect(sendQueueTicket).toHaveBeenCalledWith('p1', 'First', { file: 'a.md', priority: '7' })
+    // The tick itself survives the filter and comes back with the row.
+    fireEvent.change(screen.getByRole('textbox', { name: /search tickets/i }), { target: { value: '' } })
+    const box = await screen.findByRole('checkbox', { name: 'Select Second' })
+    expect(box.getAttribute('data-checked')).not.toBeNull()
+  })
+
+  test('the flat cross-project list selects the same way, each row on its own project', async () => {
+    onAllTickets.mockResolvedValue([
+      { projectId: 'p1', projectName: 'Alpha', tickets: [ticket({ file: 'a.md', title: 'Alpha ticket' })] },
+      { projectId: 'p2', projectName: 'Beta', tickets: [ticket({ file: 'b.md', title: 'Beta ticket' })] },
+    ])
+    window.history.replaceState(null, '', '/tickets?group=none')
+    const { sendQueueTicket } = await controls()
+    render(<TicketsPage onOpenTicket={() => {}} />)
+    await screen.findByText('Beta ticket')
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Beta ticket' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add the selected ticket to the AI queue' }))
+    await screen.findByRole('button', { name: 'Queued' })
+    expect(sendQueueTicket).toHaveBeenCalledTimes(1)
+    expect(sendQueueTicket).toHaveBeenCalledWith('p2', 'Beta ticket', { file: 'b.md' })
+  })
+})

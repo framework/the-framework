@@ -10,6 +10,8 @@ The page-wide queue-add button: every shown ticket is queued the way the ticket 
 
 Its plan sibling: every shown ticket still to plan gets one plan ask queued, the ticket named with its priority, with no implementation entry and no agent started; after the click the button reads "Plans queued" and rests; planned and claimed tickets are skipped with the label counting only what is left to plan; a plan ask already queued (recognized by its exact wording) and a ticket already queued for implementation are not asked again; and with every shown ticket planned the plan button is absent while the queue-add still offers.
 
+Row selection: ticking rows makes both queue buttons say "selected", count only the ticked tickets, and act on just them — the rest of the shown set stays put — with the heading saying how many are selected; changing the selection re-arms a rested button for the new set; clearing the selection hands the buttons back to the whole shown set; a claimed ticket in the selection is still skipped, the label counting without it; a selected ticket the filters hide is neither counted nor acted on but stays ticked and comes back with the row; and the flat cross-project list selects the same way, each row queued on its own project.
+
 ## Before modifying/creating SPEC.md files
 
 You must always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

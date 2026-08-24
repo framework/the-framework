@@ -94,6 +94,33 @@ describe('TicketsPanel (#697/#1144)', () => {
     expect(await screen.findByText('plan-1-0')).toBeTruthy()
   })
 
+  test('rows carry a selection checkbox only when the page wires one, toggling by file without opening the row', async () => {
+    const onToggleSelect = vi.fn()
+    const onOpen = vi.fn()
+    render(
+      <TicketsPanel
+        projectId="p1"
+        tickets={[ticket()]}
+        loaded
+        isSelected={() => true}
+        onToggleSelect={onToggleSelect}
+        onOpen={onOpen}
+      />,
+    )
+    const box = await screen.findByRole('checkbox', { name: /select do the thing/i })
+    // The page said this row is picked, so the box shows it.
+    expect(box.getAttribute('data-checked')).not.toBeNull()
+    fireEvent.click(box)
+    expect(onToggleSelect).toHaveBeenCalledWith('2026-07-20_do-the-thing.md')
+    // A sibling of the row's open button, like every control here: selecting must not navigate.
+    expect(onOpen).not.toHaveBeenCalled()
+    cleanup()
+    // Without the page's wiring — a surface with nothing to scope to a selection — no checkbox.
+    render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onOpen={() => {}} />)
+    await screen.findByText('Do the thing')
+    expect(screen.queryByRole('checkbox')).toBeNull()
+  })
+
   test('topic badges filter on click when the page passes a handler, without opening the row (#1144)', async () => {
     const onOpen = vi.fn()
     const onTopicClick = vi.fn()

@@ -2,7 +2,7 @@ The dashboard's Tickets page: every registered project's `tickets/` backlog on o
 
 ## User story
 
-The user wants to see the whole backlog — not one project's slice of it — decide what to work next, and act on a ticket right there: read it, read its plan, have an agent plan it, or have an agent work it. And when the filters have carved out a coherent slice, they want to queue that whole slice for the AI in one click.
+The user wants to see the whole backlog — not one project's slice of it — decide what to work next, and act on a ticket right there: read it, read its plan, have an agent plan it, or have an agent work it. And when the filters have carved out a coherent slice, they want to queue that whole slice for the AI in one click — or hand-pick some of the shown tickets and have those same clicks act on just the picked ones.
 
 ## Business logic — TL;DR
 
@@ -13,6 +13,7 @@ The user wants to see the whole backlog — not one project's slice of it — de
 - **Plan it or work it from the row** - a ticket can be handed to a planning agent or to an unattended work agent without leaving the page.
 - **Queue the whole shown set** - a button beside the page's heading adds every unclaimed shown ticket to the AI queue (a ticket already queued stays as it is), counting on its label what one click adds; no agent starts — the queue's own consumers do that.
 - **Queue plans for the whole shown set** - a sibling button queues one plan ask per shown ticket still to plan — the plan-tickets ask, placed by the ticket's priority — skipping tickets already planned, already queued, or claimed.
+- **Selecting rows narrows the queue buttons** - every row carries a checkbox; while any shown row is ticked, both queue buttons say "selected" and act on just the ticked tickets, with a readout of how many are selected and a way to clear the selection.
 - **Filtered-away tickets are accounted for** - the page says how many tickets the filters hide and offers to clear them; a project the user deselected disappears silently instead.
 
 ## Business logic
@@ -83,7 +84,7 @@ The user narrows the backlog to a coherent slice — a topic, a priority band, o
 
 #### Business logic
 
-Whenever the filters leave at least one unclaimed ticket showing, the page's heading row offers a button that adds the shown tickets to the AI queue — "Add all X tickets shown below to the AI queue". Each ticket is queued exactly as the ticket detail page's Queue action queues it (the entry links back to the ticket and lands in its priority's section), walked in the shown order so entries within a priority section keep the order the reader saw, and each on its own project's queue, so a shown set spanning projects needs no special case. A ticket an open queue entry already links to is left as it stands — "add" means the set ends up queued, never queued twice. No agent starts: the queue is what the framework's own routine drain fans out over and what the AI Queue card's play buttons start one entry at a time.
+Whenever the filters leave at least one unclaimed ticket showing, the page's heading row offers a button that adds the shown tickets — or, while any row is selected, just the selected ones (see "Selecting rows narrows the queue buttons") — to the AI queue: "Add all X tickets shown below to the AI queue". Each ticket is queued exactly as the ticket detail page's Queue action queues it (the entry links back to the ticket and lands in its priority's section), walked in the shown order so entries within a priority section keep the order the reader saw, and each on its own project's queue, so a shown set spanning projects needs no special case. A ticket an open queue entry already links to is left as it stands — "add" means the set ends up queued, never queued twice. No agent starts: the queue is what the framework's own routine drain fans out over and what the AI Queue card's play buttons start one entry at a time.
 
 Claimed tickets — those an agent already holds — are skipped: they are being worked, and the label then counts only the unclaimed tickets so it never promises a ticket it will skip; hovering explains the mechanics and says how many claimed tickets are being left alone. With nothing to add — nothing shown, or everything shown claimed — the button is not offered.
 
@@ -101,13 +102,32 @@ The user has filtered the backlog to a slice they intend to work soon and wants 
 
 #### Business logic
 
-Beside the queue-the-shown-set button sits its plan sibling: one click queues, for every shown ticket that has no plan yet and no claim on it, the ask for that ticket's plan — the same wording the plan-tickets preset queues — placed in the AI queue by the ticket's own priority, walked in the shown order. A drain agent reaching such an entry writes the plan. No agent starts from the click.
+Beside the queue-the-shown-set button sits its plan sibling: one click queues, for every shown ticket that has no plan yet and no claim on it — or, while any row is selected, only every such *selected* ticket (see "Selecting rows narrows the queue buttons") — the ask for that ticket's plan — the same wording the plan-tickets preset queues — placed in the AI queue by the ticket's own priority, walked in the shown order. A drain agent reaching such an entry writes the plan. No agent starts from the click.
 
 The click leaves alone what queueing again would waste: a ticket whose plan ask is already an open entry (recognized by its exact wording), and a ticket already queued for implementation — its work would land before a trailing plan could matter. The button's label counts only what it will ask for, saying "unplanned" the moment its count differs from the shown tally; hovering explains the mechanics, the worked order, and what is left alone. Once a click has queued the shown set's plans the button reads "Plans queued" and rests until the shown set changes. With nothing left to plan the button is not offered — the queue-the-tickets button stands on its own.
 
 #### Rationale
 
 Plans are for a human to read before spending agents, so asking for them in bulk is the natural prelude to queueing the same slice for implementation. The asks ride the same queue as everything else so the framework's own consumers pick them up with no new machinery — and the entry deliberately is not a ticket link, since a leading ticket link is what every reader takes as "queued for implementation".
+
+### Selecting rows narrows the queue buttons
+
+#### User story
+
+The filters cannot always carve out exactly the tickets the user means — a hand-picked few from across the shown list — and they want the page's queue buttons to act on just those, without queueing them one by one from their detail pages.
+
+#### Business logic
+
+Every ticket row carries a checkbox, in grouped and flat mode alike. While at least one shown row is ticked, both queue buttons stop speaking for the whole shown set and speak for the selection instead: their labels say "selected" and count only the selected tickets each click would add, their skip rules unchanged — the queue-add still skips claimed selected tickets, the plan button still skips planned and claimed ones and everything already queued. The heading row says how many tickets are selected and offers to clear the selection in one click. Both buttons' rested "Queued"/"Plans queued" states are per acted-on set, so changing the selection arms them again, exactly as changing the filters does.
+
+Only selected rows the filters still show count: a selected ticket the filters have hidden is neither counted nor acted on — what a button acts on is always visible below it — but the tick itself survives and comes back with the row when the filters release it. With every selected row hidden, the buttons speak for the whole shown set again and the selection readout disappears.
+
+Selecting is page state, never an action: checkboxes are always enabled, and ticking one starts nothing.
+
+#### Rationale
+
+- Narrowing the existing buttons rather than adding selection-only ones: one pair of buttons whose label always names its set keeps the heading readable, and the "Queued" rest state carries over unchanged.
+- Counting only shown selected rows keeps the buttons honest — a click never touches a ticket the user cannot currently see — while preserved ticks spare the user re-picking after a detour through the filters.
 
 ### Filtered-away tickets are accounted for
 

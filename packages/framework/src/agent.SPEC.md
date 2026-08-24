@@ -8,10 +8,9 @@ The user gives The Framework a task. From there the agent runs unattended: it wo
 
 - **An agent is one prompt, honouring gates** - the two kinds of agent differ only in which prompt opens them and whether the agent queue is worked afterwards.
 - **The framing is composed once, up front** - the built-in system prompt plus the user's own `SYSTEM.md`, unless vanilla drops the built-in one or transparent empties the framing entirely.
-- **A build is framed for the workspace it lands in** - an empty workspace is built from scratch, an existing codebase is extended rather than rebuilt.
+- **Every agent opens with the user's text itself** - rendered into the built-in system prompt's user-prompt slot, build and one-prompt agent alike; nothing is composed around it.
 - **Every turn's question is a gate** - the agent parks, the user picks, the agent is re-prompted with the answer; with nobody watching, the recommended option is auto-accepted.
 - **An answer that says stop ends the agent** - it ends exactly the way the Stop button does, on every path, and never publishes the work the user just declined.
-- **A build that produced nothing is pushed once** - if a build leaves the workspace empty, the agent is re-prompted once with a hard directive to create the app from scratch.
 - **The agent queue is worked after the opening exchange settles** - a build then consumes the confirmed backlog one gated entry per turn until it is empty.
 - **Live chat comes last** - a build takes the user's own messages once its backlog is worked; a one-prompt agent takes them straight after its opening exchange.
 - **A hands-off agent is its opening prompt and nothing else** - the work leaves this machine, so every later phase is dropped, the agent is told to land its own work, and it says so before ending.
@@ -32,7 +31,7 @@ Whether the user typed a raw prompt or asked for something to be built, the dash
 
 #### Business logic
 
-There are two kinds of agent: a build, which composes an opening prompt around the user's intent and afterwards works the agent queue, and a one-prompt agent, which sends the user's text as-is and stops there. Everything else is identical: the same framing, the same gates, the same event stream, the same ending. An agent defaults to being a build.
+There are two kinds of agent: a build, which works the agent queue after its opening exchange, and a one-prompt agent, which stops there. Everything else is identical: the same opening prompt, the same framing, the same gates, the same event stream, the same ending. An agent defaults to being a build.
 
 Every agent emits one event stream — its opening session announcement, what it was asked for, its system prompt, each driver turn, each gate, its usage, and its ending — so the dashboard, the archive and the control channel all read one shape regardless of what opened the agent.
 
@@ -52,17 +51,19 @@ The agent's framing is composed once, before the first prompt: The Framework's b
 
 Both what the agent was asked for and the composed framing are published as events, so the dashboard has the agent's title without parsing a prompt, and the framing is visible in full. Every per-turn prompt is visible too, as part of that turn's own events.
 
-### A build is framed for the workspace it lands in
+### Every agent opens with the user's text itself
 
 #### User story
 
-A user runs a build against an empty directory and gets a new app; a user runs one against their existing codebase and gets that codebase extended, not replaced.
+The user types what they want. What the agent is first sent is that text, framed only by the built-in system prompt the user can read — not by a second wrapper hidden in the code.
 
 #### Business logic
 
-A build against an empty workspace is opened with a prompt to create the app; a build against a workspace that already has content is opened with a prompt to extend what is there. A one-prompt agent is opened with the user's text placed into the framing's user slot, or entirely verbatim when vanilla. A transparent agent and a continuation are always opened verbatim.
+A build and a one-prompt agent open the same way: the user's text is rendered into the built-in system prompt's user-prompt slot and sent as the agent's first request. A vanilla agent (no built-in prompt, so no slot), a transparent agent and a continuation are opened with the text verbatim.
 
-The fake driver always takes the from-scratch path, because it writes nothing — its workspace always reads as empty — and its scripted demo must stay deterministic.
+#### Rationale
+
+A build used to open with its own wrapper around the user's text ("work within the existing codebase … summarize what you changed"). It said nothing the system prompt did not already say, and it was a second place where the user prompt got framed, beside the slot the system prompt's own document already provides for exactly that. One place is enough, and it is the document a person reviews.
 
 ### Every turn's question is a gate
 
@@ -91,16 +92,6 @@ The stop is checked again before the agent is allowed to settle as a success, bo
 #### Rationale
 
 The prompt path used to finish cleanly on a decline instead of stopping, so the same decline read as a completed agent on one path and a stop on the other.
-
-### A build that produced nothing is pushed once
-
-#### User story
-
-A user asks for an app and the coding agent spends its turn sanity-checking the stack instead of writing anything.
-
-#### Business logic
-
-When a build's opening exchange settles and the workspace is still empty, the agent is re-prompted once with a hard directive to create the app from scratch, and that turn's result becomes the agent's result. This applies only to a real driver — the fake driver writes nothing, so its workspace always reads as empty — never to a continuation, and never to an agent that was stopped. The gates have already been drained by this point, so the agent is never mid-question when this fires.
 
 ### The agent queue is worked after the opening exchange settles
 

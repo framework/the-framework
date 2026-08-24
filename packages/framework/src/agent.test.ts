@@ -267,7 +267,7 @@ test('a build turn that stops to ask fires a live gate and resumes on the pick (
     '```'
   const driver = new FakeDriver({
     respond: (prompt: string): string => {
-      if (/Work within the existing codebase/.test(prompt)) return awaitBlock // the build stops to ask
+      if (prompt === FAKE_INTENT) return awaitBlock // the build stops to ask
       if (/You paused to ask/.test(prompt)) return 'Built it with Postgres. Done.' // the resume
       return 'done'
     },
@@ -302,7 +302,7 @@ test('a run with no preset and no serve config reviews nothing (#1372)', async (
   const driver = new FakeDriver({
     respond: (prompt: string): string => {
       prompts.push(prompt)
-      if (/Work within the existing codebase/.test(prompt)) return 'Built it. Done.'
+      if (prompt === FAKE_INTENT) return 'Built it. Done.'
       return 'done'
     },
     sessionId: 'blackbox1372',
@@ -325,7 +325,7 @@ test('a build turn that stops to showMultiSelect fires a checklist gate and resu
     '```'
   const driver = new FakeDriver({
     respond: (prompt: string): string => {
-      if (/Work within the existing codebase/.test(prompt)) return awaitBlock
+      if (prompt === FAKE_INTENT) return awaitBlock
       if (/You paused to ask/.test(prompt)) return 'Added the picks to TODO. Done.'
       return 'done'
     },
@@ -361,7 +361,7 @@ test('a build turn that stops for plan approval resumes on Approve (#358)', asyn
     '```'
   const driver = new FakeDriver({
     respond: (prompt: string): string => {
-      if (/Work within the existing codebase/.test(prompt)) return awaitBlock
+      if (prompt === FAKE_INTENT) return awaitBlock
       if (/You paused to ask/.test(prompt)) return 'Built the plan out. Done.'
       return 'done'
     },
@@ -402,7 +402,7 @@ test('a declined plan stops the session cleanly instead of building on it (#358)
   let resumed = false
   const driver = new FakeDriver({
     respond: (prompt: string): string => {
-      if (/Work within the existing codebase/.test(prompt)) return awaitBlock
+      if (prompt === FAKE_INTENT) return awaitBlock
       if (/You paused to ask/.test(prompt)) resumed = true
       return 'done'
     },
@@ -438,7 +438,7 @@ test('an unmarked option is an ordinary answer, whatever it is labelled (#358)',
   let resumedWith = ''
   const driver = new FakeDriver({
     respond: (prompt: string): string => {
-      if (/Work within the existing codebase/.test(prompt)) return awaitBlock
+      if (prompt === FAKE_INTENT) return awaitBlock
       if (/You paused to ask/.test(prompt)) resumedWith = prompt
       return 'Understood — waiting for your instructions.'
     },
@@ -508,7 +508,7 @@ test('with nobody to ask, a session takes the recommended option and carries on 
   let resumed = false
   const driver = new FakeDriver({
     respond: (prompt: string): string => {
-      if (/Work within the existing codebase/.test(prompt)) return 'built it\n```await-choices\n{ "options": [{ "label": "A" }] }\n```'
+      if (prompt === FAKE_INTENT) return 'built it\n```await-choices\n{ "options": [{ "label": "A" }] }\n```'
       if (/You paused to ask/.test(prompt)) resumed = true
       return 'done'
     },
@@ -951,15 +951,14 @@ function realNamedDriver(turns: { text: string }[]): { driver: Driver; prompts: 
   return { driver, prompts }
 }
 
-test('a build extends an existing project instead of rebuilding it (#185)', async () => {
+test('a build opens with the intent itself, rendered through the user-prompt slot — no wrapper (#185)', async () => {
   const cwd = await mkdtemp(join(tmpdir(), 'fw-extend-'))
   await mkdir(join(cwd, 'src'), { recursive: true })
   await writeFile(join(cwd, 'src/index.ts'), 'export {}')
   try {
     const { driver, prompts } = realNamedDriver([{ text: 'added the feature' }])
     await runAgent({ prompt: 'add a search box', driver, cwd, todoLoop: false })
-    assert.match(prompts[0]!, /existing codebase/i)
-    assert.doesNotMatch(prompts[0]!, /scaffold the whole project|workspace may be empty/i)
+    assert.equal(prompts[0], 'add a search box')
   } finally {
     await rm(cwd, { recursive: true, force: true })
   }

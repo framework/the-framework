@@ -1,0 +1,25 @@
+{
+  "status": "done",
+  "id": "2026-08-24T14-45-31-442Z",
+  "startedAt": "2026-08-24T14:45:31.908Z",
+  "updatedAt": "2026-08-24T14:45:40.807Z",
+  "pid": 371345,
+  "host": "rom-thinkpad-x280",
+  "intent": "Open TODO_AGENTS.md and work on this one open entry only, then check it off. Do not start any other entry. The entry:\n\nCreate tickets/2026-07-26_landing-headless-browser.plan.md",
+  "target": "web",
+  "kind": "prompt",
+  "handoff": {
+    "push": true,
+    "pr": true,
+    "merge": false
+  },
+  "branch": "tf-agent-2026-08-24T14-45-31-442Z",
+  "driver": "claude-web",
+  "workspace": "/home/rom/code/the-framework/.the-framework/branches/tf-agent-2026-08-24T14-45-31-442Z",
+  "sessionLink": "https://claude.ai/code/session_01MU9b49xYLhWmrvFSmHgXwL?from=cli&m=0",
+  "model": "fable",
+  "cloudAnchor": "8e797ca41639232ac1efcfb87bfe4a38d0aa3609",
+  "sessionId": "session_01MU9b49xYLhWmrvFSmHgXwL",
+  "handoffReport": "skipped",
+  "handoffSkip": "no-commits"
+}

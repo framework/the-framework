@@ -315,11 +315,15 @@ async function deliver(body, prepare) {
 // these prove is the flow around it: the right chip is opened, the branch is verified before
 // anything is sent, and a page that cannot be driven says which control it lacked.
 
-function newSessionPage({ branches = ['main', 'cloud-1-abcd'], repoPicker = true } = {}) {
+function newSessionPage({ branches = ['main', 'cloud-1-abcd'], remembered = 'the-framework', repoPicker = true } = {}) {
+  // Mirrors the live page as observed 2026-08-24: chips are combobox buttons in the order repo,
+  // branch, add; a picker is a dialog holding a search input (role combobox) and a listbox of
+  // options; a closed picker's options stay in the DOM.
   const dom = new JSDOM(
     `<!doctype html><html><body><main>
       <button id="env">Default</button>
-      ${repoPicker ? '<button id="repo">+ Select repo…</button>' : ''}
+      ${remembered ? `<button role="combobox" id="repo">${remembered}</button><button role="combobox" id="branch">main</button>` : repoPicker ? '<button id="select">+ Select repo…</button>' : ''}
+      <button role="combobox" aria-label="Add repository"></button>
       <div contenteditable="true"></div>
       <button aria-label="Send message" id="send"></button>
     </main></body></html>`,
@@ -327,29 +331,36 @@ function newSessionPage({ branches = ['main', 'cloud-1-abcd'], repoPicker = true
   )
   const w = dom.window
   const d = w.document
-  const seen = { sent: false }
-  const list = (entries, onPick) => {
-    const box = d.createElement('div')
-    box.id = 'list'
-    box.innerHTML = `<input placeholder="Search repos..."/>${entries.map(e => `<div role="option">${e}</div>`).join('')}`
-    for (const opt of box.querySelectorAll('[role="option"]')) opt.addEventListener('click', () => { box.remove(); onPick(opt.textContent) })
-    d.body.append(box)
+  const seen = { sent: false, searched: [] }
+  const openList = (placeholder, entries, onPick) => {
+    const dialog = d.createElement('div')
+    dialog.setAttribute('role', 'dialog')
+    dialog.innerHTML = `<input role="combobox" placeholder="${placeholder}"/><div role="listbox">${entries.map(e => `<div role="option">${e}</div>`).join('')}</div>`
+    dialog.querySelector('input').addEventListener('input', e => seen.searched.push(e.target.value))
+    for (const opt of dialog.querySelectorAll('[role="option"]')) opt.addEventListener('click', () => { dialog.remove(); onPick(opt.textContent) })
+    d.body.append(dialog)
   }
-  d.getElementById('repo')?.addEventListener('click', () => {
-    if (d.getElementById('list')) return d.getElementById('list').remove()
-    list(['brillout/docpress', 'framework/the-framework'], picked => {
-      const repo = d.getElementById('repo')
-      repo.textContent = picked.split('/').pop()
-      const branch = d.createElement('button')
-      branch.id = 'branch'
-      branch.textContent = 'main'
-      branch.addEventListener('click', () => {
-        if (d.getElementById('list')) return d.getElementById('list').remove()
-        list(branches, b => { branch.textContent = b })
-      })
-      repo.after(branch)
+  const ensureBranchChip = () => {
+    let chip = d.getElementById('branch')
+    if (!chip) {
+      chip = d.createElement('button')
+      chip.setAttribute('role', 'combobox')
+      chip.id = 'branch'
+      chip.textContent = 'main'
+      d.getElementById('repo').after(chip)
+    }
+    chip.onclick = () => openList('Search branches…', branches, b => { chip.textContent = b })
+  }
+  const wireRepo = chip => {
+    chip.onclick = () => openList('Search repos…', ['brillout/docpress', 'framework/the-framework'], picked => {
+      chip.textContent = picked.split('/').pop()
+      chip.setAttribute('role', 'combobox')
+      chip.id = 'repo'
+      ensureBranchChip()
     })
-  })
+  }
+  if (d.getElementById('repo')) { wireRepo(d.getElementById('repo')); ensureBranchChip() }
+  if (d.getElementById('select')) wireRepo(d.getElementById('select'))
   d.getElementById('send').addEventListener('click', () => {
     seen.sent = true
     w.history.pushState({}, '', '/code/session_01NEW')
@@ -364,14 +375,37 @@ function newSessionPage({ branches = ['main', 'cloud-1-abcd'], repoPicker = true
 const START = { repo: 'framework/the-framework', branch: 'cloud-1-abcd', prompt: 'Add the thing' }
 
 {
+  // The page remembered our repo: nothing to pick but the branch.
   const { dom, w, d, seen } = newSessionPage()
+  const result = await w.__tfBridgeCreateSession(START)
+  const branch = d.getElementById('branch')?.textContent
+  const text = d.querySelector('[contenteditable="true"]').textContent
+  const ok = result.ok && result.sessionId === 'session_01NEW' && /repo already the-framework/.test(result.note) && branch === 'cloud-1-abcd' && text === 'Add the thing' && seen.sent && seen.searched.includes('cloud-1-abcd')
+  if (!ok) failed++
+  console.log(`${ok ? 'PASS' : 'FAIL'}  create with the repo remembered picks the branch, types the prompt and sends  (branch=${branch}, searched=${JSON.stringify(seen.searched)}, result=${JSON.stringify(result)})`)
+  dom.window.close()
+}
+
+{
+  // The page remembered another repo: its chip is the picker.
+  const { dom, w, d, seen } = newSessionPage({ remembered: 'docpress' })
   const result = await w.__tfBridgeCreateSession(START)
   const repo = d.getElementById('repo')?.textContent
   const branch = d.getElementById('branch')?.textContent
-  const text = d.querySelector('[contenteditable="true"]').textContent
-  const ok = result.ok && result.sessionId === 'session_01NEW' && repo === 'the-framework' && branch === 'cloud-1-abcd' && text === 'Add the thing' && seen.sent
+  const ok = result.ok && repo === 'the-framework' && branch === 'cloud-1-abcd' && seen.sent && /repo: clicked "framework\/the-framework"/.test(result.note)
   if (!ok) failed++
-  console.log(`${ok ? 'PASS' : 'FAIL'}  create drives repo, branch, composer and send into a session  (repo=${repo}, branch=${branch}, sent=${seen.sent}, result=${JSON.stringify(result)})`)
+  console.log(`${ok ? 'PASS' : 'FAIL'}  create with another repo remembered re-picks it through its chip  (repo=${repo}, branch=${branch}, result=${JSON.stringify(result)})`)
+  dom.window.close()
+}
+
+{
+  // Nothing remembered: the bare "Select repo" trigger.
+  const { dom, w, d, seen } = newSessionPage({ remembered: '' })
+  const result = await w.__tfBridgeCreateSession(START)
+  const repo = d.getElementById('repo')?.textContent
+  const ok = result.ok && repo === 'the-framework' && seen.sent
+  if (!ok) failed++
+  console.log(`${ok ? 'PASS' : 'FAIL'}  create with no repo remembered uses the select-repo trigger  (repo=${repo}, result=${JSON.stringify(result)})`)
   dom.window.close()
 }
 
@@ -386,11 +420,11 @@ const START = { repo: 'framework/the-framework', branch: 'cloud-1-abcd', prompt:
 }
 
 {
-  const { dom, w, seen } = newSessionPage({ repoPicker: false })
+  const { dom, w, seen } = newSessionPage({ remembered: '', repoPicker: false })
   const result = await w.__tfBridgeCreateSession(START)
   const ok = !result.ok && /no repo picker/.test(result.note) && !seen.sent
   if (!ok) failed++
-  console.log(`${ok ? 'PASS' : 'FAIL'}  create names the missing control  (note=${JSON.stringify(result.note)})`)
+  console.log(`${ok ? 'PASS' : 'FAIL'}  create names the missing control  (note=${result.note.slice(0, 80)}…)`)
   const probe = w.__tfBridgeProbeNewSession()
   const probeOk = probe.composer === 'contenteditable' && probe.sendButton === true && probe.triggers.some(t => t.text === 'Default')
   if (!probeOk) failed++

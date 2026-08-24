@@ -29,7 +29,7 @@ Typing the dashboard's answer back into the session:
 
 Creating a session:
 
-- On a synthetic new-session page behaving as the live one was observed to — a repository chip opening a searchable list, a branch chip appearing beside the chosen repository, a composer and a send button that turns the page into a session address — the repository and branch are chosen, the prompt typed, send clicked, and the new session's id reported.
+- On a synthetic new-session page built like the live one was observed to be — combobox chips for the repository and the branch, each opening a searchable list of options, a composer and a send button that turns the page into a session address — the branch is chosen, the prompt typed, send clicked, and the new session's id reported, in each of the three states the page opens in: the requested repository already remembered, another repository remembered (re-picked through its chip), and none remembered (picked through the select-repository control).
 - When the branch list does not offer the requested branch, nothing is sent and the outcome names the branch.
 - A page with no repository picker is refused naming that control, and the probe describes the page's controls without touching them.
 

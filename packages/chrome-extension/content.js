@@ -485,10 +485,15 @@ function controlText(el) {
   return (el.textContent ?? '').replace(/\s+/g, ' ').trim()
 }
 
-/** Whether a control is actually usable: rendered, enabled, not aria-hidden. */
+/**
+ * Whether a control is actually usable: rendered, enabled, not aria-hidden. The page keeps a
+ * closed picker's entries in the DOM, so an entry that is not visible is not on offer — a browser
+ * answers that exactly; the offline harness has no layout and answers nothing, which counts as yes.
+ */
 function usable(el) {
   if (!el || el.disabled) return false
   if (el.getAttribute?.('aria-hidden') === 'true') return false
+  if (typeof el.checkVisibility === 'function' && !el.checkVisibility()) return false
   return true
 }
 
@@ -498,7 +503,7 @@ function menuTriggers() {
   const add = (el, via) => {
     if (usable(el) && !out.some(entry => entry.el === el)) out.push({ el, via, text: controlText(el) })
   }
-  for (const el of deepQueryAll('[role="combobox"]')) add(el, 'combobox')
+  for (const el of deepQueryAll('button[role="combobox"]')) add(el, 'combobox')
   for (const el of deepQueryAll('button[aria-haspopup="listbox"], button[aria-haspopup="menu"], button[aria-haspopup="true"]')) add(el, 'haspopup')
   for (const el of deepQueryAll('button[aria-expanded]')) add(el, 'expandable')
   for (const el of deepQueryAll('button')) add(el, 'button')
@@ -506,23 +511,33 @@ function menuTriggers() {
 }
 
 /**
- * Entries on offer once a picker is open. The page's lists are not always ARIA options, so any
- * leaf-ish control whose whole text is the wanted entry counts too — exact text only, so a
- * paragraph that merely mentions a repo name is never clicked.
+ * The composer's chips, in the order the page lays them out: the repository, then the branch,
+ * then "add another repository". Each is a combobox button; the branch chip exists only once a
+ * repository is chosen.
  */
-function menuEntries(wanted) {
-  const roles = deepQueryAll('[role="option"], [role="menuitem"], [role="menuitemradio"]').filter(usable)
-  const exact = deepQueryAll('button, a, li, [role="button"], div, span')
-    .filter(usable)
-    .filter(el => el.children.length <= 3 && wanted.includes(controlText(el).toLowerCase()))
-  const out = []
-  for (const el of [...roles, ...exact]) if (!out.some(entry => entry.el === el)) out.push({ el, text: controlText(el) })
-  return out
+function chips() {
+  return deepQueryAll('button[role="combobox"]').filter(usable).map(el => ({ el, via: 'combobox', text: controlText(el) }))
 }
 
-/** The search box an open picker offers, if any. */
+/** The entries an open picker currently offers — visible options only, the closed ones stay in the DOM. */
+function menuEntries() {
+  return deepQueryAll('[role="option"]')
+    .filter(usable)
+    .map(el => ({ el, text: controlText(el) }))
+}
+
+/** The open picker's search box, if it has one. */
 function pickerSearch() {
-  return deepQueryAll('input[type="search"], input[placeholder*="search" i], input[type="text"]').filter(usable).at(-1)
+  return deepQueryAll('input[role="combobox"], input[type="search"], input[placeholder*="search" i]').filter(usable).at(-1)
+}
+
+/** Type into a React-controlled input so the page sees the change: the native setter, then an input event. */
+function typeInto(input, text) {
+  input.focus()
+  const setter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input), 'value')?.set ?? Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+  if (setter) setter.call(input, text)
+  else input.value = text
+  input.dispatchEvent(new Event('input', { bubbles: true }))
 }
 
 /** Wait for `read` to return something truthy, or give up. */
@@ -536,40 +551,34 @@ async function waitFor(read, timeoutMs, stepMs = 150) {
   }
 }
 
-/** How long to wait for a picker to render its entries. */
+/** How long to wait for a picker to render its entries, and for the chips to settle. */
 const MENU_WAIT_MS = 6000
 
 /**
- * Open `trigger` and choose the entry matching one of `wanted` (lower-cased, exact first, then
- * contains). Types the first wanted text into the picker's search box when it has one, since a
- * long repo list is filtered rather than scrolled. Returns a note either way.
+ * Open `trigger` and choose the entry whose text is one of `wanted` (lower-cased; the first is
+ * the full name, later ones aliases). Types the full name into the picker's search box when it
+ * has one, since a long list is filtered rather than scrolled. Never clicks the trigger itself
+ * or anything inside it as an entry. Returns a note either way.
  */
 async function chooseFrom(trigger, wanted, hint) {
   trigger.el.click()
   const search = await waitFor(pickerSearch, 1500, 100)
-  if (search) {
-    search.focus()
-    search.value = wanted[0]
-    search.dispatchEvent(new Event('input', { bubbles: true }))
-  }
+  if (search) typeInto(search, wanted[0])
+  const outside = e => e.el !== trigger.el && !trigger.el.contains(e.el)
   const hit = await waitFor(() => {
-    const entries = menuEntries(wanted)
-    return entries.find(e => wanted.includes(e.text.toLowerCase())) ?? entries.find(e => wanted.some(w => e.text.toLowerCase().includes(w)))
+    const entries = menuEntries().filter(outside)
+    for (const w of wanted) {
+      const exact = entries.find(e => e.text.toLowerCase() === w)
+      if (exact) return exact
+    }
+    return undefined
   }, MENU_WAIT_MS)
   if (!hit) {
-    trigger.el.click() // shut it again, so the next attempt is not clicked through an overlay
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
     return { ok: false, note: `${hint}: the list offered no "${wanted[0]}"` }
   }
   hit.el.click()
   return { ok: true, note: `${hint}: clicked "${hit.text}" via ${trigger.via}` }
-}
-
-/** The first usable button after `el` in document order — the chip the page adds beside it. */
-function nextTriggerAfter(el) {
-  const all = menuTriggers()
-  const at = all.findIndex(t => t.el === el)
-  if (at === -1) return undefined
-  return all.slice(at + 1).find(t => t.el.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_PRECEDING)
 }
 
 /**
@@ -583,6 +592,7 @@ function probeNewSession() {
     sessionId: sessionIdFromUrl() ?? null,
     composer: findComposer()?.via ?? null,
     sendButton: Boolean(findSendButton()),
+    chips: chips().map(c => c.text.slice(0, 80)),
     triggers: menuTriggers()
       .slice(0, 40)
       .map(trigger => ({ via: trigger.via, text: trigger.text.slice(0, 80) }))
@@ -593,11 +603,13 @@ function probeNewSession() {
 /**
  * Drive the new-session flow: repo, branch, prompt, send, and report the session it became.
  *
- * The branch is checked, not assumed: the chip must read the requested ref before anything is
- * sent, because a session opened on the wrong branch would push its work somewhere the run never
- * looks. The session id is read from the URL, the one thing the page is guaranteed to tell us and
- * exactly what the daemon joins runs on; a send that never becomes a session URL is a failure
- * with a reason, never a silent success.
+ * The page remembers the last repository picked, so it may open already showing ours, another
+ * one, or none — the chips are waited for and read rather than assumed. The branch is checked,
+ * not assumed: the branch chip must read the requested ref before anything is sent, because a
+ * session opened on the wrong branch would push its work somewhere the run never looks. The
+ * session id is read from the URL, the one thing the page is guaranteed to tell us and exactly
+ * what the daemon joins runs on; a send that never becomes a session URL is a failure with a
+ * reason, never a silent success.
  */
 async function createSession({ repo, branch, prompt }) {
   const composer = await waitFor(findComposer, window.__tfComposerWaitMs ?? 20000)
@@ -605,43 +617,39 @@ async function createSession({ repo, branch, prompt }) {
 
   const bare = String(repo).split('/').pop() ?? repo
   const repoWanted = [String(repo).toLowerCase(), bare.toLowerCase()]
-  // The chips render a beat after the composer, and the page remembers the last repo picked: it
-  // may already show ours (nothing to pick), another one (its chip is the picker), or the bare
-  // "Select repo" trigger. Wait for whichever appears rather than reading an unfinished page.
-  const repoChipOf = () => menuTriggers().find(t => repoWanted.includes(t.text.toLowerCase()))
-  const pickerOf = () =>
-    menuTriggers().find(t => /select repo|add repo|repositor/i.test(t.text)) ??
-    menuTriggers().find(t => t.via === 'combobox' && t.text)
-  const seen = await waitFor(() => repoChipOf() ?? pickerOf(), MENU_WAIT_MS)
-  let repoChip = repoChipOf()
-  let repoNote = repoChip ? `repo already ${repoChip.text}` : ''
-  if (!repoChip) {
-    const trigger = seen ? pickerOf() : undefined
-    if (!trigger) return { ok: false, note: `no repo picker on the page (${JSON.stringify(probeNewSession().triggers)})` }
+  const selectRepo = () => menuTriggers().find(t => /select repo|add repo|choose repo/i.test(t.text) || /select repo|choose repo/i.test(t.el.getAttribute('aria-label') ?? ''))
+  // The chips render a beat after the composer: wait for either a chip or the bare picker.
+  await waitFor(() => chips().some(c => c.text) || selectRepo(), MENU_WAIT_MS)
+  await new Promise(resolve => setTimeout(resolve, window.__tfMenuSettleMs ?? 800))
+
+  let repoNote
+  if (repoWanted.includes(chips()[0]?.text.toLowerCase())) {
+    repoNote = `repo already ${chips()[0].text}`
+  } else {
+    // A remembered other repository's chip is the picker; with nothing remembered, the page offers one.
+    const trigger = chips()[0]?.text ? chips()[0] : selectRepo()
+    if (!trigger) return { ok: false, note: `no repo picker on the page (${JSON.stringify(probeNewSession())})` }
     const pick = await chooseFrom(trigger, repoWanted, 'repo')
     if (!pick.ok) return pick
     repoNote = pick.note
-    repoChip = await waitFor(() => menuTriggers().find(t => repoWanted.includes(t.text.toLowerCase())), MENU_WAIT_MS)
-    if (!repoChip) return { ok: false, note: `${repoNote}, but no chip shows the repo afterwards` }
+    const chip = await waitFor(() => (repoWanted.includes(chips()[0]?.text.toLowerCase()) ? chips()[0] : undefined), MENU_WAIT_MS)
+    if (!chip) return { ok: false, note: `${repoNote}, but the repo chip does not read "${repo}" afterwards (chips: ${JSON.stringify(chips().map(c => c.text))})` }
   }
 
-  // The branch chip appears beside the repo chip once a repo is chosen, reading the default branch.
-  await new Promise(resolve => setTimeout(resolve, window.__tfMenuSettleMs ?? 800))
+  // The branch chip appears beside the repo chip once a repository is chosen, reading the default branch.
   const branchWanted = [String(branch).toLowerCase()]
-  let branchChip = await waitFor(() => nextTriggerAfter(repoChip.el), MENU_WAIT_MS)
-  if (!branchChip) return { ok: false, note: `${repoNote}; no branch chip appeared beside the repo` }
-  let branchNote = ''
-  if (branchChip.text.toLowerCase() !== branchWanted[0]) {
+  const readsBranch = () => (chips()[1]?.text.toLowerCase() === branchWanted[0] ? chips()[1] : undefined)
+  let branchChip = await waitFor(() => (chips()[1]?.text ? chips()[1] : undefined), MENU_WAIT_MS)
+  if (!branchChip) return { ok: false, note: `${repoNote}; no branch chip appeared beside the repo (chips: ${JSON.stringify(chips().map(c => c.text))})` }
+  let branchNote
+  if (readsBranch()) {
+    branchNote = `branch already ${branchChip.text}`
+  } else {
     const pick = await chooseFrom(branchChip, branchWanted, 'branch')
     if (!pick.ok) return { ok: false, note: `${repoNote}; ${pick.note}` }
     branchNote = pick.note
-    branchChip = await waitFor(() => {
-      const chip = nextTriggerAfter(repoChip.el)
-      return chip && chip.text.toLowerCase() === branchWanted[0] ? chip : undefined
-    }, MENU_WAIT_MS)
-    if (!branchChip) return { ok: false, note: `${repoNote}; ${branchNote}, but the branch chip does not read "${branch}" — not sending` }
-  } else {
-    branchNote = `branch already ${branchChip.text}`
+    branchChip = await waitFor(readsBranch, MENU_WAIT_MS)
+    if (!branchChip) return { ok: false, note: `${repoNote}; ${branchNote}, but the branch chip does not read "${branch}" — not sending (chips: ${JSON.stringify(chips().map(c => c.text))})` }
   }
 
   fillComposer(composer, prompt)

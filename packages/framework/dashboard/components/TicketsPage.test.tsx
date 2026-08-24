@@ -3,9 +3,11 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 
 const onAllTickets = vi.hoisted(() => vi.fn())
 // TicketsPanel (rendered per project here) reaches for these too; unmocked they fetch a daemon
-// that is not there, same as TicketsPanel's own suite.
+// that is not there, same as TicketsPanel's own suite. `onQueue` is the spin-up button's
+// click-time read of what is already queued.
 const onTicketsMeta = vi.hoisted(() => vi.fn())
-vi.mock('../rpc/reads.js', () => ({ onAllTickets, onTicketsMeta }))
+const onQueue = vi.hoisted(() => vi.fn())
+vi.mock('../rpc/reads.js', () => ({ onAllTickets, onTicketsMeta, onQueue }))
 vi.mock('../rpc/control.js', () => ({ sendQueueTicket: vi.fn(), sendStart: vi.fn() }))
 
 const { TicketsPage } = await import('./TicketsPage.js')
@@ -21,6 +23,7 @@ const ticket = (over: Record<string, unknown> = {}) => ({
 
 beforeEach(() => {
   onTicketsMeta.mockReset().mockResolvedValue({})
+  onQueue.mockReset().mockResolvedValue([])
   // The page reads its view from the URL on mount and mirrors changes back via replaceState, so
   // every test starts from a clean address.
   window.history.replaceState(null, '', '/tickets')
@@ -250,5 +253,110 @@ describe('TicketsPage grouping (#1144)', () => {
       }),
     )
     await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith('p2', expect.any(String), 'r9'))
+  })
+})
+
+// The page-wide queue-add button: the detail page's Queue action lifted to the page's heading —
+// every unclaimed shown ticket joins the AI queue (unless an open entry already links to it),
+// and no agent starts: the queue's own consumers do that.
+describe('TicketsPage add the shown set to the AI queue', () => {
+  const controls = async () => {
+    const { sendStart, sendQueueTicket } = await import('../rpc/control.js')
+    vi.mocked(sendStart).mockClear().mockResolvedValue({ ok: true, agentId: 'a1' })
+    vi.mocked(sendQueueTicket).mockClear().mockResolvedValue({ ok: true, file: 'TODO_AGENTS.md' })
+    return { sendStart, sendQueueTicket }
+  }
+
+  test('every shown ticket joins the queue, and the button rests as Queued until the set changes', async () => {
+    onAllTickets.mockResolvedValue([
+      {
+        projectId: 'p1',
+        projectName: 'Alpha',
+        tickets: [ticket({ file: 'a.md', title: 'First', priority: '7' }), ticket({ file: 'b.md', title: 'Second' })],
+      },
+    ])
+    const { sendStart, sendQueueTicket } = await controls()
+    render(<TicketsPage onOpenTicket={() => {}} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Add all 2 tickets shown below to the AI queue' }))
+    // Queued exactly as the detail page's Queue button queues (#1164): title as the entry, the
+    // ticket named so the entry links back, its priority picking the section.
+    await waitFor(() => expect(sendQueueTicket).toHaveBeenCalledTimes(2))
+    expect(sendQueueTicket).toHaveBeenCalledWith('p1', 'First', { file: 'a.md', priority: '7' })
+    expect(sendQueueTicket).toHaveBeenCalledWith('p1', 'Second', { file: 'b.md' })
+    // Queueing is the whole act — the queue's own consumers start agents, not this button.
+    expect(sendStart).not.toHaveBeenCalled()
+    // Done, the button says so and rests for this exact set…
+    const queued = await screen.findByRole('button', { name: 'Queued' })
+    expect((queued as HTMLButtonElement).disabled).toBe(true)
+    // …and narrowing the shown set arms it again, counting the new set.
+    fireEvent.change(screen.getByRole('textbox', { name: /search tickets/i }), { target: { value: 'First' } })
+    expect(await screen.findByRole('button', { name: 'Add the ticket shown below to the AI queue' })).toBeTruthy()
+  })
+
+  test('a ticket already on the queue is not queued twice', async () => {
+    onAllTickets.mockResolvedValue([
+      {
+        projectId: 'p1',
+        projectName: 'Alpha',
+        tickets: [ticket({ file: 'a.md', title: 'First' }), ticket({ file: 'b.md', title: 'Second' })],
+      },
+    ])
+    // One open entry already links to a.md (with an agent's own note after the link); b.md's
+    // only entry is checked off, so it does not count as queued.
+    onQueue.mockResolvedValue([
+      {
+        projectId: 'p1',
+        projectName: 'Alpha',
+        open: 1,
+        total: 2,
+        items: [
+          { text: '[First](tickets/a.md) — needs the new API', done: false },
+          { text: '[Second](tickets/b.md)', done: true },
+        ],
+      },
+    ])
+    const { sendQueueTicket } = await controls()
+    render(<TicketsPage onOpenTicket={() => {}} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Add all 2 tickets shown below to the AI queue' }))
+    // Only the genuinely unqueued ticket is written; a.md's open entry stands as it is.
+    await screen.findByRole('button', { name: 'Queued' })
+    expect(sendQueueTicket).toHaveBeenCalledTimes(1)
+    expect(sendQueueTicket).toHaveBeenCalledWith('p1', 'Second', { file: 'b.md' })
+  })
+
+  test('claimed tickets are left to the agents holding them, and the label says so', async () => {
+    onAllTickets.mockResolvedValue([
+      {
+        projectId: 'p1',
+        projectName: 'Alpha',
+        tickets: [ticket({ file: 'a.md', title: 'First' }), ticket({ file: 'b.md', title: 'Second', locked: true, lockedBy: 'agent-1' })],
+      },
+    ])
+    const { sendQueueTicket } = await controls()
+    render(<TicketsPage onOpenTicket={() => {}} />)
+    // The label counts only what the click will add, never promising the claimed row.
+    fireEvent.click(await screen.findByRole('button', { name: 'Add the one unclaimed ticket shown below to the AI queue' }))
+    await screen.findByRole('button', { name: 'Queued' })
+    expect(sendQueueTicket).toHaveBeenCalledTimes(1)
+    expect(sendQueueTicket).toHaveBeenCalledWith('p1', 'First', { file: 'a.md' })
+  })
+
+  test('nothing shown, no button: an empty shown set is not an offer', async () => {
+    onAllTickets.mockResolvedValue([
+      { projectId: 'p1', projectName: 'Alpha', tickets: [ticket({ file: 'a.md', title: 'First' })] },
+    ])
+    window.history.replaceState(null, '', '/tickets?q=zzz-no-match')
+    render(<TicketsPage onOpenTicket={() => {}} />)
+    await screen.findByText(/1 ticket hidden by the current filters/i)
+    expect(screen.queryByRole('button', { name: /to the ai queue/i })).toBeNull()
+  })
+
+  test('every shown ticket claimed, no button: the whole set is already being worked', async () => {
+    onAllTickets.mockResolvedValue([
+      { projectId: 'p1', projectName: 'Alpha', tickets: [ticket({ file: 'a.md', title: 'First', locked: true })] },
+    ])
+    render(<TicketsPage onOpenTicket={() => {}} />)
+    await screen.findByText('First')
+    expect(screen.queryByRole('button', { name: /to the ai queue/i })).toBeNull()
   })
 })

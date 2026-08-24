@@ -2,7 +2,7 @@ The dashboard's Tickets page: every registered project's `tickets/` backlog on o
 
 ## User story
 
-The user wants to see the whole backlog — not one project's slice of it — decide what to work next, and act on a ticket right there: read it, read its plan, have an agent plan it, or have an agent work it.
+The user wants to see the whole backlog — not one project's slice of it — decide what to work next, and act on a ticket right there: read it, read its plan, have an agent plan it, or have an agent work it. And when the filters have carved out a coherent slice, they want to queue that whole slice for the AI in one click.
 
 ## Business logic — TL;DR
 
@@ -11,6 +11,7 @@ The user wants to see the whole backlog — not one project's slice of it — de
 - **Grouped or flat** - grouped shows one section per project, each with that project's own ticket panel; flat pools every project's tickets into one order, each row naming its project — the only view that can answer which ticket is the highest-priority one anywhere.
 - **Click-to-filter** - clicking a row's topic adds that topic to the filter, clicking its claim marker narrows to claimed tickets; both add to what is already filtered rather than replacing it.
 - **Plan it or work it from the row** - a ticket can be handed to a planning agent or to an unattended work agent without leaving the page.
+- **Queue the whole shown set** - a button beside the page's heading adds every unclaimed shown ticket to the AI queue (a ticket already queued stays as it is), counting on its label what one click adds; no agent starts — the queue's own consumers do that.
 - **Filtered-away tickets are accounted for** - the page says how many tickets the filters hide and offers to clear them; a project the user deselected disappears silently instead.
 
 ## Business logic
@@ -72,6 +73,24 @@ The user has decided a ticket is next and wants an agent on it now.
 #### Business logic
 
 Every ticket row offers to start a planning agent for that ticket, and to start an agent that works it. The work agent runs unattended with the ticket named on it, so the agent knows which ticket it is working. Both start in the project the ticket belongs to — in the flat list that is the row's own project, not a page-wide selection — and the dashboard shell is told an agent started so it can show it. A start that fails leaves a message on the page saying the planning agent or the work agent could not be started.
+
+### Queue the whole shown set
+
+#### User story
+
+The user narrows the backlog to a coherent slice — a topic, a priority band, one project — and wants everything left showing on the AI queue, rather than queueing the rows one by one.
+
+#### Business logic
+
+Whenever the filters leave at least one unclaimed ticket showing, the page's heading row offers a button that adds the shown tickets to the AI queue — "Add all X tickets shown below to the AI queue". Each ticket is queued exactly as the ticket detail page's Queue action queues it (the entry links back to the ticket and lands in its priority's section), walked in the shown order so entries within a priority section keep the order the reader saw, and each on its own project's queue, so a shown set spanning projects needs no special case. A ticket an open queue entry already links to is left as it stands — "add" means the set ends up queued, never queued twice. No agent starts: the queue is what the framework's own routine drain fans out over and what the AI Queue card's play buttons start one entry at a time.
+
+Claimed tickets — those an agent already holds — are skipped: they are being worked, and the label then counts only the unclaimed tickets so it never promises a ticket it will skip; hovering explains the mechanics and says how many claimed tickets are being left alone. With nothing to add — nothing shown, or everything shown claimed — the button is not offered.
+
+Once a click has queued the shown set, the button reads "Queued" and rests; any change to the shown set — a filter, newly arrived tickets — arms it again for the new set. The work stops at the first failure, whose reason lands under the heading in grouped and flat mode alike; everything already queued stays.
+
+#### Rationale
+
+Queueing rather than starting agents keeps the one click cheap and durable: entries are what the framework already picks up on its own, survive anything that interrupts the work, and spend nothing until an agent actually starts. Skipping already-queued tickets matters because a duplicate entry would outlive its agent's check-off as an open entry naming a closed ticket, costing the sweep an agent.
 
 ### Filtered-away tickets are accounted for
 

@@ -98,6 +98,7 @@ happens while nobody is at the keyboard.
 - Ticket detail page
 - A plan page when a plan exists; a button to start an agent writing one when it doesn't
 - Queue a ticket into the AI queue
+- Queue every ticket the filters show into the AI queue, in one click from the page heading
 - Tickets carry a GitHub issue link, so merging closes the issue
 
 ## Handoff and what lands in git

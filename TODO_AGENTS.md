@@ -17,7 +17,6 @@
 
 ## Priority 3
 - [ ] Create tickets/2026-08-05_continue-planning-resume-agent.plan.md
-- [ ] Create tickets/2026-08-05_project-dropdown-multiselect.plan.md
 
 
 ## Priority 2

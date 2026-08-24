@@ -15,9 +15,10 @@ vi.mock('../lib/use-start-agent.js', () => ({
   useStartAgent: () => ({ busy, error: startError, reset: () => {}, start }),
 }))
 
-const { AiQueue, workOnEntryPrompt } = await import('./AiQueue.js')
+const { AiQueue, workOnEntryPrompt, fanOutLabel, DEFAULT_FAN_OUT_COUNT } = await import('./AiQueue.js')
 
 const RUN_LABEL = 'Spin up an agent working on this entry'
+const COUNT_LABEL = 'How many agents to spin up'
 
 const queue = (items: { text: string; done?: boolean }[], over: Partial<ProjectQueue> = {}): ProjectQueue => {
   const full = items.map(i => ({ text: i.text, done: i.done ?? false }))
@@ -87,8 +88,8 @@ describe('AiQueue', () => {
     )
     const label = screen.getByText('Apply the maintainability preset')
     expect(label.tagName).toBe('SPAN')
-    // The one button on the row is the play button, not the title.
-    expect(screen.getAllByRole('button')).toHaveLength(1)
+    // The row's play button and the header's fan-out button — the title itself is not one.
+    expect(screen.getAllByRole('button')).toHaveLength(2)
   })
 
   test('the play button starts an unattended run on that one entry and selects it (#1191)', async () => {
@@ -159,7 +160,7 @@ describe('AiQueue', () => {
     expect(screen.getByRole('alert').textContent).toMatch(/already active/)
   })
 
-  test('a start already in flight disables every play button', () => {
+  test('a start already in flight disables every play button, the fan-out included', () => {
     busy = true
     render(
       <AiQueue
@@ -169,9 +170,124 @@ describe('AiQueue', () => {
         onAgentStarted={() => {}}
       />,
     )
-    for (const button of screen.getAllByRole('button', { name: RUN_LABEL })) {
+    // Every button in the card starts agents, so every one of them sits out an in-flight start.
+    for (const button of screen.getAllByRole('button')) {
       expect((button as HTMLButtonElement).disabled).toBe(true)
     }
+  })
+
+  test('the fan-out button starts one unattended agent per top open entry, three by default', async () => {
+    const started: unknown[][] = []
+    // A done entry sits second, so "the top three" is provably the top three OPEN entries.
+    render(
+      <AiQueue
+        queue={[queue([{ text: 'one' }, { text: 'skipped', done: true }, { text: 'two' }, { text: 'three' }, { text: 'four' }])]}
+        loading={false}
+        onOpenTicket={() => {}}
+        onAgentStarted={(...args) => started.push(args)}
+      />,
+    )
+    expect(DEFAULT_FAN_OUT_COUNT).toBe(3)
+    fireEvent.click(screen.getByRole('button', { name: fanOutLabel(3) }))
+    await waitFor(() => expect(start).toHaveBeenCalledTimes(3))
+    // Each agent is pinned to its own entry, in queue order — the raw lines, since each agent must
+    // find exactly its entry to check it off.
+    expect(start.mock.calls.map(call => call[1])).toEqual([
+      workOnEntryPrompt('one'),
+      workOnEntryPrompt('two'),
+      workOnEntryPrompt('three'),
+    ])
+    for (const call of start.mock.calls) {
+      expect(call[0]).toBe('p1')
+      expect(call[2]).toBe('prompt')
+      // Unattended (#1279), exactly like the single play button: the batch is drain work.
+      expect(call[3]).toMatchObject({ unattended: true })
+    }
+    // No navigation: a batch is a fan-out, and fan-outs land in the Agents card.
+    expect(started).toHaveLength(0)
+  })
+
+  test('the count beside the button sets how many agents the click starts', async () => {
+    render(
+      <AiQueue
+        queue={[queue([{ text: 'one' }, { text: 'two' }, { text: 'three' }])]}
+        loading={false}
+        onOpenTicket={() => {}}
+        onAgentStarted={() => {}}
+      />,
+    )
+    fireEvent.change(screen.getByRole('spinbutton', { name: COUNT_LABEL }), { target: { value: '2' } })
+    fireEvent.click(screen.getByRole('button', { name: fanOutLabel(2) }))
+    await waitFor(() => expect(start).toHaveBeenCalledTimes(2))
+    expect(start.mock.calls.map(call => call[1])).toEqual([workOnEntryPrompt('one'), workOnEntryPrompt('two')])
+  })
+
+  test('the button promises only what is open: a two-entry queue caps the default three', async () => {
+    render(
+      <AiQueue
+        queue={[queue([{ text: 'one' }, { text: 'two' }])]}
+        loading={false}
+        onOpenTicket={() => {}}
+        onAgentStarted={() => {}}
+      />,
+    )
+    // The label says two, not the count box's three — and a single-entry queue reads singular.
+    fireEvent.click(screen.getByRole('button', { name: fanOutLabel(2) }))
+    await waitFor(() => expect(start).toHaveBeenCalledTimes(2))
+  })
+
+  test('a single open entry makes the fan-out read singular', () => {
+    render(
+      <AiQueue queue={[queue([{ text: 'only' }])]} loading={false} onOpenTicket={() => {}} onAgentStarted={() => {}} />,
+    )
+    expect(fanOutLabel(1)).toBe('Spin up an agent working on the top entry')
+    expect(screen.getByRole('button', { name: fanOutLabel(1) })).toBeTruthy()
+  })
+
+  test('the batch ends at the first refusal', async () => {
+    start.mockReset()
+    start.mockResolvedValueOnce({ ok: true, agentId: 'run-1' }).mockResolvedValueOnce(undefined)
+    render(
+      <AiQueue
+        queue={[queue([{ text: 'one' }, { text: 'two' }, { text: 'three' }])]}
+        loading={false}
+        onOpenTicket={() => {}}
+        onAgentStarted={() => {}}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: fanOutLabel(3) }))
+    await waitFor(() => expect(start).toHaveBeenCalledTimes(2))
+    // Whatever refused the second start is not going to take the third a moment later.
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(start).toHaveBeenCalledTimes(2)
+  })
+
+  test('a fan-out in flight disables every start button until the batch ends', async () => {
+    const releases: Array<(value: unknown) => void> = []
+    start.mockReset()
+    start.mockImplementation(() => new Promise(resolve => releases.push(resolve)))
+    render(
+      <AiQueue
+        queue={[queue([{ text: 'one' }, { text: 'two' }])]}
+        loading={false}
+        onOpenTicket={() => {}}
+        onAgentStarted={() => {}}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: fanOutLabel(2) }))
+    await waitFor(() => expect(start).toHaveBeenCalledTimes(1))
+    // Mid-batch — `busy` is false between two starts, so this pins the batch's own guard.
+    for (const button of screen.getAllByRole('button')) {
+      expect((button as HTMLButtonElement).disabled).toBe(true)
+    }
+    releases[0]!({ ok: true, agentId: 'run-1' })
+    await waitFor(() => expect(start).toHaveBeenCalledTimes(2))
+    releases[1]!({ ok: true, agentId: 'run-2' })
+    await waitFor(() => {
+      for (const button of screen.getAllByRole('button')) {
+        expect((button as HTMLButtonElement).disabled).toBe(false)
+      }
+    })
   })
 
   test('done entries and projects with nothing open are not shown', () => {

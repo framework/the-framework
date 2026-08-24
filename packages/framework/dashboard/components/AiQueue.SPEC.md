@@ -1,9 +1,10 @@
-The Overview's AI Queue card: every project's open agent queue entries — the work The Framework will pick up on its own — grouped by project, with a way to read an entry and a way to start it now.
+The Overview's AI Queue card: every project's open agent queue entries — the work The Framework will pick up on its own — grouped by project, with a way to read an entry, a way to start it now, and a way to start a project's top entries as one batch.
 
 ## User story
 
 - The user wants to see, in one place, what the framework is going to work on next across all their projects.
 - The user does not want to wait for the drain routine and starts one queued entry right now.
+- The user wants several queued entries worked on at once — one agent each — without clicking every entry's play button one by one.
 - The user wants to read the ticket behind a queued entry before deciding anything.
 
 ## Business logic — TL;DR
@@ -12,6 +13,7 @@ The Overview's AI Queue card: every project's open agent queue entries — the w
 - **Reading an entry and starting it are different acts** - the entry's title opens what the entry names; a separate play button starts an agent on it.
 - **Starting one entry runs it exactly as the drain routine would** - one agent, on that entry alone, unattended, so it finishes and hands off instead of parking on the user.
 - **The click follows the agent it started** - the user is taken to the agent, and to the project while its id is not known yet.
+- **Fanning out over the top of the queue** - a button on each project's header starts one agent per top open entry, as many as the count beside it says (three unless changed), and stays on the Overview.
 
 ## Business logic
 
@@ -66,6 +68,28 @@ The user starts one named entry and wants to watch that agent.
 #### Business logic
 
 Once the agent starts, the dashboard goes to that agent — one agent on one named entry is worth watching, unlike the drain routine's fan-out. When the agent's id is not known yet, the dashboard goes to its project and adopts the agent once the poll surfaces it.
+
+### Fanning out over the top of the queue
+
+#### User story
+
+The user wants several queued entries worked on at once — the drain routine's fan-out, but on their own click — without starting each entry by hand.
+
+#### Business logic
+
+Each project's header carries a fan-out button beside a count. Clicking the button starts one agent per open entry, taken from the top of that project's queue, as many as the count says. The count is edited right beside the button, defaults to three, and is kept between one and the same maximum as the routine panel's concurrent-agents setting. With fewer open entries than the count, the batch is just the open entries — the button's label always names the number of agents a click would actually start.
+
+Each agent of the batch is started exactly as the single play button starts one: pinned to its own entry's raw queue line, unattended. The agents are started one after another, and the first failed start ends the batch — the remaining entries are not started, and the failure is reported under the list the same way a single start's is.
+
+While the batch is starting — including between two of its starts — every start button on the card is disabled, and the clicked project's fan-out button shows itself as busy.
+
+Unlike starting a single entry, the dashboard stays on the Overview: the started agents surface in the working-now card beside this one.
+
+#### Rationale
+
+- One agent pinned per named entry, rather than several agents each told to work the queue: agents started together all read the same queue, so each would pick the same first entry and implement it as many times over — the same reason the drain routine pins the entries of its own batch.
+- Starting one after another, ending at the first refusal: whatever refused a start would refuse the next one a moment later.
+- Staying on the Overview: a batch has no single agent to follow.
 
 ## Before modifying/creating SPEC.md files
 

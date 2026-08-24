@@ -23,6 +23,7 @@ happens while nobody is at the keyboard.
 - Pre-flight warnings before spending (no `gh`, logged out, repo can't auto-merge)
 - Start an agent from a ticket row
 - Start an agent from a queue entry's play button
+- Spin up agents on a project's top queue entries — one agent per entry, the how-many set beside the button (default 3)
 - "Run now" on a routine, in a picked project the card remembers across navigations and reloads
 - "Configure first, then run" on a routine — the launcher opens with its prompt, so the model and location can be set first
 - What a routine's "Run now" is about to spend, on hover — what that routine does, how many agents it costs, which model it will use, and where it runs

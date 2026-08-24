@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { WorkspaceTicket } from '../../src/index.js'
-import { presets } from '../../src/client.js'
+import { planTicketPrompt, presets } from '../../src/client.js'
 
 const sendStart = vi.hoisted(() => vi.fn())
 vi.mock('../rpc/control.js', () => ({ sendStart }))
@@ -11,7 +11,7 @@ vi.mock('../rpc/control.js', () => ({ sendStart }))
 const onTicketsMeta = vi.hoisted(() => vi.fn())
 vi.mock('../rpc/reads.js', () => ({ onTicketsMeta }))
 
-const { TicketsPanel, planPrompt, workOnTicketPrompt } = await import('./TicketsPanel.js')
+const { TicketsPanel, workOnTicketPrompt } = await import('./TicketsPanel.js')
 
 const ticket = (over: Partial<WorkspaceTicket> = {}): WorkspaceTicket => ({
   file: '2026-07-20_do-the-thing.md',
@@ -59,7 +59,7 @@ describe('TicketsPanel (#697/#1144)', () => {
     // A fixed prompt, so it takes the verbatim-text path rather than a build, and it is exactly the
     // exported ask — no second, hidden copy to drift from the button (#1187).
     expect(sendStart.mock.calls[0]?.[2]).toBe('prompt')
-    expect(sendStart.mock.calls[0]?.[1]).toBe(planPrompt('2026-07-20_do-the-thing.md'))
+    expect(sendStart.mock.calls[0]?.[1]).toBe(planTicketPrompt('2026-07-20_do-the-thing.md'))
     expect(sendStart.mock.calls[0]?.[1]).toBe('Create tickets/2026-07-20_do-the-thing.plan.md')
     // Attended, unlike the import/update buttons: a per-ticket plan is a session you land in.
     expect(sendStart.mock.calls[0]?.[3]).toEqual({})

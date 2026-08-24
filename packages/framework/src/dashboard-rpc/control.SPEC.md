@@ -13,7 +13,7 @@ The user watches an agent work in the dashboard and steers it: sends it a furthe
 - **Merge means two different things by agent state** - a running agent is told to merge at its natural end with the user's authorization recorded; a finished agent's open pull request is merged straight away.
 - **Removing a checkout never loses work, and never surprises a running agent** - the work is committed and pushed before the worktree goes, a still-running agent is refused, and anything serving that checkout is stopped first.
 - **Publishing a cloud session's answer goes through the bridge** - a `web`-target agent has no local session to steer, so the user's pick is queued for the browser extension to type into claude.ai; only labels of the question actually parked on are accepted, and the daemon composes what gets typed from them.
-- **Queueing a ticket writes the queue directly** - the entry lands in the agent queue's matching priority section and links back to the ticket it came from.
+- **Queueing a ticket writes the queue directly** - the entry lands in the agent queue's matching priority section and links back to the ticket it came from; a ticket's *plan* can be queued the same way, as the plan-tickets ask for that one ticket.
 
 ## Business logic
 
@@ -108,6 +108,8 @@ The user sees a ticket worth doing and queues it, so the next drain agent picks 
 #### Business logic
 
 The entry is written straight into the project checkout's agent queue file. Given the ticket it came from, the entry is placed in the agent queue section matching that ticket's own priority rather than appended at the end, and is written as a link back to the ticket, so the drain agent working the queue front to back can open it. An empty entry is refused, and so is a project with no local path here.
+
+A ticket's plan is queued the same way: one entry asking for that ticket's plan file — the same wording the plan-tickets preset itself queues — placed by the ticket's priority. Deliberately not a link back to the ticket: a leading ticket link is exactly what every reader takes as "this ticket is queued for implementation", and a plan ask is not that. A name that is not a plain ticket filename is refused.
 
 #### Rationale
 

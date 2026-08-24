@@ -10,7 +10,7 @@ Each handle is declared against the daemon's own implementation of that action, 
 - **Publish the work** - push the agent branch, open a pull request, merge it, and set how far a finished agent publishes itself (its handoff level).
 - **Discard the work** - retire a finished agent's worktree, and delete the agent altogether.
 - **Open elsewhere** - hand a project or an agent to a local application (editor, terminal, browser preview) on the daemon's machine.
-- **Tickets** - queue a ticket as a confirmed task, and release a ticket's claim lock so it can be picked up again.
+- **Tickets** - queue a ticket as a confirmed task, queue a ticket's plan as one, and release a ticket's claim lock so it can be picked up again.
 
 ## Before modifying/creating SPEC.md files
 

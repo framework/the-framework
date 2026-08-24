@@ -12,6 +12,7 @@ The user wants to see the whole backlog — not one project's slice of it — de
 - **Click-to-filter** - clicking a row's topic adds that topic to the filter, clicking its claim marker narrows to claimed tickets; both add to what is already filtered rather than replacing it.
 - **Plan it or work it from the row** - a ticket can be handed to a planning agent or to an unattended work agent without leaving the page.
 - **Queue the whole shown set** - a button beside the page's heading adds every unclaimed shown ticket to the AI queue (a ticket already queued stays as it is), counting on its label what one click adds; no agent starts — the queue's own consumers do that.
+- **Queue plans for the whole shown set** - a sibling button queues one plan ask per shown ticket still to plan — the plan-tickets ask, placed by the ticket's priority — skipping tickets already planned, already queued, or claimed.
 - **Filtered-away tickets are accounted for** - the page says how many tickets the filters hide and offers to clear them; a project the user deselected disappears silently instead.
 
 ## Business logic
@@ -91,6 +92,22 @@ Once a click has queued the shown set, the button reads "Queued" and rests; any 
 #### Rationale
 
 Queueing rather than starting agents keeps the one click cheap and durable: entries are what the framework already picks up on its own, survive anything that interrupts the work, and spend nothing until an agent actually starts. Skipping already-queued tickets matters because a duplicate entry would outlive its agent's check-off as an open entry naming a closed ticket, costing the sweep an agent.
+
+### Queue plans for the whole shown set
+
+#### User story
+
+The user has filtered the backlog to a slice they intend to work soon and wants plans written for all of it first — to read before committing agents — without asking ticket by ticket.
+
+#### Business logic
+
+Beside the queue-the-shown-set button sits its plan sibling: one click queues, for every shown ticket that has no plan yet and no claim on it, the ask for that ticket's plan — the same wording the plan-tickets preset queues — placed in the AI queue by the ticket's own priority, walked in the shown order. A drain agent reaching such an entry writes the plan. No agent starts from the click.
+
+The click leaves alone what queueing again would waste: a ticket whose plan ask is already an open entry (recognized by its exact wording), and a ticket already queued for implementation — its work would land before a trailing plan could matter. The button's label counts only what it will ask for, saying "unplanned" the moment its count differs from the shown tally; hovering explains the mechanics, the worked order, and what is left alone. Once a click has queued the shown set's plans the button reads "Plans queued" and rests until the shown set changes. With nothing left to plan the button is not offered — the queue-the-tickets button stands on its own.
+
+#### Rationale
+
+Plans are for a human to read before spending agents, so asking for them in bulk is the natural prelude to queueing the same slice for implementation. The asks ride the same queue as everything else so the framework's own consumers pick them up with no new machinery — and the entry deliberately is not a ticket link, since a leading ticket link is what every reader takes as "queued for implementation".
 
 ### Filtered-away tickets are accounted for
 

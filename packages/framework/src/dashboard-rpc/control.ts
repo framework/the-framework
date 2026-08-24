@@ -4,7 +4,7 @@ import { openInApp, type OpenTarget, type OpenResult } from '../dashboard/open-i
 import { contextPreferences, contextStartAgent, resolveProjectPath, resolveAgentPath } from './context.js'
 import { relayOr } from './relay-agent.js'
 import { appendFlatTodoEntry, ticketForPrompt } from '../todo-loop.js'
-import { TICKETS_DIR, todoPriorityForTicket } from '../tickets.js'
+import { TICKETS_DIR, planTicketPrompt, todoPriorityForTicket } from '../tickets.js'
 import { isTicketFile } from '../dashboard/tickets.js'
 import { releaseTicketLock } from '../ticket-locks.js'
 import { findAgent, isSafeAgentId, worktreePath, type AgentMeta } from '../store/index.js'
@@ -376,5 +376,24 @@ export async function sendQueueTicket(
   // `parseTodoEntries` keeps the line verbatim, so the reference travels with the entry.
   const text = ticket ? `[${trimmed}](${TICKETS_DIR}/${ticket.file})` : trimmed
   const file = await appendFlatTodoEntry(cwd, text, ticket ? todoPriorityForTicket(ticket.priority) : undefined)
+  return file ? { ok: true, file } : { ok: false, error: 'the queue could not be written' }
+}
+
+/**
+ * Put a ticket's PLAN on the project's agent queue: the [Plan tickets] preset's own entry —
+ * `Create tickets/<stem>.plan.md` ({@link planTicketPrompt}) — placed by the ticket's priority
+ * like any queued pick (#1164), so a drain agent reaching it writes the plan.
+ *
+ * A sibling of {@link sendQueueTicket} rather than a flag on it, because the two write different
+ * lines on purpose: a queued ticket is a leading link back to the ticket, which is exactly what
+ * every reader (`ticketFromQueueEntry`, the hot-tickets lane, the dashboard's dedupe) takes as
+ * "queued for implementation" — a plan ask must not read as that, so it stays the preset's plain
+ * sentence.
+ */
+export async function sendQueueTicketPlan(projectId: string, ticket: QueuedTicket): Promise<QueueTicketResult> {
+  if (!isTicketFile(ticket.file)) return { ok: false, error: 'not a ticket filename' }
+  const cwd = await resolveProjectPath(projectId)
+  if (!cwd) return { ok: false, error: 'no such project' }
+  const file = await appendFlatTodoEntry(cwd, planTicketPrompt(ticket.file), todoPriorityForTicket(ticket.priority))
   return file ? { ok: true, file } : { ok: false, error: 'the queue could not be written' }
 }

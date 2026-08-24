@@ -31,6 +31,7 @@
 - [ ] Create tickets/2026-07-20_git-as-database-all-in.plan.md
 - [ ] Create tickets/2026-07-19_dogfooding-rom.plan.md
 - [ ] Create tickets/2026-07-18_combine-models.plan.md
+- [ ] Create tickets/2026-07-17_queue.plan.md
 
 
 ## Priority 4

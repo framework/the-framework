@@ -45,3 +45,4 @@
 - [ ] Create tickets/2026-07-22_metafromevents-updatedat-replay.plan.md
 - [ ] Create tickets/2026-07-21_discord-chat-single-live-run.plan.md
 - [ ] Create tickets/2026-07-21_readzip-leaks-onto-public-api.plan.md
+- [ ] Create tickets/2026-07-19_epic-hosted-mode.plan.md

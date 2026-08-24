@@ -36,7 +36,7 @@
 ## Open Questions
 
 - "Programs" => mix of skills/loops/on-going-work
-- Make everything modular with powerful extensions
+- [Modularity](https://github.com/framework/the-framework/discussions/1681)
 - Make most features headless: no need for dashboard, nor TF's code — new agent capabilities are simply teached via AGENTS.md
 
 ## Postponed

@@ -1,0 +1,25 @@
+{
+  "status": "done",
+  "id": "2026-08-24T14-33-07-634Z",
+  "startedAt": "2026-08-24T14:33:08.202Z",
+  "updatedAt": "2026-08-24T14:33:16.192Z",
+  "pid": 364137,
+  "host": "rom-thinkpad-x280",
+  "intent": "Open TODO_AGENTS.md and work on this one open entry only, then check it off. Do not start any other entry. The entry:\n\nCreate tickets/2026-08-22_catch-all-safety-commit.plan.md",
+  "target": "web",
+  "kind": "prompt",
+  "handoff": {
+    "push": true,
+    "pr": true,
+    "merge": false
+  },
+  "branch": "tf-agent-2026-08-24T14-33-07-634Z",
+  "driver": "claude-web",
+  "workspace": "/home/rom/code/the-framework/.the-framework/branches/tf-agent-2026-08-24T14-33-07-634Z",
+  "sessionLink": "https://claude.ai/code/session_01Wq6oEv6CNWDJ8zXYSF49UF?from=cli&m=0",
+  "model": "fable",
+  "cloudAnchor": "e361adb0437b26578fe697e0fa3000163019effd",
+  "sessionId": "session_01Wq6oEv6CNWDJ8zXYSF49UF",
+  "handoffReport": "skipped",
+  "handoffSkip": "no-commits"
+}

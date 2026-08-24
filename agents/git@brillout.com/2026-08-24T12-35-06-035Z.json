@@ -1,0 +1,25 @@
+{
+  "status": "done",
+  "id": "2026-08-24T12-35-06-035Z",
+  "startedAt": "2026-08-24T12:35:06.448Z",
+  "updatedAt": "2026-08-24T12:35:14.336Z",
+  "pid": 329216,
+  "host": "rom-thinkpad-x280",
+  "intent": "Open TODO_AGENTS.md and work on this one open entry only, then check it off. Do not start any other entry. The entry:\n\nCreate tickets/2026-08-05_project-dropdown-multiselect.plan.md",
+  "target": "web",
+  "kind": "prompt",
+  "handoff": {
+    "push": true,
+    "pr": true,
+    "merge": false
+  },
+  "branch": "tf-agent-2026-08-24T12-35-06-035Z",
+  "driver": "claude-web",
+  "workspace": "/home/rom/code/the-framework/.the-framework/branches/tf-agent-2026-08-24T12-35-06-035Z",
+  "sessionLink": "https://claude.ai/code/session_01EcuX8ZnAKmarHvb5aS5AbP?from=cli&m=0",
+  "model": "fable",
+  "cloudAnchor": "030dce830d8ef139cbe26fad3f68d15d3b0d5442",
+  "sessionId": "session_01EcuX8ZnAKmarHvb5aS5AbP",
+  "handoffReport": "skipped",
+  "handoffSkip": "no-commits"
+}

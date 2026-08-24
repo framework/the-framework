@@ -541,13 +541,6 @@ async function stopAndArchiveLive(fs: StoreFs, dir: string, meta: AgentMeta): Pr
   return stopped
 }
 
-/** Rebuild {@link AgentMeta} from a full event log (used when resuming). */
-export function metaFromEvents(events: readonly FrameworkEvent[], startedAt: string): AgentMeta {
-  let meta = freshMeta(startedAt)
-  for (const event of events) meta = applyEventToMeta(meta, event, startedAt)
-  return meta
-}
-
 /**
  * Durable, append-only store for a single agent's orchestration events, plus a
  * derived {@link AgentMeta} snapshot. Writes are serialized through one tail

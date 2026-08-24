@@ -11,7 +11,6 @@ What the tests cover: how an agent's record is written, summarized, archived and
 
 **Folding events into the agent meta**
 
-- Rebuilding the agent meta by replaying a whole log yields the same summary as folding events as they are appended.
 - A later request refines the seeded one.
 - The model is recorded per leg: the latest leg wins, and a leg that reports no model leaves it unknown rather than inheriting.
 - Handoff arming is mirrored, including whether merge is armed, without padding fields the arming never stated.

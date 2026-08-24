@@ -2,7 +2,7 @@ The session start-queue of the Claude web bridge: the cloud sessions a web run w
 
 ## User story
 
-A `web`-target agent hands its task to a cloud session on claude.ai. A session created through claude.ai's own repository picker is bound to that repository, so it can push its work and open a pull request; one created through the CLI's cloud flag may not be. So the run asks the daemon for an extension-created session, the extension in the user's own browser creates it, and the run learns where its work went.
+A `web`-target agent hands its task to a cloud session on claude.ai. A session created through claude.ai's own repository picker is bound to that repository, so it can push its work and open a pull request. So the run asks the daemon for an extension-created session, the extension in the user's own browser creates it, and the run learns where its work went.
 
 ## Business logic — TL;DR
 

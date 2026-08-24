@@ -11,14 +11,22 @@ import type { FrameworkEvent } from './events.js'
 // URL in hand. This wires the real driver through the real telemetry into the real meta fold,
 // so the contract that the deep link wins is pinned end to end, not per layer.
 
-const URL = 'https://claude.ai/code/session_01ABCdefGHIjklMNO?from=cli&m=0'
-const CREATED = [
-  '\x1b[?25l\x1b[2K',
-  'Created cloud session: Add the --verbose flag\r\n',
-  `View: \x1b[4m${URL}\x1b[24m\r\n`,
-  'Resume with: claude --teleport session_01ABCdefGHIjklMNO\r\n',
-  '\x1b[?25h',
-].join('')
+const SESSION = 'session_01ABCdefGHIjklMNO'
+const URL = `https://claude.ai/code/${SESSION}`
+
+/** A daemon whose start-queue reports the session created on the first poll, and a git with a GitHub origin. */
+function extensionThatCreates() {
+  const fetchFake = (async (input: string | globalThis.URL | Request, init?: RequestInit) =>
+    (init?.method ?? 'GET') === 'POST'
+      ? new Response(JSON.stringify({ id: 'req-1' }), { status: 202 })
+      : new Response(JSON.stringify({ state: 'created', sessionId: SESSION, url: URL }), { status: 200 })) as typeof fetch
+  const git = async (args: string[]): Promise<string> => {
+    if (args[0] === 'remote') return 'git@github.com:framework/the-framework.git\n'
+    if (args[0] === 'commit-tree') return `${'a'.repeat(40)}\n`
+    return ''
+  }
+  return { extension: { daemonUrl: 'http://127.0.0.1:4200', token: 'tok', fetch: fetchFake, pollMs: 1 }, git }
+}
 
 test('a cloud run meta ends with the real session URL, not the generic entry point (#1317)', async () => {
   const events: FrameworkEvent[] = []
@@ -27,14 +35,7 @@ test('a cloud run meta ends with the real session URL, not the generic entry poi
     // What a Claude agent gets without an explicit session link: the generic entry point.
     sessionLink: CLAUDE_CODE_SESSION_LINK,
   })
-  const driver = new CloudDriver({
-    agentTag: () => 'tag',
-    timeoutMs: 1000,
-    runPty: async opts => {
-      opts.onData(CREATED)
-      if (!opts.signal.aborted) await new Promise<void>(r => opts.signal.addEventListener('abort', () => r(), { once: true }))
-    },
-  })
+  const driver = new CloudDriver({ agentTag: () => 'tag', timeoutMs: 1000, ...extensionThatCreates() })
   emitSessionStart({ emit: e => events.push(e), driver, cwd: '/repo', sessionLink: CLAUDE_CODE_SESSION_LINK })
   const session = await driver.start({ cwd: '/repo', onEvent: handler.onDriverEvent })
   await session.prompt('go')

@@ -1,32 +1,26 @@
 import { randomUUID } from 'node:crypto'
-import { spawn as nodeSpawn } from 'node:child_process'
-import { closeSync, mkdtempSync, openSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { killTree, registerChild, unregisterChild } from './child-registry.js'
 import { makeEmit } from './session-support.js'
 import { nodeGitRunner, type GitRunner } from '../project.js'
-import { readClaudeTrust, writeClaudeTrust } from '../claude-trust.js'
 import { errorMessage } from '../error-message.js'
 import { githubSlugFor } from '../dashboard/github.js'
 import { WEB_START_PREFIX } from '../dashboard/web-start-endpoints.js'
 import type { Driver, DriverEvent, DriverPromptOptions, DriverSession, DriverStartOptions, DriverTurn } from './types.js'
 
 /**
- * A {@link Driver} that hands the task to **Claude Code on the web** (#610): it starts a
- * real cloud session on claude.ai and returns its id and URL.
+ * A {@link Driver} that hands the task to **Claude Code on the web** (#610): it has a cloud
+ * session created on claude.ai and returns its id and URL.
  *
- * The mechanism is the CLI's own `--cloud` flag, so the account, the auth and the
- * quota are the user's, exactly as with the local driver (#495). Nothing here drives
- * the claude.ai UI: no browser, no extension, no scraping — the two earlier candidates
- * for this issue, both of which the Usage Policy rules out.
+ * The session is created by the browser extension, in the user's own signed-in browser,
+ * through claude.ai's repository picker (#1328): the run asks its daemon to queue the request
+ * — the repository, the pushed hand-off ref, the prompt — and the extension drives the page
+ * and reports the session it became. A session created that way is bound to the repository,
+ * so it can push its work and open its pull request; the CLI's own `--cloud` flag, the earlier
+ * mechanism, produced on some accounts a bundle upload that never could (#1320), and is gone.
+ * The account, the auth and the quota are the user's, exactly as with the local driver (#495).
  *
- * **Why a pty.** `--cloud` refuses to run when stdout is a pipe, because a non-interactive
- * invocation would silently run locally instead. That check is about the *terminal*, not
- * about a human, so running the CLI under a pty satisfies it. `script` supplies the pty
- * (present on macOS and Linux) and the prompt travels in the environment, never inside a
- * shell string — the command string is a fixed literal, so no prompt text can reach the
- * shell as syntax.
+ * So a web run needs four things, and names whichever is missing: a daemon that spawned it
+ * (the daemon's URL travels in the run's environment), the browser bridge switched on, the
+ * extension present, and a GitHub remote for the picker to name.
  *
  * **What this target is, and is not.** It is a hand-off: the session runs on Anthropic's
  * infrastructure, does its own git worktree and opens its own PR, at 0% local CPU — the
@@ -69,20 +63,14 @@ export interface ExtensionStart {
 /** Options for {@link CloudDriver}. */
 export interface CloudDriverOptions {
   /**
-   * Ask the daemon for a session created by the browser extension (#1328) before falling back
-   * to the CLI's `--cloud`. Absent on a run no daemon spawned, which has no daemon to ask.
+   * The daemon whose start-queue the browser extension drains (#1328). Absent on a run no
+   * daemon spawned, which then has nobody to create its session and fails saying so.
    */
   extension?: ExtensionStart
-  /** Claude Code binary. Default `"claude"`. */
-  bin?: string
   /** Give up on session creation after this long, in ms. Default 120000. */
   timeoutMs?: number
-  /** Run one pty-hosted invocation. Injected in tests; defaults to a real `script` pty. */
-  runPty?: RunPty
   /** Runs git for the pre-hand-off push (#1320). Injected in tests; defaults to real git. */
   git?: GitRunner
-  /** The CLI's config file the pre-hand-off trust write (#1493) touches. Injected in tests; defaults to `~/.claude.json`. */
-  claudeConfig?: string
   /**
    * Unique tag mixed into the session id. Default a random token. Injected in tests for a
    * stable id, and load-bearing in production for the same reason it is in the Actions
@@ -92,85 +80,15 @@ export interface CloudDriverOptions {
   agentTag?: () => string
 }
 
-/** One pty-hosted invocation: stream its output, resolve when it ends. */
-export type RunPty = (opts: AgentPtyOptions) => Promise<void>
-
-/** What {@link RunPty} needs to run one invocation. */
-export interface AgentPtyOptions {
-  /** Claude Code binary to run under the pty. */
-  bin: string
-  /** The prompt, handed over through the environment rather than the command line. */
-  prompt: string
-  /** Model id to pass through, when one was chosen. */
-  model?: string | undefined
-  /**
-   * The ref the session clones at (#1320), pushed to origin just before this invocation.
-   * Absent when that push failed — the CLI then pins its own default, which is the current
-   * local branch and fails in-session when that branch is not on origin.
-   */
-  ref?: string | undefined
-  /** Workspace the CLI runs in — the repo whose remote the cloud session clones. */
-  cwd: string
-  /** Called with each chunk of terminal output. */
-  onData: (chunk: string) => void
-  /** Stop the invocation: the caller has what it needs, or the agent was aborted. */
-  signal: AbortSignal
-}
-
 /** Counter feeding the per-process half of a session id. */
 let sessionCounter = 0
 
-/** Control sequences a terminal emits around the text we actually want to read. */
-const ANSI = /\x1b\[[0-9;?]*[a-zA-Z]|\x1b[()][A-Z]|\x1b[=>]|\x1b\][^\x07]*(?:\x07|\x1b\\)/g
-
-/** The session link the CLI prints once the cloud session exists. */
-const SESSION_URL = /https:\/\/claude\.ai\/code\/(session_[A-Za-z0-9]+)\S*/
-
-/**
- * The workspace-trust question, matched with every space removed so a terminal that draws
- * the words with cursor moves rather than literal spaces still matches. The pre-hand-off
- * trust write (#1493) should keep this dialog from ever appearing; it is still detected as
- * the safety net for when that write failed or the CLI rejected it, so the run says what it
- * is parked on — with the manual fix named — instead of timing out with nothing to show.
- */
-const TRUST_PROMPT = 'trustthisfolder'
-
-/**
- * The project root an agent worktree belongs to, which is where trust has to be granted.
- *
- * The CLI records trust per directory and everything under a trusted directory inherits it
- * (verified live: a fresh worktree of a trusted root boots straight to the REPL, a fresh
- * worktree of an untrusted root always shows the dialog). An agent's cwd is an ephemeral
- * worktree — gone before the user could act on advice that names it — so the only advice
- * that works is: trust the root once, and every agent worktree under it is covered.
- */
-export function trustRootOf(cwd: string): string {
-  const match = /^(.+?)\/\.the-framework\/branches\/[^/]+\/?$/.exec(cwd)
-  return match ? match[1]! : cwd
-}
-
-/** The one-time fix for an untrusted workspace, phrased against the root, not the worktree. */
-function trustAdvice(cwd: string): string {
-  const root = trustRootOf(cwd)
-  return `Run \`claude\` in ${root} once and accept the trust prompt — run worktrees inherit the root's trust — then start a new web run.`
-}
-
-/** Model ids we will pass through, kept to characters that cannot act as shell syntax. */
-const SAFE_MODEL = /^[A-Za-z0-9._:-]+$/
-
-/**
- * The rule between the task and the injected instructions in a hand-off prompt (#1497).
- * Exported so a test can pin the exact seam the claude.ai reader sees.
- */
 export const CLOUD_PROMPT_SEPARATOR = '==============================='
 
 /**
- * Assemble the one prompt a cloud session receives (#1497). Unlike every streamed driver —
- * where the system channel is invisible plumbing — this whole string is what a *human* reads
- * when they open the claude.ai session. So the task comes first (it is what the user is
- * looking for), and each injected block follows behind a hard `===` rule with a one-line
- * label, because the blocks' own markdown headers run into each other and read as one
- * confusing document without it.
+ * The prompt handed to the cloud session (#1497): the task first, then every block The Framework
+ * injects — the framing, a per-call system — behind a labeled rule. On claude.ai this string is
+ * read by a human, and the task is what they open the session to find.
  */
 export function cloudHandOffPrompt(task: string, ...injected: (string | undefined)[]): string {
   const blocks = injected.filter((part): part is string => Boolean(part))
@@ -180,19 +98,12 @@ export function cloudHandOffPrompt(task: string, ...injected: (string | undefine
   return `${task}${rule}${header}\n\n${blocks.join(rule)}`
 }
 
-/**
- * One hand-off to Claude Code on the web — **exactly one, for the life of the session.**
- *
- * An agent is not a single prompt. The loop prompts again for every pass (plan, build, review,
- * the TODO backlog), so a driver that started a cloud session per prompt turned one agent into
- * six of them on the account. That is not a caveat, it is the wrong shape: the same task
- * handed to six independent cloud VMs is six agents racing on one repo.
- *
- * So the first prompt hands off, and every later one reports the hand-off that already
- * happened without spending another session. There is no continuation to offer either way —
- * the CLI can start a cloud session and pull one back, but it cannot send a second message
- * to one, so the honest answer to "keep going" is "this agent is already over there".
- */
+/** What a web run is missing when it cannot hand off, each named so the fix is the message. */
+const NO_DAEMON = '[framework] claude-web: this run was not started by a daemon, so nothing can hand it to the browser extension — start web runs from the dashboard.'
+const NO_REMOTE = '[framework] claude-web: no GitHub remote here — the cloud session is created on a repository the browser extension picks on claude.ai, so the project needs an `origin` on GitHub.'
+const NO_EXTENSION = '[framework] claude-web: no browser extension has spoken to this daemon recently — install or reload The Framework extension on a claude.ai tab (and keep the browser bridge on in Settings), then start the run again.'
+const BRIDGE_OFF = '[framework] claude-web: the browser bridge is off — turn it on in Settings so the extension can create the cloud session.'
+
 export class CloudSession implements DriverSession {
   readonly id: string
   readonly cwd: string
@@ -218,8 +129,6 @@ export class CloudSession implements DriverSession {
 
   async prompt(text: string, opts: DriverPromptOptions = {}): Promise<DriverTurn> {
     if (this.disposed) throw new Error('[framework] claude-web session disposed')
-    // Task first, injected framing behind labeled rules (#1497): on claude.ai this string is
-    // read by a human, and the task is what they open the session to find.
     const full = cloudHandOffPrompt(text, this.framing, opts.system)
     this.emit({ type: 'start', prompt: full })
 
@@ -237,183 +146,75 @@ export class CloudSession implements DriverSession {
       }
       signal.addEventListener('abort', () => controller.abort(), { once: true })
     }
+    const timer = setTimeout(() => controller.abort(), this.config.timeoutMs ?? 120_000)
 
-    const timeoutMs = this.config.timeoutMs ?? 120_000
-    const timer = setTimeout(() => controller.abort(), timeoutMs)
-    const model = this.startOpts.model
-    if (model !== undefined && !SAFE_MODEL.test(model)) {
-      clearTimeout(timer)
-      this.controllers.delete(controller)
-      throw new Error(`[framework] claude-web: unsafe model id ${JSON.stringify(model)}`)
-    }
-
-    // The pre-hand-off trust write (#1493): the CLI's one-time "trust this folder?" dialog
-    // cannot be answered under the daemon's pty, and the manual one-time fix broke the
-    // "click and it works" story for web runs. Starting a web agent on the project is itself
-    // the user's trust decision, so record it the way the CLI itself would. Best-effort: a
-    // failed write falls through to the dialog detection below and its manual advice.
-    const trustRoot = trustRootOf(this.cwd)
     try {
-      if (!(await readClaudeTrust(trustRoot, this.config.claudeConfig)).trusted) {
-        await writeClaudeTrust(trustRoot, this.config.claudeConfig)
-        this.emit({
-          type: 'notice',
-          message: `[framework] claude-web: trusted ${trustRoot} for Claude Code on behalf of this run (#1493).`,
-        })
-      }
-    } catch (err) {
-      this.emit({
-        type: 'notice',
-        message: `[framework] claude-web: could not record Claude Code trust for ${trustRoot} (${errorMessage(err)}) — if the CLI asks its trust question, this run will fail with the manual fix named.`,
-      })
-    }
+      const ext = this.config.extension
+      if (!ext) throw new Error(NO_DAEMON)
+      const git = this.config.git ?? nodeGitRunner()
+      const slug = await githubSlugFor(this.cwd, git)
+      if (!slug) throw new Error(NO_REMOTE)
 
-    // The pre-hand-off push (#1320): the cloud session clones the repo at a named origin ref,
-    // and its two failure modes are both local facts — the CLI's default pin is the current
-    // branch, which an agent worktree's local-only run branch fails, and a slash-carrying
-    // name (every `the-framework/...` branch) never resolves on the cloud side even when
-    // pushed (anthropics/claude-code#87235). So push under this agent's own id — unique,
-    // slash-free — and hand the session that. Best-effort: a repo with no pushable remote
-    // falls back to the CLI's default, which still works wherever it worked before, and the
-    // notice names what a stranded session will look like.
-    //
-    // What gets pushed is not HEAD itself but the hand-off anchor (#1601): an empty commit on
-    // top of HEAD, minted with `commit-tree` so no local branch moves. The session does its
-    // work on a branch of its own naming (`claude/*`), never the designated run branch — and
-    // since every commit it makes descends from what it cloned, a commit unique to this run is
-    // the one exact mark by which the daemon can later recognize which `claude/*` branch is
-    // this run's. Minting and pushing are one step: a checkout that cannot mint an empty commit
-    // on its HEAD has no HEAD to push either.
-    const git = this.config.git ?? nodeGitRunner()
-    let ref: string | undefined = this.id
-    try {
-      const anchor = (await git(['commit-tree', 'HEAD^{tree}', '-p', 'HEAD', '-m', `[The Framework] web hand-off ${this.id}`], this.cwd)).trim()
-      await git(['push', 'origin', `${anchor}:refs/heads/${this.id}`], this.cwd)
-      this.anchorSha = anchor
-    } catch (err) {
-      ref = undefined
-      this.emit({
-        type: 'notice',
-        message: `[framework] claude-web: could not push ${this.id} to origin (${errorMessage(err)}) — the cloud session may not find this branch and its work would then need \`claude --teleport\` to recover.`,
-      })
-    }
-
-    let output = ''
-    let trusting = false
-    let found: { url: string; sessionId: string } | undefined
-    // The extension path first (#1328): a session created through the page's repo picker is
-    // repo-bound, which is what lets it push and open the pull request. Undefined means the
-    // daemon had nobody to hand the request to, and the CLI's own `--cloud` does the hand-off.
-    if (this.config.extension) {
+      // The pre-hand-off push (#1320): the cloud session opens on a named origin ref, so the
+      // repository picker's branch list must offer this run's starting point. What gets pushed is
+      // not HEAD itself but the hand-off anchor (#1601): an empty commit on top of it, so the ref
+      // is recognizably this run's and a later sweep can tell it from a branch a person made.
+      // Minting and pushing are one step: a checkout that cannot mint an empty commit on its
+      // HEAD has no HEAD to push either. A push that fails fails the run — the session cannot
+      // open on a ref origin does not have.
+      let anchor: string
       try {
-        found = await this.createViaExtension(this.config.extension, full, ref, git, controller.signal)
-      } finally {
-        if (found) {
-          clearTimeout(timer)
-          this.controllers.delete(controller)
-        }
+        anchor = (await git(['commit-tree', 'HEAD^{tree}', '-p', 'HEAD', '-m', `[The Framework] web hand-off ${this.id}`], this.cwd)).trim()
+        await git(['push', 'origin', `${anchor}:refs/heads/${this.id}`], this.cwd)
+      } catch (err) {
+        throw new Error(`[framework] claude-web: could not push the hand-off ref ${this.id} to origin (${errorMessage(err)}) — the cloud session opens on that ref, so the project needs a pushable GitHub remote.`)
       }
-    }
-    if (found) {
+
+      const found = await this.createViaExtension(ext, `${slug.owner}/${slug.repo}`, this.id, full, controller.signal)
+      this.anchorSha = anchor
       this.handedOff = found
       return this.report(found, 'first')
-    }
-    try {
-      await (this.config.runPty ?? runPtyWithScript)({
-        bin: this.config.bin ?? 'claude',
-        prompt: full,
-        model,
-        ref,
-        cwd: this.cwd,
-        signal: controller.signal,
-        onData: chunk => {
-          output += chunk
-          if (found) return
-          const clean = output.replace(ANSI, '')
-          const match = SESSION_URL.exec(clean)
-          if (match) {
-            found = { url: match[0], sessionId: match[1]! }
-            // The link is what the dashboard needs; the CLI has nothing further to say
-            // and would otherwise sit holding the terminal, so stop it here.
-            controller.abort()
-            return
-          }
-          if (!trusting && clean.replace(/\s+/g, '').includes(TRUST_PROMPT)) {
-            trusting = true
-            this.emit({
-              type: 'notice',
-              message: `Claude Code has not been trusted in ${trustRootOf(this.cwd)}, so it asks before it will start and the cloud session is never created. ${trustAdvice(this.cwd)}`,
-            })
-            controller.abort()
-          }
-        },
-      })
+    } catch (err) {
+      // A user abort (Stop, the agent signal) lands here too; name it what it was.
+      if (this.startOpts.signal?.aborted || opts.signal?.aborted) throw new Error('[framework] claude-web prompt aborted')
+      throw err
     } finally {
       clearTimeout(timer)
       this.controllers.delete(controller)
     }
-
-    // A user abort (Stop, the agent signal) also lands here with `found` unset — the pty run
-    // resolves once the controller aborts. Name it what it was, not "no cloud session was
-    // created", which is the CLI-failure message.
-    if (!found && (this.startOpts.signal?.aborted || opts.signal?.aborted))
-      throw new Error('[framework] claude-web prompt aborted')
-    // The trust dialog is a one-time, per-root fix, so fail with that instead of the raw
-    // dialog text — three identical "no cloud session was created" runs in a row is what
-    // this looked like before the failure named its own cure.
-    if (!found && trusting)
-      throw new Error(`[framework] claude-web: no cloud session was created — the workspace is not trusted by Claude Code. ${trustAdvice(this.cwd)}`)
-    if (!found) throw new Error(`[framework] claude-web: no cloud session was created.\n${tail(output.replace(ANSI, ''))}`)
-
-    this.handedOff = found
-    return this.report(found, 'first')
   }
 
   /**
    * Hand the session request to the daemon's start-queue and wait for the extension's word
-   * (#1328). Resolves undefined — the CLI path then runs — when the daemon has no extension to
-   * ask (409), no queue at all (404), when this checkout has no GitHub remote for the repo picker
-   * to name, or when the hand-off ref was never pushed. Throws when the extension tried and
-   * failed, naming what it could not find, or when the wait was aborted.
+   * (#1328). Throws, naming the cure, when the daemon has no extension to ask (409) or the
+   * bridge is off (404); throws with the extension's own note when it tried and could not create
+   * the session; throws when the wait was aborted or timed out.
    */
   private async createViaExtension(
     ext: ExtensionStart,
+    repo: string,
+    ref: string,
     prompt: string,
-    ref: string | undefined,
-    git: GitRunner,
     signal: AbortSignal,
-  ): Promise<{ url: string; sessionId: string } | undefined> {
-    const slug = await githubSlugFor(this.cwd, git)
-    if (!slug || !ref) {
-      this.emit({
-        type: 'notice',
-        message: `[framework] claude-web: ${slug ? 'the hand-off ref was not pushed' : 'no GitHub remote here'}, so the browser extension cannot create the session — handing off through the CLI instead.`,
-      })
-      return undefined
-    }
+  ): Promise<{ url: string; sessionId: string }> {
     const doFetch = ext.fetch ?? fetch
     const base = ext.daemonUrl.replace(/\/+$/, '')
     const headers = { authorization: `Bearer ${ext.token}` }
     const queued = await doFetch(`${base}${WEB_START_PREFIX}`, {
       method: 'POST',
       headers: { ...headers, 'content-type': 'application/json' },
-      body: JSON.stringify({ repo: `${slug.owner}/${slug.repo}`, branch: ref, prompt }),
+      body: JSON.stringify({ repo, branch: ref, prompt }),
       signal,
     })
-    if (queued.status === 409 || queued.status === 404) {
-      this.emit({
-        type: 'notice',
-        message: `[framework] claude-web: ${queued.status === 409 ? 'no browser extension is around' : 'the daemon has the browser bridge off'}, so the CLI hands off instead.`,
-      })
-      return undefined
-    }
+    if (queued.status === 409) throw new Error(NO_EXTENSION)
+    if (queued.status === 404) throw new Error(BRIDGE_OFF)
     if (!queued.ok) throw new Error(`[framework] claude-web: the daemon refused the session request (${queued.status}): ${(await queued.text()).slice(0, 300)}`)
     const { id } = (await queued.json()) as { id: string }
-    this.emit({ type: 'notice', message: `[framework] claude-web: asked the browser extension to create the cloud session on ${slug.owner}/${slug.repo} at ${ref} (request ${id}).` })
+    this.emit({ type: 'notice', message: `[framework] claude-web: asked the browser extension to create the cloud session on ${repo} at ${ref} (request ${id}).` })
 
     const pollMs = ext.pollMs ?? 2000
     for (;;) {
-      if (signal.aborted) throw new Error('[framework] claude-web prompt aborted')
+      if (signal.aborted) throw new Error('[framework] claude-web: gave up waiting for the browser extension to create the session.')
       const res = await doFetch(`${base}${WEB_START_PREFIX}/${id}`, { headers, signal })
       if (!res.ok) throw new Error(`[framework] claude-web: lost the session request ${id} (${res.status})`)
       const state = (await res.json()) as { state: string; sessionId?: string; url?: string; note?: string }
@@ -468,115 +269,3 @@ export class CloudSession implements DriverSession {
   }
 }
 
-/** Keep the tail of a failed invocation's output, enough to show the reason. */
-function tail(text: string, max = 600): string {
-  const trimmed = text.trim()
-  return trimmed.length <= max ? trimmed : `...${trimmed.slice(-max)}`
-}
-
-/**
- * The shell command `script` hosts. A **fixed literal**: the prompt and the model arrive
- * as environment variables, so nothing the user typed is ever parsed as shell syntax.
- * `${FW_CLOUD_MODEL:+...}` adds the model flag only when one was chosen.
- *
- * **The prompt has to come directly after `--cloud`.** The description is that flag's own
- * value rather than a loose positional argument, so anything in between claims the slot and
- * the CLI stops with "--cloud requires a description". That is why this failed on an account
- * with a model preference and worked without one: the model flag was sitting in the slot.
- * Exported so a test can pin the order, which is load-bearing and not otherwise observable.
- *
- * `--ref` names the origin ref the session clones at (#1320) — undocumented in the CLI's
- * help but real, and the only revision spelling that works: the CLI's default pin is the
- * current local branch, which the cloud side cannot resolve when it is not on origin, and a
- * slash-carrying name (every `the-framework/...` branch) never resolves at all
- * (anthropics/claude-code#87235). The ref is pushed just before this runs; see the pre-push
- * in {@link CloudSession.prompt}.
- */
-export const CLOUD_COMMAND =
-  'exec "$FW_CLOUD_BIN" --cloud "$FW_CLOUD_PROMPT" ${FW_CLOUD_MODEL:+--model "$FW_CLOUD_MODEL"} ${FW_CLOUD_REF:+--ref "$FW_CLOUD_REF"}'
-
-/**
- * Extra environment for the CLI invocation (#1320): with statsig disabled its gates read
- * false, which turns off the server-side `tengu_ccr_bundle_seed_enabled` experiment — the
- * flag that converts a failed GitHub-App preflight into a silent local-bundle upload with no
- * remote and no push access (anthropics/claude-code#81776). With the gate off, the same
- * failed preflight falls through to a repo-bound session that clones from GitHub and can
- * push, which is the entire point of handing work to the cloud. Drop this once the upstream
- * preflight accepts connected-account access.
- */
-export const CLOUD_ENV: Readonly<Record<string, string>> = { CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1' }
-
-/**
- * Run the CLI under a pty supplied by `script`, streaming its terminal output.
- *
- * `script`'s two dialects differ: BSD (macOS) takes the typescript file then the command
- * as argv, util-linux (Linux) takes `-c <command>` then the file. Both get the same fixed
- * command string, so the difference is confined to argv order.
- */
-function runPtyWithScript(opts: AgentPtyOptions): Promise<void> {
-  return new Promise<void>((resolvePromise, rejectPromise) => {
-    const env: NodeJS.ProcessEnv = {
-      ...process.env,
-      ...CLOUD_ENV,
-      FW_CLOUD_BIN: opts.bin,
-      FW_CLOUD_PROMPT: opts.prompt,
-      ...(opts.model !== undefined ? { FW_CLOUD_MODEL: opts.model } : {}),
-      ...(opts.ref !== undefined ? { FW_CLOUD_REF: opts.ref } : {}),
-    }
-    const args =
-      process.platform === 'darwin'
-        ? ['-q', '/dev/null', 'sh', '-c', CLOUD_COMMAND]
-        : ['-qec', CLOUD_COMMAND, '/dev/null']
-    // stdin must be a FILE. BSD `script` reads its own stdin's terminal attributes to mirror
-    // them onto the pty it creates, and a pipe is a socketpair, so it dies with
-    // "tcgetattr/ioctl: Operation not supported on socket" before running anything. Under a
-    // daemon there is no terminal to inherit either, so the fd has to be something tcgetattr
-    // can fail on harmlessly, which a regular file is.
-    let dir: string
-    let stdin: number
-    try {
-      dir = mkdtempSync(join(tmpdir(), 'framework-cloud-'))
-      const path = join(dir, 'stdin')
-      writeFileSync(path, '')
-      stdin = openSync(path, 'r')
-    } catch (err) {
-      rejectPromise(new Error(`[framework] claude-web: could not prepare the pty input (${(err as Error).message})`))
-      return
-    }
-    const cleanup = () => {
-      try {
-        closeSync(stdin)
-        rmSync(dir, { recursive: true, force: true })
-      } catch {
-        // Best effort: a leftover temp file must not fail an agent that otherwise worked.
-      }
-    }
-
-    const child = nodeSpawn('script', args, { cwd: opts.cwd, env, detached: true, stdio: [stdin, 'pipe', 'pipe'] })
-    const pid = child.pid
-    if (pid != null) registerChild(pid)
-    let settled = false
-    const finish = (err?: Error) => {
-      if (settled) return
-      settled = true
-      if (pid != null) {
-        killTree(pid, 'SIGKILL')
-        unregisterChild(pid)
-      }
-      cleanup()
-      if (err) rejectPromise(err)
-      else resolvePromise()
-    }
-
-    // Aborting is the normal ending: the caller stops us the moment the session URL lands.
-    opts.signal.addEventListener('abort', () => finish(), { once: true })
-
-    const consume = (chunk: Buffer) => opts.onData(chunk.toString('utf8'))
-    child.stdout?.on('data', consume)
-    child.stderr?.on('data', consume)
-    child.on('error', (err: Error) =>
-      finish(new Error(`[framework] claude-web: could not run the CLI under a pty (${err.message}). \`script\` must be on PATH.`)),
-    )
-    child.on('close', () => finish())
-  })
-}

@@ -5,6 +5,7 @@ What the tests cover: the Overview's Agents card.
 - When nothing is working, the card says so instead of disappearing.
 - While the list is still being fetched, that is shown as loading rather than as "nothing is working".
 - An agent with no intent still gets a readable label — the session name it chose — instead of a blank line.
+- An agent another machine's daemon started names that machine; this daemon's own agents do not.
 
 ## Before modifying/creating SPEC.md files
 

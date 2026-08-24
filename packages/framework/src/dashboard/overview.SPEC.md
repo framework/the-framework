@@ -6,10 +6,10 @@ The user has several projects registered and opens the dashboard without picking
 
 ## Business logic — TL;DR
 
-- **Working now** - every project's running agents, plus every `web`-target agent whose cloud session is still working or parked on a question, most recently active first, each labelled with its task, its session name and whether it has signalled ready for merge.
+- **Working now** - every project's running agents, plus every `web`-target agent whose cloud session is still working or parked on a question, most recently active first, each labelled with its task, its session name, whether it has signalled ready for merge, and — when another machine's daemon started it — that machine's name.
 - **Backlog size** - the number of still-open agent queue entries summed across every project.
 - **Recently active projects** - the five projects that saw activity most recently.
-- **Recent agents, pooled** - the newest agents across all projects in one list, each tagged with the project it belongs to.
+- **Recent agents, pooled** - the newest agents across all projects in one list, each tagged with the project it belongs to, and listed once even when two registered checkouts share the archive that holds it.
 - **Every project's tickets** - one ticket list per registered project, in registry order, projects kept even when they have no tickets.
 - **Hot tickets** - a shortlist of tickets across all projects, sorted into three lanes: being worked on now, waiting in the agent queue, or merely flagged high priority.
 - **A broken project is silently absent** - anything unreadable contributes nothing rather than failing the whole Overview.
@@ -24,7 +24,7 @@ The user wants to know, without opening any project, which agents are running an
 
 #### Business logic
 
-Every project's live agents are read and only those still running are listed, one entry per agent — a single project can have several in flight, each in its own worktree. Every project's archived agents are read too, for the `web`-target agents whose cloud side is still at work per the cloud state rule (`cloud-run-state`): in cloud, or waiting on a question the browser bridge holds. Those are listed as well, marked with that state, keyed to the project's own path since their checkout may be gone, and once each even when two registered checkouts of one repository share the archive that holds them; a cloud session at work is an agent at work, and "no agents working" over a session waiting on the user was a lie. Each entry carries the project it belongs to, the agent's own checkout so its git and file status is read from the worktree it actually edits, what the user asked for, when the agent last spoke, the session name the agent chose if it has picked one, and whether it has signalled ready for merge (which drives the building-versus-ready indicator). The list is ordered by last activity, most recent first.
+Every project's live agents are read and only those still running are listed, one entry per agent — a single project can have several in flight, each in its own worktree. Every project's archived agents are read too, for the `web`-target agents whose cloud side is still at work per the cloud state rule (`cloud-run-state`): in cloud, or waiting on a question the browser bridge holds. Those are listed as well, marked with that state, keyed to the project's own path since their checkout may be gone, and once each even when two registered checkouts of one repository share the archive that holds them; a cloud session at work is an agent at work, and "no agents working" over a session waiting on the user was a lie. Each entry carries the project it belongs to, the agent's own checkout so its git and file status is read from the worktree it actually edits, what the user asked for, when the agent last spoke, the session name the agent chose if it has picked one, whether it has signalled ready for merge (which drives the building-versus-ready indicator), and the name of the machine whose daemon started it when that is not this machine — the data branch is shared, so another machine's agents appear here too. The list is ordered by last activity, most recent first.
 
 ### Backlog size
 
@@ -54,7 +54,7 @@ On the Overview no single project is selected, yet the sidebar should still list
 
 #### Business logic
 
-Every project's agents are pooled into one list, each row tagged with the project it belongs to so selecting it jumps into that project's agent. The list is ordered by start time, newest first, and capped at thirty rows. A project whose agents cannot be read contributes nothing.
+Every project's agents are pooled into one list, each row tagged with the project it belongs to so selecting it jumps into that project's agent. The list is ordered by start time, newest first, and capped at thirty rows. An agent is listed once: two registered checkouts of one repository share the archive that holds it, and the first project to list it keeps it. A project whose agents cannot be read contributes nothing.
 
 ### Every project's tickets
 

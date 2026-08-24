@@ -36,7 +36,7 @@ The user recognises an agent in this card by the same wording they see everywher
 
 #### Business logic
 
-A row shows the agent's one-liner, its project's name, and how long ago it was last active, with the exact date and time on hover. The one-liner is the agent's intent, falling back to the session name it chose for itself, then to its scope, and finally to its project's name — a working agent almost always has an intent or a chosen name.
+A row shows the agent's one-liner, its project's name, "from" and the machine's name when another machine's daemon started it, and how long ago it was last active, with the exact date and time on hover. The one-liner is the agent's intent, falling back to the session name it chose for itself, then to its scope, and finally to its project's name — a working agent almost always has an intent or a chosen name.
 
 ## Before modifying/creating SPEC.md files
 

@@ -167,6 +167,7 @@ happens while nobody is at the keyboard.
 - Browser-bridge token setting
 - Web runs trust the project for Claude Code automatically — no manual trust step
 - A cloud run's row follows the session's real branch and PR, with its armed draft PR opened when the session opens none
+- Another machine's runs on the shared data branch are told apart: their rows carry a glyph naming the machine that started them (the Overview's working-now card spells it out), and a run is listed once even when two checkouts share its archive
 
 ## Notifications
 

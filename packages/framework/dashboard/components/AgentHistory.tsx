@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Plus, ChevronDown, Cloud, MonitorSmartphone, Settings, LayoutDashboard, FolderGit2, Ticket } from 'lucide-react'
+import { Plus, ChevronDown, Cloud, Laptop, MonitorSmartphone, Settings, LayoutDashboard, FolderGit2, Ticket } from 'lucide-react'
 import type { AgentMeta, AgentStatus, RecentAgent, ProjectSummary } from '../../src/index.js'
 import { DRIVER_LABELS, driverFromImpl, cloudRunState, type CloudRunState } from '../../src/client.js'
 import { Button, buttonVariants } from './ui/button.js'
@@ -257,6 +257,7 @@ export function AgentHistory({
                       waiting={row.agent.settledAt !== undefined}
                       remote={row.agent.target === 'remote'}
                       cloud={row.agent.target === 'web'}
+                      {...(row.agent.otherHost && row.agent.host ? { startedOn: row.agent.host } : {})}
                       cloudState={cloudRunState(row.agent, Date.now())}
                       {...(row.agent.remoteLabel ? { remoteLabel: row.agent.remoteLabel } : {})}
                       onClick={row.onClick}
@@ -531,6 +532,7 @@ function AgentHistoryRow({
   cloud = false,
   cloudState,
   remoteLabel,
+  startedOn,
 }: {
   status: AgentStatus
   intent: string | undefined
@@ -553,6 +555,8 @@ function AgentHistoryRow({
   cloudState?: CloudRunState | undefined
   /** The device's label, for the glyph's tooltip. */
   remoteLabel?: string | undefined
+  /** The machine whose daemon started the run, when that is another machine (#1648): a glyph names it. */
+  startedOn?: string | undefined
 }) {
   // Only a live agent can be waiting on you; a finished one is just finished — except a web run
   // whose cloud session the bridge reports as parked (#1668).
@@ -608,8 +612,20 @@ function AgentHistoryRow({
             a cloud glyph for a Claude Code cloud session (#1263), then the driver logo. The logo
             is the only thing naming the driver on this row, so it carries a title rather than
             being decorative. */}
-        {(remote || cloud || picked) && (
+        {(remote || cloud || picked || startedOn) && (
           <span className="ml-auto flex shrink-0 items-center gap-1.5">
+            {/* Another machine's daemon started this run (#1648): the shared data branch lists every
+                machine's runs here, and one that looked exactly like this daemon's own was a mystery
+                solved only by reading the archive. A glyph, not a word in the meta line: the rail's
+                fixed width truncated a hostname to "from…". */}
+            {startedOn && (
+              <Tooltip>
+                <TooltipTrigger render={<span className="flex items-center" />}>
+                  <Laptop className="h-3 w-3 text-muted-foreground" aria-label={`Started on ${startedOn}`} />
+                </TooltipTrigger>
+                <TooltipContent>Started on {startedOn}, by that machine's daemon.</TooltipContent>
+              </Tooltip>
+            )}
             {remote && (
               <Tooltip>
                 <TooltipTrigger render={<span className="flex items-center" />}>

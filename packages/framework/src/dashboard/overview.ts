@@ -5,6 +5,7 @@ import { readTickets, type WorkspaceTicket } from './tickets.js'
 import { TICKETS_DIR } from '../tickets.js'
 import { cloudRunState } from '../cloud-run-state.js'
 import { bridgeQuestions } from './bridge-store.js'
+import { hostname } from 'node:os'
 
 // The first-sidebar Overview (#437, part of #314): a cross-project glance at what the agent
 // is working on right now, the size of the backlog, and the recently active projects. It
@@ -36,6 +37,8 @@ export interface ActiveAgent {
    * cloud side is the agent, and "no agents working" over a waiting cloud session was a lie.
    */
   cloud?: 'in-cloud' | 'waiting'
+  /** The machine whose daemon started it (#1648), only when that is not this one. */
+  host?: string
 }
 
 /** One recently active project, most-recent first. */
@@ -88,7 +91,10 @@ export async function buildRecentAgents(projects: ProjectSummary[], deps: Recent
     }
   }
   all.sort((a, b) => (b.agent.startedAt ?? '').localeCompare(a.agent.startedAt ?? ''))
-  return all.slice(0, RECENT_RUNS_LIMIT)
+  // One row per run (#1648): two checkouts of one repository share their archive, so every run
+  // was listed once per checkout; the first project to list it keeps it.
+  const seen = new Set<string>()
+  return all.filter(row => !seen.has(row.agent.id) && seen.add(row.agent.id)).slice(0, RECENT_RUNS_LIMIT)
 }
 
 /** One project's tickets, for the cross-project Tickets page (#1144). */
@@ -268,6 +274,8 @@ export interface OverviewDeps {
   /** Whether the bridge holds a question for that cloud session (default: the daemon's bridge store). */
   waiting?: (sessionId: string) => boolean
   now?: () => number
+  /** This machine's hostname; `node:os` in production. */
+  host?: string
 }
 
 /**
@@ -282,6 +290,7 @@ export async function buildOverview(projects: ProjectSummary[], deps: OverviewDe
   const agents = deps.agents ?? readAllAgents
   const waiting = deps.waiting ?? (sessionId => bridgeQuestions().get(sessionId) !== undefined)
   const now = (deps.now ?? Date.now)()
+  const thisHost = deps.host ?? hostname()
 
   const active: ActiveAgent[] = []
   // One entry per web run across projects: two checkouts of one repository share their archive,
@@ -297,6 +306,9 @@ export async function buildOverview(projects: ProjectSummary[], deps: OverviewDe
     ...(meta.updatedAt ? { updatedAt: meta.updatedAt } : {}),
     ...(meta.sessionName ? { sessionName: meta.sessionName } : {}),
     ...(meta.readyForMerge ? { readyForMerge: true } : {}),
+    // Another machine's daemon started it (#1648): the shared data branch shows its runs here too.
+    ...(meta.host !== undefined && meta.host !== thisHost ? { host: meta.host } : {}),
+
   })
   for (const project of projects) {
     // Every live agent of the project (#738), not just the one that used to sit at its path.

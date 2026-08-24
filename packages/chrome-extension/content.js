@@ -471,8 +471,7 @@ async function deliverAnswer(text) {
 
 // ---------------------------------------------------------------------------
 // Creating a session (#1328). A session created through this page's repo picker is repo-bound,
-// and those are the ones that can push and open a pull request; `claude --cloud` on some accounts
-// produces a bundle upload that cannot (#1320). So the daemon queues a repo, a branch and a prompt,
+// and those are the ones that can push and open a pull request (#1320). So the daemon queues a repo, a branch and a prompt,
 // and this drives the same controls a person would on the new-session page: the repo chip and
 // its searchable list, the branch chip that appears beside it, the composer, send.
 //

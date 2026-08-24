@@ -7,7 +7,7 @@ A `web`-target agent is a process the daemon spawned, not a part of the daemon, 
 ## Business logic — TL;DR
 
 - **The run presents the daemon token** - the same secret the extension holds; a missing or wrong token is refused before anything is read.
-- **No extension around means no waiting** - when nothing has spoken to the bridge recently, the request is refused on the spot with that reason, so the run hands off another way instead of timing out.
+- **No extension around means no waiting** - when nothing has spoken to the bridge recently, the request is refused on the spot with that reason, so the run stops naming it instead of timing out.
 - **A request is validated as the queue validates it** - repository, branch and prompt must be strings, and the queue's own rules decide the rest.
 - **The run polls the request by its id** - and reads queued, claimed, created with the session and its URL, or failed with the extension's note.
 - **Off with the bridge** - when the browser bridge is off, these routes do not exist either.
@@ -26,7 +26,7 @@ A run posts the repository, the branch and the prompt. With the bridge off the r
 
 #### Rationale
 
-Refusing at once when no extension is around is what keeps the CLI's cloud flag a working hand-off on a machine without the extension: the run learns in one round trip that it must hand off by itself, rather than after a two-minute wait.
+Refusing at once when no extension is around is what lets the run tell the user what is missing in one round trip, rather than after a two-minute wait.
 
 ### Following the request
 

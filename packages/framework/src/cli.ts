@@ -95,9 +95,10 @@ export function chooseSessionLink(opts: Pick<AgentOptions, 'driver'>, fake: bool
 }
 
 /**
- * The extension-backed session start a web run can use (#1328): only when a daemon spawned this
- * run (its URL is in {@link DAEMON_URL_ENV}) and the registry holds the daemon token that the
- * daemon's start-queue asks for. Anything less and the run hands off through the CLI alone.
+ * How a web run reaches the daemon whose browser extension creates its session (#1328): only
+ * when a daemon spawned this run (its URL is in {@link DAEMON_URL_ENV}) and the registry holds
+ * the daemon token that the daemon's start-queue asks for. Anything less and the run fails
+ * saying web runs start from the dashboard.
  */
 export async function extensionStartConfig(env: NodeJS.ProcessEnv): Promise<CloudDriverOptions | undefined> {
   const daemonUrl = env[DAEMON_URL_ENV]
@@ -1168,15 +1169,12 @@ async function driveAgent(opts: AgentOptions, io: CliIO): Promise<number> {
     io.out(`◆ run on: GitHub Actions (${slug.owner}/${slug.repo})`)
   }
 
-  // Run on Claude Code on the web (#610). Nothing to resolve: the CLI holds the account the
-  // cloud session is created under, so there is no token of ours and no repo config. The
-  // session clones this repo's remote at its current branch, so local commits that were never
-  // pushed are not in it — say so once here rather than let the cloud session look stale.
+  // Run on Claude Code on the web (#610): the browser extension creates the session on the
+  // user's own account (#1328), so there is no token of ours and no repo config. The session
+  // opens on this run's pushed hand-off ref, so local commits that were never pushed are not in
+  // it — say so once here rather than let the cloud session look stale.
   if (opts.target === 'web' && !fake) {
-    io.out('◆ run on: Claude Code on the web (a cloud session on your own account)')
-    if (!(await githubSlugFor(cwd))) {
-      io.out('  no GitHub remote here, so the CLI uploads a bundle of this repo instead.')
-    }
+    io.out('◆ run on: Claude Code on the web (a cloud session on your own account, created by the browser extension)')
   }
 
   // A daemon-spawned web run asks its daemon for an extension-created session first (#1328): the

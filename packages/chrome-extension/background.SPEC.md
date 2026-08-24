@@ -21,6 +21,7 @@ A `web`-target agent hands its task to a cloud session and ends; nothing streams
 - **Tabs open themselves for watched sessions** - one pinned, inactive tab per cloud session the daemon lists, so the bridge does not depend on the user happening to be on claude.ai.
 - **A tab the user closed is not reopened** - closing the tab for a session dismisses that one session, and only that one.
 - **Tabs the extension opened are also closed by it** - once the daemon stops watching a session, its tab goes, so the browser does not accumulate pinned tabs forever.
+- **Sessions are created one at a time** - the worker claims the daemon's next session request on the answer beat, opens the new-session page in its own pinned tab, has the content script drive it, and reports the session it became; a created session's tab becomes a watched tab, a failed attempt's tab is closed, and a second request waits for the first to finish.
 - **Every attempt records why it did nothing** - the outcome of the last tab sweep is kept so the options page can state the reason instead of leaving the user guessing.
 
 ## Business logic
@@ -148,6 +149,20 @@ A user who leaves the browser running for days should not end up with a pinned t
 #### Business logic
 
 At the end of every sweep, tabs this extension opened for sessions the daemon no longer lists are closed. Only tabs the extension opened: a claude.ai session the user opened themselves is theirs to keep.
+
+### Creating the session the daemon asked for
+
+#### User story
+
+A web run is waiting on the daemon for a cloud session that can push its work; the only thing that can create one is this extension, in the user's browser.
+
+#### Business logic
+
+On the answer beat, and once at start, the worker asks the daemon for the next session request. Given one, and none already in progress, it opens claude.ai's new-session page in a pinned, inactive tab, waits for the page to load, and hands the request to the content script there — retrying for a while, since the script may still be being injected. The content script's outcome is reported to the daemon under the request's id: success with the session id, or failure with the note of what the page lacked. A created session's tab is recorded as one the extension opened for that session, so it is watched and eventually closed like any other; a failed attempt's tab is closed at once. The outcome is kept where the options page can show it.
+
+#### Rationale
+
+Creation navigates a page, so two at once would race each other's controls; serial creation makes a fan-out of several runs a matter of throughput, not correctness. A report that fails to reach the daemon is not retried here: the daemon's claim expires on its own and the request is offered again.
 
 ### Waking up on a schedule rather than on a timer
 

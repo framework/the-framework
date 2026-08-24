@@ -27,6 +27,12 @@ Typing the dashboard's answer back into the session:
 - With no send button on the page, the answer is submitted with an Enter keypress instead.
 - A page with no composer is refused with that as the stated reason, rather than the text being typed somewhere else.
 
+Creating a session:
+
+- On a synthetic new-session page behaving as the live one was observed to — a repository chip opening a searchable list, a branch chip appearing beside the chosen repository, a composer and a send button that turns the page into a session address — the repository and branch are chosen, the prompt typed, send clicked, and the new session's id reported.
+- When the branch list does not offer the requested branch, nothing is sent and the outcome names the branch.
+- A page with no repository picker is refused naming that control, and the probe describes the page's controls without touching them.
+
 The panel: it folds down to a compact "TF" tab, dropping its rows and its full title, and unfolds with the question's details intact.
 
 ## Rationale

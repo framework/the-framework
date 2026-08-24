@@ -182,6 +182,100 @@ async function pollAnswers() {
   await deliverAnswers(sessions.map(s => s?.id).filter(Boolean))
 }
 
+// ---------------------------------------------------------------------------
+// Creating sessions (#1328): the daemon queues a repo, a branch and a prompt; this claims the
+// next one, opens the new-session page in a pinned tab, has the content script drive it, and
+// reports the session it became. One at a time: creation navigates a page, so two at once would
+// race each other's chips.
+
+/** A creation in flight, so a poll landing mid-way does not start a second tab. */
+let creating = false
+
+/** How long to give the new-session page to load and its content script to answer. */
+const NEW_SESSION_URL = 'https://claude.ai/code'
+const TAB_LOAD_MS = 30_000
+const SCRIPT_RETRIES = 10
+
+/** Resolve once the tab reports `complete`, or after {@link TAB_LOAD_MS}. */
+function tabLoaded(tabId) {
+  return new Promise(resolve => {
+    const done = () => {
+      chrome.tabs.onUpdated.removeListener(listener)
+      resolve()
+    }
+    const listener = (id, info) => {
+      if (id === tabId && info.status === 'complete') done()
+    }
+    chrome.tabs.onUpdated.addListener(listener)
+    setTimeout(done, TAB_LOAD_MS)
+  })
+}
+
+/** Hand the request to the content script, retrying while it is still being injected. */
+async function askPage(tabId, start) {
+  let lastErr
+  for (let i = 0; i < SCRIPT_RETRIES; i++) {
+    try {
+      const outcome = await chrome.tabs.sendMessage(tabId, { type: 'tf-create-session', start })
+      if (outcome) return outcome
+    } catch (err) {
+      lastErr = err
+    }
+    await new Promise(resolve => setTimeout(resolve, 2000))
+  }
+  return { ok: false, note: `the new-session page never answered: ${String(lastErr?.message ?? lastErr ?? 'no reply')}` }
+}
+
+async function pollStarts() {
+  if (creating) return
+  const { daemonUrl, token } = await chrome.storage.local.get(['daemonUrl', 'token'])
+  if (!token) return
+  const base = (daemonUrl || DEFAULT_DAEMON).replace(/\/+$/, '')
+  let start
+  try {
+    const res = await fetch(`${base}/_bridge/start`, { headers: { authorization: `Bearer ${token}`, ...VERSION_HEADER } })
+    if (!res.ok) return
+    start = (await res.json())?.start
+  } catch {
+    return
+  }
+  if (!start?.id || typeof start.repo !== 'string' || typeof start.branch !== 'string' || typeof start.prompt !== 'string') return
+
+  creating = true
+  let tab
+  let outcome
+  try {
+    tab = await chrome.tabs.create({ url: NEW_SESSION_URL, active: false, pinned: true })
+    await tabLoaded(tab.id)
+    outcome = await askPage(tab.id, { repo: start.repo, branch: start.branch, prompt: start.prompt })
+  } catch (err) {
+    outcome = { ok: false, note: `could not drive a new-session tab: ${String(err?.message ?? err)}` }
+  }
+  const ok = Boolean(outcome?.ok && outcome?.sessionId)
+  if (tab?.id != null) {
+    // A created session's tab is now a watched tab like any other; a failed attempt's tab goes,
+    // its note carries what the page looked like.
+    if (ok) await chrome.storage.local.set({ openedTabs: { ...(await openedTabs()), [tab.id]: outcome.sessionId } })
+    else await chrome.tabs.remove(tab.id).catch(() => {})
+  }
+  try {
+    await fetch(`${base}/_bridge/started`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${token}`, ...VERSION_HEADER },
+      body: JSON.stringify({
+        id: start.id,
+        ok,
+        ...(ok ? { sessionId: outcome.sessionId } : {}),
+        ...(outcome?.note ? { note: String(outcome.note).slice(0, 300) } : {}),
+      }),
+    })
+  } catch {
+    // The claim expires on the daemon, and the request is offered again.
+  }
+  await note({ ok, reason: ok ? `created ${outcome.sessionId}` : `session creation failed: ${outcome?.note ?? 'unknown'}` })
+  creating = false
+}
+
 /** One authenticated POST to the daemon. */
 async function post(path, body) {
   const { daemonUrl, token } = await chrome.storage.local.get(['daemonUrl', 'token'])
@@ -342,7 +436,12 @@ chrome.alarms.create('tf-sessions', { periodInMinutes: SESSION_POLL_MINUTES })
 chrome.alarms.create('tf-answers', { periodInMinutes: ANSWER_POLL_MINUTES })
 chrome.alarms.onAlarm.addListener(alarm => {
   if (alarm.name === 'tf-sessions') void openWatchedTabs()
-  if (alarm.name === 'tf-answers') void pollAnswers()
+  if (alarm.name === 'tf-answers') {
+    void pollAnswers()
+    // Session requests ride the same fast beat: a run is waiting on the other end of one.
+    void pollStarts()
+  }
 })
 void openWatchedTabs()
 void pollAnswers()
+void pollStarts()

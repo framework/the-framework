@@ -10,13 +10,14 @@ The daemon half of the Claude web bridge: the `/_bridge` routes the Chrome exten
 
 - **Every bridge call presents the daemon token** - this is the one route family meant to be reached from another origin, so it authenticates itself instead of relying on the protections the dashboard's other routes have.
 - **Deliberately no cross-origin headers** - the extension's background worker can call without them, and adding them would let any page the user visits reach their daemon.
-- **A tiny, fully validated surface** - no path, command, prompt or free text is accepted anywhere, so a stolen token buys at most a bogus question card.
+- **A tiny, fully validated surface** - no path, command, prompt or free text is accepted anywhere — the one free text on the bridge, a session request's prompt, travels out to the extension and never in — so a stolen token buys at most a bogus question card.
 - **The extension version must match exactly** - a mismatched extension is refused outright rather than allowed to half-work.
 - **The parked question becomes an open question** - a validated question from a cloud session, in the shape the session asked it, is handed to the dashboard.
 - **The transcript arrives as numbered entries** - each message carries its position in the transcript, so re-reading the page overwrites rather than duplicates.
 - **The answer is polled, and its delivery reported back** - the extension asks for the exact text to type, which the daemon composed, and then says whether typing it worked.
 - **The daemon says which cloud sessions to watch** - the extension only sees tabs the user is already on, so the daemon lists the sessions a tab should be opened for.
 - **Every contact is recorded, including refusals** - so the dashboard can show what the bridge is doing.
+- **The session start-queue is served claim-on-read** - the extension asks for the next cloud session to create and is handed it in the same step that takes it off the queue, then reports the session it became.
 - **The bridge can be off** - a daemon with the feature disabled answers every bridge route as not found.
 
 ## Business logic
@@ -122,6 +123,20 @@ When the bridge is not working, the user should be able to ask the daemon what t
 The extension reports what it injected into the page: its version, which cloud session the page belongs to, and a free note about what its last read of the page found. Unlike everything else on the bridge, this report is accepted leniently — unrecognisable fields become "unknown" rather than a rejection — because its whole purpose is to work when something is already wrong.
 
 Separately, every request that reaches the bridge is recorded with the route it asked for and the status it got, refusals included.
+
+### The session start-queue
+
+#### User story
+
+A web run wants its cloud session created through claude.ai's repository picker, in the user's browser, because such a session can push and open a pull request. The extension is the only thing that can do that, so it must be told what to create and must say what it created.
+
+#### Business logic
+
+The extension asks for the next session to create and always gets an answer: the request — its id, the repository as `owner/name`, the branch, and the prompt — or nothing, including on a daemon that wired no queue. Handing out the request is what takes it off the queue: the claim happens in that same step, never in a second call, so two tabs polling cannot both be handed it. The extension then reports the request's id, whether it succeeded, the session id when it did, and a short note; the report is validated field by field before it reaches the queue, and a daemon with no queue accepts and drops it.
+
+#### Rationale
+
+A read that mutates is unusual, and it is the point: the only duplicate that matters here is a second cloud session on the user's account, and the only way to rule it out is to never serve the same request twice.
 
 ### The bridge can be off
 

@@ -7,8 +7,10 @@ import { fileURLToPath } from 'node:url'
 import { type ClaudeCodeDriverOptions, type Driver, type DriverSession, type PermissionMode } from './driver/index.js'
 import { DRIVERS, DRIVER_SPECS, isDriverName, type DriverName } from './driver-cli.js'
 import { createAgentDriver } from './agent-driver.js'
+import type { CloudDriverOptions } from './driver/cloud.js'
 import { checkLayout } from './layout.js'
 import { githubSlugFor } from './dashboard/github.js'
+import { DAEMON_URL_ENV } from './dashboard/web-start-endpoints.js'
 import { githubToken } from './dashboard/gh.js'
 import type { ActionsDriverOptions } from './driver/index.js'
 import { launchSharedBrowser, withBrowser, type SharedBrowser } from './browser.js'
@@ -90,6 +92,18 @@ export const CLAUDE_CODE_SESSION_LIST = CLAUDE_CODE_SESSION_LINK
  */
 export function chooseSessionLink(opts: Pick<AgentOptions, 'driver'>, fake: boolean): string | undefined {
   return fake || opts.driver !== 'claude' ? undefined : CLAUDE_CODE_SESSION_LIST
+}
+
+/**
+ * The extension-backed session start a web run can use (#1328): only when a daemon spawned this
+ * run (its URL is in {@link DAEMON_URL_ENV}) and the registry holds the daemon token that the
+ * daemon's start-queue asks for. Anything less and the run hands off through the CLI alone.
+ */
+export async function extensionStartConfig(env: NodeJS.ProcessEnv): Promise<CloudDriverOptions | undefined> {
+  const daemonUrl = env[DAEMON_URL_ENV]
+  if (!daemonUrl) return undefined
+  const token = await readDaemonToken(undefined, env).catch(() => undefined)
+  return token ? { extension: { daemonUrl, token } } : undefined
 }
 
 /** Where the CLI writes. Injectable so tests capture output. */
@@ -1165,6 +1179,9 @@ async function driveAgent(opts: AgentOptions, io: CliIO): Promise<number> {
     }
   }
 
+  // A daemon-spawned web run asks its daemon for an extension-created session first (#1328): the
+  // daemon's URL is in the environment it was spawned with, the token is the registry's.
+  const cloudConfig = opts.target === 'web' && !fake ? await extensionStartConfig(process.env) : undefined
   const driver: Driver = fake
     ? fakeDriver()
     : createAgentDriver({
@@ -1172,6 +1189,7 @@ async function driveAgent(opts: AgentOptions, io: CliIO): Promise<number> {
         claudeOpts: withBrowser(claudeOpts, opts.browser, sharedBrowser?.browserUrl),
         ...(opts.target ? { target: opts.target } : {}),
         ...(actionsConfig ? { actionsConfig } : {}),
+        ...(cloudConfig ? { cloudConfig } : {}),
       })
 
   // Whether the agent actually ends up with browser tools, which is narrower than the flag: they

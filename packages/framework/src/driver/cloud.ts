@@ -8,6 +8,8 @@ import { makeEmit } from './session-support.js'
 import { nodeGitRunner, type GitRunner } from '../project.js'
 import { readClaudeTrust, writeClaudeTrust } from '../claude-trust.js'
 import { errorMessage } from '../error-message.js'
+import { githubSlugFor } from '../dashboard/github.js'
+import { WEB_START_PREFIX } from '../dashboard/web-start-endpoints.js'
 import type { Driver, DriverEvent, DriverPromptOptions, DriverSession, DriverStartOptions, DriverTurn } from './types.js'
 
 /**
@@ -51,8 +53,26 @@ export class CloudDriver implements Driver {
   // already reports, and there is nothing extra to ask a session we cannot query.
 }
 
+/**
+ * How a run reaches its daemon's session start-queue (#1328): the daemon's URL, put in the run's
+ * environment when it was spawned, and the daemon token from the registry.
+ */
+export interface ExtensionStart {
+  daemonUrl: string
+  token: string
+  /** Injected in tests; defaults to the global `fetch`. */
+  fetch?: typeof fetch
+  /** How often to ask where the request stands, in ms. Default 2000. */
+  pollMs?: number
+}
+
 /** Options for {@link CloudDriver}. */
 export interface CloudDriverOptions {
+  /**
+   * Ask the daemon for a session created by the browser extension (#1328) before falling back
+   * to the CLI's `--cloud`. Absent on a run no daemon spawned, which has no daemon to ask.
+   */
+  extension?: ExtensionStart
   /** Claude Code binary. Default `"claude"`. */
   bin?: string
   /** Give up on session creation after this long, in ms. Default 120000. */
@@ -281,6 +301,23 @@ export class CloudSession implements DriverSession {
     let output = ''
     let trusting = false
     let found: { url: string; sessionId: string } | undefined
+    // The extension path first (#1328): a session created through the page's repo picker is
+    // repo-bound, which is what lets it push and open the pull request. Undefined means the
+    // daemon had nobody to hand the request to, and the CLI's own `--cloud` does the hand-off.
+    if (this.config.extension) {
+      try {
+        found = await this.createViaExtension(this.config.extension, full, ref, git, controller.signal)
+      } finally {
+        if (found) {
+          clearTimeout(timer)
+          this.controllers.delete(controller)
+        }
+      }
+    }
+    if (found) {
+      this.handedOff = found
+      return this.report(found, 'first')
+    }
     try {
       await (this.config.runPty ?? runPtyWithScript)({
         bin: this.config.bin ?? 'claude',
@@ -330,6 +367,65 @@ export class CloudSession implements DriverSession {
 
     this.handedOff = found
     return this.report(found, 'first')
+  }
+
+  /**
+   * Hand the session request to the daemon's start-queue and wait for the extension's word
+   * (#1328). Resolves undefined — the CLI path then runs — when the daemon has no extension to
+   * ask (409), no queue at all (404), when this checkout has no GitHub remote for the repo picker
+   * to name, or when the hand-off ref was never pushed. Throws when the extension tried and
+   * failed, naming what it could not find, or when the wait was aborted.
+   */
+  private async createViaExtension(
+    ext: ExtensionStart,
+    prompt: string,
+    ref: string | undefined,
+    git: GitRunner,
+    signal: AbortSignal,
+  ): Promise<{ url: string; sessionId: string } | undefined> {
+    const slug = await githubSlugFor(this.cwd, git)
+    if (!slug || !ref) {
+      this.emit({
+        type: 'notice',
+        message: `[framework] claude-web: ${slug ? 'the hand-off ref was not pushed' : 'no GitHub remote here'}, so the browser extension cannot create the session — handing off through the CLI instead.`,
+      })
+      return undefined
+    }
+    const doFetch = ext.fetch ?? fetch
+    const base = ext.daemonUrl.replace(/\/+$/, '')
+    const headers = { authorization: `Bearer ${ext.token}` }
+    const queued = await doFetch(`${base}${WEB_START_PREFIX}`, {
+      method: 'POST',
+      headers: { ...headers, 'content-type': 'application/json' },
+      body: JSON.stringify({ repo: `${slug.owner}/${slug.repo}`, branch: ref, prompt }),
+      signal,
+    })
+    if (queued.status === 409 || queued.status === 404) {
+      this.emit({
+        type: 'notice',
+        message: `[framework] claude-web: ${queued.status === 409 ? 'no browser extension is around' : 'the daemon has the browser bridge off'}, so the CLI hands off instead.`,
+      })
+      return undefined
+    }
+    if (!queued.ok) throw new Error(`[framework] claude-web: the daemon refused the session request (${queued.status}): ${(await queued.text()).slice(0, 300)}`)
+    const { id } = (await queued.json()) as { id: string }
+    this.emit({ type: 'notice', message: `[framework] claude-web: asked the browser extension to create the cloud session on ${slug.owner}/${slug.repo} at ${ref} (request ${id}).` })
+
+    const pollMs = ext.pollMs ?? 2000
+    for (;;) {
+      if (signal.aborted) throw new Error('[framework] claude-web prompt aborted')
+      const res = await doFetch(`${base}${WEB_START_PREFIX}/${id}`, { headers, signal })
+      if (!res.ok) throw new Error(`[framework] claude-web: lost the session request ${id} (${res.status})`)
+      const state = (await res.json()) as { state: string; sessionId?: string; url?: string; note?: string }
+      if (state.state === 'created' && state.sessionId && state.url) return { url: state.url, sessionId: state.sessionId }
+      if (state.state === 'failed') {
+        throw new Error(`[framework] claude-web: the browser extension could not create the session${state.note ? ` — ${state.note}` : ''}.`)
+      }
+      await new Promise<void>(resolve => {
+        const t = setTimeout(resolve, pollMs)
+        signal.addEventListener('abort', () => { clearTimeout(t); resolve() }, { once: true })
+      })
+    }
   }
 
   /**

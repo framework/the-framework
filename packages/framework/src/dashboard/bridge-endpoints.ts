@@ -33,7 +33,7 @@ export const BRIDGE_PREFIX = '/_bridge'
  * which reads as a framework bug and burns a debugging session. The extension's manifest must
  * carry the same number; a test keeps the two in lockstep.
  */
-export const EXPECTED_EXTENSION_VERSION = '0.10.0'
+export const EXPECTED_EXTENSION_VERSION = '0.11.0'
 
 /** The header the extension states its version in. Lowercase, as node presents all headers. */
 export const EXTENSION_VERSION_HEADER = 'x-tf-extension-version'
@@ -65,6 +65,21 @@ export interface BridgeHello {
 export interface BridgeSession {
   id: string
   url: string
+}
+
+/**
+ * A session the daemon wants the extension to create on claude.ai (#1328).
+ *
+ * The one shape that travels *out* of the bridge carrying free text, and that direction is what
+ * keeps the "deliberately tiny input" rule intact: the daemon writes it, the extension reads it,
+ * and what comes back is only an id, a boolean and a session id.
+ */
+export interface BridgeStart {
+  id: string
+  /** `owner/name`, as the repo picker lists it. */
+  repo: string
+  branch: string
+  prompt: string
 }
 
 /** What the daemon wires behind the bridge. Absent when the feature is off, which 404s it. */
@@ -100,6 +115,14 @@ export interface BridgeHandlers {
   answer?: (sessionId: string) => { id: string; text: string } | undefined
   /** The extension's word on what a delivery attempt did. */
   answered?: (sessionId: string, id: string, ok: boolean, note?: string) => void
+  /**
+   * The next session the daemon wants created, claimed for whoever is asking (#1328). Claiming is
+   * the callee's job: two tabs polling must not both be handed the same request, because a
+   * duplicate here is a duplicate cloud session on the user's account.
+   */
+  start?: () => BridgeStart | undefined
+  /** The extension's word on what a creation attempt did (#1328). */
+  started?: (id: string, ok: boolean, sessionId?: string, note?: string) => void
   now?: () => Date
 }
 
@@ -123,7 +146,7 @@ export async function handleBridgeRequest(
 ): Promise<void> {
   if (!handlers) return end(res, 404, 'bridge not enabled')
   seen(handlers, pathname, res)
-  if (!authorized(req, handlers.token)) return end(res, 401, 'unauthorized')
+  if (!bearerAuthorized(req, handlers.token)) return end(res, 401, 'unauthorized')
   // The version gate (#1519), behind the token so an unauthenticated caller learns nothing.
   if (handlers.expectedExtensionVersion !== undefined) {
     const raw = req.headers[EXTENSION_VERSION_HEADER]
@@ -148,6 +171,8 @@ export async function handleBridgeRequest(
   if (pathname === `${BRIDGE_PREFIX}/hello`) return handleHello(req, res, handlers)
   if (pathname === `${BRIDGE_PREFIX}/answer`) return handleAnswer(req, res, handlers)
   if (pathname === `${BRIDGE_PREFIX}/answered`) return handleAnswered(req, res, handlers)
+  if (pathname === `${BRIDGE_PREFIX}/start`) return handleStart(req, res, handlers)
+  if (pathname === `${BRIDGE_PREFIX}/started`) return handleStarted(req, res, handlers)
   end(res, 404, 'not found')
 }
 
@@ -155,7 +180,7 @@ export async function handleBridgeRequest(
  * `Authorization: Bearer <token>`, compared in constant time. Rejects before the body is read,
  * so an unauthenticated caller cannot make the daemon buffer anything.
  */
-function authorized(req: IncomingMessage, token: string): boolean {
+export function bearerAuthorized(req: IncomingMessage, token: string): boolean {
   const header = req.headers.authorization
   if (typeof header !== 'string' || !header.startsWith('Bearer ')) return false
   const given = Buffer.from(header.slice('Bearer '.length))
@@ -329,6 +354,42 @@ async function handleAnswered(req: IncomingMessage, res: ServerResponse, handler
 }
 
 /**
+ * `GET /_bridge/start`: the next session the daemon wants created, claimed by this call (#1328).
+ *
+ * Always 200 with `{start: ...}`, null when there is nothing to do, so the extension polls it
+ * blindly alongside `/answer`; null too on a daemon that wired no queue. A GET that mutates, and
+ * the mutation is the point: handing the same request to two polling tabs would create two cloud
+ * sessions, so taking it off the queue has to happen in the same step as reading it.
+ */
+async function handleStart(req: IncomingMessage, res: ServerResponse, handlers: BridgeHandlers): Promise<void> {
+  if (req.method !== 'GET') return end(res, 405, 'method not allowed', { allow: 'GET' })
+  const start = handlers.start?.()
+  res.writeHead(200, { 'content-type': 'application/json' })
+  res.end(JSON.stringify({ start: start ?? null }))
+}
+
+/** `POST /_bridge/started`: what the extension's creation attempt did (#1328). */
+async function handleStarted(req: IncomingMessage, res: ServerResponse, handlers: BridgeHandlers): Promise<void> {
+  if (req.method !== 'POST') return end(res, 405, 'method not allowed', { allow: 'POST' })
+  let body: unknown
+  try {
+    body = await readJsonBody(req, MAX_BODY)
+  } catch (err) {
+    return end(res, 400, (err as Error).message)
+  }
+  if (typeof body !== 'object' || body === null) return end(res, 400, 'body must be an object')
+  const { id, ok, sessionId, note } = body as Record<string, unknown>
+  if (typeof id !== 'string' || !id || id.length > 64) return end(res, 400, 'id must be the start request id')
+  if (typeof ok !== 'boolean') return end(res, 400, 'ok must be a boolean')
+  if (sessionId !== undefined && (typeof sessionId !== 'string' || !SESSION_ID.test(sessionId))) {
+    return end(res, 400, 'sessionId must look like session_<id>')
+  }
+  if (note !== undefined && typeof note !== 'string') return end(res, 400, 'note must be a string')
+  handlers.started?.(id, ok, typeof sessionId === 'string' ? sessionId : undefined, typeof note === 'string' ? note.slice(0, 300) : undefined)
+  end(res, 204, '')
+}
+
+/**
  * `GET /_bridge/sessions`: the cloud sessions the extension should have a tab for.
  *
  * Answers an empty list rather than a 404 when the daemon wired no lister, so an extension
@@ -342,7 +403,7 @@ async function handleAgents(req: IncomingMessage, res: ServerResponse, handlers:
 }
 
 /** Read a JSON body, refusing anything past the cap rather than buffering it. */
-function readJsonBody(req: IncomingMessage, maxBytes: number): Promise<unknown> {
+export function readJsonBody(req: IncomingMessage, maxBytes: number): Promise<unknown> {
   return new Promise((resolve, reject) => {
     let size = 0
     const chunks: Buffer[] = []

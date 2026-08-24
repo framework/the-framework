@@ -23,6 +23,7 @@ Four parts: the content script (the page half — reads claude.ai, types answers
 - **A stranded question's round trip** - the content script extracts the parked question from the page, the service worker reports it to the daemon, the dashboard shows it as an ordinary gate; the answer is queued, collected, typed into the composer, submitted, and the outcome acknowledged.
 - **The question crosses whole, so it is answered like a local one** - the block's own shape travels with it, which is what lets the dashboard offer the recommended option, several answers at once, and a pick that hands the session back.
 - **Only what the session offered** - the daemon composes what is typed out of labels of the parked question's own options and nothing else, an answer stays withdrawable until the extension collects it, and the extension otherwise only observes.
+- **It creates the sessions the daemon asks for** - a web run's cloud session is created here, on claude.ai's own new-session page with the repository and branch the run named, so it is bound to the repository and can push and open its pull request; the branch is verified before anything is sent.
 - **Tabs nobody has to think about** - the daemon publishes which cloud sessions to watch; the extension keeps one pinned, inactive tab per session (opt-in), closes its own stale tabs, and never reopens one the user closed.
 - **The trust boundary** - the bridge token and all daemon traffic live in the service worker; the content script, which shares its tab with claude.ai, holds no secret and calls no daemon.
 - **Version lockstep** - every daemon call states the extension's version, and a daemon expecting another refuses it outright, naming both versions; the two halves must ship the same number.
@@ -49,6 +50,20 @@ See `## User story`, second and third items.
 #### Business logic
 
 Three properties bound the write path. The daemon refuses to queue an answer unless every label picked is one of the parked question's own options — exactly one of them unless the question allows several — and it composes the text to be typed itself, so the only thing the bridge can ever put in a composer is built from what the session offered, never free text from the browser. An answer stays withdrawable until the extension collects it, and that window is the only time withdrawing means anything. And the extension acts only on delivery: everything else it does is read-only, and its one manual write control — a "Fill composer (does not send)" button on its in-page panel — fills without submitting, proving the write path exists without the extension ever speaking for the user.
+
+### It creates the sessions the daemon asks for
+
+#### User story
+
+A web run wants a cloud session that can push its work and open a pull request. Such a session is created through claude.ai's repository picker, in the user's own signed-in browser — which is exactly where this extension runs.
+
+#### Business logic
+
+The service worker asks the daemon for the next session to create, at the same beat it looks for answers. Given one, it opens claude.ai's new-session page in a pinned, inactive tab and hands the request — repository, branch, prompt — to the content script there, which chooses the repository, makes sure the branch chip reads the requested branch, types the prompt and sends. The session id is read from the page's address once it becomes a session, and reported back to the daemon along with a note of what was clicked; a failure reports what the page lacked instead. One creation runs at a time. A created session's tab is kept as a watched tab like any other; a failed attempt's tab is closed.
+
+#### Rationale
+
+The session is created through the same controls a person would use, in their own browser, on their own account. Every selector is a guess about a page that is not ours, so the page half reports what it saw rather than insisting — the first failure is meant to be diagnosable from the run's log.
 
 ### Tabs nobody has to think about
 

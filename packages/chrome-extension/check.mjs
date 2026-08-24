@@ -308,5 +308,95 @@ async function deliver(body, prepare) {
   dom.window.close()
 }
 
+// ---------------------------------------------------------------------------
+// Creating a session (#1328): the new-session page's repo chip opens a searchable list, a branch
+// chip appears beside the chosen repo, the prompt goes into the composer, send turns the page
+// into a session URL. The synthetic page behaves the way the live one was observed to, and what
+// these prove is the flow around it: the right chip is opened, the branch is verified before
+// anything is sent, and a page that cannot be driven says which control it lacked.
+
+function newSessionPage({ branches = ['main', 'cloud-1-abcd'], repoPicker = true } = {}) {
+  const dom = new JSDOM(
+    `<!doctype html><html><body><main>
+      <button id="env">Default</button>
+      ${repoPicker ? '<button id="repo">+ Select repo…</button>' : ''}
+      <div contenteditable="true"></div>
+      <button aria-label="Send message" id="send"></button>
+    </main></body></html>`,
+    { url: 'https://claude.ai/code', runScripts: 'outside-only' },
+  )
+  const w = dom.window
+  const d = w.document
+  const seen = { sent: false }
+  const list = (entries, onPick) => {
+    const box = d.createElement('div')
+    box.id = 'list'
+    box.innerHTML = `<input placeholder="Search repos..."/>${entries.map(e => `<div role="option">${e}</div>`).join('')}`
+    for (const opt of box.querySelectorAll('[role="option"]')) opt.addEventListener('click', () => { box.remove(); onPick(opt.textContent) })
+    d.body.append(box)
+  }
+  d.getElementById('repo')?.addEventListener('click', () => {
+    if (d.getElementById('list')) return d.getElementById('list').remove()
+    list(['brillout/docpress', 'framework/the-framework'], picked => {
+      const repo = d.getElementById('repo')
+      repo.textContent = picked.split('/').pop()
+      const branch = d.createElement('button')
+      branch.id = 'branch'
+      branch.textContent = 'main'
+      branch.addEventListener('click', () => {
+        if (d.getElementById('list')) return d.getElementById('list').remove()
+        list(branches, b => { branch.textContent = b })
+      })
+      repo.after(branch)
+    })
+  })
+  d.getElementById('send').addEventListener('click', () => {
+    seen.sent = true
+    w.history.pushState({}, '', '/code/session_01NEW')
+  })
+  w.__tfComposerWaitMs = 1000
+  w.__tfMenuSettleMs = 10
+  w.__tfSessionWaitMs = 2000
+  w.eval(script)
+  return { dom, w, d, seen }
+}
+
+const START = { repo: 'framework/the-framework', branch: 'cloud-1-abcd', prompt: 'Add the thing' }
+
+{
+  const { dom, w, d, seen } = newSessionPage()
+  const result = await w.__tfBridgeCreateSession(START)
+  const repo = d.getElementById('repo')?.textContent
+  const branch = d.getElementById('branch')?.textContent
+  const text = d.querySelector('[contenteditable="true"]').textContent
+  const ok = result.ok && result.sessionId === 'session_01NEW' && repo === 'the-framework' && branch === 'cloud-1-abcd' && text === 'Add the thing' && seen.sent
+  if (!ok) failed++
+  console.log(`${ok ? 'PASS' : 'FAIL'}  create drives repo, branch, composer and send into a session  (repo=${repo}, branch=${branch}, sent=${seen.sent}, result=${JSON.stringify(result)})`)
+  dom.window.close()
+}
+
+{
+  // The branch list does not offer the pushed ref: nothing is sent, and the note says so.
+  const { dom, w, seen } = newSessionPage({ branches: ['main', 'develop'] })
+  const result = await w.__tfBridgeCreateSession(START)
+  const ok = !result.ok && /branch/.test(result.note) && !seen.sent
+  if (!ok) failed++
+  console.log(`${ok ? 'PASS' : 'FAIL'}  create refuses to send on the wrong branch  (sent=${seen.sent}, note=${JSON.stringify(result.note)})`)
+  dom.window.close()
+}
+
+{
+  const { dom, w, seen } = newSessionPage({ repoPicker: false })
+  const result = await w.__tfBridgeCreateSession(START)
+  const ok = !result.ok && /no repo picker/.test(result.note) && !seen.sent
+  if (!ok) failed++
+  console.log(`${ok ? 'PASS' : 'FAIL'}  create names the missing control  (note=${JSON.stringify(result.note)})`)
+  const probe = w.__tfBridgeProbeNewSession()
+  const probeOk = probe.composer === 'contenteditable' && probe.sendButton === true && probe.triggers.some(t => t.text === 'Default')
+  if (!probeOk) failed++
+  console.log(`${probeOk ? 'PASS' : 'FAIL'}  probe describes the page without touching it  (${JSON.stringify(probe.triggers)})`)
+  dom.window.close()
+}
+
 console.log(failed ? `\n${failed} case(s) failed` : '\nall cases passed')
 process.exit(failed ? 1 : 0)

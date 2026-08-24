@@ -10,7 +10,7 @@ The user runs the daemon and opens http://127.0.0.1:4200. Everything the product
 - **A broken install says so** - with no built app to serve, every request answers that the dashboard bundle is not installed, rather than half-standing-up.
 - **Token guard for a non-loopback bind** - when a token is set, every route needs it; the first visit may carry it in the address, after which it rides a cookie and disappears from the address bar.
 - **Browser-borne routes are guarded even on loopback** - the relay and the browser preview apply the same cross-origin and rebound-name checks the calls surface applies, because both change state and the token guard does nothing on a loopback bind.
-- **The bridge authenticates itself** - the bridge routes are checked before the token guard and carry their own token; without one configured they do not exist at all.
+- **The bridge authenticates itself** - the bridge routes, and the routes a web run uses to ask for an extension-created session, are checked before the token guard and carry their own token; without one configured they do not exist at all.
 - **Nothing takes the daemon down** - a failure inside the browser preview tears down that one request instead of crashing the process.
 - **Closing means closing** - shutting the server down also stops the quota polling and force-closes streaming connections, so it actually finishes.
 
@@ -76,7 +76,7 @@ The Chrome extension on claude.ai posts what a cloud session is parked on into t
 
 #### Business logic
 
-The bridge routes are checked before the shared token guard and present their own token instead. When no bridge token is configured the bridge routes do not exist, which is the default. The bridge also gates on the extension's version, refusing a stale extension outright rather than letting it half-work.
+The bridge routes are checked before the shared token guard and present their own token instead. When no bridge token is configured the bridge routes do not exist, which is the default. The bridge also gates on the extension's version, refusing a stale extension outright rather than letting it half-work. The session start-queue is wired behind both of its faces on the same token: the extension's, which claims requests and reports sessions, and the web run's, which queues a request and follows it, and which is told at once when no extension has called recently.
 
 #### Rationale
 

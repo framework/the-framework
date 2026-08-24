@@ -34,6 +34,7 @@
 - [ ] Create tickets/2026-07-17_queue.plan.md
 - [ ] Create tickets/2026-07-15_roadmap-mvp.plan.md
 - [ ] Create tickets/2026-07-14_browser-phase2-chromium-in-sandbox.plan.md
+- [ ] Create tickets/2026-07-13_git-worktrees.plan.md
 
 
 ## Priority 4

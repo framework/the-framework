@@ -60,3 +60,4 @@
 - [ ] Create tickets/2026-07-16_epic-collaboration-layer.plan.md
 - [ ] Create tickets/2026-07-16_epic-daemon-gateway-split.plan.md
 - [ ] Create tickets/2026-07-16_epic-org-layer.plan.md
+- [ ] Create tickets/2026-07-07_bootstrap-mode.plan.md

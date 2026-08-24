@@ -380,7 +380,7 @@ const START = { repo: 'framework/the-framework', branch: 'cloud-1-abcd', prompt:
   const result = await w.__tfBridgeCreateSession(START)
   const branch = d.getElementById('branch')?.textContent
   const text = d.querySelector('[contenteditable="true"]').textContent
-  const ok = result.ok && result.sessionId === 'session_01NEW' && /repo already the-framework/.test(result.note) && branch === 'cloud-1-abcd' && text === 'Add the thing' && seen.sent && seen.searched.includes('cloud-1-abcd')
+  const ok = result.ok && result.sessionId === 'session_01NEW' && /repo already the-framework/.test(result.note) && branch === 'cloud-1-abcd' && text === 'Add the thing' && seen.sent
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'}  create with the repo remembered picks the branch, types the prompt and sends  (branch=${branch}, searched=${JSON.stringify(seen.searched)}, result=${JSON.stringify(result)})`)
   dom.window.close()

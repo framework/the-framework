@@ -203,7 +203,7 @@ export function TicketsPage({
                 )}
               </TooltipTrigger>
               <TooltipContent>
-                {'Every ticket joins the AI queue — the work the framework picks up on its own — in the shown order, each in its priority section. A ticket already queued stays as it is.'}
+                {'Every ticket joins the AI queue — the work the framework picks up on its own, worked highest priority first and, within a priority, in the order shown below. A ticket already queued stays as it is.'}
                 {claimedShown === 1 && ' The claimed ticket shown is left to the agent holding it.'}
                 {claimedShown > 1 && ` The ${claimedShown} claimed tickets shown are left to the agents holding them.`}
               </TooltipContent>

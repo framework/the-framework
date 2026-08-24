@@ -17,7 +17,7 @@ Starting, supervising and retiring agents on behalf of the daemon: every agent t
 - **One more try after a transient driver death** - an agent killed by a dropped connection or an overloaded API is continued automatically, at most twice; any other failure stands.
 - **Retiring a finished agent** - its history is archived onto the data branch, then its checkout is removed once its work has reached the remote, and kept otherwise; any branch that went with it is named.
 - **Running an agent on another device** - a start aimed at a device is handed to that daemon over the relay, its events are streamed back, and read/steer requests for it are forwarded there.
-- **Adding projects** - one repo, or every git repo directly under a directory, is activated and registered in one go.
+- **Adding projects** - the repo at a given path is activated and registered in one go.
 - **Shutdown stops every agent it spawned** - Ctrl-C terminates each agent's process and waits for its teardown to finish before the daemon lets go of the repo; starts landing during shutdown are refused.
 
 ## Business logic
@@ -178,13 +178,11 @@ On the other side, this daemon serves the device role too: it runs one whitelist
 
 #### User story
 
-The user points the dashboard at a repository, or at a folder full of repositories, and expects them all to show up in the Projects list.
+The user points the dashboard at a repository and expects it to show up in the Projects list.
 
 #### Business logic
 
-A path is resolved against the daemon's working directory and checked to be an existing directory first, so a bad path is reported as a path error rather than as a confusing git failure. Adding a directory activates every git repo directly under it; adding a repo activates that one. A path with no git repositories under it is refused by name.
-
-Each target is activated and then registered. Activation is idempotent — an already-activated repo counts as such and succeeds — and the result reports how many were newly added versus already activated. A git failure on any target aborts the whole operation and is shown as the error.
+The path is resolved against the daemon's working directory and checked to be an existing directory first, so a bad path is reported as a path error rather than as a confusing git failure. The repo is activated and then registered. Activation is idempotent — an already-activated repo counts as such and succeeds, and the result says which of the two happened. A git failure is shown as the error.
 
 ### What the daemon still holds
 

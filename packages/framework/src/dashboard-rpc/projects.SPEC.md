@@ -3,8 +3,9 @@ The Projects surface: the list of registered projects with whatever the daemon l
 ## Business logic — TL;DR
 
 - **The project list carries its own problems** - every project is listed with its id, path, name, whether it is activated and its last activity, plus the errors the daemon's background jobs recorded for it.
-- **Projects are added through the daemon** - one repo, or every git repo under a directory, installed and registered in one action.
-- **Onboarding offers the directory the daemon runs in** - so the first project can be added without typing a path.
+- **Projects are added through the daemon** - the repo is installed and registered in one action.
+- **The folder is picked in the OS's own dialog** - the daemon opens the system folder picker on its machine and hands the choice back, because a browser page cannot learn an absolute path on its own.
+- **Onboarding offers the directory the daemon runs in** - so the first project can be added without picking at all.
 - **The launcher warns before the start, not after** - whether the chosen driver can actually start, and whether the repo allows GitHub's own auto-merge, are answered before an agent is spawned.
 
 ## Business logic
@@ -23,11 +24,25 @@ Each project in the list is annotated with the errors the daemon's background jo
 
 #### User story
 
-The user points the dashboard at a repo — or at a directory full of repos — and gets them installed and listed.
+The user points the dashboard at a repo and gets it installed and listed.
 
 #### Business logic
 
-Adding is handed to the daemon, which installs the repo and writes it into the registry; the dashboard cannot do either itself. An empty path is refused. The caller says whether the path is a single repo or a directory whose git repos should all be added.
+Adding is handed to the daemon, which installs the repo and writes it into the registry; the dashboard cannot do either itself. An empty path is refused.
+
+### The folder is picked in the OS's own dialog
+
+#### User story
+
+The user should pick the repo's folder the way they pick any folder on their machine — in the system dialog — not by typing an absolute path into a form.
+
+#### Business logic
+
+The dashboard asks the daemon to open the OS folder picker; the daemon runs on the machine the user is sitting at, so the dialog appears there, and the picked absolute path is handed back. Dismissing the dialog is a normal answer of its own, distinct from a failure. On a platform where no picker is wired up (only macOS is, so far), the answer says so instead of trying.
+
+#### Rationale
+
+A browser page cannot learn the absolute path of anything picked in a dialog of its own — that is deliberate browser sandboxing — and the daemon needs the absolute path to install the repo. So the dialog has to be the daemon's.
 
 ### Onboarding offers the directory the daemon runs in
 

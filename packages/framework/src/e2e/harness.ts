@@ -210,7 +210,7 @@ export async function makeWorld(): Promise<StoryWorld> {
       const origin = join(cwd, 'origin.git')
       await git(cwd, 'init', '-q', '--bare', origin)
       await git(cwd, 'remote', 'add', 'origin', origin)
-      const added = await rpc(sendAddProject)(cwd, false)
+      const added = await rpc(sendAddProject)(cwd)
       if (!added.ok) throw new Error(`could not register the fixture repo: ${added.error}`)
       return { id: projectId(resolve(cwd)), cwd }
     },

@@ -22,7 +22,7 @@ export type StartAgentHandler = (
 ) => StartAgentResult | Promise<StartAgentResult>
 
 /** Wired by the daemon so `sendAddProject` can install + register a repo (#433). */
-export type AddProjectHandler = (path: string, directory: boolean) => AddProjectResult | Promise<AddProjectResult>
+export type AddProjectHandler = (path: string) => AddProjectResult | Promise<AddProjectResult>
 
 /** Resolve an agent to its live event stream: the relay feeds `onEvents` from its own in-memory stream
  * rather than a file on disk (#426), and the daemon feeds an agent it is relaying from a device (#1067).

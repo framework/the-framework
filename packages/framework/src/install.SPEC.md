@@ -1,4 +1,4 @@
-Activating a repository for The Framework, and finding the repositories a folder contains so the user can be offered them.
+Activating a repository for The Framework.
 
 ## Business logic — TL;DR
 
@@ -6,7 +6,6 @@ Activating a repository for The Framework, and finding the repositories a folder
 - **The ignore file is the activation marker** - a repository that already carries `.the-framework/.gitignore` is already activated, and activating it again does nothing.
 - **A folder that is not a repository becomes one** - The Framework treats git as the source of truth, so it initialises the repository for the user rather than refusing, and reports that it did.
 - **Activation never crashes** - any git or filesystem failure comes back as a reported error the user can read.
-- **Repository discovery** - the immediate child folders of a directory that are git repository roots in their own right are listed, sorted; a folder that merely sits inside some outer repository is not one, and anything that is not a repository at all is passed over silently.
 
 ## Business logic
 

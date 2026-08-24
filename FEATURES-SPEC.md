@@ -9,7 +9,7 @@ happens while nobody is at the keyboard.
 
 - Install globally or run via `npx`
 - `the-framework` spins up the dashboard and the daemon, in the foreground — Ctrl-C closes the dashboard and every agent with it
-- Activate a repo from the dashboard (commits dirty state, creates `.the-framework/`, teaches `.gitignore`, registers it)
+- Activate a repo from the dashboard, picked in the OS folder picker behind a trust confirmation (commits dirty state, creates `.the-framework/`, teaches `.gitignore`, registers it)
 - Onboarding checklist — each step derived from a real fact, not a click
 - Prerequisite checks surfaced by the dashboard
 - Per-agent preflight — probe the driver CLI before spending a branch

@@ -37,10 +37,9 @@ export interface DashboardOptions {
   ) => StartAgentResult | Promise<StartAgentResult>
   /**
    * Called when the browser adds a project (#396): the `sendAddProject` RPC reaches this through
-   * the wired dashboard context. Wire it to install the repo (or every git repo under a
-   * directory) and register it.
+   * the wired dashboard context. Wire it to install the repo and register it.
    */
-  onAddProject: (path: string, directory: boolean) => Promise<AddProjectResult> | AddProjectResult
+  onAddProject: (path: string) => Promise<AddProjectResult> | AddProjectResult
   /**
    * The user-preferences store (#410): the `onPreferences` / `savePreferences` RPCs read and
    * write it through the wired dashboard context.

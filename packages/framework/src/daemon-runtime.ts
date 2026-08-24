@@ -45,7 +45,7 @@ import { scopedKey, parseScopedKey, keyBelongsTo } from './runtime-keys.js'
 import { addProject, listProjects, projectId } from './registry.js'
 import { isTicketPath } from './tickets.js'
 import { resolveProjectAgentOptions } from './daemon-services.js'
-import { installProject, enumerateGitRepos } from './install.js'
+import { installProject } from './install.js'
 import { isGitRepo, nodeGitRunner } from './project.js'
 import { isCliTimeout } from './cli-exec.js'
 import { withAgentLock } from './agent-locks.js'
@@ -368,7 +368,7 @@ export interface ProjectRuntimeOptions {
 /** The per-project agent + preview surface the dashboard drives, plus its teardown. */
 export interface ProjectRuntime {
   onStart: (prompt: string, kind: StartAgentKind, options?: StartAgentOptions, targetProjectId?: string) => Promise<StartAgentResult>
-  onAddProject: (path: string, directory: boolean) => Promise<AddProjectResult>
+  onAddProject: (path: string) => Promise<AddProjectResult>
   /** The live event stream for an agent this daemon is relaying from a device (#1067), else undefined
    *  so `onEvents` falls back to tailing the on-disk log. Wired as the dashboard's events source. */
   remoteEventsSource: EventsSource
@@ -834,29 +834,19 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
     }
   }
 
-  // Add project(s) (#396): install a single repo, or every git repo directly under a
-  // directory, then register each so it appears in the Projects list. installProject is
-  // idempotent (an already-activated repo is a no-op success); a git failure on any target
-  // aborts and surfaces as an error the dialog shows.
-  const onAddProject = async (path: string, directory: boolean): Promise<AddProjectResult> => {
+  // Add a project (#396): install the repo, then register it so it appears in the Projects
+  // list. installProject is idempotent (an already-activated repo is a no-op success).
+  const onAddProject = async (path: string): Promise<AddProjectResult> => {
     // Resolve relative input against the daemon cwd, and check the directory really
     // exists first: without this a bad path reaches git as a missing cwd, which
     // surfaces as the confusing "spawn git ENOENT" rather than a path error.
     const abs = resolve(path)
     const isDir = await stat(abs).then(s => s.isDirectory()).catch(() => false)
     if (!isDir) return { ok: false, error: `path does not exist or is not a directory: ${abs}` }
-    const targets = directory ? await enumerateGitRepos(abs) : [abs]
-    if (!targets.length) return { ok: false, error: `no git repositories found under ${abs}` }
-    let added = 0
-    let alreadyActivated = 0
-    for (const repo of targets) {
-      const result = await installProject(repo)
-      if (!result.ok) return { ok: false, error: result.error }
-      if (result.alreadyActivated) alreadyActivated++
-      else added++
-      await addProject(repo, new Date().toISOString()).catch(() => {})
-    }
-    return { ok: true, added, alreadyActivated }
+    const result = await installProject(abs)
+    if (!result.ok) return { ok: false, error: result.error }
+    await addProject(abs, new Date().toISOString()).catch(() => {})
+    return { ok: true, alreadyActivated: result.alreadyActivated === true }
   }
 
   /**

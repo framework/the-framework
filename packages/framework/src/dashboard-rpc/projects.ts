@@ -1,6 +1,7 @@
 import { contextAddProject, contextProjectErrors, contextProjects } from './context.js'
 import { cachedRepoAutoMerge, type RepoAutoMerge } from '../dashboard/gh.js'
 import { preflight, preflightProblems } from '../preflight.js'
+import { pickDirectory, type PickDirectoryResult } from '../pick-directory.js'
 import { isDriverName } from '../driver-names.js'
 import type { DriverReady } from '../dashboard/types.js'
 import type { ProjectSummary } from '../dashboard/projects.js'
@@ -25,18 +26,27 @@ export async function onProjects(): Promise<ProjectSummary[]> {
 }
 
 /**
- * Add project(s) from the dashboard (#396/#433): install a single repo, or every git
- * repo under a directory, and register each so it joins the Projects list. Like
- * `sendStart` this needs the daemon (it spawns git + writes the shared registry), so it
- * calls the daemon's own `addProject` closure off the wired dashboard context. Returns
- * the daemon's {@link AddProjectResult}.
+ * Add a project from the dashboard (#396/#433): install the repo and register it so it joins the
+ * Projects list. Like `sendStart` this needs the daemon (it spawns git + writes the shared
+ * registry), so it calls the daemon's own `addProject` closure off the wired dashboard context.
+ * Returns the daemon's {@link AddProjectResult}.
  */
-export async function sendAddProject(path: string, directory: boolean): Promise<AddProjectResult> {
+export async function sendAddProject(path: string): Promise<AddProjectResult> {
   // Throws on an unwired context (D3), like `sendStart`: a missing capability is a wiring bug.
   const addProject = contextAddProject()
   const trimmed = path.trim()
   if (!trimmed) return { ok: false, error: 'a project path is required' }
-  return addProject(trimmed, directory)
+  return addProject(trimmed)
+}
+
+/**
+ * Open the OS folder picker on the daemon's machine and wait for the user's choice (#1150). The
+ * browser cannot learn an absolute path from any picker of its own, and the daemon — which runs on
+ * the machine the user is sitting at — can, so the dialog is the daemon's. A dismissed dialog
+ * comes back as `path: null`.
+ */
+export async function sendPickProjectDirectory(): Promise<PickDirectoryResult> {
+  return pickDirectory()
 }
 
 /**

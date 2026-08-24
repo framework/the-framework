@@ -5,10 +5,17 @@ is written in TypeScript any more, so prompting can change without touching the 
 
 | file | what it is |
 |---|---|
-| `system_prompt.md` | The built-in system prompt (#326). Rom's doc. |
+| `system_prompt.md` | The built-in system prompt (#326). Rom's doc. Its `# User prompt` slot is where the user's own text is rendered, for a build and a prompt session alike (#1691). |
+| `ticketing_format.md` | The ticket file format: how a ticket, its plan and its lock are written under `tickets/`. Travels in every agent's context. |
+| `todo_format.md` | The agent-queue format: how `TODO_AGENTS.md` is banded by priority. Travels in every agent's context. |
+| `data_branch_protocol.md` | The data-branch protocol: tickets, the queue and the session archives live on `tf-data`, read and written there directly, never on a code branch. Travels in every agent's context. |
+| `triage_scope.md` | The queue-only rule appended to both triage presets: a triage writes `TODO_AGENTS.md`, never a ticket's code (#1641). |
+| `on_before_mergeable_prompt.md` | The optional extra turn an agent gets when it signals ready for merge: queue quality follow-ups, fold what it learned into the knowledge base. |
 | `protocols/await.md` | How to emit an awaited choice so the turn-boundary gate can detect it (#337/#339). |
 | `protocols/signal.md` | How to emit `setSessionName()` / `setReadyForMerge()` (#326). |
-| `presets/*.md` | One file per preset button: research (#331), readability (#360), maintainability (#361), security_audit (#461), ux (#472). |
+| `protocols/browser.md` | Added only when the run has a real Chrome attached: the `chrome-devtools` tools and what the agent may do with them (#793). |
+| `protocols/hands_off.md` | Added only when the session runs detached (a web run): land everything, since nothing on a machine follows it. |
+| `presets/*.md` | One file per preset; `src/preset-catalog.ts` is the table saying which button or routine each backs. Launcher buttons: research (#331), readability (#360), maintainability (#361), security_audit (#461), ux (#472), maintenance (#881), market_research (#694), plan_tickets (#685), suggest_new_tickets (#462), suggest_new_features, suggest_tickets_to_work_on, drain_queue (#855). Routine prompts: update_tickets (#1208), triage_quick (#891), triage_consensual (#892). |
 
 ## Editing
 

@@ -4,7 +4,7 @@ import { createAgentControls, emitSessionStart, endStopDetail } from './agent-te
 import { createTurnSignalEmitter } from './turn-gate.js'
 import { runAwaitRounds } from './await-gate.js'
 import { runTodoLoop, type TodoLoopResult } from './todo-loop.js'
-import { buildPrompt, extendPrompt, isWorkspaceEmpty, scaffoldPrompt } from './steps.js'
+import { extendPrompt } from './steps.js'
 import { type ChoicePick, type ChoiceRequest, type FrameworkEvent } from './events.js'
 import type { AgentMessages } from './agent-messages.js'
 import { isHandsOff, type AgentLocation } from './agent-location.js'
@@ -195,7 +195,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<RunAgentResult> {
   try {
     const rounds = await runAwaitRounds({
       session,
-      prompt: openingPrompt(opts, kind, resuming, session.cwd),
+      prompt: openingPrompt(opts, kind, resuming),
       emitTurnSignals,
       requestChoice: opts.requestChoice,
       emit,
@@ -214,16 +214,6 @@ export async function runAgent(opts: RunAgentOptions): Promise<RunAgentResult> {
     // session on one path and a stop on the other.
     if (rounds.stopped) answerController.abort(new Error('[framework] stopped by your answer'))
     let text = rounds.text
-
-    // #182: a build must actually produce an app. If nothing landed on disk the agent stalled
-    // (e.g. sanity-checking the stack), so re-prompt once with a hard "create it from scratch"
-    // directive. Only for a real driver — the fake one writes nothing, so its workspace always
-    // reads empty — and only when the agent is not mid-question, which the gates just drained.
-    if (kind === 'build' && !resuming && opts.driver.id !== 'fake' && !rounds.stopped && isWorkspaceEmpty(opts.cwd)) {
-      const scaffolded = await session.prompt(scaffoldPrompt(opts.prompt), { signal: agentSignal })
-      emitTurnSignals(scaffolded.text)
-      text = scaffolded.text
-    }
 
     // The session controls (a Stop, an answer that said stop #358) abort between turns, and the
     // opening rounds do not observe the abort themselves, so look before treating this as a
@@ -286,17 +276,15 @@ export async function runAgent(opts: RunAgentOptions): Promise<RunAgentResult> {
  * A resumed session (#720/#1467) gets the text verbatim: the `--resume`d transcript already
  * carries the framing, so composing it again would stack a second preamble onto a conversation
  * that lived through the first. So does a transparent or prompt-less session, which is what
- * "raw `claude -p`" means. A build is framed for the workspace it lands in: an existing codebase
- * is *extended*, not rebuilt from scratch (#185).
+ * "raw `claude -p`" means. A build extends the existing codebase (#185) — a project is a repo
+ * that already exists, so the greenfield from-scratch framing is gone (#1683 review).
  */
-function openingPrompt(opts: RunAgentOptions, kind: AgentKind, resuming: boolean, cwd: string): string {
+function openingPrompt(opts: RunAgentOptions, kind: AgentKind, resuming: boolean): string {
   if (resuming || opts.transparent) return opts.prompt
   if (kind === 'prompt') {
     return opts.vanilla ? opts.prompt : renderSystemPrompt({ prompt: opts.prompt }).user
   }
-  // Gated on a real driver, so the fake one (which writes nothing, so its workspace always reads
-  // empty) always takes the greenfield path and stays deterministic.
-  return opts.driver.id !== 'fake' && !isWorkspaceEmpty(cwd) ? extendPrompt(opts.prompt) : buildPrompt(opts.prompt)
+  return extendPrompt(opts.prompt)
 }
 
 /** The live-chat phase a build reaches after its backlog, sharing the rounds' own loop. */

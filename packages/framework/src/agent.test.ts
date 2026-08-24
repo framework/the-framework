@@ -267,7 +267,7 @@ test('a build turn that stops to ask fires a live gate and resumes on the pick (
     '```'
   const driver = new FakeDriver({
     respond: (prompt: string): string => {
-      if (/Build this app end to end/.test(prompt)) return awaitBlock // the build stops to ask
+      if (/Work within the existing codebase/.test(prompt)) return awaitBlock // the build stops to ask
       if (/You paused to ask/.test(prompt)) return 'Built it with Postgres. Done.' // the resume
       return 'done'
     },
@@ -302,7 +302,7 @@ test('a run with no preset and no serve config reviews nothing (#1372)', async (
   const driver = new FakeDriver({
     respond: (prompt: string): string => {
       prompts.push(prompt)
-      if (/Build this app end to end/.test(prompt)) return 'Built it. Done.'
+      if (/Work within the existing codebase/.test(prompt)) return 'Built it. Done.'
       return 'done'
     },
     sessionId: 'blackbox1372',
@@ -325,7 +325,7 @@ test('a build turn that stops to showMultiSelect fires a checklist gate and resu
     '```'
   const driver = new FakeDriver({
     respond: (prompt: string): string => {
-      if (/Build this app end to end/.test(prompt)) return awaitBlock
+      if (/Work within the existing codebase/.test(prompt)) return awaitBlock
       if (/You paused to ask/.test(prompt)) return 'Added the picks to TODO. Done.'
       return 'done'
     },
@@ -361,7 +361,7 @@ test('a build turn that stops for plan approval resumes on Approve (#358)', asyn
     '```'
   const driver = new FakeDriver({
     respond: (prompt: string): string => {
-      if (/Build this app end to end/.test(prompt)) return awaitBlock
+      if (/Work within the existing codebase/.test(prompt)) return awaitBlock
       if (/You paused to ask/.test(prompt)) return 'Built the plan out. Done.'
       return 'done'
     },
@@ -402,7 +402,7 @@ test('a declined plan stops the session cleanly instead of building on it (#358)
   let resumed = false
   const driver = new FakeDriver({
     respond: (prompt: string): string => {
-      if (/Build this app end to end/.test(prompt)) return awaitBlock
+      if (/Work within the existing codebase/.test(prompt)) return awaitBlock
       if (/You paused to ask/.test(prompt)) resumed = true
       return 'done'
     },
@@ -438,7 +438,7 @@ test('an unmarked option is an ordinary answer, whatever it is labelled (#358)',
   let resumedWith = ''
   const driver = new FakeDriver({
     respond: (prompt: string): string => {
-      if (/Build this app end to end/.test(prompt)) return awaitBlock
+      if (/Work within the existing codebase/.test(prompt)) return awaitBlock
       if (/You paused to ask/.test(prompt)) resumedWith = prompt
       return 'Understood — waiting for your instructions.'
     },
@@ -508,7 +508,7 @@ test('with nobody to ask, a session takes the recommended option and carries on 
   let resumed = false
   const driver = new FakeDriver({
     respond: (prompt: string): string => {
-      if (/Build this app end to end/.test(prompt)) return 'built it\n```await-choices\n{ "options": [{ "label": "A" }] }\n```'
+      if (/Work within the existing codebase/.test(prompt)) return 'built it\n```await-choices\n{ "options": [{ "label": "A" }] }\n```'
       if (/You paused to ask/.test(prompt)) resumed = true
       return 'done'
     },
@@ -960,47 +960,6 @@ test('a build extends an existing project instead of rebuilding it (#185)', asyn
     await runAgent({ prompt: 'add a search box', driver, cwd, todoLoop: false })
     assert.match(prompts[0]!, /existing codebase/i)
     assert.doesNotMatch(prompts[0]!, /scaffold the whole project|workspace may be empty/i)
-  } finally {
-    await rm(cwd, { recursive: true, force: true })
-  }
-})
-
-test('a build uses greenfield framing for an empty workspace (#185)', async () => {
-  const cwd = await mkdtemp(join(tmpdir(), 'fw-greenfield-'))
-  try {
-    const { driver, prompts } = realNamedDriver([{ text: 'scaffolded it' }, { text: 'scaffolded it properly' }])
-    await runAgent({ prompt: 'a blog', driver, cwd, todoLoop: false })
-    assert.match(prompts[0]!, /Build this app end to end/i)
-    assert.doesNotMatch(prompts[0]!, /existing codebase/i)
-  } finally {
-    await rm(cwd, { recursive: true, force: true })
-  }
-})
-
-test('a build re-prompts to scaffold from scratch when the workspace stays empty (#182)', async () => {
-  const cwd = await mkdtemp(join(tmpdir(), 'fw-scaffold-'))
-  try {
-    const { driver, prompts } = realNamedDriver([
-      { text: 'thinking about the stack' },
-      { text: 'scaffolded the whole app' },
-    ])
-    const { text } = await runAgent({ prompt: 'a blog', driver, cwd, todoLoop: false })
-    // Two turns: the build, then the hard from-scratch retry once nothing landed on disk.
-    assert.equal(prompts.length, 2)
-    assert.match(prompts[1]!, /from scratch|empty/i)
-    assert.equal(text, 'scaffolded the whole app')
-  } finally {
-    await rm(cwd, { recursive: true, force: true })
-  }
-})
-
-test('a build does not re-prompt when it produced files (#182)', async () => {
-  const cwd = await mkdtemp(join(tmpdir(), 'fw-noscaffold-'))
-  await writeFile(join(cwd, 'package.json'), '{}')
-  try {
-    const { driver, prompts } = realNamedDriver([{ text: 'built it' }])
-    await runAgent({ prompt: 'a blog', driver, cwd, todoLoop: false })
-    assert.equal(prompts.length, 1)
   } finally {
     await rm(cwd, { recursive: true, force: true })
   }

@@ -13,7 +13,7 @@ Every prompt The Framework sends an agent lives here as markdown. Nothing agent-
 - **The data-branch protocol** - where the framework's own data lives and how to read and write it without putting it on a code branch.
 - **The protocols** - how an agent signals: awaited choices, session name and ready for merge, plus the sections added only when it has a browser, when it runs hands-off, and when nothing can answer its questions.
 - **The presets** - one file per launcher button and per routine prompt.
-- **The build-opening prompts** - the three framings a build agent can open with: the greenfield build, the existing-codebase variant, and the scaffold retry for a build that produced nothing.
+- **The build-opening prompt** - the one framing a build agent opens with: deliver the work within the existing codebase.
 - **The on-before-mergeable prompt** - the optional extra turn a finished agent gets, queueing quality follow-ups and folding what it learned into the knowledge base.
 - **Prompts are reviewed before they land** - a prompt change goes through review like any other change.
 
@@ -47,7 +47,7 @@ See `## User story`.
 - **The triage scope rule** — the one-paragraph rule appended to both triage presets, that a triage only queues work and never implements it.
 - **The protocols** — how an agent signals to The Framework, and what this particular agent can do.
 - **The presets** — one file per preset: the launcher's buttons and the daemon's routine prompts.
-- **The build-opening prompts** — the greenfield build, the existing-codebase variant chosen when the workspace already holds source, and the scaffold retry sent when a build's opening turn left the workspace empty.
+- **The build-opening prompt** — the existing-codebase framing every build agent opens with: a project is a repo that already exists.
 - **The on-before-mergeable prompt** — the extra turn an agent gets when it signals ready for merge, if the user turned that on.
 
 ### Prompts are reviewed before they land

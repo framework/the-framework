@@ -468,7 +468,7 @@ test('runCli runs a whole session offline', async () => {
   assert.equal(code, 0)
   const text = out.join('\n')
   assert.match(text, /▶ "a blog"/) // what it was asked for, said once as the session opens
-  assert.match(text, /Build this app end to end/)
+  assert.match(text, /Work within the existing codebase/)
   // #1372: nothing reviews the build, so there is no checklist pass — the build is the whole session.
   assert.doesNotMatch(text, /checklist pass/)
   assert.match(text, /\u2713 done/)
@@ -483,7 +483,6 @@ test('runCli --transparent runs a bare prompt raw, skipping the build flow + wra
     const text = out.join('\n')
     // Transparent = raw Claude Code: the build path's markers must NOT appear (contrast the test above).
     assert.doesNotMatch(text, /scope: full/) // no scope phase
-    assert.doesNotMatch(text, /Build this app end to end/) // no buildPrompt wrapping
     assert.doesNotMatch(text, /Work within the existing codebase/) // no extendPrompt wrapping
     assert.doesNotMatch(text, /production-grade/) // no synthesize / production-grade pass
   } finally {

@@ -8,7 +8,7 @@ import { presets } from '../../src/client.js'
 const onDashboard = vi.hoisted(() => vi.fn())
 const onOnboarding = vi.hoisted(() => vi.fn())
 vi.mock('../rpc/reads.js', () => ({ onDashboard }))
-vi.mock('../rpc/projects.js', () => ({ onOnboarding, sendAddProject: vi.fn() }))
+vi.mock('../rpc/projects.js', () => ({ onOnboarding, sendAddProject: vi.fn(), sendPickProjectDirectory: vi.fn() }))
 vi.mock('../rpc/preferences.js', () => ({ saveDiscordCredentials: vi.fn() }))
 vi.mock('../lib/preferences.js', () => ({
   usePreferences: () => ({}),

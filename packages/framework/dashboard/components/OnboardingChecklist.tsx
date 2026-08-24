@@ -83,7 +83,7 @@ export function OnboardingChecklist({
     if (!suggestion?.cwd) return
     setAddingCwd(true)
     setAddError(null)
-    const result = await sendAddProject(suggestion.cwd, false).catch(() => ({ ok: false as const, error: 'Could not reach the daemon.' }))
+    const result = await sendAddProject(suggestion.cwd).catch(() => ({ ok: false as const, error: 'Could not reach the daemon.' }))
     setAddingCwd(false)
     if (!result.ok) {
       setAddError(result.error)

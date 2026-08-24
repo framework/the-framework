@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { join } from 'node:path'
-import { enumerateGitRepos, installProject, type DirLister } from './install.js'
+import { installProject } from './install.js'
 import { PRESETS, PRESET_DIR } from './presets.js'
 import { frameworkGitignore, gitignorePath } from './framework-gitignore.js'
 import { layoutMarker, layoutMarkerPath } from './layout.js'
@@ -143,27 +143,4 @@ test('installProject initializes a git repo when the folder is not one yet, then
   assert.ok(calls.some(args => args[0] === 'init'), 'ran git init')
   const commits = calls.filter(args => args[0] === 'commit').map(args => args[2])
   assert.deepEqual(commits, ['[The Framework] install The Framework'])
-})
-
-test('enumerateGitRepos keeps only children that are their own repo roots, sorted', async () => {
-  const dir = '/repos'
-  const children = [join(dir, 'b'), join(dir, 'a'), join(dir, 'nested'), join(dir, 'plain')]
-  const dirs: DirLister = { childDirs: async () => children }
-  // `git rev-parse --show-prefix`: '' at a repo root, a path inside an outer repo,
-  // and an error when the dir is not a repo at all.
-  const { git } = fakeGit((_args, cwd) => {
-    if (cwd === join(dir, 'nested')) return 'nested/\n' // subdir of an outer repo
-    if (cwd === join(dir, 'plain')) throw new Error('not a git repository')
-    return '\n'
-  })
-
-  assert.deepEqual(await enumerateGitRepos(dir, { git, dirs }), [join(dir, 'a'), join(dir, 'b')])
-})
-
-test('enumerateGitRepos on an empty or missing dir is []', async () => {
-  const dirs: DirLister = { childDirs: async () => [] }
-  const { git, calls } = fakeGit(() => '')
-
-  assert.deepEqual(await enumerateGitRepos('/nowhere', { git, dirs }), [])
-  assert.deepEqual(calls, [])
 })

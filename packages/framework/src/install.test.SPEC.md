@@ -1,4 +1,4 @@
-What the tests cover: activating a repository, and finding the repositories inside a folder.
+What the tests cover: activating a repository.
 
 - Activating a clean repository writes the `.the-framework/.gitignore` marker and produces exactly one install commit.
 - The quality presets are written out during activation, so a queued quality follow-up points at a document that really exists.
@@ -8,7 +8,6 @@ What the tests cover: activating a repository, and finding the repositories insi
 - An already-activated repository is left completely untouched and reported as already activated.
 - A folder that is not a git repository is initialised first and reported as such, and still gets a single install commit.
 - A git failure anywhere in activation is reported as a failed outcome carrying the reason, never as a crash.
-- Repository discovery keeps only the child folders that are repository roots in their own right, sorted: a folder sitting inside an outer repository and a folder that is no repository at all are both left out; an empty or missing folder yields nothing without consulting git.
 
 ## Before modifying/creating SPEC.md files
 

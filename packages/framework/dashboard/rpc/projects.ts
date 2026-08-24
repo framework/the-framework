@@ -12,6 +12,7 @@ export type * from '../../src/dashboard-rpc/projects.js'
 
 export const onProjects = rpc<typeof impl.onProjects>('onProjects')
 export const sendAddProject = rpc<typeof impl.sendAddProject>('sendAddProject')
+export const sendPickProjectDirectory = rpc<typeof impl.sendPickProjectDirectory>('sendPickProjectDirectory')
 export const onOnboarding = rpc<typeof impl.onOnboarding>('onOnboarding')
 export const onRepoAutoMerge = rpc<typeof impl.onRepoAutoMerge>('onRepoAutoMerge')
 export const onDriverReady = rpc<typeof impl.onDriverReady>('onDriverReady')

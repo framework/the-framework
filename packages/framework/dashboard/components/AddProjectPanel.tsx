@@ -1,28 +1,22 @@
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
-import { sendAddProject } from '../rpc/projects.js'
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { sendAddProject, sendPickProjectDirectory } from '../rpc/projects.js'
 import { useAction } from '../lib/use-action.js'
 import { Button } from './ui/button.js'
-import { Checkbox } from './ui/checkbox.js'
 
-// Add project(s) (#396/#433): install a single repo, or every git repo directly under a
-// directory, and register each so it joins the list. The daemon does the work; this posts
-// the path over the `sendAddProject` RPC and reloads on success.
+// Add a project (#396/#1150): the OS's own folder picker instead of a typed path — the daemon
+// opens the dialog (a browser page cannot learn an absolute path from a picker of its own) and
+// hands the choice back, the user confirms they trust the repo, and the daemon installs and
+// registers it. Opened as a small modal from the projects picker and the onboarding checklist.
 //
-// Lifted out of the projects sidebar when #772 replaced that rail with a navbar dropdown:
-// the picker has no room for a two-step form, so it opens this as a small modal instead.
 // It behaves like the dialog it claims to be (#948): Esc closes, Tab stays inside, focus
-// returns to the opener on close, and a directory add reports how many repos it registered
-// instead of silently vanishing.
+// returns to the opener on close.
 export function AddProjectPanel({ onAdded, onClose }: { onAdded: () => void; onClose: () => void }) {
-  const [path, setPath] = useState('')
-  const [directory, setDirectory] = useState(false)
+  // The picked path, once the system dialog answered; the phases are picking (no path yet),
+  // confirming trust (path, not added), and done (added set).
+  const [path, setPath] = useState<string | null>(null)
+  const [added, setAdded] = useState<{ alreadyActivated: boolean } | null>(null)
+  const [pickError, setPickError] = useState<string | null>(null)
   const { busy, error, reset, run } = useAction()
-  // Trust gate (#439/#314): adding a repo lets the agent read its files, so an untrusted
-  // repo is a prompt-injection risk. Confirm trust before actually installing.
-  const [confirming, setConfirming] = useState(false)
-  // What actually got registered, shown before closing — a folder-of-repos add used to
-  // register any number of projects with zero feedback.
-  const [added, setAdded] = useState<{ added: number; alreadyActivated: number } | null>(null)
   const panelRef = useRef<HTMLDivElement>(null)
 
   // Give focus back to the control that opened the dialog (the picker's Add item is gone by
@@ -30,6 +24,27 @@ export function AddProjectPanel({ onAdded, onClose }: { onAdded: () => void; onC
   useEffect(() => {
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
     return () => opener?.focus()
+  }, [])
+
+  // The system dialog opens with the modal: picking the folder IS the form. A dismissed dialog
+  // closes the modal too — the user said "not now" once already.
+  const pick = async () => {
+    setPickError(null)
+    const picked = await sendPickProjectDirectory().catch(() => ({ ok: false as const, error: 'Could not reach the daemon.' }))
+    if (!picked.ok) {
+      setPickError(picked.error)
+      return
+    }
+    if (!picked.path) {
+      onClose()
+      return
+    }
+    reset()
+    setPath(picked.path)
+  }
+  useEffect(() => {
+    void pick()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Auto-close a beat after success; Done closes sooner.
@@ -40,24 +55,13 @@ export function AddProjectPanel({ onAdded, onClose }: { onAdded: () => void; onC
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [added])
 
-  // Step 1: the user submits the path -> show the trust confirmation, don't add yet.
-  const review = (e: FormEvent) => {
-    e.preventDefault()
-    if (!path.trim() || busy) return
-    reset()
-    setConfirming(true)
-  }
-
-  // Step 2: trust confirmed -> install + register.
+  // Trust confirmed (#439) -> install + register.
   const confirmAdd = async () => {
-    if (busy) return
-    const result = await run(() => sendAddProject(path.trim(), directory), 'Failed to add the project.')
+    if (busy || !path) return
+    const result = await run(() => sendAddProject(path), 'Failed to add the project.')
     if (result?.ok) {
-      setConfirming(false)
-      setAdded({ added: result.added, alreadyActivated: result.alreadyActivated })
+      setAdded({ alreadyActivated: result.alreadyActivated })
       onAdded()
-    } else {
-      setConfirming(false)
     }
   }
 
@@ -84,15 +88,6 @@ export function AddProjectPanel({ onAdded, onClose }: { onAdded: () => void; onC
     }
   }
 
-  const summary =
-    added &&
-    [
-      `Added ${added.added} project${added.added === 1 ? '' : 's'}`,
-      added.alreadyActivated > 0 ? `${added.alreadyActivated} already added` : null,
-    ]
-      .filter(Boolean)
-      .join(' · ')
-
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 pt-24" onKeyDown={onKeyDown}>
       {/* Click-away closes, same as dismissing the dropdown it was opened from. */}
@@ -107,7 +102,7 @@ export function AddProjectPanel({ onAdded, onClose }: { onAdded: () => void; onC
         {added ? (
           <>
             <p role="status" className="mb-3 text-sm font-medium">
-              {summary}
+              {added.alreadyActivated ? 'Already added' : 'Project added'}
             </p>
             <div className="flex justify-end">
               <Button type="button" size="sm" autoFocus onClick={onClose}>
@@ -115,12 +110,25 @@ export function AddProjectPanel({ onAdded, onClose }: { onAdded: () => void; onC
               </Button>
             </div>
           </>
-        ) : confirming ? (
+        ) : pickError ? (
+          <>
+            <p className="mb-2 text-sm font-medium">Add project</p>
+            <p className="mb-3 text-xs text-danger">{pickError}</p>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="ghost" size="sm" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button type="button" size="sm" onClick={() => void pick()}>
+                Try again
+              </Button>
+            </div>
+          </>
+        ) : path ? (
           // The trust confirmation (#439): a plain-language prompt-injection warning before adding.
           <>
             <p className="mb-2 text-sm font-medium">Do you trust this repository?</p>
             <p className="mb-2 break-all text-xs text-muted-foreground">
-              <code className="rounded bg-muted px-1">{path.trim()}</code>
+              <code className="rounded bg-muted px-1">{path}</code>
             </p>
             <p className="mb-3 text-xs text-muted-foreground">
               Adding it lets the agent read its files. Hidden instructions in an untrusted repo can hijack the agent
@@ -128,40 +136,26 @@ export function AddProjectPanel({ onAdded, onClose }: { onAdded: () => void; onC
             </p>
             {error && <p className="mb-2 text-xs text-danger">{error}</p>}
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => setConfirming(false)}>
-                Back
+              <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => void pick()}>
+                Choose again
               </Button>
-              <Button type="button" size="sm" disabled={busy} onClick={() => void confirmAdd()}>
+              <Button type="button" size="sm" autoFocus disabled={busy} onClick={() => void confirmAdd()}>
                 {busy ? 'Adding…' : 'I trust it, add it'}
               </Button>
             </div>
           </>
         ) : (
-          <form onSubmit={review}>
+          <>
             <p className="mb-2 text-sm font-medium">Add project</p>
-            <input
-              value={path}
-              onChange={e => setPath(e.target.value)}
-              placeholder="/absolute/path/to/repo"
-              aria-label="Repository path"
-              autoFocus
-              disabled={busy}
-              className="mb-2 w-full rounded-md border border-border bg-transparent px-2 py-1 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
-            />
-            <label className="mb-2 flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
-              <Checkbox checked={directory} onCheckedChange={setDirectory} disabled={busy} />
-              It&apos;s a folder of repos
-            </label>
-            {error && <p className="mb-2 text-xs text-danger">{error}</p>}
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={onClose}>
+            <p role="status" className="mb-3 text-xs text-muted-foreground">
+              Choose the repository&apos;s folder in the system dialog…
+            </p>
+            <div className="flex justify-end">
+              <Button type="button" variant="ghost" size="sm" onClick={onClose}>
                 Cancel
               </Button>
-              <Button type="submit" size="sm" disabled={busy || !path.trim()}>
-                Add
-              </Button>
             </div>
-          </form>
+          </>
         )}
       </div>
     </div>

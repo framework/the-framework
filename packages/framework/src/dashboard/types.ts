@@ -12,9 +12,9 @@ export type RemoveWorktreeResult = { ok: true } | { ok: false; error: string }
 /** The outcome of deleting a session — its records and worktree (#1032). */
 export type DeleteAgentResult = { ok: true } | { ok: false; error: string }
 
-/** The outcome of an add-project attempt (#396). */
+/** The outcome of an add-project attempt (#396): registered, or was already, or why not. */
 export type AddProjectResult =
-  | { ok: true; added: number; alreadyActivated: number }
+  | { ok: true; alreadyActivated: boolean }
   | { ok: false; error: string }
 
 /**

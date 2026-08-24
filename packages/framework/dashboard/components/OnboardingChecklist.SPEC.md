@@ -22,7 +22,7 @@ See `## User story`.
 
 #### Business logic
 
-**Add a project** — done once at least one project is registered. A project is described as a git repository The Framework may work in. While it is not done, the card offers to register the directory the daemon is running in (naming that directory on the button) when that directory is not already a project, and always offers a directory picker as the alternative. A failure to register is reported in place.
+**Add a project** — done once at least one project is registered. A project is described as a git repository The Framework may work in. While it is not done, the card offers to register the directory the daemon is running in (naming that directory on the button) when that directory is not already a project, and always offers the add-project dialog — the system folder picker — as the alternative. A failure to register is reported in place.
 
 **Populate the queue of AI tasks** — done once at least one unchecked entry exists in a project's `TODO_AGENTS.md`. The card explains that each unchecked entry is work the agent picks up on its own, so a filled queue is what lets it keep going unattended. This step has no button: the queue is filled by the agent and by the user's own planning.
 

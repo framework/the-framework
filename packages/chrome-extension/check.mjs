@@ -315,14 +315,14 @@ async function deliver(body, prepare) {
 // these prove is the flow around it: the right chip is opened, the branch is verified before
 // anything is sent, and a page that cannot be driven says which control it lacked.
 
-function newSessionPage({ branches = ['main', 'cloud-1-abcd'], remembered = 'the-framework', repoPicker = true } = {}) {
+function newSessionPage({ branches = ['main', 'cloud-1-abcd'], remembered = 'the-framework', repoPicker = true, glyphs = false } = {}) {
   // Mirrors the live page as observed 2026-08-24: chips are combobox buttons in the order repo,
   // branch, add; a picker is a dialog holding a search input (role combobox) and a listbox of
   // options; a closed picker's options stay in the DOM.
   const dom = new JSDOM(
     `<!doctype html><html><body><main>
       <button id="env">Default</button>
-      ${remembered ? `<button role="combobox" id="repo">${remembered}</button><button role="combobox" id="branch">main</button>` : repoPicker ? '<button id="select">+ Select repo…</button>' : ''}
+      ${remembered ? `<button role="combobox" id="repo">${glyphs ? '\ue048' : ''}${remembered}</button><button role="combobox" id="branch">${glyphs ? '\ue078' : ''}main</button>` : repoPicker ? '<button id="select">+ Select repo…</button>' : ''}
       <button role="combobox" aria-label="Add repository"></button>
       <div contenteditable="true"></div>
       <button aria-label="Send message" id="send"></button>
@@ -335,9 +335,9 @@ function newSessionPage({ branches = ['main', 'cloud-1-abcd'], remembered = 'the
   const openList = (placeholder, entries, onPick) => {
     const dialog = d.createElement('div')
     dialog.setAttribute('role', 'dialog')
-    dialog.innerHTML = `<input role="combobox" placeholder="${placeholder}"/><div role="listbox">${entries.map(e => `<div role="option">${e}</div>`).join('')}</div>`
+    dialog.innerHTML = `<input role="combobox" placeholder="${placeholder}"/><div role="listbox">${entries.map((e, i) => `<div role="option">${e}${glyphs && i === 0 ? '\ue03b' : ''}</div>`).join('')}</div>`
     dialog.querySelector('input').addEventListener('input', e => seen.searched.push(e.target.value))
-    for (const opt of dialog.querySelectorAll('[role="option"]')) opt.addEventListener('click', () => { dialog.remove(); onPick(opt.textContent) })
+    for (const opt of dialog.querySelectorAll('[role="option"]')) opt.addEventListener('click', () => { dialog.remove(); onPick(opt.textContent.replace(/[\uE000-\uF8FF]/g, '')) })
     d.body.append(dialog)
   }
   const ensureBranchChip = () => {
@@ -383,6 +383,19 @@ const START = { repo: 'framework/the-framework', branch: 'cloud-1-abcd', prompt:
   const ok = result.ok && result.sessionId === 'session_01NEW' && /repo already the-framework/.test(result.note) && branch === 'cloud-1-abcd' && text === 'Add the thing' && seen.sent
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'}  create with the repo remembered picks the branch, types the prompt and sends  (branch=${branch}, searched=${JSON.stringify(seen.searched)}, result=${JSON.stringify(result)})`)
+  dom.window.close()
+}
+
+{
+  // As the live page renders in the content script's world: icon-font glyphs beside every label
+  // and a check glyph on the chosen entry (dogfood 4).
+  const { dom, w, d, seen } = newSessionPage({ glyphs: true, remembered: 'docpress' })
+  const result = await w.__tfBridgeCreateSession(START)
+  const repo = d.getElementById('repo')?.textContent.replace(/[\uE000-\uF8FF]/g, '')
+  const branch = d.getElementById('branch')?.textContent.replace(/[\uE000-\uF8FF]/g, '')
+  const ok = result.ok && repo === 'the-framework' && branch === 'cloud-1-abcd' && seen.sent
+  if (!ok) failed++
+  console.log(`${ok ? 'PASS' : 'FAIL'}  create reads labels through the page's icon glyphs  (repo=${repo}, branch=${branch}, result=${JSON.stringify(result)})`)
   dom.window.close()
 }
 

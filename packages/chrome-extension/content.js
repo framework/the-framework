@@ -480,9 +480,13 @@ async function deliverAnswer(text) {
 // insists: `probeNewSession` describes what the page offers without touching it, and every
 // failure below names the control it could not find.
 
-/** Visible text of a control, trimmed and collapsed, for matching chips and entries. */
+/**
+ * Visible text of a control, for matching chips and entries: the icon-font glyphs the page puts
+ * beside a label (a repo icon, a branch icon, the check on the chosen entry) are dropped, since
+ * "framework/the-framework" followed by a check glyph is the entry, not another entry.
+ */
 function controlText(el) {
-  return (el.textContent ?? '').replace(/\s+/g, ' ').trim()
+  return (el.textContent ?? '').replace(ICON_GLYPHS, '').replace(/\s+/g, ' ').trim()
 }
 
 /**

@@ -37,6 +37,7 @@
 - [ ] Create tickets/2026-07-13_git-worktrees.plan.md
 - [ ] Create tickets/2026-07-13_syncing-ui-data.plan.md
 - [ ] Create tickets/2026-07-12_app-instead-of-localhost.plan.md
+- [ ] Create tickets/2026-07-10_cli.plan.md
 
 
 ## Priority 4

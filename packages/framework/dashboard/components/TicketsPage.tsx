@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Play } from 'lucide-react'
+import { Check, ListPlus } from 'lucide-react'
 import type { ProjectTickets, WorkspaceTicket } from '../../src/index.js'
 import { onAllTickets, onQueue } from '../rpc/reads.js'
 import { sendQueueTicket, sendStart } from '../rpc/control.js'
@@ -20,7 +20,6 @@ import { ScrollArea } from './ui/scroll-area.js'
 import { Button } from './ui/button.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import { TicketFilterBar } from './TicketFilterBar.js'
-import { workOnEntryPrompt } from './AiQueue.js'
 import { TicketsPanel, TicketRow, planPrompt, workOnTicketPrompt } from './TicketsPanel.js'
 
 /** Stable initial for the cross-project tickets poll, so it does not churn on every render. */
@@ -98,46 +97,37 @@ export function TicketsPage({
     )
     if (result?.ok) onAgentStarted?.(projectId, prompt, result.agentId)
   }
-  // The page-wide spin-up: one agent per shown ticket, via the AI queue. Each ticket is queued
-  // the way the detail page's Queue button queues it (#1164) — unless an open entry already
-  // links to it, which is reused rather than written twice: a duplicate would outlive its
-  // agent's check-off as an open entry naming a closed ticket, and the sweep would spend an
-  // agent on it. The agent itself is the queue card's own per-entry start (#855): unattended,
-  // on that one entry alone, with the ticket named on its meta (#1117). Sequential, stopping at
-  // the first failure — the daemon's own reason lands in `error`, and everything already queued
-  // or started stays.
-  const startShownAgents = async (targets: { projectId: string; ticket: WorkspaceTicket }[]) => {
-    const started = await run(async () => {
-      // The open entries already linking to a ticket, first entry per ticket — read at click
-      // time, so the dedupe judges the queue as it is now, not as some poll last saw it.
-      const queuedEntries = new Map<string, string>()
+  // The page-wide queue-add: every unclaimed shown ticket joins the AI queue — the work the
+  // framework picks up on its own — queued exactly as the detail page's Queue action queues one
+  // (#1164): title as the entry, linked back to the ticket, its priority picking the section.
+  // Walked in the shown order, so within a priority section entries keep the order the reader
+  // saw. The queue is read at click time, and a ticket an open entry already links to is left
+  // as it stands: "add" means the set ends up queued, and a duplicate entry would outlive its
+  // agent's check-off as an open entry naming a closed ticket, costing the sweep an agent. No
+  // agent starts here — the queue is what the routine drain fans out over (#1204) and what the
+  // queue card's play buttons work one entry at a time (#855). Stops at the first failure; the
+  // daemon's own reason lands in `error`, and everything already queued stays.
+  const [queuedKey, setQueuedKey] = useState<string | null>(null)
+  const queueShownTickets = async (targets: { projectId: string; ticket: WorkspaceTicket }[], key: string) => {
+    const done = await run(async () => {
+      const alreadyQueued = new Set<string>()
       for (const q of await onQueue())
         for (const item of q.items) {
           if (item.done) continue
           const file = queueEntryLabel(item.text).ticket
-          if (file && !queuedEntries.has(`${q.projectId}\n${file}`)) queuedEntries.set(`${q.projectId}\n${file}`, item.text)
+          if (file) alreadyQueued.add(`${q.projectId}\n${file}`)
         }
-      let first: { projectId: string; prompt: string; agentId?: string | undefined } | undefined
       for (const { projectId, ticket } of targets) {
-        let entry = queuedEntries.get(`${projectId}\n${ticket.file}`)
-        if (entry === undefined) {
-          // The exact text sendQueueTicket writes, so the prompt below names the very line the
-          // agent will find on the queue.
-          entry = `[${ticket.title.trim()}](tickets/${ticket.file})`
-          const queued = await sendQueueTicket(projectId, ticket.title, {
-            file: ticket.file,
-            ...(ticket.priority ? { priority: ticket.priority } : {}),
-          })
-          if (!queued.ok) return { ok: false as const, error: queued.error ?? 'The queue could not be written.' }
-        }
-        const prompt = workOnEntryPrompt(entry)
-        const result = await sendStart(projectId, prompt, 'prompt', { unattended: true, ticket: `tickets/${ticket.file}` })
-        if (!result.ok) return result
-        first ??= { projectId, prompt, agentId: result.agentId }
+        if (alreadyQueued.has(`${projectId}\n${ticket.file}`)) continue
+        const queued = await sendQueueTicket(projectId, ticket.title, {
+          file: ticket.file,
+          ...(ticket.priority ? { priority: ticket.priority } : {}),
+        })
+        if (!queued.ok) return { ok: false as const, error: queued.error ?? 'The tickets could not be queued.' }
       }
-      return { ok: true as const, first }
-    }, 'The agents could not be started.')
-    if (started?.ok && started.first) onAgentStarted?.(started.first.projectId, started.first.prompt, started.first.agentId)
+      return { ok: true as const }
+    }, 'The tickets could not be queued.')
+    if (done?.ok) setQueuedKey(key)
   }
 
   // A project deselected in the Project facet disappears entirely — its section would otherwise
@@ -145,21 +135,24 @@ export function TicketsPage({
   const shownGroups = view.filters.projects.length > 0 ? groups.filter(g => view.filters.projects.includes(g.projectId)) : groups
   const flatRows = sortRows(visible, view.sort)
 
-  // What the spin-up button acts on: the shown rows minus the claimed ones — a ticket some
-  // agent already holds (#1420) is left to the agent holding it, the same rule the daemon's own
-  // fan-out follows. In the shown order, each row carrying its own project, so a cross-project
-  // view needs no special case: every ticket's agent starts where the ticket lives.
+  // What the queue-add button acts on: the shown rows minus the claimed ones — a ticket some
+  // agent already holds (#1420) is being worked, and its entry would outlive that work as queue
+  // noise. In the shown order, each row carrying its own project, so a cross-project view needs
+  // no special case: every ticket lands on its own project's queue.
   const targets = flatRows.filter(r => !r.ticket.locked)
   const claimedShown = flatRows.length - targets.length
-  // The label is the spend readout: one agent per ticket, so it counts the agents one click
-  // costs — and says "unclaimed" the moment the two counts differ, never promising a ticket it
-  // will skip.
-  const spinUpLabel =
+  // One flip per shown set: once this exact set is queued the button says so and rests, and any
+  // change to the set — a filter, a poll bringing new tickets — arms it again.
+  const queueKey = targets.map(r => `${r.projectId}/${r.ticket.file}`).join('\n')
+  const queuedShown = queuedKey === queueKey
+  // The label counts what the click adds — and says "unclaimed" the moment the two counts
+  // differ, never promising a ticket it will skip.
+  const queueLabel =
     targets.length === 1
-      ? `Spin up an agent working on the ${claimedShown > 0 ? 'one unclaimed ' : ''}ticket shown below`
+      ? `Add the ${claimedShown > 0 ? 'one unclaimed ' : ''}ticket shown below to the AI queue`
       : claimedShown > 0
-        ? `Spin up agents working on the ${targets.length} unclaimed tickets shown below`
-        : `Spin up agents working on all ${targets.length} tickets shown below`
+        ? `Add the ${targets.length} unclaimed tickets shown below to the AI queue`
+        : `Add all ${targets.length} tickets shown below to the AI queue`
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -181,10 +174,10 @@ export function TicketsPage({
               Every project&apos;s <code className="rounded bg-muted px-1">tickets/</code> backlog — what the agent plans from.
             </p>
           </div>
-          {/* The whole shown set as agents: the row's play button lifted to the page, one agent
-              per ticket. Rendered only when there is something to start — "all 0 tickets" is not
-              an offer, the list below already explains an empty set, and an all-claimed one is
-              already being worked. */}
+          {/* The whole shown set onto the queue: the detail page's Queue action lifted to the
+              page, one entry per ticket. Rendered only when there is something to add — "all 0
+              tickets" is not an offer, the list below already explains an empty set, and an
+              all-claimed one is already being worked. */}
           {loaded && targets.length > 0 && (
             <Tooltip>
               <TooltipTrigger
@@ -193,24 +186,32 @@ export function TicketsPage({
                     variant="outline"
                     size="sm"
                     className="shrink-0 gap-1.5"
-                    disabled={busy}
-                    onClick={() => void startShownAgents(targets)}
+                    disabled={busy || queuedShown}
+                    onClick={() => void queueShownTickets(targets, queueKey)}
                   />
                 }
               >
-                <Play className="h-3.5 w-3.5" aria-hidden />
-                {busy ? 'Starting…' : spinUpLabel}
+                {queuedShown ? (
+                  <>
+                    <Check className="h-3.5 w-3.5" aria-hidden /> Queued
+                  </>
+                ) : (
+                  <>
+                    <ListPlus className="h-3.5 w-3.5" aria-hidden />
+                    {queueLabel}
+                  </>
+                )}
               </TooltipTrigger>
               <TooltipContent>
-                {'One agent per ticket, via the AI queue: each ticket is queued — unless it already is — and gets its own unattended agent working that one entry.'}
+                {'Every ticket joins the AI queue — the work the framework picks up on its own — in the shown order, each in its priority section. A ticket already queued stays as it is.'}
                 {claimedShown === 1 && ' The claimed ticket shown is left to the agent holding it.'}
                 {claimedShown > 1 && ` The ${claimedShown} claimed tickets shown are left to the agents holding them.`}
               </TooltipContent>
             </Tooltip>
           )}
         </div>
-        {/* Page-level start failures land here, above the toolbar, so grouped mode shows them too —
-            the header owns a start of its own now, not just the flat rows'. */}
+        {/* Page-level failures land here, above the toolbar, so grouped mode shows them too — the
+            header owns an action of its own now, not just the flat rows'. */}
         {error && <p className="text-xs text-danger">{error}</p>}
         <TicketFilterBar
           view={view}

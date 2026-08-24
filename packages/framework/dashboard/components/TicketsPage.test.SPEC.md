@@ -6,7 +6,7 @@ Filtering: searching narrows the rows, updates the shown/total tally beside the 
 
 Grouping: the flat mode renders one cross-project list ordered across projects, with each row naming its project and no per-project update controls; opening a flat row still identifies its own project and file; and a flat row's start button runs the work agent in that row's own project, unattended, with the ticket named on it.
 
-The page-wide spin-up button: each shown ticket is queued the way the ticket detail page queues one (title as the entry, ticket linked, priority picking the section) and gets its own unattended agent started on that one entry with the ticket named on the agent, the shell pointed at the first started agent only; a ticket an open queue entry already links to is not queued twice — its agent is pointed at the existing entry verbatim, and a checked-off entry does not count as queued; claimed tickets are skipped, with the button's label counting only the unclaimed tickets it will start; and the button is absent when nothing is shown or every shown ticket is claimed.
+The page-wide queue-add button: every shown ticket is queued the way the ticket detail page queues one (title as the entry, ticket linked, priority picking the section) and no agent is started; after the click the button reads "Queued" and stays disabled until the shown set changes, when it arms again counting the new set; a ticket an open queue entry already links to is not queued twice, and a checked-off entry does not count as queued; claimed tickets are skipped, with the button's label counting only the unclaimed tickets it will add; and the button is absent when nothing is shown or every shown ticket is claimed.
 
 ## Before modifying/creating SPEC.md files
 

@@ -22,7 +22,6 @@ happens while nobody is at the keyboard.
 - Options gear writing straight to preferences
 - Pre-flight warnings before spending (no `gh`, logged out, repo can't auto-merge)
 - Start an agent from a ticket row
-- Spin up agents working on all the tickets the Tickets page's filters show — one agent per ticket, via the AI queue
 - Start an agent from a queue entry's play button
 - "Run now" on a routine, in a picked project the card remembers across navigations and reloads
 - "Configure first, then run" on a routine — the launcher opens with its prompt, so the model and location can be set first
@@ -99,6 +98,7 @@ happens while nobody is at the keyboard.
 - Ticket detail page
 - A plan page when a plan exists; a button to start an agent writing one when it doesn't
 - Queue a ticket into the AI queue
+- Queue every ticket the filters show into the AI queue, in one click from the page heading
 - Tickets carry a GitHub issue link, so merging closes the issue
 
 ## Handoff and what lands in git

@@ -11,7 +11,6 @@ vi.mock('../rpc/reads.js', () => ({ onAllTickets, onTicketsMeta, onQueue }))
 vi.mock('../rpc/control.js', () => ({ sendQueueTicket: vi.fn(), sendStart: vi.fn() }))
 
 const { TicketsPage } = await import('./TicketsPage.js')
-const { workOnEntryPrompt } = await import('./AiQueue.js')
 
 const ticket = (over: Record<string, unknown> = {}) => ({
   file: 't.md',
@@ -257,10 +256,10 @@ describe('TicketsPage grouping (#1144)', () => {
   })
 })
 
-// The page-wide spin-up button: the row's play button lifted to the page's heading — one agent
-// per shown ticket, via the AI queue. Each unclaimed shown ticket is queued (unless an open
-// entry already links to it) and gets its own unattended agent working that one entry.
-describe('TicketsPage spin up the shown set', () => {
+// The page-wide queue-add button: the detail page's Queue action lifted to the page's heading —
+// every unclaimed shown ticket joins the AI queue (unless an open entry already links to it),
+// and no agent starts: the queue's own consumers do that.
+describe('TicketsPage add the shown set to the AI queue', () => {
   const controls = async () => {
     const { sendStart, sendQueueTicket } = await import('../rpc/control.js')
     vi.mocked(sendStart).mockClear().mockResolvedValue({ ok: true, agentId: 'a1' })
@@ -268,7 +267,7 @@ describe('TicketsPage spin up the shown set', () => {
     return { sendStart, sendQueueTicket }
   }
 
-  test('one agent per shown ticket: each is queued and started on its own entry', async () => {
+  test('every shown ticket joins the queue, and the button rests as Queued until the set changes', async () => {
     onAllTickets.mockResolvedValue([
       {
         projectId: 'p1',
@@ -277,29 +276,24 @@ describe('TicketsPage spin up the shown set', () => {
       },
     ])
     const { sendStart, sendQueueTicket } = await controls()
-    const onAgentStarted = vi.fn()
-    render(<TicketsPage onOpenTicket={() => {}} onAgentStarted={onAgentStarted} />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Spin up agents working on all 2 tickets shown below' }))
+    render(<TicketsPage onOpenTicket={() => {}} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Add all 2 tickets shown below to the AI queue' }))
     // Queued exactly as the detail page's Queue button queues (#1164): title as the entry, the
     // ticket named so the entry links back, its priority picking the section.
     await waitFor(() => expect(sendQueueTicket).toHaveBeenCalledTimes(2))
     expect(sendQueueTicket).toHaveBeenCalledWith('p1', 'First', { file: 'a.md', priority: '7' })
     expect(sendQueueTicket).toHaveBeenCalledWith('p1', 'Second', { file: 'b.md' })
-    // Started exactly as the queue card's play button starts (#855): the per-entry ask on the
-    // very line the queue write produced, unattended, the ticket named on the agent (#1117).
-    const firstPrompt = workOnEntryPrompt('[First](tickets/a.md)')
-    await waitFor(() => expect(sendStart).toHaveBeenCalledTimes(2))
-    expect(sendStart).toHaveBeenCalledWith('p1', firstPrompt, 'prompt', { unattended: true, ticket: 'tickets/a.md' })
-    expect(sendStart).toHaveBeenCalledWith('p1', workOnEntryPrompt('[Second](tickets/b.md)'), 'prompt', {
-      unattended: true,
-      ticket: 'tickets/b.md',
-    })
-    // The shell is pointed at one agent, not bounced through all of them.
-    await waitFor(() => expect(onAgentStarted).toHaveBeenCalledTimes(1))
-    expect(onAgentStarted).toHaveBeenCalledWith('p1', firstPrompt, 'a1')
+    // Queueing is the whole act — the queue's own consumers start agents, not this button.
+    expect(sendStart).not.toHaveBeenCalled()
+    // Done, the button says so and rests for this exact set…
+    const queued = await screen.findByRole('button', { name: 'Queued' })
+    expect((queued as HTMLButtonElement).disabled).toBe(true)
+    // …and narrowing the shown set arms it again, counting the new set.
+    fireEvent.change(screen.getByRole('textbox', { name: /search tickets/i }), { target: { value: 'First' } })
+    expect(await screen.findByRole('button', { name: 'Add the ticket shown below to the AI queue' })).toBeTruthy()
   })
 
-  test('a ticket already on the queue is not queued twice — its open entry is worked as it stands', async () => {
+  test('a ticket already on the queue is not queued twice', async () => {
     onAllTickets.mockResolvedValue([
       {
         projectId: 'p1',
@@ -321,18 +315,13 @@ describe('TicketsPage spin up the shown set', () => {
         ],
       },
     ])
-    const { sendStart, sendQueueTicket } = await controls()
+    const { sendQueueTicket } = await controls()
     render(<TicketsPage onOpenTicket={() => {}} />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Spin up agents working on all 2 tickets shown below' }))
-    await waitFor(() => expect(sendStart).toHaveBeenCalledTimes(2))
-    // Only the genuinely unqueued ticket is written; the queued one's agent is pointed at the
-    // existing line verbatim, note and all — that is the line it must find to check off.
+    fireEvent.click(await screen.findByRole('button', { name: 'Add all 2 tickets shown below to the AI queue' }))
+    // Only the genuinely unqueued ticket is written; a.md's open entry stands as it is.
+    await screen.findByRole('button', { name: 'Queued' })
     expect(sendQueueTicket).toHaveBeenCalledTimes(1)
     expect(sendQueueTicket).toHaveBeenCalledWith('p1', 'Second', { file: 'b.md' })
-    expect(sendStart).toHaveBeenCalledWith('p1', workOnEntryPrompt('[First](tickets/a.md) — needs the new API'), 'prompt', {
-      unattended: true,
-      ticket: 'tickets/a.md',
-    })
   })
 
   test('claimed tickets are left to the agents holding them, and the label says so', async () => {
@@ -343,17 +332,13 @@ describe('TicketsPage spin up the shown set', () => {
         tickets: [ticket({ file: 'a.md', title: 'First' }), ticket({ file: 'b.md', title: 'Second', locked: true, lockedBy: 'agent-1' })],
       },
     ])
-    const { sendStart, sendQueueTicket } = await controls()
+    const { sendQueueTicket } = await controls()
     render(<TicketsPage onOpenTicket={() => {}} />)
-    // The label counts only what the click will start, never promising the claimed row.
-    fireEvent.click(await screen.findByRole('button', { name: 'Spin up an agent working on the one unclaimed ticket shown below' }))
-    await waitFor(() => expect(sendStart).toHaveBeenCalledTimes(1))
+    // The label counts only what the click will add, never promising the claimed row.
+    fireEvent.click(await screen.findByRole('button', { name: 'Add the one unclaimed ticket shown below to the AI queue' }))
+    await screen.findByRole('button', { name: 'Queued' })
     expect(sendQueueTicket).toHaveBeenCalledTimes(1)
     expect(sendQueueTicket).toHaveBeenCalledWith('p1', 'First', { file: 'a.md' })
-    expect(sendStart).toHaveBeenCalledWith('p1', workOnEntryPrompt('[First](tickets/a.md)'), 'prompt', {
-      unattended: true,
-      ticket: 'tickets/a.md',
-    })
   })
 
   test('nothing shown, no button: an empty shown set is not an offer', async () => {
@@ -363,7 +348,7 @@ describe('TicketsPage spin up the shown set', () => {
     window.history.replaceState(null, '', '/tickets?q=zzz-no-match')
     render(<TicketsPage onOpenTicket={() => {}} />)
     await screen.findByText(/1 ticket hidden by the current filters/i)
-    expect(screen.queryByRole('button', { name: /spin up/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /to the ai queue/i })).toBeNull()
   })
 
   test('every shown ticket claimed, no button: the whole set is already being worked', async () => {
@@ -372,6 +357,6 @@ describe('TicketsPage spin up the shown set', () => {
     ])
     render(<TicketsPage onOpenTicket={() => {}} />)
     await screen.findByText('First')
-    expect(screen.queryByRole('button', { name: /spin up/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /to the ai queue/i })).toBeNull()
   })
 })

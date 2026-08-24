@@ -77,7 +77,7 @@ The user wants several queued entries worked on at once — the drain routine's 
 
 #### Business logic
 
-Each project's header carries a fan-out button beside a count. Clicking the button starts one agent per open entry, taken from the top of that project's queue, as many as the count says. The count is edited right beside the button, defaults to three, and is kept between one and the same maximum as the routine panel's concurrent-agents setting. With fewer open entries than the count, the batch is just the open entries — the button's label always names the number of agents a click would actually start.
+Each project's header carries a fan-out button beside a count. Clicking the button starts one agent per open entry, taken from the top of that project's queue, as many as the count says. The count is edited right beside the button, defaults to three, and is floored at one with no maximum, like the routine panel's concurrent-agents setting. With fewer open entries than the count, the batch is just the open entries — the button's label always names the number of agents a click would actually start.
 
 Each agent of the batch is started exactly as the single play button starts one: pinned to its own entry's raw queue line, unattended. The agents are started one after another, and the first failed start ends the batch — the remaining entries are not started, and the failure is reported under the list the same way a single start's is.
 

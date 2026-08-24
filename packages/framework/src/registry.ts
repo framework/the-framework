@@ -4,7 +4,7 @@ import { basename, dirname, join, resolve } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { isDriverName } from './driver-names.js'
 import { nodeFs } from './node-fs.js'
-import { MAX_SPEND_OFFSET, DEFAULT_SPEND_OFFSET, MAX_AUTO_PM_CONCURRENCY } from './preference-defaults.js'
+import { MAX_SPEND_OFFSET, DEFAULT_SPEND_OFFSET } from './preference-defaults.js'
 
 /**
  * The multi-project registry (#390): the list of projects the user has
@@ -130,7 +130,7 @@ export interface Preferences {
   autoPmOptOut?: string[]
   /**
    * How many agents the routine may keep going at once on one project (#1204). Absent defaults to
-   * `DEFAULT_AUTO_PM_CONCURRENCY`, and the value is clamped to `MAX_AUTO_PM_CONCURRENCY`.
+   * `DEFAULT_AUTO_PM_CONCURRENCY`, and the value is floored at one, with no upper bound.
    *
    * Only the draining routine fans out: it takes work *off* the queue, one pinned entry per agent,
    * so several at once do disjoint work. The rotation invents work and each of its jobs rewrites
@@ -174,7 +174,6 @@ export {
   MAX_SPEND_OFFSET,
   DEFAULT_SPEND_OFFSET,
   DEFAULT_AUTO_PM_CONCURRENCY,
-  MAX_AUTO_PM_CONCURRENCY,
 } from './preference-defaults.js'
 
 /**
@@ -387,12 +386,13 @@ function sanitizePreferences(value: unknown): Preferences {
   // is dropped like every other empty list — nothing opted out is exactly what absent means.
   const optOut = sanitizeNameList(input['autoPmOptOut'])
   if (optOut.length) preferences.autoPmOptOut = optOut
-  // `autoPmConcurrency` (#1204) is a count of agents, so it is clamped like `autoSpendOffset` and
-  // additionally floored at one: zero concurrent agents is what the `autoPm` switch already spells,
-  // and a hand-edited nought would otherwise wedge the routine with the switch still reading on.
+  // `autoPmConcurrency` (#1204) is a count of agents, rounded like `autoSpendOffset` and floored
+  // at one: zero concurrent agents is what the `autoPm` switch already spells, and a hand-edited
+  // nought would otherwise wedge the routine with the switch still reading on. No upper bound —
+  // how many agents to run at once is the user's call, and the week's allowance paces them anyway.
   const concurrency = input['autoPmConcurrency']
   if (typeof concurrency === 'number' && Number.isFinite(concurrency))
-    preferences.autoPmConcurrency = Math.min(Math.max(Math.round(concurrency), 1), MAX_AUTO_PM_CONCURRENCY)
+    preferences.autoPmConcurrency = Math.max(Math.round(concurrency), 1)
   // `autoPmProject` (#1647) is a project id, kept as a bounded free-form string rather than checked
   // against the project list for the reason the opt-out names are not checked against the
   // catalog: the card validates it against the projects it shows, and an id of a project removed

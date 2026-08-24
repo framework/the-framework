@@ -141,7 +141,7 @@ See `## User story`.
 
 #### Business logic
 
-A number beside the schedule switch sets how many agents the routines keep going at once while there is queued work, clamped between one and the allowed maximum. A cleared box is treated as mid-edit and saves nothing, so clearing it does not silently store the minimum. When the preference is unset, the number shown is the daemon's own default, so the figure on screen is the figure the daemon would use.
+A number beside the schedule switch sets how many agents the routines keep going at once while there is queued work, floored at one and with no maximum. A cleared box is treated as mid-edit and saves nothing, so clearing it does not silently store the minimum. When the preference is unset, the number shown is the daemon's own default, so the figure on screen is the figure the daemon would use.
 
 Under it, a sentence states the consequence: at one agent, work runs only while nothing else is running and the week's allowance is not already spent; above one, up to that many agents are kept going on queued work, still only while the week's allowance is not spent.
 

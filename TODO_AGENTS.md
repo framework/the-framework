@@ -40,3 +40,4 @@
 - [ ] Create tickets/2026-07-25_global-store-one-file-or-folder.plan.md
 - [ ] Create tickets/2026-07-25_removing-or-renaming-directory.plan.md
 - [ ] Create tickets/2026-07-22_metafromevents-updatedat-replay.plan.md
+- [ ] Create tickets/2026-07-21_discord-chat-single-live-run.plan.md

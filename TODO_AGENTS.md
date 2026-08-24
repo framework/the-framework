@@ -26,6 +26,7 @@
 - [ ] Create tickets/2026-07-26_landing-headless-browser.plan.md
 - [ ] Create tickets/2026-07-26_spike-pull-cc-web-session-local.plan.md
 - [ ] Create tickets/2026-07-25_empty-settings-dropdown.plan.md
+- [ ] Create tickets/2026-07-25_improve-add-project.plan.md
 
 
 ## Priority 4

@@ -1,5 +1,6 @@
 Effort: 3
 Uncertainty: 4
+Outdated: yes
 
 # [Plan] Goal: let TF fully *autonomously* work on quick-wins
 

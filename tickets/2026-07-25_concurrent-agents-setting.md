@@ -1,15 +1,19 @@
 Priority: 9
-GitHub: [#1204](https://github.com/gemstack-land/the-framework/issues/1204)
+GitHub: [#1204](https://github.com/framework/the-framework/issues/1204)
 
 # Setting to set number of concurrent agents
 
 ## TLDR
 
-New routine setting: number of concurrent agents (default 2) that the routine spins up. Needed for the demo video, to show off 10 CC web sessions working in parallel. Thread opens: the setting should also drive concurrency from the routine-task side — e.g. clicking "Run now" on quick-wins should lead to the max number of concurrent agents — and it's unclear which routine tasks actually trigger on auto-run. Status: landed on `main` via #1252; **verified working end to end on 2026-07-27** (see [Verification](#verification)). What is left is the thread's open question, not the implementation.
+New routine setting: number of concurrent agents (default 2) that the routine spins up. Needed for the demo video, to show off 10 CC web sessions working in parallel. Status: landed via #1252, verified end to end on 2026-07-27 (see [Verification](#verification)), and **verified live through the dashboard on 2026-08-21**: the number lands as `autoPmConcurrency` in `~/.the-framework.json` and the sweep re-reads it per tick, so a change takes effect without restarting the daemon. Run now on the drain fans out too — the click is the consent the preference otherwise records.
+
+Which routines fan out is now declared as data (`fansOut` at `auto-pm.ts:209`): only the **drain** (one agent per queue entry) and **[Plan tickets]** (one agent per ticket's sibling files) — disjoint work on disjoint files. Every other rotation job (Update tickets, both triages) rewrites the whole queue document from the same fork point, so two at once would revert each other; maintainer agrees with the principle ("as long as there isn't any redundant work being done, I don't see a problem with concurrent agents"). For the demo: the drain is the routine that gives ten visibly parallel sessions — put ten entries on the queue.
+
+**What's left — the one open item:** Run now on **[Plan tickets]** starts exactly one agent (`RoutineWork.tsx:159-161`, tooltip says so) while auto-run fans the same routine out to the concurrency. Option A: leave it (Run now = "start this routine once"; fan-out is what unattended running adds). Option B: make the button fan out like the daemon does. Curator leans **B**: the asymmetry is invisible from the card, and it's the case where the setting silently does nothing. Also worth a look from the 2026-08-23 dogfood: the drain started 2 of 3 with concurrency 3 because `activeAgentCount` (live pids + the `starting` set, `daemon-runtime.ts:840`) counted one live agent while the Agents panel showed none — undiagnosed; a `starting` key that outlives its run would cost one slot forever.
 
 ## Why it matters
 
-Marked highest-prio 🌟: parallel agents are the demo's money shot and the core throughput lever. The remaining work is answering how the setting applies to routine-triggered runs; the setting itself now has coverage on every seam.
+Marked highest-prio 🌟: parallel agents are the demo's money shot and the core throughput lever. The setting itself has coverage on every seam; what remains is making the Run-now button and the daemon agree on fan-out, and pinning down the possible lost slot.
 
 ## Verification
 
@@ -35,18 +39,23 @@ row's Run now (`wakeAutoPm({ onDemand: true, drainOnly: true })`) fans out to th
 They bind to the setting rather than passing incidentally — severing the read
 (`concurrency: async () => undefined`) fails both, on the batch size rather than on a side effect.
 
+A later end-to-end test (over a real registry and a real data branch) confirms the other half:
+the number on disk is the number of unattended agents actually spun up (four in the test), each
+pinned to a different queue entry with its ticket claim committed before its agent starts. Only
+the process spawn is stubbed. (`daemon-services.test.ts`)
+
 ### Caveats found while verifying (none is a defect in the setting)
 
-- **Only the draining routine fans out.** By design and documented: the rotation jobs each rewrite
-  the whole queue file, so two at once would revert each other. For the 10-parallel-agents demo the
-  queue must already hold ≥10 open entries — the *triage* routines will not spin up 10 agents to
-  fill it. This is the same ground as the thread's open question below.
+- **Only the draining routine and [Plan tickets] fan out.** By design and now declared as data
+  (`fansOut`): the other rotation jobs each rewrite the whole queue file, so two at once would
+  revert each other. For the 10-parallel-agents demo the queue must already hold ≥10 open entries.
 - **A batch smaller than the cap is not topped up for 30 minutes.** `DEFAULT_AUTO_PM_COOLDOWN_MS`
   is stamped once per batch, so a queue that grows just after a short batch waits out the cooldown.
+  (Run now is no longer swallowed by the cooldown — #1645, verified in the 2026-08-23 dogfood.)
 - **Hands-off web runs can let a later batch exceed the cap.** Their local process ends at the
   hand-off, so `activeRunCount` stops counting them while the cloud session still works. The
   #1253 durable claims still stop the same *entry* going out twice, so this over-fans rather than
-  duplicating work. Worth a decision alongside the open question, not before it.
+  duplicating work.
 
 ### Unrelated, noticed in passing
 
@@ -57,7 +66,7 @@ A test-environment prerequisite, not a regression.
 
 ## Source
 
-Imported from GitHub issue [gemstack-land/the-framework#1204](https://github.com/gemstack-land/the-framework/issues/1204), created 2026-07-25, label: `highest-prio 🌟`, 4 comments.
+Imported from GitHub issue [framework/the-framework#1204](https://github.com/framework/the-framework/issues/1204), created 2026-07-25, label: `highest-prio 🌟`, 8 comments (last folded: 2026-08-22T22:29Z).
 
 ### Original description
 
@@ -69,5 +78,5 @@ Needed for the demo video, so we can show off 10 CC web sessions working in para
 
 ### Notes from the GitHub thread
 
-- The setting should drive concurrency from the routine-task perspective too: "Run now" on e.g. quick-wins should use the max number of concurrent agents. Related open question: which routine tasks are triggered when the routine is auto-run?
-- OP was updated; the implementation landed on `main` via #1252 (per #1243's closing note), but the maintainer isn't sure it works — verification is the remaining step. **Done 2026-07-27: it works, see [Verification](#verification).** The ticket stays open for the first bullet's open question only.
+- 2026-08-23 whole-chain dogfood on a throwaway repo, after #1640/#1644/#1645 merged: Plan tickets fanned out 3 agents (locks committed *before* any agent started); the quick-win triage queued instead of implementing (#1644 fix held — its own branch had zero commits, no PR); Run now inside the 30-minute cooldown ran instead of being swallowed (#1645); the stale-branch abort (#1643) reproduced on `main` and has since been fixed/closed. Cost: seven Opus runs.
+- Side-findings from that dogfood, tracked elsewhere: drain PRs carried `.the-framework/` scaffolding onto the throwaway repo's `main` (#1638); the routine card's project picker reset to the first project on navigation (#1647, closed since) — one mis-click had pushed an empty `tf-triage-quick` to this repo's origin, flagged for deletion.

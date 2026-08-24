@@ -1,20 +1,22 @@
 Priority: 9
 Topics: [bug]
-GitHub: [#1225](https://github.com/gemstack-land/the-framework/issues/1225)
+GitHub: [#1225](https://github.com/framework/the-framework/issues/1225)
 
 # Choices no working with CC web
 
 ## TLDR
 
-Original symptom — the dashboard showing a locally-invented choices panel for a CC-web run that never updates — is **gone** per the 2026-08-17 re-test: cloud sessions now answer their own gates under the detached-session rule instead of parking. What remains is the bridge/mirror half: the run view's "Cloud session mirror" hangs at "Connecting…" because a stale extension copy (v0.7.1 loaded vs 0.8.0 shipped since #1548) fails silently — the #1519 version gate (426) sits *behind* the bearer check in `bridge-endpoints.ts`, so a stale extension's requests die before any version claim is recorded and no blocked banner appears.
+**Everything this issue reported is addressed on `main`; it stays open only for follow-ups tracked elsewhere (headless extension: #1332).** The invented choices panel was fixed by #1234 long ago. The 2026-08-17 bridge/mirror failure turned out to be a stale v0.7.1 extension copy in Chrome, not a bug — re-tested 2026-08-21 end to end on a real Framework-started cloud run (`2026-08-21T15-35-24-093Z`): bridge contact `status 200`, transcript reaching the daemon, the run view's Cloud session mirror rendering the session. The two mirror complaints from that re-test were then fixed by #1671 (extension 0.10.0): claude.ai marks each turn as a `transcript-row`, so the mirror shows one entry per turn with roles mapped (user turns as a `you ›` line, markers skipped) instead of dumping `main`'s `innerText` — and the 8000-char cap is per turn, so nothing real is cut from the front any more. The open design question ("a TF-started cloud session never parks, so the bridge's answer-delivery half can never fire") was settled meanwhile by #1554/#1664: a session parks on its gates when the bridge is on, and the answer is typed back into the session's composer.
+
+Maintainer's direction on the thread: ideally, from a user perspective, **CC web is a driver just like any other driver** — that was #1554's ask, closed 2026-08-23.
 
 ## Why it matters
 
-Marked highest-prio 🌟: choices are the human-in-the-loop core, and for web runs they were being locally invented rather than mirroring the real session (#1234 found the cause; its fix stops cloud runs parking on made-up questions). The real interaction story for web runs is being built in #1237 (extension bridge) / #1265 / #1266 — this issue is the user-visible bug that work must close out.
+Marked highest-prio 🌟: choices are the human-in-the-loop core, and for web runs they were being locally invented rather than mirroring the real session. With gate parking + answer type-back (#1554/#1664) and the per-turn mirror (#1671) landed, the user-visible bug this ticket tracked is done — closing it is the maintainer's call; remaining work rides other tickets.
 
 ## Source
 
-Imported from GitHub issue [gemstack-land/the-framework#1225](https://github.com/gemstack-land/the-framework/issues/1225), created 2026-07-26, labels: `bug`, `highest-prio 🌟`, 2 comments.
+Imported from GitHub issue [framework/the-framework#1225](https://github.com/framework/the-framework/issues/1225), created 2026-07-26, labels: `bug`, `highest-prio 🌟`, 5 comments (last folded: 2026-08-23T22:23Z).
 
 ### Original description
 
@@ -37,8 +39,7 @@ But I still get the same view shown above in the dashboard, also after refreshin
 
 ### Notes from the GitHub thread
 
-- Reproduced 3/3 CC-web attempts, each time with the same choice — consistent with #1234's finding that the shown choices were locally invented by the relay rather than coming from the web session.
-- Re-test 2026-08-17 (post #1518/#1536/#1544/#1548), run `2026-08-17T12-31-39-194Z`: original symptom gone — a run whose prompt demanded a choice gate refused to park, picked the recommended option per the detached-session rule, finished clean. Remaining work:
-  - Mirror re-test with the correct extension: reload `packages/chrome-extension` v0.8.0 at chrome://extensions, remove the stale v0.7.1 copy (which reported `bridge: Failed to fetch` and false-positive-detected the system prompt's own rendered template as a question — the decoy problem current `content.SPEC.md` fixes).
-  - Consider making the #1519 version gate also flag never-heard-from/unauthorized contacts, since the gate behind the bearer check means a stale extension fails silently.
-  - Design question (maintainer's call): with the detached-session rule, a TF-started cloud session never parks on a choice, so the bridge's answer-delivery half can never fire — either that's the intended end state (issue closes once the mirror works) or parking should be allowed when the bridge is connected and healthy. Overlaps with #1554's ask to pipe choices through the CC web driver.
+- Originally reproduced 3/3 CC-web attempts, each time with the same choice — #1234 found the shown choices were locally invented by the relay rather than coming from the web session.
+- The 2026-08-21 re-test also held the detached-session rule where it still applies (bridge absent): read-only task, no gate, no PR, and it said so.
+- One gap confirmed and still open: the #1519 version gate can't report an extension that never got through — a stale extension with a stale token dies at `authorized()` before it ever states a version, which is what made 08-17 look like "extension accepted" when it meant "extension never arrived".
+- The `.plan.md` (verify-and-close protocol) predates the #1554/#1664 parking design and the #1671 per-turn mirror — marked outdated; its close-out step (close #1225, delete the ticket files) is now the maintainer's call.

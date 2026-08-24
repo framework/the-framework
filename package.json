@@ -22,6 +22,6 @@
     "website:test": "cd packages/the-framework.ai/ && echo 'no tests yet'"
   },
   "devDependencies": {
-    "typescript": "^5.4.0"
+    "typescript": "^7.0.2"
   }
 }

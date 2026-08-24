@@ -46,7 +46,6 @@ Body:
 Effort: 0-10 [0: implementation is trivial, 10: implementation takes months]
 Uncertainty: 0-10 [0: implementation without meaningful alternatives, 10: highly uncertain how to implement]
 Outdated: yes [optional, only if the ticket was updated in a way that makes the plan outdated]
-Ambigious: 0-10 [0: ticket's goal is crystal clear, 10: it is highly unclear what the goal is]
 
 # [Plan] Ticket title
 

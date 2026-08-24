@@ -19,6 +19,7 @@
 - [ ] Create tickets/2026-07-30_sdd-extension-post-mvp.plan.md
 - [ ] Create tickets/2026-07-29_improve-dropdowns.plan.md
 - [ ] Create tickets/2026-07-29_show-daily-quota-percent.plan.md
+- [ ] Create tickets/2026-07-28_prompts-still-in-typescript.plan.md
 
 
 ## Priority 4

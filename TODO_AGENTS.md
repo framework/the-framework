@@ -11,3 +11,4 @@
 ## Priority 2
 
 - [ ] Create tickets/2026-07-25_bug-files-missing.plan.md
+- [ ] Create tickets/2026-07-25_removing-or-renaming-directory.plan.md

@@ -6,3 +6,4 @@
 - [ ] Create tickets/2026-07-31_gate-agent-self-confidence.plan.md
 - [ ] Create tickets/2026-07-29_show-daily-quota-percent.plan.md
 - [ ] Create tickets/2026-07-27_unified-session-timeline.plan.md
+- [ ] Create tickets/2026-07-26_landing-headless-browser.plan.md

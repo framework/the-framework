@@ -266,7 +266,7 @@ async function pollStarts() {
         id: start.id,
         ok,
         ...(ok ? { sessionId: outcome.sessionId } : {}),
-        ...(outcome?.note ? { note: String(outcome.note).slice(0, 300) } : {}),
+        ...(outcome?.note ? { note: String(outcome.note).slice(0, 1500) } : {}),
       }),
     })
   } catch {

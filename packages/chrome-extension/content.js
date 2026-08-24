@@ -562,20 +562,35 @@ const MENU_WAIT_MS = 6000
  */
 async function chooseFrom(trigger, wanted, hint) {
   trigger.el.click()
-  const search = await waitFor(pickerSearch, 1500, 100)
-  if (search) typeInto(search, wanted[0])
   const outside = e => e.el !== trigger.el && !trigger.el.contains(e.el)
-  const hit = await waitFor(() => {
-    const entries = menuEntries().filter(outside)
+  const entries = () => menuEntries().filter(outside)
+  const find = () => {
+    const now = entries()
     for (const w of wanted) {
-      const exact = entries.find(e => e.text.toLowerCase() === w)
+      const exact = now.find(e => e.text.toLowerCase() === w)
       if (exact) return exact
     }
     return undefined
-  }, MENU_WAIT_MS)
+  }
+  // The list is fetched after the picker opens: wait for it to hold something before filtering
+  // it, and filter only when it has a search box. A filter that finds nothing is cleared and the
+  // whole list scanned, in case the page's search matches differently than expected.
+  const search = await waitFor(pickerSearch, 1500, 100)
+  const loaded = await waitFor(() => entries().length > 0, MENU_WAIT_MS)
+  let hit = loaded ? find() : undefined
+  if (!hit && search) {
+    typeInto(search, wanted[0])
+    hit = await waitFor(find, 3000)
+    if (!hit) {
+      typeInto(search, '')
+      hit = await waitFor(find, 3000)
+    }
+  }
   if (!hit) {
+    const seen = entries()
+    const diag = `search ${search ? `"${search.placeholder}"` : 'none'}, ${seen.length} visible of ${deepQueryAll('[role="option"]').length} options${seen.length ? `: ${seen.slice(0, 5).map(e => JSON.stringify(e.text.slice(0, 40))).join(', ')}` : ''}; chips ${JSON.stringify(chips().map(c => c.text))}`
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
-    return { ok: false, note: `${hint}: the list offered no "${wanted[0]}"` }
+    return { ok: false, note: `${hint}: the list offered no "${wanted[0]}" (${diag})` }
   }
   hit.el.click()
   return { ok: true, note: `${hint}: clicked "${hit.text}" via ${trigger.via}` }
@@ -629,8 +644,13 @@ async function createSession({ repo, branch, prompt }) {
     // A remembered other repository's chip is the picker; with nothing remembered, the page offers one.
     const trigger = chips()[0]?.text ? chips()[0] : selectRepo()
     if (!trigger) return { ok: false, note: `no repo picker on the page (${JSON.stringify(probeNewSession())})` }
-    const pick = await chooseFrom(trigger, repoWanted, 'repo')
-    if (!pick.ok) return pick
+    let pick = await chooseFrom(trigger, repoWanted, 'repo')
+    if (!pick.ok) {
+      // The page may have finished loading its remembered repository under us: read again once.
+      await new Promise(resolve => setTimeout(resolve, 1500))
+      if (repoWanted.includes(chips()[0]?.text.toLowerCase())) pick = { ok: true, note: `repo already ${chips()[0].text} (after a late render)` }
+      else return pick
+    }
     repoNote = pick.note
     const chip = await waitFor(() => (repoWanted.includes(chips()[0]?.text.toLowerCase()) ? chips()[0] : undefined), MENU_WAIT_MS)
     if (!chip) return { ok: false, note: `${repoNote}, but the repo chip does not read "${repo}" afterwards (chips: ${JSON.stringify(chips().map(c => c.text))})` }

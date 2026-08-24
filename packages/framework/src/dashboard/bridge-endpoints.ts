@@ -385,7 +385,8 @@ async function handleStarted(req: IncomingMessage, res: ServerResponse, handlers
     return end(res, 400, 'sessionId must look like session_<id>')
   }
   if (note !== undefined && typeof note !== 'string') return end(res, 400, 'note must be a string')
-  handlers.started?.(id, ok, typeof sessionId === 'string' ? sessionId : undefined, typeof note === 'string' ? note.slice(0, 300) : undefined)
+  // A failure's note is the only diagnosis the run gets, so it may carry the page's controls.
+  handlers.started?.(id, ok, typeof sessionId === 'string' ? sessionId : undefined, typeof note === 'string' ? note.slice(0, 1500) : undefined)
   end(res, 204, '')
 }
 

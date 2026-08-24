@@ -24,6 +24,7 @@
 - [ ] Create tickets/2026-07-27_feature-inventory.plan.md
 - [ ] Create tickets/2026-07-27_unified-session-timeline.plan.md
 - [ ] Create tickets/2026-07-26_landing-headless-browser.plan.md
+- [ ] Create tickets/2026-07-26_spike-pull-cc-web-session-local.plan.md
 
 
 ## Priority 4

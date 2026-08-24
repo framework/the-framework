@@ -21,6 +21,7 @@
 - [ ] Create tickets/2026-07-29_show-daily-quota-percent.plan.md
 - [ ] Create tickets/2026-07-28_prompts-still-in-typescript.plan.md
 - [ ] Create tickets/2026-07-28_spec-md-drift.plan.md
+- [ ] Create tickets/2026-07-27_feature-inventory.plan.md
 
 
 ## Priority 4

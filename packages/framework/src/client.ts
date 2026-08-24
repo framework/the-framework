@@ -37,6 +37,10 @@ export {
 // the session it was launched from. Pure string work, like the renderers below.
 export { defaultWhat, DEFAULT_WHAT, type PresetRenderContext } from './preset-prompt.js'
 export { presets, LAUNCHER_PRESETS, type PresetKey } from './preset-catalog.js'
+// The plan ask for one ticket (#685) — pure string work from an import-free module — shared with
+// the server's queue write, so the plan column's start, the queued entry, and the dedupe that
+// recognizes a queued copy all carry the exact same sentence (#1187).
+export { planTicketPrompt } from './tickets.js'
 // The routines the idle sweep fires (#1159), so the dashboard can list them and run one on demand.
 // The jobs are built from the presets above and carry their prompt verbatim, so this needs no
 // backend of its own, and the list on screen is the list the daemon runs rather than a copy of it.

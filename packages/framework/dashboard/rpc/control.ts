@@ -25,3 +25,4 @@ export const sendOpenPullRequest = rpc<typeof impl.sendOpenPullRequest>('sendOpe
 export const sendMerge = rpc<typeof impl.sendMerge>('sendMerge')
 export const sendReleaseTicketLock = rpc<typeof impl.sendReleaseTicketLock>('sendReleaseTicketLock')
 export const sendQueueTicket = rpc<typeof impl.sendQueueTicket>('sendQueueTicket')
+export const sendQueueTicketPlan = rpc<typeof impl.sendQueueTicketPlan>('sendQueueTicketPlan')

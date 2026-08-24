@@ -1,5 +1,8 @@
 import type { TicketsMeta, WorkspaceTicket } from '../../src/index.js'
-import { presets } from '../../src/client.js'
+// `planTicketPrompt` (#685): the shared plan ask — the sentence the plan column starts an agent
+// with, one wording with the [Plan tickets] preset's queued entries and the server's own queue
+// write, so no surface carries a hidden second copy (#1187).
+import { planTicketPrompt, presets } from '../../src/client.js'
 import { RefreshCw, Github, ClipboardPlus, ClipboardList, Hammer, Play } from 'lucide-react'
 import { sendStart } from '../rpc/control.js'
 import { onTicketsMeta } from '../rpc/reads.js'
@@ -25,17 +28,6 @@ const UPDATE_PROMPT = presets.updateTickets.render()
 
 /** Captured once: `useLoaded` treats a fresh `{}` literal as a new value on every render. */
 const NO_META: TicketsMeta = {}
-
-/**
- * The prompt the plan column's create button starts a session with (#685): write this ticket's plan.
- * The `<TICKET>` is the ticket's stem — its `.md` name without the extension — so
- * `2026-07-20_do-the-thing.md` asks for `tickets/2026-07-20_do-the-thing.plan.md`, the sibling the
- * plan link then reads. Plain text, not a preset, and exported so the test asserts the exact ask:
- * a hidden second copy of the prompt is what #1187 was about.
- */
-export function planPrompt(file: string): string {
-  return `Create tickets/${file.replace(/\.md$/, '')}.plan.md`
-}
 
 /**
  * The prompt the start column fires a session with: work on this one ticket, nothing else. The
@@ -314,7 +306,7 @@ export function TicketsPanel({
   // Attended, unlike the imports above: a plan is written per-ticket for a human to read and act
   // on, so the session stays a conversation you land in and steer rather than one that settles and
   // hands itself off. The reader reviews the result through the plan column's link.
-  const startPlan = (file: string) => startSession(planPrompt(file), 'The planning agent could not be started.')
+  const startPlan = (file: string) => startSession(planTicketPrompt(file), 'The planning agent could not be started.')
   // The start column (#855's play button, on the backlog): one agent on this one ticket is the
   // same work the drain sweep starts, so it runs the same way — unattended (#1279), ending at
   // settle with its armed handoff. `ticket` rides on the options so the agent's meta names what it

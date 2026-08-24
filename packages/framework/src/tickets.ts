@@ -52,6 +52,17 @@ export function todoPriorityForTicket(priority?: string): number {
 }
 
 /**
+ * The ask for one ticket's plan (#685): `Create tickets/<stem>.plan.md`, the `.md` swapped for the
+ * sibling `.plan.md` the plan views read. The one wording for plan work wherever it is asked —
+ * the sentence the [Plan tickets] preset queues, the plan column starts an attended agent with,
+ * and the dashboard's bulk queue-add writes as entries — so the surfaces cannot drift apart
+ * (#1187) and a queued copy is recognizable by exact text.
+ */
+export function planTicketPrompt(file: string): string {
+  return `Create ${TICKETS_DIR}/${file.replace(/\.md$/, '')}.plan.md`
+}
+
+/**
  * The ticket a queue entry came from, or `undefined` for an entry that is just text (#1117).
  *
  * Queueing a ticket writes the entry as a markdown link back to it (#1164), so the identity the

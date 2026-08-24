@@ -4,6 +4,7 @@ import {
   FLAT_TODO_FILE,
   TICKETS_DIR,
   isTicketPath,
+  planTicketPrompt,
   ticketFromQueueEntry,
   ticketIssueRef,
   todoPriorityForTicket,
@@ -53,6 +54,15 @@ test('a ticket priority maps onto the backlog format\'s numbered sections (#1164
   // Out-of-range and fractional values are not a priority on this scale.
   assert.equal(todoPriorityForTicket('11'), 5)
   assert.equal(todoPriorityForTicket('2.5'), 5)
+})
+
+test('planTicketPrompt is the one plan ask, and never reads as a queued ticket (#685/#1187)', () => {
+  // The exact sentence, pinned: the plan column starts an agent with it, the queue-add writes it
+  // as an entry, and the dedupe recognizes a queued copy by this text — one wording for all three.
+  assert.equal(planTicketPrompt('2026-07-25_login.md'), 'Create tickets/2026-07-25_login.plan.md')
+  // As a queue entry it stays plain text: a leading ticket link means "queued for implementation",
+  // which a plan ask must not read as.
+  assert.equal(ticketFromQueueEntry(planTicketPrompt('2026-07-25_login.md')), undefined)
 })
 
 test('ticketFromQueueEntry reads the ticket a queued entry links back to (#1117/#1164)', () => {

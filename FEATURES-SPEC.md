@@ -22,7 +22,7 @@ happens while nobody is at the keyboard.
 - Options gear writing straight to preferences
 - Pre-flight warnings before spending (no `gh`, logged out, repo can't auto-merge)
 - Start an agent from a ticket row
-- Spin up an agent working on all the tickets the Tickets page's filters show — one agent per project when the shown set spans several
+- Spin up agents working on all the tickets the Tickets page's filters show — one agent per ticket, via the AI queue
 - Start an agent from a queue entry's play button
 - "Run now" on a routine, in a picked project the card remembers across navigations and reloads
 - "Configure first, then run" on a routine — the launcher opens with its prompt, so the model and location can be set first

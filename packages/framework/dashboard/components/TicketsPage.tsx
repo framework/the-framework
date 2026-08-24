@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
 import { Play } from 'lucide-react'
-import type { ProjectTickets } from '../../src/index.js'
-import { onAllTickets } from '../rpc/reads.js'
-import { sendStart } from '../rpc/control.js'
+import type { ProjectTickets, WorkspaceTicket } from '../../src/index.js'
+import { onAllTickets, onQueue } from '../rpc/reads.js'
+import { sendQueueTicket, sendStart } from '../rpc/control.js'
 import { usePolled } from '../lib/use-async.js'
 import { useAction } from '../lib/use-action.js'
+import { queueEntryLabel } from '../lib/queue-entry.js'
 import {
   defaultView,
   filterRows,
@@ -19,19 +20,8 @@ import { ScrollArea } from './ui/scroll-area.js'
 import { Button } from './ui/button.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import { TicketFilterBar } from './TicketFilterBar.js'
+import { workOnEntryPrompt } from './AiQueue.js'
 import { TicketsPanel, TicketRow, planPrompt, workOnTicketPrompt } from './TicketsPanel.js'
-
-/**
- * The prompt the page-wide spin-up button fires per project: work every one of that project's
- * shown tickets, nothing else. One shown ticket degrades to `workOnTicketPrompt`'s exact
- * sentence — one ask, one wording, however many rows it was made for. Exported so the test
- * asserts the exact ask rather than a copy (#1187).
- */
-export function workOnTicketsPrompt(files: string[]): string {
-  const [only] = files
-  if (only !== undefined && files.length === 1) return workOnTicketPrompt(only)
-  return ['Work on all of the following tickets:', ...files.map(f => `- tickets/${f}`), 'Do not start any other ticket.'].join('\n')
-}
 
 /** Stable initial for the cross-project tickets poll, so it does not churn on every render. */
 const EMPTY_GROUPS: ProjectTickets[] = []
@@ -108,28 +98,45 @@ export function TicketsPage({
     )
     if (result?.ok) onAgentStarted?.(projectId, prompt, result.agentId)
   }
-  // The page-wide spin-up: one unattended agent per project among the shown tickets, each told to
-  // work exactly its project's shown files in the shown order and nothing else. Per project
-  // because an agent runs inside one repo; a batch of one project — the common case, and the only
-  // one the button calls "an agent" — is a single start. A batch of one *file* rides the same
-  // options the row's own start sends, `ticket` included (#1117); with several files no single
-  // ticket is "the" one the agent implements, so the option stays off and the prompt carries them.
-  const startShown = async (batches: { projectId: string; files: string[] }[]) => {
+  // The page-wide spin-up: one agent per shown ticket, via the AI queue. Each ticket is queued
+  // the way the detail page's Queue button queues it (#1164) — unless an open entry already
+  // links to it, which is reused rather than written twice: a duplicate would outlive its
+  // agent's check-off as an open entry naming a closed ticket, and the sweep would spend an
+  // agent on it. The agent itself is the queue card's own per-entry start (#855): unattended,
+  // on that one entry alone, with the ticket named on its meta (#1117). Sequential, stopping at
+  // the first failure — the daemon's own reason lands in `error`, and everything already queued
+  // or started stays.
+  const startShownAgents = async (targets: { projectId: string; ticket: WorkspaceTicket }[]) => {
     const started = await run(async () => {
+      // The open entries already linking to a ticket, first entry per ticket — read at click
+      // time, so the dedupe judges the queue as it is now, not as some poll last saw it.
+      const queuedEntries = new Map<string, string>()
+      for (const q of await onQueue())
+        for (const item of q.items) {
+          if (item.done) continue
+          const file = queueEntryLabel(item.text).ticket
+          if (file && !queuedEntries.has(`${q.projectId}\n${file}`)) queuedEntries.set(`${q.projectId}\n${file}`, item.text)
+        }
       let first: { projectId: string; prompt: string; agentId?: string | undefined } | undefined
-      for (const { projectId, files } of batches) {
-        const prompt = workOnTicketsPrompt(files)
-        const [only] = files
-        const result = await sendStart(projectId, prompt, 'prompt', {
-          unattended: true,
-          ...(only !== undefined && files.length === 1 ? { ticket: `tickets/${only}` } : {}),
-        })
-        // Surfaces the daemon's own reason via useAction; the agents already started stay started.
+      for (const { projectId, ticket } of targets) {
+        let entry = queuedEntries.get(`${projectId}\n${ticket.file}`)
+        if (entry === undefined) {
+          // The exact text sendQueueTicket writes, so the prompt below names the very line the
+          // agent will find on the queue.
+          entry = `[${ticket.title.trim()}](tickets/${ticket.file})`
+          const queued = await sendQueueTicket(projectId, ticket.title, {
+            file: ticket.file,
+            ...(ticket.priority ? { priority: ticket.priority } : {}),
+          })
+          if (!queued.ok) return { ok: false as const, error: queued.error ?? 'The queue could not be written.' }
+        }
+        const prompt = workOnEntryPrompt(entry)
+        const result = await sendStart(projectId, prompt, 'prompt', { unattended: true, ticket: `tickets/${ticket.file}` })
         if (!result.ok) return result
         first ??= { projectId, prompt, agentId: result.agentId }
       }
       return { ok: true as const, first }
-    }, 'The agent could not be started.')
+    }, 'The agents could not be started.')
     if (started?.ok && started.first) onAgentStarted?.(started.first.projectId, started.first.prompt, started.first.agentId)
   }
 
@@ -138,24 +145,21 @@ export function TicketsPage({
   const shownGroups = view.filters.projects.length > 0 ? groups.filter(g => view.filters.projects.includes(g.projectId)) : groups
   const flatRows = sortRows(visible, view.sort)
 
-  // What the spin-up button acts on: one batch per project among the shown rows, files in the
-  // page's own sort order — the set is exactly the tally's "shown", so the button never starts
-  // work on a ticket the reader cannot see below it.
-  const byProject = new Map<string, string[]>()
-  for (const r of flatRows) {
-    const files = byProject.get(r.projectId)
-    if (files) files.push(r.ticket.file)
-    else byProject.set(r.projectId, [r.ticket.file])
-  }
-  const shownBatches = [...byProject].map(([projectId, files]) => ({ projectId, files }))
-  // The label is the spend readout: it says how many agents one click costs, and goes plural the
-  // moment the shown set spans projects — "an agent" only ever promises a single start.
+  // What the spin-up button acts on: the shown rows minus the claimed ones — a ticket some
+  // agent already holds (#1420) is left to the agent holding it, the same rule the daemon's own
+  // fan-out follows. In the shown order, each row carrying its own project, so a cross-project
+  // view needs no special case: every ticket's agent starts where the ticket lives.
+  const targets = flatRows.filter(r => !r.ticket.locked)
+  const claimedShown = flatRows.length - targets.length
+  // The label is the spend readout: one agent per ticket, so it counts the agents one click
+  // costs — and says "unclaimed" the moment the two counts differ, never promising a ticket it
+  // will skip.
   const spinUpLabel =
-    shownBatches.length > 1
-      ? `Spin up ${shownBatches.length} agents working on all ${flatRows.length} tickets shown below`
-      : flatRows.length === 1
-        ? 'Spin up an agent working on the ticket shown below'
-        : `Spin up an agent working on all ${flatRows.length} tickets shown below`
+    targets.length === 1
+      ? `Spin up an agent working on the ${claimedShown > 0 ? 'one unclaimed ' : ''}ticket shown below`
+      : claimedShown > 0
+        ? `Spin up agents working on the ${targets.length} unclaimed tickets shown below`
+        : `Spin up agents working on all ${targets.length} tickets shown below`
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -177,10 +181,11 @@ export function TicketsPage({
               Every project&apos;s <code className="rounded bg-muted px-1">tickets/</code> backlog — what the agent plans from.
             </p>
           </div>
-          {/* The whole shown set as one start: the row's play button lifted to the page. Rendered
-              only over a non-empty shown set — "all 0 tickets" is not an offer, and the list below
-              already explains an empty one. */}
-          {loaded && flatRows.length > 0 && (
+          {/* The whole shown set as agents: the row's play button lifted to the page, one agent
+              per ticket. Rendered only when there is something to start — "all 0 tickets" is not
+              an offer, the list below already explains an empty set, and an all-claimed one is
+              already being worked. */}
+          {loaded && targets.length > 0 && (
             <Tooltip>
               <TooltipTrigger
                 render={
@@ -189,7 +194,7 @@ export function TicketsPage({
                     size="sm"
                     className="shrink-0 gap-1.5"
                     disabled={busy}
-                    onClick={() => void startShown(shownBatches)}
+                    onClick={() => void startShownAgents(targets)}
                   />
                 }
               >
@@ -197,9 +202,9 @@ export function TicketsPage({
                 {busy ? 'Starting…' : spinUpLabel}
               </TooltipTrigger>
               <TooltipContent>
-                {shownBatches.length > 1
-                  ? "An agent works inside one project, so each project's shown tickets get their own unattended agent."
-                  : 'One unattended agent, told to work exactly what the current filters show and start nothing else.'}
+                {'One agent per ticket, via the AI queue: each ticket is queued — unless it already is — and gets its own unattended agent working that one entry.'}
+                {claimedShown === 1 && ' The claimed ticket shown is left to the agent holding it.'}
+                {claimedShown > 1 && ` The ${claimedShown} claimed tickets shown are left to the agents holding them.`}
               </TooltipContent>
             </Tooltip>
           )}

@@ -2,7 +2,7 @@ The dashboard's Tickets page: every registered project's `tickets/` backlog on o
 
 ## User story
 
-The user wants to see the whole backlog — not one project's slice of it — decide what to work next, and act on a ticket right there: read it, read its plan, have an agent plan it, or have an agent work it. And when the filters have carved out a coherent slice, they want to hand that whole slice to an agent at once.
+The user wants to see the whole backlog — not one project's slice of it — decide what to work next, and act on a ticket right there: read it, read its plan, have an agent plan it, or have an agent work it. And when the filters have carved out a coherent slice, they want to hand that whole slice to agents at once — one agent per ticket.
 
 ## Business logic — TL;DR
 
@@ -11,7 +11,7 @@ The user wants to see the whole backlog — not one project's slice of it — de
 - **Grouped or flat** - grouped shows one section per project, each with that project's own ticket panel; flat pools every project's tickets into one order, each row naming its project — the only view that can answer which ticket is the highest-priority one anywhere.
 - **Click-to-filter** - clicking a row's topic adds that topic to the filter, clicking its claim marker narrows to claimed tickets; both add to what is already filtered rather than replacing it.
 - **Plan it or work it from the row** - a ticket can be handed to a planning agent or to an unattended work agent without leaving the page.
-- **Spin up the whole shown set** - a button beside the page's heading starts an unattended agent working exactly the tickets the filters show; a shown set spanning several projects fans out one agent per project, and the button's label counts the tickets and the agents one click costs.
+- **Spin up the whole shown set** - a button beside the page's heading spins up one unattended agent per shown ticket, via the AI queue: each unclaimed shown ticket is queued (unless it already is) and gets its own agent working that one entry, and the button's label counts the agents one click costs.
 - **Filtered-away tickets are accounted for** - the page says how many tickets the filters hide and offers to clear them; a project the user deselected disappears silently instead.
 
 ## Business logic
@@ -78,19 +78,19 @@ Every ticket row offers to start a planning agent for that ticket, and to start 
 
 #### User story
 
-The user narrows the backlog to a coherent slice — a topic, a priority band, one project — and wants an agent to sweep through everything left showing, rather than starting the rows one by one.
+The user narrows the backlog to a coherent slice — a topic, a priority band, one project — and wants agents on everything left showing, one agent per ticket, rather than starting the rows one by one.
 
 #### Business logic
 
-Whenever at least one ticket is shown, the page's heading row offers a button that starts the whole shown set: an unattended agent told to work exactly the shown tickets — listed in the shown order — and to start nothing else. The set is exactly what the heading's shown tally counts, so the button never starts work on a ticket the reader cannot see below it. With nothing shown, the button is not offered.
+Whenever the filters leave at least one unclaimed ticket showing, the page's heading row offers a button that spins up one agent per shown ticket, via the AI queue. For each such ticket, in the shown order: the ticket is queued exactly as the ticket detail page's Queue action queues it — unless an open queue entry already links to it, in which case that entry stands and nothing is written twice — and an unattended agent is started on that one entry, exactly as the AI Queue card's per-entry play button starts one, with the ticket named on the agent. Each agent starts in the project its ticket belongs to, so a shown set spanning projects needs no special case.
 
-An agent works inside one project, so when the shown set spans several projects the button starts one unattended agent per project, each told only its own project's shown tickets. The button's label is the spend readout: with one project it reads "Spin up an agent working on all X tickets shown below" (X being the shown tally), and the moment the set spans projects it also says how many agents the click costs; hovering explains the mechanics either way. A single shown ticket is started exactly as that ticket's own row start would start it — same one-ticket ask, same ticket named on the agent.
+Claimed tickets — those an agent already holds — are skipped: they are left to the agents holding them, the same rule the daemon's own fan-out follows. The button's label is the spend readout: one agent per ticket, so it counts what one click costs — "Spin up agents working on all X tickets shown below" — and switches to counting unclaimed tickets the moment the shown set contains claimed ones, so it never promises a ticket it will skip; hovering explains the mechanics and says how many claimed tickets are being left alone. With nothing to start — nothing shown, or everything shown claimed — the button is not offered.
 
-Whatever the batch, the dashboard shell is told about one started agent — the first — rather than being bounced through every one. A start that fails leaves its reason under the heading, in grouped and flat mode alike; agents already started stay started.
+The dashboard shell is told about one started agent — the first — rather than being bounced through every one. The work stops at the first failure, whose reason lands under the heading in grouped and flat mode alike; everything already queued or started stays.
 
 #### Rationale
 
-One agent working a filtered slice is a different offer from the row's one-agent-one-ticket start: related small tickets land as one coherent change instead of N parallel worktrees. And the label carries the counts precisely because the set is a side effect of the filters — the click's cost must be readable before it is paid.
+Routing through the AI queue rather than starting bare agents makes each start durable: a queue entry outlives a failed or interrupted agent, so the routine drain picks up whatever the click could not finish. Reusing an existing open entry matters for the same reason in reverse — a duplicate entry would outlive its agent's check-off as an open entry naming a closed ticket, and the sweep would spend an agent on it. And the label carries the count precisely because the set is a side effect of the filters — the click's cost must be readable before it is paid.
 
 ### Filtered-away tickets are accounted for
 

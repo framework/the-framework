@@ -18,6 +18,7 @@
 - [ ] Create tickets/2026-07-30_auto-merge-before-ci.plan.md
 - [ ] Create tickets/2026-07-30_sdd-extension-post-mvp.plan.md
 - [ ] Create tickets/2026-07-29_improve-dropdowns.plan.md
+- [ ] Create tickets/2026-07-29_show-daily-quota-percent.plan.md
 
 
 ## Priority 4

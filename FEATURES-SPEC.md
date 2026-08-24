@@ -103,7 +103,7 @@ happens while nobody is at the keyboard.
 ## Handoff and what lands in git
 
 - Every agent gets its own git worktree and branch; your checkout is never touched
-- Dependency directories shared from the parent checkout instead of reinstalled
+- Dependency directories shared from the parent checkout instead of reinstalled — as directories of links, so an agent's own install stays in its checkout and never rewrites or purges the parent's
 - A checkout whose work is not on the remote is kept — and a publish-nothing (`handoff: local`) agent's is kept until you publish or delete it
 - Commit what the agent left uncommitted
 - Push the branch (on by default)

@@ -8,7 +8,6 @@ import {
   addWorktree,
   agentBranchName,
   linkDependencies,
-  excludeDependencyLinks,
   archiveWorktreeAgent,
   restoreArchivedAgent,
   attachWorktree,
@@ -540,10 +539,8 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
   ): Promise<{ ok: true; workspace: { cwd: string; agentId?: string } } | { ok: false; error: string }> => {
     try {
       const worktree = await addWorktree(projectCwd, { agentId, branch: agentBranchName(agentId) })
-      // `node_modules` is gitignored, so a fresh worktree has none: link the parent's in, and
-      // make git ignore the links (a `node_modules/` rule does not match a symlink, #738).
+      // `node_modules` is gitignored, so a fresh worktree has none: link the parent's in.
       await linkDependencies(projectCwd, worktree.path).catch(() => [])
-      await excludeDependencyLinks(projectCwd).catch(() => {})
       // The branches view (#1580) learns about this checkout now rather than at the next tick.
       void reconcileBranchLinks(projectCwd).catch(() => {})
       return { ok: true, workspace: { cwd: worktree.path, agentId } }

@@ -39,3 +39,4 @@
 - [ ] Create tickets/2026-07-25_bug-files-missing.plan.md
 - [ ] Create tickets/2026-07-25_global-store-one-file-or-folder.plan.md
 - [ ] Create tickets/2026-07-25_removing-or-renaming-directory.plan.md
+- [ ] Create tickets/2026-07-22_metafromevents-updatedat-replay.plan.md

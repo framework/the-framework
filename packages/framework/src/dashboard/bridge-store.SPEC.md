@@ -18,6 +18,7 @@ Holds everything the Claude web bridge carries: the question each cloud session 
 - **A delivery report is matched by answer identity** - a stale report from a tab that died mid-delivery cannot resolve a newer answer.
 - **The transcript is kept by position** - repeat reports of the same message overwrite rather than accumulate, and a bounded number of entries is kept per cloud session.
 - **Nothing survives a daemon restart** - held in memory on purpose.
+- **An extension counts as present while it keeps calling** - something let through the bridge within the last few minutes means there is an extension to hand a session request to; a refusal does not count.
 - **Contacts are recorded even when refused** - a refused request at least proves something is trying.
 
 ## Glossary

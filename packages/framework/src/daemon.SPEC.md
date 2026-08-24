@@ -10,6 +10,7 @@ The user runs one command in a repository and gets a working dashboard in their 
 - **Files are the seam** - the dashboard is a projection of each agent's event log, and steering goes back through the control channel; there is no agent-to-daemon messaging.
 - **Where the dashboard binds** - localhost by default; binding anywhere reachable off the machine requires a shared token on every route.
 - **The browser bridge is opt-in** - off unless the user turned it on, and it shares the daemon's one secret rather than minting a second.
+- **Spawned agents know their daemon's address** - every agent the daemon starts is told where the daemon listens, so a web run can ask it for a cloud session created by the browser extension.
 - **The boot sequence** - create the framework directory, register the home workspace, then reconcile agents a dead daemon left marked running.
 - **Nothing is resumed at boot** - stopping the last daemon was a deliberate act, and the stopped agents keep their branches so the user can continue them when they choose.
 - **One quota meter for the whole daemon** - the usage panel and the unattended work read the same long-lived reading.
@@ -63,6 +64,8 @@ The user wants a parked question from a cloud session carried into their local d
 The browser bridge is off unless the user turned it on, because it opens the daemon's one route reachable from another origin; while off, every bridge route is not found. When on, it reuses the daemon's own shared token rather than minting a second one — the two guard the same daemon, and a second secret would be one more thing to rotate and leak without narrowing anything.
 
 The cloud sessions the bridge should have a tab open for are gathered across every registered project, because a cloud agent is not tied to the home workspace, and per project best-effort so one unreadable repo cannot empty the list.
+
+The daemon's own address is known only once it listens, so the agent runtime is handed a way to read it rather than the address itself, and reads it each time it spawns an agent.
 
 ### The boot sequence
 

@@ -38,6 +38,8 @@ Whatever the framework's own CLI entry is, the agent is spawned from it. The dae
 
 The spawned agent's error output is written to a file inside its checkout instead of being discarded, so an agent that dies at boot leaves a trace to read.
 
+The spawned agent's environment is the daemon's own plus the daemon's address, when the daemon has one: a web run uses it to ask this daemon for a cloud session created by the browser extension. A run nobody's daemon spawned has no such address and hands off by itself.
+
 ### Every agent gets its own checkout
 
 #### User story

@@ -11,6 +11,7 @@ The user wants a task done without it costing anything on their own machine — 
 ## Business logic — TL;DR
 
 - **The user's own account does the work** - the hand-off goes through the Claude Code CLI's own cloud mode, so the account, the sign-in, and the quota are the user's, exactly as for a local agent. Nothing here drives the claude.ai website: no browser, no extension, no scraping.
+- **The browser extension creates the session when it can** - a run its daemon spawned asks the daemon for a session created through claude.ai's own repository picker, which is bound to the repository and can push and open the pull request; only when no extension is around, the bridge is off, the repository has no GitHub remote or the starting point could not be pushed does the CLI's own cloud mode hand off instead.
 - **One agent, exactly one cloud session** - the first prompt hands off; every later prompt says the work is already over there and spends nothing.
 - **The hand-off prompt is written for a human to read** - the task comes first, and everything The Framework injects follows behind a labelled rule.
 - **The project is trusted on the user's behalf** - starting a `web` agent is itself the user's decision to trust the project, so Claude Code's one-time trust question is answered ahead of time instead of blocking the hand-off.
@@ -19,6 +20,20 @@ The user wants a task done without it costing anything on their own machine — 
 - **Nothing the user typed can be interpreted as a command** - the prompt and the model reach the CLI through the environment, never as part of a command line.
 
 ## Business logic
+
+### The browser extension creates the session when it can
+
+#### User story
+
+The user runs the browser extension. Their web runs should land as sessions that can push and open pull requests, without them doing anything on claude.ai — and on a machine without the extension, web runs should still work.
+
+#### Business logic
+
+After the starting point is pushed and the project trusted, a run that knows its daemon's address asks the daemon to queue a session request naming the repository as `owner/name` (read from the checkout's GitHub remote), the pushed starting-point ref, and the whole hand-off prompt. It then follows the request until the extension reports the session, and hands off exactly as the CLI path does — the same link, the same summary, the same single hand-off per agent. Four things make the run hand off through the CLI's cloud mode instead, each announced in the agent's log: no GitHub remote to name in the repository picker; a starting point that could not be pushed, since the session must open on that ref; a daemon that answers no extension is around; or a daemon with the bridge off. An extension that tried and could not create the session fails the turn with the extension's own note of what it could not find — never a silent second attempt through the CLI. The wait shares the hand-off's overall timeout.
+
+#### Rationale
+
+A session created through the page's repository picker is repo-bound; the CLI's cloud mode has, on some accounts, produced a bundle upload that could never push (#1320). The extension path is the one that ends in a pull request, so it goes first, and the CLI path stays only for the machines and cases where it cannot run.
 
 ### One agent, exactly one cloud session
 

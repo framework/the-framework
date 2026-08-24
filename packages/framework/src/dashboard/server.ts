@@ -17,6 +17,8 @@ import type { EventsSource, RemoteAgents } from './rpc-serve.js'
 import { handleRelayRequest, RELAY_PREFIX, type RelayHandlers } from './relay-endpoints.js'
 import { BRIDGE_PREFIX, EXPECTED_EXTENSION_VERSION, handleBridgeRequest, type BridgeHandlers } from './bridge-endpoints.js'
 import { bridgeQuestions } from './bridge-store.js'
+import { bridgeStarts } from './bridge-starts.js'
+import { WEB_START_PREFIX, handleWebStartRequest, type WebStartHandlers } from './web-start-endpoints.js'
 
 /** Options for {@link startDashboard}. */
 export interface DashboardOptions {
@@ -189,7 +191,24 @@ export function startDashboard(opts: DashboardOptions): Promise<Dashboard> {
           return pending ? { id: pending.id, text: pending.text } : undefined
         },
         answered: (sessionId, id, ok, note) => bridgeQuestions().resolveAnswer(sessionId, id, ok, note),
+        // The session start-queue (#1328). The claim happens inside claimNext, not in the route:
+        // two polling tabs handed the same request would create two cloud sessions.
+        start: () => {
+          const next = bridgeStarts().claimNext()
+          return next ? { id: next.id, repo: next.repo, branch: next.branch, prompt: next.prompt } : undefined
+        },
+        started: (id, ok, sessionId, note) => bridgeStarts().resolve(id, ok, sessionId, note),
         ...(opts.bridgeSessions ? { sessions: opts.bridgeSessions } : {}),
+      }
+    : undefined
+
+  // The run-facing side of the same queue (#1328): a spawned web run asks here, on the same token.
+  const webStartHandlers: WebStartHandlers | undefined = opts.bridgeToken
+    ? {
+        token: opts.bridgeToken,
+        extensionAlive: () => bridgeQuestions().extensionAlive(),
+        request: input => bridgeStarts().request(input),
+        get: id => bridgeStarts().get(id),
       }
     : undefined
 
@@ -206,6 +225,10 @@ export function startDashboard(opts: DashboardOptions): Promise<Dashboard> {
     // instead, so letting it past here costs nothing and skips a 302 it could not follow.
     if (pathname === BRIDGE_PREFIX || pathname.startsWith(`${BRIDGE_PREFIX}/`)) {
       void handleBridgeRequest(req, res, pathname, bridgeHandlers)
+      return
+    }
+    if (pathname === WEB_START_PREFIX || pathname.startsWith(`${WEB_START_PREFIX}/`)) {
+      void handleWebStartRequest(req, res, pathname, webStartHandlers)
       return
     }
     // #1051: one guard fronting every route on a non-loopback bind; a no-op when no token is set.

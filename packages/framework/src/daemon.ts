@@ -157,11 +157,14 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
 
   // Everything the dashboard drives per project — run spawning, project install, and app
   // previews — lives in the runtime, so this body stays about the daemon's own lifecycle.
+  // Known only once the dashboard listens; the runtime reads it per spawn (#1328).
+  let daemonUrl: string | undefined
   const runtime = createProjectRuntime({
     cwd,
     env,
     ...(opts.binPath !== undefined ? { binPath: opts.binPath } : {}),
     ...(opts.driverPreflight !== undefined ? { driverPreflight: opts.driverPreflight } : {}),
+    daemonUrl: () => daemonUrl,
   })
 
   // The daemon serves the built dashboard bundle (#405/#426): the SPA reads each project's
@@ -214,6 +217,7 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
     ...(clientBundleDir ? { clientBundleDir } : {}),
   })
 
+  daemonUrl = dashboard.url
   try {
     const actualPort = Number(new URL(dashboard.url).port) || port
     opts.onListening?.({ pid: process.pid, port: actualPort, host, url: dashboard.url, startedAt: new Date().toISOString() })

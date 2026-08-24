@@ -22,6 +22,7 @@ A `web`-target agent hands its task to a cloud session and ends, so when that se
 - **An answer is typed only into a composer that exists** - the composer is waited for, filled, given a beat to settle, then submitted by the page's own send button, or by Enter when there is none.
 - **Only the top frame delivers an answer** - a child frame answering too would submit the same text twice.
 - **The panel says which step failed** - what was found, where, and what the daemon said, with structure-only counters when nothing was found.
+- **A session is created through the page's own controls** - the composer's chips (repository, then branch), each opening a searchable list; the page remembers the last repository picked, so the chips are waited for and read rather than assumed; the branch chip must read the requested branch before anything is sent, the session id is read from the address the page becomes, and a failure names the control that was missing.
 - **It watches the page rather than polling it** - the session's own changes trigger a re-read immediately; a slow heartbeat is only a backstop.
 
 ## Business logic
@@ -123,6 +124,20 @@ Only the page's top frame accepts an answer.
 #### Rationale
 
 This is the one place the extension acts on the user's behalf instead of observing, so it says exactly what it did. The text it can type is bounded twice over: it comes only from the daemon, and the daemon composes it out of the options belonging to the question the session is currently parked on — this half neither writes nor edits any of it. The composer wait exists because the first live delivery landed right after a tab was reloaded, and the page takes well over a few seconds to render — "no composer on the page" almost always means "not yet". Only the top frame answers because a child frame answering as well would submit the same text a second time.
+
+### Creating a session
+
+#### User story
+
+The daemon wants a cloud session opened on a given repository and branch with a given prompt, and it must be one that can push: the kind the new-session page's repository picker creates.
+
+#### Business logic
+
+On the new-session page, the composer is waited for, then the chips beside it, which render a beat later: the page remembers the last repository picked, so it may open already showing the requested repository (nothing to pick), another one (that chip is the picker), or none (a bare select-repository control is). When picking, the picker is opened, the full `owner/name` is typed into its search box, and the entry whose text is exactly the repository is clicked — only entries the open list actually shows, since a closed list's entries linger on the page, and never the chip itself — after which the repository chip must read the repository. The branch chip beside it is then read: if it does not already read the requested branch, it is opened and the branch chosen the same way, and the chip is read again; when it still does not read the requested branch, nothing is sent and the outcome says so. The prompt is then typed into the composer and sent by the page's send button, or by Enter when there is none. The outcome is a success only once the page's address names a session, and it carries the session id and a note of what was clicked; every failure names the control that could not be found, and a probe describes the page's controls without touching them so a failed first run is diagnosable.
+
+#### Rationale
+
+A session opened on the wrong branch would push its work somewhere the run never looks, which is why the branch is verified rather than assumed. The session id comes from the address because it is the one thing the page is guaranteed to expose, and it is exactly what the daemon joins runs on.
 
 ### The bridge panel
 

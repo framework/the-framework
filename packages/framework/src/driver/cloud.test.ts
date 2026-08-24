@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { isHandsOff } from '../agent-location.js'
-import { CLOUD_COMMAND, CLOUD_ENV, CLOUD_PROMPT_SEPARATOR, CloudDriver, cloudHandOffPrompt, trustRootOf, type AgentPtyOptions } from './cloud.js'
+import { CLOUD_COMMAND, CLOUD_ENV, CLOUD_PROMPT_SEPARATOR, CloudDriver, cloudHandOffPrompt, trustRootOf, type AgentPtyOptions, type ExtensionStart } from './cloud.js'
 import type { DriverEvent } from './types.js'
 
 /**
@@ -389,4 +389,89 @@ test('the ref rides the fixed command as its own guarded flag, after the model (
 
 test('the invocation disables nonessential traffic, which is what keeps the session repo-bound (#1320)', () => {
   assert.equal(CLOUD_ENV['CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC'], '1')
+})
+
+// ---------------------------------------------------------------------------
+// The extension-created session (#1328): the run asks its daemon, the extension does the page.
+
+/** A git runner whose origin is on GitHub, so the repo picker has a slug to look for. */
+function githubGit(calls: string[][] = []) {
+  return {
+    calls,
+    run: async (args: string[], _cwd: string): Promise<string> => {
+      calls.push([...args])
+      if (args[0] === 'commit-tree') return `${ANCHOR}\n`
+      if (args[0] === 'remote') return 'git@github.com:framework/the-framework.git\n'
+      return ''
+    },
+  }
+}
+
+/**
+ * A daemon whose start-queue answers as scripted: the POST gets `queue`, then each poll pops the
+ * next `states` entry (the last one repeats). Records every request the run made.
+ */
+function fakeDaemon(queue: { status: number; body?: unknown }, states: unknown[]) {
+  const requests: { method: string; path: string; body?: unknown }[] = []
+  const doFetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    const path = new globalThis.URL(String(input)).pathname
+    const method = init?.method ?? 'GET'
+    requests.push({ method, path, ...(init?.body ? { body: JSON.parse(String(init.body)) } : {}) })
+    if (method === 'POST') {
+      return new Response(queue.body === undefined ? 'nope' : JSON.stringify(queue.body), { status: queue.status })
+    }
+    const state = states.length > 1 ? states.shift() : states[0]
+    return new Response(JSON.stringify(state), { status: 200 })
+  }) as typeof fetch
+  return { requests, fetch: doFetch }
+}
+
+function extensionDriver(daemon: ReturnType<typeof fakeDaemon>, calls: AgentPtyOptions[] = [], git = githubGit()) {
+  const pty = fakePty(CREATED, calls)
+  const extension: ExtensionStart = { daemonUrl: 'http://127.0.0.1:4200/', token: 'tok', fetch: daemon.fetch, pollMs: 1 }
+  return new CloudDriver({ extension, runPty: pty.run, git: git.run, agentTag: () => 'tag', timeoutMs: 1000, claudeConfig: tmpClaudeConfig('/repo') })
+}
+
+test('with an extension around, the session comes from the start-queue and the CLI never runs (#1328)', async () => {
+  const daemon = fakeDaemon({ status: 202, body: { id: 'req-1' } }, [{ state: 'queued' }, { state: 'claimed' }, { state: 'created', sessionId: SESSION, url: `https://claude.ai/code/${SESSION}` }])
+  const calls: AgentPtyOptions[] = []
+  const events: DriverEvent[] = []
+  const session = await extensionDriver(daemon, calls).start({ cwd: '/repo', onEvent: e => events.push(e) })
+  const turn = await session.prompt('Add the --verbose flag')
+  assert.equal(turn.sessionId, SESSION)
+  assert.equal(calls.length, 0, 'no --cloud invocation')
+  // The request names the repo the picker lists, the pushed hand-off ref, and the whole prompt.
+  const post = daemon.requests.find(r => r.method === 'POST')
+  assert.deepEqual(post?.body, { repo: 'framework/the-framework', branch: session.id, prompt: 'Add the --verbose flag' })
+  assert.equal(daemon.requests.filter(r => r.method === 'GET').length, 3, 'polled until created')
+  assert.ok(events.some(e => e.type === 'result' && e.sessionLink === `https://claude.ai/code/${SESSION}`))
+  assert.ok(events.some(e => e.type === 'notice' && /asked the browser extension/.test(e.message)))
+})
+
+test('no extension around (409) hands off through the CLI instead (#1328)', async () => {
+  const daemon = fakeDaemon({ status: 409 }, [])
+  const calls: AgentPtyOptions[] = []
+  const events: DriverEvent[] = []
+  const session = await extensionDriver(daemon, calls).start({ cwd: '/repo', onEvent: e => events.push(e) })
+  const turn = await session.prompt('go')
+  assert.equal(turn.sessionId, SESSION, 'the CLI path created it')
+  assert.equal(calls.length, 1)
+  assert.ok(events.some(e => e.type === 'notice' && /no browser extension is around/.test(e.message)))
+})
+
+test('a checkout with no GitHub remote never asks the extension (#1328)', async () => {
+  const daemon = fakeDaemon({ status: 202, body: { id: 'req-1' } }, [])
+  const calls: AgentPtyOptions[] = []
+  const session = await extensionDriver(daemon, calls, fakeGit()).start({ cwd: '/repo' })
+  await session.prompt('go')
+  assert.equal(daemon.requests.length, 0, 'nothing to name in the repo picker')
+  assert.equal(calls.length, 1, 'the CLI path ran')
+})
+
+test('an extension that tried and failed fails the turn with its note, not a silent CLI retry (#1328)', async () => {
+  const daemon = fakeDaemon({ status: 202, body: { id: 'req-1' } }, [{ state: 'failed', note: 'no repo picker on the page' }])
+  const calls: AgentPtyOptions[] = []
+  const session = await extensionDriver(daemon, calls).start({ cwd: '/repo' })
+  await assert.rejects(session.prompt('go'), /could not create the session — no repo picker on the page/)
+  assert.equal(calls.length, 0)
 })

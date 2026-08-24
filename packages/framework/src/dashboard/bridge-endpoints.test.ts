@@ -330,3 +330,84 @@ test('the expected version and the extension manifest move in lockstep (#1519)',
   }
   assert.equal(EXPECTED_EXTENSION_VERSION, manifest.version)
 })
+
+test('the start-queue is served to the extension and its report travels back (#1328)', async () => {
+  const reports: { id: string; ok: boolean; sessionId?: string; note?: string }[] = []
+  let pending: { id: string; repo: string; branch: string; prompt: string } | undefined = {
+    id: 'req-1',
+    repo: 'framework/the-framework',
+    branch: 'cloud-1-abcd1234',
+    prompt: 'Spike and plan the queue ticket',
+  }
+  const s = await serve({
+    token: TOKEN,
+    record: () => {},
+    // Claim-on-read, as the daemon wires it: a second poll must not be handed the same request.
+    start: () => {
+      const next = pending
+      pending = undefined
+      return next
+    },
+    started: (id, ok, sessionId, note) => void reports.push({ id, ok, ...(sessionId ? { sessionId } : {}), ...(note ? { note } : {}) }),
+  })
+  try {
+    const first = await fetch(`${s.url}${BRIDGE_PREFIX}/start`, { headers: { authorization: `Bearer ${TOKEN}` } })
+    assert.equal(first.status, 200)
+    assert.deepEqual(await first.json(), {
+      start: { id: 'req-1', repo: 'framework/the-framework', branch: 'cloud-1-abcd1234', prompt: 'Spike and plan the queue ticket' },
+    })
+
+    const second = await fetch(`${s.url}${BRIDGE_PREFIX}/start`, { headers: { authorization: `Bearer ${TOKEN}` } })
+    assert.deepEqual(await second.json(), { start: null }, 'claimed, so the next poll gets nothing')
+
+    const ack = await fetch(`${s.url}${BRIDGE_PREFIX}/started`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${TOKEN}` },
+      body: JSON.stringify({ id: 'req-1', ok: true, sessionId: 'session_018KtaRYq8N1T9mjrJBTvrNS' }),
+    })
+    assert.equal(ack.status, 204)
+    assert.deepEqual(reports, [{ id: 'req-1', ok: true, sessionId: 'session_018KtaRYq8N1T9mjrJBTvrNS' }])
+  } finally {
+    await s.close()
+  }
+})
+
+test('a daemon with no start-queue degrades to null rather than failing (#1328)', async () => {
+  const s = await serve({ token: TOKEN, record: () => {} })
+  try {
+    const res = await fetch(`${s.url}${BRIDGE_PREFIX}/start`, { headers: { authorization: `Bearer ${TOKEN}` } })
+    assert.equal(res.status, 200)
+    assert.deepEqual(await res.json(), { start: null })
+    const ack = await fetch(`${s.url}${BRIDGE_PREFIX}/started`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${TOKEN}` },
+      body: JSON.stringify({ id: 'req-1', ok: true, sessionId: 'session_018KtaRYq8N1T9mjrJBTvrNS' }),
+    })
+    assert.equal(ack.status, 204, 'accepted and dropped')
+  } finally {
+    await s.close()
+  }
+})
+
+test('the start report is validated field by field, and the routes demand the token (#1328)', async () => {
+  const s = await serve({ token: TOKEN, record: () => {}, start: () => undefined, started: () => {} })
+  const send = (body: unknown): Promise<Response> =>
+    fetch(`${s.url}${BRIDGE_PREFIX}/started`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${TOKEN}` },
+      body: JSON.stringify(body),
+    })
+  try {
+    assert.equal((await send({ ok: true })).status, 400, 'no id')
+    assert.equal((await send({ id: 'x'.repeat(65), ok: true })).status, 400, 'absurd id')
+    assert.equal((await send({ id: 'r', ok: 'yes' })).status, 400, 'ok must be a boolean')
+    assert.equal((await send({ id: 'r', ok: true, sessionId: 'not-a-session' })).status, 400, 'bad session id')
+    assert.equal((await send({ id: 'r', ok: false, note: 42 })).status, 400, 'note must be a string')
+    assert.equal((await send({ id: 'r', ok: false })).status, 204, 'a plain failure is fine')
+    assert.equal((await fetch(`${s.url}${BRIDGE_PREFIX}/start`)).status, 401)
+    assert.equal((await fetch(`${s.url}${BRIDGE_PREFIX}/started`, { method: 'POST' })).status, 401)
+    assert.equal((await fetch(`${s.url}${BRIDGE_PREFIX}/start`, { method: 'POST', headers: { authorization: `Bearer ${TOKEN}` } })).status, 405)
+  } finally {
+    await s.close()
+  }
+})

@@ -52,6 +52,7 @@ import { withAgentLock } from './agent-locks.js'
 import { errorMessage } from './error-message.js'
 import { preflight, preflightProblems, type PreflightResult } from './preflight.js'
 import { isDriverName, type DriverName } from './driver-names.js'
+import { DAEMON_URL_ENV } from './dashboard/web-start-endpoints.js'
 
 /**
  * How long a passing agent preflight (#1326) is trusted before it is probed again. Short enough
@@ -104,8 +105,12 @@ async function appendAgentLog(cwd: string, message: string): Promise<void> {
   await appendFile(join(cwd, FRAMEWORK_DIR, EVENTS_FILE), JSON.stringify(event) + '\n').catch(() => {})
 }
 
-/** Spawn a detached, unref'd framework child (`node <binPath> --agent <specPath>`) that outlives us. */
-export function spawnDetached(binPath: string, specPath: string, stderrFile?: string): ChildProcess {
+/**
+ * Spawn a detached, unref'd framework child (`node <binPath> --agent <specPath>`) that outlives us.
+ * `env` is the child's whole environment; the daemon adds its own URL to it (#1328) so a web run
+ * can ask this daemon for a cloud session.
+ */
+export function spawnDetached(binPath: string, specPath: string, stderrFile?: string, env: NodeJS.ProcessEnv = process.env): ChildProcess {
   // stderr goes to a file, never a pipe: a detached child must not block on a dead parent's pipe
   // buffer, and the file is what makes a silent boot death diagnosable (#1261). Best-effort — a
   // run must still start when the log cannot be opened.
@@ -119,10 +124,16 @@ export function spawnDetached(binPath: string, specPath: string, stderrFile?: st
   const child = spawn(process.execPath, [binPath, '--agent', specPath], {
     detached: true,
     stdio: ['ignore', 'ignore', fd ?? 'ignore'],
+    env,
   })
   if (fd !== undefined) closeSync(fd)
   child.unref()
   return child
+}
+
+/** A spawned run's environment: ours, plus the daemon's URL when it has one (#1328). */
+export function childEnv(daemonUrl: string | undefined, base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  return daemonUrl ? { ...base, [DAEMON_URL_ENV]: daemonUrl } : base
 }
 
 /** Where a spawned agent's stderr lands (#1261), so a child that dies at boot leaves a trace. */
@@ -363,6 +374,12 @@ export interface ProjectRuntimeOptions {
   retryDelayMs?: number | undefined
   /** How a start checks the agent can run (#1326); undefined runs the real {@link preflight}. A test seam. */
   driverPreflight?: ((driver: DriverName) => Promise<PreflightResult>) | undefined
+  /**
+   * The URL this daemon serves at, once it listens (#1328). Handed to every spawned run as
+   * {@link DAEMON_URL_ENV}, so a web run can ask the daemon for an extension-created session.
+   * A getter because the runtime exists before the daemon has a port.
+   */
+  daemonUrl?: (() => string | undefined) | undefined
 }
 
 /** The per-project agent + preview surface the dashboard drives, plus its teardown. */
@@ -415,7 +432,7 @@ export interface ProjectRuntime {
  * with no project id (or the home id) resolves to it without a registry lookup. Split out of
  * {@link runDaemon} so the daemon body reads as lifecycle and this reads as business logic.
  */
-export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPreflight }: ProjectRuntimeOptions): ProjectRuntime {
+export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPreflight, daemonUrl }: ProjectRuntimeOptions): ProjectRuntime {
   const homeId = projectId(resolve(cwd))
   // Live run pids, keyed per agent rather than per project (#736) — see onStart for the key.
   const activeAgents = new Map<string, number>()
@@ -796,7 +813,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
         }
         return { ok: false, error: 'the daemon is shutting down' }
       }
-      const child = spawnDetached(realBin, specPath, ...(workspace.agentId ? [agentStderrPath(workspace.cwd)] : []))
+      const child = spawnDetached(realBin, specPath, workspace.agentId ? agentStderrPath(workspace.cwd) : undefined, childEnv(daemonUrl?.()))
       // The agent narrates itself through its own `.the-framework/events.jsonl`, which the
       // dashboard streams over `GET /_rpc/events`; the daemon just tracks liveness.
       const settle = (detail: string): void => {

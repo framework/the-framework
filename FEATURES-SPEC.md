@@ -165,6 +165,7 @@ happens while nobody is at the keyboard.
 - Saved remote devices: run an agent on another machine's daemon — dashboard here, agents there
 - Run on a fresh GitHub Actions runner
 - Run on a Claude Code cloud session
+- A web run's cloud session is created by the Chrome extension in your own browser, through claude.ai's repository picker — repo-bound, so it can push and open its pull request; the CLI's cloud mode only when no extension is around
 - Chrome extension bridging claude.ai questions back to the dashboard
 - A cloud session's conversation mirrored into the run view, turn by turn, as it is written
 - Answer a cloud agent's question from the dashboard (typed back into claude.ai) — the same gate panel a local agent gets, multi-select and stop options included, listed with every other open question

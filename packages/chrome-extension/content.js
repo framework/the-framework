@@ -469,10 +469,242 @@ async function deliverAnswer(text) {
   return { ok: true, note: `filled ${composer.via}, no send button, sent Enter` }
 }
 
-// The worker hands answers to the top frame only: the composer lives there, and a child frame
-// answering too would submit twice.
+// ---------------------------------------------------------------------------
+// Creating a session (#1328). A session created through this page's repo picker is repo-bound,
+// and those are the ones that can push and open a pull request; `claude --cloud` on some accounts
+// produces a bundle upload that cannot (#1320). So the daemon queues a repo, a branch and a prompt,
+// and this drives the same controls a person would on the new-session page: the repo chip and
+// its searchable list, the branch chip that appears beside it, the composer, send.
+//
+// Every selector here is a guess about someone else's UI, so this half reports rather than
+// insists: `probeNewSession` describes what the page offers without touching it, and every
+// failure below names the control it could not find.
+
+/**
+ * Visible text of a control, for matching chips and entries: the icon-font glyphs the page puts
+ * beside a label (a repo icon, a branch icon, the check on the chosen entry) are dropped, since
+ * "framework/the-framework" followed by a check glyph is the entry, not another entry.
+ */
+function controlText(el) {
+  return (el.textContent ?? '').replace(ICON_GLYPHS, '').replace(/\s+/g, ' ').trim()
+}
+
+/**
+ * Whether a control is actually usable: rendered, enabled, not aria-hidden. The page keeps a
+ * closed picker's entries in the DOM, so an entry that is not visible is not on offer — a browser
+ * answers that exactly; the offline harness has no layout and answers nothing, which counts as yes.
+ */
+function usable(el) {
+  if (!el || el.disabled) return false
+  if (el.getAttribute?.('aria-hidden') === 'true') return false
+  if (typeof el.checkVisibility === 'function' && !el.checkVisibility()) return false
+  return true
+}
+
+/** Every button-like control on the page, most explicit picker shapes first. */
+function menuTriggers() {
+  const out = []
+  const add = (el, via) => {
+    if (usable(el) && !out.some(entry => entry.el === el)) out.push({ el, via, text: controlText(el) })
+  }
+  for (const el of deepQueryAll('button[role="combobox"]')) add(el, 'combobox')
+  for (const el of deepQueryAll('button[aria-haspopup="listbox"], button[aria-haspopup="menu"], button[aria-haspopup="true"]')) add(el, 'haspopup')
+  for (const el of deepQueryAll('button[aria-expanded]')) add(el, 'expandable')
+  for (const el of deepQueryAll('button')) add(el, 'button')
+  return out
+}
+
+/**
+ * The composer's chips, in the order the page lays them out: the repository, then the branch,
+ * then "add another repository". Each is a combobox button; the branch chip exists only once a
+ * repository is chosen.
+ */
+function chips() {
+  return deepQueryAll('button[role="combobox"]').filter(usable).map(el => ({ el, via: 'combobox', text: controlText(el) }))
+}
+
+/** The entries an open picker currently offers — visible options only, the closed ones stay in the DOM. */
+function menuEntries() {
+  return deepQueryAll('[role="option"]')
+    .filter(usable)
+    .map(el => ({ el, text: controlText(el) }))
+}
+
+/** The open picker's search box, if it has one. */
+function pickerSearch() {
+  return deepQueryAll('input[role="combobox"], input[type="search"], input[placeholder*="search" i]').filter(usable).at(-1)
+}
+
+/** Type into a React-controlled input so the page sees the change: the native setter, then an input event. */
+function typeInto(input, text) {
+  input.focus()
+  const setter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input), 'value')?.set ?? Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+  if (setter) setter.call(input, text)
+  else input.value = text
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+}
+
+/** Wait for `read` to return something truthy, or give up. */
+async function waitFor(read, timeoutMs, stepMs = 150) {
+  const deadline = Date.now() + timeoutMs
+  for (;;) {
+    const value = read()
+    if (value) return value
+    if (Date.now() >= deadline) return undefined
+    await new Promise(resolve => setTimeout(resolve, stepMs))
+  }
+}
+
+/** How long to wait for a picker to render its entries, and for the chips to settle. */
+const MENU_WAIT_MS = 6000
+
+/**
+ * Open `trigger` and choose the entry whose text is one of `wanted` (lower-cased; the first is
+ * the full name, later ones aliases). Types the full name into the picker's search box when it
+ * has one, since a long list is filtered rather than scrolled. Never clicks the trigger itself
+ * or anything inside it as an entry. Returns a note either way.
+ */
+async function chooseFrom(trigger, wanted, hint) {
+  trigger.el.click()
+  const outside = e => e.el !== trigger.el && !trigger.el.contains(e.el)
+  const entries = () => menuEntries().filter(outside)
+  const find = () => {
+    const now = entries()
+    for (const w of wanted) {
+      const exact = now.find(e => e.text.toLowerCase() === w)
+      if (exact) return exact
+    }
+    return undefined
+  }
+  // The list is fetched after the picker opens: wait for it to hold something before filtering
+  // it, and filter only when it has a search box. A filter that finds nothing is cleared and the
+  // whole list scanned, in case the page's search matches differently than expected.
+  const search = await waitFor(pickerSearch, 1500, 100)
+  const loaded = await waitFor(() => entries().length > 0, MENU_WAIT_MS)
+  let hit = loaded ? find() : undefined
+  if (!hit && search) {
+    typeInto(search, wanted[0])
+    hit = await waitFor(find, 3000)
+    if (!hit) {
+      typeInto(search, '')
+      hit = await waitFor(find, 3000)
+    }
+  }
+  if (!hit) {
+    const seen = entries()
+    const diag = `search ${search ? `"${search.placeholder}"` : 'none'}, ${seen.length} visible of ${deepQueryAll('[role="option"]').length} options${seen.length ? `: ${seen.slice(0, 5).map(e => JSON.stringify(e.text.slice(0, 40))).join(', ')}` : ''}; chips ${JSON.stringify(chips().map(c => c.text))}`
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    return { ok: false, note: `${hint}: the list offered no "${wanted[0]}" (${diag})` }
+  }
+  hit.el.click()
+  return { ok: true, note: `${hint}: clicked "${hit.text}" via ${trigger.via}` }
+}
+
+/**
+ * Describe the controls on this page without touching any of them. Text only, capped, so the
+ * report is safe to paste into an issue — the point is that a failed first run says what the
+ * page offers, so the selectors above can be aimed at the real markup.
+ */
+function probeNewSession() {
+  return {
+    url: location.href,
+    sessionId: sessionIdFromUrl() ?? null,
+    composer: findComposer()?.via ?? null,
+    sendButton: Boolean(findSendButton()),
+    chips: chips().map(c => c.text.slice(0, 80)),
+    triggers: menuTriggers()
+      .slice(0, 40)
+      .map(trigger => ({ via: trigger.via, text: trigger.text.slice(0, 80) }))
+      .filter(trigger => trigger.text),
+  }
+}
+
+/**
+ * Drive the new-session flow: repo, branch, prompt, send, and report the session it became.
+ *
+ * The page remembers the last repository picked, so it may open already showing ours, another
+ * one, or none — the chips are waited for and read rather than assumed. The branch is checked,
+ * not assumed: the branch chip must read the requested ref before anything is sent, because a
+ * session opened on the wrong branch would push its work somewhere the run never looks. The
+ * session id is read from the URL, the one thing the page is guaranteed to tell us and exactly
+ * what the daemon joins runs on; a send that never becomes a session URL is a failure with a
+ * reason, never a silent success.
+ */
+async function createSession({ repo, branch, prompt }) {
+  const composer = await waitFor(findComposer, window.__tfComposerWaitMs ?? 20000)
+  if (!composer) return { ok: false, note: 'no composer on the new-session page' }
+
+  const bare = String(repo).split('/').pop() ?? repo
+  const repoWanted = [String(repo).toLowerCase(), bare.toLowerCase()]
+  const selectRepo = () => menuTriggers().find(t => /select repo|add repo|choose repo/i.test(t.text) || /select repo|choose repo/i.test(t.el.getAttribute('aria-label') ?? ''))
+  // The chips render a beat after the composer: wait for either a chip or the bare picker.
+  await waitFor(() => chips().some(c => c.text) || selectRepo(), MENU_WAIT_MS)
+  await new Promise(resolve => setTimeout(resolve, window.__tfMenuSettleMs ?? 800))
+
+  let repoNote
+  if (repoWanted.includes(chips()[0]?.text.toLowerCase())) {
+    repoNote = `repo already ${chips()[0].text}`
+  } else {
+    // A remembered other repository's chip is the picker; with nothing remembered, the page offers one.
+    const trigger = chips()[0]?.text ? chips()[0] : selectRepo()
+    if (!trigger) return { ok: false, note: `no repo picker on the page (${JSON.stringify(probeNewSession())})` }
+    let pick = await chooseFrom(trigger, repoWanted, 'repo')
+    if (!pick.ok) {
+      // The page may have finished loading its remembered repository under us: read again once.
+      await new Promise(resolve => setTimeout(resolve, 1500))
+      if (repoWanted.includes(chips()[0]?.text.toLowerCase())) pick = { ok: true, note: `repo already ${chips()[0].text} (after a late render)` }
+      else return pick
+    }
+    repoNote = pick.note
+    const chip = await waitFor(() => (repoWanted.includes(chips()[0]?.text.toLowerCase()) ? chips()[0] : undefined), MENU_WAIT_MS)
+    if (!chip) return { ok: false, note: `${repoNote}, but the repo chip does not read "${repo}" afterwards (chips: ${JSON.stringify(chips().map(c => c.text))})` }
+  }
+
+  // The branch chip appears beside the repo chip once a repository is chosen, reading the default branch.
+  const branchWanted = [String(branch).toLowerCase()]
+  const readsBranch = () => (chips()[1]?.text.toLowerCase() === branchWanted[0] ? chips()[1] : undefined)
+  let branchChip = await waitFor(() => (chips()[1]?.text ? chips()[1] : undefined), MENU_WAIT_MS)
+  if (!branchChip) return { ok: false, note: `${repoNote}; no branch chip appeared beside the repo (chips: ${JSON.stringify(chips().map(c => c.text))})` }
+  let branchNote
+  if (readsBranch()) {
+    branchNote = `branch already ${branchChip.text}`
+  } else {
+    const pick = await chooseFrom(branchChip, branchWanted, 'branch')
+    if (!pick.ok) return { ok: false, note: `${repoNote}; ${pick.note}` }
+    branchNote = pick.note
+    branchChip = await waitFor(readsBranch, MENU_WAIT_MS)
+    if (!branchChip) return { ok: false, note: `${repoNote}; ${branchNote}, but the branch chip does not read "${branch}" — not sending (chips: ${JSON.stringify(chips().map(c => c.text))})` }
+  }
+
+  fillComposer(composer, prompt)
+  await new Promise(resolve => setTimeout(resolve, 400))
+  const button = findSendButton()
+  if (button) button.click()
+  else {
+    for (const type of ['keydown', 'keyup']) {
+      composer.el.dispatchEvent(new KeyboardEvent(type, { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true }))
+    }
+  }
+
+  const sessionId = await waitFor(sessionIdFromUrl, window.__tfSessionWaitMs ?? 60000, 500)
+  if (!sessionId) return { ok: false, note: `sent, but the page never became a session URL (${repoNote}; ${branchNote})` }
+  return { ok: true, sessionId, note: `${repoNote}; ${branchNote}; sent via ${button ? 'button' : 'enter'}` }
+}
+
+// The worker hands answers and session requests to the top frame only: the composer lives
+// there, and a child frame acting too would submit twice.
 if (IS_TOP && typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message?.type === 'tf-probe-new-session') {
+      sendResponse(probeNewSession())
+      return true
+    }
+    if (message?.type === 'tf-create-session' && message.start) {
+      void createSession(message.start)
+        .then(sendResponse)
+        .catch(err => sendResponse({ ok: false, note: String(err?.message ?? err) }))
+      return true
+    }
     if (message?.type !== 'tf-deliver-answer' || typeof message.text !== 'string') return false
     void deliverAnswer(message.text)
       .then(sendResponse)
@@ -486,6 +718,8 @@ if (IS_TOP && typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
 // added to the window claude.ai can see.
 if (typeof chrome === 'undefined') {
   window.__tfBridgeDeliverAnswer = deliverAnswer
+  window.__tfBridgeCreateSession = createSession
+  window.__tfBridgeProbeNewSession = probeNewSession
 }
 
 /**

@@ -55,6 +55,9 @@ export interface BridgeVersion {
   at: string
 }
 
+/** How recently the extension must have spoken to count as present. */
+export const EXTENSION_ALIVE_WINDOW_MS = 3 * 60_000
+
 export class BridgeQuestions {
   private readonly bySession = new Map<string, BridgeQuestion>()
   private contact: BridgeContact | undefined
@@ -102,6 +105,17 @@ export class BridgeQuestions {
   /** The last contact, or undefined if nothing has ever reached the bridge. */
   lastContact(): BridgeContact | undefined {
     return this.contact
+  }
+
+  /**
+   * Whether an extension is around (#1328): something reached the bridge and was let in within
+   * the window. The worker polls every half minute while it lives, so a longer silence means
+   * there is nobody to drain a request.
+   */
+  extensionAlive(now = new Date(), windowMs = EXTENSION_ALIVE_WINDOW_MS): boolean {
+    const contact = this.contact
+    if (!contact || contact.status >= 400) return false
+    return now.getTime() - Date.parse(contact.at) <= windowMs
   }
 
   private readonly eventsBySession = new Map<string, Map<number, BridgeEvent>>()

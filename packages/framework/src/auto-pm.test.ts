@@ -1282,6 +1282,24 @@ test("a plan-only sweep visits only the project the card picked (#1204)", async 
   assert.deepEqual(started, ['p2'], 'the other project is not swept by a click that named one')
 })
 
+test('a plan click does not cost the maintenance sweep its turn either', async () => {
+  // Same rule as the rotation index above: the click borrows the tick for the routine it named,
+  // so the due sweep never ran — and stamping its calendar would postpone it a whole interval.
+  const stamped: string[] = []
+  const { loop, ran } = harness({
+    jobs: [PLAN_JOB],
+    cooldownMs: 0,
+    planCandidates: async () => ['a.md'],
+    lockPlans: async (_p, assignments) => assignments,
+    maintenanceDue: async () => true,
+    recordMaintenance: async project => void stamped.push(project.id),
+  })
+  await loop.tick({ onDemand: true, only: 'plan', projectId: 'p1' })
+  loop.stop()
+  assert.deepEqual(ran, ['plan'])
+  assert.deepEqual(stamped, [], 'the sweep it did not run keeps its schedule')
+})
+
 test("a plan click does not cost the rotation its turn (#1204)", async () => {
   // The rotation is mid-cycle; a click that borrows the tick for a routine it named must leave
   // the cycle where it was, the same way a due maintenance sweep does.

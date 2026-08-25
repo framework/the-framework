@@ -934,7 +934,11 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
         // is genuinely empty, and a tick that fell through to the rotation because draining is
         // switched off still has entries waiting — exactly the case this sweep stays out of.
         const maintenanceJob = wanted(deps.maintenanceJob ?? AUTO_PM_MAINTENANCE_JOB)
+        // Never on a click that named a routine: that click takes the tick outright below, so the
+        // sweep does not run — and a schedule stamped for a sweep that never ran postpones the
+        // real one a whole interval. Asked first, so such a click also costs no schedule read.
         const sweep =
+          !named &&
           decision.mode === 'pm' &&
           maintenanceJob !== undefined &&
           (await deps.maintenanceDue?.(project).catch(() => false)) === true

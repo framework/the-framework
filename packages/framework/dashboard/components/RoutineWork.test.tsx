@@ -213,8 +213,17 @@ describe('RoutineWork (#1159)', () => {
 
   /** Open one row's secondary half — the chevron beside its Run now. */
   const openRunMenu = async (job: AutoPmJob) => {
-    await waitFor(() => expect(screen.getAllByText('Run now').length).toBe(AUTO_PM_ROUTINES.length))
-    fireEvent.click(screen.getByRole('button', { name: `Other ways to run ${routineName(job)}` }))
+    const trigger = await screen.findByRole('button', { name: `Other ways to run ${routineName(job)}` })
+    // Clicked until the trigger reports open, rather than once and hoped: the menu is a Base UI
+    // one, and a click landing before its own handlers are live is silently a no-op — the row
+    // stays at `aria-expanded="false"` and the search below then hunts for an item that was never
+    // rendered. Rare enough to pass locally every time and still fail on a loaded CI runner.
+    // Retrying is safe because the guard only ever clicks a shut menu, so it cannot toggle one
+    // back closed; a menu that genuinely will not open still fails here, on the timeout.
+    await waitFor(() => {
+      if (trigger.getAttribute('aria-expanded') !== 'true') fireEvent.click(trigger)
+      expect(trigger.getAttribute('aria-expanded')).toBe('true')
+    })
     return await screen.findByText('Configure first, then run')
   }
 

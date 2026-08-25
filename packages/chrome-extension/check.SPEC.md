@@ -1,4 +1,4 @@
-Runs the Claude web bridge's page half against synthetic session pages, so its reading and writing of the page can be checked without a browser, an installed extension, or a live cloud session.
+Runs the Claude web bridge's page half and its visit planner against synthetic claude.ai pages, so the reading, driving and writing of the page can be checked without a browser, an installed extension, or a live cloud session.
 
 ## What the tests cover
 
@@ -9,6 +9,7 @@ Finding the parked question, across every shape the block has been seen in:
 - The await protocol's own spec block, which renders on the page as part of the agent's prompt, never counts as a question — on its own, and when a real question follows it, in which case the real question wins.
 - The protocol's two literal worked examples — the browser-handoff pair and the "Ship this?" approval pair — never count as questions.
 - Everything inside the opening turn is the rendered prompt: decoys there are ignored while a real question in a later turn still wins, and a question-shaped block that exists only inside the opening turn is never reported.
+- A question the user already answered — a user turn follows the block, in the light DOM or with the block behind a shadow root — is not reported, while a question asked again after that answer is.
 - Every one of those cases also checks that the composer was located and that the panel shows the question's actual title.
 
 What is reported to the daemon:
@@ -34,6 +35,18 @@ Creating a session:
 - A page with no repository picker is refused naming that control, and the probe describes the page's controls without touching them.
 
 The panel: it folds down to a compact "TF" tab, dropping its rows and its full title, and unfolds with the question's details intact.
+
+The Driver, on a synthetic app built like the live one was observed to be — a session list of links carrying the session id with a text status label beside each, a "Show more" button at the list's end and a decoy one deep in the middle panel, a "New" link, and in-app navigation that swaps the main area without a page load:
+
+- The list is read by label — awaiting, unread, idle, running, landed, and an unknown label carried verbatim — paged through the list's own button and never the decoy, and a session absent from the list is reported missing.
+- A cycle visits the sessions it was given in-app, reports the parked question from the awaiting one, types the queued answer into the other and counts it sent only once the page took the send, returns to the list, and keeps the overlay up — with its heading, its debug log naming the visits, and the panel hidden; the overlay comes back after being removed.
+- An answer the page did not take is reported as failed, naming what the page did, never as sent.
+- A session missing from the list is not visited and its answer is not claimed.
+- The session the worker asked for is created first, from the list page, before the visits, and the cycle still ends on the list.
+- A second instruction while a drive runs is refused as busy, and the drive completes.
+- A status word on a row beats its pull-request label.
+
+The visit planner: a parked session is visited when never seen, when its status changed, and again after five minutes; a queued answer forces a visit whatever the status; idle, running, landed and missing sessions are never visited on their own.
 
 ## Rationale
 

@@ -48,5 +48,5 @@ export { startKeyedWatcher, SeenTracker, type KeyedWatcher, type KeyedWatcherOpt
 export { BRIDGE_PREFIX, handleBridgeRequest, type BridgeHandlers, type BridgeSession, type BridgeEvent, type BridgeHello, type BridgeStart } from './bridge-endpoints.js'
 export { bridgeStarts, resetBridgeStarts, BridgeStarts, START_CLAIM_TTL_MS, MAX_START_PROMPT, type BridgeStartRequest, type BridgeStartState, type BridgeStartInput } from './bridge-starts.js'
 export { WEB_START_PREFIX, DAEMON_URL_ENV, handleWebStartRequest, type WebStartHandlers } from './web-start-endpoints.js'
-export { bridgeSessionsFrom, BRIDGE_SESSION_WINDOW_MS, BRIDGE_SESSION_LIMIT } from './bridge-sessions.js'
+export { bridgeSessionsFrom, BRIDGE_SESSION_WINDOW_MS } from './bridge-sessions.js'
 export { bridgeQuestions, resetBridgeQuestions, BridgeQuestions, type BridgeContact, type BridgeAnswer } from './bridge-store.js'

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { continuationPrompt, takeoverPrompt } from '../turn-gate.js'
-import type { BridgeEvent, BridgeHello, BridgeQuestion } from './bridge-endpoints.js'
+import type { BridgeEvent, BridgeHello, BridgeQuestion, BridgeSessionStatus } from './bridge-endpoints.js'
+import { CLOUD_SESSION_WINDOW_MS } from '../cloud-run-state.js'
 
 /**
  * An answer picked in the dashboard, on its way back to the session (#1237).
@@ -107,6 +108,37 @@ export class BridgeQuestions {
     return this.contact
   }
 
+  private readonly statusBySession = new Map<string, BridgeSessionStatus>()
+
+  /**
+   * What claude.ai's session list last said about a session (#1332), as the Driver tab read it.
+   *
+   * This is the read-back a web run's own record cannot give: the run ends at its hand-off, so
+   * the record says `done` whether the session is parked on its user or finished hours ago.
+   */
+  recordStatus(status: BridgeSessionStatus): void {
+    this.statusBySession.set(status.sessionId, status)
+  }
+
+  /** The session's last list status, or undefined while the Driver has never reported one. */
+  status(sessionId: string): BridgeSessionStatus | undefined {
+    return this.statusBySession.get(sessionId)
+  }
+
+  /**
+   * Whether the session is waiting on a human: the bridge holds the question it is parked on, or
+   * claude.ai's list shows it awaiting input — a question asked in prose carries no block for
+   * the bridge to hold, and the list is the only thing that says the session stopped for it.
+   *
+   * A list status older than the session window no longer counts: the Driver stops reading a
+   * session past the window, so its last word would otherwise stand forever.
+   */
+  waiting(sessionId: string, now = new Date()): boolean {
+    if (this.bySession.has(sessionId)) return true
+    const status = this.statusBySession.get(sessionId)
+    return status?.status === 'awaiting' && now.getTime() - Date.parse(status.at) <= CLOUD_SESSION_WINDOW_MS
+  }
+
   /**
    * Whether an extension is around (#1328): something reached the bridge and was let in within
    * the window. The worker polls every half minute while it lives, so a longer silence means
@@ -203,6 +235,15 @@ export class BridgeQuestions {
     return answer?.state === 'queued' ? answer : undefined
   }
 
+  /**
+   * Every session with an answer waiting to be delivered. The Driver serves these whatever the
+   * session window says: the page reports whichever session the user is on, so a pick can be for
+   * a session no listed run carries, and one nothing serves would sit queued forever.
+   */
+  pendingAnswerSessions(): string[] {
+    return [...this.answersBySession.values()].filter(answer => answer.state === 'queued').map(answer => answer.sessionId)
+  }
+
   /** The session's answer in whatever state, for the dashboard to render. */
   answer(sessionId: string): BridgeAnswer | undefined {
     return this.answersBySession.get(sessionId)
@@ -238,6 +279,7 @@ export class BridgeQuestions {
     this.eventsBySession.delete(sessionId)
     this.answersBySession.delete(sessionId)
     this.answeredBySession.delete(sessionId)
+    this.statusBySession.delete(sessionId)
   }
 }
 

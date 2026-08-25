@@ -1,4 +1,4 @@
-Holds everything the Claude web bridge carries: the question each cloud session is parked on, the answer the user picked for it, that session's transcript so far, and the diagnostic record of what last reached the bridge.
+Holds everything the Claude web bridge carries: the question each cloud session is parked on, the answer the user picked for it, that session's transcript so far, what claude.ai's session list last said about it, and the diagnostic record of what last reached the bridge.
 
 ## User story
 
@@ -17,6 +17,7 @@ Holds everything the Claude web bridge carries: the question each cloud session 
 - **A queued answer can be withdrawn, until it is delivered** - once the extension has delivered it, it is too late.
 - **A delivery report is matched by answer identity** - a stale report from a tab that died mid-delivery cannot resolve a newer answer.
 - **The transcript is kept by position** - repeat reports of the same message overwrite rather than accumulate, and a bounded number of entries is kept per cloud session.
+- **The list status is the read-back** - what claude.ai's session list said about each session, as the extension's Driver tab read it; a session the list shows awaiting input is waiting on a human even when no question block was found.
 - **Nothing survives a daemon restart** - held in memory on purpose.
 - **An extension counts as present while it keeps calling** - something let through the bridge within the last few minutes means there is an extension to hand a session request to; a refusal does not count.
 - **Contacts are recorded even when refused** - a refused request at least proves something is trying.
@@ -75,6 +76,20 @@ Using the same wording a local gate resumes with means a cloud session hears its
 
 Each transcript entry is stored under its position in the cloud session's transcript, so a re-read of the page overwrites the entry it already reported instead of appending a duplicate, and a message still being streamed is replaced by its later, longer version. The transcript is read back in position order. Only the most recent entries are kept per cloud session, oldest dropped first, so a long session cannot grow without limit in a daemon that never restarts.
 
+### The list status
+
+#### User story
+
+A cloud session asks its question in prose rather than as a choice block, or the bridge has not read its page yet. The dashboard should still say the session is waiting on the user, because claude.ai's own list says so.
+
+#### Business logic
+
+The last status the Driver reported for each cloud session is kept — the newest replaces the older — and read back per session. A session is waiting on a human when a question is parked for it, or when its last list status is awaiting input and that status is younger than the session window (twelve hours) — past the window the Driver no longer reads the session, so its last word would otherwise stand forever; that is what marks its agent as waiting on the way to the dashboard. The store also names every session holding a queued answer, so the daemon can have the Driver serve them whatever the session window says.
+
+#### Rationale
+
+A web agent's own record says done from its hand-off on, whatever its session is doing. The list status is the only read-back that tells a session parked on its user from one that finished.
+
 ### Diagnosis
 
 #### User story
@@ -89,7 +104,7 @@ The most recent contact with the bridge is kept: when it happened, which route i
 
 #### Business logic
 
-A cloud session can be dropped entirely — its parked question, its transcript, its answer and its answered memory — once it is answered or its agent is gone.
+A cloud session can be dropped entirely — its parked question, its transcript, its answer, its answered memory and its list status — once it is answered or its agent is gone.
 
 ## Before modifying/creating SPEC.md files
 

@@ -14,6 +14,7 @@ import { registryDiscordCredentialsStore } from './discord-credentials-store.js'
 import { JsonlTailer } from './jsonl-tail.js'
 import { isLoopbackHost } from './loopback-host.js'
 import { bridgeSessionsFrom } from './dashboard/bridge-sessions.js'
+import { bridgeQuestions } from './dashboard/bridge-store.js'
 import { readAllAgents } from './store/index.js'
 import type { BridgeSession } from './dashboard/index.js'
 
@@ -289,7 +290,7 @@ function waitForShutdown(signal?: AbortSignal): Promise<void> {
 }
 
 /**
- * The cloud sessions the browser bridge should have a tab open for (#1237).
+ * The cloud sessions the browser bridge's Driver tab should be serving (#1237, #1332).
  *
  * Across every registered project, because a cloud agent is not tied to the daemon's home
  * checkout, and best-effort per project so one unreadable repo cannot empty the list.
@@ -297,5 +298,5 @@ function waitForShutdown(signal?: AbortSignal): Promise<void> {
 async function listBridgeSessions(env: NodeJS.ProcessEnv): Promise<BridgeSession[]> {
   const projects = await listProjects(undefined, env).catch(() => [])
   const agents = (await Promise.all(projects.map(p => readAllAgents(p.path).catch(() => [])))).flat()
-  return bridgeSessionsFrom(agents, new Date())
+  return bridgeSessionsFrom(agents, new Date(), bridgeQuestions().pendingAnswerSessions())
 }

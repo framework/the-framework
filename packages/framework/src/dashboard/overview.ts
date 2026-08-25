@@ -288,7 +288,7 @@ export async function buildOverview(projects: ProjectSummary[], deps: OverviewDe
   const liveAgents = deps.liveAgents ?? readLiveMetas
   const queue = deps.queue ?? (p => collectQueue(p))
   const agents = deps.agents ?? readAllAgents
-  const waiting = deps.waiting ?? (sessionId => bridgeQuestions().get(sessionId) !== undefined)
+  const waiting = deps.waiting ?? (sessionId => bridgeQuestions().waiting(sessionId))
   const now = (deps.now ?? Date.now)()
   const thisHost = deps.host ?? hostname()
 

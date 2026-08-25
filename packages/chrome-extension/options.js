@@ -76,7 +76,7 @@ document.getElementById('save').addEventListener('click', async () => {
       const list = await fetch(`${daemonUrl}/_bridge/sessions`, { headers: { authorization: `Bearer ${token}`, ...version } })
       const sessions = list.ok ? ((await list.json())?.sessions ?? []) : []
       watching = sessions.length
-        ? ` Watching ${sessions.length} recent cloud session${sessions.length === 1 ? '' : 's'}${autoOpenEl.checked ? ', tabs opening shortly.' : ' (tab opening is off).'}`
+        ? ` Watching ${sessions.length} recent cloud session${sessions.length === 1 ? '' : 's'}${autoOpenEl.checked ? ', the Driver tab serves them.' : ' (the Driver tab is off).'}`
         : ' No recent cloud sessions to watch yet.'
     } catch {
       watching = ' Could not list sessions.'
@@ -88,15 +88,15 @@ document.getElementById('save').addEventListener('click', async () => {
 })
 
 
-// Run the tab sweep on demand. The alarm fires once a minute, which is a long time to sit
-// wondering whether anything is wrong, and every reason it might do nothing is now reported.
+// Run a Driver cycle on demand. The alarm fires twice a minute, which is a long time to sit
+// wondering whether anything is wrong, and every reason it might do nothing is reported. This
+// also resumes a Driver the user paused by closing its tab.
 document.getElementById('openNow').addEventListener('click', () => {
-  say('Opening…')
+  say('Driving…')
   chrome.runtime.sendMessage({ type: 'tf-open-now' }, result => {
     if (chrome.runtime.lastError) return say(chrome.runtime.lastError.message ?? 'the worker did not answer', true)
     if (!result) return say('The worker did not answer. Try reloading the extension.', true)
     if (!result.ok) return say(`Did nothing: ${result.reason}`, true)
-    if (!result.opened) return say(`Nothing to open${result.reason ? `: ${result.reason}` : ''}${result.skipped ? ` (${result.skipped})` : ''}.`)
-    say(`Opened ${result.opened} of ${result.of} session tabs${result.skipped ? ` (${result.skipped})` : ''}.`)
+    say(`Driver cycle done: ${result.reason}.`)
   })
 })

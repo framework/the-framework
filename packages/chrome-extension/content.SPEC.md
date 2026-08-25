@@ -1,4 +1,4 @@
-The half of the Claude web bridge that lives inside the claude.ai page: it finds the question the cloud session is parked on and hands it to the extension's service worker, mirrors what the session is saying, types the answer the dashboard produced into the session's composer and submits it, and draws an on-page panel showing exactly what it did and did not find.
+The half of the Claude web bridge that lives inside the claude.ai page: it finds the question the cloud session is parked on and hands it to the extension's service worker, mirrors what the session is saying, types the answer the dashboard produced into the session's composer and submits it, and draws an on-page panel showing exactly what it did and did not find. In the Driver tab it also reads claude.ai's session list, visits sessions by navigating inside the app on the worker's instructions, and covers the page with an overlay saying what the tab is.
 
 ## User story
 
@@ -9,6 +9,8 @@ A `web`-target agent hands its task to a cloud session and ends, so when that se
 - **service worker** — the extension's own background half. It holds the daemon token and is the only part that calls the daemon; this half never sees the token and never calls the daemon directly.
 - **composer** — the message box on the session's page that text is typed into and sent from.
 - **bridge panel** — the small diagnostic box this half draws in the bottom-right corner of the session's page, stating what the bridge found and what happened to it.
+- **Driver tab** — the one pinned claude.ai tab the service worker drives; this half learns it is in that tab from the worker's reply to its self-report, or from the first instruction the worker sends it.
+- **session list** — claude.ai's own list of the user's cloud sessions: each row links to its session, so the session id is in its address, and carries a status icon whose label is text.
 
 ## Business logic — TL;DR
 
@@ -17,6 +19,7 @@ A `web`-target agent hands its task to a cloud session and ends, so when that se
 - **The question travels whole** - not just the title and the labels, but whether several answers may be picked at once, which options start ticked, and which option ends the session instead of continuing it.
 - **The protocol's own examples are not questions** - the page opens with the agent's prompt, which quotes the await protocol verbatim, so anything inside that opening message and anything that looks like the protocol's placeholders or its two literal samples is discarded.
 - **The last real block wins** - page order is transcript order, so a later question supersedes an earlier one and the spec that renders above them all.
+- **An answered question is not pending** - a block that a user turn follows was already taken, so it is not reported however long it stays on the page; the panel says it was already answered.
 - **The transcript is mirrored one turn at a time** - each conversation turn the page marks is reported under the position the page gives it, as the user's or the session's, and only turns whose text changed are re-sent.
 - **A page that marks no turns mirrors nothing** - the panel and the self-report name that state, rather than mirroring whatever text is on screen.
 - **An answer is typed only into a composer that exists** - the composer is waited for, filled, given a beat to settle, then submitted by the page's own send button, or by Enter when there is none.
@@ -24,6 +27,10 @@ A `web`-target agent hands its task to a cloud session and ends, so when that se
 - **The panel says which step failed** - what was found, where, and what the daemon said, with structure-only counters when nothing was found.
 - **A session is created through the page's own controls** - the composer's chips (repository, then branch), each opening a searchable list; the page remembers the last repository picked, so the chips are waited for and read rather than assumed; the branch chip must read the requested branch before anything is sent, the session id is read from the address the page becomes, and a failure names the control that was missing.
 - **It watches the page rather than polling it** - the session's own changes trigger a re-read immediately; a slow heartbeat is only a backstop.
+- **In the Driver tab it reads the session list** - each of the daemon's sessions becomes a status by the label beside its row (awaiting input, unread, idle, running, landed, or an unknown label carried verbatim), paging the list through its own "Show more" button until every session is found or the list ends; a session not on it is reported missing.
+- **Visits happen inside the app** - a session is visited by clicking its row and, afterwards, the "New" link back to the list, never by loading a page; a visited session is surveyed and mirrored like any other — once its own transcript is on the page, not the previous session's — and an answer that travelled with the visit is typed and counted as sent only once the page took the send.
+- **The Driver overlay** - the Driver tab is covered by a full-page overlay naming it, saying what it is for, and holding the cycle log behind a collapsed "Show debug logs"; it is re-asserted after any page change and replaces the bridge panel there.
+- **One instruction at a time** - a list read or a drive still running makes the next instruction a refusal, never a second drive over the first.
 
 ## Business logic
 
@@ -57,11 +64,15 @@ The question is a JSON object carrying `options`, which the agent emits as a fen
 
 When no code element yields one, the whole page's text is scanned instead, shadow content included, which recovers a block that a syntax highlighter split across elements. Candidates found that way that also appear inside the opening message are subtracted.
 
-Of the surviving candidates, the last in page order is the question, since page order is transcript order: a later question supersedes an earlier, already-answered one.
+Of the surviving candidates, the last in page order is the question, since page order is transcript order: a later question supersedes an earlier one.
+
+That last block is still not pending when the user has already answered it: when a user turn sits at a later position than the turn the block renders in, the question was taken and the session moved on, so nothing is reported and the panel's question line says the question was already answered. The block's turn is found through any shadow root it renders behind. A block that renders in no turn is measured from the session's latest turn instead, and a page that marks no turns at all cannot be measured, so its block stands as pending.
 
 #### Rationale
 
-Four separate obstacles shaped this, each of which defeated an earlier attempt: the page has `code` blocks with no `pre` wrapper, so a `pre code` scan examined nothing; the message body renders behind shadow roots, so reading the document body's text never saw it; matching on a fixed `{"title"` prefix guessed at an indentation nobody promised; and the page renders the agent's own prompt, so the protocol's spec block is on screen before anything has been asked.
+The answered block stays on the page after the user's answer, and the daemon forgets which questions it delivered answers for when it restarts. Before this rule, the Driver tab's next visit to a finished session re-reported its old question, the dashboard asked the user again, and the second answer was typed into a session that had moved on — a cloud agent received two different answers to one question and rewrote its branch. The page is the one place that always knows whether the question was answered, so the rule lives here rather than in anything the daemon remembers.
+
+Four separate obstacles shaped the search itself, each of which defeated an earlier attempt: the page has `code` blocks with no `pre` wrapper, so a `pre code` scan examined nothing; the message body renders behind shadow roots, so reading the document body's text never saw it; matching on a fixed `{"title"` prefix guessed at an indentation nobody promised; and the page renders the agent's own prompt, so the protocol's spec block is on screen before anything has been asked.
 
 ### Telling a real question from the protocol's own examples
 
@@ -95,7 +106,7 @@ Only the opening turn — the run's prompt — is ever long enough to be cut. A 
 
 The page keeps only the recent part of a long transcript rendered. Positions come from the page rather than from counting what is rendered, so the daemon keeps one copy of every turn it has ever been sent, whichever turns are currently on screen.
 
-Only entries whose text differs from what was last accepted are sent, and what was sent is remembered only once the daemon has taken it, so a refused batch is retried rather than lost.
+Only entries whose text differs from what was last accepted are sent, and what was sent is remembered only once the daemon has taken it, so a refused batch is retried rather than lost. That memory is kept per session as well as per position, because the Driver tab moves between sessions inside one page.
 
 When the page marks no turns at all, nothing is mirrored: the panel's transcript line and the self-report both say that no transcript rows were found.
 
@@ -139,6 +150,26 @@ On the new-session page, the composer is waited for, then the chips beside it, w
 
 A session opened on the wrong branch would push its work somewhere the run never looks, which is why the branch is verified rather than assumed. The session id comes from the address because it is the one thing the page is guaranteed to expose, and it is exactly what the daemon joins runs on.
 
+### The Driver tab
+
+#### User story
+
+One pinned tab has to serve fifty cloud sessions: find the few waiting on the user, carry their questions home, type the answers, and make it obvious to anyone who stumbles on the tab that it is not theirs to use.
+
+#### Business logic
+
+This half becomes the Driver when the worker's reply to its self-report — sent once when any page loads, session or not — says so, or when the worker's first instruction arrives. From then on the overlay is up and the bridge panel is hidden, while the page keeps being surveyed and mirrored as any other.
+
+Reading the list: the list is fetched after the page reports loaded, so it is waited for first; a page with no session rows at all — signed out, or not on the sessions page — is named as such rather than read as every session missing. For the session ids the worker names, every row of the session list is read — a row is a link to its session, so the id is in its address; a link to a session elsewhere on the page does not stand in for a row that carries a status — and the label of the status icon beside it becomes the session's status: "Awaiting input" is awaiting, "Unread response" is unread, "Idle" is idle, "Running" is running, a label naming a pull request and its state is landed only when no status word is on the row, and any other label is unknown and carried verbatim, so a label the bridge does not know is named rather than guessed at. While any named session is not on the list and the list offers a "Show more" button of its own — the one within a few levels of the rows, never the one in the page's middle panel — it is clicked and the list read again, up to ten times, stopping when a click adds no rows. A session still not on the list is reported missing.
+
+Visiting: each visit the worker asks for is made by clicking the session's row, waiting for the page's address to name that session and for transcript rows that are not the previous session's to appear — the address changes before the page does — then running the survey, so the parked question and the transcript reach the daemon exactly as from any page. When an answer travelled with the visit, it is typed and submitted the way any answer is, and then the page is given a while to take the send: the delivery counts as sent only once the composer is empty again and the transcript holds a turn row it did not before — a new row, not a higher count, since a long transcript keeps only its tail rendered — and otherwise is reported as failed, naming what the page did. A session not on the list is not visited and its answer is left untouched. When the worker also asked for a session to be created, that comes first, on the list page the cycle starts from and through the same steps as any creation — a run is waiting on it; then the visits; then the "New" link takes the page back to the list without a load. The worker gets back what the creation did, what each visit found, and what each delivery did. While a list read or a drive is running, a second instruction is refused as busy rather than run alongside it — two drives in one page would navigate over each other; it happens when the worker that sent the first ended mid-cycle, since the page drives on regardless.
+
+The overlay covers the whole page: a heading "The Framework Driver", one line saying the tab is used by The Framework to watch the user's Claude Code sessions and type their answers, that another tab should be used for claude.ai, and that closing this one pauses the bridge, then a status line and a collapsed "Show debug logs" holding the cycle log — every list read, visit, delivery and creation with its outcome. It is placed beside claude.ai's interface rather than inside it, so an in-app navigation leaves it alone, and it is put back after any page change that removed it. Every log line is also sent to the worker, which keeps the worker awake for as long as a cycle runs.
+
+#### Rationale
+
+Every selector here is a guess about someone else's page, so what the list says is reported by label and an unknown label travels verbatim: the first session whose label the bridge has not seen is diagnosable from the daemon, not from a screenshot. The send is waited for because a visit moves on to the next session; an answer counted as sent the moment the button was clicked could be lost to a page that had not taken it. Typing goes through the composer's own value and the send button's click, not through the pointer, so covering the composer with the overlay costs nothing.
+
 ### The bridge panel
 
 #### User story
@@ -152,6 +183,8 @@ A panel is drawn in the page's bottom-right corner showing the extension's versi
 When no question was found, the panel adds structure-only counters: how many code and pre elements exist, how many shadow roots, how many frames and how many of them are readable, whether the `options` text exists in the plain page text and whether it exists once shadow content is included, how many object-shaped candidates the scan produced, how many failed to parse and the last parse error, and whether a child frame reported anything. None of this includes message text, so the report is safe to paste into a public issue.
 
 Two buttons: one copies the whole survey as JSON, and one fills the composer with the first option **without** sending it, which proves the write path exists without the extension ever speaking for the user.
+
+In the Driver tab the panel is not drawn; the overlay's debug log stands in for it.
 
 The panel folds down to a compact "TF" tab and back. Folding is remembered across reloads in the extension's own storage rather than the page's, so nothing the extension keeps is readable by the page it watches; while folded the title and version retreat into the tab's tooltip. Folding hides the detail, not the bridge — the page keeps being surveyed and the daemon keeps hearing from it.
 

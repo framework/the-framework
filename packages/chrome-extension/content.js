@@ -83,7 +83,11 @@ function reportToDaemon(parsed) {
   }
 }
 
-/** What we last sent per position, so an unchanged message is not re-posted on every mutation. */
+/**
+ * What we last sent per session and position, so an unchanged message is not re-posted on every
+ * mutation. Keyed by session too, because the Driver tab moves between sessions inside one page
+ * (#1332) and a position alone would collide across them.
+ */
 const sentEvents = new Map()
 
 /** What happened to the last transcript report, for the panel. */
@@ -153,7 +157,11 @@ function sayHello(sessionId, note) {
   if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return
   const version = chrome.runtime.getManifest?.().version ?? '?'
   try {
-    chrome.runtime.sendMessage({ type: 'tf-hello', sessionId, version, note }, () => void chrome.runtime.lastError)
+    chrome.runtime.sendMessage({ type: 'tf-hello', sessionId, version, note }, reply => {
+      // The worker's reply says whether this tab is the Driver (#1332): the overlay goes up
+      // the moment the page loads, not when the first cycle reaches it.
+      if (!chrome.runtime.lastError && reply?.driver) setDriver(true)
+    })
   } catch {
     // Nothing to do; the next pass tries again.
   }
@@ -181,7 +189,7 @@ function reportTranscript() {
   const kinds = [...new Set(rows.map(row => row.getAttribute('data-perf-row') ?? '?'))].join(',')
   sayHello(sessionId, `rows ${rows.length} (${kinds}), turns ${blocks.length}, ${transcriptStatus}`)
   if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return
-  const events = blocks.filter(event => sentEvents.get(event.seq) !== event.text)
+  const events = blocks.filter(event => sentEvents.get(`${sessionId}#${event.seq}`) !== event.text)
   if (!events.length) {
     transcriptStatus = `${blocks.length} turn(s), unchanged`
     return
@@ -194,7 +202,7 @@ function reportTranscript() {
       }
       // Only remember what the daemon actually took, so a rejected batch is retried.
       if (reply?.ok) {
-        for (const event of events) sentEvents.set(event.seq, event.text)
+        for (const event of events) sentEvents.set(`${sessionId}#${event.seq}`, event.text)
         transcriptStatus = `sent ${events.length} of ${blocks.length} turn(s)`
       } else {
         transcriptStatus = reply?.error ?? 'failed'
@@ -350,11 +358,45 @@ function collectChoices(text, stats, found) {
 }
 
 /**
+ * The transcript row an element renders in, looking out through any shadow roots it sits behind:
+ * the rows are in the light DOM while a message's body is not.
+ */
+function rowOf(el) {
+  for (let node = el; node; node = node.getRootNode?.()?.host) {
+    const row = node.closest?.(TURN_ROW)
+    if (row) return row
+  }
+  return undefined
+}
+
+/**
+ * Whether the user has already answered past that row: a human turn at a later position means
+ * the question was taken and the session moved on, however long the answered block stays on the
+ * page (#1703). A block not placed in any row is measured from the session's latest turn instead.
+ * With no positioned turns at all there is nothing to measure against, and the block stands.
+ */
+function answeredAfter(row) {
+  const rows = turnRows()
+  const position = r => Number(r.getAttribute('data-index'))
+  const kind = r => r.getAttribute('data-perf-row')
+  const at = row ? position(row) : Math.max(-1, ...rows.filter(r => kind(r) === 'assistant').map(position))
+  if (!Number.isInteger(at) || at < 0) return false
+  return rows.some(r => kind(r) === 'human' && position(r) > at)
+}
+
+/** Why the last survey reported no question when a block was on the page, for the panel. */
+let choiceNote = ''
+
+/**
  * The question a parked run is waiting on. Our agents emit it as a fenced JSON block carrying
  * `options`. Element-scoped first so the winner names where it was found, then the whole page
- * as a fallback for a block split across elements by a syntax highlighter.
+ * as a fallback for a block split across elements by a syntax highlighter. A block the user has
+ * already answered — a human turn follows it — is not pending, whatever any store remembers: the
+ * daemon forgets what was answered when it restarts, and re-asking would type a second answer
+ * into a session that moved on (#1703).
  */
 function findPendingChoice() {
+  choiceNote = ''
   // `code` on its own: the page has <code> blocks with no <pre> wrapper (round 1), and they
   // sit inside shadow roots (round 2). DOM order tracks transcript order, so the last real
   // question wins over both the spec and any earlier answered one.
@@ -367,7 +409,7 @@ function findPendingChoice() {
   for (const el of deepQueryAll('pre code, pre, code')) {
     if (inFirstMessage(el, firstMessage)) continue
     for (const parsed of extractChoices(el.textContent ?? '')) {
-      fromElements.push({ via: el.tagName.toLowerCase(), parsed })
+      fromElements.push({ via: el.tagName.toLowerCase(), parsed, row: rowOf(el) })
     }
   }
   // The page-text fallback reads everything, opening message included, so any block that also
@@ -379,7 +421,10 @@ function findPendingChoice() {
         .filter(parsed => !inPrompt.has(JSON.stringify(parsed)))
         .map(parsed => ({ via: 'page-text', parsed }))
   const real = candidates.filter(c => !isTemplate(c.parsed))
-  const found = real.at(-1)
+  const last = real.at(-1)
+  const answered = Boolean(last) && answeredAfter(last.row)
+  if (answered) choiceNote = 'already answered'
+  const found = answered ? undefined : last
   if (found) reportToDaemon(found.parsed)
   reportTranscript()
   return found ?? undefined
@@ -690,22 +735,306 @@ async function createSession({ repo, branch, prompt }) {
   return { ok: true, sessionId, note: `${repoNote}; ${branchNote}; sent via ${button ? 'button' : 'enter'}` }
 }
 
-// The worker hands answers and session requests to the top frame only: the composer lives
-// there, and a child frame acting too would submit twice.
+
+// ---------------------------------------------------------------------------
+// The Driver tab (#1332): one tab serving every watched session. The worker asks this page to
+// read claude.ai's own session list — the status icon beside each session carries a text label —
+// and then to visit the sessions it picked, navigating inside the app: clicking a session's row
+// and the "New" link back, never a page load, so fifty sessions cost fifty clicks. A visited
+// session goes through the same survey and mirror as any other page.
+
+/** The list's labels, and the word each becomes on the bridge. Anything else is reported as unknown, with its label. */
+const LIST_LABELS = new Map([
+  ['Awaiting input', 'awaiting'],
+  ['Unread response', 'unread'],
+  ['Idle', 'idle'],
+  ['Running', 'running'],
+])
+/** Once the session's work landed, its pull request and state stand in for the status. */
+const LANDED_LABEL = /^#\d+ · /
+const NAV_WAIT_MS = 15000
+const ROWS_WAIT_MS = 20000
+const SEND_WAIT_MS = 15000
+const LIST_PAGE_WAIT_MS = 5000
+const MAX_LIST_PAGES = 10
+const LOG_LINES = 300
+const OVERLAY_ID = 'tf-driver-overlay'
+
+let isDriver = false
+const driverLines = []
+
+/**
+ * Whether a list read or a drive is running in this page. A second instruction meanwhile is
+ * refused as busy rather than run alongside it: two drives would navigate over each other. It
+ * happens when the worker that sent the first one ended mid-cycle — the page drives on regardless.
+ */
+let driving = false
+
+async function whileFree(work) {
+  if (driving) return { ok: false, busy: true, note: 'the Driver is still busy with an earlier cycle in this page' }
+  driving = true
+  try {
+    return await work()
+  } finally {
+    driving = false
+  }
+}
+
+function setDriver(on) {
+  if (!on || isDriver) return
+  isDriver = true
+  ensureOverlay()
+  driverLog(`driver armed on ${location.pathname}`)
+}
+
+/**
+ * One line of the cycle log: shown behind the overlay's "Show debug logs", and sent to the
+ * worker, which stays awake for as long as lines keep coming.
+ */
+function driverLog(line) {
+  const stamped = `${new Date().toISOString().slice(11, 19)} ${line}`
+  driverLines.push(stamped)
+  if (driverLines.length > LOG_LINES) driverLines.shift()
+  renderOverlay()
+  if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return
+  try {
+    chrome.runtime.sendMessage({ type: 'tf-driver-log', line: stamped }, () => void chrome.runtime.lastError)
+  } catch {
+    // Dead context; the log still renders.
+  }
+}
+
+/** What the list's status icon says about a session row. */
+function statusOf(anchor) {
+  const labels = [...anchor.querySelectorAll('[aria-label]')]
+    .map(el => el.getAttribute('aria-label') ?? '')
+    .filter(label => label && !/^more options/i.test(label))
+  for (const label of labels) {
+    const known = LIST_LABELS.get(label)
+    if (known) return { status: known }
+  }
+  // Only with no status word on the row does its pull request stand in for one: a row can carry
+  // both, and "Awaiting input" beside a pull request is still a session stopped for its user.
+  if (labels.some(label => LANDED_LABEL.test(label))) return { status: 'landed' }
+  return { status: 'unknown', label: (labels[0] ?? '').slice(0, 80) }
+}
+
+/** The session rows the list shows, by session id: each row links to its session, so the id is in its address. */
+function sessionListRows() {
+  const rows = new Map()
+  for (const anchor of deepQueryAll('a[href*="/code/session_"]')) {
+    const id = /\/code\/(session_[A-Za-z0-9]+)/.exec(anchor.getAttribute('href') ?? '')?.[1]
+    if (!id) continue
+    const row = { anchor, ...statusOf(anchor) }
+    // The first link wins unless a later one carries a status and it did not: a link to the
+    // session elsewhere on the page is not its list row.
+    if (!rows.has(id) || (rows.get(id).status === 'unknown' && row.status !== 'unknown')) rows.set(id, row)
+  }
+  return rows
+}
+
+/**
+ * How far up from a "Show N more" button the container holding session rows may be for the
+ * button to count as the list's own. The list's button sits one level from its rows; the
+ * middle panel's sits twenty-eight from them, at the app's root (measured 2026-08-25).
+ */
+const LIST_BUTTON_REACH = 3
+
+/** The list's "Show N more" button, if the list has more to show. The middle panel's is not it. */
+function showMoreButton() {
+  const candidates = deepQueryAll('button').filter(b => /^show \d+ more$/i.test((b.textContent ?? '').trim()) && usable(b))
+  for (const button of candidates) {
+    let el = button.parentElement
+    for (let distance = 0; el && distance <= LIST_BUTTON_REACH; el = el.parentElement, distance++) {
+      if (el.querySelector('a[href*="/code/session_"]')) return button
+    }
+  }
+  return undefined
+}
+
+/**
+ * Read the list for these sessions, paging it until each is found or the list ends. The list is
+ * fetched after the page reports loaded, so it is waited for before it is read; a page with no
+ * session rows at all is not a list — signed out, or not on the sessions page — and is named
+ * rather than read as every session missing.
+ */
+async function readSessionList(ids) {
+  if (!(await waitFor(() => sessionListRows().size > 0, ROWS_WAIT_MS))) {
+    driverLog(`list: no session rows on ${location.pathname}`)
+    return { ok: false, note: `no session rows on ${location.pathname}` }
+  }
+  let rows = sessionListRows()
+  let pages = 0
+  while (ids.some(id => !rows.has(id)) && pages < MAX_LIST_PAGES) {
+    const more = showMoreButton()
+    if (!more) break
+    const before = rows.size
+    more.click()
+    pages++
+    const grew = await waitFor(() => sessionListRows().size > before, LIST_PAGE_WAIT_MS)
+    rows = sessionListRows()
+    if (!grew) break
+  }
+  const statuses = ids.map(id => {
+    const row = rows.get(id)
+    return row ? { sessionId: id, status: row.status, ...(row.label ? { label: row.label } : {}) } : { sessionId: id, status: 'missing' }
+  })
+  driverLog(
+    `list: ${rows.size} rows${pages ? ` after ${pages} more page(s)` : ''}; ${statuses.map(s => `${s.sessionId.slice(8, 14)}=${s.status}${s.label ? `(${s.label})` : ''}`).join(' ')}`,
+  )
+  return { ok: true, statuses, listed: rows.size, pages }
+}
+
+const atHome = () => location.pathname.replace(/\/+$/, '') === '/code'
+
+/** Back to the session list through the app's own "New" link: no page load. */
+async function goHome() {
+  if (atHome()) return true
+  const link = deepQueryAll('a[href="/code"]').find(usable)
+  if (!link) return false
+  link.click()
+  return Boolean(await waitFor(atHome, NAV_WAIT_MS))
+}
+
+function composerText() {
+  const composer = findComposer()
+  if (!composer) return ''
+  return (composer.via === 'textarea' ? composer.el.value : composer.el.textContent) ?? ''
+}
+
+/**
+ * Visit one session: click its row, wait for its transcript, run the survey (question and mirror
+ * reach the daemon as from any page), and type the queued answer if there is one — counted as
+ * sent only once the composer is empty again and the transcript gained the turn.
+ */
+async function visitSession(visit) {
+  const row = sessionListRows().get(visit.id)
+  if (!row) return { id: visit.id, ok: false, note: 'not on the list' }
+  driverLog(`visit ${visit.id} (${visit.status})`)
+  const stale = new Set(turnRows())
+  row.anchor.click()
+  if (!(await waitFor(() => sessionIdFromUrl() === visit.id, NAV_WAIT_MS))) return { id: visit.id, ok: false, note: `the page did not become ${visit.id}` }
+  // The address changes before the page does: wait for turn rows that are not the previous
+  // session's, so what is surveyed and typed into is this session's page.
+  await waitFor(() => turnRows().some(r => !stale.has(r)), ROWS_WAIT_MS)
+  await new Promise(resolve => setTimeout(resolve, window.__tfSettleMs ?? 1500))
+  const found = findPendingChoice()
+  const result = { id: visit.id, ok: true, rows: turnRows().length, ...(found ? { question: String(found.parsed.title ?? '').slice(0, 100) } : {}) }
+  if (visit.answer) {
+    const before = new Set(turnRows())
+    let outcome = await deliverAnswer(visit.answer.text)
+    if (outcome.ok) {
+      // Taken once the composer is empty again and a turn row exists that did not before — a
+      // new row, not a higher count, since a long transcript keeps only its tail rendered.
+      const taken = await waitFor(() => !composerText().trim() && turnRows().some(r => !before.has(r)), window.__tfSendWaitMs ?? SEND_WAIT_MS)
+      if (!taken) {
+        outcome = {
+          ok: false,
+          note: `${outcome.note}, but the page did not take the send: composer ${composerText().trim() ? 'still holds text' : 'empty'}, rows ${before.size} -> ${turnRows().length}`,
+        }
+      }
+    }
+    reportTranscript()
+    result.delivered = { sessionId: visit.id, id: visit.answer.id, ok: outcome.ok, ...(outcome.note ? { note: outcome.note } : {}) }
+  }
+  return result
+}
+
+/**
+ * One cycle: the session the daemon asked for first, if any — a run is waiting on it, and the
+ * new-session page is where a cycle starts — then the visits, then home.
+ */
+async function drive({ visits = [], start }) {
+  setDriver(true)
+  driverLog(`cycle: ${start ? 'one session to create, ' : ''}${visits.length} visit(s)`)
+  let started
+  if (start) {
+    const wasHome = atHome()
+    const there = wasHome || (await goHome())
+    // A navigation home swaps the page under us a beat after the address changes.
+    if (there && !wasHome) await new Promise(resolve => setTimeout(resolve, window.__tfSettleMs ?? 1500))
+    started = there ? await createSession(start) : { ok: false, note: 'could not reach the new-session page' }
+    driverLog(`create: ${started.ok ? started.sessionId : started.note}`)
+  }
+  const visited = []
+  const delivered = []
+  for (const visit of visits) {
+    const result = await visitSession(visit)
+    visited.push(result)
+    if (result.delivered) delivered.push(result.delivered)
+    driverLog(
+      `  ${visit.id}: ${
+        result.ok
+          ? `${result.rows} rows${result.question ? `, question "${result.question}"` : ''}${result.delivered ? `, answer ${result.delivered.ok ? 'sent' : `failed: ${result.delivered.note}`}` : ''}`
+          : result.note
+      }`,
+    )
+  }
+  const home = await goHome()
+  if (!home) driverLog('could not get back to the session list')
+  return { ok: true, visited, delivered, ...(started ? { started } : {}), ...(home ? {} : { note: 'could not get back to the session list' }) }
+}
+
+/**
+ * The full-page overlay: this tab is not for people. Appended beside the app's root rather than
+ * inside it, so an in-app navigation leaves it alone; the watcher re-appends it if anything does
+ * remove it. Typing goes through the composer's own value and the send button's click, not
+ * through the pointer, so covering the composer costs nothing.
+ */
+function ensureOverlay() {
+  if (!isDriver || document.getElementById(OVERLAY_ID)) return
+  const overlay = document.createElement('div')
+  overlay.id = OVERLAY_ID
+  overlay.style.cssText = [
+    'position:fixed', 'inset:0', 'z-index:2147483647', 'background:#0f1218', 'color:#dbdbdb',
+    'font:15px/1.5 ui-sans-serif,system-ui,sans-serif', 'display:flex', 'flex-direction:column',
+    'align-items:center', 'justify-content:center', 'padding:32px', 'box-sizing:border-box', 'overflow:auto',
+  ].join(';')
+  const heading = document.createElement('h1')
+  heading.textContent = 'The Framework Driver'
+  heading.style.cssText = 'font-size:32px;margin:0 0 12px;color:#a7c080;font-weight:600'
+  const phrase = document.createElement('p')
+  phrase.textContent =
+    'The Framework is using this tab to watch your Claude Code sessions and to type your answers into them. Use another tab for claude.ai. Closing this tab pauses the bridge; the extension’s options page reopens it.'
+  phrase.style.cssText = 'max-width:560px;text-align:center;margin:0 0 16px;color:#aab2c0'
+  const status = document.createElement('div')
+  status.className = 'tf-driver-status'
+  status.style.cssText = 'font:12px/1.45 ui-monospace,monospace;color:#7f8797;text-align:center;max-width:800px'
+  const details = document.createElement('details')
+  details.style.cssText = 'margin-top:20px;width:min(900px,100%)'
+  const summary = document.createElement('summary')
+  summary.textContent = 'Show debug logs'
+  summary.style.cssText = 'cursor:pointer;color:#7f8797;text-align:center'
+  const log = document.createElement('pre')
+  log.className = 'tf-driver-log'
+  log.style.cssText = 'max-height:50vh;overflow:auto;background:#1f2430;padding:12px;border-radius:8px;font:12px/1.45 ui-monospace,monospace;white-space:pre-wrap;margin:8px 0 0'
+  details.append(summary, log)
+  overlay.append(heading, phrase, status, details)
+  document.documentElement.appendChild(overlay)
+  renderOverlay()
+}
+
+function renderOverlay() {
+  const overlay = document.getElementById(OVERLAY_ID)
+  if (!overlay) return
+  const version = typeof chrome !== 'undefined' && chrome.runtime?.getManifest ? chrome.runtime.getManifest().version : '?'
+  overlay.querySelector('.tf-driver-status').textContent = `bridge v${version} · ${location.pathname} · ${turnRows().length} turn rows · question ${bridgeStatus} · transcript ${transcriptStatus}`
+  overlay.querySelector('.tf-driver-log').textContent = driverLines.join('\n')
+}
+
+// The worker drives the top frame only: the list and the composer live there, and a child frame
+// acting too would click and submit twice.
 if (IS_TOP && typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    if (message?.type === 'tf-probe-new-session') {
-      sendResponse(probeNewSession())
-      return true
-    }
-    if (message?.type === 'tf-create-session' && message.start) {
-      void createSession(message.start)
+    if (message?.type === 'tf-read-list' && Array.isArray(message.ids)) {
+      setDriver(true)
+      void whileFree(() => readSessionList(message.ids.filter(id => typeof id === 'string')))
         .then(sendResponse)
         .catch(err => sendResponse({ ok: false, note: String(err?.message ?? err) }))
       return true
     }
-    if (message?.type !== 'tf-deliver-answer' || typeof message.text !== 'string') return false
-    void deliverAnswer(message.text)
+    if (message?.type !== 'tf-drive') return false
+    void whileFree(() => drive({ visits: Array.isArray(message.visits) ? message.visits : [], start: message.start }))
       .then(sendResponse)
       .catch(err => sendResponse({ ok: false, note: String(err?.message ?? err) }))
     return true
@@ -719,6 +1048,8 @@ if (typeof chrome === 'undefined') {
   window.__tfBridgeDeliverAnswer = deliverAnswer
   window.__tfBridgeCreateSession = createSession
   window.__tfBridgeProbeNewSession = probeNewSession
+  window.__tfBridgeReadSessionList = ids => whileFree(() => readSessionList(ids))
+  window.__tfBridgeDrive = args => whileFree(() => drive(args))
 }
 
 /**
@@ -810,6 +1141,9 @@ if (!IS_TOP) {
   document.documentElement.appendChild(panel)
 
   let latest = survey()
+  // Announce the page once whatever it is: on the session list there is no session to report,
+  // but the worker's reply is what tells the Driver tab it is the Driver (#1332).
+  sayHello(sessionIdFromUrl(), `page loaded on ${location.pathname}`)
 
   // Whether the panel is folded down to a compact TF tab. Remembered in chrome.storage rather than
   // the page's localStorage: the preference should survive a reload, and nothing the extension
@@ -841,6 +1175,15 @@ if (!IS_TOP) {
     const top = survey()
     // A child frame's find wins: it means the content lives there, which is the finding.
     latest = { ...top, fromFrame: fromFrame ?? null }
+    // The Driver tab (#1332) shows its overlay instead of the corner panel; the survey above
+    // still ran, so its sessions are read and mirrored like any other page's.
+    if (isDriver) {
+      panel.style.display = 'none'
+      ensureOverlay()
+      renderOverlay()
+      return
+    }
+    panel.style.display = ''
     const winner = top.choiceFound ? top : fromFrame?.choiceFound ? fromFrame : top
     const d = top.diagnostics
     panel.innerHTML = ''
@@ -880,7 +1223,7 @@ if (!IS_TOP) {
     // hides the detail, not the bridge, so the daemon keeps hearing from this page.
     if (collapsed) return
     const rows = [
-      ['question found', winner.choiceFound ? `yes (${winner.choiceVia}${winner === fromFrame ? ', in iframe' : ''})` : 'no'],
+      ['question found', winner.choiceFound ? `yes (${winner.choiceVia}${winner === fromFrame ? ', in iframe' : ''})` : `no${choiceNote ? ` (${choiceNote})` : ''}`],
       ['title', winner.choiceTitle ?? '-'],
       ['options', winner.choiceOptions?.length ? winner.choiceOptions.join(' | ') : '-'],
       ['composer', top.composerFound ? top.composerVia : 'not found'],

@@ -30,15 +30,16 @@
 
     <label style="font-weight:600;margin-top:18px;display:flex;align-items:center;gap:8px">
       <input id="autoOpen" type="checkbox" style="width:auto" />
-      Open a pinned background tab for each recent cloud session
+      Run the Driver tab
     </label>
     <p style="margin:4px 0 0;font-size:12px">
-      Without this the bridge only works while you happen to have the session open. With it, the
-      tabs open themselves, pinned and inactive, and close when you close them.
+      One pinned background tab that reads claude.ai's session list, visits the cloud sessions
+      waiting on you, and types your answers. Without it the bridge does nothing. Closing the tab
+      pauses it; the button below reopens it.
     </p>
 
     <button id="save">Save and test</button>
-    <button id="openNow" style="background:#4a5566;margin-left:8px">Open tabs now</button>
+    <button id="openNow" style="background:#4a5566;margin-left:8px">Open the Driver tab now</button>
     <div id="status" role="status"></div>
 
     <script src="options.js"></script>

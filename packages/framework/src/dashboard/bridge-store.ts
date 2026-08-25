@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { continuationPrompt, takeoverPrompt } from '../turn-gate.js'
-import type { BridgeEvent, BridgeHello, BridgeQuestion } from './bridge-endpoints.js'
+import type { BridgeEvent, BridgeHello, BridgeQuestion, BridgeSessionStatus } from './bridge-endpoints.js'
 
 /**
  * An answer picked in the dashboard, on its way back to the session (#1237).
@@ -105,6 +105,32 @@ export class BridgeQuestions {
   /** The last contact, or undefined if nothing has ever reached the bridge. */
   lastContact(): BridgeContact | undefined {
     return this.contact
+  }
+
+  private readonly statusBySession = new Map<string, BridgeSessionStatus>()
+
+  /**
+   * What claude.ai's session list last said about a session (#1332), as the Driver tab read it.
+   *
+   * This is the read-back a web run's own record cannot give: the run ends at its hand-off, so
+   * the record says `done` whether the session is parked on its user or finished hours ago.
+   */
+  recordStatus(status: BridgeSessionStatus): void {
+    this.statusBySession.set(status.sessionId, status)
+  }
+
+  /** The session's last list status, or undefined while the Driver has never reported one. */
+  status(sessionId: string): BridgeSessionStatus | undefined {
+    return this.statusBySession.get(sessionId)
+  }
+
+  /**
+   * Whether the session is waiting on a human: the bridge holds the question it is parked on, or
+   * claude.ai's list shows it awaiting input — a question asked in prose carries no block for
+   * the bridge to hold, and the list is the only thing that says the session stopped for it.
+   */
+  waiting(sessionId: string): boolean {
+    return this.bySession.has(sessionId) || this.statusBySession.get(sessionId)?.status === 'awaiting'
   }
 
   /**
@@ -238,6 +264,7 @@ export class BridgeQuestions {
     this.eventsBySession.delete(sessionId)
     this.answersBySession.delete(sessionId)
     this.answeredBySession.delete(sessionId)
+    this.statusBySession.delete(sessionId)
   }
 }
 

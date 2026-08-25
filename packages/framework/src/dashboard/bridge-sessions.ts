@@ -2,24 +2,28 @@ import type { AgentMeta } from '../store/index.js'
 import type { BridgeSession } from './bridge-endpoints.js'
 import { CLOUD_SESSION_WINDOW_MS } from '../cloud-run-state.js'
 
-/** How far back a cloud agent is still worth having a tab open for: the session window, shared with its cloud state (#1668). */
+/** How far back a cloud agent's session is still served: the session window, shared with its cloud state (#1668). */
 export const BRIDGE_SESSION_WINDOW_MS = CLOUD_SESSION_WINDOW_MS
 
 /**
- * At most this many tabs. The extension opens one per session, and a browser that quietly
- * accumulates tabs is worse than a bridge that misses an old agent.
- */
-export const BRIDGE_SESSION_LIMIT = 3
-
-/**
- * Which cloud sessions the extension should be watching (#1237).
+ * Which cloud sessions the extension's Driver tab should be serving (#1237, #1332).
  *
- * Recency is the whole filter, and it has to be, because a web agent's status tells us nothing:
- * #1231 ends the agent at the hand-off, so every one of them reads `done` whether its session is
- * parked on a question or finished an hour ago. There is no read-back that would say which, so
- * the honest rule is "recent, and not many", rather than a liveness check we cannot perform.
+ * Every web run's session inside the window, newest first, and all of them: one Driver tab serves
+ * the whole list by reading claude.ai's own session list and visiting only the sessions that need
+ * it (#1332), so a long list costs a sidebar read rather than a tab each — which is why the cap
+ * of three tabs this used to impose is gone.
+ *
+ * Recency is still the filter on this side, because a web run's own status says nothing: #1231
+ * ends the agent at the hand-off, so every one of them reads `done` whether its session is parked
+ * on a question or finished an hour ago. The read-back that tells those apart is the list status
+ * the Driver reports, and that lives in the bridge store, not on the record.
  */
-export function bridgeSessionsFrom(agents: readonly AgentMeta[], now: Date, windowMs = BRIDGE_SESSION_WINDOW_MS, limit = BRIDGE_SESSION_LIMIT): BridgeSession[] {
+export function bridgeSessionsFrom(
+  agents: readonly AgentMeta[],
+  now: Date,
+  answerQueued: (sessionId: string) => boolean,
+  windowMs = BRIDGE_SESSION_WINDOW_MS,
+): BridgeSession[] {
   const cutoff = now.getTime() - windowMs
   const seen = new Set<string>()
   const out: { session: BridgeSession; at: number }[] = []
@@ -29,10 +33,10 @@ export function bridgeSessionsFrom(agents: readonly AgentMeta[], now: Date, wind
     if (!Number.isFinite(at) || at < cutoff) continue
     if (seen.has(agent.sessionId)) continue
     seen.add(agent.sessionId)
-    out.push({ session: { id: agent.sessionId, url: `https://claude.ai/code/${agent.sessionId}` }, at })
+    out.push({
+      session: { id: agent.sessionId, url: `https://claude.ai/code/${agent.sessionId}`, answerQueued: answerQueued(agent.sessionId) },
+      at,
+    })
   }
-  return out
-    .sort((a, b) => b.at - a.at)
-    .slice(0, limit)
-    .map(entry => entry.session)
+  return out.sort((a, b) => b.at - a.at).map(entry => entry.session)
 }

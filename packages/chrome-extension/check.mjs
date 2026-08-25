@@ -445,5 +445,220 @@ const START = { repo: 'framework/the-framework', branch: 'cloud-1-abcd', prompt:
   dom.window.close()
 }
 
+
+// ---------------------------------------------------------------------------
+// The Driver tab (#1332): one page serving every watched session. The synthetic app mirrors what
+// was measured on the live one on 2026-08-25: the sidebar lists sessions as links carrying the
+// session id, each with a status icon whose aria-label is text ("Awaiting input", "Unread
+// response", "Idle", "Running", or the pull request's state), a "Show N more" button at the end
+// of the list — and a decoy one in the middle panel — a "New" link back to the list, and in-app
+// navigation that swaps the main area without a page load.
+
+const SESSIONS = [
+  { id: 'session_01AWAIT', label: 'Awaiting input', title: 'Parked on a question', question: true },
+  { id: 'session_01UNREAD', label: 'Unread response', title: 'Finished a turn' },
+  { id: 'session_01IDLE', label: 'Idle', title: 'Nothing new' },
+  { id: 'session_01RUN', label: 'Running', title: 'Still working' },
+  { id: 'session_01LANDED', label: '#1586 · Merged', title: 'Landed' },
+  { id: 'session_01ODD', label: 'Something new', title: 'A label the bridge does not know' },
+  { id: 'session_01PAGE2', label: 'Awaiting input', title: 'Only on the second page', question: true },
+]
+
+function appPage({ sessions = SESSIONS, firstPage = 6, sendAppendsRow = true } = {}) {
+  const sidebarRow = s => `<a href="/code/${s.id}" data-roving-item=""><span aria-label="${s.label}"></span><span>${s.title}</span></a>`
+  const composer = `<div contenteditable="true"></div><button aria-label="Send message" id="send"></button>`
+  // The middle panel's own "Show N more" sits deep in its card — on the live page, twenty-eight
+  // levels from the sidebar's rows — and must never be taken for the list's.
+  const panel = `<section><div><div><div><div>Sessions</div><button id="decoy">Show 2 more</button></div></div></div></section>`
+  const dom = new JSDOM(
+    `<!doctype html><html><body><div id="app">
+      <nav id="sidebar"><a href="/code" id="new">New</a><div id="rows">${sessions.slice(0, firstPage).map(sidebarRow).join('')}</div>${sessions.length > firstPage ? '<button id="more">Show 20 more</button>' : ''}</nav>
+      <main id="main">${panel}${composer}</main>
+    </div></body></html>`,
+    { url: 'https://claude.ai/code', runScripts: 'outside-only' },
+  )
+  const w = dom.window
+  const d = w.document
+  const seen = { decoyClicked: 0, moreClicked: 0, navigations: [], sent: [] }
+  const feedFor = s => feed(row('human', 0, 'do the thing'), row('assistant', 1, s.question ? `<code>${block}</code>` : '<p>done</p>'))
+  const wireMain = () => {
+    d.getElementById('send')?.addEventListener('click', () => {
+      const box = d.querySelector('[contenteditable="true"]')
+      const text = box.textContent
+      seen.sent.push({ path: w.location.pathname, text })
+      box.textContent = ''
+      if (sendAppendsRow) d.querySelector('[role="feed"]')?.insertAdjacentHTML('beforeend', row('human', 2, `<p>${text}</p>`))
+    })
+  }
+  const wireRows = () => {
+    for (const a of d.querySelectorAll('#rows a')) {
+      a.addEventListener('click', e => {
+        e.preventDefault()
+        const s = sessions.find(x => a.getAttribute('href').endsWith(x.id))
+        w.history.pushState({}, '', `/code/${s.id}`)
+        seen.navigations.push(s.id)
+        d.getElementById('main').innerHTML = feedFor(s) + composer
+        wireMain()
+      })
+    }
+  }
+  d.getElementById('new').addEventListener('click', e => {
+    e.preventDefault()
+    w.history.pushState({}, '', '/code')
+    seen.navigations.push('home')
+    d.getElementById('main').innerHTML = panel + composer
+    wireMain()
+  })
+  d.getElementById('more')?.addEventListener('click', () => {
+    seen.moreClicked++
+    d.getElementById('rows').insertAdjacentHTML('beforeend', sessions.slice(firstPage).map(sidebarRow).join(''))
+    d.getElementById('more').remove()
+    wireRows()
+  })
+  d.addEventListener('click', e => {
+    if (e.target?.id === 'decoy') seen.decoyClicked++
+  })
+  wireRows()
+  wireMain()
+  w.__tfComposerWaitMs = 500
+  w.__tfSettleMs = 10
+  w.eval(script)
+  return { dom, w, d, seen }
+}
+
+{
+  const { dom, w, seen } = appPage()
+  const ids = SESSIONS.map(s => s.id).concat('session_01GONE')
+  const got = await w.__tfBridgeReadSessionList(ids)
+  const want = [
+    ['session_01AWAIT', 'awaiting'],
+    ['session_01UNREAD', 'unread'],
+    ['session_01IDLE', 'idle'],
+    ['session_01RUN', 'running'],
+    ['session_01LANDED', 'landed'],
+    ['session_01ODD', 'unknown'],
+    ['session_01PAGE2', 'awaiting'],
+    ['session_01GONE', 'missing'],
+  ]
+  const statuses = got.statuses.map(s => [s.sessionId, s.status])
+  const odd = got.statuses.find(s => s.sessionId === 'session_01ODD')
+  const ok =
+    JSON.stringify(statuses) === JSON.stringify(want) && odd.label === 'Something new' && seen.moreClicked === 1 && seen.decoyClicked === 0 && got.pages === 1
+  if (!ok) failed++
+  console.log(
+    `${ok ? 'PASS' : 'FAIL'}  the list is read by label, paged through the list's own button, an unknown label is carried and an absent session is missing  (statuses=${JSON.stringify(statuses)}, label=${odd?.label}, more=${seen.moreClicked}, decoy=${seen.decoyClicked})`,
+  )
+  dom.window.close()
+}
+
+{
+  // A cycle: the awaiting session is visited and its question reported; the unread one gets the
+  // queued answer typed, and the send counts only once the transcript gained the turn; the page
+  // ends back on the list, and the overlay is up throughout.
+  const { dom, w, d, seen } = appPage()
+  const result = await w.__tfBridgeDrive({
+    visits: [
+      { id: 'session_01AWAIT', status: 'awaiting' },
+      { id: 'session_01UNREAD', status: 'unread', answer: { id: 'ans-1', text: 'Work on the next TODO' } },
+    ],
+  })
+  const overlay = d.getElementById('tf-driver-overlay')
+  const visited = result.visited.map(v => [v.id, v.ok, v.question ?? null])
+  const ok =
+    result.ok &&
+    JSON.stringify(visited) === JSON.stringify([['session_01AWAIT', true, 'What would you like me to do?'], ['session_01UNREAD', true, null]]) &&
+    w.__tfBridgeQuestion?.sessionId === 'session_01AWAIT' &&
+    JSON.stringify(result.delivered) === JSON.stringify([{ sessionId: 'session_01UNREAD', id: 'ans-1', ok: true, note: 'filled contenteditable, clicked send button' }]) &&
+    JSON.stringify(seen.sent) === JSON.stringify([{ path: '/code/session_01UNREAD', text: 'Work on the next TODO' }]) &&
+    JSON.stringify(seen.navigations) === JSON.stringify(['session_01AWAIT', 'session_01UNREAD', 'home']) &&
+    w.location.pathname === '/code' &&
+    overlay &&
+    /The Framework Driver/.test(overlay.textContent) &&
+    /Show debug logs/.test(overlay.textContent) &&
+    /visit session_01AWAIT \(awaiting\)/.test(overlay.querySelector('.tf-driver-log').textContent) &&
+    d.getElementById('tf-bridge-panel').style.display === 'none'
+  if (!ok) failed++
+  console.log(
+    `${ok ? 'PASS' : 'FAIL'}  a cycle visits in-app, reports the question, types the answer and waits for the send, then returns to the list under the overlay  (visited=${JSON.stringify(visited)}, question=${w.__tfBridgeQuestion?.sessionId}, delivered=${JSON.stringify(result.delivered)}, nav=${seen.navigations.join('>')}, path=${w.location.pathname}, overlay=${Boolean(overlay)})`,
+  )
+  // Whatever removes the overlay, the next page change brings it back.
+  overlay.remove()
+  d.getElementById('main').insertAdjacentHTML('beforeend', '<p>something changed</p>')
+  await new Promise(resolve => setTimeout(resolve, 600))
+  const back = Boolean(d.getElementById('tf-driver-overlay'))
+  if (!back) failed++
+  console.log(`${back ? 'PASS' : 'FAIL'}  the overlay is re-asserted after being removed  (back=${back})`)
+  dom.window.close()
+}
+
+{
+  // A page that swallows the send: the answer is reported as not taken, never as sent.
+  const { dom, w } = appPage({ sendAppendsRow: false })
+  w.__tfSendWaitMs = 300
+  const result = await w.__tfBridgeDrive({ visits: [{ id: 'session_01UNREAD', status: 'unread', answer: { id: 'ans-2', text: 'Work on the next TODO' } }] })
+  const delivered = result.delivered[0]
+  const ok = delivered && delivered.ok === false && /did not take the send/.test(delivered.note) && /rows 2 -> 2/.test(delivered.note)
+  if (!ok) failed++
+  console.log(`${ok ? 'PASS' : 'FAIL'}  an answer the page did not take is reported as failed, not sent  (delivered=${JSON.stringify(delivered)})`)
+  dom.window.close()
+}
+
+{
+  // A session the list does not show cannot be visited; the queued answer is reported back untouched.
+  const { dom, w } = appPage()
+  const result = await w.__tfBridgeDrive({ visits: [{ id: 'session_01GONE', status: 'missing', answer: { id: 'ans-3', text: 'x' } }] })
+  const ok = result.visited[0].ok === false && result.visited[0].note === 'not on the list' && result.delivered.length === 0
+  if (!ok) failed++
+  console.log(`${ok ? 'PASS' : 'FAIL'}  a session missing from the list is not visited and its answer is not claimed  (${JSON.stringify(result.visited[0])})`)
+  dom.window.close()
+}
+
+// ---------------------------------------------------------------------------
+// Which sessions a cycle visits (driver-plan.js): the statuses are sticky — an in-app visit clears
+// neither "Awaiting input" nor "Unread response" — so a parked session is visited on a change,
+// after a while, and always when an answer is queued; the rest are never visited.
+
+{
+  const plan = readFileSync(join(here, 'driver-plan.js'), 'utf8')
+  const dom = new JSDOM('<!doctype html><html><body></body></html>', { runScripts: 'outside-only' })
+  dom.window.eval(plan)
+  const planVisits = dom.window.__tfPlanVisits
+  const NOW = 1_000_000
+  const statuses = [
+    { sessionId: 's_await', status: 'awaiting' },
+    { sessionId: 's_unread', status: 'unread' },
+    { sessionId: 's_idle', status: 'idle' },
+    { sessionId: 's_run', status: 'running' },
+    { sessionId: 's_landed', status: 'landed' },
+    { sessionId: 's_missing', status: 'missing' },
+  ]
+  const ids = visits => visits.map(v => v.id)
+  // Never seen: every parked session is due, nothing else is.
+  const first = planVisits(statuses, new Map(), new Map(), NOW)
+  // Seen a moment ago with the same status: nothing is due.
+  const recent = new Map(statuses.map(s => [s.sessionId, { status: s.status, visitedAt: NOW - 1000 }]))
+  const second = planVisits(statuses, new Map(), recent, NOW)
+  // The same, six minutes later: the parked ones are due again.
+  const later = planVisits(statuses, new Map(), recent, NOW + 6 * 60_000)
+  // A status change makes a parked session due at once.
+  const changed = new Map(recent)
+  changed.set('s_unread', { status: 'idle', visitedAt: NOW - 1000 })
+  const onChange = planVisits(statuses, new Map(), changed, NOW)
+  // An answer forces a visit whatever the status, and travels with it.
+  const answers = new Map([['s_idle', { id: 'a1', text: 't' }]])
+  const forced = planVisits(statuses, answers, recent, NOW)
+  const ok =
+    JSON.stringify(ids(first)) === JSON.stringify(['s_await', 's_unread']) &&
+    second.length === 0 &&
+    JSON.stringify(ids(later)) === JSON.stringify(['s_await', 's_unread']) &&
+    JSON.stringify(ids(onChange)) === JSON.stringify(['s_unread']) &&
+    JSON.stringify(forced) === JSON.stringify([{ id: 's_idle', status: 'idle', answer: { id: 'a1', text: 't' } }])
+  if (!ok) failed++
+  console.log(
+    `${ok ? 'PASS' : 'FAIL'}  visits are planned on change, on age, and on a queued answer; idle, running, landed and missing sessions are left alone  (first=${ids(first)}, second=${second.length}, later=${ids(later)}, change=${ids(onChange)}, forced=${JSON.stringify(forced)})`,
+  )
+  dom.window.close()
+}
+
 console.log(failed ? `\n${failed} case(s) failed` : '\nall cases passed')
 process.exit(failed ? 1 : 0)

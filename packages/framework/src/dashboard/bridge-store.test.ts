@@ -129,3 +129,22 @@ test('an undelivered pick dies with the question it answered (#1237)', () => {
   store.record(question('Something new'))
   assert.equal(store.pendingAnswer(SESSION), undefined)
 })
+
+test("claude.ai's list saying a session awaits input makes it waiting, until the session is cleared (#1332)", () => {
+  const store = new BridgeQuestions()
+  assert.equal(store.waiting(SESSION), false)
+  // A question asked in prose carries no block: the list is the only thing that says the session
+  // stopped for its user.
+  store.recordStatus({ sessionId: SESSION, status: 'awaiting', at: '2026-08-25T18:00:00.000Z' })
+  assert.equal(store.waiting(SESSION), true)
+  assert.equal(store.status(SESSION)?.status, 'awaiting')
+  // The newest report replaces the older one.
+  store.recordStatus({ sessionId: SESSION, status: 'idle', at: '2026-08-25T18:01:00.000Z' })
+  assert.equal(store.waiting(SESSION), false)
+  // A parked question makes the session waiting whatever the list said.
+  store.record(question())
+  assert.equal(store.waiting(SESSION), true)
+  store.clear(SESSION)
+  assert.equal(store.waiting(SESSION), false)
+  assert.equal(store.status(SESSION), undefined)
+})

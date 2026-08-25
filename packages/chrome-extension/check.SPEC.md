@@ -1,4 +1,4 @@
-Runs the Claude web bridge's page half against synthetic session pages, so its reading and writing of the page can be checked without a browser, an installed extension, or a live cloud session.
+Runs the Claude web bridge's page half and its visit planner against synthetic claude.ai pages, so the reading, driving and writing of the page can be checked without a browser, an installed extension, or a live cloud session.
 
 ## What the tests cover
 
@@ -34,6 +34,15 @@ Creating a session:
 - A page with no repository picker is refused naming that control, and the probe describes the page's controls without touching them.
 
 The panel: it folds down to a compact "TF" tab, dropping its rows and its full title, and unfolds with the question's details intact.
+
+The Driver, on a synthetic app built like the live one was observed to be — a session list of links carrying the session id with a text status label beside each, a "Show more" button at the list's end and a decoy one deep in the middle panel, a "New" link, and in-app navigation that swaps the main area without a page load:
+
+- The list is read by label — awaiting, unread, idle, running, landed, and an unknown label carried verbatim — paged through the list's own button and never the decoy, and a session absent from the list is reported missing.
+- A cycle visits the sessions it was given in-app, reports the parked question from the awaiting one, types the queued answer into the other and counts it sent only once the page took the send, returns to the list, and keeps the overlay up — with its heading, its debug log naming the visits, and the panel hidden; the overlay comes back after being removed.
+- An answer the page did not take is reported as failed, naming what the page did, never as sent.
+- A session missing from the list is not visited and its answer is not claimed.
+
+The visit planner: a parked session is visited when never seen, when its status changed, and again after five minutes; a queued answer forces a visit whatever the status; idle, running, landed and missing sessions are never visited on their own.
 
 ## Rationale
 

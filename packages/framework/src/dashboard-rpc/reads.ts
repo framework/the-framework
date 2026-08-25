@@ -94,12 +94,13 @@ export async function onAgents(projectId: string): Promise<AgentMeta[]> {
 }
 
 /**
- * A web run whose cloud session the bridge reports as parked on a question is marked waiting
- * (#1668), so its row says so instead of "in cloud" — the archive on disk cannot know, only the
- * daemon's bridge store does. Every other run passes through untouched.
+ * A web run whose cloud session is waiting on a human — the bridge holds its parked question, or
+ * claude.ai's session list shows it awaiting input (#1332) — is marked waiting (#1668), so its row
+ * says so instead of "in cloud": the archive on disk cannot know, only the daemon's bridge store
+ * does. Every other run passes through untouched.
  */
 export function markCloudWaiting(agent: AgentMeta): AgentMeta {
-  if (agent.target !== 'web' || !agent.sessionId || !bridgeQuestions().get(agent.sessionId)) return agent
+  if (agent.target !== 'web' || !agent.sessionId || !bridgeQuestions().waiting(agent.sessionId)) return agent
   return { ...agent, cloudWaiting: true }
 }
 

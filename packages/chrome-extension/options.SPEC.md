@@ -1,4 +1,4 @@
-The Claude web bridge's settings page: where the user points the extension at their dashboard, pastes the daemon token, and switches session tabs on or off — and where saving those settings immediately proves whether the bridge actually works, naming which failure it is when it does not.
+The Claude web bridge's settings page: where the user points the extension at their dashboard, pastes the daemon token, and switches the Driver tab on or off — and where saving those settings immediately proves whether the bridge actually works, naming which failure it is when it does not.
 
 ## User story
 
@@ -6,11 +6,11 @@ The bridge has several ways to be misconfigured, and from the dashboard they all
 
 ## Business logic — TL;DR
 
-- **Three settings, stored by the extension** - the dashboard URL, the daemon token, and whether tabs open by themselves; kept in the extension's own storage so nothing on claude.ai can read the token.
+- **Three settings, stored by the extension** - the dashboard URL, the daemon token, and whether the Driver tab runs; kept in the extension's own storage so nothing on claude.ai can read the token.
 - **Saving is followed by proving** - every save runs a connection test, because a token that is merely stored tells the user nothing.
 - **Each failure is named, not merely reported** - browser permissions not granted, bridge switched off, token rejected, extension too old, dashboard too old, or daemon unreachable are six different messages with six different fixes.
-- **Success answers the next question too** - a working connection also reports how many recent cloud sessions the daemon is watching and whether tabs are about to open.
-- **Tabs can be opened on demand** - a button runs the tab sweep immediately and reports what it did, or why it did nothing.
+- **Success answers the next question too** - a working connection also reports how many recent cloud sessions the daemon lists and whether the Driver tab serves them.
+- **A cycle can be run on demand** - a button runs a Driver cycle immediately and reports what it did, or why it did nothing; it also resumes a Driver paused by closing its tab.
 
 ## Business logic
 
@@ -22,7 +22,7 @@ See `## User story`.
 
 #### Business logic
 
-Three things are stored: the dashboard's URL, defaulting to `http://localhost:4200` and kept without trailing slashes; the daemon token, which the user pastes from The Framework; and whether the extension may open a tab per watched cloud session, which is on unless the user turns it off. The tab switch is written out explicitly rather than left unset, so the extension's service worker never has to guess a default. Saving without a token is refused with a prompt to paste one.
+Three things are stored: the dashboard's URL, defaulting to `http://localhost:4200` and kept without trailing slashes; the daemon token, which the user pastes from The Framework; and whether the extension may run its Driver tab, which is on unless the user turns it off. The Driver switch is written out explicitly rather than left unset, so the extension's service worker never has to guess a default. Saving without a token is refused with a prompt to paste one.
 
 ### Proving the connection
 
@@ -41,7 +41,7 @@ Saving is immediately followed by a test, reported as one sentence. It walks a l
 - **The dashboard has no bridge route.** The dashboard answered successfully but with its own web page rather than the bridge's acknowledgement, which means a build of The Framework that predates the bridge; the fix is updating it.
 - **The dashboard is unreachable.** Nothing answered at that URL.
 
-Only a clean acknowledgement counts as connected, and a connected result goes one step further: it lists the cloud sessions the daemon is currently watching and says whether tabs are about to open for them, or that tab opening is switched off, or that there is nothing recent to watch.
+Only a clean acknowledgement counts as connected, and a connected result goes one step further: it counts the cloud sessions the daemon currently lists and says that the Driver tab serves them, or that the Driver tab is switched off, or that there is nothing recent to watch.
 
 #### Rationale
 
@@ -49,19 +49,19 @@ Declaring the sites an extension needs is not the same as holding access to them
 
 The acknowledgement text is checked rather than just the success status because the dashboard serves its own web page for any address it does not recognise: a build with no bridge would answer successfully with a page of HTML, and calling that "connected" would tell someone their bridge works when it does not exist.
 
-### Opening tabs on demand
+### Running a cycle on demand
 
 #### User story
 
-The user turns tab opening on and then sits watching a browser where nothing happens, with no way to tell whether it is broken or merely not due yet.
+The user turns the Driver on and then sits watching a browser where nothing happens, with no way to tell whether it is broken or merely not due yet — or closed the Driver tab and wants it back.
 
 #### Business logic
 
-A button asks the extension's service worker to run its tab sweep right now and reports the result: how many tabs were opened out of how many sessions, why any session was skipped, or — when nothing opened — the reason, whether that is no token, tab opening being off, an unreachable or refusing daemon, or simply no recent cloud sessions. A worker that does not answer at all is reported as such, with reloading the extension as the fix.
+A button lifts the pause a closed Driver tab left behind, asks the extension's service worker to run a cycle right now, and reports the result: the cycle's own summary — how many sessions were read and with which statuses, how many visited, typed and created — or, when it did nothing, the reason, whether that is no token, the Driver being switched off, an unreachable or refusing daemon, or simply nothing to drive. A worker that does not answer at all is reported as such, with reloading the extension as the fix.
 
 #### Rationale
 
-The scheduled sweep runs once a minute, which is a long time to sit wondering whether something is wrong.
+The scheduled cycle runs twice a minute, which is a long time to sit wondering whether something is wrong.
 
 ## Before modifying/creating SPEC.md files
 

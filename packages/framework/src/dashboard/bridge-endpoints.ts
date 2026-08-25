@@ -33,7 +33,7 @@ export const BRIDGE_PREFIX = '/_bridge'
  * which reads as a framework bug and burns a debugging session. The extension's manifest must
  * carry the same number; a test keeps the two in lockstep.
  */
-export const EXPECTED_EXTENSION_VERSION = '0.11.0'
+export const EXPECTED_EXTENSION_VERSION = '0.12.0'
 
 /** The header the extension states its version in. Lowercase, as node presents all headers. */
 export const EXTENSION_VERSION_HEADER = 'x-tf-extension-version'
@@ -61,10 +61,35 @@ export interface BridgeHello {
   at: string
 }
 
-/** A cloud session the extension should be watching. */
+/** A cloud session the extension's Driver tab should be serving (#1237, #1332). */
 export interface BridgeSession {
   id: string
   url: string
+  /**
+   * Whether the dashboard holds an answer for it waiting to be typed. Such a session is visited
+   * whatever the session list says about it.
+   */
+  answerQueued: boolean
+}
+
+/**
+ * What claude.ai's own session list says a session is doing, as the Driver tab reads it (#1332).
+ *
+ * The list's status icon carries a text label, and these are its words: `awaiting` ("Awaiting
+ * input": the session stopped to ask its user), `unread` ("Unread response": it finished a turn
+ * nobody has read), `idle`, `running`, `landed` (the label is the session's pull request and
+ * its state), `missing` (the list does not show the session at all) and `unknown` — a label
+ * the extension does not know, carried verbatim so it can be named rather than guessed at.
+ */
+export type BridgeListStatus = 'awaiting' | 'unread' | 'idle' | 'running' | 'landed' | 'missing' | 'unknown'
+
+/** One session's list status, stamped when the daemon took it. */
+export interface BridgeSessionStatus {
+  sessionId: string
+  status: BridgeListStatus
+  /** The list's own label, kept only for `unknown`. */
+  label?: string | undefined
+  at: string
 }
 
 /**
@@ -108,6 +133,11 @@ export interface BridgeHandlers {
    */
   sessions?: () => Promise<BridgeSession[]>
   /**
+   * What the Driver tab read off claude.ai's session list for the watched sessions (#1332): the
+   * read-back a web run's own record cannot give, since the run ends at its hand-off.
+   */
+  statuses?: (statuses: BridgeSessionStatus[]) => void
+  /**
    * The answer queued in the dashboard for that session, waiting to be delivered (#1237): `text`
    * is exactly what the extension types into the composer, composed by the daemon from labels the
    * session itself offered (#1554).
@@ -136,6 +166,9 @@ const MAX_EVENTS_BODY = 512 * 1024
 const MAX_EVENT_BATCH = 50
 const MAX_EVENT_TEXT = 8000
 const MAX_SEQ = 10_000
+const LIST_STATUSES: ReadonlySet<string> = new Set<BridgeListStatus>(['awaiting', 'unread', 'idle', 'running', 'landed', 'missing', 'unknown'])
+const MAX_STATUSES = 500
+const MAX_STATUS_LABEL = 80
 
 /** Route a `/_bridge/*` request. A daemon with the bridge off 404s every route. */
 export async function handleBridgeRequest(
@@ -169,6 +202,7 @@ export async function handleBridgeRequest(
   if (pathname === `${BRIDGE_PREFIX}/sessions`) return handleAgents(req, res, handlers)
   if (pathname === `${BRIDGE_PREFIX}/events`) return handleEvents(req, res, handlers)
   if (pathname === `${BRIDGE_PREFIX}/hello`) return handleHello(req, res, handlers)
+  if (pathname === `${BRIDGE_PREFIX}/statuses`) return handleStatuses(req, res, handlers)
   if (pathname === `${BRIDGE_PREFIX}/answer`) return handleAnswer(req, res, handlers)
   if (pathname === `${BRIDGE_PREFIX}/answered`) return handleAnswered(req, res, handlers)
   if (pathname === `${BRIDGE_PREFIX}/start`) return handleStart(req, res, handlers)
@@ -319,6 +353,44 @@ function validateEvents(body: unknown, now: Date): BridgeEvent[] | string {
   return out
 }
 
+/** `POST /_bridge/statuses`: what claude.ai's session list says about each watched session (#1332). */
+async function handleStatuses(req: IncomingMessage, res: ServerResponse, handlers: BridgeHandlers): Promise<void> {
+  if (req.method !== 'POST') return end(res, 405, 'method not allowed', { allow: 'POST' })
+  let body: unknown
+  try {
+    body = await readJsonBody(req, MAX_BODY)
+  } catch (err) {
+    return end(res, 400, (err as Error).message)
+  }
+  const statuses = validateStatuses(body, (handlers.now ?? (() => new Date()))())
+  if (typeof statuses === 'string') return end(res, 400, statuses)
+  handlers.statuses?.(statuses)
+  end(res, 204, '')
+}
+
+/** A batch of list statuses, validated entry by entry; one bad entry refuses the batch. */
+function validateStatuses(body: unknown, now: Date): BridgeSessionStatus[] | string {
+  if (typeof body !== 'object' || body === null) return 'body must be an object'
+  const raw = (body as Record<string, unknown>).statuses
+  if (!Array.isArray(raw) || raw.length === 0) return 'statuses must be a non-empty array'
+  if (raw.length > MAX_STATUSES) return `statuses must hold at most ${MAX_STATUSES} entries`
+  const out: BridgeSessionStatus[] = []
+  for (const entry of raw) {
+    if (typeof entry !== 'object' || entry === null) return 'each status must be an object'
+    const { sessionId, status, label } = entry as Record<string, unknown>
+    if (typeof sessionId !== 'string' || !SESSION_ID.test(sessionId)) return 'each status needs a sessionId that looks like session_<id>'
+    if (typeof status !== 'string' || !LIST_STATUSES.has(status)) return `each status must be one of ${[...LIST_STATUSES].join(', ')}`
+    if (label !== undefined && typeof label !== 'string') return 'label must be a string'
+    out.push({
+      sessionId,
+      status: status as BridgeListStatus,
+      ...(typeof label === 'string' && label ? { label: label.slice(0, MAX_STATUS_LABEL) } : {}),
+      at: now.toISOString(),
+    })
+  }
+  return out
+}
+
 /**
  * `GET /_bridge/answer?sessionId=...`: the answer the dashboard queued for that session (#1237).
  *
@@ -391,7 +463,7 @@ async function handleStarted(req: IncomingMessage, res: ServerResponse, handlers
 }
 
 /**
- * `GET /_bridge/sessions`: the cloud sessions the extension should have a tab for.
+ * `GET /_bridge/sessions`: the cloud sessions the extension's Driver tab should be serving.
  *
  * Answers an empty list rather than a 404 when the daemon wired no lister, so an extension
  * polling an older daemon degrades to doing nothing instead of reporting a fault.

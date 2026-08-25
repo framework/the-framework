@@ -63,7 +63,7 @@ The user wants a parked question from a cloud session carried into their local d
 
 The browser bridge is off unless the user turned it on, because it opens the daemon's one route reachable from another origin; while off, every bridge route is not found. When on, it reuses the daemon's own shared token rather than minting a second one — the two guard the same daemon, and a second secret would be one more thing to rotate and leak without narrowing anything.
 
-The cloud sessions the bridge should have a tab open for are gathered across every registered project, because a cloud agent is not tied to the home workspace, and per project best-effort so one unreadable repo cannot empty the list.
+The cloud sessions the bridge's Driver tab should serve — each flagged with whether the bridge holds an answer queued for it — are gathered across every registered project, because a cloud agent is not tied to the home workspace, and per project best-effort so one unreadable repo cannot empty the list.
 
 The daemon's own address is known only once it listens, so the agent runtime is handed a way to read it rather than the address itself, and reads it each time it spawns an agent.
 

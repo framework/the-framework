@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "The Framework: Claude web bridge",
-  "version": "0.11.0",
-  "description": "Shows the question a Claude Code cloud session is parked on in your local The Framework dashboard, and types the answer you pick there back into the session.",
+  "version": "0.12.0",
+  "description": "Drives one pinned claude.ai tab through your Claude Code cloud sessions: the question a session is parked on shows up in your local The Framework dashboard, and the answer you pick there is typed back into the session.",
   "permissions": [
     "storage",
     "tabs",

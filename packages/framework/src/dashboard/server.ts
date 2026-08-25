@@ -186,6 +186,9 @@ export function startDashboard(opts: DashboardOptions): Promise<Dashboard> {
         contact: (route, status) => bridgeQuestions().recordContact(route, status),
         recordEvent: event => bridgeQuestions().recordEvent(event),
         hello: hello => bridgeQuestions().recordHello(hello),
+        statuses: statuses => {
+          for (const status of statuses) bridgeQuestions().recordStatus(status)
+        },
         answer: sessionId => {
           const pending = bridgeQuestions().pendingAnswer(sessionId)
           return pending ? { id: pending.id, text: pending.text } : undefined

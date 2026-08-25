@@ -15,7 +15,8 @@ The daemon half of the Claude web bridge: the `/_bridge` routes the Chrome exten
 - **The parked question becomes an open question** - a validated question from a cloud session, in the shape the session asked it, is handed to the dashboard.
 - **The transcript arrives as numbered entries** - each message carries its position in the transcript, so re-reading the page overwrites rather than duplicates.
 - **The answer is polled, and its delivery reported back** - the extension asks for the exact text to type, which the daemon composed, and then says whether typing it worked.
-- **The daemon says which cloud sessions to watch** - the extension only sees tabs the user is already on, so the daemon lists the sessions a tab should be opened for.
+- **The daemon says which cloud sessions are its** - the extension only sees pages the user is already on, so the daemon lists the sessions its Driver tab should serve, each with whether an answer is queued for it.
+- **The list statuses come back** - what claude.ai's session list says about each of those sessions, as the Driver read it, is posted back: the read-back a web run's record cannot give.
 - **Every contact is recorded, including refusals** - so the dashboard can show what the bridge is doing.
 - **The session start-queue is served claim-on-read** - the extension asks for the next cloud session to create and is handed it in the same step that takes it off the queue, then reports the session it became.
 - **The bridge can be off** - a daemon with the feature disabled answers every bridge route as not found.
@@ -102,15 +103,25 @@ What comes back is the answer's identity and the exact text to type: the extensi
 
 After trying to type the answer into the page, the extension reports back which cloud session it was for, which answer it tried to deliver, whether it worked, and an optional note.
 
-### Which cloud sessions to watch
+### Which cloud sessions are the daemon's
 
 #### User story
 
-An agent starts a cloud session while the user is looking at something else entirely. The extension only ever sees tabs the user is already on, so without help the bridge would work only by coincidence.
+An agent starts a cloud session while the user is looking at something else entirely. The extension only ever sees pages the user is already on, so without help the bridge would work only by coincidence.
 
 #### Business logic
 
-The daemon lists the cloud sessions worth watching, newest first, each with the address of its page, so the extension can open a tab for one. A daemon that has no list to give answers with an empty list rather than an error, so an extension polling an older daemon quietly does nothing instead of reporting a fault. A failure while building the list is likewise reported as an empty list.
+The daemon lists its cloud sessions, newest first, each with the address of its page and whether the dashboard holds an answer queued for it, so the extension's Driver tab knows which sessions to read off claude.ai's list and which to visit whatever that list says. A daemon that has no list to give answers with an empty list rather than an error, so an extension polling an older daemon quietly does nothing instead of reporting a fault. A failure while building the list is likewise reported as an empty list.
+
+### The list statuses
+
+#### User story
+
+A web run's own record says done from its hand-off on. Only claude.ai's session list says whether the session is still working, stopped to ask its user, or finished — and only the extension can read it.
+
+#### Business logic
+
+The extension posts, for each of the daemon's sessions, what the list's status label said: awaiting input, unread response, idle, running, landed (the label is the session's pull request and its state), missing from the list, or unknown, with the label carried verbatim so a new one can be named rather than guessed at. Each entry is checked — the session id's shape, the status being one of those words, the label a string when present — and one bad entry refuses the whole batch; an empty batch and one past five hundred entries are refused too. The daemon stamps the moment it took the batch, keeps the label only when present and cuts it to a short length, and hands the batch on; a daemon that keeps no statuses accepts and drops it.
 
 ### Diagnosis
 

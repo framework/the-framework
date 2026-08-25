@@ -411,3 +411,82 @@ test('the start report is validated field by field, and the routes demand the to
     await s.close()
   }
 })
+
+test('the session list says whether an answer is queued for each session (#1332)', async () => {
+  const s = await serve({
+    token: TOKEN,
+    record: () => {},
+    sessions: async () => [
+      { id: 'session_A', url: 'https://claude.ai/code/session_A', answerQueued: false },
+      { id: 'session_B', url: 'https://claude.ai/code/session_B', answerQueued: true },
+    ],
+  })
+  try {
+    const res = await fetch(`${s.url}${BRIDGE_PREFIX}/sessions`, { headers: { authorization: `Bearer ${TOKEN}` } })
+    assert.equal(res.status, 200)
+    assert.deepEqual(await res.json(), {
+      sessions: [
+        { id: 'session_A', url: 'https://claude.ai/code/session_A', answerQueued: false },
+        { id: 'session_B', url: 'https://claude.ai/code/session_B', answerQueued: true },
+      ],
+    })
+  } finally {
+    await s.close()
+  }
+})
+
+test("the Driver's list statuses are validated, stamped by the daemon and handed on (#1332)", async () => {
+  const got: unknown[] = []
+  const s = await serve({ token: TOKEN, record: () => {}, statuses: batch => void got.push(...batch), now: () => new Date('2026-08-25T18:00:00.000Z') })
+  const send = (body: unknown): Promise<Response> =>
+    fetch(`${s.url}${BRIDGE_PREFIX}/statuses`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${TOKEN}` },
+      body: JSON.stringify(body),
+    })
+  try {
+    const res = await send({
+      statuses: [
+        { sessionId: 'session_A', status: 'awaiting', at: 'whenever the caller likes' },
+        // A label the extension did not know travels verbatim, cut to a sane length; a known
+        // status carries none.
+        { sessionId: 'session_B', status: 'unknown', label: 'Something new '.repeat(20) },
+        { sessionId: 'session_C', status: 'idle', label: '' },
+      ],
+    })
+    assert.equal(res.status, 204)
+    assert.deepEqual(got, [
+      { sessionId: 'session_A', status: 'awaiting', at: '2026-08-25T18:00:00.000Z' },
+      { sessionId: 'session_B', status: 'unknown', label: 'Something new '.repeat(20).slice(0, 80), at: '2026-08-25T18:00:00.000Z' },
+      { sessionId: 'session_C', status: 'idle', at: '2026-08-25T18:00:00.000Z' },
+    ])
+
+    got.length = 0
+    assert.equal((await send([])).status, 400, 'not an object')
+    assert.equal((await send({ statuses: [] })).status, 400, 'empty')
+    assert.equal((await send({ statuses: [{ sessionId: 'nope', status: 'idle' }] })).status, 400, 'bad session id')
+    assert.equal((await send({ statuses: [{ sessionId: 'session_A', status: 'busy' }] })).status, 400, 'a status the daemon does not know')
+    assert.equal((await send({ statuses: [{ sessionId: 'session_A', status: 'idle', label: 3 }] })).status, 400, 'label must be a string')
+    // One bad entry refuses the whole batch: nothing partial reaches the store.
+    assert.equal((await send({ statuses: [{ sessionId: 'session_A', status: 'idle' }, { sessionId: 'session_B', status: 'busy' }] })).status, 400)
+    assert.deepEqual(got, [])
+    assert.equal((await fetch(`${s.url}${BRIDGE_PREFIX}/statuses`, { headers: { authorization: `Bearer ${TOKEN}` } })).status, 405)
+    assert.equal((await fetch(`${s.url}${BRIDGE_PREFIX}/statuses`, { method: 'POST' })).status, 401)
+  } finally {
+    await s.close()
+  }
+})
+
+test('a daemon that keeps no list statuses accepts and drops them (#1332)', async () => {
+  const s = await serve({ token: TOKEN, record: () => {} })
+  try {
+    const res = await fetch(`${s.url}${BRIDGE_PREFIX}/statuses`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${TOKEN}` },
+      body: JSON.stringify({ statuses: [{ sessionId: 'session_A', status: 'awaiting' }] }),
+    })
+    assert.equal(res.status, 204)
+  } finally {
+    await s.close()
+  }
+})

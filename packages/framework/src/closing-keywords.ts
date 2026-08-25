@@ -29,14 +29,12 @@ const CLOSING_KEYWORDS = ['close', 'closes', 'closed', 'fix', 'fixes', 'fixed', 
 const FILLER = 'the ticket'
 
 /**
- * A closing keyword, the gap GitHub allows after it, then an issue reference — `#123`, or the
- * cross-repo `owner/repo#123` form, which closes just as well. The gap is whitespace or a colon
- * ("The keywords can be followed by colons... `Closes: #10`", per the same documentation), and it
- * is re-emitted verbatim so the sentence keeps its own punctuation. A reference already inside
- * backticks is left alone: GitHub does not act on one, and rewriting it would corrupt a code sample.
+ * A closing keyword, whitespace, then an issue reference — `#123`, or the cross-repo
+ * `owner/repo#123` form, which closes just as well. A reference already inside backticks is
+ * left alone: GitHub does not act on one, and rewriting it would corrupt a code sample.
  */
 const CLOSING_PHRASE = new RegExp(
-  String.raw`(^|[^\`\w])(${CLOSING_KEYWORDS.join('|')})(\s*:\s*|\s+)((?:[\w.-]+\/[\w.-]+)?#\d+)(?!\`)`,
+  String.raw`(^|[^\`\w])(${CLOSING_KEYWORDS.join('|')})(\s+)((?:[\w.-]+\/[\w.-]+)?#\d+)(?!\`)`,
   'gi',
 )
 

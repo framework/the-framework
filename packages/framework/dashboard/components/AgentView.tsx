@@ -97,13 +97,6 @@ export function AgentView({
   const retained = useLoaded<string[]>(!live && agentId ? () => onRetainedWorktrees(projectId) : null, [], [projectId, agentId, live])
   const [removed, setRemoved] = useState(false)
   const onWorktreeRemoved = useCallback(() => setRemoved(true), [])
-  // The view is mounted un-keyed, so switching agents only swaps props: per-agent latches must
-  // reset by hand or the previous agent's Remove press hides this one's offer (and a stale
-  // archiveBehind can swallow the catch-up re-read on an equal-length collision).
-  useEffect(() => {
-    setRemoved(false)
-    setArchiveBehind(0)
-  }, [agentId])
   const hasWorktree = !live && !removed && agentId !== null && agentId !== undefined && retained.includes(agentId)
 
   // Whether the agent is still working, which is not whether the agent's process is up (#1173).

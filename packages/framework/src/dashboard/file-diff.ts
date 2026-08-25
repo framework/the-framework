@@ -50,16 +50,8 @@ function hunksOnly(patch: string): string {
 function countChanges(patch: string): { added: number; removed: number } {
   let added = 0
   let removed = 0
-  let inHunk = false
   for (const line of patch.split('\n')) {
-    if (line.startsWith('@@')) {
-      inHunk = true
-      continue
-    }
-    // The file headers only ever precede the first hunk. Past it a line opening the same way is
-    // content — a removed `---` separator reads `----`, a removed `-- comment` reads `--- comment`
-    // — and skipping those undercounted the file's own stats.
-    if (!inHunk && (line.startsWith('+++') || line.startsWith('---'))) continue
+    if (line.startsWith('+++') || line.startsWith('---')) continue
     if (line.startsWith('+')) added++
     else if (line.startsWith('-')) removed++
   }
@@ -95,12 +87,8 @@ export async function readFileDiff(
     const raw = await readConfinedFile(cwd, path)
     if (!raw) return null
     if (raw.includes(0)) return { path, status, patch: '', added: 0, removed: 0, truncated: false, binary: true }
-    const all = asAllAdded(raw.toString('utf8'))
-    const { body: patch, truncated } = cutToPreview(all)
-    // Every line of an untracked file is an addition, so it is counted rather than parsed — and
-    // counted over the whole file, not the cut preview: the Changes list reports the file's own
-    // size, which a long new file used to report as exactly the preview limit.
-    return { path, status, patch, added: all ? all.split('\n').length : 0, removed: 0, truncated, binary: false }
+    const { body: patch, truncated } = cutToPreview(asAllAdded(raw.toString('utf8')))
+    return { path, status, patch, ...countChanges(patch), truncated, binary: false }
   }
 
   // `HEAD` is missing in a repo with no commits yet; the working-tree diff is the honest answer

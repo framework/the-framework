@@ -133,9 +133,6 @@ export class CodexJsonParser implements AgentCliParser {
     } catch {
       return [] // Banners and other noise: not every line is an event.
     }
-    // `null` parses, so the catch above lets it through and every field read below throws — from
-    // inside a readline handler, where nothing catches it. Noise is noise whatever it parses to.
-    if (typeof obj !== 'object' || obj === null) return []
     const type = obj['type']
 
     if (type === 'thread.started') {

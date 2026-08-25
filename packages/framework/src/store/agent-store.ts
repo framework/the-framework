@@ -1183,9 +1183,9 @@ export type ArchivePatch = Partial<Pick<AgentMeta, 'branch' | 'pr'>>
  * on. There is no event stream left to carry it, and every surface reads the record, so this
  * one write is what turns a "nothing committed" row into its real branch and PR.
  *
- * The archive lives on the data branch's checkout, and a fact written there is only durable once
- * committed — {@link patchArchivedAgentOnDataBranch} is the funneled form every caller outside a
- * test uses.
+ * A plain file write: the archive lives on the data branch's checkout, and a fact written there
+ * is only durable once committed — {@link patchArchivedAgentOnDataBranch} is the funneled form
+ * every caller outside a test uses.
  */
 export async function patchArchivedAgent(
   cwd: string,
@@ -1199,7 +1199,7 @@ export async function patchArchivedAgent(
     if (!archive) return false
     const meta = await readMetaFile(fs, archive.meta)
     if (!meta) return false
-    await writeMetaFile(fs, archive.meta, { ...meta, ...patch })
+    await fs.write(archive.meta, JSON.stringify({ ...meta, ...patch }))
     return true
   } catch {
     return false

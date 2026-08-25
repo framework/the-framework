@@ -173,9 +173,8 @@ export function AgentHistory({
 
   // New is the active view when a project is open on its launcher (its "New" / Start-a-session
   // screen: a project selected, no run picked, not following a live one). On the Overview that role
-  // belongs to the Overview item instead, so the two are never active at once — and a ticket page
-  // routes with a project but is the Tickets view, not the launcher.
-  const atProjectLauncher = projectId !== null && selectedAgentId === null && !followLive && !ticketsActive
+  // belongs to the Overview item instead, so the two are never active at once.
+  const atProjectLauncher = projectId !== null && selectedAgentId === null && !followLive
 
   const hasRecents = rows.length > 0 || showOptimistic
 
@@ -601,9 +600,7 @@ function AgentHistoryRow({
             it used to pulse identically whether it was mid-edit or had been idle for an hour. */}
         {/* The publishing dot pulses green like the session pill's (#1431), so the two surfaces
             describe the same window the same way. */}
-        {/* `parked` alone covers the cloud-side wait: its local status is done, but the SPEC's
-            "waiting" always comes with the still dot, wherever the session is parked. */}
-        {(status === 'running' || parked) && (
+        {status === 'running' && (
           <span className={cn('inline-block h-2 w-2 shrink-0 rounded-full', parked ? 'bg-muted-foreground' : 'animate-pulse bg-primary')} />
         )}
         {publishingNow && <span className="inline-block h-2 w-2 shrink-0 animate-pulse rounded-full bg-success" />}

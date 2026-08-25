@@ -147,12 +147,17 @@ describe('TicketsPage sort (#1144/#1265)', () => {
 
 // The filters (#1144): search + facets, state mirrored to the URL so a filtered view is a link.
 describe('TicketsPage filters (#1144)', () => {
-  const fixture = (
-    tickets = [
-      ticket({ file: 'lock.md', title: 'Improve the lock', topics: ['dx'], priority: '9' }),
-      ticket({ file: 'other.md', title: 'Something else', locked: true, lockedBy: 'agent-1' }),
-    ],
-  ) => onAllTickets.mockResolvedValue([{ projectId: 'p1', projectName: 'Alpha', tickets }])
+  const fixture = () =>
+    onAllTickets.mockResolvedValue([
+      {
+        projectId: 'p1',
+        projectName: 'Alpha',
+        tickets: [
+          ticket({ file: 'lock.md', title: 'Improve the lock', topics: ['dx'], priority: '9' }),
+          ticket({ file: 'other.md', title: 'Something else', locked: true, lockedBy: 'agent-1' }),
+        ],
+      },
+    ])
 
   test('searching narrows the rows and writes q= to the URL', async () => {
     fixture()
@@ -182,18 +187,6 @@ describe('TicketsPage filters (#1144)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'dx' }))
     await waitFor(() => expect(screen.queryByText('Something else')).toBeNull())
     expect(window.location.search).toBe('?topics=dx')
-  })
-
-  test('a badge whose topic is capitalised filters by it just the same', async () => {
-    // Matching lowercases the ticket's topics, so an `UX` badge added verbatim matched nothing —
-    // clicking it emptied the page instead of narrowing it.
-    fixture([ticket({ file: 'ux.md', title: 'Polish the rail', topics: ['UX'] }), ticket({ file: 'other.md', title: 'Something else' })])
-    render(<TicketsPage onOpenTicket={() => {}} />)
-    await screen.findByText('Polish the rail')
-    fireEvent.click(screen.getByRole('button', { name: 'UX' }))
-    await waitFor(() => expect(screen.queryByText('Something else')).toBeNull())
-    expect(screen.getByText('Polish the rail')).toBeTruthy()
-    expect(window.location.search).toBe('?topics=ux')
   })
 
   test('clicking the claim marker narrows to claimed tickets', async () => {

@@ -27,9 +27,7 @@ export function safeRepoPath(path: string): boolean {
   if (path.startsWith('/') || path.startsWith('-') || /^[a-zA-Z]:/.test(path)) return false
   const parts = path.split(/[\\/]/)
   // Any `.git` segment, not just a leading one: a nested repo's `.git/config` holds credentials too.
-  // Compared case-insensitively, because macOS and Windows are: there `.GIT/config` opens the very
-  // file this refuses, and the path comes from the browser.
-  if (parts.some(part => part.toLowerCase() === '.git')) return false
+  if (parts.includes('.git')) return false
   return parts.every(part => part !== '' && part !== '.' && part !== '..')
 }
 

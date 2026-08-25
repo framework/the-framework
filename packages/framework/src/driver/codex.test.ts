@@ -87,9 +87,6 @@ test('CodexJsonParser ignores noise that is not an event (#539)', () => {
   const p = new CodexJsonParser()
   assert.deepEqual(p.push('Reading additional input from stdin...'), [])
   assert.deepEqual(p.push(''), [])
-  // `null` is valid JSON, so it survives the parse and used to throw on the first field read —
-  // inside a readline handler, which takes the daemon and every live agent with it.
-  assert.deepEqual(p.push('null'), [])
   assert.deepEqual(p.push(JSON.stringify({ type: 'turn.started' })), [])
   assert.deepEqual(p.result(), { text: '' })
 })

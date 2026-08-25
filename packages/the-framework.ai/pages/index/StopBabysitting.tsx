@@ -44,7 +44,7 @@ const PROBLEMS: { title: string; desc?: string; rows: Row[] }[] = [
       bad('Explicitly tell AI to deep dive important aspects.'),
       good(
         <>
-          Automatic loop of critical feedback <Arrow glyph="↔" /> research <Arrow glyph="↔" /> confidence <Arrow glyph="↔" /> implementation.
+          Automatic loop of critcal feedback <Arrow glyph="↔" /> research <Arrow glyph="↔" /> confidence <Arrow glyph="↔" /> implementation.
         </>,
       ),
     ],

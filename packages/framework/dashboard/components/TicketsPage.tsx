@@ -70,10 +70,7 @@ export function TicketsPage({
   const clearFilters = () => setView({ ...view, filters: defaultView().filters })
   // Click-to-filter (#1144): a row's topic badge adds its topic, the claim marker narrows to
   // claimed — additive, so clicking a second topic widens the OR instead of replacing it.
-  // Lowercased on the way in, the one casing the filters hold (the query-string parser does the
-  // same): matching lowercases the ticket's own topics, so a badge reading `UX` filtered nothing.
-  const addTopic = (raw: string) => {
-    const topic = raw.toLowerCase()
+  const addTopic = (topic: string) => {
     if (!view.filters.topics.includes(topic)) setView({ ...view, filters: { ...view.filters, topics: [...view.filters.topics, topic] } })
   }
   const filterClaimed = () => {

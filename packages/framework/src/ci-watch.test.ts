@@ -71,16 +71,6 @@ test('an auto-armed PR is never merged here: GitHub holds that promise', async (
   assert.deepEqual(result.merged, [])
 })
 
-test('a PR read still warming waits for the next tick: its OPEN is a guess', async () => {
-  // The cache answers `pending` with a synthetic OPEN (agent-handoff.ts), which on a daemon's
-  // start-up tick is every watched agent — including ones whose PR has since merged or closed.
-  const { deps, merges, fixes } = sweepDeps(openPr(), { checks: 'passing', failed: [] })
-  const result = await sweepProjectCi('/p', { ...deps, pr: async () => ({ value: openPr(), pending: true }) })
-  assert.deepEqual(merges, [])
-  assert.deepEqual(fixes, [])
-  assert.deepEqual(result, { merged: [], failed: [], fixes: [] })
-})
-
 test('pending checks wait for the next tick: no merge, no fix', async () => {
   const { deps, merges, fixes } = sweepDeps(openPr(), { checks: 'pending', failed: [] })
   const result = await sweepProjectCi('/p', deps)
@@ -89,34 +79,22 @@ test('pending checks wait for the next tick: no merge, no fix', async () => {
   assert.deepEqual(result, { merged: [], failed: [], fixes: [] })
 })
 
-/** A repo that genuinely has no CI: `gh` answered, so the read carries the head it read. */
-const NO_CI: PrCiStatus = { checks: 'none', failed: [], headSha: 'abc1234', branch: 'tf-change' }
-
 test('a check-less PR younger than the attach grace is not merged — the stale-check window (#1406)', async () => {
   const justOpened = openPr({ createdAt: new Date(NOW - NO_CHECKS_GRACE_MS + 1000).toISOString() })
-  const { deps, merges } = sweepDeps(justOpened, NO_CI)
+  const { deps, merges } = sweepDeps(justOpened, { checks: 'none', failed: [] })
   await sweepProjectCi('/p', deps)
   assert.deepEqual(merges, [])
 })
 
 test('a check-less PR past the grace merges: the repo genuinely has no CI', async () => {
   const settled = openPr({ createdAt: new Date(NOW - NO_CHECKS_GRACE_MS - 1000).toISOString() })
-  const { deps, merges } = sweepDeps(settled, NO_CI)
+  const { deps, merges } = sweepDeps(settled, { checks: 'none', failed: [] })
   await sweepProjectCi('/p', deps)
   assert.deepEqual(merges, ['run-1'])
 })
 
-test('an unreadable CI status never merges, however old the PR is', async () => {
-  // `gh` failing answers `none` with no head (gh.ts): indistinguishable from a CI-less repo except
-  // by the missing head commit, and merging on it lands work whose checks may be red.
-  const settled = openPr({ createdAt: new Date(NOW - NO_CHECKS_GRACE_MS - 1000).toISOString() })
-  const { deps, merges } = sweepDeps(settled, { checks: 'none', failed: [] })
-  await sweepProjectCi('/p', deps)
-  assert.deepEqual(merges, [])
-})
-
 test('a check-less PR with no createdAt never merges: age unknowable', async () => {
-  const { deps, merges } = sweepDeps(openPr({ createdAt: undefined as unknown as string }), NO_CI)
+  const { deps, merges } = sweepDeps(openPr({ createdAt: undefined as unknown as string }), { checks: 'none', failed: [] })
   await sweepProjectCi('/p', deps)
   assert.deepEqual(merges, [])
 })

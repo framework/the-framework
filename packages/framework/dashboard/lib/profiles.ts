@@ -89,9 +89,6 @@ function hostLabel(url: string): string {
 export function parseDeviceUrl(pasted: string): { url: string; token: string } | null {
   try {
     const u = new URL(pasted.trim())
-    // A scheme-less paste like `localhost:4200/?token=…` parses with `localhost:` as the scheme
-    // and an opaque `null` origin — not a device address.
-    if (u.protocol !== 'http:' && u.protocol !== 'https:') return null
     return { url: u.origin, token: u.searchParams.get('token') ?? '' }
   } catch {
     return null
@@ -109,9 +106,8 @@ export function localOrigin(): string {
   return store()?.getItem(LOCAL_ORIGIN_KEY) ?? DEFAULT_LOCAL_ORIGIN
 }
 
-/** Cap on a carried composer draft (#1066), measured on the percent-encoded form — the thing whose
- * length the URL actually spends (multibyte text encodes up to 9x longer). Above this the hop drops
- * the draft (plain connect) so a huge paste can't blow the URL length. */
+/** Cap on a carried composer draft (#1066): above this the hop drops the draft (plain connect) so a
+ * huge paste can't blow the URL length. */
 const MAX_CARRIED_DRAFT = 7000
 
 /** The connect URL for a device: its origin plus the token for the one bootstrap hop (#1051), and
@@ -120,8 +116,7 @@ const MAX_CARRIED_DRAFT = 7000
 export function connectUrl(profile: Pick<ConnectionProfile, 'url' | 'token'>, draft?: string): string {
   const parts: string[] = []
   if (profile.token) parts.push(`token=${encodeURIComponent(profile.token)}`)
-  const encodedDraft = draft ? encodeURIComponent(draft) : ''
-  if (encodedDraft && encodedDraft.length <= MAX_CARRIED_DRAFT) parts.push(`draft=${encodedDraft}`)
+  if (draft && draft.length <= MAX_CARRIED_DRAFT) parts.push(`draft=${encodeURIComponent(draft)}`)
   return parts.length ? `${profile.url}/?${parts.join('&')}` : profile.url
 }
 

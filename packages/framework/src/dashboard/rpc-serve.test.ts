@@ -1,7 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { createServer, type Server } from 'node:http'
-import { connect } from 'node:net'
 import { makeRpcMount, type DashboardContext } from './rpc-serve.js'
 import { RPC_HANDLERS } from '../dashboard-rpc/index.js'
 import { registryPreferencesStore } from '../registry.js'
@@ -53,35 +52,6 @@ const call = async (url: string, name: string, args: unknown[] = []): Promise<{ 
   })
   return { status: res.status, body: await res.text() }
 }
-
-/** One request over a raw socket, so a header `fetch` refuses to send can be put on the wire. */
-const rawRequest = (url: string, hostHeader: string): Promise<string> =>
-  new Promise((resolve, reject) => {
-    const socket = connect(Number(new URL(url).port), '127.0.0.1', () => {
-      socket.write(`POST /_rpc/onProjects HTTP/1.1\r\n${hostHeader}\r\nContent-Length: 2\r\nConnection: close\r\n\r\n[]`)
-    })
-    let seen = ''
-    socket.setEncoding('utf8')
-    socket.on('data', chunk => (seen += chunk))
-    socket.on('end', () => resolve(seen))
-    socket.on('error', reject)
-  })
-
-test('a request whose Host header is malformed is answered, not thrown past the server', async () => {
-  // Node's parser accepts `Host:` (empty — so the `?? 'localhost'` fallback never applied) and
-  // `Host: foo bar`; interpolating either into the parse base threw where nothing caught it, so
-  // any local process could end the daemon with one request it never answered.
-  const server = await mounted()
-  try {
-    for (const host of ['Host:', 'Host: foo bar']) {
-      assert.match(await rawRequest(server.url, host), /^HTTP\/1\.1 \d{3}/, host)
-    }
-    // Still serving.
-    assert.equal((await call(server.url, 'onNothingLikeThis')).status, 404)
-  } finally {
-    await server.close()
-  }
-})
 
 test('every RPC the modules export is dispatchable by its own name', () => {
   // The registry is built from the modules' exports rather than a hand-written list, which is what

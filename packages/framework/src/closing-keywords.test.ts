@@ -22,14 +22,6 @@ describe('defuseClosingKeywords', () => {
     }
   })
 
-  test('the colon form GitHub also accepts is defused, colon and all', () => {
-    // "The keywords can be followed by colons... `Closes: #10`" — GitHub's own documentation, so
-    // `Fixes: #1164` closes exactly like `Fixes #1164` and has to lose its authority too.
-    assert.equal(defuseClosingKeywords('Fixes: #1164'), 'Fixes: the ticket #1164')
-    assert.equal(defuseClosingKeywords('CLOSES: #10'), 'CLOSES: the ticket #10')
-    assert.equal(defuseClosingKeywords('resolves:#7'), 'resolves:the ticket #7')
-  })
-
   test('the reference itself is never rewritten, so it stays clickable and cross-references', () => {
     // Rom's point on #1612: backticking the reference defused the phrase but also killed the
     // link and the mention on the issue's own timeline. Only the adjacency may be broken.

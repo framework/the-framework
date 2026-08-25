@@ -238,9 +238,6 @@ export class StreamJsonParser {
     } catch {
       return [] // Non-JSON noise (banners etc.); ignore.
     }
-    // `null` parses, so the catch above lets it through and every field read below throws — from
-    // inside a readline handler, where nothing catches it. Noise is noise whatever it parses to.
-    if (typeof obj !== 'object' || obj === null) return []
 
     // Announced on the very first stream line, so it must not wait for `result`: a turn that is
     // stopped or dies mid-flight would take the id — the agent's `claude --resume` handle — with

@@ -107,12 +107,6 @@ export interface AgentHandoffDeps {
    * on the same branch name (#1251). Without it, only an open PR is trusted.
    */
   since?: string
-  /**
-   * Which of the run's own PRs answers, when it has more than one (#1512). Identity questions want
-   * the first; a handoff decision comparing the branch tip against a PR's head wants the last one
-   * that saw the branch, or work a later PR already landed reads as unlanded. See {@link pickAgentPr}.
-   */
-  order?: 'first' | 'latest'
 }
 
 /**
@@ -138,7 +132,7 @@ export function agentBranchFor(agent: { id: string; branch?: string; sessionName
 async function lookupAgentPr(cwd: string, branch: string, deps: AgentHandoffDeps): Promise<Cached<LinkedPr | undefined>> {
   if (deps.pr) return { value: await deps.pr(cwd, branch).catch(() => undefined), pending: false }
   const prs = await cachedPrsForBranch(cwd, branch).catch(() => ({ value: undefined, pending: false }))
-  return { value: prs.value ? pickAgentPr(prs.value, deps.since, deps.order) : undefined, pending: prs.pending }
+  return { value: prs.value ? pickAgentPr(prs.value, deps.since) : undefined, pending: prs.pending }
 }
 
 /** The cached single-PR read {@link resolveAgentPr} asks for the recorded PR's current state. */
@@ -563,10 +557,7 @@ export async function openAgentPullRequest(
   options: { draft?: boolean } = {},
 ): Promise<HandoffResult> {
   const branch = agentBranchFor(agent)
-  // `latest` order (#1512), because the `movedPastPr` decision below compares the branch tip
-  // against a PR's head: against the *first* PR, work a second one already landed reads as
-  // unlanded and this opens a third for it. The same reason the automatic handoff picks latest.
-  const handoff = await readAgentHandoff(cwd, branch, { since: agent.startedAt, order: 'latest' }).catch(() => undefined)
+  const handoff = await readAgentHandoff(cwd, branch, { since: agent.startedAt }).catch(() => undefined)
   // The agent's PR first, even when its branch is gone locally: a hands-off web agent's branch only
   // ever existed on the remote, and its PR is the answer the button exists to give (#1255).
   // Unless the session demonstrably kept committing after that PR merged or closed (#1512) —

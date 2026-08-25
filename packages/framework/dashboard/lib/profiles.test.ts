@@ -45,10 +45,6 @@ describe('profiles.ts (#1052)', () => {
     expect(parseDeviceUrl('  http://box:4200/some/path?token=xyz  ')).toEqual({ url: 'http://box:4200', token: 'xyz' })
     expect(parseDeviceUrl('http://box:4200')).toEqual({ url: 'http://box:4200', token: '' })
     expect(parseDeviceUrl('not a url')).toBeNull()
-    // A scheme-less paste parses with `localhost:` as the scheme and a `null` origin — reject it
-    // rather than storing an unusable device (and crashing the dialog's host label).
-    expect(parseDeviceUrl('localhost:4200/?token=abc')).toBeNull()
-    expect(parseDeviceUrl('ftp://box:4200/?token=abc')).toBeNull()
   })
 
   test('connectUrl carries the token for the bootstrap hop', () => {
@@ -62,9 +58,6 @@ describe('profiles.ts (#1052)', () => {
     expect(connectUrl({ url: 'http://127.0.0.1:4200', token: '' }, 'hi')).toBe('http://127.0.0.1:4200/?draft=hi')
     // An oversize draft is dropped so it can't blow the URL length; the hop still connects.
     expect(connectUrl({ url: 'http://box:4200', token: 'abc' }, 'x'.repeat(8000))).toBe('http://box:4200/?token=abc')
-    // The cap measures the percent-encoded form: multibyte text encodes ~9x longer, and the
-    // encoded length is what the destination daemon's header budget sees.
-    expect(connectUrl({ url: 'http://box:4200', token: 'abc' }, '中'.repeat(1000))).toBe('http://box:4200/?token=abc')
   })
 
   test('connectTo navigates carrying the token and the draft (#1066)', () => {

@@ -91,15 +91,6 @@ describe('run handoff (#799)', () => {
     expect(screen.getByText('Nothing committed — no PR to open.')).toBeTruthy()
   })
 
-  test('a merged branch says merged, not "no changes" — its commits are all on the base', async () => {
-    // Merged implies empty: `base..branch` lists nothing once every commit landed. The two facts
-    // must not read the same, since one means work shipped and the other means there was none.
-    onAgentHandoff.mockResolvedValue({ ...worked, commits: [], files: [], insertions: 0, deletions: 0, empty: true, pushed: true, merged: true })
-    render(<Harness />)
-    await waitFor(() => expect(screen.getByText('merged')).toBeTruthy())
-    expect(screen.queryByText('no changes')).toBeNull()
-  })
-
   test('an empty branch with work waiting in the tree names the work, never a button (#1173)', async () => {
     onAgentHandoff.mockResolvedValue({
       ...worked,

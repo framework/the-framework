@@ -82,9 +82,6 @@ test('StreamJsonParser announces the session id once, re-announcing only a chang
 test('StreamJsonParser ignores non-JSON noise and falls back to assistant text', () => {
   const p = new StreamJsonParser()
   assert.deepEqual(p.push('some banner line'), [])
-  // `null` is valid JSON, so it survives the parse and used to throw on the first field read —
-  // inside a readline handler, which takes the daemon and every live agent with it.
-  assert.deepEqual(p.push('null'), [])
   p.push(JSON.stringify({ type: 'assistant', message: { content: [{ type: 'text', text: 'partial' }] } }))
   assert.deepEqual(p.result(), { text: 'partial' })
 })

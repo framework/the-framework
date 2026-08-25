@@ -21,8 +21,5 @@ export function buildResumeCommand(
   if (!id) return null
   const dir = session.workspace
   if (!dir) return id
-  // The path is wherever the user keeps the repo — quote it so a space (routine on macOS,
-  // `/Users/John Doe/…`) doesn't split the command.
-  const q = `'${dir.replaceAll("'", `'\\''`)}'`
-  return `mkdir -p ${q} && cd ${q} && claude --resume ${id}`
+  return `mkdir -p ${dir} && cd ${dir} && claude --resume ${id}`
 }

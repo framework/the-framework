@@ -95,13 +95,7 @@ export function AgentComposer({
   const stopping = stopBusy || (stopRequested && live)
   // The last message that went through: a queued control entry is invisible until the agent
   // drains it between turns, so without this the send looked like nothing happened (#948).
-  // Reset like the latches above: the note is about THIS agent's live session, so it must not
-  // survive an agent switch or outlive the session it was queued into.
   const [queued, setQueued] = useState<string | null>(null)
-  useEffect(() => setQueued(null), [agentId])
-  useEffect(() => {
-    if (!live) setQueued(null)
-  }, [live])
   const resumable = !live && sessionId !== undefined
 
   const send = async (text: string, _kind: 'build' | 'prompt', opts: { newAgent: boolean }): Promise<void> => {

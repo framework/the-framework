@@ -17,16 +17,11 @@ import type { Intervention } from './interventions.js'
 
 /**
  * The stable identity of an intervention. A PR is its url (survives title edits and re-sorts);
- * the other two are keyed on the project plus the thing waiting — the agent and the gate it is
- * parked on, or the agent whose branch is unpushed — since their url is the shared dashboard URL
- * and would otherwise collide.
- *
- * The agent is part of the awaiting key because a gate id is only unique within its own agent:
- * every agent's first gate is `await-choices`. Two agents running in one project (#736) and both
- * parked would otherwise share one identity, and the dedupe would announce only one of them.
+ * the other two are keyed on the project plus the thing waiting — the gate id, or the agent whose
+ * branch is unpushed — since their url is the shared dashboard URL and would otherwise collide.
  */
 export function interventionKey(item: Intervention): string {
-  if (item.kind === 'awaiting') return `awaiting:${item.projectId}:${item.agentId ?? ''}:${item.awaitId ?? ''}`
+  if (item.kind === 'awaiting') return `awaiting:${item.projectId}:${item.awaitId ?? ''}`
   if (item.kind === 'unpushed') return `unpushed:${item.projectId}:${item.agentId ?? ''}`
   return item.url
 }

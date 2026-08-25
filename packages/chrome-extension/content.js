@@ -16,6 +16,27 @@
 // `check.mjs` covers all four offline, in jsdom, with no browser and no live session.
 
 const POLL_MS = 2000
+// How many surveys this page has run; read by the offline harness (check.mjs) to prove one page
+// change costs one survey (#1707).
+let surveys = 0
+
+// Every observer `watch` runs, so the script's own drawing can pause them (#1707): the corner
+// panel and the Driver overlay live under the observed root, and without the pause each survey's
+// redraw was the next survey's trigger — a full survey about four times a second, forever, on a
+// page where nothing had changed.
+const watchers = new Set()
+const OBSERVED = { childList: true, subtree: true, characterData: true }
+let drawing = 0
+
+/** Run `draw`, which writes the script's own elements, without the observers taking it for a page change. */
+function ownWrites(draw) {
+  if (drawing++ === 0) for (const observer of watchers) observer.disconnect()
+  try {
+    draw()
+  } finally {
+    if (--drawing === 0) for (const observer of watchers) observer.observe(document.documentElement, OBSERVED)
+  }
+}
 /** The on-page panel's element id. */
 const PANEL_ID = 'tf-bridge-panel'
 const IS_TOP = window.top === window
@@ -1010,7 +1031,7 @@ function ensureOverlay() {
   log.style.cssText = 'max-height:50vh;overflow:auto;background:#1f2430;padding:12px;border-radius:8px;font:12px/1.45 ui-monospace,monospace;white-space:pre-wrap;margin:8px 0 0'
   details.append(summary, log)
   overlay.append(heading, phrase, status, details)
-  document.documentElement.appendChild(overlay)
+  ownWrites(() => document.documentElement.appendChild(overlay))
   renderOverlay()
 }
 
@@ -1018,8 +1039,10 @@ function renderOverlay() {
   const overlay = document.getElementById(OVERLAY_ID)
   if (!overlay) return
   const version = typeof chrome !== 'undefined' && chrome.runtime?.getManifest ? chrome.runtime.getManifest().version : '?'
-  overlay.querySelector('.tf-driver-status').textContent = `bridge v${version} · ${location.pathname} · ${turnRows().length} turn rows · question ${bridgeStatus} · transcript ${transcriptStatus}`
-  overlay.querySelector('.tf-driver-log').textContent = driverLines.join('\n')
+  ownWrites(() => {
+    overlay.querySelector('.tf-driver-status').textContent = `bridge v${version} · ${location.pathname} · ${turnRows().length} turn rows · question ${bridgeStatus} · transcript ${transcriptStatus}`
+    overlay.querySelector('.tf-driver-log').textContent = driverLines.join('\n')
+  })
 }
 
 // The worker drives the top frame only: the list and the composer live there, and a child frame
@@ -1050,6 +1073,7 @@ if (typeof chrome === 'undefined') {
   window.__tfBridgeProbeNewSession = probeNewSession
   window.__tfBridgeReadSessionList = ids => whileFree(() => readSessionList(ids))
   window.__tfBridgeDrive = args => whileFree(() => drive(args))
+  window.__tfBridgeSurveys = () => surveys
 }
 
 /**
@@ -1098,6 +1122,7 @@ function diagnostics() {
 }
 
 function survey() {
+  surveys++
   const choice = findPendingChoice()
   const composer = findComposer()
   return {
@@ -1171,7 +1196,8 @@ if (!IS_TOP) {
     return b
   }
 
-  const render = () => {
+  // Drawn under `ownWrites`: the redraw must not read as a page change (#1707).
+  const render = () => ownWrites(() => {
     const top = survey()
     // A child frame's find wins: it means the content lives there, which is the finding.
     latest = { ...top, fromFrame: fromFrame ?? null }
@@ -1275,7 +1301,7 @@ if (!IS_TOP) {
         document.execCommand('insertText', false, text)
       }
     }))
-  }
+  })
 
   render()
   watch(render)
@@ -1302,6 +1328,7 @@ function watch(run) {
       // Reading chrome.runtime itself can throw once the context is gone.
     }
     observer.disconnect()
+    watchers.delete(observer)
     clearInterval(interval)
     return false
   }
@@ -1313,7 +1340,8 @@ function watch(run) {
       run()
     }, 250)
   })
-  observer.observe(document.documentElement, { childList: true, subtree: true, characterData: true })
+  observer.observe(document.documentElement, OBSERVED)
+  watchers.add(observer)
   interval = setInterval(() => {
     if (alive()) run()
   }, 30 * POLL_MS)

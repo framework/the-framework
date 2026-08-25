@@ -210,11 +210,11 @@ The bridge is meant to work in a pinned background tab nobody is looking at.
 
 #### Business logic
 
-Every re-read is triggered by the page's own changes, coalesced so a burst of changes causes one pass, plus a slow heartbeat once a minute as a backstop for a change that was missed. When the extension is reloaded out from under an already-injected script, that script stops watching entirely instead of continuing to fail.
+Every re-read is triggered by the page's own changes, coalesced so a burst of changes causes one pass, plus a slow heartbeat once a minute as a backstop for a change that was missed. The bridge's own drawing — the corner panel and the Driver overlay — is not a page change: watching is paused while they are drawn, so one page change causes exactly one re-read. When the extension is reloaded out from under an already-injected script, that script stops watching entirely instead of continuing to fail.
 
 #### Rationale
 
-A frequent timer is the wrong instrument here: the browser slows timers in a tab hidden for more than a few minutes to roughly once a minute, while the session's stream mutates the page the moment anything happens, so watching catches it immediately. And an orphaned script left running after an extension reload throws on every attempt to reach the extension; those throws surface as extension errors and read as product bugs, so a script whose extension is gone shuts itself down.
+A frequent timer is the wrong instrument here: the browser slows timers in a tab hidden for more than a few minutes to roughly once a minute, while the session's stream mutates the page the moment anything happens, so watching catches it immediately. The panel and the overlay are drawn into the same page that is watched, so without the pause each re-read's own redraw was the next re-read's trigger — a full pass about four times a second, forever, in a tab where nothing had changed. And an orphaned script left running after an extension reload throws on every attempt to reach the extension; those throws surface as extension errors and read as product bugs, so a script whose extension is gone shuts itself down.
 
 ## Before modifying/creating SPEC.md files
 

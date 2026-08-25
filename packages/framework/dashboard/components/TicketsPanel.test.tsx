@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { WorkspaceTicket } from '../../src/index.js'
 import { planTicketPrompt, presets } from '../../src/client.js'
+import { configureFirst } from '../test-utils.js'
 
 const sendStart = vi.hoisted(() => vi.fn())
 vi.mock('../rpc/control.js', () => ({ sendStart }))
@@ -12,6 +13,7 @@ const onTicketsMeta = vi.hoisted(() => vi.fn())
 vi.mock('../rpc/reads.js', () => ({ onTicketsMeta }))
 
 const { TicketsPanel, workOnTicketPrompt } = await import('./TicketsPanel.js')
+const { takePendingDraft } = await import('../lib/draft-handoff.js')
 
 const ticket = (over: Partial<WorkspaceTicket> = {}): WorkspaceTicket => ({
   file: '2026-07-20_do-the-thing.md',
@@ -24,6 +26,7 @@ const ticket = (over: Partial<WorkspaceTicket> = {}): WorkspaceTicket => ({
 
 beforeEach(() => {
   onTicketsMeta.mockReset().mockResolvedValue({})
+  takePendingDraft() // a draft left by the previous test would look like this one's
 })
 
 afterEach(() => {
@@ -33,7 +36,7 @@ afterEach(() => {
 
 describe('TicketsPanel (#697/#1144)', () => {
   test('lists the tickets as one-liners, with what has already been done to them', async () => {
-    render(<TicketsPanel projectId="p1" tickets={[ticket({ priority: '8', locked: true, lockedBy: 'agent-1' })]} loaded onOpen={() => {}} />)
+    render(<TicketsPanel projectId="p1" tickets={[ticket({ priority: '8', locked: true, lockedBy: 'agent-1' })]} loaded onOpen={() => {}} onSelectProject={() => {}} />)
     expect(await screen.findByText('Do the thing')).toBeTruthy()
     // The claim marker (#1420): a hammer plus the holder, inline on the row.
     expect(screen.getByText('agent-1')).toBeTruthy()
@@ -43,7 +46,7 @@ describe('TicketsPanel (#697/#1144)', () => {
 
   test('the plan column links a planned ticket to its plan, by the same slug the plan route uses (#685)', async () => {
     const onOpenPlan = vi.fn()
-    render(<TicketsPanel projectId="p1" tickets={[ticket({ planned: true })]} loaded onOpen={() => {}} onOpenPlan={onOpenPlan} />)
+    render(<TicketsPanel projectId="p1" tickets={[ticket({ planned: true })]} loaded onOpen={() => {}} onOpenPlan={onOpenPlan} onSelectProject={() => {}} />)
     // "planned" is no longer a badge — the column says it, and gives somewhere to go with it.
     expect(screen.queryByText('planned')).toBeNull()
     fireEvent.click(await screen.findByRole('button', { name: /view the plan for do the thing/i }))
@@ -53,7 +56,7 @@ describe('TicketsPanel (#697/#1144)', () => {
   test('the plan column starts a session to write the plan when the ticket has none (#685)', async () => {
     sendStart.mockResolvedValue({ ok: true, agentId: 'r3' })
     const onAgentStarted = vi.fn()
-    render(<TicketsPanel projectId="p1" tickets={[ticket({ planned: false })]} loaded onOpen={() => {}} onAgentStarted={onAgentStarted} />)
+    render(<TicketsPanel projectId="p1" tickets={[ticket({ planned: false })]} loaded onOpen={() => {}} onAgentStarted={onAgentStarted} onSelectProject={() => {}} />)
     fireEvent.click(await screen.findByRole('button', { name: /create a plan for do the thing/i }))
     await waitFor(() => expect(sendStart).toHaveBeenCalled())
     // A fixed prompt, so it takes the verbatim-text path rather than a build, and it is exactly the
@@ -70,7 +73,7 @@ describe('TicketsPanel (#697/#1144)', () => {
     sendStart.mockResolvedValue({ ok: true, agentId: 'r4' })
     const onAgentStarted = vi.fn()
     const onOpen = vi.fn()
-    render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onOpen={onOpen} onAgentStarted={onAgentStarted} />)
+    render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onOpen={onOpen} onAgentStarted={onAgentStarted} onSelectProject={() => {}} />)
     fireEvent.click(await screen.findByRole('button', { name: /start work on do the thing/i }))
     await waitFor(() => expect(sendStart).toHaveBeenCalled())
     // A fixed prompt on the verbatim-text path, and exactly the exported ask — no second, hidden
@@ -88,7 +91,7 @@ describe('TicketsPanel (#697/#1144)', () => {
   })
 
   test('a claimed ticket shows the hammer marker with its holder inline (#1420/#1144)', async () => {
-    render(<TicketsPanel projectId="p1" tickets={[ticket({ locked: true, lockedBy: 'plan-1-0' })]} loaded onOpen={() => {}} />)
+    render(<TicketsPanel projectId="p1" tickets={[ticket({ locked: true, lockedBy: 'plan-1-0' })]} loaded onOpen={() => {}} onSelectProject={() => {}} />)
     // Inline, not tooltip-only: a still 1-2s hover is how nobody discovers anything. The tooltip
     // adds what the icon cannot say — that the agent may be planning OR implementing.
     expect(await screen.findByText('plan-1-0')).toBeTruthy()
@@ -105,6 +108,7 @@ describe('TicketsPanel (#697/#1144)', () => {
         isSelected={() => true}
         onToggleSelect={onToggleSelect}
         onOpen={onOpen}
+        onSelectProject={() => {}}
       />,
     )
     const box = await screen.findByRole('checkbox', { name: /select do the thing/i })
@@ -116,7 +120,7 @@ describe('TicketsPanel (#697/#1144)', () => {
     expect(onOpen).not.toHaveBeenCalled()
     cleanup()
     // Without the page's wiring — a surface with nothing to scope to a selection — no checkbox.
-    render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onOpen={() => {}} />)
+    render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onOpen={() => {}} onSelectProject={() => {}} />)
     await screen.findByText('Do the thing')
     expect(screen.queryByRole('checkbox')).toBeNull()
   })
@@ -124,7 +128,7 @@ describe('TicketsPanel (#697/#1144)', () => {
   test('topic badges filter on click when the page passes a handler, without opening the row (#1144)', async () => {
     const onOpen = vi.fn()
     const onTopicClick = vi.fn()
-    render(<TicketsPanel projectId="p1" tickets={[ticket({ topics: ['dx'] })]} loaded onOpen={onOpen} onTopicClick={onTopicClick} />)
+    render(<TicketsPanel projectId="p1" tickets={[ticket({ topics: ['dx'] })]} loaded onOpen={onOpen} onTopicClick={onTopicClick} onSelectProject={() => {}} />)
     fireEvent.click(await screen.findByRole('button', { name: 'dx' }))
     expect(onTopicClick).toHaveBeenCalledWith('dx')
     // A sibling of the row's open button, like the plan cell: filtering must not also navigate.
@@ -140,6 +144,7 @@ describe('TicketsPanel (#697/#1144)', () => {
         loaded
         onOpen={() => {}}
         onClaimedClick={onClaimedClick}
+        onSelectProject={() => {}}
       />,
     )
     fireEvent.click(await screen.findByText('agent-1'))
@@ -154,6 +159,7 @@ describe('TicketsPanel (#697/#1144)', () => {
         tickets={[ticket({ priority: '8', topics: ['dx', 'ui'], date: twoDaysAgo })]}
         loaded
         onOpen={() => {}}
+        onSelectProject={() => {}}
       />,
     )
     // A bare "8" would be cryptic on its own; the row spells out what it is a rating of.
@@ -171,6 +177,7 @@ describe('TicketsPanel (#697/#1144)', () => {
         tickets={[ticket({ file: 'older.md', title: 'Older' }), ticket({ file: 'newer.md', title: 'Newer' })]}
         loaded
         onOpen={() => {}}
+        onSelectProject={() => {}}
       />,
     )
     const titles = (await screen.findAllByRole('button')).map(b => b.textContent)
@@ -185,6 +192,7 @@ describe('TicketsPanel (#697/#1144)', () => {
         tickets={[ticket({ github: { label: '#42', url: 'https://github.com/org/repo/issues/42' } })]}
         loaded
         onOpen={onOpen}
+        onSelectProject={() => {}}
       />,
     )
     const link = await screen.findByRole('link', { name: /#42/ })
@@ -213,6 +221,7 @@ describe('TicketsPanel (#697/#1144)', () => {
         ]}
         loaded
         onOpen={() => {}}
+        onSelectProject={() => {}}
       />,
     )
     expect(await screen.findByText('Effort: 2')).toBeTruthy()
@@ -227,7 +236,7 @@ describe('TicketsPanel (#697/#1144)', () => {
 
   test('opening a row hands back its file, the slug the detail route uses (#1144)', async () => {
     const onOpen = vi.fn()
-    render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onOpen={onOpen} />)
+    render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onOpen={onOpen} onSelectProject={() => {}} />)
     fireEvent.click(await screen.findByText('Do the thing'))
     expect(onOpen).toHaveBeenCalledWith('2026-07-20_do-the-thing.md')
   })
@@ -235,8 +244,8 @@ describe('TicketsPanel (#697/#1144)', () => {
   test('an empty tickets/ offers the GitHub update instead of a dead end (#1501)', async () => {
     sendStart.mockResolvedValue({ ok: true, agentId: 'r1' })
     const onAgentStarted = vi.fn()
-    render(<TicketsPanel projectId="p1" tickets={[]} loaded onOpen={() => {}} onAgentStarted={onAgentStarted} />)
-    fireEvent.click(await screen.findByRole('button', { name: /update from github/i }))
+    render(<TicketsPanel projectId="p1" tickets={[]} loaded onOpen={() => {}} onAgentStarted={onAgentStarted} onSelectProject={() => {}} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Update from GitHub' }))
     await waitFor(() => expect(sendStart).toHaveBeenCalled())
     // A fixed prompt, so it takes the verbatim-text path rather than a build.
     expect(sendStart.mock.calls[0]?.[2]).toBe('prompt')
@@ -253,8 +262,8 @@ describe('TicketsPanel (#697/#1144)', () => {
   test('a refused update says why and moves you nowhere (#1169)', async () => {
     sendStart.mockResolvedValue({ ok: false, error: 'a session is already active' })
     const onAgentStarted = vi.fn()
-    render(<TicketsPanel projectId="p1" tickets={[]} loaded onOpen={() => {}} onAgentStarted={onAgentStarted} />)
-    fireEvent.click(await screen.findByRole('button', { name: /update from github/i }))
+    render(<TicketsPanel projectId="p1" tickets={[]} loaded onOpen={() => {}} onAgentStarted={onAgentStarted} onSelectProject={() => {}} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Update from GitHub' }))
     expect(await screen.findByText(/already active/i)).toBeTruthy()
     expect(onAgentStarted).not.toHaveBeenCalled()
   })
@@ -262,8 +271,8 @@ describe('TicketsPanel (#697/#1144)', () => {
   test('a filled tickets/ offers the same update beside the stamp (#1208)', async () => {
     sendStart.mockResolvedValue({ ok: true, agentId: 'r2' })
     const onAgentStarted = vi.fn()
-    render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onOpen={() => {}} onAgentStarted={onAgentStarted} />)
-    fireEvent.click(await screen.findByRole('button', { name: /update from github/i }))
+    render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onOpen={() => {}} onAgentStarted={onAgentStarted} onSelectProject={() => {}} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Update from GitHub' }))
     await waitFor(() => expect(sendStart).toHaveBeenCalled())
     expect(sendStart.mock.calls[0]?.[2]).toBe('prompt')
     expect(sendStart.mock.calls[0]?.[1]).toBe(presets.updateTickets.render())
@@ -271,40 +280,85 @@ describe('TicketsPanel (#697/#1144)', () => {
   })
 
   test('the empty state offers exactly one update button, without the stamp row (#1501)', async () => {
-    render(<TicketsPanel projectId="p1" tickets={[]} loaded onOpen={() => {}} />)
+    render(<TicketsPanel projectId="p1" tickets={[]} loaded onOpen={() => {}} onSelectProject={() => {}} />)
     // One button, one preset: the stamp row and its sibling button belong to the filled panel.
-    expect((await screen.findAllByRole('button', { name: /update from github/i })).length).toBe(1)
+    expect((await screen.findAllByRole('button', { name: 'Update from GitHub' })).length).toBe(1)
     expect(screen.queryByText(/No record of an import yet/i)).toBeNull()
   })
 
   test('the stamp says when tickets/ last caught up, and admits when it does not know (#1208)', async () => {
     onTicketsMeta.mockResolvedValue({ lastImportedAt: new Date(Date.now() - 3 * 60 * 60_000).toISOString() })
-    render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onOpen={() => {}} />)
+    render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onOpen={() => {}} onSelectProject={() => {}} />)
     expect(await screen.findByText('Updated from GitHub 3h ago')).toBeTruthy()
     cleanup()
     // A repo imported before the stamp existed has none, and saying so beats inventing a date.
     onTicketsMeta.mockResolvedValue({})
-    render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onOpen={() => {}} />)
+    render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onOpen={() => {}} onSelectProject={() => {}} />)
     expect(await screen.findByText('No record of an import yet')).toBeTruthy()
   })
 
   test('a refused update says why and moves you nowhere (#1208)', async () => {
     sendStart.mockResolvedValue({ ok: false, error: 'a session is already active' })
     const onAgentStarted = vi.fn()
-    render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onOpen={() => {}} onAgentStarted={onAgentStarted} />)
-    fireEvent.click(await screen.findByRole('button', { name: /update from github/i }))
+    render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onOpen={() => {}} onAgentStarted={onAgentStarted} onSelectProject={() => {}} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Update from GitHub' }))
     expect(await screen.findByText(/already active/i)).toBeTruthy()
     expect(onAgentStarted).not.toHaveBeenCalled()
   })
 
+  // #1507: every start on this panel spends an agent on a model and a run target that live in
+  // the Global options, a page away — so each carries the chevron that opens the launcher instead.
+  test("the start column's Configure first opens the launcher with the ticket's own prompt", async () => {
+    const selected: string[] = []
+    render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onOpen={() => {}} onSelectProject={id => selected.push(id)} />)
+    await configureFirst('Other ways to work on Do the thing')
+    await waitFor(() => expect(selected).toEqual(['p1']))
+    // The launcher, not an agent — that is the whole reason this half exists.
+    expect(sendStart).not.toHaveBeenCalled()
+    expect(takePendingDraft()).toBe(workOnTicketPrompt('2026-07-20_do-the-thing.md'))
+  })
+
+  test("the plan column's Configure first carries the plan ask, not the work ask", async () => {
+    const selected: string[] = []
+    render(<TicketsPanel projectId="p1" tickets={[ticket({ planned: false })]} loaded onOpen={() => {}} onSelectProject={id => selected.push(id)} />)
+    await configureFirst('Other ways to plan Do the thing')
+    await waitFor(() => expect(selected).toEqual(['p1']))
+    expect(sendStart).not.toHaveBeenCalled()
+    // The shared plan sentence, so the launcher opens with the very ask the button would have sent.
+    expect(takePendingDraft()).toBe(planTicketPrompt('2026-07-20_do-the-thing.md'))
+  })
+
+  test('a plan that already exists is a link, so it has no chevron to configure', async () => {
+    render(<TicketsPanel projectId="p1" tickets={[ticket({ planned: true })]} loaded onOpen={() => {}} onOpenPlan={() => {}} onSelectProject={() => {}} />)
+    expect(await screen.findByRole('button', { name: 'View the plan for Do the thing' })).toBeTruthy()
+    // Reading a file starts nothing, so there is nothing to set up first.
+    expect(screen.queryByRole('button', { name: 'Other ways to plan Do the thing' })).toBeNull()
+  })
+
+  test("the update's Configure first carries the update preset, from either state (#1501)", async () => {
+    const selected: string[] = []
+    // The filled panel's stamp row.
+    render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onOpen={() => {}} onSelectProject={id => selected.push(id)} />)
+    await configureFirst('Other ways to update from GitHub')
+    await waitFor(() => expect(selected).toEqual(['p1']))
+    expect(takePendingDraft()).toBe(presets.updateTickets.render())
+    cleanup()
+    // And the empty panel's own button, which offers the same preset under the same label.
+    render(<TicketsPanel projectId="p1" tickets={[]} loaded onOpen={() => {}} onSelectProject={id => selected.push(id)} />)
+    await configureFirst('Other ways to update from GitHub')
+    await waitFor(() => expect(selected).toEqual(['p1', 'p1']))
+    expect(takePendingDraft()).toBe(presets.updateTickets.render())
+    expect(sendStart).not.toHaveBeenCalled()
+  })
+
   test('an empty list with hiddenByFilter says so, rather than offering an update for work already done (#1144/#1230)', async () => {
-    render(<TicketsPanel projectId="p1" tickets={[]} loaded hiddenByFilter={3} onOpen={() => {}} />)
+    render(<TicketsPanel projectId="p1" tickets={[]} loaded hiddenByFilter={3} onOpen={() => {}} onSelectProject={() => {}} />)
     expect(await screen.findByText(/3 tickets hidden by the current filter/i)).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /update from github/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Update from GitHub' })).toBeNull()
   })
 
   test('no project renders nothing at all', () => {
-    const { container } = render(<TicketsPanel projectId={null} tickets={[]} loaded onOpen={() => {}} />)
+    const { container } = render(<TicketsPanel projectId={null} tickets={[]} loaded onOpen={() => {}} onSelectProject={() => {}} />)
     expect(container.textContent).toBe('')
   })
 })

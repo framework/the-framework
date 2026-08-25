@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { configureFirst } from '../test-utils.js'
 
 const onAllTickets = vi.hoisted(() => vi.fn())
 // TicketsPanel (rendered per project here) reaches for these too; unmocked they fetch a daemon
@@ -11,6 +12,8 @@ vi.mock('../rpc/reads.js', () => ({ onAllTickets, onTicketsMeta, onQueue }))
 vi.mock('../rpc/control.js', () => ({ sendQueueTicket: vi.fn(), sendQueueTicketPlan: vi.fn(), sendStart: vi.fn() }))
 
 const { TicketsPage } = await import('./TicketsPage.js')
+const { workOnTicketPrompt } = await import('./TicketsPanel.js')
+const { takePendingDraft } = await import('../lib/draft-handoff.js')
 
 const ticket = (over: Record<string, unknown> = {}) => ({
   file: 't.md',
@@ -27,6 +30,7 @@ beforeEach(() => {
   // The page reads its view from the URL on mount and mirrors changes back via replaceState, so
   // every test starts from a clean address.
   window.history.replaceState(null, '', '/tickets')
+  takePendingDraft() // a draft left by the previous test would look like this one's
 })
 
 /** Fresh control mocks for the tests that click the header's queue-adds. */
@@ -49,7 +53,7 @@ describe('TicketsPage (#1144)', () => {
       { projectId: 'p1', projectName: 'Alpha', tickets: [ticket({ title: 'Do the thing' })] },
       { projectId: 'p2', projectName: 'Beta', tickets: [ticket({ file: 'b.md', title: 'Do the other thing' })] },
     ])
-    render(<TicketsPage onOpenTicket={() => {}} />)
+    render(<TicketsPage onOpenTicket={() => {}} onSelectProject={() => {}} />)
     expect(await screen.findByText('Alpha')).toBeTruthy()
     expect(screen.getByText('Beta')).toBeTruthy()
     expect(screen.getByText('Do the thing')).toBeTruthy()
@@ -59,21 +63,21 @@ describe('TicketsPage (#1144)', () => {
   test('opening a row hands back its project and file, for the detail route (#1144)', async () => {
     onAllTickets.mockResolvedValue([{ projectId: 'p1', projectName: 'Alpha', tickets: [ticket()] }])
     const onOpenTicket = vi.fn()
-    render(<TicketsPage onOpenTicket={onOpenTicket} />)
+    render(<TicketsPage onOpenTicket={onOpenTicket} onSelectProject={() => {}} />)
     fireEvent.click(await screen.findByText('Do the thing'))
     expect(onOpenTicket).toHaveBeenCalledWith('p1', 't.md')
   })
 
   test('a project with no tickets still offers its own GitHub update, not a dead end', async () => {
     onAllTickets.mockResolvedValue([{ projectId: 'p1', projectName: 'Alpha', tickets: [] }])
-    render(<TicketsPage onOpenTicket={() => {}} />)
+    render(<TicketsPage onOpenTicket={() => {}} onSelectProject={() => {}} />)
     expect(await screen.findByText('Alpha')).toBeTruthy()
-    expect(screen.getByRole('button', { name: /update from github/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Update from GitHub' })).toBeTruthy()
   })
 
   test('no registered projects says so rather than an empty page', async () => {
     onAllTickets.mockResolvedValue([])
-    render(<TicketsPage onOpenTicket={() => {}} />)
+    render(<TicketsPage onOpenTicket={() => {}} onSelectProject={() => {}} />)
     expect(await screen.findByText(/no projects registered/i)).toBeTruthy()
   })
 
@@ -82,8 +86,8 @@ describe('TicketsPage (#1144)', () => {
     const { sendStart } = await import('../rpc/control.js')
     vi.mocked(sendStart).mockResolvedValue({ ok: true, agentId: 'r1' })
     const onAgentStarted = vi.fn()
-    render(<TicketsPage onOpenTicket={() => {}} onAgentStarted={onAgentStarted} />)
-    fireEvent.click(await screen.findByRole('button', { name: /update from github/i }))
+    render(<TicketsPage onOpenTicket={() => {}} onAgentStarted={onAgentStarted} onSelectProject={() => {}} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Update from GitHub' }))
     await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith('p1', expect.any(String), 'r1'))
   })
 })
@@ -105,7 +109,7 @@ describe('TicketsPage sort (#1144/#1265)', () => {
 
   test('defaults to the server\'s date order', async () => {
     twoByPriority()
-    render(<TicketsPage onOpenTicket={() => {}} />)
+    render(<TicketsPage onOpenTicket={() => {}} onSelectProject={() => {}} />)
     await screen.findByText('Low priority')
     const titles = screen.getAllByRole('button').map(b => b.textContent)
     // 'low.md' is first in the fixture, standing in for "whatever order the server sent" — the
@@ -115,7 +119,7 @@ describe('TicketsPage sort (#1144/#1265)', () => {
 
   test('sorting by priority puts the highest first, and lands in the URL', async () => {
     twoByPriority()
-    render(<TicketsPage onOpenTicket={() => {}} />)
+    render(<TicketsPage onOpenTicket={() => {}} onSelectProject={() => {}} />)
     await screen.findByText('Low priority')
     fireEvent.click(screen.getByRole('button', { name: /sort: date/i }))
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Priority' }))
@@ -136,7 +140,7 @@ describe('TicketsPage sort (#1144/#1265)', () => {
         ],
       },
     ])
-    render(<TicketsPage onOpenTicket={() => {}} />)
+    render(<TicketsPage onOpenTicket={() => {}} onSelectProject={() => {}} />)
     await screen.findByText('Newer')
     fireEvent.click(screen.getByRole('button', { name: /sort: date/i }))
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Priority' }))
@@ -161,7 +165,7 @@ describe('TicketsPage filters (#1144)', () => {
 
   test('searching narrows the rows and writes q= to the URL', async () => {
     fixture()
-    render(<TicketsPage onOpenTicket={() => {}} />)
+    render(<TicketsPage onOpenTicket={() => {}} onSelectProject={() => {}} />)
     await screen.findByText('Improve the lock')
     // The shown/total tally sits beside the page title, full pool while unfiltered.
     expect(screen.getByText('2/2')).toBeTruthy()
@@ -175,14 +179,14 @@ describe('TicketsPage filters (#1144)', () => {
   test('the URL is the initial state: mounting under ?q= starts filtered', async () => {
     fixture()
     window.history.replaceState(null, '', '/tickets?q=lock')
-    render(<TicketsPage onOpenTicket={() => {}} />)
+    render(<TicketsPage onOpenTicket={() => {}} onSelectProject={() => {}} />)
     expect(await screen.findByText('Improve the lock')).toBeTruthy()
     expect(screen.queryByText('Something else')).toBeNull()
   })
 
   test('clicking a row\'s topic badge adds that topic filter (#1144)', async () => {
     fixture()
-    render(<TicketsPage onOpenTicket={() => {}} />)
+    render(<TicketsPage onOpenTicket={() => {}} onSelectProject={() => {}} />)
     await screen.findByText('Improve the lock')
     fireEvent.click(screen.getByRole('button', { name: 'dx' }))
     await waitFor(() => expect(screen.queryByText('Something else')).toBeNull())
@@ -191,7 +195,7 @@ describe('TicketsPage filters (#1144)', () => {
 
   test('clicking the claim marker narrows to claimed tickets', async () => {
     fixture()
-    render(<TicketsPage onOpenTicket={() => {}} />)
+    render(<TicketsPage onOpenTicket={() => {}} onSelectProject={() => {}} />)
     await screen.findByText('Something else')
     fireEvent.click(screen.getByText('agent-1'))
     await waitFor(() => expect(screen.queryByText('Improve the lock')).toBeNull())
@@ -202,10 +206,10 @@ describe('TicketsPage filters (#1144)', () => {
   test('a project filtered to nothing says so and clears from right there', async () => {
     fixture()
     window.history.replaceState(null, '', '/tickets?q=zzz-no-match')
-    render(<TicketsPage onOpenTicket={() => {}} />)
+    render(<TicketsPage onOpenTicket={() => {}} onSelectProject={() => {}} />)
     expect(await screen.findByText(/2 tickets hidden by the current filters/i)).toBeTruthy()
     // Not the update offer — these tickets exist, they are filtered (#1230's rule, kept).
-    expect(screen.queryByRole('button', { name: /update from github/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Update from GitHub' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: /clear filters/i }))
     expect(await screen.findByText('Improve the lock')).toBeTruthy()
     expect(window.location.search).toBe('')
@@ -221,7 +225,7 @@ describe('TicketsPage grouping (#1144)', () => {
       { projectId: 'p2', projectName: 'Beta', tickets: [ticket({ file: 'b.md', title: 'Beta ticket', priority: '9' })] },
     ])
     window.history.replaceState(null, '', '/tickets?sort=priority&group=none')
-    render(<TicketsPage onOpenTicket={() => {}} />)
+    render(<TicketsPage onOpenTicket={() => {}} onSelectProject={() => {}} />)
     await screen.findByText('Beta ticket')
     // Project names ride the rows now — there are no section headings to say them.
     expect(screen.getByText('Alpha')).toBeTruthy()
@@ -230,7 +234,7 @@ describe('TicketsPage grouping (#1144)', () => {
     const titles = (await screen.findAllByRole('button')).map(b => b.textContent)
     expect(titles.findIndex(t => t?.includes('Beta ticket'))).toBeLessThan(titles.findIndex(t => t?.includes('Alpha ticket')))
     // No per-project Update bars in the flat list.
-    expect(screen.queryByRole('button', { name: /update from github/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Update from GitHub' })).toBeNull()
   })
 
   test('opening a flat row still hands back its own project and file', async () => {
@@ -239,7 +243,7 @@ describe('TicketsPage grouping (#1144)', () => {
     ])
     window.history.replaceState(null, '', '/tickets?group=none')
     const onOpenTicket = vi.fn()
-    render(<TicketsPage onOpenTicket={onOpenTicket} />)
+    render(<TicketsPage onOpenTicket={onOpenTicket} onSelectProject={() => {}} />)
     fireEvent.click(await screen.findByText('Beta ticket'))
     expect(onOpenTicket).toHaveBeenCalledWith('p2', 'b.md')
   })
@@ -252,7 +256,7 @@ describe('TicketsPage grouping (#1144)', () => {
     const { sendStart } = await import('../rpc/control.js')
     vi.mocked(sendStart).mockResolvedValue({ ok: true, agentId: 'r9' })
     const onAgentStarted = vi.fn()
-    render(<TicketsPage onOpenTicket={() => {}} onAgentStarted={onAgentStarted} />)
+    render(<TicketsPage onOpenTicket={() => {}} onAgentStarted={onAgentStarted} onSelectProject={() => {}} />)
     fireEvent.click(await screen.findByRole('button', { name: /start work on beta ticket/i }))
     // The row's own project, not a panel-bound one — the flat list carries one per row.
     await waitFor(() =>
@@ -262,6 +266,23 @@ describe('TicketsPage grouping (#1144)', () => {
       }),
     )
     await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith('p2', expect.any(String), 'r9'))
+  })
+
+  test("a flat row's Configure first opens that row's own project's launcher (#1507)", async () => {
+    onAllTickets.mockResolvedValue([
+      { projectId: 'p1', projectName: 'Alpha', tickets: [ticket({ file: 'a.md', title: 'Alpha ticket' })] },
+      { projectId: 'p2', projectName: 'Beta', tickets: [ticket({ file: 'b.md', title: 'Beta ticket' })] },
+    ])
+    window.history.replaceState(null, '', '/tickets?group=none')
+    const { sendStart } = await import('../rpc/control.js')
+    vi.mocked(sendStart).mockClear()
+    const selected: string[] = []
+    render(<TicketsPage onOpenTicket={() => {}} onSelectProject={id => selected.push(id)} />)
+    await configureFirst('Other ways to work on Beta ticket')
+    // The row's own project, not the first one the page happens to list.
+    await waitFor(() => expect(selected).toEqual(['p2']))
+    expect(sendStart).not.toHaveBeenCalled()
+    expect(takePendingDraft()).toBe(workOnTicketPrompt('b.md'))
   })
 })
 
@@ -278,7 +299,7 @@ describe('TicketsPage add the shown set to the AI queue', () => {
       },
     ])
     const { sendStart, sendQueueTicket } = await controls()
-    render(<TicketsPage onOpenTicket={() => {}} />)
+    render(<TicketsPage onOpenTicket={() => {}} onSelectProject={() => {}} />)
     fireEvent.click(await screen.findByRole('button', { name: 'Add all 2 tickets shown below to the AI queue' }))
     // Queued exactly as the detail page's Queue button queues (#1164): title as the entry, the
     // ticket named so the entry links back, its priority picking the section.
@@ -318,7 +339,7 @@ describe('TicketsPage add the shown set to the AI queue', () => {
       },
     ])
     const { sendQueueTicket } = await controls()
-    render(<TicketsPage onOpenTicket={() => {}} />)
+    render(<TicketsPage onOpenTicket={() => {}} onSelectProject={() => {}} />)
     fireEvent.click(await screen.findByRole('button', { name: 'Add all 2 tickets shown below to the AI queue' }))
     // Only the genuinely unqueued ticket is written; a.md's open entry stands as it is.
     await screen.findByRole('button', { name: 'Queued' })
@@ -335,7 +356,7 @@ describe('TicketsPage add the shown set to the AI queue', () => {
       },
     ])
     const { sendQueueTicket } = await controls()
-    render(<TicketsPage onOpenTicket={() => {}} />)
+    render(<TicketsPage onOpenTicket={() => {}} onSelectProject={() => {}} />)
     // The label counts only what the click will add, never promising the claimed row.
     fireEvent.click(await screen.findByRole('button', { name: 'Add the one unclaimed ticket shown below to the AI queue' }))
     await screen.findByRole('button', { name: 'Queued' })
@@ -348,7 +369,7 @@ describe('TicketsPage add the shown set to the AI queue', () => {
       { projectId: 'p1', projectName: 'Alpha', tickets: [ticket({ file: 'a.md', title: 'First' })] },
     ])
     window.history.replaceState(null, '', '/tickets?q=zzz-no-match')
-    render(<TicketsPage onOpenTicket={() => {}} />)
+    render(<TicketsPage onOpenTicket={() => {}} onSelectProject={() => {}} />)
     await screen.findByText(/1 ticket hidden by the current filters/i)
     expect(screen.queryByRole('button', { name: /to the ai queue/i })).toBeNull()
     expect(screen.queryByRole('button', { name: /queue plans/i })).toBeNull()
@@ -358,7 +379,7 @@ describe('TicketsPage add the shown set to the AI queue', () => {
     onAllTickets.mockResolvedValue([
       { projectId: 'p1', projectName: 'Alpha', tickets: [ticket({ file: 'a.md', title: 'First', locked: true })] },
     ])
-    render(<TicketsPage onOpenTicket={() => {}} />)
+    render(<TicketsPage onOpenTicket={() => {}} onSelectProject={() => {}} />)
     await screen.findByText('First')
     expect(screen.queryByRole('button', { name: /to the ai queue/i })).toBeNull()
     expect(screen.queryByRole('button', { name: /queue a plan/i })).toBeNull()
@@ -378,7 +399,7 @@ describe('TicketsPage queue plans for the shown set', () => {
       },
     ])
     const { sendStart, sendQueueTicket, sendQueueTicketPlan } = await controls()
-    render(<TicketsPage onOpenTicket={() => {}} />)
+    render(<TicketsPage onOpenTicket={() => {}} onSelectProject={() => {}} />)
     fireEvent.click(await screen.findByRole('button', { name: 'Queue plans for all 2 tickets shown below' }))
     // One plan ask per ticket, the ticket named with its priority so the entry lands in its
     // section — and neither an implementation entry nor an agent comes out of this button.
@@ -404,7 +425,7 @@ describe('TicketsPage queue plans for the shown set', () => {
       },
     ])
     const { sendQueueTicketPlan } = await controls()
-    render(<TicketsPage onOpenTicket={() => {}} />)
+    render(<TicketsPage onOpenTicket={() => {}} onSelectProject={() => {}} />)
     fireEvent.click(await screen.findByRole('button', { name: 'Queue a plan for the one unplanned ticket shown below' }))
     await screen.findByRole('button', { name: 'Plans queued' })
     expect(sendQueueTicketPlan).toHaveBeenCalledTimes(1)
@@ -438,7 +459,7 @@ describe('TicketsPage queue plans for the shown set', () => {
       },
     ])
     const { sendQueueTicketPlan } = await controls()
-    render(<TicketsPage onOpenTicket={() => {}} />)
+    render(<TicketsPage onOpenTicket={() => {}} onSelectProject={() => {}} />)
     fireEvent.click(await screen.findByRole('button', { name: 'Queue plans for all 3 tickets shown below' }))
     await screen.findByRole('button', { name: 'Plans queued' })
     expect(sendQueueTicketPlan).toHaveBeenCalledTimes(1)
@@ -449,7 +470,7 @@ describe('TicketsPage queue plans for the shown set', () => {
     onAllTickets.mockResolvedValue([
       { projectId: 'p1', projectName: 'Alpha', tickets: [ticket({ file: 'a.md', title: 'First', planned: true })] },
     ])
-    render(<TicketsPage onOpenTicket={() => {}} />)
+    render(<TicketsPage onOpenTicket={() => {}} onSelectProject={() => {}} />)
     await screen.findByText('First')
     expect(screen.queryByRole('button', { name: /queue a plan|queue plans/i })).toBeNull()
     expect(screen.getByRole('button', { name: 'Add the ticket shown below to the AI queue' })).toBeTruthy()
@@ -475,7 +496,7 @@ describe('TicketsPage selection scopes the queue buttons', () => {
   test('selected tickets are what the queue-add adds — the rest of the shown set stays put', async () => {
     threeTickets()
     const { sendQueueTicket } = await controls()
-    render(<TicketsPage onOpenTicket={() => {}} />)
+    render(<TicketsPage onOpenTicket={() => {}} onSelectProject={() => {}} />)
     await screen.findByText('First')
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select First' }))
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select Third' }))
@@ -494,7 +515,7 @@ describe('TicketsPage selection scopes the queue buttons', () => {
   test('the plan button narrows to the selection the same way', async () => {
     threeTickets()
     const { sendQueueTicketPlan } = await controls()
-    render(<TicketsPage onOpenTicket={() => {}} />)
+    render(<TicketsPage onOpenTicket={() => {}} onSelectProject={() => {}} />)
     await screen.findByText('First')
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select Second' }))
     fireEvent.click(screen.getByRole('button', { name: 'Queue a plan for the selected ticket' }))
@@ -505,7 +526,7 @@ describe('TicketsPage selection scopes the queue buttons', () => {
 
   test('clearing the selection hands the buttons back to the whole shown set', async () => {
     threeTickets()
-    render(<TicketsPage onOpenTicket={() => {}} />)
+    render(<TicketsPage onOpenTicket={() => {}} onSelectProject={() => {}} />)
     await screen.findByText('First')
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select First' }))
     expect(screen.getByRole('button', { name: 'Add the selected ticket to the AI queue' })).toBeTruthy()
@@ -526,7 +547,7 @@ describe('TicketsPage selection scopes the queue buttons', () => {
       },
     ])
     const { sendQueueTicket } = await controls()
-    render(<TicketsPage onOpenTicket={() => {}} />)
+    render(<TicketsPage onOpenTicket={() => {}} onSelectProject={() => {}} />)
     await screen.findByText('First')
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select First' }))
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select Second' }))
@@ -539,7 +560,7 @@ describe('TicketsPage selection scopes the queue buttons', () => {
   test('a selected ticket the filters hide is neither counted nor acted on, and stays selected', async () => {
     threeTickets()
     const { sendQueueTicket } = await controls()
-    render(<TicketsPage onOpenTicket={() => {}} />)
+    render(<TicketsPage onOpenTicket={() => {}} onSelectProject={() => {}} />)
     await screen.findByText('Second')
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select Second' }))
     // Hide the selected row: the selection has nothing shown, so the buttons speak for the
@@ -564,7 +585,7 @@ describe('TicketsPage selection scopes the queue buttons', () => {
     ])
     window.history.replaceState(null, '', '/tickets?group=none')
     const { sendQueueTicket } = await controls()
-    render(<TicketsPage onOpenTicket={() => {}} />)
+    render(<TicketsPage onOpenTicket={() => {}} onSelectProject={() => {}} />)
     await screen.findByText('Beta ticket')
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select Beta ticket' }))
     fireEvent.click(screen.getByRole('button', { name: 'Add the selected ticket to the AI queue' }))

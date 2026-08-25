@@ -7,6 +7,7 @@ import { RefreshCw, Github, ClipboardPlus, ClipboardList, Hammer, Play } from 'l
 import { sendStart } from '../rpc/control.js'
 import { onTicketsMeta } from '../rpc/reads.js'
 import { Button } from './ui/button.js'
+import { StartAgentButton } from './StartAgentButton.js'
 import { Badge } from './ui/badge.js'
 import { Checkbox } from './ui/checkbox.js'
 import { useAction } from '../lib/use-action.js'
@@ -58,8 +59,10 @@ export function TicketRow({
   onToggleSelect,
   onOpen,
   onStartWork,
+  onConfigureWork,
   onOpenPlan,
   onStartPlan,
+  onConfigurePlan,
   onTopicClick,
   onClaimedClick,
 }: {
@@ -76,8 +79,12 @@ export function TicketRow({
   onOpen: () => void
   /** The start column: spin up an agent implementing this one ticket. */
   onStartWork: () => void
+  /** Its chevron (#1507): open this ticket's project launcher, prefilled with the same ask. */
+  onConfigureWork: () => void
   onOpenPlan?: (() => void) | undefined
   onStartPlan: () => void
+  /** The plan column's chevron (#1507): the launcher, prefilled with the plan ask. */
+  onConfigurePlan: () => void
   /** Click-to-filter (#1144): a topic badge adds its topic to the page's filter. Without a
    *  handler the topics render as plain badges. */
   onTopicClick?: ((topic: string) => void) | undefined
@@ -98,25 +105,25 @@ export function TicketRow({
       {/* The start column: one click spins up an agent implementing this
           ticket — the AI Queue card's play button (#855), offered where the backlog is read
           instead of only after queueing. A sibling of the open button like every control on the
-          row (an interactive control nested in a button is invalid HTML): starting is not opening. */}
-      <div className="flex w-10 shrink-0 items-center justify-center">
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <button
-                type="button"
-                onClick={onStartWork}
-                disabled={busy}
-                aria-label={`Start work on ${ticket.title}`}
-                // Quiet like the plan column's create button: an available action, not a state.
-                className="text-muted-foreground/50 hover:text-foreground disabled:opacity-50"
-              />
-            }
-          >
-            <Play className="h-4 w-4" aria-hidden />
-          </TooltipTrigger>
-          <TooltipContent>Spin up an agent working on this ticket</TooltipContent>
-        </Tooltip>
+          row (an interactive control nested in a button is invalid HTML): starting is not opening.
+          Its chevron opens the launcher with the same ask (#1507), since the model and where the
+          agent runs are nowhere on this row. */}
+      <div className="flex w-16 shrink-0 items-center justify-center">
+        <StartAgentButton
+          variant="ghost"
+          size="icon-sm"
+          icon={<Play className="h-4 w-4" aria-hidden />}
+          ariaLabel={`Start work on ${ticket.title}`}
+          menuAriaLabel={`Other ways to work on ${ticket.title}`}
+          tooltip="Spin up an agent working on this ticket"
+          busy={busy}
+          onStart={onStartWork}
+          onConfigure={onConfigureWork}
+          prompt={workOnTicketPrompt(ticket.file)}
+          configureDescription="Opens the launcher with this ticket's prompt, so you can set the model and where it runs."
+          // Quiet like the plan column's create button: an available action, not a state.
+          className="text-muted-foreground/50 hover:text-foreground"
+        />
       </div>
       <button type="button" onClick={onOpen} className="flex min-w-0 flex-1 items-center gap-2 py-2 pl-0 pr-3 text-left text-sm">
         {/* The title is the row's one flexible column: it truncates when long and stretches
@@ -197,8 +204,10 @@ export function TicketRow({
           write one. A sibling of the row's button, not a child, for the same reason the GitHub
           link is: an interactive control nested in a button is invalid HTML, and the two go
           different places. */}
-      <div className="flex w-10 shrink-0 items-center justify-center">
+      <div className="flex w-16 shrink-0 items-center justify-center">
         {ticket.planned ? (
+          // A plan that exists is a link, not a start — so no chevron: there is nothing to
+          // configure about reading a file.
           <Tooltip>
             <TooltipTrigger
               render={
@@ -221,25 +230,23 @@ export function TicketRow({
             <TooltipContent>View the plan</TooltipContent>
           </Tooltip>
         ) : (
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <button
-                  type="button"
-                  onClick={onStartPlan}
-                  disabled={busy}
-                  aria-label={`Create a plan for ${ticket.title}`}
-                  // Light grey, lighter than the row's "4d ago" date, against the view
-                  // button's bold blue: a plan yet to be written is the quiet state, an
-                  // available action rather than something already there.
-                  className="text-muted-foreground/50 hover:text-foreground disabled:opacity-50"
-                />
-              }
-            >
-              <ClipboardPlus className="h-4 w-4" aria-hidden />
-            </TooltipTrigger>
-            <TooltipContent>Plan this ticket — starts an agent to write its plan</TooltipContent>
-          </Tooltip>
+          <StartAgentButton
+            variant="ghost"
+            size="icon-sm"
+            icon={<ClipboardPlus className="h-4 w-4" aria-hidden />}
+            ariaLabel={`Create a plan for ${ticket.title}`}
+            menuAriaLabel={`Other ways to plan ${ticket.title}`}
+            tooltip="Plan this ticket — starts an agent to write its plan"
+            busy={busy}
+            onStart={onStartPlan}
+            onConfigure={onConfigurePlan}
+            prompt={planTicketPrompt(ticket.file)}
+            configureDescription="Opens the launcher with the plan prompt, so you can set the model and where it runs."
+            // Light grey, lighter than the row's "4d ago" date, against the view
+            // button's bold blue: a plan yet to be written is the quiet state, an
+            // available action rather than something already there.
+            className="text-muted-foreground/50 hover:text-foreground"
+          />
         )}
       </div>
       {ticket.github ? (
@@ -278,6 +285,7 @@ export function TicketsPanel({
   onOpen,
   onOpenPlan,
   onAgentStarted,
+  onSelectProject,
   onTopicClick,
   onClaimedClick,
   onClearFilters,
@@ -303,6 +311,8 @@ export function TicketsPanel({
   /** Told when the import session starts, so the shell can show it (#948) — the button used
    *  to flip "Starting…" and leave you staring at the still-empty panel. */
   onAgentStarted?: ((intent: string, agentId?: string) => void) | undefined
+  /** Where every "Configure first, then run" here lands (#1507): this project's own launcher. */
+  onSelectProject: (id: string) => void
   /** Click-to-filter (#1144), threaded to every row; absent on a page with no filters. */
   onTopicClick?: ((topic: string) => void) | undefined
   onClaimedClick?: (() => void) | undefined
@@ -317,6 +327,11 @@ export function TicketsPanel({
 
   if (!projectId) return null
   if (!loaded) return <p className="p-4 text-sm text-muted-foreground">Loading…</p>
+
+  // Every "Configure first, then run" on the panel lands in the same place: this project's own
+  // launcher, where the model, the run target and the prompt itself can all be changed (#1507).
+  // The prompt each button carries is stashed by the button itself.
+  const configure = () => onSelectProject(projectId)
 
   const startSession = async (prompt: string, failure: string, options: { unattended?: boolean; ticket?: string } = {}) => {
     const result = await run(() => sendStart(projectId, prompt, 'prompt', options), failure)
@@ -364,9 +379,19 @@ export function TicketsPanel({
           plans from.
         </p>
         {error && <p className="text-xs text-danger">{error}</p>}
-        <Button size="sm" variant="outline" disabled={busy} onClick={() => void updateFromGithub()}>
-          {busy ? 'Starting…' : 'Update from GitHub'}
-        </Button>
+        <StartAgentButton
+          size="sm"
+          icon={<RefreshCw className="h-3.5 w-3.5" aria-hidden />}
+          label="Update from GitHub"
+          menuAriaLabel="Other ways to update from GitHub"
+          tooltip="Bring tickets/ up to date with GitHub. With no import on record, everything open comes across."
+          busy={busy}
+          starting={busy}
+          onStart={() => void updateFromGithub()}
+          onConfigure={configure}
+          prompt={UPDATE_PROMPT}
+          configureDescription="Opens the launcher with the update prompt, so you can set the model and where it runs."
+        />
       </div>
     )
   }
@@ -384,27 +409,24 @@ export function TicketsPanel({
             ? `Updated from GitHub ${formatRelative(meta.lastImportedAt)}`
             : 'No record of an import yet'}
         </span>
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-6 shrink-0 gap-1 px-2 text-xs"
-                disabled={busy}
-                onClick={() => void updateFromGithub()}
-              />
-            }
-          >
-            <RefreshCw className="h-3.5 w-3.5" aria-hidden />
-            {busy ? 'Starting…' : 'Update from GitHub'}
-          </TooltipTrigger>
-          <TooltipContent>
-            {meta.lastImportedAt
+        <StartAgentButton
+          size="sm"
+          icon={<RefreshCw className="h-3.5 w-3.5" aria-hidden />}
+          label="Update from GitHub"
+          menuAriaLabel="Other ways to update from GitHub"
+          tooltip={
+            meta.lastImportedAt
               ? 'Bring tickets/ up to date with the issues and comments changed since the last import.'
-              : 'Bring tickets/ up to date with GitHub. With no import on record, everything open comes across.'}
-          </TooltipContent>
-        </Tooltip>
+              : 'Bring tickets/ up to date with GitHub. With no import on record, everything open comes across.'
+          }
+          busy={busy}
+          starting={busy}
+          onStart={() => void updateFromGithub()}
+          onConfigure={configure}
+          prompt={UPDATE_PROMPT}
+          configureDescription="Opens the launcher with the update prompt, so you can set the model and where it runs."
+          className="h-6 gap-1 px-2 text-xs"
+        />
       </div>
       <ul className="divide-y divide-border">
         {tickets.map(ticket => (
@@ -416,8 +438,10 @@ export function TicketsPanel({
             onToggleSelect={onToggleSelect ? () => onToggleSelect(ticket.file) : undefined}
             onOpen={() => onOpen(ticket.file)}
             onStartWork={() => void startWork(ticket.file)}
+            onConfigureWork={configure}
             onOpenPlan={onOpenPlan ? () => onOpenPlan(ticket.file) : undefined}
             onStartPlan={() => void startPlan(ticket.file)}
+            onConfigurePlan={configure}
             onTopicClick={onTopicClick}
             onClaimedClick={onClaimedClick}
           />

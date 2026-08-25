@@ -30,9 +30,12 @@ import { RUN_TARGET_LABELS } from '../lib/agent-settings.js'
 
 export function SettingsPage({
   onAgentStarted,
+  onSelectProject,
 }: {
   /** Where a session the onboarding checklist starts lands (#1169): on that session. */
   onAgentStarted: (projectId: string, intent: string, agentId?: string) => void
+  /** Where the checklist's "Configure first, then run" lands (#1507): that project's launcher. */
+  onSelectProject: (id: string) => void
   onDone?: () => void
 }) {
   const preferences = usePreferences()
@@ -60,7 +63,7 @@ export function SettingsPage({
           </p>
         </div>
 
-        <OnboardingChecklist onAgentStarted={onAgentStarted} />
+        <OnboardingChecklist onAgentStarted={onAgentStarted} onSelectProject={onSelectProject} />
 
         <Section title="Appearance">
           <SelectRow

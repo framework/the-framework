@@ -29,7 +29,7 @@ describe('SettingsPage dropdowns (#1172)', () => {
     // open and not use, which reads as broken rather than as "no choices here". The control itself
     // did not survive the deletions on this branch, so this asserts the property rather than
     // hunting the instance — the next dynamic option list is the one that would bring it back.
-    const { container } = render(<SettingsPage onAgentStarted={() => {}} />)
+    const { container } = render(<SettingsPage onAgentStarted={() => {}} onSelectProject={() => {}} />)
     const selects = [...container.querySelectorAll('select')]
     expect(selects.length).toBeGreaterThan(0) // the page really did render its controls
     for (const select of selects) {
@@ -40,7 +40,7 @@ describe('SettingsPage dropdowns (#1172)', () => {
   test('an editor list the daemon could not fill still leaves a usable Editor row', () => {
     // Its options are the one list on the page assembled at run time. Auto-detect is a real
     // choice rather than a placeholder, so the row stays operable with nothing detected.
-    render(<SettingsPage onAgentStarted={() => {}} />)
+    render(<SettingsPage onAgentStarted={() => {}} onSelectProject={() => {}} />)
     const editor = screen.getByLabelText('Editor') as HTMLSelectElement
     expect([...editor.querySelectorAll('option')].map(o => o.textContent)).toEqual(['Auto-detect'])
   })

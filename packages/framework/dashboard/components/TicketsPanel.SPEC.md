@@ -1,8 +1,10 @@
-One project's `tickets/` backlog as a list of one-line rows, scannable without opening anything, with three agent-starting actions on it: work a ticket, plan a ticket, and bring the whole backlog up to date with GitHub.
+One project's `tickets/` backlog as a list of one-line rows, scannable without opening anything, with three agent-starting actions on it: work a ticket, plan a ticket, and bring the whole backlog up to date with GitHub. Each of the three also offers "Configure first, then run", which opens the project's launcher with the same prompt instead.
 
 ## User story
 
 The user wants to read a project's backlog at a glance — what each ticket is, how urgent, whether it is already planned or already being worked, how old — and to put an agent on any of it in one click. On a project with no tickets yet, they want the backlog filled from the repo's GitHub issues rather than a dead end.
+
+The user also wants to run any of those three on a different model or somewhere other than this machine — settings that live in the launcher, not on a backlog row.
 
 ## Business logic — TL;DR
 
@@ -12,6 +14,7 @@ The user wants to read a project's backlog at a glance — what each ticket is, 
 - **Claimed rows say who holds them** - a ticket an agent has claimed shows a hammer and the holder's name, meaning an agent is planning or implementing it.
 - **Update from GitHub** - one action brings `tickets/` up to date with the repo's issues; on a project with no import on record it brings everything open across. It runs unattended, as the same routine does when the daemon starts it.
 - **Empty is not the same as filtered** - a backlog filtered down to nothing says how many tickets the filters hide and offers to clear them; only a genuinely empty `tickets/` offers the GitHub update.
+- **Configure first, then run** - each of the three actions carries a chevron that hands its prompt to this project's launcher instead of starting anything; the plan column's link to an existing plan carries none, since reading a file starts nothing.
 
 ## Glossary
 
@@ -82,6 +85,18 @@ A bar above the list says when `tickets/` last caught up with GitHub, or that th
 
 The same instruction sits behind the same label everywhere it is offered, including the onboarding checklist, so one label always means one instruction.
 
+### Configure first, then run
+
+#### User story
+
+The user wants a ticket worked, planned, or the backlog updated, but on a different model or somewhere other than this machine.
+
+#### Business logic
+
+All three agent-starting actions are split buttons: beside each sits a chevron whose menu holds "Configure first, then run". Taking it opens this project's launcher carrying the prompt that action would have sent — the ticket's work ask, the ticket's plan ask, or the GitHub update's own instruction — and starts nothing. Both of the panel's update buttons, the filled backlog's and the empty backlog's, carry the same instruction here as they send.
+
+A plan that already exists is a link rather than a start, so its column carries no chevron: there is nothing to configure about reading a file.
+
 ### Starting anything hands the user to the agent
 
 #### User story
@@ -90,7 +105,7 @@ The user presses a button and wants to watch the work, not stare at a list that 
 
 #### Business logic
 
-Whenever any of the three actions starts an agent, the dashboard shell is told, so the user lands on the agent doing the work rather than on a panel showing stale rows until files land. Every action is blocked while another start is in flight, and a failed start leaves its reason in the panel: the update, the planning agent, or the work agent could not be started.
+Whenever any of the three actions starts an agent, the dashboard shell is told, so the user lands on the agent doing the work rather than on a panel showing stale rows until files land. Every action is blocked while another start is in flight — the chevrons beside them excepted, since those start nothing — and a failed start leaves its reason in the panel: the update, the planning agent, or the work agent could not be started.
 
 ### Empty is not the same as filtered
 

@@ -25,7 +25,7 @@ happens while nobody is at the keyboard.
 - Start an agent from a queue entry's play button
 - Spin up agents on a project's top queue entries — one agent per entry, the how-many set beside the button (default 3)
 - "Run now" on a routine, in a picked project the card remembers across navigations and reloads
-- "Configure first, then run" on a routine — the launcher opens with its prompt, so the model and location can be set first
+- "Configure first, then run" on every button that starts an agent — a ticket row's work and plan starts, a queue entry's play button and a project's queue fan-out, "Update from GitHub", a routine's "Run now", and the onboarding checklist's import — the launcher opens with that button's own prompt, so the model and location can be set first
 - What a routine's "Run now" is about to spend, on hover — what that routine does, how many agents it costs, which model it will use, and where it runs
 - The whole CLI is one command: `the-framework` serves the dashboard — four options, no verbs
 - `--host` / `--port`, the two things a browser cannot be asked; `--help` / `--version`

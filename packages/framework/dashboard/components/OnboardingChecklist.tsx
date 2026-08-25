@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { DashboardData, OnboardingSuggestion } from '../../src/index.js'
 import { presets } from '../../src/client.js'
-import { Square, SquareCheckBig, X } from 'lucide-react'
+import { RefreshCw, Square, SquareCheckBig, X } from 'lucide-react'
 import { onDashboard } from '../rpc/reads.js'
 import { onOnboarding, sendAddProject } from '../rpc/projects.js'
 import { usePolled } from '../lib/use-async.js'
@@ -10,6 +10,7 @@ import { useNotifyChannels, reloadNotifyChannels } from '../lib/notify-channels.
 import { useNotificationPermission } from '../lib/notification-permission.js'
 import { useStartAgent } from '../lib/use-start-agent.js'
 import { AddProjectPanel } from './AddProjectPanel.js'
+import { StartAgentButton } from './StartAgentButton.js'
 import { DiscordWebhookDialog, DISCORD_WEBHOOK_DESCRIPTION } from './DiscordDialogs.js'
 import { Button } from './ui/button.js'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
@@ -45,6 +46,7 @@ interface Step {
 export function OnboardingChecklist({
   dismissible = false,
   onAgentStarted,
+  onSelectProject,
 }: {
   /** The Overview offers to hide it; the settings page always shows it. */
   dismissible?: boolean
@@ -54,6 +56,10 @@ export function OnboardingChecklist({
    * one selected. Required, so a new mounting surface cannot quietly drop the navigation.
    */
   onAgentStarted: (projectId: string, intent: string, agentId?: string) => void
+  /** Where "Configure first, then run" lands (#1507): the launcher of the project the checklist
+   *  acts on. Required for the same reason `onAgentStarted` is — a new mounting surface must not
+   *  quietly leave the chevron with nowhere to go. */
+  onSelectProject: (id: string) => void
 }) {
   // Slower than the Overview's own 5s poll: onboarding state changes at human speed, and this
   // read fans out over every project to answer the tickets question.
@@ -99,11 +105,15 @@ export function OnboardingChecklist({
     if (permission === 'default') void Notification.requestPermission()
   }
 
+  // The update preset (#1501): its empty branch is the first import, so one preset serves both
+  // this checklist's fresh project and the panel's filled one — one label, one instruction. Read
+  // once here because two controls need it: the start, and the draft its chevron hands the
+  // launcher (#1507).
+  const updateIntent = presets.updateTickets.render()
+
   const populateTickets = async () => {
     if (!targetProjectId) return
-    // The update preset (#1501): its empty branch is the first import, so one preset serves both
-    // this checklist's fresh project and the panel's filled one — one label, one instruction.
-    const intent = presets.updateTickets.render()
+    const intent = updateIntent
     // Unattended (#1279): a checklist-fired routine ends at settle instead of parking in the chat loop.
     const started = await start(targetProjectId, intent, 'prompt', { unattended: true })
     // Land on the session doing the import, not the project's launcher (#1169): its id is what
@@ -149,9 +159,21 @@ export function OnboardingChecklist({
       optional: true,
       action: (
         <div className="flex flex-col items-end gap-1">
-          <Button size="sm" onClick={populateTickets} disabled={!targetProjectId || starting}>
-            {starting ? 'Starting…' : 'Update from GitHub'}
-          </Button>
+          <StartAgentButton
+            variant="default"
+            size="sm"
+            icon={<RefreshCw className="h-3.5 w-3.5" aria-hidden />}
+            label="Update from GitHub"
+            menuAriaLabel="Other ways to update from GitHub"
+            tooltip="Bring tickets/ up to date with GitHub. With no import on record, everything open comes across."
+            busy={starting}
+            starting={starting}
+            disabled={!targetProjectId}
+            onStart={() => void populateTickets()}
+            onConfigure={() => targetProjectId && onSelectProject(targetProjectId)}
+            prompt={updateIntent}
+            configureDescription="Opens the launcher with the update prompt, so you can set the model and where it runs."
+          />
           {!targetProjectId && <span className="text-xs text-muted-foreground">Add a project first</span>}
           {startError && <span className="text-xs text-destructive">{startError}</span>}
         </div>

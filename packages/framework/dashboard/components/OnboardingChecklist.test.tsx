@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { DashboardData } from '../../src/index.js'
 import { presets } from '../../src/client.js'
+import { configureFirst } from '../test-utils.js'
 
 // The checklist reads its state over several RPC stubs and hooks; stub them all so nothing reaches
 // for a daemon and each row's "done" comes from a fixture instead.
@@ -24,12 +25,14 @@ const startAgent = vi.hoisted(() => ({ start: vi.fn(), busy: false, error: null 
 vi.mock('../lib/use-start-agent.js', () => ({ useStartAgent: () => startAgent }))
 
 const { OnboardingChecklist } = await import('./OnboardingChecklist.js')
+const { takePendingDraft } = await import('../lib/draft-handoff.js')
 
 afterEach(() => {
   cleanup()
   startAgent.start.mockReset()
   startAgent.busy = false
   startAgent.error = null
+  takePendingDraft() // a draft left by one test would look like the next one's
 })
 
 /** A board with nothing set up: every row is open, which is when the marks have to be readable. */
@@ -51,7 +54,7 @@ const WITH_PROJECT: DashboardData = {
 
 /** Click the import step and wait for the start to have been attempted. */
 const clickImport = async () => {
-  fireEvent.click(await screen.findByRole('button', { name: /update from github/i }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Update from GitHub' }))
   await waitFor(() => expect(startAgent.start).toHaveBeenCalled())
 }
 
@@ -59,7 +62,7 @@ describe('OnboardingChecklist (#1139)', () => {
   test('the steps nothing breaks without are marked optional, and the two essentials are not', async () => {
     onDashboard.mockResolvedValue(EMPTY)
     onOnboarding.mockResolvedValue(null)
-    render(<OnboardingChecklist onAgentStarted={vi.fn()} />)
+    render(<OnboardingChecklist onAgentStarted={vi.fn()} onSelectProject={() => {}} />)
     await waitFor(() => expect(screen.getByText('Add a project')).toBeTruthy())
 
     // Four integrations/inputs are optional; adding a project and filling the queue are not.
@@ -73,7 +76,7 @@ describe('OnboardingChecklist (#1139)', () => {
   test('an unticked step is a checkbox, not a radio button', async () => {
     onDashboard.mockResolvedValue(EMPTY)
     onOnboarding.mockResolvedValue(null)
-    const { container } = render(<OnboardingChecklist onAgentStarted={vi.fn()} />)
+    const { container } = render(<OnboardingChecklist onAgentStarted={vi.fn()} onSelectProject={() => {}} />)
     await waitFor(() => expect(screen.getByText('Add a project')).toBeTruthy())
     // An outlined circle read as "pick one of these" when the rows are independent things to tick.
     expect(container.querySelector('circle')).toBeNull()
@@ -87,7 +90,7 @@ describe('the GitHub import lands on the session it starts (#1169)', () => {
     onOnboarding.mockResolvedValue(null)
     startAgent.start.mockResolvedValue({ agentId: 'run-7' })
     const onAgentStarted = vi.fn()
-    render(<OnboardingChecklist onAgentStarted={onAgentStarted} />)
+    render(<OnboardingChecklist onAgentStarted={onAgentStarted} onSelectProject={() => {}} />)
     await clickImport()
 
     // The project travels with it: this surface has none selected, so an id alone cannot be routed.
@@ -101,7 +104,7 @@ describe('the GitHub import lands on the session it starts (#1169)', () => {
     onOnboarding.mockResolvedValue(null)
     startAgent.start.mockResolvedValue({})
     const onAgentStarted = vi.fn()
-    render(<OnboardingChecklist onAgentStarted={onAgentStarted} />)
+    render(<OnboardingChecklist onAgentStarted={onAgentStarted} onSelectProject={() => {}} />)
     await clickImport()
 
     await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith('p1', presets.updateTickets.render(), undefined))
@@ -113,10 +116,33 @@ describe('the GitHub import lands on the session it starts (#1169)', () => {
     startAgent.start.mockResolvedValue(undefined)
     startAgent.error = 'A session is already active for this project.'
     const onAgentStarted = vi.fn()
-    render(<OnboardingChecklist onAgentStarted={onAgentStarted} />)
+    render(<OnboardingChecklist onAgentStarted={onAgentStarted} onSelectProject={() => {}} />)
     await clickImport()
 
     expect(await screen.findByText(/already active/i)).toBeTruthy()
     expect(onAgentStarted).not.toHaveBeenCalled()
+  })
+
+  test('Configure first opens the launcher of the project the step acts on (#1507)', async () => {
+    onDashboard.mockResolvedValue(WITH_PROJECT)
+    onOnboarding.mockResolvedValue(null)
+    const onSelectProject = vi.fn()
+    render(<OnboardingChecklist onAgentStarted={vi.fn()} onSelectProject={onSelectProject} />)
+    await configureFirst('Other ways to update from GitHub')
+    // The launcher, not an agent — the model and where it runs are nowhere on this checklist.
+    await waitFor(() => expect(onSelectProject).toHaveBeenCalledWith('p1'))
+    expect(startAgent.start).not.toHaveBeenCalled()
+    expect(takePendingDraft()).toBe(presets.updateTickets.render())
+  })
+
+  test('with no project yet, neither half of the import button can be pressed', async () => {
+    onDashboard.mockResolvedValue(EMPTY)
+    onOnboarding.mockResolvedValue(null)
+    render(<OnboardingChecklist onAgentStarted={vi.fn()} onSelectProject={vi.fn()} />)
+    // There is no project to start in and none to open a launcher for, so the chevron is out too.
+    const start = await screen.findByRole('button', { name: 'Update from GitHub' })
+    expect((start as HTMLButtonElement).disabled).toBe(true)
+    const chevron = screen.getByRole('button', { name: 'Other ways to update from GitHub' })
+    expect((chevron as HTMLButtonElement).disabled).toBe(true)
   })
 })

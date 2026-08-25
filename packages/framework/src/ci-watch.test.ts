@@ -71,6 +71,16 @@ test('an auto-armed PR is never merged here: GitHub holds that promise', async (
   assert.deepEqual(result.merged, [])
 })
 
+test('a PR read still warming waits for the next tick: its OPEN is a guess', async () => {
+  // The cache answers `pending` with a synthetic OPEN (agent-handoff.ts), which on a daemon's
+  // start-up tick is every watched agent — including ones whose PR has since merged or closed.
+  const { deps, merges, fixes } = sweepDeps(openPr(), { checks: 'passing', failed: [] })
+  const result = await sweepProjectCi('/p', { ...deps, pr: async () => ({ value: openPr(), pending: true }) })
+  assert.deepEqual(merges, [])
+  assert.deepEqual(fixes, [])
+  assert.deepEqual(result, { merged: [], failed: [], fixes: [] })
+})
+
 test('pending checks wait for the next tick: no merge, no fix', async () => {
   const { deps, merges, fixes } = sweepDeps(openPr(), { checks: 'pending', failed: [] })
   const result = await sweepProjectCi('/p', deps)

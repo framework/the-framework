@@ -177,7 +177,12 @@ export async function sweepProjectCi(cwd: string, deps: CiSweepDeps = {}): Promi
 
   const seen = new Set<number>()
   for (const meta of candidates) {
-    const linked = (await pr(cwd, meta).catch((): Cached<LinkedPr | undefined> => ({ value: undefined, pending: false }))).value
+    const read = await pr(cwd, meta).catch((): Cached<LinkedPr | undefined> => ({ value: undefined, pending: false }))
+    // A cache still warming answers `pending`, and the value standing in for the state it has not
+    // read yet is a synthetic OPEN (agent-handoff.ts). Acting on that guess re-merges PRs that
+    // already landed and starts fix sessions on branches a human closed; the next tick knows.
+    if (read.pending) continue
+    const linked = read.value
     // No PR, or one that is no longer open: nothing left to watch. CLOSED stays closed on
     // purpose — an unmerged close is a human's rejection of the work.
     if (!linked || linked.state !== 'OPEN' || seen.has(linked.number)) continue

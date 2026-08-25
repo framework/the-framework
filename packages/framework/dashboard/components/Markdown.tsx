@@ -37,7 +37,7 @@ function tableCells(row: string): string[] {
 
 /** The GFM header separator (`| --- | :-: |`), which is what makes pipe rows a table. */
 function isTableSeparator(row: string): boolean {
-  return tableCells(row).length > 0 && tableCells(row).every(c => /^:?-{3,}:?$/.test(c))
+  return tableCells(row).length > 0 && tableCells(row).every(c => /^:?-+:?$/.test(c))
 }
 
 function renderBlocks(text: string, compact = false): ReactNode[] {

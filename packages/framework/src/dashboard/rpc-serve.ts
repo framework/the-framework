@@ -207,7 +207,10 @@ export function makeRpcMount(
 ): (req: IncomingMessage, res: ServerResponse) => Promise<boolean> {
   setDashboardContext(context)
   return async (req, res) => {
-    const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`)
+    // A fixed base, like every other request parse here: only the path and the query are read,
+    // and a request carrying an empty or malformed `Host` made this throw — outside the handler's
+    // own try, so the daemon died of the unhandled rejection rather than answering the request.
+    const url = new URL(req.url ?? '/', 'http://localhost')
     if (url.pathname !== RPC_PREFIX && !url.pathname.startsWith(`${RPC_PREFIX}/`)) return false
     if (!isSameOriginRequest(req)) {
       res.writeHead(403, { 'content-type': 'text/plain' })

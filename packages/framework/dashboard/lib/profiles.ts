@@ -109,8 +109,9 @@ export function localOrigin(): string {
   return store()?.getItem(LOCAL_ORIGIN_KEY) ?? DEFAULT_LOCAL_ORIGIN
 }
 
-/** Cap on a carried composer draft (#1066): above this the hop drops the draft (plain connect) so a
- * huge paste can't blow the URL length. */
+/** Cap on a carried composer draft (#1066), measured on the percent-encoded form — the thing whose
+ * length the URL actually spends (multibyte text encodes up to 9x longer). Above this the hop drops
+ * the draft (plain connect) so a huge paste can't blow the URL length. */
 const MAX_CARRIED_DRAFT = 7000
 
 /** The connect URL for a device: its origin plus the token for the one bootstrap hop (#1051), and
@@ -119,7 +120,8 @@ const MAX_CARRIED_DRAFT = 7000
 export function connectUrl(profile: Pick<ConnectionProfile, 'url' | 'token'>, draft?: string): string {
   const parts: string[] = []
   if (profile.token) parts.push(`token=${encodeURIComponent(profile.token)}`)
-  if (draft && draft.length <= MAX_CARRIED_DRAFT) parts.push(`draft=${encodeURIComponent(draft)}`)
+  const encodedDraft = draft ? encodeURIComponent(draft) : ''
+  if (encodedDraft && encodedDraft.length <= MAX_CARRIED_DRAFT) parts.push(`draft=${encodedDraft}`)
   return parts.length ? `${profile.url}/?${parts.join('&')}` : profile.url
 }
 

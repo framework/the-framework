@@ -38,7 +38,7 @@ The user should pick the repo's folder the way they pick any folder on their mac
 
 #### Business logic
 
-The dashboard asks the daemon to open the OS folder picker; the daemon runs on the machine the user is sitting at, so the dialog appears there, and the picked absolute path is handed back. Dismissing the dialog is a normal answer of its own, distinct from a failure. On a platform where no picker is wired up (only macOS is, so far), the answer says so instead of trying.
+The dashboard asks the daemon to open the OS folder picker; the daemon runs on the machine the user is sitting at, so the dialog appears there, and the picked absolute path is handed back. Dismissing the dialog is a normal answer of its own, distinct from a failure. A dialog that cannot open — no desktop session on the daemon's machine, no dialog helper installed on Linux, or a platform with no dialog wired up — comes back as that reason instead of being attempted.
 
 #### Rationale
 

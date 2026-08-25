@@ -193,7 +193,13 @@ export async function sweepProjectCi(cwd: string, deps: CiSweepDeps = {}): Promi
     // Green — but the merge is only ours where GitHub could not take it (#1418): an auto-armed
     // PR lands by GitHub's own hand, and a check-less one must outlive the attach window first.
     if (meta.mergeOutcome !== 'watched') continue
-    if (status.checks === 'none' && !pastNoChecksGrace(linked, now())) continue
+    if (status.checks === 'none') {
+      // "No checks" means "this repo has no CI" only when `gh` actually answered: an unreadable
+      // status reads `none` too (gh.ts), and acting on one must never merge anything. A read that
+      // succeeded always carries the head commit, so its presence is what tells the two apart.
+      if (!status.headSha) continue
+      if (!pastNoChecksGrace(linked, now())) continue
+    }
     const attemptKey = `${cwd}\u0000${linked.number}\u0000${status.headSha ?? ''}`
     if (deps.attemptedMerges?.has(attemptKey)) continue
     const outcome = await merge(cwd, meta)

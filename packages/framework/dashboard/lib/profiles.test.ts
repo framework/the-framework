@@ -45,6 +45,10 @@ describe('profiles.ts (#1052)', () => {
     expect(parseDeviceUrl('  http://box:4200/some/path?token=xyz  ')).toEqual({ url: 'http://box:4200', token: 'xyz' })
     expect(parseDeviceUrl('http://box:4200')).toEqual({ url: 'http://box:4200', token: '' })
     expect(parseDeviceUrl('not a url')).toBeNull()
+    // A scheme-less paste parses with `localhost:` as the scheme and a `null` origin — reject it
+    // rather than storing an unusable device (and crashing the dialog's host label).
+    expect(parseDeviceUrl('localhost:4200/?token=abc')).toBeNull()
+    expect(parseDeviceUrl('ftp://box:4200/?token=abc')).toBeNull()
   })
 
   test('connectUrl carries the token for the bootstrap hop', () => {

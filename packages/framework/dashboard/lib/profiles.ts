@@ -89,6 +89,9 @@ function hostLabel(url: string): string {
 export function parseDeviceUrl(pasted: string): { url: string; token: string } | null {
   try {
     const u = new URL(pasted.trim())
+    // A scheme-less paste like `localhost:4200/?token=…` parses with `localhost:` as the scheme
+    // and an opaque `null` origin — not a device address.
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return null
     return { url: u.origin, token: u.searchParams.get('token') ?? '' }
   } catch {
     return null

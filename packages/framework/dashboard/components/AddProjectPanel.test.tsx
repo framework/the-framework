@@ -45,10 +45,10 @@ describe('AddProjectPanel (#1150)', () => {
   })
 
   test('a dialog that could not be opened reports why, and Try again asks again', async () => {
-    sendPickProjectDirectory.mockResolvedValueOnce({ ok: false, error: 'The system folder picker is only available on macOS so far.' })
+    sendPickProjectDirectory.mockResolvedValueOnce({ ok: false, error: 'The machine running The Framework has no desktop session, so no folder dialog can open there.' })
     sendPickProjectDirectory.mockResolvedValueOnce({ ok: true, path: '/Users/dev/my-repo' })
     render(<AddProjectPanel onAdded={() => {}} onClose={() => {}} />)
-    await screen.findByText(/only available on macOS/)
+    await screen.findByText(/no desktop session/)
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
     await screen.findByText('/Users/dev/my-repo')
   })

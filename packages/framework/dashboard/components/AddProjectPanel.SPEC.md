@@ -16,7 +16,7 @@ The user has a repo on this machine that they want The Framework to work on, and
 
 #### Business logic
 
-Opening the dialog immediately asks the daemon to open the OS folder picker; the modal meanwhile says to choose the folder there. Picking a folder moves to the trust confirmation. Dismissing the system picker closes the modal — the user already said "not now". If the picker itself cannot open (for example on a platform where none is wired up), the reason is shown with the option to try again. Esc, Cancel, and clicking outside the modal close it without adding; keyboard focus stays inside the modal and returns to the control that opened it once it closes.
+Opening the dialog immediately asks the daemon to open the OS folder picker; the modal meanwhile says to choose the folder there. Picking a folder moves to the trust confirmation. Dismissing the system picker closes the modal — the user already said "not now". If the picker itself cannot open (for example on a machine with no desktop session), the reason is shown with the option to try again. Esc, Cancel, and clicking outside the modal close it without adding; keyboard focus stays inside the modal and returns to the control that opened it once it closes.
 
 ### Trust gate before installing
 

@@ -1,5 +1,6 @@
 Effort: 5
 Uncertainty: 6
+Outdated: yes
 
 # [Plan] Spike: Is it possible to make the extension headless?
 

@@ -98,6 +98,22 @@ const cases = [
   ],
   // #1568: a question-shaped block that only exists inside the opening turn is never asked.
   ['question-shaped block only in the opening turn', `${feed(row('human', 0, `<code>${block}</code>`))}<div contenteditable="true"></div>`, false],
+  // #1703: an answered question is not pending. The block stays on the page after the user's
+  // answer, and the daemon forgets it was answered when it restarts, so the page has to say so:
+  // a human turn after the block means the session moved on.
+  [
+    'answered question: a human turn follows the block',
+    `${feed(row('human', 0, 'intro'), row('assistant', 1, `<code>${block}</code>`), row('human', 2, 'Work on the next TODO'), row('assistant', 3, 'Done.'))}<div contenteditable="true"></div>`,
+    false,
+  ],
+  // #1703: and a question asked again after that answer is pending, as the last block always was.
+  [
+    'answered, then asked again: the later block is pending',
+    `${feed(row('human', 0, 'intro'), row('assistant', 1, `<code>${block}</code>`), row('human', 2, 'Work on the next TODO'), row('assistant', 3, `<code>${block}</code>`))}<div contenteditable="true"></div>`,
+    true,
+  ],
+  // #1703: a block behind a shadow root is placed in its row through the root's host.
+  ['answered question behind a shadow root', { shadowRows: true }, false],
 ]
 
 const script = readFileSync(join(here, 'content.js'), 'utf8')
@@ -105,14 +121,19 @@ let failed = 0
 
 for (const [name, body, expectFound] of cases) {
   const shadow = typeof body === 'object' ? body.shadow : undefined
-  const light = shadow ? '<div id="host"></div><div contenteditable="true"></div>' : body
+  const shadowRows = typeof body === 'object' && body.shadowRows
+  const light = shadow
+    ? '<div id="host"></div><div contenteditable="true"></div>'
+    : shadowRows
+      ? `${feed(row('human', 0, 'intro'), row('assistant', 1, '<div id="host"></div>'), row('human', 2, 'Work on the next TODO'))}<div contenteditable="true"></div>`
+      : body
   const dom = new JSDOM(`<!doctype html><html><body><main>${light}</main></body></html>`, {
     url: 'https://claude.ai/code/session_01TEST',
     runScripts: 'outside-only',
   })
-  if (shadow) {
+  if (shadow || shadowRows) {
     const host = dom.window.document.getElementById('host')
-    host.attachShadow({ mode: 'open' }).innerHTML = `<code>${shadow}</code>`
+    host.attachShadow({ mode: 'open' }).innerHTML = `<code>${shadow ?? block}</code>`
   }
   dom.window.eval(script)
   // The panel is appended to documentElement, so it is a direct child rather than in the body.

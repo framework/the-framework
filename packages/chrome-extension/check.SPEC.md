@@ -9,6 +9,7 @@ Finding the parked question, across every shape the block has been seen in:
 - The await protocol's own spec block, which renders on the page as part of the agent's prompt, never counts as a question — on its own, and when a real question follows it, in which case the real question wins.
 - The protocol's two literal worked examples — the browser-handoff pair and the "Ship this?" approval pair — never count as questions.
 - Everything inside the opening turn is the rendered prompt: decoys there are ignored while a real question in a later turn still wins, and a question-shaped block that exists only inside the opening turn is never reported.
+- A question the user already answered — a user turn follows the block, in the light DOM or with the block behind a shadow root — is not reported, while a question asked again after that answer is.
 - Every one of those cases also checks that the composer was located and that the panel shows the question's actual title.
 
 What is reported to the daemon:

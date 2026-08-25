@@ -358,11 +358,45 @@ function collectChoices(text, stats, found) {
 }
 
 /**
+ * The transcript row an element renders in, looking out through any shadow roots it sits behind:
+ * the rows are in the light DOM while a message's body is not.
+ */
+function rowOf(el) {
+  for (let node = el; node; node = node.getRootNode?.()?.host) {
+    const row = node.closest?.(TURN_ROW)
+    if (row) return row
+  }
+  return undefined
+}
+
+/**
+ * Whether the user has already answered past that row: a human turn at a later position means
+ * the question was taken and the session moved on, however long the answered block stays on the
+ * page (#1703). A block not placed in any row is measured from the session's latest turn instead.
+ * With no positioned turns at all there is nothing to measure against, and the block stands.
+ */
+function answeredAfter(row) {
+  const rows = turnRows()
+  const position = r => Number(r.getAttribute('data-index'))
+  const kind = r => r.getAttribute('data-perf-row')
+  const at = row ? position(row) : Math.max(-1, ...rows.filter(r => kind(r) === 'assistant').map(position))
+  if (!Number.isInteger(at) || at < 0) return false
+  return rows.some(r => kind(r) === 'human' && position(r) > at)
+}
+
+/** Why the last survey reported no question when a block was on the page, for the panel. */
+let choiceNote = ''
+
+/**
  * The question a parked run is waiting on. Our agents emit it as a fenced JSON block carrying
  * `options`. Element-scoped first so the winner names where it was found, then the whole page
- * as a fallback for a block split across elements by a syntax highlighter.
+ * as a fallback for a block split across elements by a syntax highlighter. A block the user has
+ * already answered — a human turn follows it — is not pending, whatever any store remembers: the
+ * daemon forgets what was answered when it restarts, and re-asking would type a second answer
+ * into a session that moved on (#1703).
  */
 function findPendingChoice() {
+  choiceNote = ''
   // `code` on its own: the page has <code> blocks with no <pre> wrapper (round 1), and they
   // sit inside shadow roots (round 2). DOM order tracks transcript order, so the last real
   // question wins over both the spec and any earlier answered one.
@@ -375,7 +409,7 @@ function findPendingChoice() {
   for (const el of deepQueryAll('pre code, pre, code')) {
     if (inFirstMessage(el, firstMessage)) continue
     for (const parsed of extractChoices(el.textContent ?? '')) {
-      fromElements.push({ via: el.tagName.toLowerCase(), parsed })
+      fromElements.push({ via: el.tagName.toLowerCase(), parsed, row: rowOf(el) })
     }
   }
   // The page-text fallback reads everything, opening message included, so any block that also
@@ -387,7 +421,10 @@ function findPendingChoice() {
         .filter(parsed => !inPrompt.has(JSON.stringify(parsed)))
         .map(parsed => ({ via: 'page-text', parsed }))
   const real = candidates.filter(c => !isTemplate(c.parsed))
-  const found = real.at(-1)
+  const last = real.at(-1)
+  const answered = Boolean(last) && answeredAfter(last.row)
+  if (answered) choiceNote = 'already answered'
+  const found = answered ? undefined : last
   if (found) reportToDaemon(found.parsed)
   reportTranscript()
   return found ?? undefined
@@ -1186,7 +1223,7 @@ if (!IS_TOP) {
     // hides the detail, not the bridge, so the daemon keeps hearing from this page.
     if (collapsed) return
     const rows = [
-      ['question found', winner.choiceFound ? `yes (${winner.choiceVia}${winner === fromFrame ? ', in iframe' : ''})` : 'no'],
+      ['question found', winner.choiceFound ? `yes (${winner.choiceVia}${winner === fromFrame ? ', in iframe' : ''})` : `no${choiceNote ? ` (${choiceNote})` : ''}`],
       ['title', winner.choiceTitle ?? '-'],
       ['options', winner.choiceOptions?.length ? winner.choiceOptions.join(' | ') : '-'],
       ['composer', top.composerFound ? top.composerVia : 'not found'],

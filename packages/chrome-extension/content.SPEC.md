@@ -19,6 +19,7 @@ A `web`-target agent hands its task to a cloud session and ends, so when that se
 - **The question travels whole** - not just the title and the labels, but whether several answers may be picked at once, which options start ticked, and which option ends the session instead of continuing it.
 - **The protocol's own examples are not questions** - the page opens with the agent's prompt, which quotes the await protocol verbatim, so anything inside that opening message and anything that looks like the protocol's placeholders or its two literal samples is discarded.
 - **The last real block wins** - page order is transcript order, so a later question supersedes an earlier one and the spec that renders above them all.
+- **An answered question is not pending** - a block that a user turn follows was already taken, so it is not reported however long it stays on the page; the panel says it was already answered.
 - **The transcript is mirrored one turn at a time** - each conversation turn the page marks is reported under the position the page gives it, as the user's or the session's, and only turns whose text changed are re-sent.
 - **A page that marks no turns mirrors nothing** - the panel and the self-report name that state, rather than mirroring whatever text is on screen.
 - **An answer is typed only into a composer that exists** - the composer is waited for, filled, given a beat to settle, then submitted by the page's own send button, or by Enter when there is none.
@@ -63,11 +64,15 @@ The question is a JSON object carrying `options`, which the agent emits as a fen
 
 When no code element yields one, the whole page's text is scanned instead, shadow content included, which recovers a block that a syntax highlighter split across elements. Candidates found that way that also appear inside the opening message are subtracted.
 
-Of the surviving candidates, the last in page order is the question, since page order is transcript order: a later question supersedes an earlier, already-answered one.
+Of the surviving candidates, the last in page order is the question, since page order is transcript order: a later question supersedes an earlier one.
+
+That last block is still not pending when the user has already answered it: when a user turn sits at a later position than the turn the block renders in, the question was taken and the session moved on, so nothing is reported and the panel's question line says the question was already answered. The block's turn is found through any shadow root it renders behind. A block that renders in no turn is measured from the session's latest turn instead, and a page that marks no turns at all cannot be measured, so its block stands as pending.
 
 #### Rationale
 
-Four separate obstacles shaped this, each of which defeated an earlier attempt: the page has `code` blocks with no `pre` wrapper, so a `pre code` scan examined nothing; the message body renders behind shadow roots, so reading the document body's text never saw it; matching on a fixed `{"title"` prefix guessed at an indentation nobody promised; and the page renders the agent's own prompt, so the protocol's spec block is on screen before anything has been asked.
+The answered block stays on the page after the user's answer, and the daemon forgets which questions it delivered answers for when it restarts. Before this rule, the Driver tab's next visit to a finished session re-reported its old question, the dashboard asked the user again, and the second answer was typed into a session that had moved on — a cloud agent received two different answers to one question and rewrote its branch. The page is the one place that always knows whether the question was answered, so the rule lives here rather than in anything the daemon remembers.
+
+Four separate obstacles shaped the search itself, each of which defeated an earlier attempt: the page has `code` blocks with no `pre` wrapper, so a `pre code` scan examined nothing; the message body renders behind shadow roots, so reading the document body's text never saw it; matching on a fixed `{"title"` prefix guessed at an indentation nobody promised; and the page renders the agent's own prompt, so the protocol's spec block is on screen before anything has been asked.
 
 ### Telling a real question from the protocol's own examples
 

@@ -118,6 +118,8 @@ test('safeRepoPath rejects everything that is not a plain repo-relative path', (
     '--output=/tmp/pwned', // git would read a leading dash as a flag
     '.git/config',
     '.git\\config',
+    '.GIT/config', // macOS and Windows are case-insensitive: this opens the same file
+    'nested/.Git/config',
     'src//a.ts',
     'a\0b',
   ]) {

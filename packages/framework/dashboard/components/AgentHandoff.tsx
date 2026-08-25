@@ -86,6 +86,9 @@ export function HandoffArm({
   useEffect(() => {
     if (pending && pending === armed) setPending(null)
   }, [pending, armed])
+  // Mounted un-keyed across agent switches: a pick still waiting for agent A's event echo must
+  // not paint agent B's box, where `pending === armed` may never come true to clear it.
+  useEffect(() => setPending(null), [agentId])
 
   const set = (next: HandoffLevel): void => {
     setPending(next)

@@ -692,6 +692,33 @@ function appPage({ sessions = SESSIONS, firstPage = 6, sendAppendsRow = true } =
 }
 
 // ---------------------------------------------------------------------------
+// The script's own drawing is not a page change (#1707). The corner panel is redrawn on every
+// survey and the Driver overlay on every log line, both under the observed root — so unless the
+// observers are paused around those writes, each survey's redraw is the next survey's trigger:
+// a full survey about four times a second, forever, on a page where nothing changed.
+
+{
+  const dom = new JSDOM(`<!doctype html><html><body><main>${feed(row('human', 0, 'intro'), row('assistant', 1, 'Hello.'))}<div contenteditable="true"></div></main></body></html>`, {
+    url: 'https://claude.ai/code/session_01TEST',
+    runScripts: 'outside-only',
+  })
+  dom.window.eval(script)
+  const w = dom.window
+  const settle = ms => new Promise(resolve => setTimeout(resolve, ms))
+  // Let whatever the load itself queued run out, then make exactly one page change. The re-read
+  // coalesces over 250 ms; a self-loop fits several more surveys into the wait after it.
+  await settle(600)
+  const before = w.__tfBridgeSurveys()
+  w.document.querySelector('[role=feed]').insertAdjacentHTML('beforeend', row('assistant', 2, 'One more turn.'))
+  await settle(1500)
+  const ran = w.__tfBridgeSurveys() - before
+  const ok = ran === 1
+  if (!ok) failed++
+  console.log(`${ok ? 'PASS' : 'FAIL'}  one page change costs one survey: the panel's redraw does not trigger the next  (surveys after the change=${ran})`)
+  dom.window.close()
+}
+
+// ---------------------------------------------------------------------------
 // Which sessions a cycle visits (driver-plan.js): the statuses are sticky — an in-app visit clears
 // neither "Awaiting input" nor "Unread response" — so a parked session is visited on a change,
 // after a while, and always when an answer is queued; the rest are never visited.

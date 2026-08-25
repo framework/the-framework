@@ -36,6 +36,8 @@ Creating a session:
 
 The panel: it folds down to a compact "TF" tab, dropping its rows and its full title, and unfolds with the question's details intact.
 
+One page change costs one re-read: the panel's own redraw is not taken for a page change, so a re-read never triggers the next.
+
 The Driver, on a synthetic app built like the live one was observed to be — a session list of links carrying the session id with a text status label beside each, a "Show more" button at the list's end and a decoy one deep in the middle panel, a "New" link, and in-app navigation that swaps the main area without a page load:
 
 - The list is read by label — awaiting, unread, idle, running, landed, and an unknown label carried verbatim — paged through the list's own button and never the decoy, and a session absent from the list is reported missing.

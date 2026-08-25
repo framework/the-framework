@@ -3,11 +3,12 @@ import type { TicketsMeta, WorkspaceTicket } from '../../src/index.js'
 // with, one wording with the [Plan tickets] preset's queued entries and the server's own queue
 // write, so no surface carries a hidden second copy (#1187).
 import { planTicketPrompt, presets } from '../../src/client.js'
-import { RefreshCw, Github, ClipboardPlus, ClipboardList, Hammer, Play } from 'lucide-react'
+import { Github, ClipboardPlus, ClipboardList, Hammer, Play } from 'lucide-react'
 import { sendStart } from '../rpc/control.js'
 import { onTicketsMeta } from '../rpc/reads.js'
 import { Button } from './ui/button.js'
 import { StartAgentButton } from './StartAgentButton.js'
+import { UpdateTicketsButton, UPDATE_TICKETS_PROMPT } from './UpdateTicketsButton.js'
 import { Badge } from './ui/badge.js'
 import { Checkbox } from './ui/checkbox.js'
 import { useAction } from '../lib/use-action.js'
@@ -16,17 +17,6 @@ import { formatRelative, formatAge, formatDateTime } from '../lib/format-date.js
 import { priorityTone } from '../lib/ticket-priority.js'
 import { cn } from '../lib/utils.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
-
-/**
- * The prompt behind "Update from GitHub" (#1208), read from the preset rather than written here:
- * this panel and the onboarding checklist offer the same button under the same label, and one
- * label must mean one instruction wherever it is pressed (#697's lesson, when two surfaces sent
- * different texts behind the same words).
- *
- * The one GitHub sync since #1501: the preset's own empty branch treats a bare `tickets/` as the
- * first import, so the separate import preset could go.
- */
-const UPDATE_PROMPT = presets.updateTickets.render()
 
 /** Captured once: `useLoaded` treats a fresh `{}` literal as a new value on every render. */
 const NO_META: TicketsMeta = {}
@@ -342,7 +332,7 @@ export function TicketsPanel({
 
   // Unattended (#1279): an update fired by a button is routine work, not a conversation — it
   // ends at settle and its armed handoff fires, as when the sweep starts the same routine.
-  const updateFromGithub = () => startSession(UPDATE_PROMPT, 'The update could not be started.', { unattended: true })
+  const updateFromGithub = () => startSession(UPDATE_TICKETS_PROMPT, 'The update could not be started.', { unattended: true })
   // Attended, unlike the imports above: a plan is written per-ticket for a human to read and act
   // on, so the session stays a conversation you land in and steer rather than one that settles and
   // hands itself off. The reader reviews the result through the plan column's link.
@@ -379,19 +369,7 @@ export function TicketsPanel({
           plans from.
         </p>
         {error && <p className="text-xs text-danger">{error}</p>}
-        <StartAgentButton
-          size="sm"
-          icon={<RefreshCw className="h-3.5 w-3.5" aria-hidden />}
-          label="Update from GitHub"
-          menuAriaLabel="Other ways to update from GitHub"
-          tooltip="Bring tickets/ up to date with GitHub. With no import on record, everything open comes across."
-          busy={busy}
-          starting={busy}
-          onStart={() => void updateFromGithub()}
-          onConfigure={configure}
-          prompt={UPDATE_PROMPT}
-          configureDescription="Opens the launcher with the update prompt, so you can set the model and where it runs."
-        />
+        <UpdateTicketsButton busy={busy} onStart={() => void updateFromGithub()} onConfigure={configure} />
       </div>
     )
   }
@@ -409,22 +387,11 @@ export function TicketsPanel({
             ? `Updated from GitHub ${formatRelative(meta.lastImportedAt)}`
             : 'No record of an import yet'}
         </span>
-        <StartAgentButton
-          size="sm"
-          icon={<RefreshCw className="h-3.5 w-3.5" aria-hidden />}
-          label="Update from GitHub"
-          menuAriaLabel="Other ways to update from GitHub"
-          tooltip={
-            meta.lastImportedAt
-              ? 'Bring tickets/ up to date with the issues and comments changed since the last import.'
-              : 'Bring tickets/ up to date with GitHub. With no import on record, everything open comes across.'
-          }
+        <UpdateTicketsButton
           busy={busy}
-          starting={busy}
           onStart={() => void updateFromGithub()}
           onConfigure={configure}
-          prompt={UPDATE_PROMPT}
-          configureDescription="Opens the launcher with the update prompt, so you can set the model and where it runs."
+          lastImportedAt={meta.lastImportedAt}
           className="h-6 gap-1 px-2 text-xs"
         />
       </div>

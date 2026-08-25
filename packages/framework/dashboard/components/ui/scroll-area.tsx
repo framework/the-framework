@@ -55,7 +55,7 @@ export function ScrollArea({
   )
 }
 
-export function ScrollBar({ className, ...props }: ComponentProps<typeof ScrollAreaPrimitive.Scrollbar>) {
+function ScrollBar({ className, ...props }: ComponentProps<typeof ScrollAreaPrimitive.Scrollbar>) {
   return (
     <ScrollAreaPrimitive.Scrollbar
       data-slot="scroll-area-scrollbar"

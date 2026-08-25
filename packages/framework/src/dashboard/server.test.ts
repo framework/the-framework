@@ -7,33 +7,14 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { startDashboard, type Dashboard, type DashboardOptions } from './server.js'
 import { isExpectedHost, isSameOriginRequest } from './rpc-serve.js'
-import { registryPreferencesStore } from '../registry.js'
-import { registryDiscordCredentialsStore } from '../discord-credentials-store.js'
-import { defaultQuotaSource } from './quota.js'
+import { testDashboardOptions } from '../dashboard-rpc/test-context.js'
 import type { FrameworkEvent } from '../events.js'
 import type { StartAgentKind, StartAgentOptions, StartAgentResult } from './types.js'
 import type { IncomingMessage } from 'node:http'
 
-/**
- * Start a dashboard the way the daemon does — every context capability wired (D3) — with only the
- * parts a test cares about overridden. Since there is one host, the options are required, and a
- * test asserting one route should still stand up the same server the product does.
- */
+/** Start a dashboard the way the daemon does (D3), with only the parts a test cares about overridden. */
 function dashboard(over: Partial<DashboardOptions> = {}): Promise<Dashboard> {
-  return startDashboard({
-    port: 0,
-    onStart: () => ({ ok: false, error: 'not wired in this test' }),
-    onAddProject: () => ({ ok: false, error: 'not wired in this test' }),
-    eventsSource: () => undefined,
-    remote: { target: () => undefined, list: () => [] },
-    preferences: registryPreferencesStore(),
-    discord: registryDiscordCredentialsStore(),
-    quota: defaultQuotaSource(),
-    autoPm: () => undefined,
-    autoPmSweep: () => {},
-    projectErrors: () => [],
-    ...over,
-  })
+  return startDashboard(testDashboardOptions(over))
 }
 
 function fetchText(url: string): Promise<{ status: number; body: string; type: string }> {

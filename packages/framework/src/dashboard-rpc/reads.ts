@@ -116,7 +116,7 @@ export function markOtherHost(agent: AgentMeta, thisHost: string = hostname()): 
 }
 
 /** Every annotation a run's record gets on its way to the dashboard: what the daemon knows and the disk cannot. */
-export function forDashboard(agent: AgentMeta): AgentMeta {
+function forDashboard(agent: AgentMeta): AgentMeta {
   return markOtherHost(markCloudWaiting(agent))
 }
 

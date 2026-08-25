@@ -15,7 +15,7 @@ import { FRAMEWORK_DIR } from './store/index.js'
  */
 
 /** The per-repo review-state filename under `.the-framework/`. */
-export const MAINTENANCE_FILE = 'maintenance.json'
+const MAINTENANCE_FILE = 'maintenance.json'
 
 /** What a repo's last maintenance review recorded. */
 export interface MaintenanceState {

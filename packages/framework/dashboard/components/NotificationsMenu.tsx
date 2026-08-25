@@ -3,7 +3,7 @@ import { useNotificationPermission } from '../lib/notification-permission.js'
 import { usePreferences, updatePreferences, notificationsEnabled, discordEnabled, newActivityEnabled, humanInterventionEnabled } from '../lib/preferences.js'
 import { useNotifyChannels } from '../lib/notify-channels.js'
 import { cn } from '../lib/utils.js'
-import { OptionLabel } from './OptionsMenu.js'
+import { OptionLabel } from './ui/option-label.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import {
   DropdownMenu,

@@ -16,7 +16,7 @@
  * Safe to reserve because a project id is never this word: the registry builds one as
  * `<slugified basename>-<hash in base36>`, so every real id carries a `-<hash>` suffix.
  */
-export const SETTINGS_SEGMENT = 'settings'
+const SETTINGS_SEGMENT = 'settings'
 
 /**
  * The one word that names the Tickets view (#1144), whether as the bare first segment (the
@@ -27,14 +27,14 @@ export const SETTINGS_SEGMENT = 'settings'
  * always carries a `-<hash>` suffix, and an agent id is derived from its start time
  * (`agentIdFromStartedAt`) — neither is ever this bare word.
  */
-export const TICKETS_SEGMENT = 'tickets'
+const TICKETS_SEGMENT = 'tickets'
 
 /**
  * The word that names a ticket's plan view (its `.plan.md`), the fourth segment of
  * `/{projectId}/tickets/{slug}/plan`. Reserved past a ticket slug, where it can never collide: a
  * slug is a `.md` filename, so the bare word `plan` is never one.
  */
-export const PLAN_SEGMENT = 'plan'
+const PLAN_SEGMENT = 'plan'
 
 /** What the dashboard is looking at, as carried by the URL. */
 export interface Route {

@@ -1,6 +1,7 @@
 import { timingSafeEqual } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { BridgeOption, BridgeQuestion } from './bridge-question.js'
+import { end, readPost, requireGet, sendJson } from './http.js'
 
 export type { BridgeOption, BridgeQuestion } from './bridge-question.js'
 
@@ -195,7 +196,7 @@ export async function handleBridgeRequest(
     }
   }
   if (pathname === `${BRIDGE_PREFIX}/ping`) {
-    if (req.method !== 'GET') return end(res, 405, 'method not allowed', { allow: 'GET' })
+    if (!requireGet(req, res)) return
     return end(res, 200, 'ok')
   }
   if (pathname === `${BRIDGE_PREFIX}/question`) return handleQuestion(req, res, handlers)
@@ -224,19 +225,32 @@ export function bearerAuthorized(req: IncomingMessage, token: string): boolean {
   return timingSafeEqual(given, expected)
 }
 
+/** When the daemon says it is; injectable so a test can pin the timestamps it records. */
+function now(handlers: BridgeHandlers): Date {
+  return (handlers.now ?? (() => new Date()))()
+}
+
 /** `POST /_bridge/question`: validate hard, record, answer 204. */
 async function handleQuestion(req: IncomingMessage, res: ServerResponse, handlers: BridgeHandlers): Promise<void> {
-  if (req.method !== 'POST') return end(res, 405, 'method not allowed', { allow: 'POST' })
-  let body: unknown
-  try {
-    body = await readJsonBody(req, MAX_BODY)
-  } catch (err) {
-    return end(res, 400, (err as Error).message)
-  }
-  const question = validate(body, (handlers.now ?? (() => new Date()))())
+  const body = await readPost(req, res, MAX_BODY)
+  if (body === undefined) return
+  const question = validate(body, now(handlers))
   if (typeof question === 'string') return end(res, 400, question)
   handlers.record(question)
   end(res, 204, '')
+}
+
+/**
+ * The session a posted body names, or the reason it names none. Both bodies the extension posts
+ * are addressed to one cloud session and are refused the same way when they are not — one rule,
+ * one message, so a caller cannot learn a different thing from each route.
+ */
+function bodySessionId(body: unknown): { sessionId: string; raw: Record<string, unknown> } | string {
+  if (typeof body !== 'object' || body === null) return 'body must be an object'
+  const raw = body as Record<string, unknown>
+  const sessionId = raw.sessionId
+  if (typeof sessionId !== 'string' || !SESSION_ID.test(sessionId)) return 'sessionId must look like session_<id>'
+  return { sessionId, raw }
 }
 
 /**
@@ -244,10 +258,9 @@ async function handleQuestion(req: IncomingMessage, res: ServerResponse, handler
  * refused, so a newer extension posting an extra field still works against an older daemon.
  */
 function validate(body: unknown, now: Date): BridgeQuestion | string {
-  if (typeof body !== 'object' || body === null) return 'body must be an object'
-  const raw = body as Record<string, unknown>
-  const sessionId = raw.sessionId
-  if (typeof sessionId !== 'string' || !SESSION_ID.test(sessionId)) return 'sessionId must look like session_<id>'
+  const named = bodySessionId(body)
+  if (typeof named === 'string') return named
+  const { sessionId, raw } = named
   const title = raw.title
   if (typeof title !== 'string' || !title.trim() || title.length > MAX_TITLE) return `title must be a string of 1 to ${MAX_TITLE} characters`
   if (!Array.isArray(raw.options) || raw.options.length === 0) return 'options must be a non-empty array'
@@ -296,34 +309,27 @@ function validate(body: unknown, now: Date): BridgeQuestion | string {
  * what its last scrape found, so the daemon can be asked instead.
  */
 async function handleHello(req: IncomingMessage, res: ServerResponse, handlers: BridgeHandlers): Promise<void> {
-  if (req.method !== 'POST') return end(res, 405, 'method not allowed', { allow: 'POST' })
-  let body: unknown
-  try {
-    body = await readJsonBody(req, MAX_BODY)
-  } catch (err) {
-    return end(res, 400, (err as Error).message)
-  }
+  const body = await readPost(req, res, MAX_BODY)
+  if (body === undefined) return
   const raw = (typeof body === 'object' && body !== null ? body : {}) as Record<string, unknown>
   handlers.hello?.({
     version: typeof raw.version === 'string' ? raw.version.slice(0, 32) : 'unknown',
     sessionId: typeof raw.sessionId === 'string' && SESSION_ID.test(raw.sessionId) ? raw.sessionId : undefined,
     note: typeof raw.note === 'string' ? raw.note.slice(0, 300) : '',
-    at: (handlers.now ?? (() => new Date()))().toISOString(),
+    at: now(handlers).toISOString(),
   })
   end(res, 204, '')
 }
 
 /** `POST /_bridge/events`: record a batch of transcript entries. */
 async function handleEvents(req: IncomingMessage, res: ServerResponse, handlers: BridgeHandlers): Promise<void> {
+  // The method is checked here rather than left to `readPost`, so that a wrong method is refused
+  // ahead of the un-wired 404: a GET on a daemon with events off is still a wrong method.
   if (req.method !== 'POST') return end(res, 405, 'method not allowed', { allow: 'POST' })
   if (!handlers.recordEvent) return end(res, 404, 'events not enabled')
-  let body: unknown
-  try {
-    body = await readJsonBody(req, MAX_EVENTS_BODY)
-  } catch (err) {
-    return end(res, 400, (err as Error).message)
-  }
-  const events = validateEvents(body, (handlers.now ?? (() => new Date()))())
+  const body = await readPost(req, res, MAX_EVENTS_BODY)
+  if (body === undefined) return
+  const events = validateEvents(body, now(handlers))
   if (typeof events === 'string') return end(res, 400, events)
   for (const event of events) handlers.recordEvent(event)
   end(res, 204, '')
@@ -335,10 +341,9 @@ async function handleEvents(req: IncomingMessage, res: ServerResponse, handlers:
  * from a message that has not arrived yet.
  */
 function validateEvents(body: unknown, now: Date): BridgeEvent[] | string {
-  if (typeof body !== 'object' || body === null) return 'body must be an object'
-  const raw = body as Record<string, unknown>
-  const sessionId = raw.sessionId
-  if (typeof sessionId !== 'string' || !SESSION_ID.test(sessionId)) return 'sessionId must look like session_<id>'
+  const named = bodySessionId(body)
+  if (typeof named === 'string') return named
+  const { sessionId, raw } = named
   if (!Array.isArray(raw.events) || raw.events.length === 0) return 'events must be a non-empty array'
   if (raw.events.length > MAX_EVENT_BATCH) return `events must hold at most ${MAX_EVENT_BATCH} entries`
   const out: BridgeEvent[] = []
@@ -398,23 +403,16 @@ function validateStatuses(body: unknown, now: Date): BridgeSessionStatus[] | str
  * poll it blindly. Degrades to null on a daemon that wired no answer source, same as `sessions`.
  */
 async function handleAnswer(req: IncomingMessage, res: ServerResponse, handlers: BridgeHandlers): Promise<void> {
-  if (req.method !== 'GET') return end(res, 405, 'method not allowed', { allow: 'GET' })
+  if (!requireGet(req, res)) return
   const sessionId = new URL(req.url ?? '', 'http://bridge.invalid').searchParams.get('sessionId')
   if (typeof sessionId !== 'string' || !SESSION_ID.test(sessionId)) return end(res, 400, 'sessionId must look like session_<id>')
-  const answer = handlers.answer?.(sessionId)
-  res.writeHead(200, { 'content-type': 'application/json' })
-  res.end(JSON.stringify({ answer: answer ?? null }))
+  sendJson(res, { answer: handlers.answer?.(sessionId) ?? null })
 }
 
 /** `POST /_bridge/answered`: what the extension's delivery attempt did. */
 async function handleAnswered(req: IncomingMessage, res: ServerResponse, handlers: BridgeHandlers): Promise<void> {
-  if (req.method !== 'POST') return end(res, 405, 'method not allowed', { allow: 'POST' })
-  let body: unknown
-  try {
-    body = await readJsonBody(req, MAX_BODY)
-  } catch (err) {
-    return end(res, 400, (err as Error).message)
-  }
+  const body = await readPost(req, res, MAX_BODY)
+  if (body === undefined) return
   if (typeof body !== 'object' || body === null) return end(res, 400, 'body must be an object')
   const { sessionId, id, ok, note } = body as Record<string, unknown>
   if (typeof sessionId !== 'string' || !SESSION_ID.test(sessionId)) return end(res, 400, 'sessionId must look like session_<id>')
@@ -434,21 +432,14 @@ async function handleAnswered(req: IncomingMessage, res: ServerResponse, handler
  * sessions, so taking it off the queue has to happen in the same step as reading it.
  */
 async function handleStart(req: IncomingMessage, res: ServerResponse, handlers: BridgeHandlers): Promise<void> {
-  if (req.method !== 'GET') return end(res, 405, 'method not allowed', { allow: 'GET' })
-  const start = handlers.start?.()
-  res.writeHead(200, { 'content-type': 'application/json' })
-  res.end(JSON.stringify({ start: start ?? null }))
+  if (!requireGet(req, res)) return
+  sendJson(res, { start: handlers.start?.() ?? null })
 }
 
 /** `POST /_bridge/started`: what the extension's creation attempt did (#1328). */
 async function handleStarted(req: IncomingMessage, res: ServerResponse, handlers: BridgeHandlers): Promise<void> {
-  if (req.method !== 'POST') return end(res, 405, 'method not allowed', { allow: 'POST' })
-  let body: unknown
-  try {
-    body = await readJsonBody(req, MAX_BODY)
-  } catch (err) {
-    return end(res, 400, (err as Error).message)
-  }
+  const body = await readPost(req, res, MAX_BODY)
+  if (body === undefined) return
   if (typeof body !== 'object' || body === null) return end(res, 400, 'body must be an object')
   const { id, ok, sessionId, note } = body as Record<string, unknown>
   if (typeof id !== 'string' || !id || id.length > 64) return end(res, 400, 'id must be the start request id')
@@ -469,40 +460,8 @@ async function handleStarted(req: IncomingMessage, res: ServerResponse, handlers
  * polling an older daemon degrades to doing nothing instead of reporting a fault.
  */
 async function handleAgents(req: IncomingMessage, res: ServerResponse, handlers: BridgeHandlers): Promise<void> {
-  if (req.method !== 'GET') return end(res, 405, 'method not allowed', { allow: 'GET' })
-  const sessions = handlers.sessions ? await handlers.sessions().catch(() => []) : []
-  res.writeHead(200, { 'content-type': 'application/json' })
-  res.end(JSON.stringify({ sessions }))
-}
-
-/** Read a JSON body, refusing anything past the cap rather than buffering it. */
-export function readJsonBody(req: IncomingMessage, maxBytes: number): Promise<unknown> {
-  return new Promise((resolve, reject) => {
-    let size = 0
-    const chunks: Buffer[] = []
-    req.on('data', (chunk: Buffer) => {
-      size += chunk.length
-      if (size > maxBytes) {
-        reject(new Error('body too large'))
-        req.destroy()
-        return
-      }
-      chunks.push(chunk)
-    })
-    req.on('end', () => {
-      try {
-        resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')))
-      } catch {
-        reject(new Error('body must be JSON'))
-      }
-    })
-    req.on('error', () => reject(new Error('read failed')))
-  })
-}
-
-function end(res: ServerResponse, status: number, message: string, headers: Record<string, string> = {}): void {
-  res.writeHead(status, { 'content-type': 'text/plain', ...headers })
-  res.end(message)
+  if (!requireGet(req, res)) return
+  sendJson(res, { sessions: handlers.sessions ? await handlers.sessions().catch(() => []) : [] })
 }
 
 /** Wrap a route so its outcome is recorded whatever it was. */

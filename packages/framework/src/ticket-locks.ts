@@ -1,7 +1,6 @@
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 import { TICKETS_DIR } from './tickets.js'
-import { withDataBranch } from './data-branch.js'
+import { resolveDataFileDeps, type DataFileDeps } from './data-branch.js'
 import type { PlanAssignment } from './auto-pm.js'
 
 // The `.lock.md` claim on a ticket (#1420, replacing #1327's PENDING placeholders).
@@ -65,18 +64,7 @@ export function abandonedReleaseMessage(ticket: string): string {
 }
 
 /** Injectable seams so every operation is unit-testable off disk and git. */
-export interface TicketLockDeps {
-  /** Write one lock file (default `fs.writeFile`). */
-  write?: (path: string, content: string) => Promise<void>
-  /** Read one sibling (default `fs.readFile`); a rejection reads as "absent". */
-  read?: (path: string) => Promise<string>
-  /** Delete one lock file (default `fs.rm`). */
-  remove?: (path: string) => Promise<void>
-  /** The data-branch write funnel (default {@link withDataBranch}); a test's fake stands in. */
-  funnel?: typeof withDataBranch
-  /** Progress line. */
-  log?: (message: string) => void
-}
+export type TicketLockDeps = DataFileDeps
 
 /**
  * Which side of a ticket's life a batch claims for (#1420). A `plan` batch is about to *write*
@@ -108,17 +96,7 @@ export async function acquireTicketLocks(
   deps: TicketLockDeps = {},
   phase: TicketLockPhase = 'plan',
 ): Promise<PlanAssignment[]> {
-  // Creating parents, because `tickets/` itself is not a given: retiring the last ticket removes
-  // the directory (git keeps no empty dirs), and the branch is born without it.
-  const write =
-    deps.write ??
-    (async (path: string, content: string) => {
-      await mkdir(dirname(path), { recursive: true })
-      await writeFile(path, content, 'utf8')
-    })
-  const read = deps.read ?? (path => readFile(path, 'utf8'))
-  const funnel = deps.funnel ?? withDataBranch
-  const log = deps.log ?? (() => {})
+  const { read, write, funnel, log } = resolveDataFileDeps(deps)
 
   let locked: PlanAssignment[] = []
   const result = await funnel(
@@ -183,10 +161,7 @@ export async function releaseTicketLock(
     heldBy?: string
   } = {},
 ): Promise<ReleaseTicketLockResult> {
-  const read = deps.read ?? (path => readFile(path, 'utf8'))
-  const remove = deps.remove ?? (path => rm(path))
-  const funnel = deps.funnel ?? withDataBranch
-  const log = deps.log ?? (() => {})
+  const { read, remove, funnel, log } = resolveDataFileDeps(deps)
 
   const lock = `${TICKETS_DIR}/${ticketLockName(ticket)}`
   let outcome: ReleaseTicketLockResult = 'released'

@@ -146,7 +146,7 @@ function rangeActive(f: RangeFilter): boolean {
 }
 
 /** A ticket's topics, lowercased — the one casing both matching and the facet list use. */
-export function normalTopics(ticket: WorkspaceTicket): string[] {
+function normalTopics(ticket: WorkspaceTicket): string[] {
   return (ticket.topics ?? []).map(t => t.toLowerCase())
 }
 
@@ -178,7 +178,7 @@ function matchesQuery(row: TicketRow, q: string): boolean {
 }
 
 /** The whole predicate: AND across facets, OR within each. */
-export function matchesFilters(row: TicketRow, f: TicketFilters): boolean {
+function matchesFilters(row: TicketRow, f: TicketFilters): boolean {
   const t = row.ticket
   if (!matchesQuery(row, f.q)) return false
   if (!matchesRange(parsePriority(t.priority), f.priority, PRIORITY_BUCKETS)) return false

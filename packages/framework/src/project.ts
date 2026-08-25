@@ -16,7 +16,7 @@ export interface ProjectFs {
 }
 
 /** A {@link ProjectFs} backed by `node:fs/promises`. See {@link nodeFs}. */
-export function nodeProjectFs(): ProjectFs {
+function nodeProjectFs(): ProjectFs {
   const { exists } = nodeFs()
   return { exists }
 }

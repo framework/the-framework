@@ -5,6 +5,7 @@ import { agentBranchName } from './branch-names.js'
 import { listAgents, nodeStoreFs, startedAtFromAgentId, type AgentMeta, type ArchivePatch } from './store/index.js'
 import { patchArchivedAgentOnDataBranch } from './archived-agent-patch.js'
 import { errorMessage } from './error-message.js'
+import { startProjectPass, type ProjectPass, type ProjectsSource } from './project-pass.js'
 
 // Adopt the branch a cloud session actually worked on (#1601).
 //
@@ -225,17 +226,10 @@ export async function adoptCloudWork(cwd: string, deps: CloudWorkDeps = {}): Pro
   return result
 }
 
-/** A running adoption pass, in the shape the daemon's other background services use. */
-export interface CloudWorkAdoption {
-  /** Run one pass now, awaiting it. Exposed for tests and for a caller that wants it on demand. */
-  tick: () => Promise<void>
-  stop: () => void
-}
-
 /** What {@link startCloudWorkAdoption} needs from the daemon. */
 export interface CloudWorkAdoptionOptions {
   /** The registered projects to pass over. */
-  projects: () => Promise<readonly { path: string }[]>
+  projects: ProjectsSource
   log: (message: string) => void
   /** The per-project pass (default {@link adoptCloudWork}). */
   adopt?: (cwd: string) => Promise<CloudWorkResult>
@@ -248,40 +242,18 @@ export interface CloudWorkAdoptionOptions {
  * pushed yet is the normal state of every run this watches, and a line per tick about it would
  * be noise. A run's row changing branch with no line explaining why would read as a bug.
  */
-export function startCloudWorkAdoption(opts: CloudWorkAdoptionOptions): CloudWorkAdoption {
+export function startCloudWorkAdoption(opts: CloudWorkAdoptionOptions): ProjectPass {
   const adopt = opts.adopt ?? adoptCloudWork
-  let stopped = false
-
-  const passAll = async (): Promise<void> => {
-    for (const project of await opts.projects().catch(() => [])) {
-      if (stopped) break
-      const { adopted, failed } = await adopt(project.path).catch((): CloudWorkResult => ({ adopted: [], failed: [] }))
-      for (const adoption of adopted) {
-        const prLine = adoption.pr ? (adoption.opened ? `; opened its armed draft PR ${adoption.pr.url}` : `; its PR is ${adoption.pr.url}`) : ''
-        opts.log(`[framework] session ${adoption.agentId}'s cloud work landed on ${adoption.branch} — adopted as its branch (#1601)${prLine}`)
-      }
-      for (const failure of failed) {
-        opts.log(`[framework] cloud work adoption for session ${failure.agentId}: ${failure.error}`)
-      }
-    }
-  }
-
-  // Overlapping ticks join the pass already running rather than being dropped, so awaiting
-  // `tick()` means the pass finished — same rule as the worktree sweep, for the same reason.
-  let inflight: Promise<void> | undefined
-  const tick = (): Promise<void> => {
-    if (stopped) return Promise.resolve()
-    inflight ??= passAll().finally(() => {
-      inflight = undefined
-    })
-    return inflight
-  }
 
   // No timer of its own (E4): the daemon's one clock calls `tick`.
-  return {
-    tick,
-    stop: () => {
-      stopped = true
-    },
-  }
+  return startProjectPass(opts.projects, async cwd => {
+    const { adopted, failed } = await adopt(cwd).catch((): CloudWorkResult => ({ adopted: [], failed: [] }))
+    for (const adoption of adopted) {
+      const prLine = adoption.pr ? (adoption.opened ? `; opened its armed draft PR ${adoption.pr.url}` : `; its PR is ${adoption.pr.url}`) : ''
+      opts.log(`[framework] session ${adoption.agentId}'s cloud work landed on ${adoption.branch} — adopted as its branch (#1601)${prLine}`)
+    }
+    for (const failure of failed) {
+      opts.log(`[framework] cloud work adoption for session ${failure.agentId}: ${failure.error}`)
+    }
+  })
 }

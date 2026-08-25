@@ -57,7 +57,7 @@ export interface BridgeVersion {
 }
 
 /** How recently the extension must have spoken to count as present. */
-export const EXTENSION_ALIVE_WINDOW_MS = 3 * 60_000
+const EXTENSION_ALIVE_WINDOW_MS = 3 * 60_000
 
 export class BridgeQuestions {
   private readonly bySession = new Map<string, BridgeQuestion>()

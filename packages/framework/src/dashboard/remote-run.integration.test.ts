@@ -5,9 +5,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { EventStream } from '../event-stream.js'
 import { startDashboard } from './server.js'
-import { registryPreferencesStore } from '../registry.js'
-import { registryDiscordCredentialsStore } from '../discord-credentials-store.js'
-import { defaultQuotaSource } from './quota.js'
+import { testDashboardOptions } from '../dashboard-rpc/test-context.js'
 import { relayRpc } from './remote-run.js'
 import { createProjectRuntime, delay } from '../daemon-runtime.js'
 import { dispatchRelayRpc } from '../dashboard-rpc/relay-dispatch.js'
@@ -71,23 +69,16 @@ test('a run submitted with options.remote is created on the other daemon and its
   const cwdB = await mkdtemp(join(tmpdir(), 'relay-b-'))
   const homeIdB = projectId(resolve(cwdB))
   const bRpc = (fn: string, args: unknown[]): Promise<unknown> => dispatchRelayRpc(homeIdB, fn, args)
-  const deviceB = await startDashboard({
-    port: 0,
-    clientBundleDir: bundle,
-    token: TOKEN,
-    onStart: bStart,
-    relay: { tailEvents: bTail, rpc: bRpc },
-    // The rest of the one host's wiring (D3): this test drives the relay endpoints, not these.
-    onAddProject: () => ({ ok: false, error: 'not wired in this test' }),
-    eventsSource: () => undefined,
-    remote: { target: () => undefined, list: () => [] },
-    preferences: registryPreferencesStore(),
-    discord: registryDiscordCredentialsStore(),
-    quota: defaultQuotaSource(),
-    autoPm: () => undefined,
-    autoPmSweep: () => {},
-    projectErrors: () => [],
-  })
+  // The rest of the one host's wiring (D3) comes from the shared defaults: this test drives the
+  // relay endpoints, not the other capabilities.
+  const deviceB = await startDashboard(
+    testDashboardOptions({
+      clientBundleDir: bundle,
+      token: TOKEN,
+      onStart: bStart,
+      relay: { tailEvents: bTail, rpc: bRpc },
+    }),
+  )
 
   // Daemon A: the browser's own daemon, a real project runtime. Its onStart takes the remote branch.
   const cwdA = await mkdtemp(join(tmpdir(), 'relay-a-'))

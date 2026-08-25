@@ -275,6 +275,33 @@ async function readLock(dir: string, name: string, siblings: Set<string>): Promi
 }
 
 /**
+ * One ticket's row: what the head of its markdown says about itself, plus what the `.plan.md` and
+ * `.lock.md` beside it add. `head` is the whole file for the detail page and the first
+ * {@link MAX_TICKET_BYTES} for a list row — nothing below that is ever shown.
+ */
+async function ticketRow(dir: string, file: string, head: string, date: string, siblings: Set<string>): Promise<WorkspaceTicket> {
+  const stem = file.replace(/\.md$/, '')
+  const { title, summary, priority, topics, github } = describe(head)
+  const [plan, lock] = await Promise.all([
+    readSibling(dir, `${stem}.plan.md`, siblings),
+    readLock(dir, `${stem}.lock.md`, siblings),
+  ])
+  return {
+    file,
+    title: title ?? titleFromFile(file),
+    summary,
+    ...(priority ? { priority } : {}),
+    ...(topics ? { topics } : {}),
+    ...(github ? { github } : {}),
+    date,
+    planned: plan.real,
+    ...(lock.locked ? { locked: true } : {}),
+    ...(lock.lockedBy !== undefined ? { lockedBy: lock.lockedBy } : {}),
+    ...planMeta(plan.md),
+  }
+}
+
+/**
  * The project's tickets, by filename, newest first (#1144). `[]` when the repo has no `tickets/`
  * directory at all, which is the state the view offers to import into.
  *
@@ -295,25 +322,7 @@ export async function readTickets(cwd: string): Promise<WorkspaceTicket[]> {
       ticketDate(dir, file),
     ])
     if (content === undefined) continue
-    const stem = file.replace(/\.md$/, '')
-    const { title, summary, priority, topics, github } = describe(content.slice(0, MAX_TICKET_BYTES))
-    const [plan, lock] = await Promise.all([
-      readSibling(dir, `${stem}.plan.md`, siblings),
-      readLock(dir, `${stem}.lock.md`, siblings),
-    ])
-    tickets.push({
-      file,
-      title: title ?? titleFromFile(file),
-      summary,
-      ...(priority ? { priority } : {}),
-      ...(topics ? { topics } : {}),
-      ...(github ? { github } : {}),
-      date,
-      planned: plan.real,
-      ...(lock.locked ? { locked: true } : {}),
-      ...(lock.lockedBy !== undefined ? { lockedBy: lock.lockedBy } : {}),
-      ...planMeta(plan.md),
-    })
+    tickets.push(await ticketRow(dir, file, content.slice(0, MAX_TICKET_BYTES), date, siblings))
   }
   // Newest first: what changed most recently is what the list is for (#1144), and it is the only
   // ordering that means the same thing for a dated ticket and a bare GitHub-imported one alike.
@@ -351,25 +360,5 @@ export async function readTicket(cwd: string, file: string): Promise<WorkspaceTi
     readdir(dir).catch(() => [] as string[]),
   ])
   if (content === undefined) return null
-  const stem = file.replace(/\.md$/, '')
-  const { title, summary, priority, topics, github } = describe(content)
-  const present = new Set(names)
-  const [plan, lock] = await Promise.all([
-    readSibling(dir, `${stem}.plan.md`, present),
-    readLock(dir, `${stem}.lock.md`, present),
-  ])
-  return {
-    file,
-    title: title ?? titleFromFile(file),
-    summary,
-    ...(priority ? { priority } : {}),
-    ...(topics ? { topics } : {}),
-    ...(github ? { github } : {}),
-    date,
-    planned: plan.real,
-    ...(lock.locked ? { locked: true } : {}),
-    ...(lock.lockedBy !== undefined ? { lockedBy: lock.lockedBy } : {}),
-    ...planMeta(plan.md),
-    content,
-  }
+  return { ...(await ticketRow(dir, file, content, date, new Set(names))), content }
 }

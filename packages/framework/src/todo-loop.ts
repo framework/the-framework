@@ -313,7 +313,7 @@ export interface TodoLoopOptions {
 }
 
 /** The default per-agent cap on backlog entries — a backstop beside the budget cap (#322). */
-export const DEFAULT_MAX_TODO_ITEMS = 25
+const DEFAULT_MAX_TODO_ITEMS = 25
 
 /** How many consecutive failed check-off writes before the loop stops rather than spins. */
 const MAX_STALLS = 2

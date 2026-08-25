@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import type { DashboardData, OnboardingSuggestion } from '../../src/index.js'
-import { presets } from '../../src/client.js'
-import { RefreshCw, Square, SquareCheckBig, X } from 'lucide-react'
+import { Square, SquareCheckBig, X } from 'lucide-react'
 import { onDashboard } from '../rpc/reads.js'
 import { onOnboarding, sendAddProject } from '../rpc/projects.js'
 import { usePolled } from '../lib/use-async.js'
@@ -10,7 +9,7 @@ import { useNotifyChannels, reloadNotifyChannels } from '../lib/notify-channels.
 import { useNotificationPermission } from '../lib/notification-permission.js'
 import { useStartAgent } from '../lib/use-start-agent.js'
 import { AddProjectPanel } from './AddProjectPanel.js'
-import { StartAgentButton } from './StartAgentButton.js'
+import { UpdateTicketsButton, UPDATE_TICKETS_PROMPT } from './UpdateTicketsButton.js'
 import { DiscordWebhookDialog, DISCORD_WEBHOOK_DESCRIPTION } from './DiscordDialogs.js'
 import { Button } from './ui/button.js'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
@@ -105,20 +104,13 @@ export function OnboardingChecklist({
     if (permission === 'default') void Notification.requestPermission()
   }
 
-  // The update preset (#1501): its empty branch is the first import, so one preset serves both
-  // this checklist's fresh project and the panel's filled one — one label, one instruction. Read
-  // once here because two controls need it: the start, and the draft its chevron hands the
-  // launcher (#1507).
-  const updateIntent = presets.updateTickets.render()
-
   const populateTickets = async () => {
     if (!targetProjectId) return
-    const intent = updateIntent
     // Unattended (#1279): a checklist-fired routine ends at settle instead of parking in the chat loop.
-    const started = await start(targetProjectId, intent, 'prompt', { unattended: true })
+    const started = await start(targetProjectId, UPDATE_TICKETS_PROMPT, 'prompt', { unattended: true })
     // Land on the session doing the import, not the project's launcher (#1169): its id is what
     // the shell needs to show the live output. A refusal keeps you here, with `startError` shown.
-    if (started) onAgentStarted(targetProjectId, intent, started.agentId)
+    if (started) onAgentStarted(targetProjectId, UPDATE_TICKETS_PROMPT, started.agentId)
   }
 
   const steps: Step[] = [
@@ -159,20 +151,12 @@ export function OnboardingChecklist({
       optional: true,
       action: (
         <div className="flex flex-col items-end gap-1">
-          <StartAgentButton
+          <UpdateTicketsButton
             variant="default"
-            size="sm"
-            icon={<RefreshCw className="h-3.5 w-3.5" aria-hidden />}
-            label="Update from GitHub"
-            menuAriaLabel="Other ways to update from GitHub"
-            tooltip="Bring tickets/ up to date with GitHub. With no import on record, everything open comes across."
             busy={starting}
-            starting={starting}
             disabled={!targetProjectId}
             onStart={() => void populateTickets()}
             onConfigure={() => targetProjectId && onSelectProject(targetProjectId)}
-            prompt={updateIntent}
-            configureDescription="Opens the launcher with the update prompt, so you can set the model and where it runs."
           />
           {!targetProjectId && <span className="text-xs text-muted-foreground">Add a project first</span>}
           {startError && <span className="text-xs text-destructive">{startError}</span>}

@@ -36,7 +36,9 @@ export function HandoffSummary({ handoff }: { handoff: AgentHandoff | null }) {
   // A branch that is gone and a branch that was never pushed are different facts, and the summary
   // is only useful if it tells them apart.
   if (!handoff.exists) return <span className="text-muted-foreground">branch gone</span>
-  if (handoff.empty) return <span className="text-muted-foreground">no changes</span>
+  // A merged branch reads as empty too — its commits are all on the base, so `base..branch` lists
+  // nothing — but "merged" and "no changes" are opposite verdicts, and only one of them is true.
+  if (handoff.empty) return <span className="text-muted-foreground">{handoff.merged ? 'merged' : 'no changes'}</span>
   const commits = `${handoff.commits.length} commit${handoff.commits.length === 1 ? '' : 's'}`
   const files = `${handoff.files.length} file${handoff.files.length === 1 ? '' : 's'}`
   return (
@@ -48,7 +50,6 @@ export function HandoffSummary({ handoff }: { handoff: AgentHandoff | null }) {
       {/* Whether the work is on the remote yet is the first handoff question — say it. The PR
           itself is not repeated here: the bar already links it. */}
       {handoff.pushed && !handoff.pr && <span>· pushed</span>}
-      {handoff.merged && <span>· merged</span>}
     </span>
   )
 }
@@ -85,6 +86,9 @@ export function HandoffArm({
   useEffect(() => {
     if (pending && pending === armed) setPending(null)
   }, [pending, armed])
+  // Mounted un-keyed across agent switches: a pick still waiting for agent A's event echo must
+  // not paint agent B's box, where `pending === armed` may never come true to clear it.
+  useEffect(() => setPending(null), [agentId])
 
   const set = (next: HandoffLevel): void => {
     setPending(next)

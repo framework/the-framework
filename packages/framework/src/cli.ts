@@ -932,8 +932,13 @@ async function driveAgent(opts: AgentOptions, io: CliIO): Promise<number> {
   // Who parks and who ends is #1390: a dashboard-spawned session drains what queued and then ends
   // itself — the dashboard reopens the conversation as a continuation (#762), so nothing needs to
   // stay alive for the composer.
+  //
+  // Not tied to the gates (#846): an unattended agent leaves `requestChoice` unset so its gates
+  // take the recommended option, but its control channel still carries Stop and the user's own
+  // messages — "messages still work" is what the SPEC promises of it. Reading the queue off the
+  // gate switch dropped every message typed at a preset or routine agent, reported as queued.
   const chatQueue =
-    isInteractive(opts) && requestChoice
+    isInteractive(opts) && control !== undefined
       ? {
           messages: {
             next: (signal?: AbortSignal) => gateKeepalive.hold(messages.next(signal)),

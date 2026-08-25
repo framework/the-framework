@@ -123,15 +123,19 @@ test('buildInterventions surfaces PRs and awaiting runs together, newest first',
   assert.deepEqual(items.map(i => i.kind), ['awaiting', 'pr']) // awaiting is newer
 })
 
-test('interventionKey is the url for a PR and project+gate for an awaiting run', () => {
+test('interventionKey is the url for a PR and project+agent+gate for an awaiting run', () => {
   assert.equal(
     interventionKey({ projectId: 'a', projectName: 'a', kind: 'pr', title: 't', url: 'https://gh/pr/1', number: 1 }),
     'https://gh/pr/1',
   )
   assert.equal(
-    interventionKey({ projectId: 'a', projectName: 'a', kind: 'awaiting', title: 't', url: '', awaitId: 'g1' }),
-    'awaiting:a:g1',
+    interventionKey({ projectId: 'a', projectName: 'a', kind: 'awaiting', title: 't', url: '', awaitId: 'g1', agentId: 'r1' }),
+    'awaiting:a:r1:g1',
   )
+  // Every agent's first gate is `await-choices`, so two agents parked in one project would share
+  // an identity without the run in the key — and the dedupe would announce only one of them.
+  const parked = { projectId: 'a', projectName: 'a', kind: 'awaiting', title: 't', url: '', awaitId: 'await-choices' } as const
+  assert.notEqual(interventionKey({ ...parked, agentId: 'r1' }), interventionKey({ ...parked, agentId: 'r2' }))
 })
 
 // #860: a finished agent whose branch still holds unpushed, unmerged commits.

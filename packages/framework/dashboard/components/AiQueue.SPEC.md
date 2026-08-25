@@ -1,4 +1,4 @@
-The Overview's AI Queue card: every project's open agent queue entries — the work The Framework will pick up on its own — grouped by project, with a way to read an entry, a way to start it now, and a way to start a project's top entries as one batch.
+The Overview's AI Queue card: every project's open agent queue entries — the work The Framework will pick up on its own — grouped by project, with a way to read an entry, a way to start it now, and a way to start a project's top entries as one batch. Both starts also offer "Configure first, then run", which opens the project's launcher with the same prompt instead.
 
 ## User story
 
@@ -6,6 +6,7 @@ The Overview's AI Queue card: every project's open agent queue entries — the w
 - The user does not want to wait for the drain routine and starts one queued entry right now.
 - The user wants several queued entries worked on at once — one agent each — without clicking every entry's play button one by one.
 - The user wants to read the ticket behind a queued entry before deciding anything.
+- The user wants to start a queued entry on a different model, or somewhere other than this machine — neither of which this card shows.
 
 ## Business logic — TL;DR
 
@@ -14,6 +15,7 @@ The Overview's AI Queue card: every project's open agent queue entries — the w
 - **Starting one entry runs it exactly as the drain routine would** - one agent, on that entry alone, unattended, so it finishes and hands off instead of parking on the user.
 - **The click follows the agent it started** - the user is taken to the agent, and to the project while its id is not known yet.
 - **Fanning out over the top of the queue** - a button on each project's header starts one agent per top open entry, as many as the count beside it says (three unless changed), and stays on the Overview.
+- **Configure first, then run** - the chevron beside either start hands its prompt to that entry's own project's launcher instead of starting anything.
 
 ## Business logic
 
@@ -39,7 +41,7 @@ The user wants to read the ticket behind a queued entry, and separately to kick 
 
 An entry's title opens what the entry names. A queued ticket is written into the queue as a link back to its ticket, so its title opens that ticket's own page inside the dashboard; an entry pointing at something outside the dashboard opens in a new tab; an entry naming nothing is plain text.
 
-Beside each entry sits a play button, labelled "Spin up an agent working on this entry", which starts the work rather than reading it. Only the clicked entry's button shows itself as busy, tracked by the entry's own content because the list is polled and can shift under a click. While any start is in flight, every play button is disabled. A failed start is reported as an error under the list.
+Beside each entry sits a play button, labelled "Spin up an agent working on this entry", which starts the work rather than reading it. Only the clicked entry's button shows itself as busy, tracked by the entry's own content because the list is polled and can shift under a click. While any start is in flight, every start on the card is disabled — the chevrons beside them excepted, since those start nothing. A failed start is reported as an error under the list.
 
 The project's name is a header and nothing more — clicking a project name does not navigate anywhere.
 
@@ -81,7 +83,7 @@ Each project's header carries a fan-out button beside a count. Clicking the butt
 
 Each agent of the batch is started exactly as the single play button starts one: pinned to its own entry's raw queue line, unattended. The agents are started one after another, and the first failed start ends the batch — the remaining entries are not started, and the failure is reported under the list the same way a single start's is.
 
-While the batch is starting — including between two of its starts — every start button on the card is disabled, and the clicked project's fan-out button shows itself as busy.
+While the batch is starting — including between two of its starts — every start on the card is disabled, again excepting the chevrons, and the clicked project's fan-out button shows itself as busy.
 
 Unlike starting a single entry, the dashboard stays on the Overview: the started agents surface in the working-now card beside this one.
 
@@ -90,6 +92,18 @@ Unlike starting a single entry, the dashboard stays on the Overview: the started
 - One agent pinned per named entry, rather than several agents each told to work the queue: agents started together all read the same queue, so each would pick the same first entry and implement it as many times over — the same reason the drain routine pins the entries of its own batch.
 - Starting one after another, ending at the first refusal: whatever refused a start would refuse the next one a moment later.
 - Staying on the Overview: a batch has no single agent to follow.
+
+### Configure first, then run
+
+#### User story
+
+The user wants a queued entry worked on a different model, or somewhere other than this machine — settings that live in the launcher and the global options, not on this card.
+
+#### Business logic
+
+Both starts on the card are split buttons: beside each sits a chevron whose menu holds "Configure first, then run". Taking it opens the launcher of the project the pressed control belongs to — the entry's own project, never the first project listed — carrying the prompt that press would have sent, and starts nothing.
+
+For an entry's play button that is the entry's own prompt. For a project's fan-out button it is the top entry's prompt alone, and the entry says so: a launcher can only ever send one agent, so that half really is a different act from the batch beside it.
 
 ## Before modifying/creating SPEC.md files
 

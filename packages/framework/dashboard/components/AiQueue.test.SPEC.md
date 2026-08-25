@@ -6,12 +6,15 @@ What the tests cover: the Overview's AI Queue card.
 - The play button says what it does on hover.
 - A start that comes back without an agent id still hands over the project, so the dashboard can adopt the agent once the poll surfaces it.
 - A failed start navigates nowhere and shows the refusal instead of swallowing it.
-- While a start is in flight, every start button — the play buttons and the fan-out button — is disabled.
+- While a start is in flight, every start button — the play buttons and the fan-out button — is disabled, while the "Configure first, then run" chevrons beside them stay usable, since they start nothing.
 - The fan-out button starts one unattended agent per top open entry — three by default, each prompt pinned to its own raw queue line, in queue order, skipping checked-off entries — and navigates nowhere.
 - The count beside the fan-out button sets how many agents the click starts.
 - The fan-out button promises only what is open: with fewer open entries than the count, its label and the batch shrink to the open entries, and a single open entry reads singular.
 - A refused start ends the fan-out batch: the remaining entries are not started.
-- While a fan-out batch is in flight — including between two of its starts — every start button is disabled, until the batch ends.
+- While a fan-out batch is in flight — including between two of its starts — every start button is disabled, until the batch ends; the chevrons are excluded, deliberately.
+- An entry's "Configure first, then run" opens its own project's launcher carrying that entry's own prompt, and starts nothing.
+- The fan-out's "Configure first, then run" carries the top entry's prompt alone and says it is one agent, not the batch.
+- A "Configure first, then run" lands in the project whose row it belongs to, not in the first project the card lists.
 - Checked-off entries, and projects with nothing open, are not listed.
 - Loading and empty read as themselves rather than as each other.
 

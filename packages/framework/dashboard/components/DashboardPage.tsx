@@ -51,7 +51,9 @@ export function DashboardPage({
   return (
     <ScrollArea className="min-h-0 flex-1">
       <div className="mx-auto max-w-6xl space-y-6 p-6">
-        {!onboardingDismissed && <OnboardingChecklist dismissible onAgentStarted={onAgentStarted} />}
+        {!onboardingDismissed && (
+          <OnboardingChecklist dismissible onAgentStarted={onAgentStarted} onSelectProject={onSelectProject} />
+        )}
 
         {/* Usage first (#1139): the one figure that governs everything the agent may do next. */}
         <Quota />
@@ -63,7 +65,13 @@ export function DashboardPage({
           <HumanQueue items={interventions} onSelectProject={onSelectProject} onSelectAgent={onSelectAgent} />
           <div className="space-y-4">
             <Agents working={data?.active ?? []} loading={loading} onSelectAgent={onSelectAgent} />
-            <AiQueue queue={data?.queue ?? []} loading={loading} onOpenTicket={onOpenTicket} onAgentStarted={onAgentStarted} />
+            <AiQueue
+              queue={data?.queue ?? []}
+              loading={loading}
+              onOpenTicket={onOpenTicket}
+              onAgentStarted={onAgentStarted}
+              onSelectProject={onSelectProject}
+            />
           </div>
         </div>
 

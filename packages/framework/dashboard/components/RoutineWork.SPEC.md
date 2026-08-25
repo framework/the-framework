@@ -16,7 +16,7 @@ The Overview's "Routine work" card: the routines Auto PM runs on a schedule, eac
 - **The card is the daemon's own routine list** - the rows are the routines the daemon runs, not a second copy, so what is on screen cannot drift from what actually runs.
 - **Run now takes the right path per routine** - a routine that fans out, or that has to hold its routine lock while it runs, asks the daemon to run that one routine's work; every other routine is started directly, as one unattended agent with the routine's prompt.
 - **The button says what it costs first** - each Run now carries the routine's own description, the model and run target the start would use, and how many agents it starts.
-- **Configure first, then run** - the secondary half of the split button hands the routine's prompt to the project's launcher instead of starting anything, so the model and run target can be changed and the prompt edited before sending.
+- **Configure first, then run** - the secondary half of the split button hands the routine's prompt to the project's launcher instead of starting anything, so the model and run target can be changed and the prompt edited before sending. Every button in the dashboard that starts an agent carries this same second half.
 - **The picked project is a preference** - which project the routines run in survives navigation, reloads and tabs, and is re-checked against the projects that actually exist.
 - **Two tiers of switch** - the checkbox on each row is that routine's place in the schedule; the checkbox at the foot is whether the schedule runs at all.
 - **Opting out is what is recorded** - every routine counts as ticked until it is unticked, so a routine introduced by a later version runs for a user who saved the setting before it existed.
@@ -81,9 +81,11 @@ The user wants to run a routine but on a different model, or on a different run 
 
 #### Business logic
 
-The chevron beside Run now opens a menu with one entry, "Configure first, then run": it stashes the routine's prompt as a launcher draft and opens the picked project's launcher, where the prompt can be edited and the model and run target chosen. It starts nothing, so it stays available even while a start is in flight.
+The chevron beside Run now opens a menu with one entry, "Configure first, then run": it carries the routine's prompt to the picked project's launcher and opens it, where the prompt can be edited and the model and run target chosen. It starts nothing, so it stays available even while a start is in flight.
 
 For a routine whose Run now would fan out, the entry says plainly that the launcher sends one agent, not the fan-out.
+
+Run now and its chevron are one shared control, the same one every start button in the dashboard is built from, so this offer is the same on all of them.
 
 ### The picked project is a preference
 

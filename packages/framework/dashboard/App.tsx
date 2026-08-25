@@ -274,7 +274,8 @@ export function App() {
   // run streams its own feed and is steered by its own id (#749).
   const selectedAgent = agentId ? agents.find(agent => agent.id === agentId) : undefined
   const renderMain = () => {
-    if (view === 'settings') return <SettingsPage onAgentStarted={agentStarted} onDone={showDashboard} />
+    if (view === 'settings')
+      return <SettingsPage onAgentStarted={agentStarted} onSelectProject={selectProject} onDone={showDashboard} />
     // A ticket's plan view is the same shape plus the `plan` flag (#685): its `.plan.md` on its own
     // page, checked before the detail page since the flag only rides alongside a slug.
     if (view === 'tickets' && projectId && ticketSlug && plan)
@@ -283,7 +284,15 @@ export function App() {
     // bare cross-project route) is the list — every registered project, one section each.
     if (view === 'tickets' && projectId && ticketSlug)
       return <TicketDetailPage projectId={projectId} slug={ticketSlug} onBack={showTickets} />
-    if (view === 'tickets') return <TicketsPage onOpenTicket={openTicket} onOpenTicketPlan={openTicketPlan} onAgentStarted={agentStarted} />
+    if (view === 'tickets')
+      return (
+        <TicketsPage
+          onOpenTicket={openTicket}
+          onOpenTicketPlan={openTicketPlan}
+          onAgentStarted={agentStarted}
+          onSelectProject={selectProject}
+        />
+      )
     if (!projectId)
       return (
         <DashboardPage

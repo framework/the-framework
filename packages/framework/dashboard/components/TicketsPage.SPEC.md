@@ -76,6 +76,8 @@ The user has decided a ticket is next and wants an agent on it now.
 
 Every ticket row offers to start a planning agent for that ticket, and to start an agent that works it. The work agent runs unattended with the ticket named on it, so the agent knows which ticket it is working. Both start in the project the ticket belongs to — in the flat list that is the row's own project, not a page-wide selection — and the dashboard shell is told an agent started so it can show it. A start that fails leaves a message on the page saying the planning agent or the work agent could not be started.
 
+Both also offer "Configure first, then run", which opens a launcher carrying the same prompt instead of starting anything. It opens the launcher of the row's own project, for the same reason the start runs there: this page spans every project, so which one a row means comes from the row.
+
 ### Queue the whole shown set
 
 #### User story

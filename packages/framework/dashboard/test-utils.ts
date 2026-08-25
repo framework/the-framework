@@ -26,3 +26,30 @@ export async function hoverTooltip(trigger: Element): Promise<HTMLElement> {
 export function unhoverTooltip(trigger: Element): void {
   fireEvent.mouseLeave(trigger)
 }
+
+/**
+ * Open a dropdown menu by its trigger and wait until the trigger reports it open (#1699).
+ *
+ * Clicked until it opens rather than once and hoped: these are Base UI menus, and a click landing
+ * before the trigger's own handlers are live is silently a no-op — the trigger stays at
+ * `aria-expanded="false"` and the search that follows then hunts for an item that was never
+ * rendered. Rare enough to pass locally every time and still fail on a loaded CI runner. Retrying
+ * is safe because the guard only ever clicks a shut menu, so it cannot toggle one back closed; a
+ * menu that genuinely will not open still fails here, on the timeout.
+ */
+export async function openMenu(trigger: Element): Promise<void> {
+  await waitFor(() => {
+    if (trigger.getAttribute('aria-expanded') !== 'true') fireEvent.click(trigger)
+    if (trigger.getAttribute('aria-expanded') !== 'true') throw new Error('the menu did not open')
+  })
+}
+
+/**
+ * Take a start button's "Configure first, then run" (#1507): open the chevron named
+ * `menuAriaLabel`, then click the entry. Shared, because every surface that starts an agent
+ * carries this same second half.
+ */
+export async function configureFirst(menuAriaLabel: string | RegExp): Promise<void> {
+  await openMenu(await screen.findByRole('button', { name: menuAriaLabel }))
+  fireEvent.click(await screen.findByText('Configure first, then run'))
+}

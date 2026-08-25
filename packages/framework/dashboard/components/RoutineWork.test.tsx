@@ -8,7 +8,7 @@ import {
   AUTO_PM_MAINTENANCE_JOB,
   DEFAULT_AUTO_PM_CONCURRENCY,
 } from '../../src/client.js'
-import { hoverTooltip } from '../test-utils.js'
+import { hoverTooltip, openMenu } from '../test-utils.js'
 
 // Everything the card reads goes through a lib module, so the mocks stop at the `rpc/` stubs: an
 // unmocked one reaches for `/_rpc/<name>`, and there is no daemon behind jsdom to answer.
@@ -213,17 +213,7 @@ describe('RoutineWork (#1159)', () => {
 
   /** Open one row's secondary half — the chevron beside its Run now. */
   const openRunMenu = async (job: AutoPmJob) => {
-    const trigger = await screen.findByRole('button', { name: `Other ways to run ${routineName(job)}` })
-    // Clicked until the trigger reports open, rather than once and hoped: the menu is a Base UI
-    // one, and a click landing before its own handlers are live is silently a no-op — the row
-    // stays at `aria-expanded="false"` and the search below then hunts for an item that was never
-    // rendered. Rare enough to pass locally every time and still fail on a loaded CI runner.
-    // Retrying is safe because the guard only ever clicks a shut menu, so it cannot toggle one
-    // back closed; a menu that genuinely will not open still fails here, on the timeout.
-    await waitFor(() => {
-      if (trigger.getAttribute('aria-expanded') !== 'true') fireEvent.click(trigger)
-      expect(trigger.getAttribute('aria-expanded')).toBe('true')
-    })
+    await openMenu(await screen.findByRole('button', { name: `Other ways to run ${routineName(job)}` }))
     return await screen.findByText('Configure first, then run')
   }
 

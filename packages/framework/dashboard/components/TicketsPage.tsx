@@ -45,6 +45,7 @@ export function TicketsPage({
   onOpenTicket,
   onOpenTicketPlan,
   onAgentStarted,
+  onSelectProject,
 }: {
   /** Open one ticket's detail page (#1144), by its project and file. */
   onOpenTicket: (projectId: string, file: string) => void
@@ -54,6 +55,9 @@ export function TicketsPage({
    *  started it is not implied the way it is for a single-project page, so each section binds
    *  its own id below rather than this prop guessing. */
   onAgentStarted?: ((projectId: string, intent: string, agentId?: string) => void) | undefined
+  /** Where every "Configure first, then run" on this page lands (#1507): the row's own project's
+   *  launcher — which project that is comes from the row, since the page spans all of them. */
+  onSelectProject: (id: string) => void
 }) {
   const { value: groups, loaded } = usePolled<ProjectTickets[]>(onAllTickets, EMPTY_GROUPS, 10_000, [])
   const [view, setViewState] = useState<TicketsView>(initialView)
@@ -391,8 +395,10 @@ export function TicketsPage({
                         onToggleSelect={() => toggleSelected(`${r.projectId}/${r.ticket.file}`)}
                         onOpen={() => onOpenTicket(r.projectId, r.ticket.file)}
                         onStartWork={() => void startWork(r.projectId, r.ticket.file)}
+                        onConfigureWork={() => onSelectProject(r.projectId)}
                         onOpenPlan={onOpenTicketPlan ? () => onOpenTicketPlan(r.projectId, r.ticket.file) : undefined}
                         onStartPlan={() => void startPlan(r.projectId, r.ticket.file)}
+                        onConfigurePlan={() => onSelectProject(r.projectId)}
                         onTopicClick={addTopic}
                         onClaimedClick={filterClaimed}
                       />
@@ -419,6 +425,7 @@ export function TicketsPage({
                       onOpen={file => onOpenTicket(g.projectId, file)}
                       onOpenPlan={onOpenTicketPlan ? file => onOpenTicketPlan(g.projectId, file) : undefined}
                       onAgentStarted={(intent, agentId) => onAgentStarted?.(g.projectId, intent, agentId)}
+                      onSelectProject={onSelectProject}
                       onTopicClick={addTopic}
                       onClaimedClick={filterClaimed}
                       onClearFilters={filtered ? clearFilters : undefined}

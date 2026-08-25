@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import type { ProjectQueue } from '../../src/index.js'
 import { agentOptionsFromPreferences } from '../../src/client.js'
-import { FastForward, ListTodo, Loader2, Play } from 'lucide-react'
+import { FastForward, ListTodo, Play } from 'lucide-react'
 import { queueEntryLabel } from '../lib/queue-entry.js'
 import { usePreferences } from '../lib/preferences.js'
 import { useStartAgent } from '../lib/use-start-agent.js'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
-import { Button } from './ui/button.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
+import { StartAgentButton } from './StartAgentButton.js'
 
 // The Overview's AI Queue card (#1139): every project's open `TODO_AGENTS.md` items — the work the
 // framework picks up on its own — grouped by project and shown in full. No "+N more": this is the
@@ -21,6 +21,9 @@ import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 // out, and that is still true — but it carries the project's batch act: a fan-out button that
 // starts one agent per top entry, as many as the count beside it says, each pinned to its own
 // entry the way the sweep pins a drain batch (#1204).
+//
+// Both starts are split buttons (#1507): the chevron beside each hands its prompt to the project's
+// launcher instead of spending an agent on the settings the card cannot show.
 //
 // Its own file rather than inline in DashboardPage, like every other card on the Overview:
 // DashboardPage has no test file, and opening tickets and starting runs are behaviour worth pinning.
@@ -55,6 +58,7 @@ export function AiQueue({
   loading,
   onOpenTicket,
   onAgentStarted,
+  onSelectProject,
 }: {
   queue: ProjectQueue[]
   loading: boolean
@@ -65,6 +69,8 @@ export function AiQueue({
    * Overview has no project selected — each entry knows its own — so the shell cannot supply it.
    */
   onAgentStarted: (projectId: string, intent: string, agentId?: string) => void
+  /** Where "Configure first, then run" lands (#1507): the entry's own project's launcher. */
+  onSelectProject: (id: string) => void
 }) {
   const preferences = usePreferences()
   const { busy, error, start } = useStartAgent()
@@ -80,6 +86,17 @@ export function AiQueue({
   const inFlight = busy || fanningOut !== null
 
   const fanOutCount = (projectId: string) => fanOutCounts[projectId] ?? DEFAULT_FAN_OUT_COUNT
+
+  /**
+   * The entries a fan-out click would take: the top of the queue, as many as the count beside the
+   * button says. One reading of "the top", shared by the click and by the "Configure first, then
+   * run" beside it — which sends the first of them, since a launcher can only ever send one agent.
+   */
+  const topEntries = (project: ProjectQueue) =>
+    project.items
+      .filter(item => !item.done)
+      .slice(0, fanOutCount(project.projectId))
+      .map(item => item.text)
 
   const agentEntry = async (projectId: string, entry: string) => {
     if (inFlight) return
@@ -102,10 +119,7 @@ export function AiQueue({
     // The top of the queue, one agent per entry: the same order the drain sweep picks in, and each
     // prompt pinned to its own entry for the same reason the sweep pins a batch (#1204) — several
     // agents told "the first open entry" would all implement the same one.
-    const entries = project.items
-      .filter(item => !item.done)
-      .slice(0, fanOutCount(project.projectId))
-      .map(item => item.text)
+    const entries = topEntries(project)
     setFanningOut(project.projectId)
     for (const entry of entries) {
       // One after another, the way the sweep spawns its batch: each start allocates a worktree and
@@ -171,28 +185,24 @@ export function AiQueue({
                     />
                     <TooltipContent>How many agents to spin up — one per entry, from the top of the queue.</TooltipContent>
                   </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger
-                      render={
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label={fanOutLabel(Math.min(fanOutCount(q.projectId), q.open))}
-                          disabled={inFlight}
-                          onClick={() => void fanOutProject(q)}
-                          className="shrink-0 text-muted-foreground hover:text-foreground"
-                        />
-                      }
-                    >
-                      {fanningOut === q.projectId ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-                      ) : (
-                        <FastForward className="h-3.5 w-3.5" aria-hidden />
-                      )}
-                    </TooltipTrigger>
-                    <TooltipContent>{fanOutLabel(Math.min(fanOutCount(q.projectId), q.open))}</TooltipContent>
-                  </Tooltip>
+                  {/* The batch, and beside it the launcher (#1507). The chevron sends the top
+                      entry alone: a launcher can only ever start one agent, which is why its
+                      wording says so rather than letting the two halves look like one act. */}
+                  <StartAgentButton
+                    variant="ghost"
+                    size="icon-sm"
+                    icon={<FastForward className="h-3.5 w-3.5" aria-hidden />}
+                    ariaLabel={fanOutLabel(Math.min(fanOutCount(q.projectId), q.open))}
+                    menuAriaLabel={`Other ways to spin up agents on ${q.projectName}'s queue`}
+                    tooltip={fanOutLabel(Math.min(fanOutCount(q.projectId), q.open))}
+                    busy={inFlight}
+                    starting={fanningOut === q.projectId}
+                    onStart={() => void fanOutProject(q)}
+                    onConfigure={() => onSelectProject(q.projectId)}
+                    prompt={workOnEntryPrompt(topEntries(q)[0] ?? '')}
+                    configureDescription="Opens the launcher with the top entry's prompt — one agent, not the batch."
+                    className="text-muted-foreground hover:text-foreground"
+                  />
                 </div>
                 <ul className="mt-1.5 space-y-1 pl-0.5">
                   {q.items
@@ -232,28 +242,21 @@ export function AiQueue({
                               {label.text}
                             </span>
                           )}
-                          <Tooltip>
-                            <TooltipTrigger
-                              render={
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon-sm"
-                                  aria-label="Spin up an agent working on this entry"
-                                  disabled={inFlight}
-                                  onClick={() => void agentEntry(q.projectId, item.text)}
-                                  className="shrink-0 text-muted-foreground hover:text-foreground"
-                                />
-                              }
-                            >
-                              {starting === key ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-                              ) : (
-                                <Play className="h-3.5 w-3.5" aria-hidden />
-                              )}
-                            </TooltipTrigger>
-                            <TooltipContent>Spin up an agent working on this entry</TooltipContent>
-                          </Tooltip>
+                          <StartAgentButton
+                            variant="ghost"
+                            size="icon-sm"
+                            icon={<Play className="h-3.5 w-3.5" aria-hidden />}
+                            ariaLabel="Spin up an agent working on this entry"
+                            menuAriaLabel={`Other ways to run ${label.text}`}
+                            tooltip="Spin up an agent working on this entry"
+                            busy={inFlight}
+                            starting={starting === key}
+                            onStart={() => void agentEntry(q.projectId, item.text)}
+                            onConfigure={() => onSelectProject(q.projectId)}
+                            prompt={workOnEntryPrompt(item.text)}
+                            configureDescription="Opens the launcher with this entry's prompt, so you can set the model and where it runs."
+                            className="text-muted-foreground hover:text-foreground"
+                          />
                         </li>
                       )
                     })}

@@ -5,7 +5,7 @@ import {
   DEFAULT_AUTO_PM_CONCURRENCY,
   agentOptionsFromPreferences,
 } from '../../src/client.js'
-import { CalendarClock, ChevronDown, Play } from 'lucide-react'
+import { CalendarClock, Play } from 'lucide-react'
 import { onProjects } from '../rpc/projects.js'
 import { sendAutoPmSweep } from '../rpc/quota.js'
 import { useAutoPm } from '../lib/quota.js'
@@ -13,20 +13,11 @@ import { usePreferences, updatePreferences } from '../lib/preferences.js'
 import { useStartAgent } from '../lib/use-start-agent.js'
 import { useLoaded } from '../lib/use-async.js'
 import { formatUntil } from '../lib/format-date.js'
-import { stashPendingDraft } from '../lib/draft-handoff.js'
 import { describeAgentSettings } from '../lib/agent-settings.js'
-import { cn } from '../lib/utils.js'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
-import { Button, buttonVariants } from './ui/button.js'
 import { Checkbox } from './ui/checkbox.js'
-import { OptionLabel } from './ui/option-label.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-} from './ui/dropdown-menu.js'
+import { StartAgentButton } from './StartAgentButton.js'
 
 // The Overview's "Routine work" card (#1159): the jobs the idle sweep fires on a schedule, each with
 // a Run now button that starts it against a project immediately.
@@ -151,25 +142,6 @@ export function RoutineWork({
   }
 
   /**
-   * "Configure first, then run" (#1507). Run now spends an agent on settings that are nowhere on
-   * this card: the model and where it runs come from the Global options, so the only way to change
-   * them was to leave, edit the preferences, and come back. This hands the same prompt to the
-   * launcher instead — where those controls are, and where the prompt itself can be edited before
-   * it is sent.
-   *
-   * The carry is the draft stash a hot ticket already uses (#1066/#1139) rather than a second
-   * mechanism: the launcher takes it once as it mounts, so nothing re-seeds on a reload.
-   *
-   * Not gated on `busy`: this starts nothing, and being unable to go and look at the settings
-   * because a start is in flight would be the opposite of the point.
-   */
-  const configureFirst = (job: AutoPmJob) => {
-    if (!projectId) return
-    stashPendingDraft(job.prompt)
-    onSelectProject(projectId)
-  }
-
-  /**
    * What a Run now is about to spend, said before it is spent (#1506). The card fires prompts on
    * settings that are nowhere on it: the model and where it runs come from the Global options, a
    * page away, so the button's own cost was invisible right up until the agent existed.
@@ -263,28 +235,31 @@ export function RoutineWork({
                       )}
                     </span>
                   </label>
-                  {/* A split button, not a hover-revealed second control (#1507): the routine
-                      it belongs to is not always the row the pointer is on, and a control that
-                      only exists under a mouse is reachable by neither keyboard nor touch. The
-                      chevron is the secondary half, so the common click stays one click. */}
-                  <div className="flex shrink-0 items-center">
-                    <Tooltip>
-                      <TooltipTrigger
-                        render={
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="xs"
-                            disabled={busy || !projectId}
-                            onClick={() => void runNow(job)}
-                            className="rounded-r-none border-r-0"
-                          />
-                        }
-                      >
-                        <Play className="h-3 w-3" aria-hidden />
-                        {starting === job.name ? 'Starting…' : 'Run now'}
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-[22rem] space-y-1">
+                  {/* The shared start button (#1507): Run now, and beside it the chevron that
+                      opens the launcher with the same prompt instead of spending an agent on it. */}
+                  <StartAgentButton
+                    icon={<Play className="h-3 w-3" aria-hidden />}
+                    label="Run now"
+                    menuAriaLabel={`Other ways to run ${job.label ?? job.name}`}
+                    busy={busy}
+                    starting={starting === job.name}
+                    disabled={!projectId}
+                    onStart={() => void runNow(job)}
+                    onConfigure={() => projectId && onSelectProject(projectId)}
+                    prompt={job.prompt}
+                    /* A fan-out routine's Run now is a sweep, and the launcher can only ever send
+                       one agent — so this row's secondary action really is a different job, and
+                       says so rather than looking like the same one. Both fan-out routines
+                       (#1204), not just the drain: the same sentence is true the moment a Run now
+                       stops being one start. */
+                    configureDescription={
+                      job.drains || job.fansOut
+                        ? 'Opens the launcher with this prompt — one agent, not the fan-out.'
+                        : 'Opens the launcher with this prompt, so you can set the model and where it runs.'
+                    }
+                    tooltipClassName="max-w-[22rem] space-y-1"
+                    tooltip={
+                      <>
                         {job.tooltip && <span className="block">{job.tooltip}</span>}
                         {/* The drain row's Run now is the sweep, so neither half of the settings
                             line would be true of it: the sweep resolves each project's own
@@ -304,40 +279,9 @@ export function RoutineWork({
                               ? `Starts up to ${concurrency} ${concurrency === 1 ? 'agent' : 'agents'}${projectName ? ` in ${projectName}` : ''}, one per open ticket, unattended.`
                               : `Starts one agent${projectName ? ` in ${projectName}` : ''}, unattended — nothing is asked mid-run.`}
                         </span>
-                      </TooltipContent>
-                    </Tooltip>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        type="button"
-                        disabled={!projectId}
-                        aria-label={`Other ways to run ${job.label ?? job.name}`}
-                        className={cn(buttonVariants({ variant: 'outline', size: 'xs' }), 'rounded-l-none px-1.5')}
-                      >
-                        <ChevronDown className="h-3 w-3" aria-hidden />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="max-w-[20rem]">
-                        <DropdownMenuItem
-                          disabled={!projectId}
-                          onClick={() => configureFirst(job)}
-                          className="items-start"
-                        >
-                          <OptionLabel
-                            label="Configure first, then run"
-                            /* A fan-out routine's Run now is a sweep, and the launcher can only
-                               ever send one agent — so this row's secondary action really is a
-                               different job, and says so rather than looking like the same one.
-                               Both fan-out routines (#1204), not just the drain: the same
-                               sentence is true the moment a Run now stops being one start. */
-                            description={
-                              job.drains || job.fansOut
-                                ? 'Opens the launcher with this prompt — one agent, not the fan-out.'
-                                : 'Opens the launcher with this prompt, so you can set the model and where it runs.'
-                            }
-                          />
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
+                      </>
+                    }
+                  />
                 </li>
               ))}
             </ul>

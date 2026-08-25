@@ -124,9 +124,6 @@ describe('OpenQuestions jump-nav (#1455 bonus 1)', () => {
 
 describe('OpenQuestions answered collapse (#1455 bonus 2)', () => {
   test('answering collapses the card to a ✓ line in place, and the header counts only open ones', async () => {
-    // A defined result is the ChoicePanel's "posted and accepted" condition, which is what
-    // fires onAnswered — the default undefined models a failed post and must not collapse.
-    sendChoice.mockResolvedValue(null)
     onOpenQuestions.mockResolvedValue([question()])
     render(<OpenQuestions onOpenAgent={vi.fn()} />)
     await waitFor(() => expect(screen.getByText('Work on it')).toBeTruthy())
@@ -139,7 +136,6 @@ describe('OpenQuestions answered collapse (#1455 bonus 2)', () => {
   })
 
   test('expanding an answered card shows the options with the pick marked, and still opens the session', async () => {
-    sendChoice.mockResolvedValue(null)
     onOpenQuestions.mockResolvedValue([question()])
     const onOpenAgent = vi.fn()
     render(<OpenQuestions onOpenAgent={onOpenAgent} />)

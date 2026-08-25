@@ -75,9 +75,11 @@ export function ChoicePanel({
 
   const post = (pick: string | string[], by: 'user' | 'autopilot' = 'user') => {
     const deliver = send ?? ((p: string | string[], b: 'user' | 'autopilot') => sendChoice(projectId, choice.id, p, b, agentId ?? undefined))
-    void run(() => deliver(pick, by), 'Could not send your choice — try again.').then(
-      result => {
-        if (result !== undefined) {
+    // Both deliverers resolve void and run() reports failure as undefined, so map a delivered
+    // pick to a value — otherwise success is indistinguishable from a failed post.
+    void run(() => deliver(pick, by).then(() => true as const), 'Could not send your choice — try again.').then(
+      delivered => {
+        if (delivered) {
           setSent(true)
           onAnswered?.(pick)
         }

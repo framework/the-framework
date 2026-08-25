@@ -360,14 +360,9 @@ function validateEvents(body: unknown, now: Date): BridgeEvent[] | string {
 
 /** `POST /_bridge/statuses`: what claude.ai's session list says about each watched session (#1332). */
 async function handleStatuses(req: IncomingMessage, res: ServerResponse, handlers: BridgeHandlers): Promise<void> {
-  if (req.method !== 'POST') return end(res, 405, 'method not allowed', { allow: 'POST' })
-  let body: unknown
-  try {
-    body = await readJsonBody(req, MAX_BODY)
-  } catch (err) {
-    return end(res, 400, (err as Error).message)
-  }
-  const statuses = validateStatuses(body, (handlers.now ?? (() => new Date()))())
+  const body = await readPost(req, res, MAX_BODY)
+  if (body === undefined) return
+  const statuses = validateStatuses(body, now(handlers))
   if (typeof statuses === 'string') return end(res, 400, statuses)
   handlers.statuses?.(statuses)
   end(res, 204, '')

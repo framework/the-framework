@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { continuationPrompt, takeoverPrompt } from '../turn-gate.js'
 import type { BridgeEvent, BridgeHello, BridgeQuestion, BridgeSessionStatus } from './bridge-endpoints.js'
+import { CLOUD_SESSION_WINDOW_MS } from '../cloud-run-state.js'
 
 /**
  * An answer picked in the dashboard, on its way back to the session (#1237).
@@ -128,9 +129,14 @@ export class BridgeQuestions {
    * Whether the session is waiting on a human: the bridge holds the question it is parked on, or
    * claude.ai's list shows it awaiting input — a question asked in prose carries no block for
    * the bridge to hold, and the list is the only thing that says the session stopped for it.
+   *
+   * A list status older than the session window no longer counts: the Driver stops reading a
+   * session past the window, so its last word would otherwise stand forever.
    */
-  waiting(sessionId: string): boolean {
-    return this.bySession.has(sessionId) || this.statusBySession.get(sessionId)?.status === 'awaiting'
+  waiting(sessionId: string, now = new Date()): boolean {
+    if (this.bySession.has(sessionId)) return true
+    const status = this.statusBySession.get(sessionId)
+    return status?.status === 'awaiting' && now.getTime() - Date.parse(status.at) <= CLOUD_SESSION_WINDOW_MS
   }
 
   /**
@@ -227,6 +233,15 @@ export class BridgeQuestions {
   pendingAnswer(sessionId: string): BridgeAnswer | undefined {
     const answer = this.answersBySession.get(sessionId)
     return answer?.state === 'queued' ? answer : undefined
+  }
+
+  /**
+   * Every session with an answer waiting to be delivered. The Driver serves these whatever the
+   * session window says: the page reports whichever session the user is on, so a pick can be for
+   * a session no listed run carries, and one nothing serves would sit queued forever.
+   */
+  pendingAnswerSessions(): string[] {
+    return [...this.answersBySession.values()].filter(answer => answer.state === 'queued').map(answer => answer.sessionId)
   }
 
   /** The session's answer in whatever state, for the dashboard to render. */

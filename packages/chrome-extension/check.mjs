@@ -467,13 +467,16 @@ const SESSIONS = [
 function appPage({ sessions = SESSIONS, firstPage = 6, sendAppendsRow = true } = {}) {
   const sidebarRow = s => `<a href="/code/${s.id}" data-roving-item=""><span aria-label="${s.label}"></span><span>${s.title}</span></a>`
   const composer = `<div contenteditable="true"></div><button aria-label="Send message" id="send"></button>`
+  // The new-session page's chips as the live one renders them with a repository remembered, so a
+  // creation asked of the Driver can succeed here without a picker.
+  const chips = `<button role="combobox" id="repo">the-framework</button><button role="combobox" id="branch">main</button>`
   // The middle panel's own "Show N more" sits deep in its card — on the live page, twenty-eight
   // levels from the sidebar's rows — and must never be taken for the list's.
   const panel = `<section><div><div><div><div>Sessions</div><button id="decoy">Show 2 more</button></div></div></div></section>`
   const dom = new JSDOM(
     `<!doctype html><html><body><div id="app">
       <nav id="sidebar"><a href="/code" id="new">New</a><div id="rows">${sessions.slice(0, firstPage).map(sidebarRow).join('')}</div>${sessions.length > firstPage ? '<button id="more">Show 20 more</button>' : ''}</nav>
-      <main id="main">${panel}${composer}</main>
+      <main id="main">${panel}${chips}${composer}</main>
     </div></body></html>`,
     { url: 'https://claude.ai/code', runScripts: 'outside-only' },
   )
@@ -487,6 +490,14 @@ function appPage({ sessions = SESSIONS, firstPage = 6, sendAppendsRow = true } =
       const text = box.textContent
       seen.sent.push({ path: w.location.pathname, text })
       box.textContent = ''
+      if (w.location.pathname === '/code') {
+        // A send from the new-session page creates a session, as the live page does.
+        w.history.pushState({}, '', '/code/session_01NEW')
+        seen.navigations.push('create')
+        d.getElementById('main').innerHTML = feedFor({ question: false }) + composer
+        wireMain()
+        return
+      }
       if (sendAppendsRow) d.querySelector('[role="feed"]')?.insertAdjacentHTML('beforeend', row('human', 2, `<p>${text}</p>`))
     })
   }
@@ -506,7 +517,7 @@ function appPage({ sessions = SESSIONS, firstPage = 6, sendAppendsRow = true } =
     e.preventDefault()
     w.history.pushState({}, '', '/code')
     seen.navigations.push('home')
-    d.getElementById('main').innerHTML = panel + composer
+    d.getElementById('main').innerHTML = panel + chips + composer
     wireMain()
   })
   d.getElementById('more')?.addEventListener('click', () => {
@@ -522,6 +533,8 @@ function appPage({ sessions = SESSIONS, firstPage = 6, sendAppendsRow = true } =
   wireMain()
   w.__tfComposerWaitMs = 500
   w.__tfSettleMs = 10
+  w.__tfMenuSettleMs = 10
+  w.__tfSessionWaitMs = 2000
   w.eval(script)
   return { dom, w, d, seen }
 }
@@ -610,6 +623,50 @@ function appPage({ sessions = SESSIONS, firstPage = 6, sendAppendsRow = true } =
   const ok = result.visited[0].ok === false && result.visited[0].note === 'not on the list' && result.delivered.length === 0
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'}  a session missing from the list is not visited and its answer is not claimed  (${JSON.stringify(result.visited[0])})`)
+  dom.window.close()
+}
+
+{
+  // The session the daemon asked for is created first, from the list page the cycle starts on,
+  // before any visit — a run is waiting on it — and the cycle still ends on the list.
+  const { dom, w, seen } = appPage()
+  const result = await w.__tfBridgeDrive({
+    visits: [{ id: 'session_01UNREAD', status: 'unread', answer: { id: 'ans-4', text: 'Work on the next TODO' } }],
+    start: { repo: 'framework/the-framework', branch: 'main', prompt: 'Add the thing' },
+  })
+  const ok =
+    result.started?.ok === true &&
+    result.started.sessionId === 'session_01NEW' &&
+    JSON.stringify(seen.navigations) === JSON.stringify(['create', 'session_01UNREAD', 'home']) &&
+    JSON.stringify(seen.sent.map(s => [s.path, s.text])) === JSON.stringify([['/code', 'Add the thing'], ['/code/session_01UNREAD', 'Work on the next TODO']]) &&
+    result.delivered[0]?.ok === true &&
+    w.location.pathname === '/code'
+  if (!ok) failed++
+  console.log(`${ok ? 'PASS' : 'FAIL'}  the requested session is created before the visits, and the cycle ends on the list  (started=${JSON.stringify(result.started)}, nav=${seen.navigations.join('>')}, sent=${JSON.stringify(seen.sent)})`)
+  dom.window.close()
+}
+
+{
+  // A second instruction while a drive runs is refused as busy, never run alongside it.
+  const { dom, w } = appPage()
+  const first = w.__tfBridgeDrive({ visits: [{ id: 'session_01AWAIT', status: 'awaiting' }] })
+  const second = await w.__tfBridgeReadSessionList(['session_01AWAIT'])
+  const done = await first
+  const ok = second.ok === false && second.busy === true && done.ok && done.visited[0]?.ok === true
+  if (!ok) failed++
+  console.log(`${ok ? 'PASS' : 'FAIL'}  a list read during a drive is refused as busy and the drive completes  (second=${JSON.stringify(second)}, first=${done.visited?.[0]?.ok})`)
+  dom.window.close()
+}
+
+{
+  // A row carrying a pull-request label and a status word is the status word's: a session that
+  // opened a pull request and then stopped for its user is still awaiting.
+  const { dom, w, d } = appPage()
+  d.querySelector('a[href="/code/session_01AWAIT"]').insertAdjacentHTML('afterbegin', '<span aria-label="#1700 · Open"></span>')
+  const got = await w.__tfBridgeReadSessionList(['session_01AWAIT'])
+  const ok = got.statuses[0].status === 'awaiting'
+  if (!ok) failed++
+  console.log(`${ok ? 'PASS' : 'FAIL'}  a status word on the row beats its pull-request label  (${JSON.stringify(got.statuses[0])})`)
   dom.window.close()
 }
 

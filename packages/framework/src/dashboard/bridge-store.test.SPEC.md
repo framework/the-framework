@@ -10,6 +10,7 @@ What the tests cover: queuing, delivering and withdrawing the answer to a questi
 - A delivery report that names an older answer is ignored, so a stale report cannot resolve a newer pick or drop the question.
 - A pick that was never collected is discarded when the cloud session moves on to a different question, so an answer is never typed into a question nobody asked.
 - A session claude.ai's list shows awaiting input is waiting even with no question parked; a newer list status replaces the older; a parked question makes it waiting whatever the list said; clearing the session drops the status with the rest.
+- A list status older than the session window no longer marks the session waiting.
 
 ## Before modifying/creating SPEC.md files
 

@@ -148,3 +148,11 @@ test("claude.ai's list saying a session awaits input makes it waiting, until the
   assert.equal(store.waiting(SESSION), false)
   assert.equal(store.status(SESSION), undefined)
 })
+
+test('a list status older than the session window no longer marks the session waiting (#1332)', () => {
+  const store = new BridgeQuestions()
+  store.recordStatus({ sessionId: SESSION, status: 'awaiting', at: '2026-08-25T06:00:00.000Z' })
+  assert.equal(store.waiting(SESSION, new Date('2026-08-25T17:59:00.000Z')), true)
+  // Past the window the Driver no longer reads the session, so its last word cannot stand forever.
+  assert.equal(store.waiting(SESSION, new Date('2026-08-25T18:01:00.000Z')), false)
+})

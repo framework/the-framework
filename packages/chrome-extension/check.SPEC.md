@@ -41,6 +41,9 @@ The Driver, on a synthetic app built like the live one was observed to be — a 
 - A cycle visits the sessions it was given in-app, reports the parked question from the awaiting one, types the queued answer into the other and counts it sent only once the page took the send, returns to the list, and keeps the overlay up — with its heading, its debug log naming the visits, and the panel hidden; the overlay comes back after being removed.
 - An answer the page did not take is reported as failed, naming what the page did, never as sent.
 - A session missing from the list is not visited and its answer is not claimed.
+- The session the worker asked for is created first, from the list page, before the visits, and the cycle still ends on the list.
+- A second instruction while a drive runs is refused as busy, and the drive completes.
+- A status word on a row beats its pull-request label.
 
 The visit planner: a parked session is visited when never seen, when its status changed, and again after five minutes; a queued answer forces a visit whatever the status; idle, running, landed and missing sessions are never visited on their own.
 

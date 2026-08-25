@@ -84,7 +84,7 @@ A cloud session asks its question in prose rather than as a choice block, or the
 
 #### Business logic
 
-The last status the Driver reported for each cloud session is kept — the newest replaces the older — and read back per session. A session is waiting on a human when a question is parked for it or when its last list status is awaiting input; that is what marks its agent as waiting on the way to the dashboard.
+The last status the Driver reported for each cloud session is kept — the newest replaces the older — and read back per session. A session is waiting on a human when a question is parked for it, or when its last list status is awaiting input and that status is younger than the session window (twelve hours) — past the window the Driver no longer reads the session, so its last word would otherwise stand forever; that is what marks its agent as waiting on the way to the dashboard. The store also names every session holding a queued answer, so the daemon can have the Driver serve them whatever the session window says.
 
 #### Rationale
 

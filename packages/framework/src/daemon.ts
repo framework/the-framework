@@ -298,5 +298,5 @@ function waitForShutdown(signal?: AbortSignal): Promise<void> {
 async function listBridgeSessions(env: NodeJS.ProcessEnv): Promise<BridgeSession[]> {
   const projects = await listProjects(undefined, env).catch(() => [])
   const agents = (await Promise.all(projects.map(p => readAllAgents(p.path).catch(() => [])))).flat()
-  return bridgeSessionsFrom(agents, new Date(), sessionId => bridgeQuestions().pendingAnswer(sessionId) !== undefined)
+  return bridgeSessionsFrom(agents, new Date(), bridgeQuestions().pendingAnswerSessions())
 }

@@ -17,13 +17,20 @@ export const BRIDGE_SESSION_WINDOW_MS = CLOUD_SESSION_WINDOW_MS
  * ends the agent at the hand-off, so every one of them reads `done` whether its session is parked
  * on a question or finished an hour ago. The read-back that tells those apart is the list status
  * the Driver reports, and that lives in the bridge store, not on the record.
+ *
+ * `queuedFor` names every session the dashboard holds an answer for. Those are served whatever
+ * the window says — appended after the recent ones when no run of the window carries them —
+ * because a pick is made on a question the page reported, and the page reports whichever session
+ * the user happens to be on: outside the window, or no run's at all. A pick nothing serves would
+ * sit queued forever.
  */
 export function bridgeSessionsFrom(
   agents: readonly AgentMeta[],
   now: Date,
-  answerQueued: (sessionId: string) => boolean,
+  queuedFor: readonly string[],
   windowMs = BRIDGE_SESSION_WINDOW_MS,
 ): BridgeSession[] {
+  const queued = new Set(queuedFor)
   const cutoff = now.getTime() - windowMs
   const seen = new Set<string>()
   const out: { session: BridgeSession; at: number }[] = []
@@ -34,9 +41,11 @@ export function bridgeSessionsFrom(
     if (seen.has(agent.sessionId)) continue
     seen.add(agent.sessionId)
     out.push({
-      session: { id: agent.sessionId, url: `https://claude.ai/code/${agent.sessionId}`, answerQueued: answerQueued(agent.sessionId) },
+      session: { id: agent.sessionId, url: `https://claude.ai/code/${agent.sessionId}`, answerQueued: queued.has(agent.sessionId) },
       at,
     })
   }
-  return out.sort((a, b) => b.at - a.at).map(entry => entry.session)
+  const recent = out.sort((a, b) => b.at - a.at).map(entry => entry.session)
+  const extra = queuedFor.filter(id => !seen.has(id)).map(id => ({ id, url: `https://claude.ai/code/${id}`, answerQueued: true }))
+  return [...recent, ...extra]
 }

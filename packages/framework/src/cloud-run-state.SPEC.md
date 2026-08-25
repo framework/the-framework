@@ -11,7 +11,7 @@ A user hands a task to Claude web and later glances at the dashboard. The agent'
 ## Business logic — TL;DR
 
 - **Only a settled web agent has a cloud state** - a local agent, or a web agent still handing off, stopped or failed, keeps its stored status as its word.
-- **Waiting beats everything** - the browser bridge reporting the agent's session as waiting on a human — it holds the session's parked question, or claude.ai's session list shows the session awaiting input — makes it "waiting", however old the agent is.
+- **Waiting beats everything** - the browser bridge reporting the agent's session as waiting on a human — it holds the session's parked question, or claude.ai's session list shows the session awaiting input — makes it "waiting", however old the agent is (a list status older than the session window no longer counts).
 - **Adopted work speaks as a local agent's would** - a pull request merged by the framework reads "merged"; any other recorded pull request means the agent is "done", its pull request badge carrying the live state.
 - **Otherwise age decides** - inside the session window with no pull request the session is "in cloud"; past it, the agent is "done" — the session finished or never pushed.
 - **At work means in cloud or waiting** - those two states count the agent among the agents working now; the settled ones do not.
@@ -28,7 +28,7 @@ See `## User story`.
 
 The rule applies only to a `web`-target agent whose status is done — done being what the hand-off leaves behind, since the local half ends the moment the task is handed over. Any other agent has no cloud state and its status is the word.
 
-For such an agent, in this order: if the browser bridge reports the session waiting on a human — it holds the session's parked question, or claude.ai's session list shows it awaiting input — the agent is waiting; else if the framework merged its pull request, it is merged; else if it has a pull request, it is done — the pull request's own state is not on the record and is read live wherever its badge shows, so the word is the same a local agent with a pull request gets; else if the agent started within the session window, the session is assumed to be still working and the agent is in cloud; else it is done. A start time that cannot be read counts as outside the window — "in cloud forever" is the lie this rule exists to end, so the doubt resolves to done.
+For such an agent, in this order: if the browser bridge reports the session waiting on a human — it holds the session's parked question, or claude.ai's session list showed it awaiting input within the session window — the agent is waiting; else if the framework merged its pull request, it is merged; else if it has a pull request, it is done — the pull request's own state is not on the record and is read live wherever its badge shows, so the word is the same a local agent with a pull request gets; else if the agent started within the session window, the session is assumed to be still working and the agent is in cloud; else it is done. A start time that cannot be read counts as outside the window — "in cloud forever" is the lie this rule exists to end, so the doubt resolves to done.
 
 #### Rationale
 

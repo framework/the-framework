@@ -189,6 +189,14 @@ const LIST_REFRESH_MS = 60_000
 const TAB_LOAD_MS = 30_000
 const SCRIPT_RETRIES = 10
 
+/**
+ * Most visits handed to the Driver in one cycle, answers first. One drive is one message this
+ * worker waits on, and Chrome ends a worker whose single call has run five minutes — the cycle
+ * log lines reset only the separate idle clock. Four visits and a creation keep well under it
+ * even on a slow page; the rest wait for the next beat.
+ */
+const MAX_VISITS = 4
+
 /** A cycle in flight, so the next alarm does not start a second one over it. */
 let cycling = false
 /** When the Driver's page was last loaded fresh. In memory: a new worker reloads once, which is fine. */
@@ -196,9 +204,17 @@ let lastReloadAt = 0
 /** What the list said and when the session was last visited, per session — the sticky-state memory `planVisits` reads. */
 const seen = new Map()
 
+/**
+ * The Driver's bookkeeping that is only good for one browser session — its tab id, and the pause
+ * that closing it leaves — is kept in session storage: Chrome empties it on a browser restart and
+ * keeps it across worker restarts. A tab id from an earlier browser session would name whatever
+ * tab happens to carry that number now, which is not a tab to drive.
+ */
+const driverState = chrome.storage.session
+
 /** The tab id the Driver runs in, or undefined. Stored, so a restarted worker finds its tab again. */
 async function driverTabId() {
-  const { driverTabId } = await chrome.storage.local.get('driverTabId')
+  const { driverTabId } = await driverState.get('driverTabId')
   return driverTabId ?? undefined
 }
 
@@ -229,22 +245,18 @@ function tabLoaded(tabId) {
 }
 
 /**
- * The Driver tab, opened if there is none. A stored tab that is gone is replaced; one that
- * wandered off claude.ai is brought back. On a browser restart Chrome restores pinned tabs under
- * new ids, so a lone pinned claude.ai/code tab is adopted rather than doubled.
+ * The Driver tab, opened if there is none. A stored tab that is gone, or that someone moved off
+ * claude.ai, is forgotten and replaced — whoever moved it keeps it; a tab is never navigated to
+ * make it ours. On a browser restart Chrome restores pinned tabs under new ids and the stored id
+ * is gone with the session, so a lone pinned claude.ai/code tab is adopted rather than doubled; a
+ * restored tab carries no other mark, so this cannot tell it from one the user pinned themselves.
  */
 async function ensureDriverTab() {
   const stored = await driverTabId()
   if (stored != null) {
     const tab = await chrome.tabs.get(stored).catch(() => undefined)
-    if (tab) {
-      if (!(tab.url ?? '').startsWith('https://claude.ai/')) {
-        await chrome.tabs.update(tab.id, { url: DRIVER_URL })
-        await tabLoaded(tab.id)
-        lastReloadAt = Date.now()
-      }
-      return tab
-    }
+    if (tab && (tab.url ?? '').startsWith('https://claude.ai/')) return tab
+    await driverState.set({ driverTabId: null })
   }
   const pinned = await chrome.tabs.query({ url: `${DRIVER_URL}*`, pinned: true })
   let tab = pinned.length === 1 ? pinned[0] : undefined
@@ -253,7 +265,7 @@ async function ensureDriverTab() {
     await tabLoaded(tab.id)
     lastReloadAt = Date.now()
   }
-  await chrome.storage.local.set({ driverTabId: tab.id })
+  await driverState.set({ driverTabId: tab.id })
   return tab
 }
 
@@ -267,7 +279,9 @@ async function reloadDriver(tabId) {
 /**
  * Hand a message to the Driver's content script, retrying while it is still being injected.
  * A script orphaned by an extension reload cannot hear us at all; the tab is ours, so one reload
- * revives it before the retries continue.
+ * revives it before the retries continue. A tab that is gone, or a drive whose page was torn
+ * down after taking the message, is a failure rather than a throw or a re-send: the answers
+ * handed over must still be accounted for, and a drive is not idempotent.
  */
 async function askDriver(tabId, message) {
   let lastErr
@@ -278,9 +292,18 @@ async function askDriver(tabId, message) {
       if (outcome) return outcome
     } catch (err) {
       lastErr = err
+      // A port that closed after the page took the message means the page acted and was then
+      // torn down — a reload under it, a sign-in bounce. The answer may already be typed.
+      if (message.type === 'tf-drive' && /port closed/i.test(String(err?.message ?? ''))) {
+        return { ok: false, tornDown: true, note: 'the Driver page was torn down mid-drive; an answer handed over may or may not have been typed — check the session before picking again' }
+      }
       if (i >= 2 && !reloaded) {
         reloaded = true
-        await reloadDriver(tabId)
+        try {
+          await reloadDriver(tabId)
+        } catch (reloadErr) {
+          return { ok: false, note: `the Driver tab is gone: ${String(reloadErr?.message ?? reloadErr)}` }
+        }
         continue
       }
     }
@@ -303,13 +326,22 @@ async function cycle() {
 }
 
 async function runCycle() {
-  const { daemonUrl, token, autoOpen, driverPaused } = await chrome.storage.local.get(['daemonUrl', 'token', 'autoOpen', 'driverPaused'])
+  const { daemonUrl, token, autoOpen } = await chrome.storage.local.get(['daemonUrl', 'token', 'autoOpen'])
   if (!token) return { ok: false, reason: 'no token set' }
-  // Opt-in: driving a tab on someone's behalf should be asked for, not assumed.
-  if (autoOpen === false) return { ok: false, reason: 'the Driver tab is switched off' }
-  if (driverPaused) return { ok: false, reason: 'the Driver tab was closed; "Open the Driver tab" on the options page resumes it' }
   const base = (daemonUrl || DEFAULT_DAEMON).replace(/\/+$/, '')
+  // Whatever the Driver's state, what is owed to the daemon is paid first: acknowledgements that
+  // never landed, and — with the Driver off or paused — an honest failure for any session request,
+  // since one left queued would be created hours later, for a run long gone.
   for (const body of [...pendingAcks.values()]) await ack(base, token, body)
+  const { driverPaused } = await driverState.get('driverPaused')
+  // Opt-in: driving a tab on someone's behalf should be asked for, not assumed.
+  const stopped =
+    autoOpen === false ? 'the Driver tab is switched off' : driverPaused ? 'the Driver tab was closed; "Open the Driver tab" on the options page resumes it' : undefined
+  if (stopped) {
+    const start = await claimStart(base, token)
+    if (start) await reportStarted(base, token, start.id, { ok: false, note: stopped })
+    return { ok: false, reason: stopped }
+  }
 
   let sessions
   try {
@@ -337,7 +369,9 @@ async function runCycle() {
   if (ids.length && Date.now() - lastReloadAt >= LIST_REFRESH_MS) await reloadDriver(tab.id)
   const read = ids.length ? await askDriver(tab.id, { type: 'tf-read-list', ids }) : { ok: true, statuses: [] }
   if (!read.ok) {
-    if (start) await reportStarted(base, token, start.id, { ok: false, note: read.note })
+    // A Driver still busy with an earlier cycle's drive is left alone, claim included: the claim
+    // expires on the daemon and the request is offered again once the page is free.
+    if (start && !read.busy) await reportStarted(base, token, start.id, { ok: false, note: read.note })
     return { ok: false, reason: read.note ?? 'the Driver could not read the session list' }
   }
   const statuses = Array.isArray(read.statuses) ? read.statuses : []
@@ -346,30 +380,48 @@ async function runCycle() {
   }
 
   const now = Date.now()
-  const visits = planVisits(statuses, answers, seen, now)
+  const planned = planVisits(statuses, answers, seen, now)
+  // Answers first, then a bounded handful of parked sessions; what is cut waits for the next
+  // beat, with the change that made it due kept pending below.
+  const visits = [...planned.filter(v => v.answer), ...planned.filter(v => !v.answer)].slice(0, MAX_VISITS)
   for (const visit of visits) if (visit.answer) deliveredAnswers.add(visit.answer.id)
   const driven =
     visits.length || start
       ? await askDriver(tab.id, { type: 'tf-drive', visits, ...(start ? { start: { repo: start.repo, branch: start.branch, prompt: start.prompt } } : {}) })
       : { ok: true, visited: [], delivered: [] }
+  if (driven.busy) {
+    // The page is still on an earlier cycle's drive — a worker that ended mid-cycle leaves the
+    // page driving. Nothing was handed over, so nothing is claimed, acknowledged or reported; the
+    // next beat tries again, and the daemon's claim on the session request expires on its own.
+    for (const visit of visits) if (visit.answer) deliveredAnswers.delete(visit.answer.id)
+    return { ok: false, reason: driven.note ?? 'the Driver is still busy with an earlier cycle' }
+  }
   const visited = Array.isArray(driven.visited) ? driven.visited : []
   const delivered = Array.isArray(driven.delivered) ? driven.delivered : []
+  // A session planned but not reached this beat — cut by the cap, or a visit that failed — keeps
+  // its earlier status, so the change that made it due is still a change next time.
+  const unreached = id => planned.some(v => v.id === id) && !visited.some(v => v.id === id && v.ok)
   for (const { sessionId, status } of statuses) {
+    if (unreached(sessionId)) continue
     const before = seen.get(sessionId)
     seen.set(sessionId, { status, visitedAt: visited.some(v => v.id === sessionId && v.ok) ? now : (before?.visitedAt ?? 0) })
   }
-  // Every answer handed over is accounted for: delivered as the page reported, or failed with
-  // the reason the visit never got to it. A failure releases the claim so it can be retried.
+  // Every answer handed over is accounted for. A delivery the page attempted is acknowledged as
+  // it reported it, sent or failed. One the visit never got to — the session not on the list,
+  // the page not becoming it, a Driver that did not answer — stays queued on the daemon and is
+  // released here, so the next beat tries again. The one exception is a page torn down
+  // mid-drive: its answer may already be typed, so that is acknowledged as failed with a note
+  // saying to check the session before picking again.
   for (const visit of visits) {
     if (!visit.answer) continue
-    const outcome = delivered.find(d => d.id === visit.answer.id) ?? {
-      sessionId: visit.id,
-      id: visit.answer.id,
-      ok: false,
-      note: visited.find(v => v.id === visit.id)?.note ?? driven.note ?? 'the Driver did not reach the session',
+    const outcome = delivered.find(d => d.id === visit.answer.id)
+    if (!outcome && !driven.tornDown) {
+      deliveredAnswers.delete(visit.answer.id)
+      continue
     }
-    if (!outcome.ok) deliveredAnswers.delete(visit.answer.id)
-    await ack(base, token, { sessionId: outcome.sessionId, id: outcome.id, ok: Boolean(outcome.ok), ...(outcome.note ? { note: String(outcome.note).slice(0, 300) } : {}) })
+    const report = outcome ?? { sessionId: visit.id, id: visit.answer.id, ok: false, note: driven.note }
+    if (!report.ok) deliveredAnswers.delete(visit.answer.id)
+    await ack(base, token, { sessionId: report.sessionId, id: report.id, ok: Boolean(report.ok), ...(report.note ? { note: String(report.note).slice(0, 300) } : {}) })
   }
   if (start) await reportStarted(base, token, start.id, driven.started ?? { ok: false, note: driven.note ?? 'the Driver did not create the session' })
 
@@ -380,7 +432,7 @@ async function runCycle() {
   }
   return {
     ok: driven.ok !== false,
-    reason: `read ${statuses.length} of ${ids.length} (${counts.awaiting} awaiting, ${counts.unread} unread, ${counts.missing} missing), visited ${visited.length}, typed ${delivered.filter(d => d.ok).length}${start ? `, created ${driven.started?.ok ? driven.started.sessionId : 'nothing: ' + (driven.started?.note ?? driven.note ?? 'unknown')}` : ''}`,
+    reason: `read ${statuses.length} of ${ids.length} (${counts.awaiting} awaiting, ${counts.unread} unread, ${counts.missing} missing), visited ${visited.length}${planned.length > visits.length ? ` of ${planned.length} due` : ''}, typed ${delivered.filter(d => d.ok).length}${start ? `, created ${driven.started?.ok ? driven.started.sessionId : 'nothing: ' + (driven.started?.note ?? driven.note ?? 'unknown')}` : ''}${driven.note ? `; ${driven.note}` : ''}`,
   }
 }
 
@@ -405,19 +457,17 @@ async function reportStarted(base, token, id, outcome) {
 
 /** The options page's button: resume a paused Driver and run a cycle now. */
 async function openDriverNow() {
-  await chrome.storage.local.set({ driverPaused: false })
+  await driverState.set({ driverPaused: false })
   return cycle()
 }
 
 // Closing the Driver tab is the user saying stop: the bridge pauses until they reopen it from
 // the options page or restart the browser, rather than the tab reappearing half a minute later.
-chrome.tabs.onRemoved.addListener(async tabId => {
+// Closing the window it sits in is not that — Chrome keeps running without a window — so the
+// tab is merely forgotten and reopened in the next one.
+chrome.tabs.onRemoved.addListener(async (tabId, info) => {
   if (tabId !== (await driverTabId())) return
-  await chrome.storage.local.set({ driverTabId: null, driverPaused: true })
-})
-
-chrome.runtime.onStartup.addListener(() => {
-  void chrome.storage.local.set({ driverTabId: null, driverPaused: false })
+  await driverState.set({ driverTabId: null, driverPaused: !info.isWindowClosing })
 })
 
 // An alarm rather than setInterval: an MV3 service worker is terminated when idle, and a timer

@@ -17,13 +17,13 @@ A `web`-target agent hands its task to a cloud session and ends; nothing streams
 - **What comes back is text, not an option** - the daemon composes what is typed into the session out of the option the user picked; the worker relays it without composing or editing anything.
 - **Every call states the extension's version** - each daemon request carries `x-tf-extension-version`, and a daemon expecting another version refuses it outright rather than half-working.
 - **A repeat of the same question costs nothing** - a question identical to the last one accepted for that cloud session is dropped without a call; a failed report is never remembered, so the next page change retries.
-- **One Driver tab, one cycle twice a minute** - the daemon's session list, claude.ai's status for each, the visits the planner picks, the answers typed, the session created — all through one pinned tab, whose page is reloaded at most once a minute so its list is fresh.
+- **One Driver tab, one cycle twice a minute** - the daemon's session list, claude.ai's status for each, the visits the planner picks — answers first, at most four a cycle — the answers typed, the session created — all through one pinned tab, whose page is reloaded at most once a minute so its list is fresh.
 - **The list statuses are reported back** - what claude.ai's list said about each of the daemon's sessions goes to `POST /_bridge/statuses`, the read-back the daemon otherwise lacks.
 - **The answer is typed before it is acknowledged** - it is handed to the Driver first and only reported as delivered afterwards, so the dashboard never shows a session as answered when nothing was typed; every answer handed over is accounted for, delivered or failed with the reason.
-- **A Driver that cannot hear the worker is reloaded** - the tab is the extension's own, so an orphaned script is revived by a reload rather than reported.
+- **A Driver that cannot hear the worker is reloaded** - the tab is the extension's own, so an orphaned script is revived by a reload rather than reported; a tab that is gone, or a page torn down mid-drive, fails the cycle instead, with every answer handed over accounted for.
 - **An acknowledgement is retried until it lands** - a lost acknowledgement would leave an answer sitting as queued in the dashboard after it was already typed.
-- **Closing the Driver tab pauses the bridge** - until the options page reopens it or the browser restarts; a tab that wandered off claude.ai is brought back, and a pinned claude.ai tab Chrome restored is adopted rather than doubled.
-- **Sessions are created in the Driver tab** - the worker claims the daemon's next session request each cycle and the Driver creates it at the end of the cycle, from claude.ai's new-session page; the outcome is reported under the request's id.
+- **Closing the Driver tab pauses the bridge** - until the options page reopens it or the browser restarts; closing its window does not. A tab someone moved off claude.ai is forgotten, never brought back, and after a restart a lone pinned claude.ai tab is taken to be the Driver Chrome restored rather than doubled.
+- **Sessions are created in the Driver tab** - the worker claims the daemon's next session request each cycle and the Driver creates it first thing, before the visits, from claude.ai's new-session page the cycle starts on; the outcome is reported under the request's id, and a Driver that is off or paused reports the request failed at once rather than leaving it queued.
 - **Every cycle records what it did** - the outcome of the last cycle is kept so the options page can state it, including every reason a cycle did nothing.
 
 ## Business logic
@@ -68,7 +68,7 @@ When the content script reports a question, the service worker posts it to `POST
 
 The service worker also forwards, unchanged, two other things the content script produces: batches of transcript entries to `POST /_bridge/events`, and the content script's report about itself — its version, the session it is on, and what its last scrape found — to `POST /_bridge/hello`. The reply to that self-report tells the content script whether its tab is the Driver tab, so the Driver's overlay goes up the moment its page loads.
 
-A third message from the content script, a line of the Driver's cycle log, is merely received: a cycle in the page can run for minutes, and each line resets the idle clock that would otherwise end the worker mid-cycle.
+A third message from the content script, a line of the Driver's cycle log, is merely received: each line resets the idle clock that ends a worker thirty seconds after its last event. Chrome also ends a worker whose single call has run five minutes, which no message resets — which is why one cycle's drive is bounded (below).
 
 ### The Driver cycle
 
@@ -78,17 +78,17 @@ The bridge only sees pages the extension is injected into, and the extension can
 
 #### Business logic
 
-Twice a minute, once when the service worker starts, and on demand from the options page, the worker runs one cycle; a cycle already running makes the next beat do nothing. The cycle stops at once, stating the reason, when no token is set, when the Driver is switched off in the options, or when the Driver is paused because its tab was closed. Otherwise it first re-sends any delivery acknowledgements the daemon has not yet taken, then asks `GET /_bridge/sessions` for the cloud sessions that are the daemon's, each flagged with whether an answer is queued for it. For every flagged session it fetches `GET /_bridge/answer`: the delivery id and the exact text to type, composed by the daemon. It then claims the daemon's next session request, if any. With no sessions and no request, the cycle ends there, saying so, and no tab is opened.
+Twice a minute, once when the service worker starts, and on demand from the options page, the worker runs one cycle; a cycle already running makes the next beat do nothing. With no token set the cycle stops at once, saying so. Otherwise it first re-sends any delivery acknowledgements the daemon has not yet taken. When the Driver is switched off in the options, or paused because its tab was closed, the cycle then stops with that reason — after claiming the daemon's next session request, if any, and reporting it failed with the same reason: a request left queued would be created hours later, for a run long gone. Otherwise it asks `GET /_bridge/sessions` for the cloud sessions that are the daemon's, each flagged with whether an answer is queued for it. For every flagged session it fetches `GET /_bridge/answer`: the delivery id and the exact text to type, composed by the daemon. It then claims the daemon's next session request, if any. With no sessions and no request, the cycle ends there, saying so, and no tab is opened.
 
-Otherwise the Driver tab is made sure of: the stored tab if it still exists — brought back to claude.ai if it wandered off — else a lone pinned claude.ai tab Chrome restored after a restart, else a new pinned, inactive tab on claude.ai's session page. Its page is reloaded before the list is read if the last load is a minute or more old. The Driver's content script is asked to read the list for the daemon's sessions and answers with each session's status: awaiting input, unread, idle, running, landed, missing from the list, or an unknown label carried verbatim. Those statuses go to `POST /_bridge/statuses`.
+Otherwise the Driver tab is made sure of: the stored tab if it still exists and is still on claude.ai — one someone moved elsewhere is forgotten, never brought back — else a lone pinned claude.ai tab, taken to be the one Chrome restored after a restart (a restored tab carries no other mark, so the worker cannot tell it from one the user pinned), else a new pinned, inactive tab on claude.ai's session page. The tab id, like the pause, is kept only for the browser session, so a restart starts clean. Its page is reloaded before the list is read if the last load is a minute or more old. The Driver's content script is asked to read the list for the daemon's sessions and answers with each session's status: awaiting input, unread, idle, running, landed, missing from the list, or an unknown label carried verbatim — or that the page shows no session list at all. Those statuses go to `POST /_bridge/statuses`.
 
-The visit planner (`driver-plan`) then picks which sessions to visit this cycle from the statuses, the queued answers, and what earlier cycles saw and visited. The Driver is asked to make those visits and, when a session request was claimed, to create that session at the end; it answers with what each visit found, what each delivery did, and what the creation did. The worker then remembers each session's status and, for the ones visited, the time; acknowledges every answer it handed over — as the Driver reported it, or as failed with the reason the visit never got to it, which also releases the answer to be tried again; reports the creation's outcome under the request's id; and records the cycle's summary — how many statuses of how many sessions, how many awaiting, unread and missing, how many visited, typed and created.
+The visit planner (`driver-plan`) then picks which sessions are due this cycle from the statuses, the queued answers, and what earlier cycles saw and visited; the worker takes the ones carrying an answer first and at most four in all, the rest waiting for the next beat. The Driver is asked to create the claimed session, if any, and then make those visits; it answers with what the creation did, what each visit found and what each delivery did. A Driver that says it is still busy with an earlier cycle's drive — a worker that ended mid-cycle leaves the page driving — is left alone: nothing is claimed, acknowledged or reported, and the next beat tries again. Otherwise the worker remembers each session's status and, for the ones visited, the time — except a session it planned but did not reach, cut or failed, which keeps its earlier status so the change that made it due still counts; acknowledges every delivery the Driver attempted, as it reported it, while an answer the visit never got to — the session not on the list, the page not becoming it, a Driver that did not answer — stays queued on the daemon and is released here to be tried again next beat (the one exception is a page torn down mid-drive, whose answer may already be typed: that is acknowledged as failed with a note saying to check the session before picking again); reports the creation's outcome under the request's id; and records the cycle's summary — how many statuses of how many sessions, how many awaiting, unread and missing, how many visited of how many due, typed and created, and anything the Driver noted.
 
 #### Rationale
 
 One page load a minute rather than one per session, and the in-app visits the content script makes, are what let one tab serve fifty sessions. The list is reloaded rather than trusted because claude.ai's list refreshes only on a page load: after an in-app navigation it still shows what it showed before.
 
-Claiming the session request before the tab is made sure of means a cycle that then fails still owns the request and reports its failure, rather than leaving the daemon to wait out its claim.
+Claiming the session request before the tab is made sure of means a cycle that fails once it has the tab still owns the request and reports its failure; a cycle that cannot open or reload the tab at all, or finds the Driver busy, leaves the claim to expire on the daemon, which offers the request again.
 
 ### Delivering the answer back into the session
 
@@ -98,11 +98,11 @@ The user answers the question in the dashboard. They expect the session to be co
 
 #### Business logic
 
-An answer travels with its visit, and the visit reports it delivered only once the session's page took the send. Only then does the worker post the outcome to `POST /_bridge/answered`, quoting the delivery id and whether it succeeded, plus the content script's note on failure. An answer without a delivery id or without text is ignored. An answer already handed to the Driver is not handed over again for as long as the service worker lives; a delivery that came back a failure releases that claim, so it can be tried again on a later cycle.
+An answer travels with its visit, and the visit reports it delivered only once the session's page took the send. Only then does the worker post the outcome to `POST /_bridge/answered`, quoting the delivery id and whether it succeeded, plus the content script's note on failure. An answer without a delivery id or without text is ignored. An answer already handed to the Driver is not handed over again for as long as the service worker lives. A delivery the page attempted and reported failed releases that hold; the daemon marks the delivery failed, and only a new pick in the dashboard tries again. An answer the visit never reached is released and left queued, so the next cycle tries it again.
 
 #### Rationale
 
-Acknowledging before typing would mark an answer as sent that a dying page never actually sent, leaving the dashboard claiming a session was answered while it sits parked — the worse of the two races. The cost of typing first is a delivered answer whose acknowledgement is lost being delivered twice, which the claim set prevents while the worker lives, and which the daemon's own delivery id makes harmless afterwards.
+Acknowledging before typing would mark an answer as sent that a dying page never actually sent, leaving the dashboard claiming a session was answered while it sits parked — the worse of the two races. The cost of typing first is a delivered answer whose acknowledgement is lost being delivered twice, which the claim set prevents while the worker lives; after a worker restart it can be typed a second time, which the bounded drive makes rare.
 
 ### A Driver that cannot hear the worker
 
@@ -112,7 +112,7 @@ Reloading the extension leaves the already-injected content scripts orphaned; Ch
 
 #### Business logic
 
-When the Driver's page does not answer, the worker retries for a while, since the script may still be being injected; if it keeps not answering, the page is reloaded once — it is the extension's own tab — and the retries continue. A Driver that never answers makes the cycle fail with that reason, and a session request claimed for that cycle is reported as failed with it.
+When the Driver's page does not answer, the worker retries for a while, since the script may still be being injected; if it keeps not answering, the page is reloaded once — it is the extension's own tab — and the retries continue. A Driver that never answers makes the cycle fail with that reason, and a session request claimed for that cycle is reported as failed with it. A reload that fails because the tab is gone — closed under the cycle — fails the cycle the same way, so every answer handed over is still accounted for. A drive whose page was torn down after taking the message — a reload under it, a sign-in bounce — is not sent again, since the answer may already be typed; the cycle fails with a note saying so.
 
 ### An acknowledgement is retried until it lands
 
@@ -132,7 +132,7 @@ The user closes the Driver tab. Having it reappear half a minute later, forever,
 
 #### Business logic
 
-When the Driver tab closes, the Driver is paused: every following cycle stops with that as its reason, naming the options page's button as the way to resume. That button, and a browser restart, lift the pause. The Driver switch in the options is separate: switched off, no cycle runs at all.
+When the Driver tab closes, the Driver is paused: every following cycle stops with that as its reason, naming the options page's button as the way to resume. That button lifts the pause; so does a browser restart, since the pause — like the tab id — is kept only for the browser session. Closing the window the tab sits in is not closing the tab: Chrome keeps running without a window, so the tab is merely forgotten and reopened in the next one. The Driver switch in the options is separate: switched off, no cycle drives at all. Off or paused, the cycle still pays what it owes the daemon — acknowledgements not yet taken, and a session request claimed and reported failed at once.
 
 ### Creating the session the daemon asked for
 
@@ -142,7 +142,7 @@ A web run is waiting on the daemon for a cloud session that can push its work; t
 
 #### Business logic
 
-Each cycle claims the daemon's next session request, if any, and hands it to the Driver along with the cycle's visits; the Driver creates it at the end of the cycle, from claude.ai's new-session page it returns to. The outcome is reported to the daemon under the request's id: success with the session id, or failure with the note of what the page lacked — or, when the cycle never reached the Driver, with the cycle's own failure. The created session is one of the daemon's from the next cycle on.
+Each cycle claims the daemon's next session request, if any, and hands it to the Driver along with the cycle's visits; the Driver creates it first, from claude.ai's new-session page the cycle starts on, before making the visits — a run is waiting on it. The outcome is reported to the daemon under the request's id: success with the session id, or failure with the note of what the page lacked — or, when the cycle never reached the Driver, with the cycle's own failure. The created session is one of the daemon's from the next cycle on.
 
 #### Rationale
 

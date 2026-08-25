@@ -4,7 +4,7 @@ import type { AgentMeta } from '../store/index.js'
 import { bridgeSessionsFrom } from './bridge-sessions.js'
 
 const NOW = new Date('2026-07-26T20:00:00.000Z')
-const NONE_QUEUED = (): boolean => false
+const NONE_QUEUED: string[] = []
 
 function agent(over: Partial<AgentMeta>): AgentMeta {
   return {
@@ -67,7 +67,7 @@ test('a session with an answer queued says so, since it is visited whatever the 
   const got = bridgeSessionsFrom(
     [agent({ id: 'a', target: 'web', sessionId: 'session_A' }), agent({ id: 'b', target: 'web', sessionId: 'session_B' })],
     NOW,
-    sessionId => sessionId === 'session_B',
+    ['session_B'],
   )
   assert.deepEqual(
     got.map(s => [s.id, s.answerQueued]),
@@ -76,6 +76,18 @@ test('a session with an answer queued says so, since it is visited whatever the 
       ['session_B', true],
     ],
   )
+})
+
+test('a session with an answer queued is served even outside the window or with no run at all (#1332)', () => {
+  const got = bridgeSessionsFrom(
+    [agent({ id: 'old', target: 'web', sessionId: 'session_OLD', startedAt: '2026-07-25T20:00:00.000Z' })],
+    NOW,
+    ['session_OLD', 'session_NOBODYS'],
+  )
+  assert.deepEqual(got, [
+    { id: 'session_OLD', url: 'https://claude.ai/code/session_OLD', answerQueued: true },
+    { id: 'session_NOBODYS', url: 'https://claude.ai/code/session_NOBODYS', answerQueued: true },
+  ])
 })
 
 test('the same session listed by two runs is offered once (#1237)', () => {

@@ -6,7 +6,7 @@ Picks which cloud sessions the Claude web bridge's Driver tab serves, so a parke
 - **Recent only** - a cloud session is served for twelve hours after its agent started, and no longer — the same session window after which the agent's row stops saying "in cloud" (`cloud-run-state`).
 - **All of them, newest first** - one Driver tab serves the whole list by reading claude.ai's own session list and visiting only the sessions that need it, so the list is not capped.
 - **One entry per cloud session** - several agents pointing at the same cloud session yield a single entry.
-- **Whether an answer is queued** - each entry says whether the dashboard holds an answer for it, since such a session is visited whatever the list says.
+- **Whether an answer is queued** - each entry says whether the dashboard holds an answer for it, since such a session is visited whatever the list says; a session holding one that no run of the window carries — the user's own tab reported its question — is served all the same, after the recent ones.
 
 ## Business logic
 
@@ -18,7 +18,7 @@ A `web`-target agent hands its task to a cloud session on claude.ai. If that ses
 
 #### Business logic
 
-Every agent whose run target is `web` and that recorded a cloud session id contributes that session's claude.ai page, provided the agent started within the last twelve hours. Duplicates are collapsed to one entry per cloud session. The list is ordered newest agent first and carries, per entry, whether an answer is queued for the session.
+Every agent whose run target is `web` and that recorded a cloud session id contributes that session's claude.ai page, provided the agent started within the last twelve hours. Duplicates are collapsed to one entry per cloud session. The list is ordered newest agent first and carries, per entry, whether an answer is queued for the session. Every other session the dashboard holds a queued answer for — outside the window, or no run's at all — is appended after them, flagged as such, so a pick is served wherever it is for rather than sitting queued forever.
 
 #### Rationale
 

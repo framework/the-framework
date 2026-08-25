@@ -726,6 +726,23 @@ const OVERLAY_ID = 'tf-driver-overlay'
 let isDriver = false
 const driverLines = []
 
+/**
+ * Whether a list read or a drive is running in this page. A second instruction meanwhile is
+ * refused as busy rather than run alongside it: two drives would navigate over each other. It
+ * happens when the worker that sent the first one ended mid-cycle — the page drives on regardless.
+ */
+let driving = false
+
+async function whileFree(work) {
+  if (driving) return { ok: false, busy: true, note: 'the Driver is still busy with an earlier cycle in this page' }
+  driving = true
+  try {
+    return await work()
+  } finally {
+    driving = false
+  }
+}
+
 function setDriver(on) {
   if (!on || isDriver) return
   isDriver = true
@@ -758,8 +775,10 @@ function statusOf(anchor) {
   for (const label of labels) {
     const known = LIST_LABELS.get(label)
     if (known) return { status: known }
-    if (LANDED_LABEL.test(label)) return { status: 'landed' }
   }
+  // Only with no status word on the row does its pull request stand in for one: a row can carry
+  // both, and "Awaiting input" beside a pull request is still a session stopped for its user.
+  if (labels.some(label => LANDED_LABEL.test(label))) return { status: 'landed' }
   return { status: 'unknown', label: (labels[0] ?? '').slice(0, 80) }
 }
 
@@ -768,7 +787,11 @@ function sessionListRows() {
   const rows = new Map()
   for (const anchor of deepQueryAll('a[href*="/code/session_"]')) {
     const id = /\/code\/(session_[A-Za-z0-9]+)/.exec(anchor.getAttribute('href') ?? '')?.[1]
-    if (id && !rows.has(id)) rows.set(id, { anchor, ...statusOf(anchor) })
+    if (!id) continue
+    const row = { anchor, ...statusOf(anchor) }
+    // The first link wins unless a later one carries a status and it did not: a link to the
+    // session elsewhere on the page is not its list row.
+    if (!rows.has(id) || (rows.get(id).status === 'unknown' && row.status !== 'unknown')) rows.set(id, row)
   }
   return rows
 }
@@ -792,8 +815,17 @@ function showMoreButton() {
   return undefined
 }
 
-/** Read the list for these sessions, paging it until each is found or the list ends. */
+/**
+ * Read the list for these sessions, paging it until each is found or the list ends. The list is
+ * fetched after the page reports loaded, so it is waited for before it is read; a page with no
+ * session rows at all is not a list — signed out, or not on the sessions page — and is named
+ * rather than read as every session missing.
+ */
 async function readSessionList(ids) {
+  if (!(await waitFor(() => sessionListRows().size > 0, ROWS_WAIT_MS))) {
+    driverLog(`list: no session rows on ${location.pathname}`)
+    return { ok: false, note: `no session rows on ${location.pathname}` }
+  }
   let rows = sessionListRows()
   let pages = 0
   while (ids.some(id => !rows.has(id)) && pages < MAX_LIST_PAGES) {
@@ -842,21 +874,26 @@ async function visitSession(visit) {
   const row = sessionListRows().get(visit.id)
   if (!row) return { id: visit.id, ok: false, note: 'not on the list' }
   driverLog(`visit ${visit.id} (${visit.status})`)
+  const stale = new Set(turnRows())
   row.anchor.click()
   if (!(await waitFor(() => sessionIdFromUrl() === visit.id, NAV_WAIT_MS))) return { id: visit.id, ok: false, note: `the page did not become ${visit.id}` }
-  await waitFor(() => turnRows().length > 0, ROWS_WAIT_MS)
+  // The address changes before the page does: wait for turn rows that are not the previous
+  // session's, so what is surveyed and typed into is this session's page.
+  await waitFor(() => turnRows().some(r => !stale.has(r)), ROWS_WAIT_MS)
   await new Promise(resolve => setTimeout(resolve, window.__tfSettleMs ?? 1500))
   const found = findPendingChoice()
   const result = { id: visit.id, ok: true, rows: turnRows().length, ...(found ? { question: String(found.parsed.title ?? '').slice(0, 100) } : {}) }
   if (visit.answer) {
-    const before = turnRows().length
+    const before = new Set(turnRows())
     let outcome = await deliverAnswer(visit.answer.text)
     if (outcome.ok) {
-      const taken = await waitFor(() => turnRows().length > before && !composerText().trim(), window.__tfSendWaitMs ?? SEND_WAIT_MS)
+      // Taken once the composer is empty again and a turn row exists that did not before — a
+      // new row, not a higher count, since a long transcript keeps only its tail rendered.
+      const taken = await waitFor(() => !composerText().trim() && turnRows().some(r => !before.has(r)), window.__tfSendWaitMs ?? SEND_WAIT_MS)
       if (!taken) {
         outcome = {
           ok: false,
-          note: `${outcome.note}, but the page did not take the send: composer ${composerText().trim() ? 'still holds text' : 'empty'}, rows ${before} -> ${turnRows().length}`,
+          note: `${outcome.note}, but the page did not take the send: composer ${composerText().trim() ? 'still holds text' : 'empty'}, rows ${before.size} -> ${turnRows().length}`,
         }
       }
     }
@@ -866,10 +903,22 @@ async function visitSession(visit) {
   return result
 }
 
-/** One cycle's visits, then home, then the session the daemon asked for, if any. */
+/**
+ * One cycle: the session the daemon asked for first, if any — a run is waiting on it, and the
+ * new-session page is where a cycle starts — then the visits, then home.
+ */
 async function drive({ visits = [], start }) {
   setDriver(true)
-  driverLog(`cycle: ${visits.length} visit(s)${start ? ', one session to create' : ''}`)
+  driverLog(`cycle: ${start ? 'one session to create, ' : ''}${visits.length} visit(s)`)
+  let started
+  if (start) {
+    const wasHome = atHome()
+    const there = wasHome || (await goHome())
+    // A navigation home swaps the page under us a beat after the address changes.
+    if (there && !wasHome) await new Promise(resolve => setTimeout(resolve, window.__tfSettleMs ?? 1500))
+    started = there ? await createSession(start) : { ok: false, note: 'could not reach the new-session page' }
+    driverLog(`create: ${started.ok ? started.sessionId : started.note}`)
+  }
   const visited = []
   const delivered = []
   for (const visit of visits) {
@@ -886,11 +935,6 @@ async function drive({ visits = [], start }) {
   }
   const home = await goHome()
   if (!home) driverLog('could not get back to the session list')
-  let started
-  if (start) {
-    started = home ? await createSession(start) : { ok: false, note: 'could not reach the new-session page' }
-    driverLog(`create: ${started.ok ? started.sessionId : started.note}`)
-  }
   return { ok: true, visited, delivered, ...(started ? { started } : {}), ...(home ? {} : { note: 'could not get back to the session list' }) }
 }
 
@@ -947,13 +991,13 @@ if (IS_TOP && typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message?.type === 'tf-read-list' && Array.isArray(message.ids)) {
       setDriver(true)
-      void readSessionList(message.ids.filter(id => typeof id === 'string'))
+      void whileFree(() => readSessionList(message.ids.filter(id => typeof id === 'string')))
         .then(sendResponse)
         .catch(err => sendResponse({ ok: false, note: String(err?.message ?? err) }))
       return true
     }
     if (message?.type !== 'tf-drive') return false
-    void drive({ visits: Array.isArray(message.visits) ? message.visits : [], start: message.start })
+    void whileFree(() => drive({ visits: Array.isArray(message.visits) ? message.visits : [], start: message.start }))
       .then(sendResponse)
       .catch(err => sendResponse({ ok: false, note: String(err?.message ?? err) }))
     return true
@@ -967,8 +1011,8 @@ if (typeof chrome === 'undefined') {
   window.__tfBridgeDeliverAnswer = deliverAnswer
   window.__tfBridgeCreateSession = createSession
   window.__tfBridgeProbeNewSession = probeNewSession
-  window.__tfBridgeReadSessionList = readSessionList
-  window.__tfBridgeDrive = drive
+  window.__tfBridgeReadSessionList = ids => whileFree(() => readSessionList(ids))
+  window.__tfBridgeDrive = args => whileFree(() => drive(args))
 }
 
 /**

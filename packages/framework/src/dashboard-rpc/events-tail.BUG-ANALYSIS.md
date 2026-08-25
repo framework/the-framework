@@ -1,0 +1,29 @@
+# Bug analysis: packages/framework/src/dashboard-rpc/events-tail.ts
+
+## Business logic (high-level)
+
+Two tails over `JsonlTailer` + `followFile` (the shared pieces, so the #567 same-length-rewrite detection is inherited rather than re-implemented):
+
+- **`tailEvents`** — replay (first `pull`), announce the replay boundary exactly once (`onReplayed`, #1383), then follow (fs.watch + 1s poll). The boundary fires even when the first read fails (a client waiting forever would freeze its feed) and before the follower exists, so no appended line can beat the marker — both spec'd and pinned by tests.
+- **`tailAgentEvents`** — the relocating tail (#1472): same read-then-follow, but when the tailed file disappears *after having existed* (`sawFile`), the path is re-resolved (`resolvePath`), the same tailer is retargeted (offset carried; `retarget` suppresses the same-length-rewrite reset by adopting the copy's mtime once), and the new home is followed. Same resolution or none → keep polling the current home (the "archive not visible yet" window and the deleted-agent forever-undefined case). "Gone before anything was written" (`!sawFile`) is a booting agent, not a move. `onReplayed` stays once-per-subscription: a relocation is not a new replay boundary.
+
+Ordering/concurrency analysis:
+
+- **Stop discipline**: both tails set `stopped` and call the current `stopFollow`. In `tailEvents`, a stop before the initial pull settles prevents the follower from ever being created (`follow` checks `stopped`); the pull itself may still deliver a few events to `onEvent` after stop — the consumer (`events.ts` → the SSE mount) tolerates late sends. In `tailAgentEvents`, every continuation (`replayed`, `follow`, `relocate`, `pullOrRelocate`) re-checks `stopped`; the one gap is the initial `resolvePath()` *rejection* handler (L124: `() => onReplayed?.()`), which fires the replay marker even after stop — one late marker into a closed subscription, harmless downstream (the mount guards its response) and asymmetric with the success path's check. Noted, not reported.
+- **Relocation vs. follower**: `relocate` runs only from `pullOrRelocate`, which the follower serializes (`pulling` flag in `followFile`); it stops the old follower before retargeting and starts the new one only after the catch-up pull, and a stop landing inside the awaited span is honored by `follow()`'s check — no leaked watcher. The `relocating` flag prevents overlap across the follower swap. Sound.
+- **Offset carry**: correctness rests on the archive copy being content-identical (teardown copies verbatim) — documented invariant; a *diverging* copy would deliver garbage from a mid-line offset, which the JSON-parse skip absorbs line-wise. Acceptable.
+- **Known limitation (not reported)**: a *continuation* restores the archived log into a fresh worktree but leaves the archive file in place, so a feed currently tailing the archive never sees a disappearance and does not relocate back — it goes stale until the continued agent settles and the archive is rewritten (at which point the grown copy delivers the missed lines from the carried offset). The SPEC only promises the worktree→archive move, and the dashboard re-subscribes on continuation, so this stays within spec.
+
+## Functions (low-level)
+
+- **`POLL_MS`** — 1s backstop. Correct.
+- **`tailEvents(path, onEvent, onReplayed?)`** — described above. `void tailer.pull().then(follow, follow)`: failure still announces and follows (the poll retries the read). Stop removes watcher + poll via `followFile`'s closer. Correct.
+- **`tailAgentEvents(resolvePath, onEvent, onReplayed?)`**:
+  - init: resolve → undefined ⇒ announce + stay silent (spec'd); else create tailer, pull, `replayed` (announce once, probe `existsSync(initial)` into `sawFile`, follow). **Bug found** in the `sawFile` probe — see below.
+  - `pullOrRelocate`: exists ⇒ `sawFile = true` + pull; gone ∧ `sawFile` ⇒ relocate (guarded by `relocating`).
+  - `relocate`: re-resolve; same/none/stopped ⇒ keep polling; else stop old follower, retarget (resets `sawFile`), catch-up pull, follow new dir. If the new home does not exist yet, polls idle there (`!sawFile` branch) until it appears — and can never hop again from a home that never materializes; acceptable for the archive-without-events residue.
+  - returns stop. Correct apart from the bug below.
+
+## Bugs found
+
+1. **L119 (`if (existsSync(initial)) sawFile = true`): a log that vanishes between the initial replay and this probe can never relocate — the feed silently loses the agent's final events.** `sawFile` is what distinguishes "existed and is now gone ⇒ move" from "booting agent"; it is seeded here by an `existsSync` *after* the first pull rather than by whether that pull actually read the file. Scenario: a browser subscribes just as a fast agent finishes — the initial `tailer.pull()` reads the worktree log (events are delivered), teardown then appends the final lines, copies the log into the archive and removes the worktree before `replayed` runs its `existsSync` — `sawFile` stays `false`, so every subsequent poll takes the `!sawFile ⇒ return` branch and the tail idles on the dead worktree path forever: no relocation to the archive, the `end` event never reaches the feed. That is precisely the failure mode this module exists to close (its own header: "went silent *without the final lines*"), now surviving in a narrower window. Severity: minor (millisecond-scale window, but the same teardown burst the module documents as the hot path). Confidence: low-to-medium (mechanism certain, window small). Fix: treat a successful read as having seen the file — e.g. set `sawFile = true` inside `pullOrRelocate`'s exists-branch *and* in `replayed` when the tailer consumed bytes (`JsonlTailer` could expose its offset, or `pull()` could report bytes read), or simplest: in `replayed`, `sawFile = existsSync(initial) || tailerConsumedBytes`.

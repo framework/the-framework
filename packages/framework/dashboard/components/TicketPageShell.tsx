@@ -1,0 +1,40 @@
+import type { ReactNode } from 'react'
+import { ArrowLeft } from 'lucide-react'
+import { Button } from './ui/button.js'
+import { ScrollArea } from './ui/scroll-area.js'
+
+// The frame both ticket pages sit in (#1144, #685): the way back to the list, then the ticket's
+// own content in one scrolling column. A page under a list needs the same way out and the same
+// measure wherever it goes, and the two were written out separately — so a change to one left the
+// other reading as a different kind of page.
+
+/** What a ticket page shows while its read is in flight, and when there is nothing to show. */
+export function TicketPageNote({ children }: { children: ReactNode }) {
+  return <p className="text-sm text-muted-foreground">{children}</p>
+}
+
+export function TicketPageShell({
+  onBack,
+  path,
+  children,
+}: {
+  /** Back to the tickets list. */
+  onBack: () => void
+  /** The repo-relative file this page renders, shown beside the way back. Omitted where the page's own heading already names it. */
+  path?: string | undefined
+  children: ReactNode
+}) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex items-center gap-2 border-b border-border px-4 py-2">
+        <Button variant="ghost" size="sm" className="gap-1.5" onClick={onBack}>
+          <ArrowLeft className="h-4 w-4" /> Tickets
+        </Button>
+        {path && <span className="min-w-0 truncate text-xs text-muted-foreground">{path}</span>}
+      </div>
+      <ScrollArea className="min-h-0 flex-1">
+        <div className="mx-auto max-w-3xl p-6">{children}</div>
+      </ScrollArea>
+    </div>
+  )
+}

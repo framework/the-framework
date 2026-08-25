@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { bearerAuthorized, readJsonBody } from './bridge-endpoints.js'
+import { bearerAuthorized } from './bridge-endpoints.js'
+import { end, readPost, requireGet, sendJson } from './http.js'
 import type { BridgeStartInput, BridgeStartRequest } from './bridge-starts.js'
 
 /**
@@ -54,12 +55,8 @@ export async function handleWebStartRequest(
 async function handleRequest(req: IncomingMessage, res: ServerResponse, handlers: WebStartHandlers): Promise<void> {
   if (req.method !== 'POST') return end(res, 405, 'method not allowed', { allow: 'POST' })
   if (!handlers.extensionAlive()) return end(res, 409, 'no browser extension has spoken to this daemon recently')
-  let body: unknown
-  try {
-    body = await readJsonBody(req, MAX_BODY)
-  } catch (err) {
-    return end(res, 400, (err as Error).message)
-  }
+  const body = await readPost(req, res, MAX_BODY)
+  if (body === undefined) return
   if (typeof body !== 'object' || body === null) return end(res, 400, 'body must be an object')
   const { repo, branch, prompt } = body as Record<string, unknown>
   if (typeof repo !== 'string' || typeof branch !== 'string' || typeof prompt !== 'string') {
@@ -67,27 +64,18 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, handlers
   }
   const queued = handlers.request({ repo, branch, prompt })
   if (typeof queued === 'string') return end(res, 400, queued)
-  res.writeHead(202, { 'content-type': 'application/json' })
-  res.end(JSON.stringify({ id: queued.id }))
+  sendJson(res, { id: queued.id }, 202)
 }
 
 /** `GET /_web-start/<id>`: where the request stands. */
 async function handleState(req: IncomingMessage, res: ServerResponse, id: string, handlers: WebStartHandlers): Promise<void> {
-  if (req.method !== 'GET') return end(res, 405, 'method not allowed', { allow: 'GET' })
+  if (!requireGet(req, res)) return
   const start = handlers.get(id)
   if (!start) return end(res, 404, 'no such start request')
-  res.writeHead(200, { 'content-type': 'application/json' })
-  res.end(
-    JSON.stringify({
-      state: start.state,
-      ...(start.sessionId ? { sessionId: start.sessionId } : {}),
-      ...(start.url ? { url: start.url } : {}),
-      ...(start.note ? { note: start.note } : {}),
-    }),
-  )
-}
-
-function end(res: ServerResponse, status: number, message: string, headers: Record<string, string> = {}): void {
-  res.writeHead(status, { 'content-type': 'text/plain', ...headers })
-  res.end(message)
+  sendJson(res, {
+    state: start.state,
+    ...(start.sessionId ? { sessionId: start.sessionId } : {}),
+    ...(start.url ? { url: start.url } : {}),
+    ...(start.note ? { note: start.note } : {}),
+  })
 }

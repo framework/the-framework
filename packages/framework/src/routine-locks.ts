@@ -1,7 +1,6 @@
-import { readdir, readFile, rm, writeFile, mkdir } from 'node:fs/promises'
 import { hostname } from 'node:os'
-import { dirname, join } from 'node:path'
-import { withDataBranch } from './data-branch.js'
+import { join } from 'node:path'
+import { resolveDataFileDeps, type DataFileDeps } from './data-branch.js'
 
 // The "one triage at a time" guard (#1659): a `routines/<name>.lock.md` on the data branch.
 //
@@ -19,7 +18,7 @@ import { withDataBranch } from './data-branch.js'
 // tickets can take hours, and a heartbeat would cost code and `tf-data` churn.
 
 /** Where routine state lives on the data branch; only the lock files, for now (#1660). */
-export const ROUTINES_DIR = 'routines'
+const ROUTINES_DIR = 'routines'
 
 /** How long a lock stands before whoever finds it may take it over: four hours, no heartbeat. */
 export const ROUTINE_LOCK_TTL_MS = 4 * 60 * 60 * 1000
@@ -49,39 +48,22 @@ export function routineLockHolder(md: string): RoutineLockHolder | undefined {
 }
 
 /** Injectable seams so every operation is unit-testable off disk and git. */
-export interface RoutineLockDeps {
-  read?: (path: string) => Promise<string>
-  write?: (path: string, content: string) => Promise<void>
-  remove?: (path: string) => Promise<void>
-  /** The lock files under a directory, by filename; a missing directory reads as none. */
-  list?: (dir: string) => Promise<string[]>
-  /** The data-branch write funnel (default {@link withDataBranch}). */
-  funnel?: typeof withDataBranch
+export interface RoutineLockDeps extends DataFileDeps {
+  /** The machine claiming the lock (default this host's name). */
   host?: string
   now?: () => number
-  log?: (message: string) => void
 }
 
 function resolve(deps: RoutineLockDeps) {
   return {
-    read: deps.read ?? ((path: string) => readFile(path, 'utf8')),
-    write:
-      deps.write ??
-      (async (path: string, content: string) => {
-        await mkdir(dirname(path), { recursive: true })
-        await writeFile(path, content, 'utf8')
-      }),
-    remove: deps.remove ?? ((path: string) => rm(path)),
-    list: deps.list ?? ((dir: string) => readdir(dir).catch((): string[] => [])),
-    funnel: deps.funnel ?? withDataBranch,
+    ...resolveDataFileDeps(deps),
     host: deps.host ?? hostname(),
     now: deps.now ?? (() => Date.now()),
-    log: deps.log ?? (() => {}),
   }
 }
 
 /** Whether a lock is past its fixed expiry, as of `now`. An unparseable mint time counts as expired. */
-export function routineLockExpired(holder: RoutineLockHolder, now: number): boolean {
+function routineLockExpired(holder: RoutineLockHolder, now: number): boolean {
   const since = Date.parse(holder.since)
   return !Number.isFinite(since) || now - since >= ROUTINE_LOCK_TTL_MS
 }

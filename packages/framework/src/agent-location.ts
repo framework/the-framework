@@ -17,7 +17,7 @@
 export type AgentLocation = 'local' | 'actions' | 'web'
 
 /** Every location, for validating what arrives from a browser or a config file. */
-export const AGENT_LOCATIONS = ['local', 'actions', 'web'] as const
+const AGENT_LOCATIONS = ['local', 'actions', 'web'] as const
 
 /** Whether `value` names a location. */
 export function isAgentLocation(value: unknown): value is AgentLocation {

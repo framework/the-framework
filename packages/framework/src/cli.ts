@@ -100,7 +100,7 @@ export function chooseSessionLink(opts: Pick<AgentOptions, 'driver'>, fake: bool
  * the daemon token that the daemon's start-queue asks for. Anything less and the run fails
  * saying web runs start from the dashboard.
  */
-export async function extensionStartConfig(env: NodeJS.ProcessEnv): Promise<CloudDriverOptions | undefined> {
+async function extensionStartConfig(env: NodeJS.ProcessEnv): Promise<CloudDriverOptions | undefined> {
   const daemonUrl = env[DAEMON_URL_ENV]
   if (!daemonUrl) return undefined
   const token = await readDaemonToken(undefined, env).catch(() => undefined)

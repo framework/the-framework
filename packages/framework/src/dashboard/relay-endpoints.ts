@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { FrameworkEvent } from '../events.js'
 import type { StartAgentKind, StartAgentOptions, StartAgentResult } from './types.js'
+import { end, readJsonBody, requireGet, sendJson } from './http.js'
 
 /**
  * The device-side of the remote-agent relay (#1067): the two endpoints a daemon exposes so another
@@ -59,9 +60,8 @@ export async function handleRelayRequest(
 /** `GET /_relay/ping` (#1072): answer 200 with an empty body. Starts nothing; only proves this
  * daemon is reachable and the caller's cookie is valid (the shared-token guard (#1051) already enforced that). */
 function handlePing(req: IncomingMessage, res: ServerResponse): void {
-  if (req.method !== 'GET') return end(res, 405, 'method not allowed', { allow: 'GET' })
-  res.writeHead(200, { 'content-type': 'text/plain' })
-  res.end()
+  if (!requireGet(req, res)) return
+  end(res, 200, '')
 }
 
 /** `POST /_relay/start`: read the agent request, start it locally, and answer with the result JSON. */
@@ -84,13 +84,12 @@ async function handleStart(req: IncomingMessage, res: ServerResponse, handlers: 
   } catch (err) {
     result = { ok: false, error: err instanceof Error ? err.message : String(err) }
   }
-  res.writeHead(200, { 'content-type': 'application/json' })
-  res.end(JSON.stringify(result))
+  sendJson(res, result)
 }
 
 /** `GET /_relay/events?run=<id>`: stream the agent's events as newline-delimited JSON. */
 function handleEvents(req: IncomingMessage, res: ServerResponse, handlers: RelayHandlers): void {
-  if (req.method !== 'GET') return end(res, 405, 'method not allowed', { allow: 'GET' })
+  if (!requireGet(req, res)) return
   const agentId = new URL(req.url ?? '/', 'http://localhost').searchParams.get('run')
   if (!agentId) return end(res, 400, 'missing run id')
   res.writeHead(200, { 'content-type': 'application/x-ndjson', 'cache-control': 'no-cache' })
@@ -122,41 +121,9 @@ async function handleRpc(req: IncomingMessage, res: ServerResponse, handlers: Re
   const args = Array.isArray(body.args) ? body.args : []
   if (!fn) return end(res, 400, 'missing rpc name')
   try {
-    const result = await handlers.rpc(fn, args)
-    res.writeHead(200, { 'content-type': 'application/json' })
-    res.end(JSON.stringify({ result }))
+    sendJson(res, { result: await handlers.rpc(fn, args) })
   } catch (err) {
     end(res, 500, err instanceof Error ? err.message : 'rpc failed')
   }
 }
 
-/** Read a capped JSON request body, rejecting on overflow or malformed JSON. */
-function readJsonBody(req: IncomingMessage, maxBytes: number): Promise<unknown> {
-  return new Promise((resolvePromise, rejectPromise) => {
-    const chunks: Buffer[] = []
-    let bytes = 0
-    req.on('data', (chunk: Buffer) => {
-      bytes += chunk.length
-      if (bytes > maxBytes) {
-        rejectPromise(new Error('payload too large'))
-        req.destroy()
-        return
-      }
-      chunks.push(chunk)
-    })
-    req.on('end', () => {
-      try {
-        resolvePromise(JSON.parse(Buffer.concat(chunks).toString('utf8')))
-      } catch (err) {
-        rejectPromise(err instanceof Error ? err : new Error('invalid json'))
-      }
-    })
-    req.on('error', rejectPromise)
-  })
-}
-
-/** Answer a relay request with a plain-text status. */
-function end(res: ServerResponse, status: number, message: string, headers: Record<string, string> = {}): void {
-  res.writeHead(status, { 'content-type': 'text/plain', ...headers })
-  res.end(message)
-}

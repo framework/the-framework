@@ -494,19 +494,26 @@ export async function openBranchPullRequest(
     const args = ['pr', 'create', '--head', branch, '--title', draft.title, '--body', draft.body]
     if (draft.base) args.push('--base', prBaseName(draft.base))
     if (draft.draft) args.push('--draft')
-    const out = (await gh(args, cwd)).trim()
-    // The branch has a PR now, so the cached "no PR" must go or the bar would keep offering to
-    // open one for the next minute (#1028). Both caches: the single-PR view and the history.
-    forgetPr(cwd, branch)
-    forgetBranchPrs(cwd, branch)
-    // gh prints the new PR's URL as its last line, and the number is its last path segment.
-    const url = out.split('\n').filter(Boolean).at(-1)
-    if (!url) return { ok: true }
-    const number = prNumberFromUrl(url)
-    return { ok: true, url, ...(number !== undefined ? { number } : {}) }
+    return createdPr(await gh(args, cwd), cwd, branch)
   } catch (err) {
     return { ok: false, error: errorMessage(err) }
   }
+}
+
+/**
+ * What a `gh pr create` left behind. gh prints the new PR's URL as its last line, and the number is
+ * that URL's last path segment; an output with no URL still reports success, since the PR is open.
+ *
+ * The branch has a PR now, so the cached "no PR" must go or the bar would keep offering to open one
+ * for the next minute (#1028) — both caches: the single-PR view and the history.
+ */
+function createdPr(out: string, cwd: string, branch: string): HandoffResult {
+  forgetPr(cwd, branch)
+  forgetBranchPrs(cwd, branch)
+  const url = out.trim().split('\n').filter(Boolean).at(-1)
+  if (!url) return { ok: true }
+  const number = prNumberFromUrl(url)
+  return { ok: true, url, ...(number !== undefined ? { number } : {}) }
 }
 
 /**
@@ -525,13 +532,8 @@ export async function openRemoteBranchPullRequest(
 ): Promise<HandoffResult> {
   const gh = deps.gh ?? nodeGhRunner()
   try {
-    const out = (await gh(['pr', 'create', '--head', branch, '--title', agentPrTitle(agent), '--body', agentPrBody(agent), '--draft'], cwd)).trim()
-    forgetPr(cwd, branch)
-    forgetBranchPrs(cwd, branch)
-    const url = out.split('\n').filter(Boolean).at(-1)
-    if (!url) return { ok: true }
-    const number = prNumberFromUrl(url)
-    return { ok: true, url, ...(number !== undefined ? { number } : {}) }
+    const args = ['pr', 'create', '--head', branch, '--title', agentPrTitle(agent), '--body', agentPrBody(agent), '--draft']
+    return createdPr(await gh(args, cwd), cwd, branch)
   } catch (err) {
     return { ok: false, error: errorMessage(err) }
   }

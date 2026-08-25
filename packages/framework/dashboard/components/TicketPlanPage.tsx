@@ -1,10 +1,8 @@
 import type { FileContent } from '../../src/index.js'
-import { ArrowLeft } from 'lucide-react'
 import { onFileContent } from '../rpc/reads.js'
 import { usePolled } from '../lib/use-async.js'
-import { Button } from './ui/button.js'
 import { Markdown } from './Markdown.js'
-import { ScrollArea } from './ui/scroll-area.js'
+import { TicketPageShell, TicketPageNote } from './TicketPageShell.js'
 
 /** Where tickets and their plans live, repo-relative. The literal, not the package's Node-bound
  *  `TICKETS_DIR` const, so nothing drags the server graph into the browser bundle. */
@@ -39,29 +37,19 @@ export function TicketPlanPage({
   const { value: plan, loaded } = usePolled<FileContent | null>(() => onFileContent(projectId, path), null, 10_000, [projectId, path])
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex items-center gap-2 border-b border-border px-4 py-2">
-        <Button variant="ghost" size="sm" className="gap-1.5" onClick={onBack}>
-          <ArrowLeft className="h-4 w-4" /> Tickets
-        </Button>
-        <span className="min-w-0 truncate text-xs text-muted-foreground">{path}</span>
-      </div>
-      <ScrollArea className="min-h-0 flex-1">
-        <div className="mx-auto max-w-3xl p-6">
-          {!loaded ? (
-            <p className="text-sm text-muted-foreground">Loading…</p>
-          ) : !plan || plan.binary ? (
-            // No `.plan.md` beside the ticket — never written, or removed since the list read.
-            <p className="text-sm text-muted-foreground">This ticket has no plan yet.</p>
-          ) : (
-            <>
-              <Markdown text={plan.text} />
-              {/* The confined read caps long files; say so rather than pretending the tail is empty. */}
-              {plan.truncated && <p className="mt-4 text-xs text-muted-foreground">Plan truncated — open the file to read the rest.</p>}
-            </>
-          )}
-        </div>
-      </ScrollArea>
-    </div>
+    <TicketPageShell onBack={onBack} path={path}>
+      {!loaded ? (
+        <TicketPageNote>Loading…</TicketPageNote>
+      ) : !plan || plan.binary ? (
+        // No `.plan.md` beside the ticket — never written, or removed since the list read.
+        <TicketPageNote>This ticket has no plan yet.</TicketPageNote>
+      ) : (
+        <>
+          <Markdown text={plan.text} />
+          {/* The confined read caps long files; say so rather than pretending the tail is empty. */}
+          {plan.truncated && <p className="mt-4 text-xs text-muted-foreground">Plan truncated — open the file to read the rest.</p>}
+        </>
+      )}
+    </TicketPageShell>
   )
 }

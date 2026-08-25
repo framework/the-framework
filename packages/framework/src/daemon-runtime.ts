@@ -76,7 +76,7 @@ const DRIVER_READY_TTL_MS = 30_000
  * back here, so each spawn spawns another: a fork bomb. A real agent passes the compiled bin
  * (or an explicit `binPath`), so the guard only ever trips in tests.
  */
-export function resolveSpawnBin(explicitBinPath: string | undefined): string {
+function resolveSpawnBin(explicitBinPath: string | undefined): string {
   const binPath = explicitBinPath ?? process.argv[1]
   if (!binPath) throw new Error('cannot locate the framework CLI entry')
   if (!explicitBinPath && (process.env.NODE_TEST_CONTEXT || /\.test\.[cm]?[jt]s$/.test(binPath))) {
@@ -110,7 +110,7 @@ async function appendAgentLog(cwd: string, message: string): Promise<void> {
  * `env` is the child's whole environment; the daemon adds its own URL to it (#1328) so a web run
  * can ask this daemon for a cloud session.
  */
-export function spawnDetached(binPath: string, specPath: string, stderrFile?: string, env: NodeJS.ProcessEnv = process.env): ChildProcess {
+function spawnDetached(binPath: string, specPath: string, stderrFile?: string, env: NodeJS.ProcessEnv = process.env): ChildProcess {
   // stderr goes to a file, never a pipe: a detached child must not block on a dead parent's pipe
   // buffer, and the file is what makes a silent boot death diagnosable (#1261). Best-effort — a
   // run must still start when the log cannot be opened.
@@ -132,7 +132,7 @@ export function spawnDetached(binPath: string, specPath: string, stderrFile?: st
 }
 
 /** A spawned run's environment: ours, plus the daemon's URL when it has one (#1328). */
-export function childEnv(daemonUrl: string | undefined, base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+function childEnv(daemonUrl: string | undefined, base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
   return daemonUrl ? { ...base, [DAEMON_URL_ENV]: daemonUrl } : base
 }
 

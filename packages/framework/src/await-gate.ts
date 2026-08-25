@@ -124,7 +124,7 @@ export interface AwaitTurnDeps {
  * `continueWith` is. Keeping one loop is what stopped the per-turn signal emission from
  * having to be added to each copy by hand (#563).
  */
-export async function drainGates<T extends { text: string }>(
+async function drainGates<T extends { text: string }>(
   turn: T,
   deps: AwaitTurnDeps,
   continueWith: (question: string, answer: string) => Promise<T>,

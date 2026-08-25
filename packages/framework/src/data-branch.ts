@@ -266,6 +266,50 @@ export async function withDataBranch(
   })
 }
 
+/**
+ * The file seams a *claim* on the data branch needs — the ticket locks (#1420) and the routine
+ * locks (#1659), which read, write, delete and list plain files inside the checkout the funnel
+ * hands them. Injectable so every operation is unit-testable off disk and git; production takes
+ * the defaults.
+ */
+export interface DataFileDeps {
+  /** Read one file (default `fs.readFile`); a rejection reads as "absent". */
+  read?: (path: string) => Promise<string>
+  /** Write one file, creating parents (default `fs.writeFile`). */
+  write?: (path: string, content: string) => Promise<void>
+  /** Delete one file (default `fs.rm`). */
+  remove?: (path: string) => Promise<void>
+  /** The files under a directory, by filename (default `fs.readdir`); a missing directory reads as none. */
+  list?: (dir: string) => Promise<string[]>
+  /** The data-branch write funnel (default {@link withDataBranch}); a test's fake stands in. */
+  funnel?: typeof withDataBranch
+  /** Progress line. */
+  log?: (message: string) => void
+}
+
+/**
+ * Fill in whatever a caller left out, so an operation reads the same way in tests and out. Parents
+ * are created on write because the directory itself is not a given: retiring the last file removes
+ * it (git keeps no empty dirs), and the branch is born without it.
+ */
+export function resolveDataFileDeps(deps: DataFileDeps): Required<DataFileDeps> {
+  const fs = () => import('node:fs/promises')
+  return {
+    read: deps.read ?? (path => fs().then(f => f.readFile(path, 'utf8'))),
+    write:
+      deps.write ??
+      (async (path, content) => {
+        const f = await fs()
+        await f.mkdir(dirname(path), { recursive: true })
+        await f.writeFile(path, content, 'utf8')
+      }),
+    remove: deps.remove ?? (path => fs().then(f => f.rm(path))),
+    list: deps.list ?? (dir => fs().then(f => f.readdir(dir)).catch((): string[] => [])),
+    funnel: deps.funnel ?? withDataBranch,
+    log: deps.log ?? (() => {}),
+  }
+}
+
 /** How a sync went: converged with origin, or why it could not. */
 export type DataSyncResult = { ok: true } | { ok: false; error: string }
 

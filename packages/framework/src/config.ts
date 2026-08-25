@@ -38,7 +38,7 @@ export interface FrameworkFileConfig {
 }
 
 /** Config file names read from the workspace root, in precedence order. */
-export const FRAMEWORK_CONFIG_FILES = ['the-framework.yml', 'the-framework.yaml'] as const
+const FRAMEWORK_CONFIG_FILES = ['the-framework.yml', 'the-framework.yaml'] as const
 
 /**
  * The keys whose values come from a closed set, so parsing checks the value rather than the type

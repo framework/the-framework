@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FrameworkEvent } from '../../src/index.js'
 import { sessionInfo } from '../../src/client.js'
-import { MoreVertical, Github, FolderOpen, Code, Check, Play, ExternalLink, Square, FolderX, Trash2, Copy, GitMerge } from 'lucide-react'
+import { MoreVertical, Github, FolderOpen, Code, Check, ExternalLink, Square, FolderX, Trash2, Copy, GitMerge } from 'lucide-react'
 import { onGithubUrl } from '../rpc/reads.js'
 import {
   sendOpenInApp,
@@ -10,17 +10,13 @@ import {
   sendRemoveWorktree,
   sendDeleteAgent,
 } from '../rpc/control.js'
-import type { EditorInfo } from '../rpc/preferences.js'
 import { useLoaded } from '../lib/use-async.js'
 import { useAction } from '../lib/use-action.js'
-import { usePreferences, updatePreferences } from '../lib/preferences.js'
-import { useDetectedEditors } from '../lib/editors.js'
 import { isAgentActive } from '../lib/live-state.js'
 import { describeSessionLink } from '../lib/session-link.js'
 import { buildResumeCommand } from '../lib/resume-command.js'
-import { cn } from '../lib/utils.js'
 import { buttonVariants } from './ui/button.js'
-import { OptionLabel } from './ui/option-label.js'
+import { PreferredEditorItems } from './PreferredEditorItems.js'
 import { ConfirmDialog } from './ui/confirm-dialog.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import {
@@ -28,8 +24,6 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuGroup,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubTrigger,
@@ -91,11 +85,6 @@ export function AgentActionsMenu({
   }
   // keepPrevious: hold the last repo URL while a new project's loads, so the item does not flicker.
   const githubUrl = useLoaded<string | null>(() => onGithubUrl(projectId), null, [projectId], true)
-
-  const editor = usePreferences().editor
-  const detectedEditors = useDetectedEditors()
-  const editorRows: EditorInfo[] =
-    editor && !detectedEditors.some(e => e.bin === editor) ? [...detectedEditors, { bin: editor, label: editor }] : detectedEditors
 
   const { busy, error, reset, run } = useAction()
 
@@ -174,30 +163,7 @@ export function AgentActionsMenu({
                 <Code className="h-3.5 w-3.5 shrink-0" /> {agentId ? "Open this session's checkout" : 'Open in your editor'}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuGroup>
-                <DropdownMenuLabel>Preferred editor</DropdownMenuLabel>
-                <DropdownMenuItem
-                  disabled={busy}
-                  closeOnClick={false}
-                  onClick={() => updatePreferences({ editor: '' })}
-                  className="items-start"
-                >
-                  <Check className={cn('mt-0.5 h-3.5 w-3.5 shrink-0', editor ? 'opacity-0' : 'opacity-100')} />
-                  <OptionLabel label="Default" description="$FRAMEWORK_EDITOR, or code" />
-                </DropdownMenuItem>
-                {editorRows.map(e => (
-                  <DropdownMenuItem
-                    key={e.bin}
-                    disabled={busy}
-                    closeOnClick={false}
-                    onClick={() => updatePreferences({ editor: e.bin })}
-                    className="items-start"
-                  >
-                    <Check className={cn('mt-0.5 h-3.5 w-3.5 shrink-0', editor === e.bin ? 'opacity-100' : 'opacity-0')} />
-                    <OptionLabel label={e.label} description={e.bin} />
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuGroup>
+              <PreferredEditorItems busy={busy} />
             </DropdownMenuSubContent>
           </DropdownMenuSub>
           {session && (

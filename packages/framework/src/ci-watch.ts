@@ -2,6 +2,7 @@ import { listAgents, readLiveMetas, type AgentMeta } from './store/index.js'
 import { mergeAgentPr, resolveAgentPr, type HandoffResult, type PrAgent } from './dashboard/agent-handoff.js'
 import { ghPrCiStatus, type LinkedPr, type PrCiStatus } from './dashboard/gh.js'
 import type { Cached } from './dashboard/cache.js'
+import { startProjectPass, type ProjectPass, type ProjectsSource } from './project-pass.js'
 
 // Watch the PRs the framework is waiting to land, and act on what their CI says (#1418).
 //
@@ -255,17 +256,10 @@ async function requestFix(
   return agentId ? { number: pr.number, agentId } : { number: pr.number, reason: 'declined' }
 }
 
-/** A running watch, in the shape the daemon's other background services use. */
-export interface CiWatch {
-  /** Run one sweep now, awaiting it. Exposed for tests and on-demand callers. */
-  tick: () => Promise<void>
-  stop: () => void
-}
-
 /** What {@link startCiWatch} needs from the daemon. */
 export interface CiWatchOptions {
   /** The registered projects to sweep. */
-  projects: () => Promise<readonly { path: string }[]>
+  projects: ProjectsSource
   log: (message: string) => void
   /** The per-project sweep's seams, {@link CiSweepDeps.fix} included — the daemon wires the gates. */
   deps?: CiSweepDeps
@@ -281,10 +275,9 @@ export interface CiWatchOptions {
  * timer is unref'd, and everything it does is logged — a PR merging with no line explaining why
  * reads as a bug even when it is the feature.
  */
-export function startCiWatch(opts: CiWatchOptions): CiWatch {
+export function startCiWatch(opts: CiWatchOptions): ProjectPass {
   const sweep = opts.sweep ?? sweepProjectCi
   const deps: CiSweepDeps = { attemptedMerges: new Set(), ...opts.deps }
-  let stopped = false
 
   // A red or unmergeable PR stays a candidate for a week, and its line does not get truer with
   // repetition: each distinct line is said once per daemon lifetime.
@@ -295,39 +288,18 @@ export function startCiWatch(opts: CiWatchOptions): CiWatch {
     opts.log(line)
   }
 
-  const sweepAll = async (): Promise<void> => {
-    for (const project of await opts.projects().catch(() => [])) {
-      if (stopped) break
-      const result = await sweep(project.path, deps).catch(
-        (): CiSweepResult => ({ merged: [], failed: [], fixes: [] }),
-      )
-      for (const item of result.merged) {
-        opts.log(`[framework] CI watch: checks passed on PR #${item.number}, merged it${item.url ? ` (${item.url})` : ''} (session ${item.agentId})`)
-      }
-      for (const item of result.failed) {
-        sayOnce(`[framework] CI watch: could not merge PR #${item.number}: ${item.error}`)
-      }
-      for (const item of result.fixes) {
-        if (item.agentId) opts.log(`[framework] CI watch: checks failed on PR #${item.number}, started fix session ${item.agentId}`)
-        else if (item.reason === 'attempts-exhausted') sayOnce(`[framework] CI watch: PR #${item.number} is still red after ${MAX_CI_FIX_ATTEMPTS} fix sessions; leaving it for a human`)
-      }
-    }
-  }
-
-  let inflight: Promise<void> | undefined
-  const tick = (): Promise<void> => {
-    if (stopped) return Promise.resolve()
-    inflight ??= sweepAll().finally(() => {
-      inflight = undefined
-    })
-    return inflight
-  }
-
   // No timer of its own (E4): the daemon's one clock calls `tick`.
-  return {
-    tick,
-    stop: () => {
-      stopped = true
-    },
-  }
+  return startProjectPass(opts.projects, async cwd => {
+    const result = await sweep(cwd, deps).catch((): CiSweepResult => ({ merged: [], failed: [], fixes: [] }))
+    for (const item of result.merged) {
+      opts.log(`[framework] CI watch: checks passed on PR #${item.number}, merged it${item.url ? ` (${item.url})` : ''} (session ${item.agentId})`)
+    }
+    for (const item of result.failed) {
+      sayOnce(`[framework] CI watch: could not merge PR #${item.number}: ${item.error}`)
+    }
+    for (const item of result.fixes) {
+      if (item.agentId) opts.log(`[framework] CI watch: checks failed on PR #${item.number}, started fix session ${item.agentId}`)
+      else if (item.reason === 'attempts-exhausted') sayOnce(`[framework] CI watch: PR #${item.number} is still red after ${MAX_CI_FIX_ATTEMPTS} fix sessions; leaving it for a human`)
+    }
+  })
 }

@@ -4,6 +4,7 @@ import { ghPrsForBranch, type LinkedPr } from './dashboard/gh.js'
 import { startedAtFromAgentId, FRAMEWORK_DIR, AGENT_BRANCH_PREFIX, LEGACY_AGENT_BRANCH_PREFIX } from './store/index.js'
 import { nodeFs } from './node-fs.js'
 import { errorMessage } from './error-message.js'
+import { startProjectPass, type ProjectPass, type ProjectsSource } from './project-pass.js'
 
 // Sweep the scratch refs a cloud hand-off leaves on origin (#1547).
 //
@@ -55,7 +56,7 @@ const RUN_BRANCH_PREFIXES = [`${AGENT_BRANCH_PREFIX}agent-`, `${LEGACY_AGENT_BRA
  * timestamp and its commit date says nothing — the driver pushes the worktree's HEAD, which is
  * however old the base commit happens to be, not when the hand-off happened.
  */
-export const CLOUD_REFS_FILE = 'cloud-refs.json'
+const CLOUD_REFS_FILE = 'cloud-refs.json'
 
 /** When the sweep first saw each `cloud-*` ref on origin, ISO, keyed by short ref name. */
 interface CloudRefsState {
@@ -318,17 +319,10 @@ export async function sweepCloudScratchRefs(cwd: string, deps: ScratchSweepDeps 
   return result
 }
 
-/** A running sweep, in the shape the daemon's other background services use. */
-export interface CloudScratchSweep {
-  /** Run one sweep now, awaiting it. Exposed for tests and for a caller that wants it on demand. */
-  tick: () => Promise<void>
-  stop: () => void
-}
-
 /** What {@link startCloudScratchSweep} needs from the daemon. */
 export interface CloudScratchSweepOptions {
   /** The registered projects to sweep. */
-  projects: () => Promise<readonly { path: string }[]>
+  projects: ProjectsSource
   log: (message: string) => void
   /** The agents the daemon is still responsible for, whose run branches this must not touch. */
   busy?: () => ReadonlySet<string>
@@ -343,39 +337,17 @@ export interface CloudScratchSweepOptions {
  * enough yet is the normal state of every ref this watches, and a line per tick about it would be
  * noise. A ref vanishing from origin with no line explaining why would read as a bug.
  */
-export function startCloudScratchSweep(opts: CloudScratchSweepOptions): CloudScratchSweep {
+export function startCloudScratchSweep(opts: CloudScratchSweepOptions): ProjectPass {
   const sweep = opts.sweep ?? ((cwd: string) => sweepCloudScratchRefs(cwd, { ...(opts.busy ? { busy: opts.busy() } : {}) }))
-  let stopped = false
-
-  const sweepAll = async (): Promise<void> => {
-    for (const project of await opts.projects().catch(() => [])) {
-      if (stopped) break
-      const { deleted, failed } = await sweep(project.path).catch((): ScratchSweepResult => ({ deleted: [], kept: [], failed: [] }))
-      for (const ref of deleted) {
-        opts.log(`[framework] deleted the leftover cloud hand-off ref ${ref} on origin: its session settled long ago and nothing consumes it (#1547).`)
-      }
-      for (const item of failed) {
-        opts.log(`[framework] could not delete the leftover ref ${item.ref} on origin: ${item.error}`)
-      }
-    }
-  }
-
-  // Overlapping ticks join the sweep already running rather than being dropped, so awaiting
-  // `tick()` means the sweep finished — same rule as the worktree sweep, for the same reason.
-  let inflight: Promise<void> | undefined
-  const tick = (): Promise<void> => {
-    if (stopped) return Promise.resolve()
-    inflight ??= sweepAll().finally(() => {
-      inflight = undefined
-    })
-    return inflight
-  }
 
   // No timer of its own (E4): the daemon's one clock calls `tick`.
-  return {
-    tick,
-    stop: () => {
-      stopped = true
-    },
-  }
+  return startProjectPass(opts.projects, async cwd => {
+    const { deleted, failed } = await sweep(cwd).catch((): ScratchSweepResult => ({ deleted: [], kept: [], failed: [] }))
+    for (const ref of deleted) {
+      opts.log(`[framework] deleted the leftover cloud hand-off ref ${ref} on origin: its session settled long ago and nothing consumes it (#1547).`)
+    }
+    for (const item of failed) {
+      opts.log(`[framework] could not delete the leftover ref ${item.ref} on origin: ${item.error}`)
+    }
+  })
 }

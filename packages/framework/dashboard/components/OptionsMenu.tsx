@@ -28,11 +28,8 @@ import {
 export type { OptionRow } from '../lib/agent-option-rows.js'
 
 
-// Moved to ui/option-label.tsx (#948) so menus without preference wiring can share it;
-// re-exported to keep this module the import site the other menus already use.
 import { OptionLabel } from './ui/option-label.js'
 import { RUN_TARGET_LABELS } from '../lib/agent-settings.js'
-export { OptionLabel }
 
 /**
  * Where an agent executes (#1050/#610). `local` runs on this device; `actions` on a GitHub Actions

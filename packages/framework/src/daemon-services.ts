@@ -160,7 +160,7 @@ export async function resolveProjectAgentOptions(id: string, env: NodeJS.Process
  * go from a stand-down straight to `ps` and to the run's own page. The worktree-less fallback
  * agent has no id of its own and is named by where it runs.
  */
-export function describeSlot(slot: ActiveAgentSlot): string {
+function describeSlot(slot: ActiveAgentSlot): string {
   const who = slot.agentId ?? 'a run in the project checkout'
   return slot.state === 'starting' ? `${who} (starting)` : `${who} (pid ${slot.pid})`
 }

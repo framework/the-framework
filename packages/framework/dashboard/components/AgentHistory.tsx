@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Plus, ChevronDown, Cloud, Laptop, MonitorSmartphone, Settings, LayoutDashboard, FolderGit2, Ticket } from 'lucide-react'
 import type { AgentMeta, AgentStatus, RecentAgent, ProjectSummary } from '../../src/index.js'
 import { DRIVER_LABELS, driverFromImpl, cloudRunState, type CloudRunState } from '../../src/client.js'
@@ -293,9 +293,22 @@ export function AgentHistory({
   )
 }
 
-// Tickets: a project's backlog as its own nav item (#1144), same row style as Overview. Only
-// rendered once a project is selected — there is nothing to open otherwise.
-function TicketsButton({ active, onClick }: { active: boolean; onClick: () => void }) {
+// One rail destination — Overview, Tickets. Same box as New (px-2 py-1.5 gap-2) so every row's
+// icon and label line up exactly, and only the current view carries the active fill.
+function NavRow({
+  icon: Icon,
+  label,
+  active,
+  onClick,
+  children,
+}: {
+  icon: typeof LayoutDashboard
+  label: string
+  active: boolean
+  onClick: () => void
+  /** What sits after the label, e.g. the Overview row's Human Queue badge. */
+  children?: ReactNode
+}) {
   return (
     <button
       type="button"
@@ -306,8 +319,9 @@ function TicketsButton({ active, onClick }: { active: boolean; onClick: () => vo
         active ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-foreground hover:bg-sidebar-accent/60',
       )}
     >
-      <Ticket className="h-4 w-4 shrink-0" aria-hidden />
-      <span className="flex-1 text-left">Tickets</span>
+      <Icon className="h-4 w-4 shrink-0" aria-hidden />
+      <span className="flex-1 text-left">{label}</span>
+      {children}
     </button>
   )
 }
@@ -317,18 +331,7 @@ function TicketsButton({ active, onClick }: { active: boolean; onClick: () => vo
 // highlights while it is the current view.
 function OverviewButton({ active, count, onClick }: { active: boolean; count: number; onClick: () => void }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-current={active ? 'page' : undefined}
-      className={cn(
-        // Same box as New (px-2 py-1.5 gap-2) so the two rows' icons and labels line up exactly.
-        'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
-        active ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-foreground hover:bg-sidebar-accent/60',
-      )}
-    >
-      <LayoutDashboard className="h-4 w-4 shrink-0" aria-hidden />
-      <span className="flex-1 text-left">Overview</span>
+    <NavRow icon={LayoutDashboard} label="Overview" active={active} onClick={onClick}>
       {count > 0 && (
         <Tooltip>
           <TooltipTrigger
@@ -343,8 +346,14 @@ function OverviewButton({ active, count, onClick }: { active: boolean; count: nu
           </TooltipContent>
         </Tooltip>
       )}
-    </button>
+    </NavRow>
   )
+}
+
+// Tickets: a project's backlog as its own nav item (#1144), same row as Overview. Only rendered
+// once a project is selected — there is nothing to open otherwise.
+function TicketsButton({ active, onClick }: { active: boolean; onClick: () => void }) {
+  return <NavRow icon={Ticket} label="Tickets" active={active} onClick={onClick} />
 }
 
 // Projects: the project selector as an expandable nav item (Rom), the same row style as Overview,

@@ -4,30 +4,15 @@ import { createServer, type Server } from 'node:http'
 import { connect } from 'node:net'
 import { makeRpcMount, type DashboardContext } from './rpc-serve.js'
 import { RPC_HANDLERS } from '../dashboard-rpc/index.js'
-import { registryPreferencesStore } from '../registry.js'
-import { registryDiscordCredentialsStore } from '../discord-credentials-store.js'
-import { defaultQuotaSource } from './quota.js'
+import { testDashboardContext } from '../dashboard-rpc/test-context.js'
 
 // F3: the dashboard's transport is `POST /_rpc/<name>` and `GET /_rpc/events`, where it used to be
 // Telefunc. The CSRF and rebound-Host guards are covered in server.test.ts, which exercises them
 // through the whole dashboard; these pin the dispatch itself.
 
-const context: DashboardContext = {
-  startAgent: () => ({ ok: false, error: 'not wired in this test' }),
-  addProject: () => ({ ok: false, error: 'not wired in this test' }),
-  eventsSource: () => undefined,
-  remote: { target: () => undefined, list: () => [] },
-  preferences: registryPreferencesStore(),
-  discord: registryDiscordCredentialsStore(),
-  quota: defaultQuotaSource(),
-  autoPm: () => undefined,
-  autoPmSweep: () => {},
-  projectErrors: () => [],
-}
-
 /** A server carrying just the mount, so a test can call it over real HTTP. */
 async function mounted(over: Partial<DashboardContext> = {}): Promise<{ url: string; close: () => Promise<void> }> {
-  const mount = makeRpcMount({ ...context, ...over })
+  const mount = makeRpcMount(testDashboardContext(over))
   const server: Server = createServer((req, res) => {
     void mount(req, res).then(handled => {
       if (!handled) {

@@ -3,6 +3,7 @@ import { nodeGitRunner, type GitRunner } from './project.js'
 import { excludeFromGit } from './git-exclude.js'
 import { FRAMEWORK_DIR, BRANCHES_DIR, worktreeDirEntries, worktreeBranch, type WorktreeDirEntry } from './store/index.js'
 import { isWorktreeDirName } from './branch-names.js'
+import { startProjectPass, type ProjectPass, type ProjectsSource } from './project-pass.js'
 
 // The branches view (#1580): every checkout under `.the-framework/branches/` is a directory named
 // as its birth branch (`tf-agent-<id>`), and this pass keeps the *current* names reachable beside
@@ -32,7 +33,7 @@ export interface LinksFs {
 }
 
 /** A {@link LinksFs} over `node:fs/promises`, dynamically imported like {@link nodeDirLister}. */
-export function nodeLinksFs(): LinksFs {
+function nodeLinksFs(): LinksFs {
   const fs = () => import('node:fs/promises')
   return {
     readdir: dir => fs().then(f => f.readdir(dir)).catch(() => []),
@@ -121,16 +122,9 @@ export async function reconcileBranchLinks(cwd: string, deps: BranchLinksDeps = 
   }
 }
 
-/** A running reconcile pass, in the shape the daemon's other background services use. */
-export interface BranchLinksPass {
-  /** Run one pass now, awaiting it. */
-  tick: () => Promise<void>
-  stop: () => void
-}
-
 /** What {@link startBranchLinksPass} needs from the daemon. */
 export interface BranchLinksOptions {
-  projects: () => Promise<readonly { path: string }[]>
+  projects: ProjectsSource
   /** The per-project reconcile (default {@link reconcileBranchLinks}). */
   reconcile?: (cwd: string) => Promise<void>
 }
@@ -141,31 +135,7 @@ export interface BranchLinksOptions {
  * gets its link immediately because allocation calls the reconcile too. Quiet on purpose: links
  * are presentation, and narrating every rename would drown the log.
  */
-export function startBranchLinksPass(opts: BranchLinksOptions): BranchLinksPass {
+export function startBranchLinksPass(opts: BranchLinksOptions): ProjectPass {
   const reconcile = opts.reconcile ?? reconcileBranchLinks
-  let stopped = false
-
-  const passAll = async (): Promise<void> => {
-    for (const project of await opts.projects().catch(() => [])) {
-      if (stopped) break
-      await reconcile(project.path).catch(() => {})
-    }
-  }
-
-  // Same overlap rule as the worktree sweep: awaiting `tick()` means the pass finished.
-  let inflight: Promise<void> | undefined
-  const tick = (): Promise<void> => {
-    if (stopped) return Promise.resolve()
-    inflight ??= passAll().finally(() => {
-      inflight = undefined
-    })
-    return inflight
-  }
-
-  return {
-    tick,
-    stop: () => {
-      stopped = true
-    },
-  }
+  return startProjectPass(opts.projects, cwd => reconcile(cwd).catch(() => {}))
 }

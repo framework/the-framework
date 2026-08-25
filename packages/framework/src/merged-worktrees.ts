@@ -1,6 +1,7 @@
 import { listProjectWorktrees, removeProjectWorktree, type RemoveResult, type WorktreeRow } from './worktrees.js'
 import { withAgentLock } from './agent-locks.js'
 import { repoHasRemote, worktreePath } from './store/index.js'
+import { startProjectPass, type ProjectPass, type ProjectsSource } from './project-pass.js'
 
 // Reclaim a session's checkout once its work is on the remote (#1036/E5).
 //
@@ -98,17 +99,10 @@ export function describeDeleted(branches: readonly string[]): string {
   return branches.length === 1 ? `its branch ${branches[0]}` : `its branches ${branches.join(' and ')}`
 }
 
-/** A running sweep, in the shape the daemon's other background services use. */
-export interface MergedWorktreeSweep {
-  /** Run one sweep now, awaiting it. Exposed for tests and for a caller that wants it on demand. */
-  tick: () => Promise<void>
-  stop: () => void
-}
-
 /** What {@link startMergedWorktreeSweep} needs from the daemon. */
 export interface MergedSweepOptions {
   /** The registered projects to sweep. */
-  projects: () => Promise<readonly { path: string }[]>
+  projects: ProjectsSource
   log: (message: string) => void
   /**
    * The agents the daemon is still responsible for — spawning, running, or mid-retirement — whose
@@ -130,9 +124,8 @@ export interface MergedSweepOptions {
  * Says what it removed rather than removing it silently: a checkout vanishing from under someone
  * with no line explaining why reads as a bug, even when the work behind it is safe.
  */
-export function startMergedWorktreeSweep(opts: MergedSweepOptions): MergedWorktreeSweep {
+export function startMergedWorktreeSweep(opts: MergedSweepOptions): ProjectPass {
   const sweep = opts.sweep ?? ((cwd: string) => removeMergedWorktrees(cwd, { ...(opts.busy ? { busy: opts.busy() } : {}) }))
-  let stopped = false
   // Each checkout's last-announced keep reason, so a retained checkout is accounted for once per
   // *state* rather than re-announced every ten minutes for the life of the daemon — a permanently
   // unpushable one (no remote, a publish-nothing session) repeats forever. A changed reason is a
@@ -142,44 +135,22 @@ export function startMergedWorktreeSweep(opts: MergedSweepOptions): MergedWorktr
   // state deserves.
   const announced = new Map<string, string>()
 
-  const sweepAll = async (): Promise<void> => {
-    for (const project of await opts.projects().catch(() => [])) {
-      if (stopped) break
-      const { removed, failed } = await sweep(project.path).catch((): MergedSweepResult => ({ removed: [], failed: [] }))
-      for (const item of removed) {
-        announced.delete(item.agentId)
-        opts.log(
-          item.branchesDeleted
-            ? `[framework] removed the worktree for session ${item.agentId} and ${describeDeleted(item.branchesDeleted)}: nothing on it is missing elsewhere. The session is kept.`
-            : `[framework] removed the worktree for session ${item.agentId}: its branch is on the remote. The branch and the session are kept.`,
-        )
-      }
-      for (const item of failed) {
-        if (announced.get(item.agentId) === item.error) continue
-        announced.set(item.agentId, item.error)
-        opts.log(`[framework] kept the worktree for session ${item.agentId}: ${item.error}`)
-      }
-    }
-  }
-
-  // Overlapping ticks join the sweep already running rather than being dropped: awaiting `tick()`
-  // has to mean the sweep finished, or an on-demand caller (and a test) gets a silent no-op
-  // whenever the clock's turn happens to be mid-flight.
-  let inflight: Promise<void> | undefined
-  const tick = (): Promise<void> => {
-    if (stopped) return Promise.resolve()
-    inflight ??= sweepAll().finally(() => {
-      inflight = undefined
-    })
-    return inflight
-  }
-
   // No timer of its own (E4): the daemon's one clock calls `tick`, including once at start-up —
   // the case this exists for is a machine that was off while the work could not be pushed.
-  return {
-    tick,
-    stop: () => {
-      stopped = true
-    },
-  }
+  return startProjectPass(opts.projects, async cwd => {
+    const { removed, failed } = await sweep(cwd).catch((): MergedSweepResult => ({ removed: [], failed: [] }))
+    for (const item of removed) {
+      announced.delete(item.agentId)
+      opts.log(
+        item.branchesDeleted
+          ? `[framework] removed the worktree for session ${item.agentId} and ${describeDeleted(item.branchesDeleted)}: nothing on it is missing elsewhere. The session is kept.`
+          : `[framework] removed the worktree for session ${item.agentId}: its branch is on the remote. The branch and the session are kept.`,
+      )
+    }
+    for (const item of failed) {
+      if (announced.get(item.agentId) === item.error) continue
+      announced.set(item.agentId, item.error)
+      opts.log(`[framework] kept the worktree for session ${item.agentId}: ${item.error}`)
+    }
+  })
 }

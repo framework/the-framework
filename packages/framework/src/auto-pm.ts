@@ -25,7 +25,7 @@ export const DEFAULT_AUTO_PM_INTERVAL_MS = 10 * 60 * 1000
  * takes a moment to appear in the daemon's live-run map, and without this the next tick
  * would see "nothing running, queue still empty" and start a second one.
  */
-export const DEFAULT_AUTO_PM_COOLDOWN_MS = 30 * 60 * 1000
+const DEFAULT_AUTO_PM_COOLDOWN_MS = 30 * 60 * 1000
 
 /** What the policy was told about one project at one moment. */
 export interface AutoPmInputs {

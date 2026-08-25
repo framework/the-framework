@@ -381,7 +381,7 @@ async function runCycle() {
 
   const now = Date.now()
   const planned = planVisits(statuses, answers, seen, now)
-  // Answers first, then a bounded handful of parked sessions; what is cut waits for the next
+  // Answers first, then a bounded handful of the due sessions; what is cut waits for the next
   // beat, with the change that made it due kept pending below.
   const visits = [...planned.filter(v => v.answer), ...planned.filter(v => !v.answer)].slice(0, MAX_VISITS)
   for (const visit of visits) if (visit.answer) deliveredAnswers.add(visit.answer.id)

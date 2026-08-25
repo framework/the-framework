@@ -771,8 +771,12 @@ const LIST_LABELS = new Map([
   ['Idle', 'idle'],
   ['Running', 'running'],
 ])
-/** Once the session's work landed, its pull request and state stand in for the status. */
-const LANDED_LABEL = /^#\d+ · /
+/**
+ * A pull request's label stands in for the status only with no status word on the row: merged or
+ * closed, the session's work landed; still open, the session went quiet and is idle (#1707).
+ */
+const LANDED_LABEL = /^#\d+ · (Merged|Closed)\b/
+const OPEN_LABEL = /^#\d+ · Open\b/
 const NAV_WAIT_MS = 15000
 const ROWS_WAIT_MS = 20000
 const SEND_WAIT_MS = 15000
@@ -837,6 +841,7 @@ function statusOf(anchor) {
   // Only with no status word on the row does its pull request stand in for one: a row can carry
   // both, and "Awaiting input" beside a pull request is still a session stopped for its user.
   if (labels.some(label => LANDED_LABEL.test(label))) return { status: 'landed' }
+  if (labels.some(label => OPEN_LABEL.test(label))) return { status: 'idle' }
   return { status: 'unknown', label: (labels[0] ?? '').slice(0, 80) }
 }
 

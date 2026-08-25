@@ -50,8 +50,16 @@ function hunksOnly(patch: string): string {
 function countChanges(patch: string): { added: number; removed: number } {
   let added = 0
   let removed = 0
+  let inHunk = false
   for (const line of patch.split('\n')) {
-    if (line.startsWith('+++') || line.startsWith('---')) continue
+    if (line.startsWith('@@')) {
+      inHunk = true
+      continue
+    }
+    // The file headers only ever precede the first hunk. Past it a line opening the same way is
+    // content — a removed `---` separator reads `----`, a removed `-- comment` reads `--- comment`
+    // — and skipping those undercounted the file's own stats.
+    if (!inHunk && (line.startsWith('+++') || line.startsWith('---'))) continue
     if (line.startsWith('+')) added++
     else if (line.startsWith('-')) removed++
   }

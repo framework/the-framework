@@ -30,6 +30,24 @@ test('a modified file yields the hunks, without git’s diff/index preamble', as
   assert.equal(diff.removed, 1) // the `---`/`+++` headers are not counted as changes
 })
 
+test('a removed line that looks like a file header is still counted', async () => {
+  // A removed `---` separator reads `----` in the patch and a removed `-- comment` reads
+  // `--- comment`: content, not headers, and dropping them undercounted the file's own stats.
+  const patch = [
+    '--- a/notes.md',
+    '+++ b/notes.md',
+    '@@ -1,4 +1,1 @@',
+    '----',
+    '-title: x',
+    '--- a note',
+    ' kept',
+  ].join('\n')
+  const diff = await readFileDiff('/repo', 'notes.md', 'modified', fakeGit(patch))
+  assert.ok(diff)
+  assert.equal(diff.removed, 3)
+  assert.equal(diff.added, 0)
+})
+
 test('a file with no diff to show yields null, not an empty card', async () => {
   assert.equal(await readFileDiff('/repo', 'src/a.ts', 'modified', fakeGit('')), null)
 })

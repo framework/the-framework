@@ -192,7 +192,7 @@ describe('TicketsPage filters (#1144)', () => {
     // Matching lowercases the ticket's topics, so an `UX` badge added verbatim matched nothing —
     // clicking it emptied the page instead of narrowing it.
     fixture([ticket({ file: 'ux.md', title: 'Polish the rail', topics: ['UX'] }), ticket({ file: 'other.md', title: 'Something else' })])
-    render(<TicketsPage onOpenTicket={() => {}} />)
+    render(<TicketsPage onOpenTicket={() => {}} onSelectProject={() => {}} />)
     await screen.findByText('Polish the rail')
     fireEvent.click(screen.getByRole('button', { name: 'UX' }))
     await waitFor(() => expect(screen.queryByText('Something else')).toBeNull())

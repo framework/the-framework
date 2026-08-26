@@ -132,20 +132,24 @@ test('an undelivered pick dies with the question it answered (#1237)', () => {
 
 test("claude.ai's list saying a session awaits input makes it waiting, until the session is cleared (#1332)", () => {
   const store = new BridgeQuestions()
-  assert.equal(store.waiting(SESSION), false)
+  // A fixed clock: a list status counts only within the session window, so the test's "now" must
+  // sit inside the window of the timestamps it records — not the wall clock, which walked out of
+  // it twelve hours after the timestamps were written.
+  const now = new Date('2026-08-25T18:05:00.000Z')
+  assert.equal(store.waiting(SESSION, now), false)
   // A question asked in prose carries no block: the list is the only thing that says the session
   // stopped for its user.
   store.recordStatus({ sessionId: SESSION, status: 'awaiting', at: '2026-08-25T18:00:00.000Z' })
-  assert.equal(store.waiting(SESSION), true)
+  assert.equal(store.waiting(SESSION, now), true)
   assert.equal(store.status(SESSION)?.status, 'awaiting')
   // The newest report replaces the older one.
   store.recordStatus({ sessionId: SESSION, status: 'idle', at: '2026-08-25T18:01:00.000Z' })
-  assert.equal(store.waiting(SESSION), false)
+  assert.equal(store.waiting(SESSION, now), false)
   // A parked question makes the session waiting whatever the list said.
   store.record(question())
-  assert.equal(store.waiting(SESSION), true)
+  assert.equal(store.waiting(SESSION, now), true)
   store.clear(SESSION)
-  assert.equal(store.waiting(SESSION), false)
+  assert.equal(store.waiting(SESSION, now), false)
   assert.equal(store.status(SESSION), undefined)
 })
 

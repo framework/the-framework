@@ -250,10 +250,16 @@ export async function terminate(pid: number, graceMs: number): Promise<boolean> 
     // exited between the check and the signal
   }
   if (!(await waitForExit(pid, graceMs))) {
-    try {
-      process.kill(pid, 'SIGKILL')
-    } catch {
-      // raced us to exit
+    // The agent leads its own process group (it is spawned detached) and the browser it launched
+    // sits in that group, so the kill goes to the group (#1719): a SIGKILL to the agent alone runs
+    // none of its handlers, and its Chrome reparented to init and ran on for days. Then the pid
+    // itself, for a process that led no group.
+    for (const target of [-pid, pid]) {
+      try {
+        process.kill(target, 'SIGKILL')
+      } catch {
+        // raced us to exit
+      }
     }
     await waitForExit(pid, 1000)
   }

@@ -1,6 +1,8 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { waitOutFinishedLeg, waitOutSlots, type FinishedLegState } from './daemon-runtime.js'
+import { spawn } from 'node:child_process'
+import { terminate, waitOutFinishedLeg, waitOutSlots, type FinishedLegState } from './daemon-runtime.js'
+import { isPidAlive } from './store/index.js'
 
 const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms))
 
@@ -179,4 +181,41 @@ test('the wait is bounded: a wedged teardown costs the grace period, not the exi
   await waitOutSlots(['p::r1'], slots, 120)
   assert.ok(Date.now() - before >= 120, 'the grace period was sat out')
   assert.ok(slots.activeAgents.has('p::r1'), 'and it gave up rather than hanging the shutdown')
+})
+
+// The escalation behind #1719: an agent is spawned detached, so it leads a process group that its
+// browser sits in; a SIGKILL to the agent alone left that browser on init for days.
+
+test('terminate reaps the whole process group of an agent that ignores SIGTERM, browser included (#1719)', async () => {
+  // Stands in for an agent wedged in shutdown: ignores SIGTERM, has spawned a child that lingers
+  // like a headless Chrome, and prints that child's pid so the test can watch it.
+  const agent = spawn(
+    process.execPath,
+    [
+      '-e',
+      [
+        "process.on('SIGTERM', () => {})",
+        "const child = require('node:child_process').spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' })",
+        'process.stdout.write(String(child.pid))',
+        'setInterval(() => {}, 1000)',
+      ].join('\n'),
+    ],
+    { detached: true, stdio: ['ignore', 'pipe', 'ignore'] },
+  )
+  const browserPid = await new Promise<number>(resolve => agent.stdout.once('data', chunk => resolve(Number(String(chunk)))))
+  assert.ok(browserPid > 0 && isPidAlive(browserPid))
+  try {
+    assert.equal(await terminate(agent.pid!, 200), true, 'it was alive to begin with')
+    for (let i = 0; i < 20 && isPidAlive(browserPid); i++) await sleep(50)
+    assert.equal(isPidAlive(agent.pid!), false, 'the agent is gone')
+    assert.equal(isPidAlive(browserPid), false, 'and so is the browser it launched — not left on init')
+  } finally {
+    for (const pid of [browserPid, agent.pid!]) {
+      try {
+        process.kill(pid, 'SIGKILL')
+      } catch {
+        // already gone
+      }
+    }
+  }
 })

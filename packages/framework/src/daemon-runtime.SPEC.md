@@ -18,7 +18,7 @@ Starting, supervising and retiring agents on behalf of the daemon: every agent t
 - **Retiring a finished agent** - its history is archived onto the data branch, then its checkout is removed once its work has reached the remote, and kept otherwise; any branch that went with it is named.
 - **Running an agent on another device** - a start aimed at a device is handed to that daemon over the relay, its events are streamed back, and read/steer requests for it are forwarded there.
 - **Adding projects** - the repo at a given path is activated and registered in one go.
-- **Shutdown stops every agent it spawned** - Ctrl-C terminates each agent's process and waits for its teardown to finish before the daemon lets go of the repo; starts landing during shutdown are refused.
+- **Shutdown stops every agent it spawned** - Ctrl-C terminates each agent's process — an agent that will not go is killed together with its whole process group, its browser included — and waits for its teardown to finish before the daemon lets go of the repo; starts landing during shutdown are refused.
 
 ## Business logic
 
@@ -206,7 +206,7 @@ The user presses Ctrl-C. Nothing the daemon started may outlive it.
 
 #### Business logic
 
-Every agent this daemon spawned is sent a terminate signal, which the agent already handles by aborting cleanly and killing its own driver, and a kill signal if it will not go within the grace period. Only agents this daemon spawned are stopped; an agent it merely steers is not its to stop. The ids of the agents it stopped are reported, so the shutdown line can name a process that outlived its finished agent.
+Every agent this daemon spawned is sent a terminate signal, which the agent already handles by aborting cleanly and killing its own driver and closing its own browser. An agent that will not go within the grace period is killed outright, and the kill goes to its whole process group, not just the agent: the browser the agent launched sits in that group, and a kill to the agent alone runs none of the agent's own cleanup, leaving that browser running with nothing left that knows about it. Only agents this daemon spawned are stopped; an agent it merely steers is not its to stop. The ids of the agents it stopped are reported, so the shutdown line can name a process that outlived its finished agent.
 
 Shutdown then waits — bounded by the same grace period — until the daemon has actually let go of the repo: not merely until the processes are dead, but until each stopped agent's teardown has finished. The archive commit that runs right behind shutdown depends on this; without the wait it fires while an agent is still being archived and misses that agent's ending.
 

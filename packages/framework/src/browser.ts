@@ -1,10 +1,12 @@
-import { spawn, type ChildProcess } from 'node:child_process'
+import { execFile, spawn, type ChildProcess } from 'node:child_process'
 import type { ClaudeCodeDriverOptions, McpServerSpec } from './driver/index.js'
+import type { EventEmitter } from 'node:events'
 import { existsSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
-import { delimiter, join } from 'node:path'
+import { basename, delimiter, join } from 'node:path'
+import { promisify } from 'node:util'
 
 /**
  * The agent's browser (#793, first slice of #609).
@@ -22,6 +24,12 @@ export interface SharedBrowser {
   /** Kill Chrome and remove its throwaway profile. Safe to call twice. */
   close(): Promise<void>
 }
+
+/**
+ * The prefix of every throwaway profile an agent's browser runs on. It is the ownership mark
+ * (#1719): a Chrome whose profile carries it was launched by an agent, and by nothing else.
+ */
+export const AGENT_PROFILE_PREFIX = 'framework-chrome-'
 
 /** Where Chrome usually lives, per platform. First hit wins. */
 const CHROME_PATHS: Record<string, string[]> = {
@@ -145,7 +153,7 @@ export async function launchSharedBrowser(
   if (!chromePath) return undefined
 
   const port = await freePort()
-  const userDataDir = await mkdtemp(join(tmpdir(), 'framework-chrome-'))
+  const userDataDir = await mkdtemp(join(tmpdir(), AGENT_PROFILE_PREFIX))
   const browserUrl = `http://127.0.0.1:${port}`
 
   let child: ChildProcess
@@ -155,11 +163,13 @@ export async function launchSharedBrowser(
     await rm(userDataDir, { recursive: true, force: true })
     return undefined
   }
+  const disarm = reapOnExit(child)
 
   let closed = false
   const close = async () => {
     if (closed) return
     closed = true
+    disarm()
     child.kill()
     await rm(userDataDir, { recursive: true, force: true }).catch(() => {})
   }
@@ -176,6 +186,103 @@ export async function launchSharedBrowser(
     return undefined
   }
   return { browserUrl, close }
+}
+
+/**
+ * Kill `child` when this process exits before `close()` ran (#1719). Node reaps nothing on its
+ * own: an agent that leaves through `process.exit` (the second Ctrl+C) or an uncaught error
+ * leaves its Chrome running on `ppid 1`, and a headless Chrome that nobody owns runs for days.
+ * Signal deaths are the CLI's to handle — it aborts the agent, which closes the browser — and a
+ * SIGKILL runs no handler at all; that case is the daemon's, which kills the agent's whole
+ * process group. Returns the disarm, for a browser closed the ordinary way.
+ *
+ * `target` is the process; injectable so a test can fire the exit without exiting.
+ */
+export function reapOnExit(child: ChildProcess, target: EventEmitter = process): () => void {
+  const reap = () => {
+    try {
+      child.kill('SIGKILL')
+    } catch {
+      // already gone
+    }
+  }
+  target.once('exit', reap)
+  return () => void target.off('exit', reap)
+}
+
+/** A browser process an agent launched, as read off the process table. */
+export interface AgentBrowser {
+  pid: number
+  /** Its throwaway profile directory, which is what marks it as ours. */
+  profile: string
+}
+
+/**
+ * The agent browsers in a process listing that no agent owns any more (#1719). `listing` is
+ * `ps -axo pid=,ppid=,command=`: one process per line, pid, parent pid, then the full command.
+ *
+ * Ours = the command carries a `--user-data-dir` under the agent-profile prefix and is the
+ * browser process itself, not one of its `--type=` helpers (renderers and the like repeat the
+ * flag, and their parent is the browser). Orphaned = its parent is gone, which shows as
+ * reparenting: to pid 1, to a process not in the listing, or to a process that is not Node —
+ * the only thing that ever launches these browsers is a Node agent, so any other parent is the
+ * init, subreaper or shell that inherited it.
+ */
+export function orphanedAgentBrowsers(listing: string): AgentBrowser[] {
+  const rows = new Map<number, { ppid: number; command: string }>()
+  for (const line of listing.split('\n')) {
+    const match = /^\s*(\d+)\s+(\d+)\s+(.*)$/.exec(line)
+    if (match) rows.set(Number(match[1]), { ppid: Number(match[2]), command: match[3] ?? '' })
+  }
+  // `ps` prints the command unquoted, so a Node under a path with spaces in it cannot be split
+  // into argv; instead the executable is looked for before the first flag, as a path segment
+  // named `node` (`node22` and `node.exe` included).
+  const isNode = (command: string): boolean => /(?:^|\/)node\d*(?:\.exe)?(?:\s|$)/.test(command.split(/\s-/)[0] ?? '')
+  const orphans: AgentBrowser[] = []
+  for (const [pid, { ppid, command }] of rows) {
+    const profile = /(?:^|\s)--user-data-dir=(\S+)/.exec(command)?.[1]
+    if (!profile || !basename(profile).startsWith(AGENT_PROFILE_PREFIX) || /\s--type=/.test(command)) continue
+    const parent = rows.get(ppid)
+    if (ppid === 1 || !parent || !isNode(parent.command)) orphans.push({ pid, profile })
+  }
+  return orphans
+}
+
+/** What the sweep needs from the machine; injectable so a test needs no orphan of its own. */
+export interface OrphanSweepDeps {
+  /** The process listing, `ps -axo pid=,ppid=,command=` shaped. */
+  list(): Promise<string>
+  kill(pid: number, signal: NodeJS.Signals): void
+  /** Remove a throwaway profile. */
+  remove(path: string): Promise<void>
+  platform: string
+}
+
+const realSweepDeps = (): OrphanSweepDeps => ({
+  list: async () => (await promisify(execFile)('ps', ['-axo', 'pid=,ppid=,command='], { maxBuffer: 64 * 1024 * 1024 })).stdout,
+  kill: (pid, signal) => process.kill(pid, signal),
+  remove: path => rm(path, { recursive: true, force: true }),
+  platform: process.platform,
+})
+
+/**
+ * Kill every agent browser no agent owns any more, and remove its profile (#1719). Run at daemon
+ * boot: it is the net under the two in-process guards, for a Chrome whose agent died by SIGKILL
+ * under a daemon that is gone, or from a build before the guards existed. Returns what it closed.
+ * Windows has no `ps`; the sweep does nothing there.
+ */
+export async function closeOrphanedAgentBrowsers(deps: OrphanSweepDeps = realSweepDeps()): Promise<AgentBrowser[]> {
+  if (deps.platform === 'win32') return []
+  const orphans = orphanedAgentBrowsers(await deps.list())
+  for (const { pid, profile } of orphans) {
+    try {
+      deps.kill(pid, 'SIGKILL')
+    } catch {
+      // gone between the listing and the kill
+    }
+    await deps.remove(profile).catch(() => {})
+  }
+  return orphans
 }
 
 /**

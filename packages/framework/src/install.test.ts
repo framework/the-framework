@@ -103,13 +103,25 @@ test('installProject on a dirty repo commits the pre-existing changes first', as
   const fs = memFs()
   const { git, calls } = fakeGit(args => {
     if (args[0] === 'rev-parse') return 'true'
-    return args[0] === 'status' ? ' M file.ts\n' : ''
+    return args[0] === 'status' ? ' M file.ts\0' : ''
   })
 
   assert.deepEqual(await installProject(CWD, { git, fs }), { ok: true })
 
   const commits = calls.filter(args => args[0] === 'commit').map(args => args[2])
   assert.deepEqual(commits, ['[The Framework] uncommitted changes', '[The Framework] install The Framework'])
+})
+
+test('installProject refuses to sweep a cache directory into the safety commit, and activates nothing (#1638)', async () => {
+  const fs = memFs()
+  const pending = Array.from({ length: 300 }, (_, i) => `?? .turbo/cache/${i}\0`).join('')
+  const { git, calls } = fakeGit(args => (args[0] === 'rev-parse' ? 'true' : args[0] === 'status' ? pending : ''))
+
+  const result = await installProject(CWD, { git, fs })
+  assert.equal(result.ok, false)
+  assert.match(result.ok ? '' : result.error, /refused to commit 300 pending files .* \.turbo\/ \(300 files\)/, 'the report is the error the user reads')
+  assert.deepEqual(calls.filter(args => args[0] === 'commit' || args[0] === 'add'), [], 'nothing staged, nothing committed')
+  assert.equal(await fs.exists(join(CWD, '.the-framework', '.gitignore')), false, 'not activated: the next attempt runs the check again')
 })
 
 test('installProject on an already-activated repo is a no-op that never calls git', async () => {

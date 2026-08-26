@@ -5,6 +5,7 @@ What the tests cover: activating a repository.
 - The seeded ignore file ignores everything transient under `.the-framework/` and un-ignores only itself and the layout marker — the lasting records live on the data branch, so nothing else is kept.
 - The layout marker is written and is tracked, which is what lets a build with a different layout refuse to run in the repository.
 - A repository with uncommitted work commits that work first, under its own message, and only then commits the activation.
+- A repository whose pending files are past the safety commit's limit is not activated: nothing is staged or committed, the activation marker is not written, and the error is the safety commit's report.
 - An already-activated repository is left completely untouched and reported as already activated.
 - A folder that is not a git repository is initialised first and reported as such, and still gets a single install commit.
 - A git failure anywhere in activation is reported as a failed outcome carrying the reason, never as a crash.

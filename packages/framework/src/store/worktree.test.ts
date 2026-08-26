@@ -200,11 +200,11 @@ test('isWorktreeRoot is true for the main checkout and a linked worktree, false 
 })
 
 test('commitPendingWork stages and commits a dirty checkout (#786)', async () => {
-  const git = recordingGit(' M index.html\n')
+  const git = recordingGit(' M index.html\0')
   assert.equal(await commitPendingWork('/wt', git), true)
   assert.deepEqual(
     git.calls.map(c => c.args),
-    [['status', '--porcelain'], ['add', '-A'], ['commit', '-m', '[The Framework] uncommitted changes']],
+    [['status', '--porcelain', '-uall', '-z'], ['add', '-A'], ['commit', '-m', '[The Framework] uncommitted changes']],
   )
   assert.equal(git.calls[1]?.cwd, '/wt', 'commits in the worktree, not the repo')
 })
@@ -212,7 +212,25 @@ test('commitPendingWork stages and commits a dirty checkout (#786)', async () =>
 test('commitPendingWork leaves a clean checkout alone (#786)', async () => {
   const git = recordingGit('')
   assert.equal(await commitPendingWork('/wt', git), true)
-  assert.deepEqual(git.calls.map(c => c.args), [['status', '--porcelain']]) // nothing to commit
+  assert.deepEqual(git.calls.map(c => c.args), [['status', '--porcelain', '-uall', '-z']]) // nothing to commit
+})
+
+test('commitPendingWork refuses an implausible sweep at once — no retry — so the checkout is kept (#1638)', async () => {
+  const calls: string[][] = []
+  const git: GitRunner = async args => {
+    calls.push(args)
+    return args[0] === 'status' ? Array.from({ length: 250 }, (_, i) => `?? .next/cache/${i}\0`).join('') : ''
+  }
+  const warned: string[] = []
+  const warn = console.warn
+  console.warn = (line: string) => void warned.push(line)
+  try {
+    assert.equal(await commitPendingWork('/wt', git, { attempts: 3, delayMs: 1 }), false)
+  } finally {
+    console.warn = warn
+  }
+  assert.deepEqual(calls.map(c => c[0]), ['status'], 'one look, no add, no commit, no retries: this is not a lost lock')
+  assert.match(warned[0] ?? '', /\/wt: refused to commit 250 pending files/, 'the reason is said out loud, since the caller can only say "could not be committed"')
 })
 
 test('commitPendingWork reports failure so the caller keeps the checkout (#786)', async () => {
@@ -230,7 +248,7 @@ test('commitPendingWork retries past a transient failure (#1376)', async () => {
   const git: GitRunner = async args => {
     calls.push(args)
     if (args[0] === 'commit' && failures-- > 0) throw new Error('fatal: Unable to create index.lock: File exists')
-    return args[0] === 'status' ? ' M test04.md\n' : ''
+    return args[0] === 'status' ? ' M test04.md\0' : ''
   }
   assert.equal(await commitPendingWork('/wt', git, { delayMs: 1 }), true)
   assert.equal(calls.filter(c => c[0] === 'commit').length, 2, 'first commit lost the race, the retry won')

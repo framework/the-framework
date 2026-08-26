@@ -1,4 +1,5 @@
 import { join } from 'node:path'
+import { SafetyCommitRefused, safetyCommit } from '../safety-commit.js'
 import { realpath } from 'node:fs/promises'
 import { nodeGitRunner, type GitRunner } from '../project.js'
 import { FRAMEWORK_DIR, BRANCHES_DIR, isSafeAgentId } from './agent-store.js'
@@ -163,13 +164,15 @@ export async function commitPendingWork(
   const delayMs = retry.delayMs ?? 300
   for (let attempt = 1; attempt <= attempts; attempt++) {
     try {
-      const status = await agent(['status', '--porcelain'], path)
-      if (!status.trim()) return true
-      await agent(['add', '-A'], path)
-      // Same wording as the install-time safety commit (install.ts), for one vocabulary.
-      await agent(['commit', '-m', '[The Framework] uncommitted changes'], path)
+      await safetyCommit(agent, path)
       return true
-    } catch {
+    } catch (err) {
+      // Not transient, and not a lost race: the checkout holds far more than a session leaves
+      // behind (#1638). Said out loud, since the caller's "could not be committed" cannot say why.
+      if (err instanceof SafetyCommitRefused) {
+        console.warn(`[framework] ${path}: ${err.message}`)
+        return false
+      }
       if (attempt < attempts) await new Promise(resolve => setTimeout(resolve, delayMs))
     }
   }

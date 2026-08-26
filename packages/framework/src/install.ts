@@ -1,4 +1,5 @@
 import { join } from 'node:path'
+import { safetyCommit } from './safety-commit.js'
 import { nodeGitRunner, type GitRunner } from './project.js'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import { frameworkGitignore, gitignorePath } from './framework-gitignore.js'
@@ -44,12 +45,9 @@ export async function installProject(cwd: string, deps: InstallDeps = {}): Promi
       .catch(() => false)
     if (!insideRepo) await git(['init'], cwd)
 
-    // Commit pre-existing changes first so the install commit is clean.
-    const status = await git(['status', '--porcelain'], cwd)
-    if (status.trim()) {
-      await git(['add', '-A'], cwd)
-      await git(['commit', '-m', '[The Framework] uncommitted changes'], cwd)
-    }
+    // Commit pre-existing changes first so the install commit is clean — unless there are far
+    // more than a person's pending edits (#1638), which fails the activation with the report.
+    await safetyCommit(git, cwd)
 
     await fs.mkdir(join(cwd, THE_FRAMEWORK_DIR))
     // Keep the transient agent state (events.jsonl / agent.json / agents/) out of git and the session

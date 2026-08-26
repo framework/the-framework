@@ -111,7 +111,7 @@ happens while nobody is at the keyboard.
 - Every agent gets its own git worktree and branch; your checkout is never touched
 - Dependency directories shared from the parent checkout instead of reinstalled — as directories of links, so an agent's own install stays in its checkout and never rewrites or purges the parent's
 - A checkout whose work is not on the remote is kept — and a publish-nothing (`handoff: local`) agent's is kept until you publish or delete it
-- Commit what the agent left uncommitted
+- Commit what the agent left uncommitted — unless it is far more than a session leaves behind (past 200 files or 20 MB, a build cache say): then nothing is committed, the checkout is kept, and the report says what was seen
 - Push the branch (on by default)
 - Open a PR (on by default)
 - The PR is named and described by the agent that did the work, when it wrote them — never titled with the prompt it was given

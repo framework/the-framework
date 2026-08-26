@@ -12,7 +12,7 @@ The lifecycle of an agent's own checkout: creating it, naming its branch, commit
 - **A new agent branches; a continued agent re-attaches** - continuing an agent puts it back on the branch its work is already on rather than branching again, recreating that branch if it is gone.
 - **A checkout's own directory, told apart from the repository around it** - whether a directory is a git checkout in its own right is asked before anything reads a branch or runs git there.
 - **The branch is renamed once the agent names itself** - the checkout is created before a session name exists, and gains the readable name afterwards.
-- **Teardown commits before it deletes** - work the agent left uncommitted is committed onto the agent's branch first, and a checkout that cannot be committed is kept.
+- **Teardown commits before it deletes** - work the agent left uncommitted is committed onto the agent's branch first, and a checkout that cannot be committed is kept — including one whose pending files are far more than a session leaves behind, which the safety commit refuses to sweep.
 - **Nothing local is ever the last copy of work** - a checkout may be deleted only when the remote already has its branch tip.
 - **A branch the caller proved holds nothing can be deleted outright** - the deletion is unconditional and forgiving, because the caller has already established the stronger fact.
 - **Every read is forgiving; every removal is idempotent** - a git failure yields "unknown" rather than breaking the caller, and removing a checkout twice is harmless.
@@ -71,7 +71,7 @@ The agent edits files and stops without committing. The user must still be able 
 
 #### Business logic
 
-An agent that edits and stops without committing is behaving as instructed: it is told to commit pre-existing changes before it starts, never its own work at the end. Removing its checkout would destroy that diff outright, because unstaged work is not recoverable from git afterwards. So teardown commits whatever is left onto the agent's own branch first, and the branch outlives the checkout. The commit is worded identically to the framework's install-time safety commit, so the user sees one vocabulary.
+An agent that edits and stops without committing is behaving as instructed: it is told to commit pre-existing changes before it starts, never its own work at the end. Removing its checkout would destroy that diff outright, because unstaged work is not recoverable from git afterwards. So teardown commits whatever is left onto the agent's own branch first, and the branch outlives the checkout. The commit is the same safety commit activation makes (see its own specification), so the user sees one vocabulary — and it carries the same refusal: a checkout holding far more pending files than a session leaves behind, a build cache for instance, is not committed. That refusal is final rather than retried, since it is not a lost lock, and its report is logged, because the caller can only say the checkout was kept.
 
 The answer teardown acts on is "is this checkout safe to remove": yes when it was already clean or the work is now committed, no when the commit failed — a missing git identity, or a hook refusing it. A no means keep the checkout, which is the safe direction.
 

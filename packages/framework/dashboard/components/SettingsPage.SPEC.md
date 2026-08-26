@@ -17,7 +17,7 @@ The dashboard's Settings page: every one of the user's own preferences in one pl
 - **Notifications** - browser and Discord as the delivery channels, and the two categories that can be sent: an agent awaiting an answer or a pull request ready to review, and agents starting and finishing.
 - **A toggle never promises delivery it cannot make** - a channel the browser or the daemon cannot deliver on says so instead, and the Discord row carries the button that supplies what it is missing.
 - **Automation** - whether Auto PM starts queued work on its own, and how far from the quota boundary unattended work is allowed to sit.
-- **Claude web** - the browser bridge switch and its settings, introduced by why the bridge exists at all; below them the bridge browser switch and its line, available only while the bridge is on.
+- **Claude web** - the browser bridge switch, introduced by why the bridge exists at all, and — while it is on — one choice of which browser does the bridge's work: a browser the daemon runs (recommended), or the user's own Chrome; each option carries its own setup right under it.
 
 ## Business logic
 
@@ -105,7 +105,11 @@ See `## User story`.
 
 #### Business logic
 
-The section explains why the bridge exists: a Claude web agent hands off and ends, so the questions its cloud session asks never reach this dashboard, and the browser bridge carries them back. Its switch opens one route on this daemon that a browser extension can reach, guarded by the token shown with the bridge's own settings below it. Under those, the bridge browser switch lets the daemon run its own Chrome for Testing with the extension installed, signed in once and kept minimized, so web runs no longer need the user's Chrome open; the switch says the browser is downloaded the first time, is unavailable while the bridge is off, and is followed by the bridge browser's own line (its status, and the window and restart controls).
+The section explains why the bridge exists: a Claude web agent hands off and ends, so the questions its cloud session asks never reach this dashboard, and the browser bridge carries them back. Its switch says what the bridge does — carry claude.ai questions into the dashboard and type the answers back, through a browser signed in to claude.ai running the bridge extension. While the switch is on, one question follows: which browser does the work. Two options, one picked: a browser the daemon runs (marked recommended: Chrome for Testing, downloaded once, signed in once, kept minimized, so web runs work with the user's own Chrome closed) or the user's own Chrome (install the extension, open its options, paste the token; web runs then need that Chrome open). The picked option carries its own setup right under it: the daemon's browser its status line with the window and restart controls, the user's Chrome the token panel. The choice is the bridge browser preference, on for the daemon's browser. While the bridge is off there is no browser to choose and nothing else is shown.
+
+#### Rationale
+
+The two were once two switches, "Browser bridge" and "Bridge browser", which read as anagrams of each other. There is one feature and one real decision — which browser drives claude.ai — so the page presents exactly that. Both browsers can technically serve at once (an answer is handed to one at a time), but nobody decides to run both, so it is not offered.
 
 ### Controls that cannot be operated are not rendered
 

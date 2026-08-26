@@ -25,6 +25,7 @@ A `web`-target agent hands its task to a cloud session and ends; nothing streams
 - **Closing the Driver tab pauses the bridge** - until the options page reopens it or the browser restarts; closing its window does not. A tab someone moved off claude.ai is forgotten, never brought back, and after a restart a lone pinned claude.ai tab is taken to be the Driver Chrome restored rather than doubled.
 - **Sessions are created in the Driver tab** - the worker claims the daemon's next session request each cycle and the Driver creates it first thing, before the visits, from claude.ai's new-session page the cycle starts on; the outcome is reported under the request's id, and a Driver that is off or paused reports the request failed at once rather than leaving it queued.
 - **Every cycle records what it did** - the outcome of the last cycle is kept so the options page can state it, including every reason a cycle did nothing.
+- **It reloads itself when its files change** - the worker fingerprints the extension's own files when it starts and again every beat; when any of them changed on disk it reloads the extension, never in the middle of a cycle, and records the reload as the last cycle's outcome.
 
 ## Business logic
 
@@ -148,6 +149,22 @@ Each cycle claims the daemon's next session request, if any, and hands it to the
 
 Creation navigates the page, and so do visits; running both inside one cycle, one after the other, keeps them from racing each other's controls. A report that fails to reach the daemon is not retried here: the daemon's claim expires on its own and the request is offered again.
 
+### Reloading itself when its files change
+
+#### User story
+
+A developer edits the extension in its checkout — the content script, the worker, the manifest — and wants the running extension to pick the change up on its own. Chrome re-reads an unpacked extension's files only on a reload, which used to be a click on chrome://extensions after every edit.
+
+#### Business logic
+
+When the worker starts it takes the fingerprint of the extension's files — see `fingerprint.SPEC.md` for which files and what counts as a change. Every beat, before running the cycle, it takes the fingerprint again; when any file changed, it records "reloading the extension" naming the changed files as the last cycle's outcome and reloads the extension instead of running the cycle. The reload is never done while a cycle is running: a beat that lands on a running cycle does nothing at all, and the next beat checks again. While the files cannot be read, nothing is reloaded. The new worker takes a fresh fingerprint at its start, so one edit is one reload.
+
+After the reload the Driver tab's content script is an orphan, as after a manual reload, and is replaced by the next cycle's page load (see `### A Driver that cannot hear the worker`).
+
+#### Rationale
+
+The worker can read its own files as they are on disk right now — measured on 2026-08-26: a fetch of the extension's own URL from the worker returns the current file, not a cached copy — so no other process has to watch the checkout. A reload mid-cycle would end a drive with answers handed over and unaccounted for; waiting a beat costs half a minute. With developer mode switched off on chrome://extensions, Chrome (137 and later) disables an unpacked extension on reload rather than reloading it; the mode is on for anyone who loaded the extension unpacked, and the extension's README says to leave it on.
+
 ### Waking up on a schedule rather than on a timer
 
 #### User story
@@ -156,7 +173,7 @@ None directly — this is what makes every scheduled behavior above actually hap
 
 #### Business logic
 
-The cycle runs off one browser alarm, twice a minute, and once when the service worker starts.
+The beat — the file check and then the cycle — runs off one browser alarm, twice a minute; the cycle also runs once when the service worker starts.
 
 #### Rationale
 

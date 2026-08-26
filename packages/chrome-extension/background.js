@@ -9,7 +9,7 @@
 // It also keeps the token out of the page. A content script shares a tab with claude.ai, and
 // nothing on that page should ever be able to read the secret that talks to a daemon.
 
-importScripts('driver-plan.js')
+importScripts('driver-plan.js', 'fingerprint.js')
 
 const DEFAULT_DAEMON = 'http://localhost:4200'
 
@@ -475,6 +475,54 @@ chrome.tabs.onRemoved.addListener(async (tabId, info) => {
 // dashboard watching an answer's spinner, and a run may be waiting for its session.
 chrome.alarms.create('tf-cycle', { periodInMinutes: CYCLE_MINUTES })
 chrome.alarms.onAlarm.addListener(alarm => {
-  if (alarm.name === 'tf-cycle') void cycle()
+  if (alarm.name === 'tf-cycle') void beat()
 })
+
+// ---------------------------------------------------------------------------
+// Reloading itself when its files change (#1711). The extension is unpacked and edited in place,
+// and Chrome re-reads its files only on a reload; that used to be a click on chrome://extensions
+// after every change. The worker can read its own files as they are on disk, so it takes their
+// fingerprint at start and compares each beat. Reloading orphans the content script in the
+// Driver tab, which the next cycle's page load replaces, as after a manual reload.
+//
+// One thing to know: with developer mode switched off on chrome://extensions, Chrome (137 and
+// later) disables an unpacked extension on reload instead of reloading it, and only a click on
+// chrome://extensions brings it back. The mode is on for anyone who loaded the extension
+// unpacked; leave it on.
+
+/** The files' hashes when this worker started, or undefined until the first read succeeds. */
+let filesAtStart
+
+/** The extension's own file as it is on disk now. */
+const readOwnFile = file => fetch(chrome.runtime.getURL(file)).then(res => res.text())
+
+/** The watched files that changed since this worker started; none while a read fails. */
+async function filesChanged() {
+  try {
+    const now = await fingerprint(readOwnFile)
+    if (!filesAtStart) {
+      filesAtStart = now
+      return []
+    }
+    return changedFiles(filesAtStart, now)
+  } catch {
+    return []
+  }
+}
+
+/**
+ * One beat: reload the extension if its files changed, else run a cycle. Never mid-cycle — a
+ * reload would kill a drive with answers handed over and unaccounted for — so a beat that lands
+ * on a running cycle merely does nothing, and the next one checks again. The reload is recorded
+ * as the last cycle's outcome, so the options page can say why the worker restarted.
+ */
+async function beat() {
+  if (cycling) return
+  const changed = await filesChanged()
+  if (changed.length === 0 || cycling) return cycle()
+  await note({ ok: true, reason: `reloading the extension: ${changed.join(', ')} changed on disk` })
+  chrome.runtime.reload()
+}
+
+void filesChanged()
 void cycle()

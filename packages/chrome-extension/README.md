@@ -70,7 +70,11 @@ the Driver: reading the session list by label and paging it, a cycle that visits
 the question, types and waits for the send, then returns to the list under the overlay, an answer
 the page did not take, a session missing from the list, and the visit planner.
 
-After editing any file here, reload the extension on `chrome://extensions` AND reload the open
-claude.ai tabs: reloading the extension does not re-inject content scripts, and an orphaned
-script cannot hear the new worker. The panel shows the manifest version, which is how you tell
-a stale script from a current one.
+After editing any file here, nothing to click: the worker fingerprints the extension's files
+every beat (30 s) and reloads the extension itself when any changed, never mid-cycle
+(#1711). The Driver tab gets the new content script on the next cycle's page load; your own
+claude.ai tabs still need a reload, since reloading the extension does not re-inject content
+scripts and an orphaned script cannot hear the new worker. The panel shows the manifest
+version, which is how you tell a stale script from a current one. Leave developer mode on in
+`chrome://extensions`: with it off, Chrome 137+ disables an unpacked extension on reload instead
+of reloading it, and only a click there brings it back.

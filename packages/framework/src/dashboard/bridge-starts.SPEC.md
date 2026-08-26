@@ -7,6 +7,7 @@ A `web`-target agent hands its task to a cloud session on claude.ai. A session c
 ## Business logic — TL;DR
 
 - **A request names the repository, the branch and the prompt** - the repository as `owner/name` the way the picker lists it, the branch the run pushed its starting point to, and the whole hand-off prompt; a malformed repository or branch, an empty prompt, or an absurdly long one is refused.
+- **A request names the model when the run has one** - the model the run was started with, for the extension to pick on claude.ai; a blank model counts as none, an absurdly long one is refused.
 - **A request is claimed in the same step that serves it** - two polling tabs must never be handed the same request, because a duplicate is a second cloud session on the user's account.
 - **A claim nobody reports on expires** - after ninety seconds the request is offered again, so a browser that quit mid-creation retries instead of stranding the run.
 - **Success without a session is a failure** - a run pointing nowhere is not a usable outcome.
@@ -23,7 +24,7 @@ See `## User story`.
 
 #### Business logic
 
-A request carries three things: the repository as `owner/name`, the branch, and the prompt. The repository must be exactly two path segments of ordinary characters, neither of which is only dots; the branch must be a plausible git branch name; the prompt must be non-empty and under the cap. The cap is generous, because the hand-off prompt carries the whole framing The Framework injects — the system prompt, the file formats, the protocols — and not only the user's task. A queued request is stamped with when it was queued and starts as queued.
+A request carries three things: the repository as `owner/name`, the branch, and the prompt — and, when the run was started with one, the model, kept trimmed: a blank model is as good as none, and one over a hundred characters is refused. The repository must be exactly two path segments of ordinary characters, neither of which is only dots; the branch must be a plausible git branch name; the prompt must be non-empty and under the cap. The cap is generous, because the hand-off prompt carries the whole framing The Framework injects — the system prompt, the file formats, the protocols — and not only the user's task. A queued request is stamped with when it was queued and starts as queued.
 
 ### Claiming and reporting
 

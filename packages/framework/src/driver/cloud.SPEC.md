@@ -10,7 +10,7 @@ The user picks "Claude Code on the web" as where an agent runs. The work should 
 
 ## Business logic — TL;DR
 
-- **The browser extension creates the session** - the run asks its daemon to queue a request naming the repository, the pushed starting point and the prompt; the extension creates the session through claude.ai's own repository picker, so the session is bound to the repository and can push and open its pull request.
+- **The browser extension creates the session** - the run asks its daemon to queue a request naming the repository, the pushed starting point, the prompt, and the model the run was started with when it has one; the extension creates the session through claude.ai's own repository picker, so the session is bound to the repository and can push and open its pull request.
 - **The user's own account does the work** - the session is created in the user's signed-in browser, so the account, the sign-in and the quota are the user's, as with a local agent.
 - **What the hand-off needs is named when missing** - a daemon that started the run, a GitHub remote, the browser bridge switched on, and the extension present: each absence stops the run with that as the message.
 - **The starting point is pushed first, under a name the cloud side can resolve** - the session is told exactly which ref to open on, and that ref doubles as the run's identity on the remote; a push that fails stops the run.
@@ -28,7 +28,7 @@ See `## User story`.
 
 #### Business logic
 
-After the starting point is pushed, the run asks its daemon to queue a session request: the repository as `owner/name` (read from the checkout's GitHub remote), the pushed starting-point ref, and the whole hand-off prompt. It then follows the request until the extension reports the session, and reports the session's link and id exactly as before. An extension that tried and could not create the session stops the run with the extension's own note of what it could not find.
+After the starting point is pushed, the run asks its daemon to queue a session request: the repository as `owner/name` (read from the checkout's GitHub remote), the pushed starting-point ref, the whole hand-off prompt, and the model the run was started with when it has one — the extension picks it in claude.ai's model menu, so a web run runs on the chosen model as a local run does, and a model the menu does not offer fails the creation. It then follows the request until the extension reports the session, and reports the session's link and id exactly as before. An extension that tried and could not create the session stops the run with the extension's own note of what it could not find.
 
 #### Rationale
 

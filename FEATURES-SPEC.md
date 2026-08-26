@@ -166,8 +166,10 @@ happens while nobody is at the keyboard.
 - Run on a fresh GitHub Actions runner
 - Run on a Claude Code cloud session
 - A web run's cloud session is created by the Chrome extension in your own browser, through claude.ai's repository picker — repo-bound, so it can push and open its pull request; without the extension (or with the browser bridge off) the run stops and says which is missing
+- A web run runs on the model chosen for it — the launcher's or Settings' model is picked in claude.ai's model menu before the session is sent, and a model the menu does not offer stops the run saying so
 - Chrome extension bridging claude.ai questions back to the dashboard
 - One pinned "The Framework Driver" tab serves every recent cloud session: it reads claude.ai's own session list (the status beside each session), visits a session when the list's word for it changed to awaiting input, unread or idle, an awaiting one again every five minutes, and any session holding a queued answer — navigating inside the app, one page load a minute — and shows a full-page overlay naming what it is, with collapsible debug logs; closing the tab pauses the bridge until the extension's options page reopens it or the browser restarts
+- The extension's options page shows what its last cycle did, or why it did nothing — including that it reloaded itself because its files changed on disk — and keeps the line current while the page is open
 - The extension reloads itself when its files change on disk: an edit in the checkout is running within half a minute, never mid-cycle, with no trip to chrome://extensions
 - A cloud run's row says "waiting" when claude.ai's session list shows its session awaiting input, even when the question was asked in prose rather than as a choice block
 - A cloud session's conversation mirrored into the run view, turn by turn, as it is written

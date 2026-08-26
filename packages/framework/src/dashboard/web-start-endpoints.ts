@@ -58,11 +58,12 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, handlers
   const body = await readPost(req, res, MAX_BODY)
   if (body === undefined) return
   if (typeof body !== 'object' || body === null) return end(res, 400, 'body must be an object')
-  const { repo, branch, prompt } = body as Record<string, unknown>
+  const { repo, branch, prompt, model } = body as Record<string, unknown>
   if (typeof repo !== 'string' || typeof branch !== 'string' || typeof prompt !== 'string') {
     return end(res, 400, 'repo, branch and prompt must be strings')
   }
-  const queued = handlers.request({ repo, branch, prompt })
+  if (model !== undefined && typeof model !== 'string') return end(res, 400, 'model must be a string')
+  const queued = handlers.request({ repo, branch, prompt, ...(model !== undefined ? { model } : {}) })
   if (typeof queued === 'string') return end(res, 400, queued)
   sendJson(res, { id: queued.id }, 202)
 }

@@ -143,7 +143,7 @@ A web run wants its cloud session created through claude.ai's repository picker,
 
 #### Business logic
 
-The extension asks for the next session to create and always gets an answer: the request — its id, the repository as `owner/name`, the branch, and the prompt — or nothing, including on a daemon that wired no queue. Handing out the request is what takes it off the queue: the claim happens in that same step, never in a second call, so two tabs polling cannot both be handed it. The extension then reports the request's id, whether it succeeded, the session id when it did, and a short note; the report is validated field by field before it reaches the queue, and a daemon with no queue accepts and drops it.
+The extension asks for the next session to create and always gets an answer: the request — its id, the repository as `owner/name`, the branch, the prompt, and the model when the run named one — or nothing, including on a daemon that wired no queue. Handing out the request is what takes it off the queue: the claim happens in that same step, never in a second call, so two tabs polling cannot both be handed it. The extension then reports the request's id, whether it succeeded, the session id when it did, and a short note; the report is validated field by field before it reaches the queue, and a daemon with no queue accepts and drops it.
 
 #### Rationale
 

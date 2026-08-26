@@ -198,7 +198,7 @@ export function startDashboard(opts: DashboardOptions): Promise<Dashboard> {
         // two polling tabs handed the same request would create two cloud sessions.
         start: () => {
           const next = bridgeStarts().claimNext()
-          return next ? { id: next.id, repo: next.repo, branch: next.branch, prompt: next.prompt } : undefined
+          return next ? { id: next.id, repo: next.repo, branch: next.branch, prompt: next.prompt, ...(next.model ? { model: next.model } : {}) } : undefined
         },
         started: (id, ok, sessionId, note) => bridgeStarts().resolve(id, ok, sessionId, note),
         ...(opts.bridgeSessions ? { sessions: opts.bridgeSessions } : {}),

@@ -387,7 +387,11 @@ async function runCycle() {
   for (const visit of visits) if (visit.answer) deliveredAnswers.add(visit.answer.id)
   const driven =
     visits.length || start
-      ? await askDriver(tab.id, { type: 'tf-drive', visits, ...(start ? { start: { repo: start.repo, branch: start.branch, prompt: start.prompt } } : {}) })
+      ? await askDriver(tab.id, {
+          type: 'tf-drive',
+          visits,
+          ...(start ? { start: { repo: start.repo, branch: start.branch, prompt: start.prompt, ...(typeof start.model === 'string' ? { model: start.model } : {}) } } : {}),
+        })
       : { ok: true, visited: [], delivered: [] }
   if (driven.busy) {
     // The page is still on an earlier cycle's drive — a worker that ended mid-cycle leaves the

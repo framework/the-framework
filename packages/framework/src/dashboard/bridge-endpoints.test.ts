@@ -333,11 +333,12 @@ test('the expected version and the extension manifest move in lockstep (#1519)',
 
 test('the start-queue is served to the extension and its report travels back (#1328)', async () => {
   const reports: { id: string; ok: boolean; sessionId?: string; note?: string }[] = []
-  let pending: { id: string; repo: string; branch: string; prompt: string } | undefined = {
+  let pending: { id: string; repo: string; branch: string; prompt: string; model?: string } | undefined = {
     id: 'req-1',
     repo: 'framework/the-framework',
     branch: 'cloud-1-abcd1234',
     prompt: 'Spike and plan the queue ticket',
+    model: 'sonnet',
   }
   const s = await serve({
     token: TOKEN,
@@ -354,7 +355,7 @@ test('the start-queue is served to the extension and its report travels back (#1
     const first = await fetch(`${s.url}${BRIDGE_PREFIX}/start`, { headers: { authorization: `Bearer ${TOKEN}` } })
     assert.equal(first.status, 200)
     assert.deepEqual(await first.json(), {
-      start: { id: 'req-1', repo: 'framework/the-framework', branch: 'cloud-1-abcd1234', prompt: 'Spike and plan the queue ticket' },
+      start: { id: 'req-1', repo: 'framework/the-framework', branch: 'cloud-1-abcd1234', prompt: 'Spike and plan the queue ticket', model: 'sonnet' },
     })
 
     const second = await fetch(`${s.url}${BRIDGE_PREFIX}/start`, { headers: { authorization: `Bearer ${TOKEN}` } })

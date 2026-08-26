@@ -22,6 +22,8 @@ export interface BridgeStartRequest {
   /** The branch the session opens on — the run's pushed hand-off ref. */
   branch: string
   prompt: string
+  /** The model the run was started with (#1697), when it was; absent leaves claude.ai's default. */
+  model?: string
   queuedAt: string
   state: BridgeStartState
   claimedAt?: string
@@ -34,6 +36,7 @@ export interface BridgeStartInput {
   repo: string
   branch: string
   prompt: string
+  model?: string
 }
 
 /** How long a claim stands before the request is offered again. */
@@ -44,6 +47,8 @@ const DOTS_ONLY = /^\.+$/
 const BRANCH = /^[A-Za-z0-9._\-/]{1,255}$/
 /** The hand-off prompt carries the whole framing (system prompt, formats, protocols), so it is long. */
 export const MAX_START_PROMPT = 200_000
+/** A model is a short name or id the extension matches against claude.ai's model menu (#1697). */
+export const MAX_START_MODEL = 100
 
 export class BridgeStarts {
   private readonly byId = new Map<string, BridgeStartRequest>()
@@ -57,7 +62,17 @@ export class BridgeStarts {
     const prompt = input.prompt.trim()
     if (!prompt) return 'prompt must not be empty'
     if (prompt.length > MAX_START_PROMPT) return `prompt must be at most ${MAX_START_PROMPT} characters`
-    const start: BridgeStartRequest = { id: randomUUID(), repo, branch, prompt, queuedAt: now.toISOString(), state: 'queued' }
+    const model = input.model?.trim()
+    if (model && model.length > MAX_START_MODEL) return `model must be at most ${MAX_START_MODEL} characters`
+    const start: BridgeStartRequest = {
+      id: randomUUID(),
+      repo,
+      branch,
+      prompt,
+      ...(model ? { model } : {}),
+      queuedAt: now.toISOString(),
+      state: 'queued',
+    }
     this.byId.set(start.id, start)
     return start
   }

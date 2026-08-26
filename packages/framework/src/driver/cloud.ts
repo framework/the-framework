@@ -170,7 +170,7 @@ export class CloudSession implements DriverSession {
         throw new Error(`[framework] claude-web: could not push the hand-off ref ${this.id} to origin (${errorMessage(err)}) — the cloud session opens on that ref, so the project needs a pushable GitHub remote.`)
       }
 
-      const found = await this.createViaExtension(ext, `${slug.owner}/${slug.repo}`, this.id, full, controller.signal)
+      const found = await this.createViaExtension(ext, `${slug.owner}/${slug.repo}`, this.id, full, this.startOpts.model, controller.signal)
       this.anchorSha = anchor
       this.handedOff = found
       return this.report(found, 'first')
@@ -188,13 +188,16 @@ export class CloudSession implements DriverSession {
    * Hand the session request to the daemon's start-queue and wait for the extension's word
    * (#1328). Throws, naming the cure, when the daemon has no extension to ask (409) or the
    * bridge is off (404); throws with the extension's own note when it tried and could not create
-   * the session; throws when the wait was aborted or timed out.
+   * the session; throws when the wait was aborted or timed out. The model the run was started
+   * with travels along (#1697): the extension picks it in claude.ai's model menu, so a web run
+   * honours the choice the way a local one does instead of dropping it on the page's default.
    */
   private async createViaExtension(
     ext: ExtensionStart,
     repo: string,
     ref: string,
     prompt: string,
+    model: string | undefined,
     signal: AbortSignal,
   ): Promise<{ url: string; sessionId: string }> {
     const doFetch = ext.fetch ?? fetch
@@ -203,14 +206,14 @@ export class CloudSession implements DriverSession {
     const queued = await doFetch(`${base}${WEB_START_PREFIX}`, {
       method: 'POST',
       headers: { ...headers, 'content-type': 'application/json' },
-      body: JSON.stringify({ repo, branch: ref, prompt }),
+      body: JSON.stringify({ repo, branch: ref, prompt, ...(model ? { model } : {}) }),
       signal,
     })
     if (queued.status === 409) throw new Error(NO_EXTENSION)
     if (queued.status === 404) throw new Error(BRIDGE_OFF)
     if (!queued.ok) throw new Error(`[framework] claude-web: the daemon refused the session request (${queued.status}): ${(await queued.text()).slice(0, 300)}`)
     const { id } = (await queued.json()) as { id: string }
-    this.emit({ type: 'notice', message: `[framework] claude-web: asked the browser extension to create the cloud session on ${repo} at ${ref} (request ${id}).` })
+    this.emit({ type: 'notice', message: `[framework] claude-web: asked the browser extension to create the cloud session on ${repo} at ${ref}${model ? ` on ${model}` : ''} (request ${id}).` })
 
     const pollMs = ext.pollMs ?? 2000
     for (;;) {

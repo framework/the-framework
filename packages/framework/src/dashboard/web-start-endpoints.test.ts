@@ -66,6 +66,22 @@ test('a run queues a request and polls it to the session the extension created (
   }
 })
 
+test('the model travels to the queue when the run names one, and must be a string when it does (#1697)', async () => {
+  const starts = new BridgeStarts()
+  const s = await serve(wired(starts))
+  try {
+    const queued = await post(s.url, { ...INPUT, model: 'sonnet' })
+    assert.equal(queued.status, 202)
+    const { id } = (await queued.json()) as { id: string }
+    assert.equal(starts.get(id)?.model, 'sonnet')
+    const bare = await post(s.url, INPUT)
+    assert.equal(starts.get(((await bare.json()) as { id: string }).id)?.model, undefined)
+    assert.equal((await post(s.url, { ...INPUT, model: 42 })).status, 400)
+  } finally {
+    await s.close()
+  }
+})
+
 test('a failure travels back with the extension note (#1328)', async () => {
   const starts = new BridgeStarts()
   const s = await serve(wired(starts))

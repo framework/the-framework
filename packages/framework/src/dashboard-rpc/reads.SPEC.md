@@ -15,7 +15,7 @@ The dashboard is a projection of what the daemon and its agents write to disk. E
 - **A finished agent is described by its branch, not by a checkout it no longer has** - the handoff reads the agent's branch from the project, so it never reports the user's own branch and uncommitted files as the agent's.
 - **A pull request badge belongs to the agent that earned it** - pull requests are only counted from the moment the agent started, so an agent on a reused branch never wears a predecessor's.
 - **Cross-project rollups say which projects they could read whole** - so a feed that came back short because a remote was unreachable is not mistaken for a feed with nothing in it.
-- **The bridge is read by cloud session** - the parked question, the state of the answer, what the session has said, and whether the extension is reaching the daemon at all.
+- **The bridge is read by cloud session** - the parked question, the state of the answer, what the session has said, whether the extension is reaching the daemon at all, and where the daemon's own bridge browser stands.
 
 ## Business logic
 
@@ -128,6 +128,8 @@ The parked question, the state of the answer picked for it — queued, delivered
 A separate status read says whether anything has reached the bridge at all, when it last did, which page it reported, its version, and how many questions are held — because a misconfigured extension and an uninstalled one both leave no questions behind, and only that status distinguishes them.
 
 The bridge token is readable for the setup step where the user pastes it into the extension, and only while the bridge is switched on, so a daemon with the feature off never hands it out.
+
+The bridge browser's status is readable as the daemon reports it: off, starting and on which step, running — whether its window is shown, and whether its claude.ai tab is on the sign-in page — or stopped and why.
 
 #### Rationale
 

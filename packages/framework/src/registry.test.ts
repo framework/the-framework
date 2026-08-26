@@ -205,6 +205,7 @@ test('every boolean preference survives a save; the sanitizer cannot silently dr
     notifyHumanIntervention: true,
     autoPm: true,
     bridge: true,
+    bridgeBrowser: true,
     onboardingDismissed: true,
   }
   const fs = memFs()

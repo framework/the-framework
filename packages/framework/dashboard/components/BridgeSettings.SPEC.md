@@ -11,7 +11,7 @@ The settings panel for pairing the Claude web bridge: it hands the user the brid
 - **The token is revealed on request** - it is masked by default, revealed on demand, and copyable in one click.
 - **No token yet means a restart is needed** - the token is generated when the daemon starts.
 - **A turned-away extension says why** - a version mismatch and a rejected token are each reported with the fix, rather than looking like a silent disconnection.
-- **Nothing is shown while the bridge is off** - the panel only exists once the bridge is enabled.
+- **Shown only for the user's own Chrome** - the panel exists once the bridge is enabled and the user has chosen their own Chrome to do its work; a browser the daemon runs is handed the token itself and shows its own line instead.
 
 ## Business logic
 

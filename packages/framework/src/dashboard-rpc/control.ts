@@ -1,7 +1,8 @@
 import { appendControl, type ControlEntry } from '../control.js'
 import { bridgeQuestions } from '../dashboard/bridge-store.js'
 import { openInApp, type OpenTarget, type OpenResult } from '../dashboard/open-in-app.js'
-import { contextPreferences, contextStartAgent, resolveProjectPath, resolveAgentPath } from './context.js'
+import { contextBridgeBrowser, contextPreferences, contextStartAgent, resolveProjectPath, resolveAgentPath } from './context.js'
+import type { BridgeBrowserAction } from '../bridge-browser.js'
 import { relayOr } from './relay-agent.js'
 import { appendFlatTodoEntry, ticketForPrompt } from '../todo-loop.js'
 import { TICKETS_DIR, planTicketPrompt, todoPriorityForTicket } from '../tickets.js'
@@ -396,4 +397,14 @@ export async function sendQueueTicketPlan(projectId: string, ticket: QueuedTicke
   if (!cwd) return { ok: false, error: 'no such project' }
   const file = await appendFlatTodoEntry(cwd, planTicketPrompt(ticket.file), todoPriorityForTicket(ticket.priority))
   return file ? { ok: true, file } : { ok: false, error: 'the queue could not be written' }
+}
+
+/**
+ * Ask the daemon's bridge browser to show its window (for the one-time sign-in), hide it again,
+ * or restart (#1332). Anything else is refused; a browser that is not running ignores show/hide.
+ */
+export async function sendBridgeBrowser(action: BridgeBrowserAction): Promise<{ ok: boolean; error?: string }> {
+  if (action !== 'show' && action !== 'hide' && action !== 'restart') return { ok: false, error: 'unknown action' }
+  await contextBridgeBrowser().act(action)
+  return { ok: true }
 }

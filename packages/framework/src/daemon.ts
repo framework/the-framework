@@ -15,6 +15,7 @@ import { JsonlTailer } from './jsonl-tail.js'
 import { isLoopbackHost } from './loopback-host.js'
 import { bridgeSessionsFrom } from './dashboard/bridge-sessions.js'
 import { bridgeQuestions } from './dashboard/bridge-store.js'
+import { bridgeBrowserDir, bridgeBrowserOwner, startBridgeBrowser, type BridgeBrowser, type BridgeBrowserOptions } from './bridge-browser.js'
 import { readAllAgents } from './store/index.js'
 import type { BridgeSession } from './dashboard/index.js'
 
@@ -115,6 +116,8 @@ export interface RunDaemonOptions {
   driverPreflight?: ProjectRuntimeOptions['driverPreflight']
   /** Called once the server has bound, before it blocks. The only way a caller learns the port. */
   onListening?: (state: DaemonState) => void
+  /** How the bridge browser is launched (#1332); default the real Chrome for Testing. For tests. */
+  bridgeBrowser?: (opts: BridgeBrowserOptions) => Promise<BridgeBrowser>
 }
 
 /**
@@ -179,6 +182,14 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
   const quota = defaultQuotaSource()
   // The per-project error state (#1500): the background services write it, the dashboard reads it.
   const projectErrors = projectErrorStore()
+  // The bridge browser (#1332): the daemon's own Chrome for Testing with the extension installed,
+  // so a web run no longer needs the user's Chrome open. Created here, launched only once the
+  // dashboard listens (the extension is told the daemon's address) and the preference says so.
+  // It needs the bridge: without the token there is nothing to hand the extension.
+  const bridgeBrowser = bridgeBrowserOwner(report => {
+    if (!bridgeToken || !daemonUrl) throw new Error('turn the browser bridge on and restart the dashboard first')
+    return (opts.bridgeBrowser ?? (o => startBridgeBrowser(o)))({ daemonUrl, token: bridgeToken, dir: bridgeBrowserDir(env), report })
+  }, console.log)
   // Assigned below, read from the credentials store's `onChange` (#1095): the dashboard mount has
   // to exist before the services do, and a save can only arrive over a mount that is already up.
   let services: BackgroundServices | undefined
@@ -206,6 +217,9 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
     // saved while it happens to be on is not a reason to go spend quota.
     preferences: registryPreferencesStore(nodeRegistryFs(), env, written => {
       if (written.autoPm === true) void services?.wakeAutoPm()
+      // The bridge browser follows its switch the same way (#1332): on launches it, off closes it.
+      if (written.bridgeBrowser === true) void bridgeBrowser.start()
+      if (written.bridgeBrowser === false) void bridgeBrowser.stop()
     }),
     // Only the daemon runs the sweep, so only it can say what the sweep decided.
     autoPm: () => services?.autoPmReport(),
@@ -214,6 +228,7 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
     // while auto-run is off — one sweep for the click, and the schedule stays off.
     autoPmSweep: opts => services?.wakeAutoPm({ onDemand: true, ...opts }),
     projectErrors: projectErrors.list,
+    bridgeBrowser,
     ...(token ? { token } : {}),
     ...(clientBundleDir ? { clientBundleDir } : {}),
   })
@@ -228,6 +243,11 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
     await dashboard.close()
     throw err
   }
+
+  // The bridge browser comes up in the background (#1332): its first launch downloads Chrome,
+  // and the dashboard must not wait on that. Read here rather than with the bridge preference
+  // above: the launch needs the address the dashboard only has now.
+  if ((await readPreferences(undefined, env).catch((): Preferences => ({}))).bridgeBrowser === true) void bridgeBrowser.start()
 
   // Every background start is a verbatim prompt agent (#353): these are preset prompts and chat
   // text, not build intents to scaffold from.
@@ -269,6 +289,9 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
   // Stopped here as well as by the dashboard: a broken install serves 503s without ever taking
   // ownership of the source we handed in, and that poller would go on reading by itself.
   quota.stop()
+  // The daemon's browser goes with the daemon (#1332): left running it would keep serving a
+  // daemon that is gone, and the next daemon would find its profile held.
+  await bridgeBrowser.stop()
   await runtime.dispose()
   await dashboard.close()
 }

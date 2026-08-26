@@ -119,6 +119,13 @@ export interface Preferences {
    */
   bridge?: boolean
   /**
+   * The bridge browser (#1332): let the daemon run its own Chrome for Testing with the bridge
+   * extension installed, signed in once and kept minimized, so web runs stop depending on the
+   * user's own Chrome being open. **Absent = off**: it downloads a browser and keeps a signed-in
+   * claude.ai session on disk, neither of which should happen unasked. Needs {@link bridge}.
+   */
+  bridgeBrowser?: boolean
+  /**
    * The routines {@link autoPm} must not fire, by {@link AutoPmJob.name} (#1209). Absent or empty
    * = every routine runs, which is what the sweep did before this existed.
    *
@@ -331,6 +338,7 @@ const BOOLEAN_PREFERENCES: Record<BooleanPreferenceKey, true> = {
   notifyHumanIntervention: true,
   autoPm: true,
   bridge: true,
+  bridgeBrowser: true,
   onboardingDismissed: true,
 }
 

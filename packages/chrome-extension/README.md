@@ -17,6 +17,12 @@ the bridge off it simply waits on claude.ai for an answer typed there.
 
 ## Set it up
 
+The short way (#1332): turn the bridge on in The Framework's settings, then switch on **Bridge
+browser** below it. The daemon downloads a Chrome for Testing (once, ~150 MB), installs this
+extension into it over CDP, hands it the token, and keeps the window minimized. Press *Show the
+window*, sign in to claude.ai in it once, hide it again — done, and web runs no longer need your
+own Chrome open. The steps below are the manual way, for running the extension in your own Chrome.
+
 1. **Turn the bridge on in The Framework.** It is off by default; it opens the daemon's one route
    reachable from another origin, so it is an explicit choice.
 2. **Load the extension**: `chrome://extensions` -> Developer mode -> Load unpacked -> this directory.

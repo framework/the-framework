@@ -8,6 +8,7 @@ import { useNotificationPermission } from '../lib/notification-permission.js'
 import { useNotifyChannels, reloadNotifyChannels } from '../lib/notify-channels.js'
 import { OnboardingChecklist } from './OnboardingChecklist.js'
 import { BridgeSettings } from './BridgeSettings.js'
+import { BridgeBrowserSettings } from './BridgeBrowserSettings.js'
 import { DevicesSettings } from './DevicesSettings.js'
 import { DiscordWebhookDialog } from './DiscordDialogs.js'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
@@ -198,15 +199,23 @@ export function SettingsPage({
 
         <Section
           title="Claude web"
-          description="A Claude web agent hands off and ends, so the questions its session asks never reach this dashboard. The browser bridge carries them back."
+          description="A Claude web agent hands off and ends, so the questions its session asks never reach this dashboard. The browser bridge carries them back and types your answers into the session."
         >
           <ToggleRow
             label="Browser bridge"
-            description="Opens one route on this daemon that a browser extension can reach, guarded by the token below."
+            description="Carry claude.ai questions into this dashboard and type your answers back. A browser signed in to claude.ai does the work, through the bridge extension."
             checked={preferences.bridge ?? false}
             onChange={next => updatePreferences({ bridge: next })}
           />
-          <BridgeSettings enabled={preferences.bridge ?? false} onChange={next => updatePreferences({ bridge: next })} />
+          {(preferences.bridge ?? false) && (
+            // One feature, one real choice (#1332): which browser drives claude.ai. Two toggles
+            // named "Browser bridge" and "Bridge browser" read as anagrams; a choice under the
+            // switch reads as what it is. The preference stays the boolean `bridgeBrowser`.
+            <BridgeBrowserChoice
+              daemonBrowser={preferences.bridgeBrowser ?? false}
+              onChange={next => updatePreferences({ bridgeBrowser: next })}
+            />
+          )}
         </Section>
       </div>
 
@@ -280,6 +289,50 @@ function OptionToggleRow({ row }: { row: OptionRow }) {
         />
       }
     />
+  )
+}
+
+/**
+ * Which browser does the bridge's work (#1332): one the daemon runs — recommended, since web runs
+ * then work with the user's own Chrome closed — or the user's own Chrome with the extension set up
+ * by hand. Each option carries what it needs right under it: the daemon's browser its status and
+ * window controls, the user's Chrome the token to paste. Both can technically serve at once
+ * (answers are claimed on read), but a person decides one, so it is presented as one.
+ */
+function BridgeBrowserChoice({ daemonBrowser, onChange }: { daemonBrowser: boolean; onChange: (daemonBrowser: boolean) => void }) {
+  const option = (value: boolean, label: string, description: string, body: ReactNode) => (
+    <label className={cn('flex cursor-pointer gap-3 rounded-md border p-3', daemonBrowser === value ? 'border-primary/60 bg-muted/20' : 'border-border')}>
+      <input
+        type="radio"
+        name="bridge-browser"
+        className="mt-1 shrink-0"
+        checked={daemonBrowser === value}
+        onChange={() => onChange(value)}
+        aria-label={label}
+      />
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-medium">{label}</span>
+        <span className="block text-xs text-muted-foreground">{description}</span>
+        {daemonBrowser === value && body}
+      </span>
+    </label>
+  )
+  return (
+    <fieldset className="mt-3 space-y-2">
+      <legend className="text-sm font-medium">Which browser does the work?</legend>
+      {option(
+        true,
+        'A browser the daemon runs — recommended',
+        'Chrome for Testing, downloaded once, signed in once, kept minimized. Web runs work with your own Chrome closed.',
+        <BridgeBrowserSettings enabled />,
+      )}
+      {option(
+        false,
+        'Your own Chrome',
+        'Install the extension, open its options and paste the token. Web runs need your Chrome open.',
+        <BridgeSettings enabled onChange={() => {}} />,
+      )}
+    </fieldset>
   )
 }
 

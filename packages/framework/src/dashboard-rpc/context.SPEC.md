@@ -1,4 +1,4 @@
-Holds the daemon's capabilities that every dashboard RPC acts through — starting agents, registering projects, reading preferences, quota, Auto PM's last decision, a project's recorded errors, Discord credentials, and the lookup that tells a locally running agent from one relayed from a device — and resolves a project id, and an agent id, to the directory on disk a call must act on.
+Holds the daemon's capabilities that every dashboard RPC acts through — starting agents, registering projects, reading preferences, quota, Auto PM's last decision, a project's recorded errors, Discord credentials, the daemon's own bridge browser, and the lookup that tells a locally running agent from one relayed from a device — and resolves a project id, and an agent id, to the directory on disk a call must act on.
 
 ## Business logic — TL;DR
 

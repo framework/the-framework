@@ -160,3 +160,20 @@ test('a list status older than the session window no longer marks the session wa
   // Past the window the Driver no longer reads the session, so its last word cannot stand forever.
   assert.equal(store.waiting(SESSION, new Date('2026-08-25T18:01:00.000Z')), false)
 })
+
+test('an answer is handed to one Driver at a time, and offered again once its claim expires (#1332)', () => {
+  const store = new BridgeQuestions()
+  store.record(question())
+  store.queueAnswer(SESSION, ['Alpha'])
+  const t0 = Date.parse('2026-08-26T12:00:00.000Z')
+  const first = store.claimAnswer(SESSION, t0)
+  assert.equal(first?.labels[0], 'Alpha')
+  // The user's own Chrome and the daemon's browser both serve the session: the second asker gets nothing.
+  assert.equal(store.claimAnswer(SESSION, t0 + 1000), undefined)
+  // The dashboard still sees it queued, and cannot withdraw what a Driver is typing.
+  assert.equal(store.pendingAnswer(SESSION)?.state, 'queued')
+  assert.equal(store.cancelAnswer(SESSION, t0 + 1000), false)
+  // A Driver that died mid-delivery never acknowledges; the claim expires and the answer is offered again.
+  assert.equal(store.claimAnswer(SESSION, t0 + 90_001)?.id, first?.id)
+  assert.equal(store.cancelAnswer(SESSION, t0 + 200_000), true)
+})

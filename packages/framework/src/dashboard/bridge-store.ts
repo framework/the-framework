@@ -22,9 +22,17 @@ export interface BridgeAnswer {
    */
   text: string
   queuedAt: string
+  /**
+   * When a Driver collected it to type (#1332). Two Drivers can serve one daemon — the user's own
+   * Chrome and the daemon's bridge browser — and an answer handed to both would be typed twice.
+   */
+  claimedAt?: string
   state: 'queued' | 'sent' | 'failed'
   note?: string
 }
+
+/** How long a collected answer stays with the Driver that collected it before it is offered again. */
+export const ANSWER_CLAIM_TTL_MS = 90_000
 
 /** Most transcript entries kept per session, oldest dropped first. */
 const MAX_SESSION_EVENTS = 300
@@ -221,18 +229,36 @@ export class BridgeQuestions {
     return queued
   }
 
-  /** Withdraw a queued answer. Too late once the extension has delivered it. */
-  cancelAnswer(sessionId: string): boolean {
+  /** Withdraw a queued answer. Too late once a Driver has collected it or the extension has delivered it. */
+  cancelAnswer(sessionId: string, now = Date.now()): boolean {
     const answer = this.answersBySession.get(sessionId)
-    if (!answer || answer.state !== 'queued') return false
+    if (!answer || answer.state !== 'queued' || this.claimed(answer, now)) return false
     this.answersBySession.delete(sessionId)
     return true
   }
 
-  /** The answer waiting for the extension to deliver, if any. */
+  /** The answer waiting for the extension to deliver, if any — collected by a Driver or not. */
   pendingAnswer(sessionId: string): BridgeAnswer | undefined {
     const answer = this.answersBySession.get(sessionId)
     return answer?.state === 'queued' ? answer : undefined
+  }
+
+  /** Whether a Driver holds the answer: collected, and not so long ago that it is presumed lost. */
+  private claimed(answer: BridgeAnswer, now: number): boolean {
+    return answer.claimedAt !== undefined && now - Date.parse(answer.claimedAt) < ANSWER_CLAIM_TTL_MS
+  }
+
+  /**
+   * Hand the queued answer to the Driver asking, once (#1332): the next Driver asking within the
+   * claim's lifetime gets nothing, so a session served by two browsers is not answered twice. A
+   * claim nobody acknowledged — the Driver died mid-delivery — expires, and the answer is offered
+   * again.
+   */
+  claimAnswer(sessionId: string, now = Date.now()): BridgeAnswer | undefined {
+    const answer = this.pendingAnswer(sessionId)
+    if (!answer || this.claimed(answer, now)) return undefined
+    answer.claimedAt = new Date(now).toISOString()
+    return answer
   }
 
   /**

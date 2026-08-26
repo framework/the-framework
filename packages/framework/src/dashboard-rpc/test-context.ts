@@ -24,6 +24,7 @@ export function testDashboardContext(over: Partial<DashboardContext> = {}): Dash
     autoPm: () => undefined,
     autoPmSweep: () => {},
     projectErrors: () => [],
+    bridgeBrowser: { status: async () => ({ state: 'off' }), start: async () => {}, stop: async () => {}, act: async () => {} },
     ...over,
   }
 }

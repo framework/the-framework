@@ -6,6 +6,7 @@ import type { DiscordCredentialsStore } from '../discord-credentials.js'
 import type { QuotaSource } from '../dashboard/quota.js'
 import type { AutoPmReporter, AutoPmOnly } from '../auto-pm.js'
 import type { ProjectErrorsReader } from '../project-errors.js'
+import type { BridgeBrowserOwner } from '../bridge-browser.js'
 
 /**
  * What the dashboard's RPCs act through: the daemon's own closures, set once when it comes up.
@@ -116,6 +117,11 @@ export function contextAutoPmSweep(): (opts?: { only?: AutoPmOnly; projectId?: s
 /** What a project currently suffers from (#1500), as the daemon's background jobs last recorded it. */
 export function contextProjectErrors(): ProjectErrorsReader {
   return fromContext('projectErrors')
+}
+
+/** The daemon's own bridge browser (#1332). */
+export function contextBridgeBrowser(): BridgeBrowserOwner {
+  return fromContext('bridgeBrowser')
 }
 
 /** The daemon's own `startAgent`, so a start from the dashboard is the same start the CLI makes. */

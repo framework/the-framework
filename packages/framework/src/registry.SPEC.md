@@ -91,6 +91,7 @@ Everything else:
 - **editor** - which editor CLI "Open in editor" launches. Absent falls back to the editor environment variable, then to `code`.
 - **theme** - the dashboard's colour theme: follow the operating system, light, or dark. Anything else, including absent, means follow the operating system.
 - **bridge** - let the Claude web bridge report the question a cloud session is parked on into the dashboard. Absent means off: it opens the daemon's one route reachable from another origin, and turning it on is what mints the bridge token.
+- **bridge browser** - let the daemon run its own browser for the Claude web bridge: a Chrome for Testing with the extension installed, signed in once and kept minimized, so web runs stop depending on the user's own Chrome being open. Absent means off: it downloads a browser and keeps a signed-in claude.ai session on disk, neither of which should happen unasked. Needs the bridge.
 - **custom presets** - the user's own saved prompts, shown beside the built-in presets.
 - **onboarding dismissed** - whether the Overview's onboarding checklist has been dismissed. Absent means show it, so a fresh install is walked through setup; dismissing hides it only on the Overview, and the same checklist stays on the settings page.
 

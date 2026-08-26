@@ -691,6 +691,31 @@ function appPage({ sessions = SESSIONS, firstPage = 6, sendAppendsRow = true } =
   dom.window.close()
 }
 
+{
+  // A row carrying only a pull-request label: the work landed when the pull request is merged or
+  // closed; any other state — open, or draft as the live list spelled it on 2026-08-26 — is a
+  // session that went quiet, so it is idle — visited when its row changes, never for its age (#1707).
+  const sessions = [
+    { id: 'session_01PROPEN', label: '#1700 · Open', title: 'Pull request open' },
+    { id: 'session_01PRDRAFT', label: '#1706 · Draft', title: 'Pull request draft' },
+    { id: 'session_01PRMERGED', label: '#1701 · Merged', title: 'Pull request merged' },
+    { id: 'session_01PRCLOSED', label: '#1702 · Closed', title: 'Pull request closed' },
+  ]
+  const { dom, w } = appPage({ sessions })
+  const got = await w.__tfBridgeReadSessionList(sessions.map(s => s.id))
+  const statuses = got.statuses.map(s => [s.sessionId, s.status])
+  const want = [
+    ['session_01PROPEN', 'idle'],
+    ['session_01PRDRAFT', 'idle'],
+    ['session_01PRMERGED', 'landed'],
+    ['session_01PRCLOSED', 'landed'],
+  ]
+  const ok = JSON.stringify(statuses) === JSON.stringify(want)
+  if (!ok) failed++
+  console.log(`${ok ? 'PASS' : 'FAIL'}  an open or draft pull request alone reads as idle, a merged or closed one as landed  (${JSON.stringify(statuses)})`)
+  dom.window.close()
+}
+
 // ---------------------------------------------------------------------------
 // The script's own drawing is not a page change (#1707). The corner panel is redrawn on every
 // survey and the Driver overlay on every log line, both under the observed root — so unless the
@@ -720,8 +745,9 @@ function appPage({ sessions = SESSIONS, firstPage = 6, sendAppendsRow = true } =
 
 // ---------------------------------------------------------------------------
 // Which sessions a cycle visits (driver-plan.js): the statuses are sticky — an in-app visit clears
-// neither "Awaiting input" nor "Unread response" — so a parked session is visited on a change,
-// after a while, and always when an answer is queued; the rest are never visited.
+// neither "Awaiting input" nor "Unread response" — so a session is visited when its status changed
+// to awaiting, unread or idle, only awaiting is visited again on age, and an answer always earns a
+// visit; running, landed and missing sessions are never visited on their own (#1707).
 
 {
   const plan = readFileSync(join(here, 'driver-plan.js'), 'utf8')
@@ -738,30 +764,43 @@ function appPage({ sessions = SESSIONS, firstPage = 6, sendAppendsRow = true } =
     { sessionId: 's_missing', status: 'missing' },
   ]
   const ids = visits => visits.map(v => v.id)
-  // Never seen: every parked session is due, nothing else is.
-  const first = planVisits(statuses, new Map(), new Map(), NOW)
   // Seen a moment ago with the same status: nothing is due.
   const recent = new Map(statuses.map(s => [s.sessionId, { status: s.status, visitedAt: NOW - 1000 }]))
-  const second = planVisits(statuses, new Map(), recent, NOW)
-  // The same, six minutes later: the parked ones are due again.
-  const later = planVisits(statuses, new Map(), recent, NOW + 6 * 60_000)
-  // A status change makes a parked session due at once.
-  const changed = new Map(recent)
-  changed.set('s_unread', { status: 'idle', visitedAt: NOW - 1000 })
-  const onChange = planVisits(statuses, new Map(), changed, NOW)
-  // An answer forces a visit whatever the status, and travels with it.
-  const answers = new Map([['s_idle', { id: 'a1', text: 't' }]])
-  const forced = planVisits(statuses, answers, recent, NOW)
-  const ok =
-    JSON.stringify(ids(first)) === JSON.stringify(['s_await', 's_unread']) &&
-    second.length === 0 &&
-    JSON.stringify(ids(later)) === JSON.stringify(['s_await', 's_unread']) &&
-    JSON.stringify(ids(onChange)) === JSON.stringify(['s_unread']) &&
-    JSON.stringify(forced) === JSON.stringify([{ id: 's_idle', status: 'idle', answer: { id: 'a1', text: 't' } }])
-  if (!ok) failed++
-  console.log(
-    `${ok ? 'PASS' : 'FAIL'}  visits are planned on change, on age, and on a queued answer; idle, running, landed and missing sessions are left alone  (first=${ids(first)}, second=${second.length}, later=${ids(later)}, change=${ids(onChange)}, forced=${JSON.stringify(forced)})`,
-  )
+  {
+    // Never seen: the awaiting, unread and idle sessions are due, nothing else is.
+    const first = planVisits(statuses, new Map(), new Map(), NOW)
+    const second = planVisits(statuses, new Map(), recent, NOW)
+    // A status change makes each of those due at once — the unread one from idle, the idle one
+    // from running — and leaves a running session alone.
+    const changed = new Map(recent)
+    changed.set('s_unread', { status: 'idle', visitedAt: NOW - 1000 })
+    changed.set('s_idle', { status: 'running', visitedAt: NOW - 1000 })
+    changed.set('s_run', { status: 'idle', visitedAt: NOW - 1000 })
+    const onChange = planVisits(statuses, new Map(), changed, NOW)
+    // An answer forces a visit whatever the status, and travels with it.
+    const answers = new Map([['s_landed', { id: 'a1', text: 't' }]])
+    const forced = planVisits(statuses, answers, recent, NOW)
+    const ok =
+      JSON.stringify(ids(first)) === JSON.stringify(['s_await', 's_unread', 's_idle']) &&
+      second.length === 0 &&
+      JSON.stringify(ids(onChange)) === JSON.stringify(['s_unread', 's_idle']) &&
+      JSON.stringify(forced) === JSON.stringify([{ id: 's_landed', status: 'landed', answer: { id: 'a1', text: 't' } }])
+    if (!ok) failed++
+    console.log(
+      `${ok ? 'PASS' : 'FAIL'}  awaiting, unread and idle sessions are visited when never seen or on a status change, an answer forces a visit; running, landed and missing sessions are left alone  (first=${ids(first)}, second=${second.length}, change=${ids(onChange)}, forced=${JSON.stringify(forced)})`,
+    )
+  }
+  {
+    // The same list six minutes later, nothing changed: only the awaiting session is due again.
+    // The unread one was visited once when it turned unread; re-reading it every five minutes
+    // for the whole window would mirror nothing new (#1707).
+    const later = planVisits(statuses, new Map(), recent, NOW + 6 * 60_000)
+    // And one minute later nothing is: the age revisit is five minutes, not every beat.
+    const soon = planVisits(statuses, new Map(), recent, NOW + 60_000)
+    const ok = JSON.stringify(ids(later)) === JSON.stringify(['s_await']) && soon.length === 0
+    if (!ok) failed++
+    console.log(`${ok ? 'PASS' : 'FAIL'}  after five minutes unchanged, only an awaiting session is visited again; unread and idle are not  (later=${ids(later)}, soon=${soon.length})`)
+  }
   dom.window.close()
 }
 

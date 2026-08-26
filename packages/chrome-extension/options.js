@@ -6,12 +6,32 @@ const daemonEl = document.getElementById('daemon')
 const tokenEl = document.getElementById('token')
 const statusEl = document.getElementById('status')
 const autoOpenEl = document.getElementById('autoOpen')
+const lastCycleEl = document.getElementById('lastCycle')
 
 void chrome.storage.local.get(['daemonUrl', 'token', 'autoOpen']).then(({ daemonUrl, token, autoOpen }) => {
   daemonEl.value = daemonUrl || DEFAULT_DAEMON
   tokenEl.value = token || ''
   // Default on once configured, but stored explicitly so the worker never has to guess.
   autoOpenEl.checked = autoOpen !== false
+})
+
+/**
+ * What the worker's last cycle did, as it recorded it: this page is the one place to read why
+ * the bridge is doing nothing — or that the worker just reloaded the extension because its files
+ * changed on disk — without opening a service worker console. Kept live while the page is open:
+ * the worker records every cycle, and each record re-renders the line.
+ */
+function showLastCycle(lastCycle) {
+  if (!lastCycle) {
+    lastCycleEl.textContent = 'No cycle has run yet.'
+    return
+  }
+  const at = lastCycle.at ? ` at ${new Date(lastCycle.at).toLocaleTimeString()}` : ''
+  lastCycleEl.textContent = `Last cycle${at}: ${lastCycle.ok ? '' : 'failed — '}${lastCycle.reason ?? 'no reason recorded'}`
+}
+void chrome.storage.local.get('lastCycle').then(({ lastCycle }) => showLastCycle(lastCycle))
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes.lastCycle) showLastCycle(changes.lastCycle.newValue)
 })
 
 function say(message, isError) {

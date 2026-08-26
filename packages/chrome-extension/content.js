@@ -665,6 +665,85 @@ async function chooseFrom(trigger, wanted, hint) {
   return { ok: true, note: `${hint}: clicked "${hit.text}" via ${trigger.via}` }
 }
 
+// The model (#1697). The page's model picker is a menu button beside the composer reading the
+// current model — "Opus 5" — and its menu lists the models as radio items, each label beside a
+// hidden keyboard-shortcut digit and, on the current one, a hidden check glyph; a "More models"
+// item opens a submenu of older versions. A run started with a model must run on it, so when the
+// request names one it is picked before anything is sent, and a menu that does not offer it, or
+// a page with no picker, fails the creation rather than sending on whatever the page defaults to.
+
+/** A model name as the dashboard sends it: `opus`, or a full label such as `Opus 4.8`. */
+const MODEL_WORDS = /\b(fable|opus|sonnet|haiku)\b/i
+
+/** The model picker's trigger: the menu button reading a model name. Not a chip, so the chips' order is untouched. */
+function modelTrigger() {
+  return menuTriggers().find(t => t.el.getAttribute('aria-haspopup') === 'menu' && MODEL_WORDS.test(t.text))
+}
+
+/**
+ * A control's label without its decorations: the hidden shortcut digit and check glyph the page
+ * puts beside a model's name are not part of it, so "Sonnet 5" is read, not "Sonnet 53".
+ */
+function labelText(el) {
+  const parts = []
+  const walk = node => {
+    if (node.nodeType === Node.TEXT_NODE) parts.push(node.textContent)
+    else if (node.nodeType === Node.ELEMENT_NODE && node.getAttribute('aria-hidden') !== 'true' && node.tagName !== 'KBD') node.childNodes.forEach(walk)
+  }
+  walk(el)
+  return parts.join('').replace(ICON_GLYPHS, '').replace(/\s+/g, ' ').trim()
+}
+
+/** The models the open menu offers, by label. */
+function modelEntries() {
+  return deepQueryAll('[role="menuitemradio"]')
+    .filter(usable)
+    .map(el => ({ el, text: labelText(el) }))
+}
+
+/** Whether a label names the wanted model: the whole label, or the model's word in it — "opus" reads "Opus 5". */
+function readsModel(text, wanted) {
+  const label = text.toLowerCase()
+  return label === wanted || new RegExp(`(^|[^a-z0-9])${wanted.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^a-z0-9])`).test(label)
+}
+
+/**
+ * Open the model menu and click the entry for `wanted` (lower-cased): the exact label first, else
+ * the first entry carrying its word, which is the newest version, since the menu lists the current
+ * versions and keeps older ones behind "More models" — searched too when the menu itself offers
+ * nothing. Returns a note either way; nothing is clicked as an entry that is not one.
+ */
+async function chooseModel(trigger, wanted) {
+  trigger.el.click()
+  const entries = () => modelEntries().filter(e => e.el !== trigger.el && !trigger.el.contains(e.el))
+  const find = () => {
+    const now = entries()
+    return now.find(e => e.text.toLowerCase() === wanted) ?? now.find(e => readsModel(e.text, wanted))
+  }
+  const loaded = await waitFor(() => entries().length > 0, MENU_WAIT_MS)
+  let hit = loaded ? find() : undefined
+  let via = 'menu'
+  if (!hit) {
+    const more = deepQueryAll('[role="menuitem"][aria-haspopup="menu"]').filter(usable).find(el => /more models/i.test(labelText(el)))
+    if (more) {
+      const before = entries().length
+      more.click()
+      if (await waitFor(() => entries().length > before, MENU_WAIT_MS)) {
+        hit = find()
+        via = 'More models'
+      }
+    }
+  }
+  if (!hit) {
+    const seen = entries()
+    const diag = `${seen.length} entries${seen.length ? `: ${seen.slice(0, 12).map(e => JSON.stringify(e.text.slice(0, 40))).join(', ')}` : ''}`
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    return { ok: false, note: `model: the menu offered no "${wanted}" (${diag})` }
+  }
+  hit.el.click()
+  return { ok: true, note: `model: clicked "${hit.text}" via ${via}` }
+}
+
 /**
  * Describe the controls on this page without touching any of them. Text only, capped, so the
  * report is safe to paste into an issue — the point is that a failed first run says what the
@@ -676,6 +755,7 @@ function probeNewSession() {
     sessionId: sessionIdFromUrl() ?? null,
     composer: findComposer()?.via ?? null,
     sendButton: Boolean(findSendButton()),
+    model: modelTrigger()?.text ?? null,
     chips: chips().map(c => c.text.slice(0, 80)),
     triggers: menuTriggers()
       .slice(0, 40)
@@ -685,17 +765,19 @@ function probeNewSession() {
 }
 
 /**
- * Drive the new-session flow: repo, branch, prompt, send, and report the session it became.
+ * Drive the new-session flow: repo, branch, model, prompt, send, and report the session it became.
  *
  * The page remembers the last repository picked, so it may open already showing ours, another
  * one, or none — the chips are waited for and read rather than assumed. The branch is checked,
  * not assumed: the branch chip must read the requested ref before anything is sent, because a
  * session opened on the wrong branch would push its work somewhere the run never looks. The
- * session id is read from the URL, the one thing the page is guaranteed to tell us and exactly
- * what the daemon joins runs on; a send that never becomes a session URL is a failure with a
- * reason, never a silent success.
+ * model, when the request names one, is checked the same way (#1697): the picker must read it
+ * before anything is sent, since a session on the page's default model is the choice silently
+ * dropped. The session id is read from the URL, the one thing the page is guaranteed to tell us
+ * and exactly what the daemon joins runs on; a send that never becomes a session URL is a
+ * failure with a reason, never a silent success.
  */
-async function createSession({ repo, branch, prompt }) {
+async function createSession({ repo, branch, prompt, model }) {
   const composer = await waitFor(findComposer, window.__tfComposerWaitMs ?? 20000)
   if (!composer) return { ok: false, note: 'no composer on the new-session page' }
 
@@ -741,6 +823,28 @@ async function createSession({ repo, branch, prompt }) {
     if (!branchChip) return { ok: false, note: `${repoNote}; ${branchNote}, but the branch chip does not read "${branch}" — not sending (chips: ${JSON.stringify(chips().map(c => c.text))})` }
   }
 
+  // The model picker remembers the last pick too, so it is read before it is opened.
+  let modelNote
+  if (model) {
+    const wanted = String(model).trim().toLowerCase()
+    const readsWanted = () => {
+      const trigger = modelTrigger()
+      return trigger && readsModel(trigger.text, wanted) ? trigger : undefined
+    }
+    const trigger = await waitFor(modelTrigger, MENU_WAIT_MS)
+    if (!trigger) return { ok: false, note: `${repoNote}; ${branchNote}; no model picker on the page — not sending (${JSON.stringify(probeNewSession())})` }
+    if (readsWanted()) {
+      modelNote = `model already ${trigger.text}`
+    } else {
+      const pick = await chooseModel(trigger, wanted)
+      if (!pick.ok) return { ok: false, note: `${repoNote}; ${branchNote}; ${pick.note}` }
+      modelNote = pick.note
+      if (!(await waitFor(readsWanted, MENU_WAIT_MS))) {
+        return { ok: false, note: `${repoNote}; ${branchNote}; ${modelNote}, but the model picker does not read "${model}" afterwards — not sending (reads ${JSON.stringify(modelTrigger()?.text ?? null)})` }
+      }
+    }
+  }
+
   fillComposer(composer, prompt)
   await new Promise(resolve => setTimeout(resolve, 400))
   const button = findSendButton()
@@ -752,8 +856,9 @@ async function createSession({ repo, branch, prompt }) {
   }
 
   const sessionId = await waitFor(sessionIdFromUrl, window.__tfSessionWaitMs ?? 60000, 500)
-  if (!sessionId) return { ok: false, note: `sent, but the page never became a session URL (${repoNote}; ${branchNote})` }
-  return { ok: true, sessionId, note: `${repoNote}; ${branchNote}; sent via ${button ? 'button' : 'enter'}` }
+  const notes = [repoNote, branchNote, ...(modelNote ? [modelNote] : [])].join('; ')
+  if (!sessionId) return { ok: false, note: `sent, but the page never became a session URL (${notes})` }
+  return { ok: true, sessionId, note: `${notes}; sent via ${button ? 'button' : 'enter'}` }
 }
 
 

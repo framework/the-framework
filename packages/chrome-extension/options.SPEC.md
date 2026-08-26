@@ -11,6 +11,7 @@ The bridge has several ways to be misconfigured, and from the dashboard they all
 - **Each failure is named, not merely reported** - browser permissions not granted, bridge switched off, token rejected, extension too old, dashboard too old, or daemon unreachable are six different messages with six different fixes.
 - **Success answers the next question too** - a working connection also reports how many recent cloud sessions the daemon lists and whether the Driver tab serves them.
 - **A cycle can be run on demand** - a button runs a Driver cycle immediately and reports what it did, or why it did nothing; it also resumes a Driver paused by closing its tab.
+- **The last cycle's outcome is on the page** - what the service worker's most recent cycle did, or why it did nothing — including that it reloaded the extension because its files changed on disk — is shown when the page opens, with the time, and kept current while the page stays open.
 
 ## Business logic
 
@@ -62,6 +63,16 @@ A button lifts the pause a closed Driver tab left behind, asks the extension's s
 #### Rationale
 
 The scheduled cycle runs twice a minute, which is a long time to sit wondering whether something is wrong.
+
+### Showing the last cycle
+
+#### User story
+
+The user wants to know what the bridge last did without pressing anything, and without opening the service worker's console — including whether the worker restarted because the extension's files were edited.
+
+#### Business logic
+
+The service worker records the outcome of every cycle it runs — whether it succeeded and its one-line reason — and the time; the page shows that record as one line when it opens: the time, "failed" when the cycle did, and the reason. When no cycle has run yet the line says so. The line is updated the moment the worker records a new outcome, so a page left open follows the bridge as it runs, and a reload the worker did because its files changed on disk is shown with the changed files' names.
 
 ## Before modifying/creating SPEC.md files
 

@@ -11,6 +11,9 @@ import { testDashboardOptions } from '../dashboard-rpc/test-context.js'
 import type { FrameworkEvent } from '../events.js'
 import type { StartAgentKind, StartAgentOptions, StartAgentResult } from './types.js'
 import type { IncomingMessage } from 'node:http'
+import { EXPECTED_EXTENSION_VERSION, EXTENSION_VERSION_HEADER } from './bridge-endpoints.js'
+import { resetBridgeStarts } from './bridge-starts.js'
+import { resetBridgeQuestions } from './bridge-store.js'
 
 /** Start a dashboard the way the daemon does (D3), with only the parts a test cares about overridden. */
 function dashboard(over: Partial<DashboardOptions> = {}): Promise<Dashboard> {
@@ -510,4 +513,35 @@ test('isExpectedHost: on a loopback bind only a loopback Host passes (DNS rebind
 
   // The bound address itself passes even when it is not one of the loopback spellings.
   assert.equal(isExpectedHost(req({ host: 'localhost:4200' }), 'localhost'), true)
+})
+
+// The session start-queue end to end (#1328/#1697): what a web run posts on the run-facing route is
+// what the extension is handed on the bridge route, the model included.
+test('a web run\'s model reaches the extension through the start-queue (#1697)', async () => {
+  resetBridgeStarts()
+  resetBridgeQuestions()
+  const bridgeToken = 'x'.repeat(43)
+  const bundle = await fakeBundle()
+  const dash = await dashboard({ clientBundleDir: bundle, bridgeToken })
+  const asExtension = { authorization: `Bearer ${bridgeToken}`, [EXTENSION_VERSION_HEADER]: EXPECTED_EXTENSION_VERSION }
+  try {
+    // The extension must have spoken recently for the run's request to be taken at all.
+    assert.equal((await fetch(`${dash.url}/_bridge/ping`, { headers: asExtension })).status, 200)
+    const queued = await fetch(`${dash.url}/_web-start`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${bridgeToken}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ repo: 'framework/the-framework', branch: 'cloud-1-abcd1234', prompt: 'Add the thing', model: 'sonnet' }),
+    })
+    assert.equal(queued.status, 202)
+    const { id } = (await queued.json()) as { id: string }
+    const claimed = await fetch(`${dash.url}/_bridge/start`, { headers: asExtension })
+    assert.deepEqual(await claimed.json(), {
+      start: { id, repo: 'framework/the-framework', branch: 'cloud-1-abcd1234', prompt: 'Add the thing', model: 'sonnet' },
+    })
+  } finally {
+    await dash.close()
+    await rm(bundle, { recursive: true, force: true })
+    resetBridgeStarts()
+    resetBridgeQuestions()
+  }
 })

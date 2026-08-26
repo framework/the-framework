@@ -334,12 +334,25 @@ async function deliver(body, prepare) {
 // chip appears beside the chosen repo, the prompt goes into the composer, send turns the page
 // into a session URL. The synthetic page behaves the way the live one was observed to, and what
 // these prove is the flow around it: the right chip is opened, the branch is verified before
-// anything is sent, and a page that cannot be driven says which control it lacked.
+// anything is sent, the model is picked when the request names one (#1697), and a page that
+// cannot be driven says which control it lacked.
 
-function newSessionPage({ branches = ['main', 'cloud-1-abcd'], remembered = 'the-framework', repoPicker = true, glyphs = false } = {}) {
+function newSessionPage({
+  branches = ['main', 'cloud-1-abcd'],
+  remembered = 'the-framework',
+  repoPicker = true,
+  glyphs = false,
+  models = ['Fable 5', 'Opus 5', 'Sonnet 5', 'Haiku 4.5'],
+  moreModels = ['Opus 4.8', 'Sonnet 4.6'],
+  currentModel = 'Opus 5',
+  modelPicker = true,
+} = {}) {
   // Mirrors the live page as observed 2026-08-24: chips are combobox buttons in the order repo,
   // branch, add; a picker is a dialog holding a search input (role combobox) and a listbox of
-  // options; a closed picker's options stay in the DOM.
+  // options; a closed picker's options stay in the DOM. The model picker as observed 2026-08-26:
+  // a menu button reading the current model beside an effort button reading "High"; its menu is
+  // radio items whose label sits in a span beside a hidden shortcut digit and, on the current one,
+  // a hidden check glyph; a "More models" item opens a submenu of older versions on click.
   const dom = new JSDOM(
     `<!doctype html><html><body><main>
       <button id="env">Default</button>
@@ -347,12 +360,41 @@ function newSessionPage({ branches = ['main', 'cloud-1-abcd'], remembered = 'the
       <button role="combobox" aria-label="Add repository"></button>
       <div contenteditable="true"></div>
       <button aria-label="Send message" id="send"></button>
+      ${modelPicker ? `<button aria-haspopup="menu" aria-expanded="false" id="model">${currentModel}</button>` : ''}
+      <button aria-haspopup="menu" aria-expanded="false" id="effort">High</button>
     </main></body></html>`,
     { url: 'https://claude.ai/code', runScripts: 'outside-only' },
   )
   const w = dom.window
   const d = w.document
-  const seen = { sent: false, searched: [] }
+  const seen = { sent: false, searched: [], modelOpened: 0 }
+  const modelItem = (label, i, withShortcut) => {
+    const current = label === d.getElementById('model').textContent
+    return `<div role="menuitemradio" aria-checked="${current}"><span>${label}</span><span><span aria-hidden="true">${current ? '\ue03b' : ''}</span>${withShortcut ? `<span aria-hidden="true"><kbd>${i + 1}</kbd></span>` : ''}</span></div>`
+  }
+  const wireModelItems = menu => {
+    for (const item of menu.querySelectorAll('[role="menuitemradio"]')) {
+      item.addEventListener('click', () => {
+        d.getElementById('model').textContent = item.querySelector('span').textContent
+        for (const open of d.querySelectorAll('[role="menu"]')) open.remove()
+      })
+    }
+  }
+  d.getElementById('model')?.addEventListener('click', () => {
+    seen.modelOpened++
+    const menu = d.createElement('div')
+    menu.setAttribute('role', 'menu')
+    menu.innerHTML = `<div>Models</div>${models.map((m, i) => modelItem(m, i, true)).join('')}<div role="menuitem" aria-haspopup="menu"><span>More models</span><span aria-hidden="true">\ue0a4</span></div>`
+    wireModelItems(menu)
+    menu.querySelector('[role="menuitem"]').addEventListener('click', () => {
+      const sub = d.createElement('div')
+      sub.setAttribute('role', 'menu')
+      sub.innerHTML = moreModels.map((m, i) => modelItem(m, i, false)).join('')
+      wireModelItems(sub)
+      d.body.append(sub)
+    })
+    d.body.append(menu)
+  })
   const openList = (placeholder, entries, onPick) => {
     const dialog = d.createElement('div')
     dialog.setAttribute('role', 'dialog')
@@ -401,9 +443,62 @@ const START = { repo: 'framework/the-framework', branch: 'cloud-1-abcd', prompt:
   const result = await w.__tfBridgeCreateSession(START)
   const branch = d.getElementById('branch')?.textContent
   const text = d.querySelector('[contenteditable="true"]').textContent
-  const ok = result.ok && result.sessionId === 'session_01NEW' && /repo already the-framework/.test(result.note) && branch === 'cloud-1-abcd' && text === 'Add the thing' && seen.sent
+  const ok = result.ok && result.sessionId === 'session_01NEW' && /repo already the-framework/.test(result.note) && branch === 'cloud-1-abcd' && text === 'Add the thing' && seen.sent && seen.modelOpened === 0
   if (!ok) failed++
-  console.log(`${ok ? 'PASS' : 'FAIL'}  create with the repo remembered picks the branch, types the prompt and sends  (branch=${branch}, searched=${JSON.stringify(seen.searched)}, result=${JSON.stringify(result)})`)
+  console.log(`${ok ? 'PASS' : 'FAIL'}  create with the repo remembered picks the branch, types the prompt and sends, and leaves the model picker alone  (branch=${branch}, searched=${JSON.stringify(seen.searched)}, modelOpened=${seen.modelOpened}, result=${JSON.stringify(result)})`)
+  dom.window.close()
+}
+
+{
+  // A request naming a model (#1697): the picker is opened and the entry for that model clicked
+  // before anything is sent; the note reports what was clicked, and the trigger reads it.
+  const { dom, w, d, seen } = newSessionPage()
+  const result = await w.__tfBridgeCreateSession({ ...START, model: 'sonnet' })
+  const model = d.getElementById('model')?.textContent
+  const ok = result.ok && model === 'Sonnet 5' && /model: clicked "Sonnet 5"/.test(result.note) && seen.sent && seen.modelOpened === 1
+  if (!ok) failed++
+  console.log(`${ok ? 'PASS' : 'FAIL'}  create picks the requested model in the model menu before sending  (model=${model}, result=${JSON.stringify(result)})`)
+  dom.window.close()
+}
+
+{
+  // The picker already reads the requested model: nothing is opened, and the note says so.
+  const { dom, w, d, seen } = newSessionPage({ currentModel: 'Opus 5' })
+  const result = await w.__tfBridgeCreateSession({ ...START, model: 'opus' })
+  const ok = result.ok && d.getElementById('model')?.textContent === 'Opus 5' && /model already Opus 5/.test(result.note) && seen.sent && seen.modelOpened === 0
+  if (!ok) failed++
+  console.log(`${ok ? 'PASS' : 'FAIL'}  create leaves a model picker that already reads the requested model alone  (result=${JSON.stringify(result)})`)
+  dom.window.close()
+}
+
+{
+  // An older version lives behind "More models": the submenu is opened and searched too.
+  const { dom, w, d, seen } = newSessionPage()
+  const result = await w.__tfBridgeCreateSession({ ...START, model: 'Opus 4.8' })
+  const model = d.getElementById('model')?.textContent
+  const ok = result.ok && model === 'Opus 4.8' && /model: clicked "Opus 4.8" via More models/.test(result.note) && seen.sent
+  if (!ok) failed++
+  console.log(`${ok ? 'PASS' : 'FAIL'}  create finds an older model behind "More models"  (model=${model}, result=${JSON.stringify(result)})`)
+  dom.window.close()
+}
+
+{
+  // The menu does not offer the model: nothing is sent, and the note names the model and what was offered.
+  const { dom, w, d, seen } = newSessionPage()
+  const result = await w.__tfBridgeCreateSession({ ...START, model: 'gpt-9' })
+  const ok = !result.ok && /model: the menu offered no "gpt-9"/.test(result.note) && /Fable 5/.test(result.note) && !seen.sent && d.getElementById('model')?.textContent === 'Opus 5'
+  if (!ok) failed++
+  console.log(`${ok ? 'PASS' : 'FAIL'}  create refuses to send on a model the menu does not offer  (sent=${seen.sent}, note=${JSON.stringify(result.note)})`)
+  dom.window.close()
+}
+
+{
+  // No model picker on the page at all: a request naming a model is not sent on whatever the page defaults to.
+  const { dom, w, seen } = newSessionPage({ modelPicker: false })
+  const result = await w.__tfBridgeCreateSession({ ...START, model: 'sonnet' })
+  const ok = !result.ok && /no model picker on the page/.test(result.note) && !seen.sent
+  if (!ok) failed++
+  console.log(`${ok ? 'PASS' : 'FAIL'}  create names a missing model picker rather than sending on the default  (sent=${seen.sent}, note=${result.note.slice(0, 80)}…)`)
   dom.window.close()
 }
 

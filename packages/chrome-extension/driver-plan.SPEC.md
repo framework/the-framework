@@ -6,7 +6,7 @@ Fifty cloud sessions are running. The dashboard user wants every question those 
 
 ## Glossary
 
-- **stopped** — a session claude.ai's session list shows as "Awaiting input" (it stopped to ask its user), "Unread response" (it finished a turn nobody has read) or idle (nothing is happening in it — the list's "Idle", or a row showing only an open pull request).
+- **stopped** — a session claude.ai's session list shows as "Awaiting input" (it stopped to ask its user), "Unread response" (it finished a turn nobody has read) or idle (nothing is happening in it — the list's "Idle", or a row showing only a pull request that is not merged or closed).
 
 ## Business logic — TL;DR
 

@@ -46,7 +46,7 @@ The Driver, on a synthetic app built like the live one was observed to be — a 
 - A session missing from the list is not visited and its answer is not claimed.
 - The session the worker asked for is created first, from the list page, before the visits, and the cycle still ends on the list.
 - A second instruction while a drive runs is refused as busy, and the drive completes.
-- A status word on a row beats its pull-request label; a row showing only a pull request is idle when the pull request is open and landed when it is merged or closed.
+- A status word on a row beats its pull-request label; a row showing only a pull request is idle when the pull request is open or a draft and landed when it is merged or closed.
 
 The visit planner: an awaiting, unread or idle session is visited when never seen and when its status changed; after five minutes unchanged only an awaiting session is visited again, an unread or idle one is not; a queued answer forces a visit whatever the status; running, landed and missing sessions are never visited on their own.
 

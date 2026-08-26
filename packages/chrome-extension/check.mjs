@@ -693,10 +693,11 @@ function appPage({ sessions = SESSIONS, firstPage = 6, sendAppendsRow = true } =
 
 {
   // A row carrying only a pull-request label: the work landed when the pull request is merged or
-  // closed; an open pull request is a session that went quiet, so it is idle — visited when its
-  // row changes, never for its age (#1707).
+  // closed; any other state — open, or draft as the live list spelled it on 2026-08-26 — is a
+  // session that went quiet, so it is idle — visited when its row changes, never for its age (#1707).
   const sessions = [
     { id: 'session_01PROPEN', label: '#1700 · Open', title: 'Pull request open' },
+    { id: 'session_01PRDRAFT', label: '#1706 · Draft', title: 'Pull request draft' },
     { id: 'session_01PRMERGED', label: '#1701 · Merged', title: 'Pull request merged' },
     { id: 'session_01PRCLOSED', label: '#1702 · Closed', title: 'Pull request closed' },
   ]
@@ -705,12 +706,13 @@ function appPage({ sessions = SESSIONS, firstPage = 6, sendAppendsRow = true } =
   const statuses = got.statuses.map(s => [s.sessionId, s.status])
   const want = [
     ['session_01PROPEN', 'idle'],
+    ['session_01PRDRAFT', 'idle'],
     ['session_01PRMERGED', 'landed'],
     ['session_01PRCLOSED', 'landed'],
   ]
   const ok = JSON.stringify(statuses) === JSON.stringify(want)
   if (!ok) failed++
-  console.log(`${ok ? 'PASS' : 'FAIL'}  an open pull request alone reads as idle, a merged or closed one as landed  (${JSON.stringify(statuses)})`)
+  console.log(`${ok ? 'PASS' : 'FAIL'}  an open or draft pull request alone reads as idle, a merged or closed one as landed  (${JSON.stringify(statuses)})`)
   dom.window.close()
 }
 

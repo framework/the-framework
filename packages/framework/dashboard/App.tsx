@@ -279,7 +279,7 @@ export function App() {
     // A ticket's plan view is the same shape plus the `plan` flag (#685): its `.plan.md` on its own
     // page, checked before the detail page since the flag only rides alongside a slug.
     if (view === 'tickets' && projectId && ticketSlug && plan)
-      return <TicketPlanPage projectId={projectId} slug={ticketSlug} onBack={showTickets} />
+      return <TicketPlanPage projectId={projectId} slug={ticketSlug} onBack={showTickets} onOpenAgent={selectAgent} />
     // A ticket's own page needs both a project and a slug; anything short of that (including the
     // bare cross-project route) is the list — every registered project, one section each.
     if (view === 'tickets' && projectId && ticketSlug)

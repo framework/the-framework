@@ -1,6 +1,7 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import {
+  planAgentFor,
   FLAT_TODO_FILE,
   TICKETS_DIR,
   isTicketPath,
@@ -103,4 +104,20 @@ test('ticketIssueRef reads the issue off the GitHub header line, URL first (#133
   // No header, or one naming no number, fixes nothing.
   assert.equal(ticketIssueRef('# A ticket with no GitHub line\n'), undefined)
   assert.equal(ticketIssueRef('GitHub: none yet\n'), undefined)
+})
+
+test('planAgentFor names the newest agent whose ask was this plan (#1511)', () => {
+  const agent = (id: string, startedAt: string, intent?: string) => ({ id, status: 'done' as const, startedAt, updatedAt: startedAt, ...(intent ? { intent } : {}) })
+  const agents = [
+    // The plan column's attended start: the ask verbatim.
+    agent('older', '2026-08-01T00:00:00Z', 'Create tickets/2026-07-25_login.plan.md'),
+    // A pinned queue drain carries the entry inside a longer prompt.
+    agent('newer', '2026-08-02T00:00:00Z', 'Work on this one open task-queue entry only:\n\n- Create tickets/2026-07-25_login.plan.md\n\nDo not start any other entry.'),
+    // Another ticket's plan, and an implementation run: neither is this plan's author.
+    agent('other', '2026-08-03T00:00:00Z', 'Create tickets/2026-07-26_signup.plan.md'),
+    agent('impl', '2026-08-04T00:00:00Z', '[Add a login page](tickets/2026-07-25_login.md)'),
+    agent('mute', '2026-08-05T00:00:00Z'),
+  ]
+  assert.equal(planAgentFor(agents, '2026-07-25_login.md')?.id, 'newer')
+  assert.equal(planAgentFor(agents, '2026-07-27_nothing.md'), undefined)
 })

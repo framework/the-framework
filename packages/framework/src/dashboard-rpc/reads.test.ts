@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { onProjectFiles, onProjectFileStatus, onAgentWorktree, markCloudWaiting, markOtherHost } from './reads.js'
+import { onProjectFiles, onPlanAgent, onProjectFileStatus, onAgentWorktree, markCloudWaiting, markOtherHost } from './reads.js'
 import { bridgeQuestions, resetBridgeQuestions } from '../dashboard/bridge-store.js'
 import type { AgentMeta } from '../store/index.js'
 import { provideTestContext } from './test-context.js'
@@ -11,6 +11,10 @@ import { provideTestContext } from './test-context.js'
 test('onProjectFiles for an unknown project returns an empty list', async () => {
   provideTestContext()
   assert.deepEqual(await onProjectFiles('project-that-does-not-exist'), [])
+})
+
+test('onPlanAgent for an unknown project returns null (#1511)', async () => {
+  assert.equal(await onPlanAgent('nope', 'x.md'), null)
 })
 
 test('onProjectFileStatus for an unknown project returns an empty map', async () => {

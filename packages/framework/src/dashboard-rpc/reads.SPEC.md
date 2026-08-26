@@ -143,6 +143,8 @@ The prompt preview claims to show the entire system prompt, including the user's
 
 The project's own `SYSTEM.md`, its surfaced documents in sidebar order, its tickets by filename, one ticket's full text, when its tickets last caught up with GitHub, and its GitHub URL as derived from its `origin` remote, are each served as plain reads — answering with nothing when the project has no such file or no GitHub remote.
 
+A ticket's plan page can also ask who wrote the plan: the answer is the agent the project's records name as its author (the newest whose ask was that plan), with its id and whether it is still running, so the page can open that agent's session; nothing when no recorded agent was asked for the plan.
+
 ## Before modifying/creating SPEC.md files
 
 You must always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

@@ -99,6 +99,7 @@ happens while nobody is at the keyboard.
 - The whole filter view mirrored to the URL so it can be shared
 - Ticket detail page
 - A plan page when a plan exists; a button to start an agent writing one when it doesn't
+- "Resume agent" on the plan page: opens the session of the agent that wrote the plan, so the conversation continues with the plan already in its context
 - Queue a ticket into the AI queue
 - Queue every ticket the filters show into the AI queue, in one click from the page heading
 - Queue a plan for every unplanned ticket the filters show, from the same heading

@@ -7,6 +7,8 @@
  */
 export const TICKETS_DIR = 'tickets'
 
+import type { AgentMeta } from './store/index.js'
+
 /**
  * The flat, durable backlog/roadmap file — the confirmed-task queue (the "AI task queue"
  * the repo-context (#683) fragment names). Lives at the repo root as `TODO_AGENTS.md` (#682):
@@ -72,6 +74,19 @@ export function planTicketPrompt(file: string): string {
  * rather than followed. A relative segment, an absolute path, a URL, or a nested directory all
  * fail that test.
  */
+/**
+ * The agent that wrote a ticket's plan (#1511): the newest agent whose ask names that plan — the
+ * {@link planTicketPrompt} sentence, as the plan column starts it and as a pinned queue drain
+ * carries it. There is no marker in the plan file itself: an agent does not know its own session id
+ * while it writes, so the link is made from the framework's own records instead. A plan written by
+ * a run whose ask never named it (a single unpinned drain reading "the first open entry") is not
+ * attributed.
+ */
+export function planAgentFor(agents: AgentMeta[], file: string): AgentMeta | undefined {
+  const ask = planTicketPrompt(file)
+  return agents.filter(agent => agent.intent?.includes(ask)).sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0]
+}
+
 export function ticketFromQueueEntry(entry: string): string | undefined {
   const target = /\]\(([^)\s]+)\)/.exec(entry)?.[1]
   return target && isTicketPath(target) ? target : undefined

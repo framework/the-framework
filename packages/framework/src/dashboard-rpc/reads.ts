@@ -1,4 +1,5 @@
-import { findAgent, readLiveMetas, readAllAgents, loadAgentEvents, worktreeSize, isSafeAgentId, startedAtFromAgentId, type AgentMeta } from '../store/index.js'
+import { findAgent, readLiveMetas, readAllAgents, loadAgentEvents, worktreeSize, isSafeAgentId, startedAtFromAgentId, type AgentMeta, type AgentStatus } from '../store/index.js'
+import { planAgentFor } from '../tickets.js'
 import { loadUserSystemPrompt } from '../system-prompt-file.js'
 import { listProjectWorktrees } from '../worktrees.js'
 import { readDocs, type WorkspaceDoc } from '../dashboard/docs.js'
@@ -209,6 +210,28 @@ export async function onTickets(projectId: string): Promise<WorkspaceTicket[]> {
 /** One ticket's full text, for its own detail page (#1144). Null when it does not exist. */
 export async function onTicket(projectId: string, file: string): Promise<WorkspaceTicketDetail | null> {
   return withProject(projectId, cwd => readTicket(cwd, file), null)
+}
+
+/** The agent that wrote a ticket's plan (#1511), as the plan page shows it: enough to open its session. */
+export interface PlanAgent {
+  agentId: string
+  status: AgentStatus
+}
+
+/**
+ * The agent that wrote a ticket's plan (#1511), or `null` when none of the project's agents was
+ * asked for it (see {@link planAgentFor}). The plan page offers to open that agent's session, where
+ * the composer continues the same conversation.
+ */
+export async function onPlanAgent(projectId: string, file: string): Promise<PlanAgent | null> {
+  return withProject(
+    projectId,
+    async cwd => {
+      const agent = planAgentFor(await readAllAgents(cwd), file)
+      return agent ? { agentId: agent.id, status: agent.status } : null
+    },
+    null,
+  )
 }
 
 /** When `tickets/` last caught up with GitHub (#1208), or `{}` when nothing has recorded it. */

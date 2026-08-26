@@ -162,6 +162,7 @@ export async function makeWorld(): Promise<StoryWorld> {
       autoPm.sweeps.push(opts ?? {})
     },
     projectErrors: () => [],
+    bridgeBrowser: { status: async () => ({ state: 'off' as const }), start: async () => {}, stop: async () => {}, act: async () => {} },
   }
 
   const repos: string[] = []

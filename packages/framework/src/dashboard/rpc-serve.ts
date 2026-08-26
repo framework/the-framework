@@ -8,6 +8,7 @@ import type { FrameworkEvent } from '../events.js'
 import type { PreferencesStore } from '../registry.js'
 import type { DiscordCredentialsStore } from '../discord-credentials.js'
 import type { QuotaSource } from './quota.js'
+import type { BridgeBrowserOwner } from '../bridge-browser.js'
 import type { AutoPmReporter, AutoPmOnly } from '../auto-pm.js'
 import type { ProjectErrorsReader } from '../project-errors.js'
 import type { AddProjectResult, StartAgentKind, StartAgentOptions, StartAgentResult } from './types.js'
@@ -69,6 +70,8 @@ export interface DashboardContext {
   autoPmSweep: (opts?: { only?: AutoPmOnly; projectId?: string }) => void | Promise<void>
   /** What a project currently suffers from (#1500): the daemon's error state, read per project. */
   projectErrors: ProjectErrorsReader
+  /** The daemon's own bridge browser (#1332): status, and show/hide/restart on request. */
+  bridgeBrowser: BridgeBrowserOwner
 }
 
 /**

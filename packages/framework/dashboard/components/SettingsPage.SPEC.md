@@ -17,7 +17,7 @@ The dashboard's Settings page: every one of the user's own preferences in one pl
 - **Notifications** - browser and Discord as the delivery channels, and the two categories that can be sent: an agent awaiting an answer or a pull request ready to review, and agents starting and finishing.
 - **A toggle never promises delivery it cannot make** - a channel the browser or the daemon cannot deliver on says so instead, and the Discord row carries the button that supplies what it is missing.
 - **Automation** - whether Auto PM starts queued work on its own, and how far from the quota boundary unattended work is allowed to sit.
-- **Claude web** - the browser bridge switch and its settings, introduced by why the bridge exists at all.
+- **Claude web** - the browser bridge switch and its settings, introduced by why the bridge exists at all; below them the bridge browser switch and its line, available only while the bridge is on.
 
 ## Business logic
 
@@ -105,7 +105,7 @@ See `## User story`.
 
 #### Business logic
 
-The section explains why the bridge exists: a Claude web agent hands off and ends, so the questions its cloud session asks never reach this dashboard, and the browser bridge carries them back. Its switch opens one route on this daemon that a browser extension can reach, guarded by the token shown with the bridge's own settings below it.
+The section explains why the bridge exists: a Claude web agent hands off and ends, so the questions its cloud session asks never reach this dashboard, and the browser bridge carries them back. Its switch opens one route on this daemon that a browser extension can reach, guarded by the token shown with the bridge's own settings below it. Under those, the bridge browser switch lets the daemon run its own Chrome for Testing with the extension installed, signed in once and kept minimized, so web runs no longer need the user's Chrome open; the switch says the browser is downloaded the first time, is unavailable while the bridge is off, and is followed by the bridge browser's own line (its status, and the window and restart controls).
 
 ### Controls that cannot be operated are not rendered
 

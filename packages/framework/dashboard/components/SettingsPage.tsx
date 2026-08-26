@@ -8,6 +8,7 @@ import { useNotificationPermission } from '../lib/notification-permission.js'
 import { useNotifyChannels, reloadNotifyChannels } from '../lib/notify-channels.js'
 import { OnboardingChecklist } from './OnboardingChecklist.js'
 import { BridgeSettings } from './BridgeSettings.js'
+import { BridgeBrowserSettings } from './BridgeBrowserSettings.js'
 import { DevicesSettings } from './DevicesSettings.js'
 import { DiscordWebhookDialog } from './DiscordDialogs.js'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
@@ -207,6 +208,14 @@ export function SettingsPage({
             onChange={next => updatePreferences({ bridge: next })}
           />
           <BridgeSettings enabled={preferences.bridge ?? false} onChange={next => updatePreferences({ bridge: next })} />
+          <ToggleRow
+            label="Bridge browser"
+            description="The daemon runs its own Chrome for Testing with the extension installed, signed in once and kept minimized, so web runs no longer need your Chrome open. Downloads the browser the first time."
+            checked={preferences.bridgeBrowser ?? false}
+            disabled={!(preferences.bridge ?? false)}
+            onChange={next => updatePreferences({ bridgeBrowser: next })}
+          />
+          <BridgeBrowserSettings enabled={preferences.bridgeBrowser ?? false} />
         </Section>
       </div>
 

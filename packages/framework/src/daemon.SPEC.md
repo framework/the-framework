@@ -10,12 +10,13 @@ The user runs one command in a repository and gets a working dashboard in their 
 - **Files are the seam** - the dashboard is a projection of each agent's event log, and steering goes back through the control channel; there is no agent-to-daemon messaging.
 - **Where the dashboard binds** - localhost by default; binding anywhere reachable off the machine requires a shared token on every route.
 - **The browser bridge is opt-in** - off unless the user turned it on, and it shares the daemon's one secret rather than minting a second.
+- **The bridge browser follows its switch** - when the user has switched it on, the daemon launches its own browser for the bridge once the dashboard listens, closes it when the daemon stops, and starts or stops it the moment the switch changes.
 - **Spawned agents know their daemon's address** - every agent the daemon starts is told where the daemon listens, so a web run can ask it for a cloud session created by the browser extension.
 - **The boot sequence** - create the framework directory, register the home workspace, then reconcile agents a dead daemon left marked running.
 - **Nothing is resumed at boot** - stopping the last daemon was a deliberate act, and the stopped agents keep their branches so the user can continue them when they choose.
 - **One quota meter for the whole daemon** - the usage panel and the unattended work read the same long-lived reading.
 - **The dashboard's settings act immediately** - saving a Discord credential rebuilds the Discord services, and switching Auto PM on sweeps now instead of up to ten minutes later.
-- **Shutdown in order** - the background services stop first, then the agents, then the meter, then the server.
+- **Shutdown in order** - the background services stop first, then the agents, then the meter, then the bridge browser, then the server.
 
 ## Business logic
 
@@ -66,6 +67,16 @@ The browser bridge is off unless the user turned it on, because it opens the dae
 The cloud sessions the bridge's Driver tab should serve — each flagged with whether the bridge holds an answer queued for it, plus every session holding one that no listed run carries — are gathered across every registered project, because a cloud agent is not tied to the home workspace, and per project best-effort so one unreadable repo cannot empty the list.
 
 The daemon's own address is known only once it listens, so the agent runtime is handed a way to read it rather than the address itself, and reads it each time it spawns an agent.
+
+### The bridge browser follows its switch
+
+#### User story
+
+The user wants web runs served from a daemon whose machine has no Chrome open — or wants their own Chrome out of it.
+
+#### Business logic
+
+The daemon keeps one bridge browser (see the bridge browser's own specification): its own Chrome for Testing with the extension installed. When the bridge browser preference is on, the daemon launches it once the dashboard listens — the extension is told the daemon's address — and without waiting for the launch, whose first run downloads a browser. A preferences write that switches the bridge browser on launches it at once; one that switches it off closes it. The launch needs the browser bridge on, because the extension is handed the bridge token; with the bridge off the launch fails saying to turn the bridge on and restart the dashboard. The dashboard reads the browser's status through the daemon and asks it to show or hide the window, or to restart.
 
 ### The boot sequence
 
@@ -119,7 +130,7 @@ The user presses Ctrl-C. Nothing may be started while everything is being stoppe
 
 #### Business logic
 
-On an interrupt or termination signal, the shutdown runs in a fixed order. The background services quiesce first, so that Auto PM or an arriving notification cannot start an agent while the rest are being stopped. Then the agents this daemon spawned are stopped, and the ids of those that were still alive are logged by name — a process still alive at shutdown that the dashboard showed as finished is the one fact that explains a busy slot nothing else can account for, and a bare count hides it. Finally the quota meter is stopped, the runtime is disposed, and the server is closed.
+On an interrupt or termination signal, the shutdown runs in a fixed order. The background services quiesce first, so that Auto PM or an arriving notification cannot start an agent while the rest are being stopped. Then the agents this daemon spawned are stopped, and the ids of those that were still alive are logged by name — a process still alive at shutdown that the dashboard showed as finished is the one fact that explains a busy slot nothing else can account for, and a bare count hides it. Finally the quota meter is stopped, the bridge browser is closed — left running it would serve a daemon that is gone, and hold the profile the next daemon needs — the runtime is disposed, and the server is closed.
 
 Finished agents' archives need no flushing step here: each one is committed and pushed through the data branch's write cycle the moment that agent settles.
 

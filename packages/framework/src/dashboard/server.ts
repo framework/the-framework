@@ -8,6 +8,7 @@ import type { DiscordCredentialsStore } from '../discord-credentials.js'
 import { defaultQuotaSource, type QuotaSource } from './quota.js'
 import type { AutoPmReporter, AutoPmOnly } from '../auto-pm.js'
 import type { ProjectErrorsReader } from '../project-errors.js'
+import type { BridgeBrowserOwner } from '../bridge-browser.js'
 import { serveClientBundle } from './static.js'
 import { BROWSER_PROXY_PREFIX, handleBrowserProxy } from './browser-proxy.js'
 import { makeRpcMount, RPC_PREFIX, isSameOriginRequest, isExpectedHost } from './rpc-serve.js'
@@ -64,6 +65,8 @@ export interface DashboardOptions {
   autoPmSweep: (opts?: { only?: AutoPmOnly; projectId?: string }) => void | Promise<void>
   /** What a project currently suffers from (#1500), for the project list to carry. */
   projectErrors: ProjectErrorsReader
+  /** The daemon's own bridge browser (#1332): its status, and the show/hide/restart the settings page asks for. */
+  bridgeBrowser: BridgeBrowserOwner
   /**
    * Serve the new dashboard bundle (#405) from this directory — the built SPA
    * (`index.html` + `assets/**`). The daemon also mounts the dashboard's RPC surface
@@ -161,6 +164,7 @@ export function startDashboard(opts: DashboardOptions): Promise<Dashboard> {
       autoPm: opts.autoPm,
       autoPmSweep: opts.autoPmSweep,
       projectErrors: opts.projectErrors,
+      bridgeBrowser: opts.bridgeBrowser,
       quota,
     },
     // The bound host, so the mount can reject a rebound `Host`: a page on evil.com whose DNS
@@ -189,8 +193,9 @@ export function startDashboard(opts: DashboardOptions): Promise<Dashboard> {
         statuses: statuses => {
           for (const status of statuses) bridgeQuestions().recordStatus(status)
         },
+        // Claimed on read (#1332), like a start: two Drivers asking must not both type it.
         answer: sessionId => {
-          const pending = bridgeQuestions().pendingAnswer(sessionId)
+          const pending = bridgeQuestions().claimAnswer(sessionId)
           return pending ? { id: pending.id, text: pending.text } : undefined
         },
         answered: (sessionId, id, ok, note) => bridgeQuestions().resolveAnswer(sessionId, id, ok, note),

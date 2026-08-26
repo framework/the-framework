@@ -1,3 +1,4 @@
+import type { BridgeBrowserStatus } from '../bridge-browser.js'
 import { findAgent, readLiveMetas, readAllAgents, loadAgentEvents, worktreeSize, isSafeAgentId, startedAtFromAgentId, type AgentMeta, type AgentStatus } from '../store/index.js'
 import { planAgentFor } from '../tickets.js'
 import { loadUserSystemPrompt } from '../system-prompt-file.js'
@@ -19,7 +20,7 @@ import { crawlRepoFiles } from '../project.js'
 import { readFileStatuses, type FileGitStatus } from '../dashboard/file-status.js'
 import { readFileDiff, readFileChanges, type FileDiff, type FileChange } from '../dashboard/file-diff.js'
 import { readFileContent, type FileContent } from '../dashboard/file-read.js'
-import { contextProjects, contextRemote, resolveProjectPath, resolveAgentPath } from './context.js'
+import { contextBridgeBrowser, contextProjects, contextRemote, resolveProjectPath, resolveAgentPath } from './context.js'
 import { relayOr } from './relay-agent.js'
 import type { FrameworkEvent } from '../events.js'
 import { bridgeQuestions } from '../dashboard/bridge-store.js'
@@ -500,4 +501,9 @@ export async function onBridgeAnswer(sessionId: string): Promise<BridgeAnswer | 
 export async function onBridgeEvents(sessionId: string): Promise<BridgeEvent[]> {
   if (typeof sessionId !== 'string' || !/^session_[A-Za-z0-9]{1,128}$/.test(sessionId)) return []
   return bridgeQuestions().events(sessionId)
+}
+
+/** Where the daemon's own bridge browser stands (#1332): off, starting (and on which step), running, or stopped and why. */
+export async function onBridgeBrowser(): Promise<BridgeBrowserStatus> {
+  return contextBridgeBrowser().status()
 }

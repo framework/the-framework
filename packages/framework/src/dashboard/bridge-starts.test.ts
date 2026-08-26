@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { BridgeStarts, MAX_START_PROMPT, START_CLAIM_TTL_MS, bridgeStarts, resetBridgeStarts } from './bridge-starts.js'
+import { BridgeStarts, MAX_START_MODEL, MAX_START_PROMPT, START_CLAIM_TTL_MS, bridgeStarts, resetBridgeStarts } from './bridge-starts.js'
 
 const INPUT = { repo: 'framework/the-framework', branch: 'main', prompt: 'Do the thing' }
 
@@ -12,6 +12,17 @@ test('a queued start carries the repo, branch and prompt (#1328)', () => {
   assert.equal(queued.branch, 'main')
   assert.equal(queued.prompt, 'Do the thing')
   assert.equal(queued.state, 'queued')
+})
+
+test('a queued start carries the model when the run named one, trimmed; a blank one is dropped and an absurd one refused (#1697)', () => {
+  const starts = new BridgeStarts()
+  const named = starts.request({ ...INPUT, model: ' sonnet ' })
+  assert.ok(typeof named !== 'string')
+  assert.equal(named.model, 'sonnet')
+  const blank = starts.request({ ...INPUT, model: '   ' })
+  assert.ok(typeof blank !== 'string')
+  assert.equal(blank.model, undefined)
+  assert.equal(starts.request({ ...INPUT, model: 'x'.repeat(MAX_START_MODEL + 1) }), `model must be at most ${MAX_START_MODEL} characters`)
 })
 
 test('a repo that is not owner/name is refused (#1328)', () => {

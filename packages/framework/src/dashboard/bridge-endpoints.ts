@@ -106,6 +106,8 @@ export interface BridgeStart {
   repo: string
   branch: string
   prompt: string
+  /** The model to pick in claude.ai's model menu before sending (#1697); absent leaves the page's own. */
+  model?: string
 }
 
 /** What the daemon wires behind the bridge. Absent when the feature is off, which 404s it. */

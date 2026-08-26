@@ -69,6 +69,14 @@ test('a prompt has the extension create a cloud session and returns its id (#132
   assert.equal(daemon.requests.filter(r => r.method === 'GET').length, 3, 'polled until created')
 })
 
+test('the model the run was started with travels with the request, and an unset one does not (#1697)', async () => {
+  const daemon = fakeDaemon({ status: 202, body: { id: 'req-1' } }, [...CREATED])
+  const session = await driverWith(daemon).start({ cwd: '/repo', model: 'sonnet' })
+  await session.prompt('Add the --verbose flag')
+  const post = daemon.requests.find(r => r.method === 'POST')
+  assert.deepEqual(post?.body, { repo: 'framework/the-framework', branch: session.id, prompt: 'Add the --verbose flag', model: 'sonnet' })
+})
+
 test('the session link rides an `action` event, the way the Actions run link does', async () => {
   const events: DriverEvent[] = []
   const session = await driverWith().start({ cwd: '/repo', onEvent: e => events.push(e) })

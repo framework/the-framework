@@ -1,5 +1,6 @@
 import { basename } from 'node:path'
 import { listProjects, type ProjectRecord } from '../registry.js'
+import { nodeFs } from '../node-fs.js'
 import { isActivated } from '../project.js'
 import { loadFrameworkConfig, type FrameworkFileConfig } from '../config.js'
 import { readAllAgents, type AgentMeta } from '../store/index.js'
@@ -108,16 +109,40 @@ export interface ProjectsProvider {
   resolvePath(id: string): Promise<string | undefined>
 }
 
-/** A {@link ProjectsProvider} backed by the global registry (#390). */
-export function defaultProjectsProvider(): ProjectsProvider {
+/** Injectable readers so {@link defaultProjectsProvider} is unit-testable off the user's registry. */
+export interface ProviderDeps {
+  /** The registry's records. Defaults to {@link listProjects}, forgiving. */
+  listRecords?: () => Promise<ProjectRecord[]>
+  /** Whether a project's directory is on disk. Defaults to a directory stat. */
+  isDirectory?: (path: string) => Promise<boolean>
+  /** Defaults to {@link summarizeProject}. */
+  summarize?: (record: ProjectRecord) => Promise<ProjectSummary>
+}
+
+/**
+ * A {@link ProjectsProvider} backed by the global registry (#390).
+ *
+ * Only projects whose directory is still on disk are served (#1140): a repo the user renamed or
+ * deleted used to stay in the sidebar as a grey "not activated" entry with no files (#1142),
+ * indistinguishable from a repo that merely lost its marker, and with nothing to click to make it
+ * go away. The registry itself is left alone — the record is skipped, not pruned — so a directory
+ * that comes back (renamed back, a volume remounted) is a project again on the next read.
+ */
+export function defaultProjectsProvider(deps: ProviderDeps = {}): ProjectsProvider {
+  const listRecords = deps.listRecords ?? (() => listProjects().catch(() => []))
+  const isDirectory = deps.isDirectory ?? nodeFs().isDirectory
+  const summarize = deps.summarize ?? (record => summarizeProject(record))
+  const present = async (): Promise<ProjectRecord[]> => {
+    const records = await listRecords()
+    const kept = await Promise.all(records.map(async record => ((await isDirectory(record.path).catch(() => false)) ? record : undefined)))
+    return kept.filter((record): record is ProjectRecord => record !== undefined)
+  }
   return {
     async list() {
-      const records = await listProjects().catch(() => [])
-      return Promise.all(records.map(record => summarizeProject(record)))
+      return Promise.all((await present()).map(summarize))
     },
     async resolvePath(id) {
-      const records = await listProjects().catch(() => [])
-      return records.find(record => record.id === id)?.path
+      return (await present()).find(record => record.id === id)?.path
     },
   }
 }

@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { summarizeProject, type SummarizeDeps } from './projects.js'
+import { summarizeProject, defaultProjectsProvider, type SummarizeDeps } from './projects.js'
 import type { ProjectRecord } from '../registry.js'
 import { type AgentMeta } from '../store/index.js'
 
@@ -91,4 +91,47 @@ test('an unreadable yml leaves the summary intact (#842)', async () => {
   )
   assert.equal(summary.name, 'app-a')
   assert.equal(summary.fileConfig, undefined)
+})
+
+const RECORD_B: ProjectRecord = { id: 'app-b-2', path: '/repos/app-b', addedAt: '2026-07-11T00:00:00.000Z' }
+
+/** A provider over two registered projects, of which only `present` are still on disk. */
+function provider(present: string[]) {
+  return defaultProjectsProvider({
+    listRecords: async () => [RECORD, RECORD_B],
+    isDirectory: async path => present.includes(path),
+    summarize: async record => ({ id: record.id, path: record.path, name: record.path.split('/').pop()!, activated: true }),
+  })
+}
+
+test('a project whose directory is gone is not listed (#1140)', async () => {
+  // Renamed or deleted on disk: it used to stay in the sidebar as a grey, file-less entry (#1142)
+  // that nothing could remove. Now it is simply absent until the directory is back.
+  const listed = await provider(['/repos/app-a']).list()
+  assert.deepEqual(
+    listed.map(p => p.id),
+    ['app-a-1'],
+  )
+})
+
+test('a project whose directory is gone does not resolve a path either (#1140)', async () => {
+  assert.equal(await provider(['/repos/app-a']).resolvePath('app-b-2'), undefined)
+  assert.equal(await provider(['/repos/app-a']).resolvePath('app-a-1'), '/repos/app-a')
+})
+
+test('a directory that comes back is a project again (#1140)', async () => {
+  // The registry is skipped, not pruned: the record survives the absence.
+  assert.deepEqual((await provider([]).list()).map(p => p.id), [])
+  assert.deepEqual((await provider(['/repos/app-a', '/repos/app-b']).list()).map(p => p.id), ['app-a-1', 'app-b-2'])
+})
+
+test('a failing directory check reads as gone, never throws (#1140)', async () => {
+  const listed = await defaultProjectsProvider({
+    listRecords: async () => [RECORD],
+    isDirectory: async () => {
+      throw new Error('EACCES')
+    },
+    summarize: async record => ({ id: record.id, path: record.path, name: 'x', activated: true }),
+  }).list()
+  assert.deepEqual(listed, [])
 })

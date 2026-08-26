@@ -31,6 +31,7 @@ test('the launch is headed, on its own profile, with the extension-debugging fla
   assert.ok(args.includes('--user-data-dir=/p/profile'))
   assert.ok(args.includes('--remote-debugging-port=9333'))
   assert.ok(args.includes('--enable-unsafe-extension-debugging'), 'Extensions.loadUnpacked refuses without it')
+  assert.ok(args.includes('--use-mock-keychain') && args.includes('--password-store=basic'), 'an unattended browser must never pop a keychain password dialog')
   assert.ok(!args.some(a => a.startsWith('--load-extension')), 'a command-line install is disabled on the first reload')
 })
 

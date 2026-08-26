@@ -43,12 +43,17 @@ export function bridgeBrowserDir(env: NodeJS.ProcessEnv): string {
 /**
  * The launch flags. Headed (no `--headless`): claude.ai's bot gate rejects a headless browser
  * outright, and a headed one whose window is minimized passes. The unsafe-extension-debugging
- * flag is what lets `Extensions.loadUnpacked` install the extension over CDP.
+ * flag is what lets `Extensions.loadUnpacked` install the extension over CDP. The keychain flags
+ * keep the cookie-encryption key out of the OS keychain (macOS asks for the login password on
+ * every launch otherwise, and Linux for the wallet) — the same choice Puppeteer makes; the profile
+ * directory's own permissions are what guard the sign-in.
  */
 export function bridgeBrowserLaunchArgs(port: number, profileDir: string): string[] {
   return [
     `--remote-debugging-port=${port}`,
     `--user-data-dir=${profileDir}`,
+    '--use-mock-keychain',
+    '--password-store=basic',
     '--enable-unsafe-extension-debugging',
     '--no-first-run',
     '--no-default-browser-check',

@@ -4,7 +4,7 @@ It exists because an agent with run target `web` is hands-off: the daemon hands 
 
 A cloud session asks the same way a local agent does — its gates are never framed away. The bridge is what carries the question home; with the bridge off, the question simply waits in the session on claude.ai until the user finds it there.
 
-Five parts: the content script (the page half — reads claude.ai's session list and session pages, types answers, draws the Driver overlay), the service worker (the daemon half — holds the token, makes every daemon call, runs the Driver cycle), the visit planner the worker and the harness share, the options page (setup and connection proof), and an offline check harness that proves the reading, driving and typing against synthetic pages without a browser.
+Six parts: the content script (the page half — reads claude.ai's session list and session pages, types answers, draws the Driver overlay), the service worker (the daemon half — holds the token, makes every daemon call, runs the Driver cycle, reloads the extension when its files change), the visit planner and the file fingerprint the worker and the harness share, the options page (setup and connection proof), and an offline check harness that proves the reading, driving, typing and the fingerprint against synthetic pages without a browser.
 
 ## User story
 
@@ -29,6 +29,7 @@ Five parts: the content script (the page half — reads claude.ai's session list
 - **One Driver tab for every session** - the daemon publishes which cloud sessions are its; the extension keeps one pinned, inactive tab (opt-in) that reads claude.ai's session list, visits only the sessions waiting on their user or holding a queued answer — navigating inside the app, with one page load a minute to refresh the list — reports each session's list status to the daemon, and covers itself with a full-page overlay saying what it is, with collapsible debug logs. Closing the tab pauses the bridge until the options page reopens it or the browser restarts.
 - **The trust boundary** - the bridge token and all daemon traffic live in the service worker; the content script, which shares its tab with claude.ai, holds no secret and calls no daemon.
 - **Version lockstep** - every daemon call states the extension's version, and a daemon expecting another refuses it outright, naming both versions; the two halves must ship the same number.
+- **It reloads itself when its files change** - the extension is unpacked and edited in place; the service worker fingerprints its own files every beat and reloads the extension when any changed on disk, never mid-cycle, so an edit in the checkout is running within half a minute without a visit to chrome://extensions.
 - **Where it runs and why each permission exists** - a content script on every claude.ai page and frame; host access to the localhost origins for the worker's CORS-free daemon calls; storage, tabs and alarms for the token, the Driver tab's bookkeeping, and a cycle that survives the worker's idle termination.
 
 ## Business logic
@@ -102,6 +103,20 @@ See `## User story`, first item — a bridge that half-works is worse than one t
 #### Business logic
 
 Every daemon call states the extension's version in the `x-tf-extension-version` header. A daemon expecting a different version refuses the call outright with an error naming both versions and the way out, because a version-skewed extension does not fail loudly — it half-works, which reads as dashboard bugs. The options page shows that refusal verbatim. The extension and the daemon must therefore ship the same version number.
+
+### It reloads itself when its files change
+
+#### User story
+
+The extension is dogfood-only and unpacked: it runs straight from the checkout. A developer who edits it wants the change running without the click on chrome://extensions that Chrome otherwise requires before it re-reads an unpacked extension's files.
+
+#### Business logic
+
+The service worker takes a fingerprint of the extension's own files when it starts — every file Chrome loads for the extension — and again every beat; when any of them changed on disk, it reloads the extension instead of running that beat's cycle, and never while a cycle is running. The reload is recorded as the last cycle's outcome, naming the changed files. Content scripts already injected — the Driver tab's included — are orphaned by the reload, as by a manual one; the Driver's is replaced by the next cycle's page load, and the user's own claude.ai tabs get the new script on their next load. The fingerprint's rules are in `fingerprint.SPEC.md`, the worker's in `background.SPEC.md`.
+
+#### Rationale
+
+Chrome offers no way for anything but a click to reload an unpacked extension — chrome:// pages are off-limits to extensions and the daemon has no handle on the browser — but an extension may reload itself, and its worker can read its own files as they are on disk. The trigger the click used to supply is the worker noticing the change.
 
 ### Where it runs and why each permission exists
 

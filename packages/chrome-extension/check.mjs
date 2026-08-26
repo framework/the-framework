@@ -804,5 +804,56 @@ function appPage({ sessions = SESSIONS, firstPage = 6, sendAppendsRow = true } =
   dom.window.close()
 }
 
+// ---------------------------------------------------------------------------
+// The extension reloads itself when its files change (fingerprint.js, #1711): the worker
+// fingerprints its own files at start and again every beat, and a difference in any of them is
+// what triggers the reload. Every file Chrome loads for the extension is watched, and a file
+// that cannot be read is never taken for a change: a reload on a transient read failure would
+// loop.
+
+{
+  const src = readFileSync(join(here, 'fingerprint.js'), 'utf8')
+  const dom = new JSDOM('<!doctype html><html><body></body></html>', { runScripts: 'outside-only' })
+  dom.window.eval(src)
+  const { WATCHED_FILES, fingerprint, changedFiles } = dom.window.__tfFingerprint
+  {
+    // The manifest's files, what the worker imports, and the options page's script.
+    const manifest = JSON.parse(readFileSync(join(here, 'manifest.json'), 'utf8'))
+    const worker = readFileSync(join(here, 'background.js'), 'utf8')
+    const options = readFileSync(join(here, manifest.options_page), 'utf8')
+    const imported = [...worker.matchAll(/importScripts\(([^)]*)\)/g)].flatMap(m => [...m[1].matchAll(/'([^']+)'/g)].map(x => x[1]))
+    const loaded = new Set([
+      'manifest.json',
+      manifest.background.service_worker,
+      ...imported,
+      ...manifest.content_scripts.flatMap(c => c.js),
+      manifest.options_page,
+      ...[...options.matchAll(/<script src="([^"]+)"/g)].map(m => m[1]),
+    ])
+    const missing = [...loaded].filter(f => !WATCHED_FILES.includes(f))
+    const extra = WATCHED_FILES.filter(f => !loaded.has(f))
+    const ok = missing.length === 0 && extra.length === 0
+    if (!ok) failed++
+    console.log(`${ok ? 'PASS' : 'FAIL'}  every file Chrome loads for the extension is watched, and nothing else  (watched=${WATCHED_FILES.join(',')}, unwatched=${missing.join(',') || 'none'}, not loaded=${extra.join(',') || 'none'})`)
+  }
+  {
+    const files = new Map(WATCHED_FILES.map(f => [f, `the text of ${f}`]))
+    const read = async f => {
+      if (!files.has(f)) throw new Error(`cannot read ${f}`)
+      return files.get(f)
+    }
+    const before = await fingerprint(read)
+    const same = changedFiles(before, await fingerprint(read))
+    files.set('content.js', 'the text of content.js // edited')
+    const edited = changedFiles(before, await fingerprint(read))
+    files.delete('driver-plan.js')
+    const unreadable = await fingerprint(read).then(() => 'taken', err => `refused: ${err.message}`)
+    const ok = same.length === 0 && JSON.stringify(edited) === JSON.stringify(['content.js']) && unreadable.startsWith('refused')
+    if (!ok) failed++
+    console.log(`${ok ? 'PASS' : 'FAIL'}  unchanged files change nothing, one edited file is named, and a file that cannot be read refuses the fingerprint rather than counting as a change  (same=${same.length}, edited=${edited}, unreadable=${unreadable})`)
+  }
+  dom.window.close()
+}
+
 console.log(failed ? `\n${failed} case(s) failed` : '\nall cases passed')
 process.exit(failed ? 1 : 0)

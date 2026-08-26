@@ -1,4 +1,4 @@
-Runs the Claude web bridge's page half and its visit planner against synthetic claude.ai pages, so the reading, driving and writing of the page can be checked without a browser, an installed extension, or a live cloud session.
+Runs the Claude web bridge's page half, its visit planner and its file fingerprint against synthetic claude.ai pages and files, so the reading, driving and writing of the page and the rule for reloading the extension can be checked without a browser, an installed extension, or a live cloud session.
 
 ## What the tests cover
 
@@ -49,6 +49,8 @@ The Driver, on a synthetic app built like the live one was observed to be — a 
 - A status word on a row beats its pull-request label; a row showing only a pull request is idle when the pull request is open or a draft and landed when it is merged or closed.
 
 The visit planner: an awaiting, unread or idle session is visited when never seen and when its status changed; after five minutes unchanged only an awaiting session is visited again, an unread or idle one is not; a queued answer forces a visit whatever the status; running, landed and missing sessions are never visited on their own.
+
+The file fingerprint, which decides when the extension reloads itself: the watched files are exactly the ones Chrome loads for the extension — those the manifest names, those the service worker imports, and the options page's script — with nothing missing and nothing extra; unchanged files change nothing; one edited file is named; and a file that cannot be read fails the fingerprint rather than counting as a change.
 
 ## Rationale
 

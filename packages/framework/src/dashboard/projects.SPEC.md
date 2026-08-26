@@ -5,6 +5,7 @@ Turns the registry's project list into what the dashboard shows in its project s
 - **Project summary** - each project is described by its display name (the repo folder's name), whether it is still activated, when it was last active, and the run defaults its `the-framework.yml` commits.
 - **Fresh on every read** - the committed config is re-read each time a project is summarized, so an edit to `the-framework.yml` shows up immediately.
 - **A broken project still lists** - any read that fails degrades to "not activated, no activity, no committed config" instead of failing the sidebar.
+- **A vanished project does not** - a registered project whose directory is no longer on disk is left out of the list and resolves no path; the registry keeps its entry, so the project is back as soon as the directory is.
 - **Complete versus partial** - a cross-project list also reports which projects it could actually read, so a caller can tell "this project has nothing" apart from "this project could not be read".
 
 ## Business logic
@@ -22,6 +23,20 @@ A project's display name is the last segment of its repo path. It counts as acti
 #### Rationale
 
 Last activity is taken from the agents themselves. It used to also consider a committed markdown log that re-narrated the same agents, which by construction could only ever be older than the agent it described.
+
+### Vanished project
+
+#### User story
+
+The user renames or deletes a registered repo's directory and expects the sidebar to reflect that, rather than keep showing a project nothing can be done with.
+
+#### Business logic
+
+Every read of the registry checks that each registered project's directory still exists. A project whose directory is missing is not listed and its id resolves to no path, exactly as if it had never been registered. The registry entry itself is not removed: when the directory exists again, the project is listed again on the next read. A check that fails for any reason counts as missing.
+
+#### Rationale
+
+Skipping rather than pruning keeps the read side free of writes and makes a temporary absence (a renamed-back folder, a remounted volume) cost nothing. Before this, a vanished project was shown as a not-activated project with no files, which is what a repo that merely lost its marker looks like too, and there was no way to remove it.
 
 ### Complete versus partial
 

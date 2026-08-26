@@ -88,6 +88,7 @@ happens while nobody is at the keyboard.
 - Routine work panel
 - Hottest tickets
 - Projects sidebar
+- A project whose directory was renamed or deleted leaves the sidebar on the next refresh, and comes back when the directory does; the registration is kept
 - Project errors: a project whose data branch cannot reach origin (push rejected, or no remote) is flagged with a red dot in the sidebar and a banner on its page, until a sync converges
 
 ## Tickets

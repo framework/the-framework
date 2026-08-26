@@ -16,6 +16,7 @@ import { isLoopbackHost } from './loopback-host.js'
 import { bridgeSessionsFrom } from './dashboard/bridge-sessions.js'
 import { bridgeQuestions } from './dashboard/bridge-store.js'
 import { bridgeBrowserDir, bridgeBrowserOwner, startBridgeBrowser, type BridgeBrowser, type BridgeBrowserOptions } from './bridge-browser.js'
+import { closeOrphanedAgentBrowsers } from './browser.js'
 import { readAllAgents } from './store/index.js'
 import type { BridgeSession } from './dashboard/index.js'
 
@@ -158,6 +159,11 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
     const fixed = await reconcileOrphanedAgents(record.path).catch(() => 0)
     if (fixed > 0) console.log(`[framework] reconciled ${fixed} orphaned agent(s) in ${basename(record.path)}`)
   }
+  // Browsers those agents left behind (#1719): a Chrome whose agent died by SIGKILL runs on
+  // with nothing tracking it. Its throwaway profile marks it as ours; a parent that is not an
+  // agent marks it as nobody's.
+  const browsers = await closeOrphanedAgentBrowsers().catch((): [] => [])
+  if (browsers.length > 0) console.log(`[framework] closed ${browsers.length} orphaned agent browser(s): pid ${browsers.map(b => b.pid).join(', ')}`)
 
   // Everything the dashboard drives per project — run spawning, project install, and app
   // previews — lives in the runtime, so this body stays about the daemon's own lifecycle.

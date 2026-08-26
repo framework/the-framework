@@ -12,7 +12,7 @@ The user runs one command in a repository and gets a working dashboard in their 
 - **The browser bridge is opt-in** - off unless the user turned it on, and it shares the daemon's one secret rather than minting a second.
 - **The bridge browser follows its switch** - when the user has switched it on, the daemon launches its own browser for the bridge once the dashboard listens, closes it when the daemon stops, and starts or stops it the moment the switch changes.
 - **Spawned agents know their daemon's address** - every agent the daemon starts is told where the daemon listens, so a web run can ask it for a cloud session created by the browser extension.
-- **The boot sequence** - create the framework directory, register the home workspace, then reconcile agents a dead daemon left marked running.
+- **The boot sequence** - create the framework directory, register the home workspace, reconcile agents a dead daemon left marked running, then close the browsers dead agents left behind.
 - **Nothing is resumed at boot** - stopping the last daemon was a deliberate act, and the stopped agents keep their branches so the user can continue them when they choose.
 - **One quota meter for the whole daemon** - the usage panel and the unattended work read the same long-lived reading.
 - **The dashboard's settings act immediately** - saving a Discord credential rebuilds the Discord services, and switching Auto PM on sweeps now instead of up to ten minutes later.
@@ -82,11 +82,11 @@ The daemon keeps one bridge browser (see the bridge browser's own specification)
 
 #### User story
 
-The user's machine crashed, or they killed the daemon the hard way. On the next start, agents that no longer exist must not still show as running with a Stop button that does nothing.
+The user's machine crashed, or they killed the daemon the hard way. On the next start, agents that no longer exist must not still show as running with a Stop button that does nothing, and a browser one of them launched must not keep running invisibly for days.
 
 #### Business logic
 
-At boot, in order: the framework directory is created; the home workspace is registered as a project if it is activated; then every registered project's agents are reconciled — any agent a dead process left marked as running is recorded as stopped, and the number fixed per project is logged.
+At boot, in order: the framework directory is created; the home workspace is registered as a project if it is activated; then every registered project's agents are reconciled — any agent a dead process left marked as running is recorded as stopped, and the number fixed per project is logged; then every agent browser that no agent owns any more (see the agent's browser's own specification for how one is recognised) is killed and its profile removed, and the number closed is logged with their process ids. A browser sweep that fails closes nothing and never blocks the daemon coming up.
 
 Registering the home workspace is best-effort and idempotent, so it never blocks the daemon coming up, and a working directory that lives inside an already-registered project is skipped — the daemon creates its framework directory wherever it runs, so starting it from a subfolder of a repo would otherwise keep adding a nested duplicate project.
 

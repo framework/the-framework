@@ -717,6 +717,18 @@ function appPage({ sessions = SESSIONS, firstPage = 6, sendAppendsRow = true } =
   const back = Boolean(d.getElementById('tf-driver-overlay'))
   if (!back) failed++
   console.log(`${back ? 'PASS' : 'FAIL'}  the overlay is re-asserted after being removed  (back=${back})`)
+  // The sign-in page is where a person has to act in this tab (the daemon's bridge browser is
+  // signed in there, once): the overlay stands aside on it and returns with the next page.
+  w.history.pushState({}, '', '/login?from=logout')
+  d.getElementById('main').insertAdjacentHTML('beforeend', '<p>sign in</p>')
+  await new Promise(resolve => setTimeout(resolve, 600))
+  const aside = !d.getElementById('tf-driver-overlay')
+  w.history.pushState({}, '', '/code')
+  d.getElementById('main').insertAdjacentHTML('beforeend', '<p>signed in</p>')
+  await new Promise(resolve => setTimeout(resolve, 600))
+  const returned = Boolean(d.getElementById('tf-driver-overlay'))
+  if (!aside || !returned) failed++
+  console.log(`${aside && returned ? 'PASS' : 'FAIL'}  the overlay stands aside on the sign-in page and returns on the next page  (aside=${aside}, returned=${returned})`)
   dom.window.close()
 }
 

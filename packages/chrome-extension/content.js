@@ -892,6 +892,15 @@ const MAX_LIST_PAGES = 10
 const LOG_LINES = 300
 const OVERLAY_ID = 'tf-driver-overlay'
 
+/** claude.ai's sign-in page, and the sign-out step that redirects to it: where a person must act. */
+const signInPage = () => /^\/(login|logout)(\/|$)/.test(location.pathname)
+
+/** Take the overlay down, if it is up. */
+function removeOverlay() {
+  const overlay = document.getElementById(OVERLAY_ID)
+  if (overlay) ownWrites(() => overlay.remove())
+}
+
 let isDriver = false
 const driverLines = []
 
@@ -1115,7 +1124,12 @@ async function drive({ visits = [], start }) {
  * through the pointer, so covering the composer costs nothing.
  */
 function ensureOverlay() {
-  if (!isDriver || document.getElementById(OVERLAY_ID)) return
+  if (!isDriver) return
+  // The sign-in pages are the one place a person has to act in this tab (the daemon's bridge
+  // browser is signed in exactly there, once), so the overlay stands aside on them and comes back
+  // with the next page.
+  if (signInPage()) return removeOverlay()
+  if (document.getElementById(OVERLAY_ID)) return
   const overlay = document.createElement('div')
   overlay.id = OVERLAY_ID
   overlay.style.cssText = [
@@ -1148,6 +1162,7 @@ function ensureOverlay() {
 }
 
 function renderOverlay() {
+  if (signInPage()) return removeOverlay()
   const overlay = document.getElementById(OVERLAY_ID)
   if (!overlay) return
   const version = typeof chrome !== 'undefined' && chrome.runtime?.getManifest ? chrome.runtime.getManifest().version : '?'

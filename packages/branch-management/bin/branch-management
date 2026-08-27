@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// This file only forwards to dist/cli.js.
 import { runCli } from '../dist/cli.js'
 
 runCli(process.argv.slice(2), { cwd: process.cwd(), stdout: line => console.log(line), stderr: line => console.error(line) })

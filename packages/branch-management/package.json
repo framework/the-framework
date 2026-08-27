@@ -1,6 +1,6 @@
 {
   "name": "@better-skills/branch-management",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Branch management for coding agents: one git checkout per agent under .the-framework/branches/, named as its branch, reclaimed once its work is on the remote.",
   "license": "MIT",
   "repository": {
@@ -17,7 +17,7 @@
   },
   "files": [
     "dist",
-    "bin",
+    "bin/branch-management",
     "SKILL.md"
   ],
   "bin": {

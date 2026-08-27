@@ -1,4 +1,4 @@
-import type { Driver, DriverEvent } from './driver/index.js'
+import type { Driver, DriverEvent } from 'agent-driver'
 import { hasSessionIdPlaceholder, resolveSessionLink } from './session-link.js'
 import { type FrameworkEvent } from './events.js'
 import { UsageMeter } from './usage.js'

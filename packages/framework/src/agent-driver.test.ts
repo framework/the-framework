@@ -1,7 +1,8 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { createAgentDriver } from './agent-driver.js'
-import { ActionsDriver, ClaudeCodeDriver, CloudDriver, CodexDriver } from './driver/index.js'
+import { ActionsDriver, ClaudeCodeDriver, CodexDriver } from 'agent-driver'
+import { CloudDriver } from './driver/cloud.js'
 
 // The run-target wrapper (#1050/#610): `--run-on actions` becomes an ActionsDriver (#934),
 // `--run-on web` a CloudDriver; anything else falls through to the local agent driver,

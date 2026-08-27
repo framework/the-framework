@@ -5,6 +5,7 @@ export type {
   DriverPromptOptions,
   DriverTurn,
   DriverEvent,
+  DriverImplId,
   DriverUsage,
   DriverRateLimit,
   DriverQuota,
@@ -25,12 +26,13 @@ export {
   type PermissionMode,
 } from './claude-code.js'
 export { ActionsDriver, ActionsSession, replayTranscript, type ActionsDriverOptions, type FetchLike } from './actions.js'
-export { CloudDriver, CloudSession, type CloudDriverOptions, type ExtensionStart } from './cloud.js'
+// `makeEmit` is what a driver implemented outside this package (The Framework's cloud hand-off) builds
+// its event stream with.
+export { makeEmit } from './session-support.js'
 // `readZip`/`ZipEntry` are deliberately absent (#947): the Actions driver's internal zip reader
-// rode this barrel onto the published surface via `src/index.ts`'s `export *`, with no importer
-// outside the driver and its own test — both of which take the module by path. An accidental
-// export is a one-way door once released, and this package has never been published, so the
-// removal costs nobody anything.
+// rode this barrel onto the published surface with no importer outside the driver and its own
+// test — both of which take the module by path. An accidental export is a one-way door once
+// released.
 export {
   runCliSession,
   type AgentCliParser,

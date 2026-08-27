@@ -1,6 +1,6 @@
 import { MAX_AWAIT_ROUNDS, continuationPrompt, parseAwaitGate, stopMessage, type ParsedAwaitGate } from './turn-gate.js'
 import { pickedIds, type ChoicePick, type ChoiceRequest, type FrameworkEvent } from './events.js'
-import type { DriverSession, DriverTurn } from './driver/index.js'
+import type { DriverSession, DriverTurn } from 'agent-driver'
 import type { ChatMessage, AgentMessages } from './agent-messages.js'
 
 // The shared await/choice/chat machinery (#304/#337/#339/#714), lifted out of the agent

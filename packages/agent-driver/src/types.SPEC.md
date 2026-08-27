@@ -35,7 +35,7 @@ The contract is deliberately tiny: start an agent bound to a checkout, prompt it
 
 #### Rationale
 
-Two identities are kept apart. The **driver** is the user's choice — Claude Code or Codex. Each driver has a separate implementation for each place it can run, since running on a GitHub Actions runner or in a cloud session is a different mechanism from running on this device, and the run target is a fact about *where*, not about *which agent*.
+Two identities are kept apart. The **driver** is the user's choice — Claude Code or Codex. Each driver has a separate implementation for each place it can run, since running on a GitHub Actions runner or in a cloud session is a different mechanism from running on this device, and the run target is a fact about *where*, not about *which agent*. The contract fixes the set of implementation ids (`claude-code`, `codex`, `claude-web`, `github-actions`, `fake`), because an agent's record names the implementation that ran it and every reader of that record must agree on the vocabulary; mapping an id back to the user's choice is the product's business, not the package's.
 
 ### Every pass is a fresh prompt
 

@@ -1,5 +1,5 @@
 import { execFile, spawn, type ChildProcess } from 'node:child_process'
-import type { ClaudeCodeDriverOptions, McpServerSpec } from './driver/index.js'
+import type { ClaudeCodeDriverOptions, McpServerSpec } from 'agent-driver'
 import type { EventEmitter } from 'node:events'
 import { existsSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'

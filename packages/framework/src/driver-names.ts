@@ -9,7 +9,8 @@
  * These are the *choice* — which coding-agent CLI does the work — not the implementation that
  * carries it out. One driver has several implementations because it can run in several places:
  * `claude` is `claude-code` locally, `claude-web` in a cloud session, and `github-actions` on a
- * runner. That is what {@link DriverImplId} names and {@link driverFromImpl} collapses.
+ * runner. That is what `DriverImplId` (the `agent-driver` package's, recorded on a session's meta)
+ * names and {@link driverFromImpl} collapses.
  *
  * Both were called "agent" until D5, when the unit of work took that word. The two meanings sat
  * one line apart in the CLI's own help — "which coding-agent CLI drives the session" — and the seam
@@ -32,12 +33,6 @@ export const DRIVER_LABELS: Record<DriverName, string> = {
   claude: 'Claude Code',
   codex: 'Codex',
 }
-
-/**
- * The stable id of one concrete implementation, as recorded on a session's meta. A driver has
- * one per place it can run, which is why this is a wider set than {@link DriverName}.
- */
-export type DriverImplId = 'claude-code' | 'claude-web' | 'github-actions' | 'codex' | 'fake'
 
 /**
  * The driver behind an implementation id (#831): a session records the implementation that ran it

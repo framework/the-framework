@@ -43,7 +43,7 @@ drives a coding agent as a **black box**: it sends a prompt, lets the agent's ow
 loop run a full turn, then reads the code and the turn's final message. It gates on
 outcomes, never on the agent's individual tool calls — so the wrapped agent keeps
 its own subscription auth and stays swappable behind the driver seam
-([`Driver`](./src/driver/types.ts); Claude Code and Codex today).
+([`Driver`](../agent-driver/src/types.ts) in the `agent-driver` package; Claude Code and Codex today).
 
 Everything the framework learns from a turn, it learns by parsing that turn's final
 message: the session name the agent invented (the branch is renamed to match), the

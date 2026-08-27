@@ -1,4 +1,4 @@
-import type { DriverEvent } from './driver/index.js'
+import type { DriverEvent } from 'agent-driver'
 
 /** One selectable option in an interactive {@link ChoiceRequest} (#304). */
 export interface ChoiceOption {

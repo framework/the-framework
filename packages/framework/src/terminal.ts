@@ -1,4 +1,4 @@
-import type { DriverEvent, DriverRateLimit } from './driver/index.js'
+import type { DriverEvent, DriverRateLimit } from 'agent-driver'
 import { pickedIds, type AutoHandoffSkip, type AutoMergeOutcome, type ChoiceOption, type FrameworkEvent, type MergeWithheldReason, type OnBeforeMergeableSkip } from './events.js'
 
 // The terminal surface for the agent's event stream: render one {@link FrameworkEvent} as one

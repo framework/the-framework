@@ -1,4 +1,4 @@
-import { ClaudeCodeDriver, CodexDriver, type ClaudeCodeDriverOptions, type Driver } from './driver/index.js'
+import { ClaudeCodeDriver, CodexDriver, type ClaudeCodeDriverOptions, type Driver } from 'agent-driver'
 import { DRIVER_LABELS, type DriverName } from './driver-names.js'
 
 /**

@@ -12,6 +12,15 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
 
+  packages/agent-driver:
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.43
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
   packages/branch-management:
     devDependencies:
       '@types/node':
@@ -50,6 +59,9 @@ importers:
       '@tiptap/suggestion':
         specifier: ^2.10.0
         version: 2.27.2(@tiptap/core@2.27.2(@tiptap/pm@2.27.2))(@tiptap/pm@2.27.2)
+      agent-driver:
+        specifier: workspace:*
+        version: link:../agent-driver
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1

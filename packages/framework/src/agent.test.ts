@@ -608,7 +608,7 @@ test('runAgent runs the backlog loop after the build when opted in (#323)', asyn
   const { mkdtemp, realpath, rm, writeFile } = await import('node:fs/promises')
   const { tmpdir } = await import('node:os')
   const { join } = await import('node:path')
-  const { nodeGitRunner } = await import('./project.js')
+  const { nodeGitRunner } = await import('@superskill/branch-management')
   const { withDataBranch } = await import('./data-branch.js')
   // The queue lives on the data branch (#1582), so the fixture is a real repo.
   const git = nodeGitRunner()

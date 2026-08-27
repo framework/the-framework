@@ -1,0 +1,5 @@
+What the tests cover: a checkout still on its birth branch gets no link, since the directory already carries the name; a renamed branch gets a sibling link and the stale name is dropped in the same pass; a reclaimed checkout loses its link, and detached or legacy slash-named branches never get one; against a real repository, a leftover `.the-framework/branches/` directory that is not a checkout gets no link — where a plain branch read would have named it after the user's own branch — while a genuinely renamed checkout beside it still gets its link; user files and foreign symlinks are never removed, and nothing is created over a user's entry that occupies a wanted name; the repo-root `branches` shortcut is created once, relative, and hidden from git with the exclude pair — while an occupied path is left alone and nothing is excluded on the user's behalf.
+
+## Before modifying/creating SPEC.md files
+
+You must always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

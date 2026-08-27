@@ -14,8 +14,7 @@ import {
   type RoutineLockDeps,
 } from './routine-locks.js'
 import { DATA_BRANCH, dataWorktreePath, type withDataBranch } from './data-branch.js'
-import { nodeGitRunner } from './project.js'
-
+import { nodeGitRunner } from '@superskill/branch-management'
 const CWD = '/repo'
 const DATA = join(CWD, '.the-framework', 'branches', 'tf-data')
 const T0 = Date.parse('2026-08-23T10:00:00.000Z')

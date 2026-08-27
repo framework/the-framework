@@ -1,7 +1,6 @@
-import { nodeGitRunner, type GitRunner } from './project.js'
+import { nodeGitRunner, type GitRunner, agentBranchName } from '@superskill/branch-management'
 import { ghPrsForBranchOrThrow, pickAgentPr, type LinkedPr } from './dashboard/gh.js'
 import { openRemoteBranchPullRequest, type HandoffResult } from './dashboard/agent-handoff.js'
-import { agentBranchName } from './branch-names.js'
 import { listAgents, nodeStoreFs, startedAtFromAgentId, type AgentMeta, type ArchivePatch } from './store/index.js'
 import { patchArchivedAgentOnDataBranch } from './archived-agent-patch.js'
 import { errorMessage } from './error-message.js'

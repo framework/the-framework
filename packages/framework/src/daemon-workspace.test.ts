@@ -14,9 +14,9 @@ import type { PreflightResult } from './preflight.js'
  */
 const agentReady = (): Promise<PreflightResult> => Promise.resolve({ ok: true, checks: [] })
 
-import { FRAMEWORK_DIR, BRANCHES_DIR, EVENTS_FILE, META_FILE, worktreePath, agentBranchName, startedAtFromAgentId, type AgentMeta } from './store/index.js'
+import { EVENTS_FILE, META_FILE, startedAtFromAgentId, type AgentMeta } from './store/index.js'
+import { FRAMEWORK_DIR, BRANCHES_DIR, worktreePath, agentBranchName, nodeGitRunner } from '@superskill/branch-management'
 import { addProject, projectId } from './registry.js'
-import { nodeGitRunner } from './project.js'
 import type { AgentSpec } from './agent-spec.js'
 
 /**

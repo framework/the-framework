@@ -23,7 +23,6 @@ export { readFileContent, type FileContent } from './file-read.js'
 export {
   readAgentHandoff,
   agentBranchFor,
-  pushAgentBranch,
   openBranchPullRequest,
   openAgentPullRequest,
   type AgentHandoff,

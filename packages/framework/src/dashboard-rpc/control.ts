@@ -8,11 +8,12 @@ import { appendFlatTodoEntry, ticketForPrompt } from '../todo-loop.js'
 import { TICKETS_DIR, planTicketPrompt, todoPriorityForTicket } from '../tickets.js'
 import { isTicketFile } from '../dashboard/tickets.js'
 import { releaseTicketLock } from '../ticket-locks.js'
-import { findAgent, isSafeAgentId, worktreePath, type AgentMeta } from '../store/index.js'
+import { findAgent, type AgentMeta } from '../store/index.js'
+import { isSafeAgentId, worktreePath, pushBranch } from '@superskill/branch-management'
 import { withAgentLock } from '../agent-locks.js'
 import { removeProjectWorktree, deleteProjectAgent } from '../worktrees.js'
 import { patchArchivedAgentOnDataBranch } from '../archived-agent-patch.js'
-import { mergeAgentPr, openAgentPullRequest, pushAgentBranch, agentBranchFor, type HandoffResult } from '../dashboard/agent-handoff.js'
+import { mergeAgentPr, openAgentPullRequest, agentBranchFor, type HandoffResult } from '../dashboard/agent-handoff.js'
 import type { ChoiceBy } from '../events.js'
 import { isHandoffLevel, type HandoffLevel } from '../handoff-level.js'
 import type {
@@ -253,7 +254,7 @@ export async function sendPushBranch(projectId: string, agentId: string): Promis
     // ref … reference already exists` — which, when teardown was the loser, meant E5 kept the
     // worktree rather than retiring it. What is pushed is the branch as the agent committed it
     // (#1638): nothing is committed on its behalf first.
-    return withAgentLock(target.checkout, () => pushAgentBranch(target.cwd, branch))
+    return withAgentLock(target.checkout, () => pushBranch(target.cwd, branch))
   }, { ok: false, error: 'could not reach the device' })
 }
 

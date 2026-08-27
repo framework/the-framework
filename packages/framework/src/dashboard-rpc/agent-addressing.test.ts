@@ -6,9 +6,8 @@ import { tmpdir } from 'node:os'
 import { sendStop, sendMessage, sendChoice, sendRemoveWorktree } from './control.js'
 import { onRetainedWorktrees, onAgents } from './reads.js'
 import { addProject, projectId as idFor } from '../registry.js'
-import { FRAMEWORK_DIR, worktreePath, addWorktree, agentBranchName } from '../store/index.js'
+import { FRAMEWORK_DIR, worktreePath, addWorktree, agentBranchName, nodeGitRunner } from '@superskill/branch-management'
 import { CONTROL_FILE } from '../control.js'
-import { nodeGitRunner } from '../project.js'
 import { provideTestContext } from './test-context.js'
 
 // #749: an agent tails the control log inside its own worktree (#736), so a steering call has to

@@ -1,7 +1,25 @@
 /**
- * Branch naming (#736/#1581), alone in a module so browser-safe code (the client barrel reaches
- * auto-pm's policy functions) can name branches without dragging the store's node imports along.
+ * The naming rules for everything The Framework mints in git (#736/#1581), and the layout they
+ * imply on disk. Pure: no node imports, so browser-safe code can name branches too.
  */
+
+/**
+ * The directory, under a project's root, that holds The Framework's state (#313): the agent
+ * checkouts, and inside each checkout the agent's own record.
+ */
+export const FRAMEWORK_DIR = '.the-framework'
+
+/**
+ * Per-agent checkouts live under `<repo>/.the-framework/branches/` (#736/#1580), each in a dir
+ * named as its branch. Kept out of git by the install-time `.the-framework/.gitignore`, so a
+ * checkout never shows up as dirty in the parent.
+ */
+export const BRANCHES_DIR = 'branches'
+
+/** An agent id is path-safe: no separators or traversal, only our own charset. */
+export function isSafeAgentId(id: string): boolean {
+  return /^[A-Za-z0-9_-]+$/.test(id)
+}
 
 /**
  * What every framework-minted branch is named under (#1581). Slash-free on purpose: a `/` in a

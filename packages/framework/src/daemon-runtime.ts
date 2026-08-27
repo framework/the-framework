@@ -2,32 +2,8 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import { closeSync, mkdirSync, openSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
 import { appendFile, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
-import {
-  agentIdFromStartedAt,
-  startedAtFromAgentId,
-  addWorktree,
-  agentBranchName,
-  linkDependencies,
-  archiveWorktreeAgent,
-  restoreArchivedAgent,
-  attachWorktree,
-  worktreePath,
-  listAgents,
-  findAgent,
-  archivedAgentPaths,
-  worktreeBranch,
-  readLiveMetas,
-  readLiveMeta,
-  removeWorktree,
-  pruneWorktrees,
-  resolveAgentEventsPath,
-  FRAMEWORK_DIR,
-  EVENTS_FILE,
-  META_FILE,
-  isPidAlive,
-  type AgentMeta,
-} from './store/index.js'
-import { agentIdFromWorktreeDir } from './branch-names.js'
+import { agentIdFromStartedAt, startedAtFromAgentId, archiveWorktreeAgent, restoreArchivedAgent, listAgents, findAgent, archivedAgentPaths, readLiveMetas, readLiveMeta, resolveAgentEventsPath, EVENTS_FILE, META_FILE, isPidAlive, type AgentMeta } from './store/index.js'
+import { addWorktree, agentBranchName, linkDependencies, attachWorktree, worktreePath, worktreeBranch, removeWorktree, pruneWorktrees, FRAMEWORK_DIR, agentIdFromWorktreeDir, isGitRepo, nodeGitRunner, isGitTimeout } from '@superskill/branch-management'
 import type { FrameworkEvent } from './events.js'
 import { removeAgentSpec, writeAgentSpec } from './agent-spec.js'
 import type { StartAgentKind, StartAgentOptions, StartAgentResult, AddProjectResult } from './dashboard/index.js'
@@ -40,14 +16,12 @@ import { resolveUserDir } from './agent-archive.js'
 import { withDataBranch } from './data-branch.js'
 import { removeProjectWorktree } from './worktrees.js'
 import { describeDeleted } from './merged-worktrees.js'
-import { reconcileBranchLinks } from './branch-links.js'
+import { reconcileBranchLinks } from '@superskill/branch-management'
 import { scopedKey, parseScopedKey, keyBelongsTo } from './runtime-keys.js'
 import { addProject, listProjects, projectId } from './registry.js'
 import { isTicketPath } from './tickets.js'
 import { resolveProjectAgentOptions } from './daemon-services.js'
 import { installProject } from './install.js'
-import { isGitRepo, nodeGitRunner } from './project.js'
-import { isCliTimeout } from './cli-exec.js'
 import { withAgentLock } from './agent-locks.js'
 import { errorMessage } from './error-message.js'
 import { preflight, preflightProblems, type PreflightResult } from './preflight.js'
@@ -94,7 +68,7 @@ function resolveSpawnBin(explicitBinPath: string | undefined): string {
  * already on disk before this agent asked for it, and that is not ours to delete.
  */
 export async function cleanupTimedOutWorktree(repo: string, agentId: string, err: unknown): Promise<void> {
-  if (!isCliTimeout(err)) return
+  if (!isGitTimeout(err)) return
   await rm(worktreePath(repo, agentId), { recursive: true, force: true }).catch(() => {})
 }
 

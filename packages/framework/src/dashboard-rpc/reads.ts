@@ -1,5 +1,6 @@
 import type { BridgeBrowserStatus } from '../bridge-browser.js'
-import { findAgent, readLiveMetas, readAllAgents, loadAgentEvents, worktreeSize, isSafeAgentId, startedAtFromAgentId, type AgentMeta, type AgentStatus } from '../store/index.js'
+import { findAgent, readLiveMetas, readAllAgents, loadAgentEvents, startedAtFromAgentId, type AgentMeta, type AgentStatus } from '../store/index.js'
+import { worktreeSize, isSafeAgentId } from '@superskill/branch-management'
 import { planAgentFor } from '../tickets.js'
 import { loadUserSystemPrompt } from '../system-prompt-file.js'
 import { listProjectWorktrees } from '../worktrees.js'

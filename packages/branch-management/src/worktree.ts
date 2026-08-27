@@ -1,8 +1,7 @@
 import { join } from 'node:path'
 import { realpath } from 'node:fs/promises'
-import { nodeGitRunner, type GitRunner } from '../project.js'
-import { FRAMEWORK_DIR, BRANCHES_DIR, isSafeAgentId } from './agent-store.js'
-import { worktreeDirName } from '../branch-names.js'
+import { nodeGitRunner, type GitRunner } from './git.js'
+import { FRAMEWORK_DIR, BRANCHES_DIR, isSafeAgentId, worktreeDirName, agentIdFromWorktreeDir, isWorktreeDirName } from './branch-names.js'
 
 /**
  * Git-worktree lifecycle for concurrent agents (#453/#735): give each agent its own
@@ -17,13 +16,42 @@ export function worktreePath(repo: string, agentId: string): string {
   return join(repo, FRAMEWORK_DIR, BRANCHES_DIR, worktreeDirName(agentId))
 }
 
+/** One checkout on disk: where it is, and whose it is. */
+export interface WorktreeDirEntry {
+  path: string
+  agentId: string
+}
 
-export {
-  AGENT_BRANCH_PREFIX,
-  LEGACY_AGENT_BRANCH_PREFIX,
-  agentBranchName,
-  legacyAgentBranchName,
-} from '../branch-names.js'
+/** Lists a directory's entry names. A missing or unreadable directory yields `[]`. */
+export type DirReader = (path: string) => Promise<string[]>
+
+async function nodeReaddir(path: string): Promise<string[]> {
+  const { readdir } = await import('node:fs/promises')
+  return readdir(path).catch(() => [])
+}
+
+/**
+ * Every checkout directory on disk (#1580). Only the run branch spelling counts — the same
+ * directory holds the rename links (#1589), which are views, not checkouts. Forgiving: a missing
+ * root yields nothing.
+ */
+export async function worktreeDirEntries(repo: string, readdir: DirReader = nodeReaddir): Promise<WorktreeDirEntry[]> {
+  const root = join(repo, FRAMEWORK_DIR, BRANCHES_DIR)
+  const entries: WorktreeDirEntry[] = []
+  for (const name of await readdir(root).catch((): string[] => [])) {
+    const agentId = agentIdFromWorktreeDir(name)
+    if (isWorktreeDirName(name) && isSafeAgentId(agentId)) entries.push({ path: join(root, name), agentId })
+  }
+  return entries
+}
+
+/**
+ * The agent ids that have a worktree directory (#737/#1580). Forgiving — a project that never ran
+ * concurrently has no such dir and yields `[]`.
+ */
+export async function listWorktreeDirs(repo: string, readdir: DirReader = nodeReaddir): Promise<string[]> {
+  return [...new Set((await worktreeDirEntries(repo, readdir)).map(entry => entry.agentId))]
+}
 
 /** One entry parsed from `git worktree list --porcelain`. */
 export interface WorktreeInfo {

@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import type { GitRunner } from './project.js'
+import type { GitRunner } from '@superskill/branch-management'
 import {
   assessRepo,
   planMaintenanceSweep,

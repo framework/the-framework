@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { realpath } from 'node:fs/promises'
 import { test } from 'node:test'
-import { nodeGitRunner } from './project.js'
+import { nodeGitRunner } from '@superskill/branch-management'
 import { DATA_BRANCH, dataWorktreePath, ensureDataWorktree, pullDataBranch, withDataBranch } from './data-branch.js'
 
 const git = nodeGitRunner()

@@ -9,7 +9,7 @@ import {
   type ScratchFs,
   type ScratchSweepResult,
 } from './cloud-scratch-refs.js'
-import type { GitRunner } from './project.js'
+import type { GitRunner } from '@superskill/branch-management'
 import type { LinkedPr } from './dashboard/gh.js'
 
 const DAY = 24 * 60 * 60 * 1000

@@ -1,31 +1,20 @@
 import { readFile } from 'node:fs/promises'
 import { join, sep } from 'node:path'
 import { errorMessage } from './error-message.js'
+import { listAgents, readLiveMetas, archivedAgentPaths, META_FILE, type AgentMeta, type AgentStatus } from './store/index.js'
 import {
-  listWorktreeDirs,
-  listAgents,
-  readLiveMetas,
-  branchPushed,
-  worktreeClean,
-  isWorktreeRoot,
-  currentBranch,
   agentBranchName,
+  listWorktreeDirs,
+  isSafeAgentId,
+  reclaimWorktree,
   removeWorktree,
-  deleteBranch,
   pruneWorktrees,
   worktreePath,
   worktreeSize,
-  isSafeAgentId,
-  archivedAgentPaths,
   FRAMEWORK_DIR,
-  META_FILE,
-  type AgentMeta,
-  type AgentStatus,
-} from './store/index.js'
-import { pushAgentBranch } from './dashboard/agent-handoff.js'
+  type ReclaimOutcome,
+} from '@superskill/branch-management'
 import { dataWorktreePath, withDataBranch } from './data-branch.js'
-import { isRunBranch } from './branch-names.js'
-import { nodeGitRunner } from './project.js'
 
 /** A retained worktree and the agent that left it behind (#752). */
 export interface WorktreeRow {
@@ -115,23 +104,12 @@ async function sizeOf(cwd: string, agentId: string): Promise<{ sizeBytes?: numbe
  * Remove one retained worktree (#752/#737/E5): the one implementation behind every surface that
  * removes one — the sweep, teardown, and the dashboard's Remove button (#982).
  *
- * **One rule: only what is on the remote may go.** The work is committed to the session's branch,
- * the branch is pushed, and the checkout is removed only once the remote has it. Every deletion is
- * therefore recoverable, and nothing local is ever the last copy of anything. It replaced three
- * interacting rules that each asked *what state did this session end in* — a clean finish removes
- * the checkout, a failure or stop keeps it, a merged branch reclaims it later via two different
- * "landed" signals — where the question that actually matters is *is this recoverable yet*. There
- * is one failure mode now, and it is legible: the push did not land, so the checkout stays and the
- * reason says why.
- *
- * The push serves the rule; it is not a licence to publish. A session armed to publish nothing
- * (`handoff: local`, B5/#1379) said its branch must not reach the remote, so its unpushed checkout
- * is kept — the same outcome as a repo with no remote — rather than pushed to make it removable.
- * Deciding otherwise would have teardown publish the very branch the agent's own handoff just
- * declined to. Nothing is committed on the way to that refusal either — a kept checkout is a
- * place someone works, and the sweep re-offers it every pass — so it goes only from a clean tree
- * on a pushed tip. And a record that cannot be read keeps the checkout too: unreadable is not
- * "publish freely".
+ * **One rule: only what is on the remote may go** — the git side of it is the package's
+ * `reclaimWorktree`. What this adds is the agent's side: its record, which says whether the
+ * branch may be pushed at all (a session armed to publish nothing, `handoff: local`, B5/#1379,
+ * said its branch must not reach the remote — pushing it to make removal possible would have
+ * teardown publish the very branch the handoff declined to) and, for a cloud run, the pushed
+ * anchor that proves what its checkout holds (#1601).
  *
  * Refuses while the agent is still going — an agent's checkout is where its agent is working, and Stop
  * is how you end an agent, not pulling the floor out from under it.
@@ -149,152 +127,54 @@ export async function removeProjectWorktree(
     return { ok: false, error: 'that session is still going; stop it before removing its worktree' }
   }
   const path = worktreePath(cwd, agentId)
+  // The agent's record decides what the git rule may do, before any git runs: a `web` run's
+  // hand-off anchor (#1601) proves what its checkout holds; a publish-nothing handoff (B5) means
+  // the branch may not be pushed to make removal possible. `handoff` is on the meta from the
+  // agent's first event, so a meta that exists without one (a boot death) keeps the recoverable
+  // default; a meta that cannot be read keeps the checkout instead, because it cannot tell a
+  // publish-nothing session from any other (fail closed, retried by a later pass).
+  let meta: AgentMeta | undefined
   try {
-    // Before any git runs in it (#1654): a directory under `branches/` that git does not know as
-    // a worktree root makes every command below act on the enclosing repo — the user's checkout,
-    // the user's branch. Nothing is committed, pushed or deleted through it; it is reported and
-    // left where it is.
-    if (!(await isWorktreeRoot(path))) {
-      return { ok: false, error: `session ${agentId}'s directory is not a git worktree; left alone` }
+    meta = await readMetaFor(cwd, path, agentId)
+  } catch (err) {
+    return {
+      ok: false,
+      error: `session ${agentId}'s record could not be read (${errorMessage(err)}); its worktree was kept`,
     }
-    const branch = await currentBranch(path)
-    if (!branch) return { ok: false, error: `session ${agentId} is on no branch; its worktree was kept` }
-    // The armed handoff decides before anything commits or pushes: a session armed to publish
-    // nothing keeps its checkout instead of having its branch pushed to make removal possible —
-    // the push here serves recoverability, and pushing a `handoff: local` session's branch is
-    // the publish that rung exists to refuse. `handoff` is on the meta from the agent's first
-    // event, so a meta that exists without one (a boot death) keeps the recoverable default;
-    // a meta that cannot be read keeps the checkout instead, because it cannot tell a
-    // publish-nothing session from any other (fail closed, retried by a later pass).
-    let meta: AgentMeta | undefined
-    try {
-      meta = await readMetaFor(cwd, path, agentId)
-    } catch (err) {
-      return {
-        ok: false,
-        error: `session ${agentId}'s record could not be read (${errorMessage(err)}); its worktree was kept`,
-      }
-    }
-    // Whether the run's branch goes with the checkout (#1650): only when it provably holds nothing.
-    let emptyBranch = false
-    if (meta?.target === 'web' && meta.cloudAnchor && (await webCheckoutCovered(path, branch, meta.cloudAnchor))) {
-      // A web run's checkout never holds the work (#1601): the hand-off pushed everything the
-      // cloud session clones at, and the work itself lands on the session's own remote branch.
-      // Pushing the local run branch just to satisfy the remote rule is what accreted one empty
-      // `tf-agent-*` ref on origin per web run — so the checkout goes without a push, once it is
-      // provably holding nothing: a clean tree whose tip is inside what the hand-off pushed (the
-      // recorded anchor). Anything short of that proof — no anchor recorded, the anchor's object
-      // gone, a tree or tip that moved — falls through to the ordinary rule below, which is never
-      // worse than what every web run got before.
-    } else if (isRunBranch(branch) && (await branchHoldsNothing(cwd, path, branch))) {
-      // A run that committed nothing (#1650) — a triage that wrote only to the data branch, a run
-      // stopped before its first commit — leaves a branch whose tip is a commit the remote already
-      // has. The rule is satisfied before any push: what the checkout holds *is* on the remote.
-      // Pushing anyway is what put an empty `tf-triage-quick` on origin, back when the triage
-      // prompt pinned that name and aborted on finding it (#1293, retired by the routine lock,
-      // #1659). The branch goes with the checkout. It is not the last copy of anything, by
-      // construction. Only a
-      // branch the framework minted, though: a leftover checkout can sit on the user's own branch
-      // (one was found on `main`), and deleting that is not this code's call even when it holds
-      // nothing — git's refusal to delete a checked-out branch must never be the guard.
-      emptyBranch = true
-    } else if (meta?.handoff && !meta.handoff.push) {
-      // A publish-nothing session's checkout goes only once everything it holds is already on
-      // the remote by someone's explicit act: a clean tree on a pushed tip — then removing it
-      // publishes nothing. Anything short of that would take a push of removal's own.
-      if (!(await worktreeClean(path)) || !(await branchPushed(cwd, branch))) {
-        return {
-          ok: false,
-          error: `session ${agentId} was set to publish nothing (handoff: local); its worktree was kept`,
-        }
-      }
-    } else {
-      // `removeWorktree` forces past a dirty tree, and the framework commits nothing on an agent's
-      // behalf (#1638): work the agent left uncommitted stays where it is, and so does the checkout,
-      // until a person commits or deletes it. A tree git cannot read is kept the same way.
-      if (!(await worktreeClean(path).catch(() => false))) {
-        return { ok: false, error: `session ${agentId} has uncommitted work; its worktree was kept` }
-      }
-      if (!(await branchPushed(cwd, branch))) {
-        // Pushing is what makes the removal recoverable, so it is attempted here rather than
-        // required of the caller. A repo with no remote never gets past this, which is the honest
-        // answer: there is nowhere for the work to be recoverable from.
-        const pushed = await pushAgentBranch(cwd, branch)
-        if (!pushed.ok) {
-          return { ok: false, error: `${branch} is not on the remote (${pushed.error}); its worktree was kept` }
-        }
-      }
-    }
-    await opts.beforeRemove?.(agentId)
-    await removeWorktree(cwd, path)
-    await pruneWorktrees(cwd)
-    // After the checkout: git refuses to delete a branch a worktree still has checked out.
-    // The run-id branch the run started on (#1657). The system prompt has the agent *create*
-    // `tf-<name>` rather than be renamed onto it, so the checkout ends elsewhere and the run-id
-    // branch stays behind at the commit the run began from — one per run, forever. It goes when
-    // the checkout's branch contains it: then everything it holds is held again by a branch that
-    // either stays or (an empty one, above) is itself inside the remote. A run-id branch the agent
-    // committed on and then abandoned for a branch from elsewhere is not contained, and stays.
-    // Decided before anything is deleted: the containment reads both refs.
-    const runBranch = agentBranchName(agentId)
-    const runBranchGoes = runBranch !== branch && (await branchContains(cwd, branch, runBranch))
-    const deleted: string[] = []
-    if (emptyBranch) {
-      await deleteBranch(cwd, branch)
-      deleted.push(branch)
-    }
-    if (runBranchGoes) {
-      await deleteBranch(cwd, runBranch)
-      deleted.push(runBranch)
-    }
-    return deleted.length ? { ok: true, branchesDeleted: deleted } : { ok: true }
+  }
+  const publishNothing = Boolean(meta?.handoff && !meta.handoff.push)
+  try {
+    const outcome = await reclaimWorktree(cwd, path, {
+      birthBranch: agentBranchName(agentId),
+      mayPush: !publishNothing,
+      ...(meta?.target === 'web' && meta.cloudAnchor ? { heldBy: meta.cloudAnchor } : {}),
+      ...(opts.beforeRemove ? { beforeRemove: () => opts.beforeRemove!(agentId) } : {}),
+    })
+    return outcome.ok ? outcome : { ok: false, error: refusal(agentId, outcome, publishNothing) }
   } catch (err) {
     return { ok: false, error: errorMessage(err) }
   }
 }
 
-/**
- * Whether a web run's checkout provably holds nothing its hand-off did not carry (#1601): the
- * tree is clean and the branch tip is an ancestor of the pushed anchor. False on any doubt —
- * the caller then treats the checkout like every other run's.
- */
-async function webCheckoutCovered(path: string, branch: string, anchor: string): Promise<boolean> {
-  if (!(await worktreeClean(path))) return false
-  const git = nodeGitRunner()
-  return git(['merge-base', '--is-ancestor', branch, anchor], path).then(
-    () => true,
-    () => false,
-  )
-}
-
-/**
- * Whether a run's branch holds nothing the remote lacks (#1650): the tree is clean and the tip is
- * reachable from some remote-tracking branch *other than the branch's own* — a commit `origin`
- * already has under another name, so nothing on the branch is unique to it. Its own remote copy
- * does not count: a pushed branch with a PR contains its own tip and is exactly the branch that
- * must stay. Read from the local remote-tracking refs, which are only ever behind the remote: a
- * tip they do not cover yet answers false, and the caller falls back to the push.
- */
-async function branchHoldsNothing(cwd: string, path: string, branch: string): Promise<boolean> {
-  if (!(await worktreeClean(path))) return false
-  const git = nodeGitRunner()
-  return git(['branch', '--remotes', '--contains', `refs/heads/${branch}`, '--format=%(refname:short)'], cwd).then(
-    out =>
-      out
-        .split('\n')
-        .map(line => line.trim())
-        .some(name => name !== '' && !name.endsWith(`/${branch}`)),
-    () => false,
-  )
-}
-
-/** Whether `inner` exists and is an ancestor of (or equal to) `outer` — everything on it is on `outer` too. */
-async function branchContains(cwd: string, outer: string, inner: string): Promise<boolean> {
-  const git = nodeGitRunner()
-  return git(['merge-base', '--is-ancestor', `refs/heads/${inner}`, `refs/heads/${outer}`], cwd).then(
-    () => true,
-    () => false,
-  )
+/** Why a checkout stayed, said the way every surface reports it. */
+function refusal(agentId: string, outcome: ReclaimOutcome & { ok: false }, publishNothing: boolean): string {
+  switch (outcome.reason) {
+    case 'not-a-worktree':
+      return `session ${agentId}'s directory is not a git worktree; left alone`
+    case 'no-branch':
+      return `session ${agentId} is on no branch; its worktree was kept`
+    case 'dirty':
+      // A publish-nothing session's checkout goes only once everything it holds is already on
+      // the remote by someone's explicit act — a clean tree on a pushed tip — so a dirty tree is
+      // that refusal too, said as such. Nothing is committed on the way to it (#1638).
+      return publishNothing
+        ? `session ${agentId} was set to publish nothing (handoff: local); its worktree was kept`
+        : `session ${agentId} has uncommitted work; its worktree was kept`
+    case 'not-on-remote':
+      return publishNothing
+        ? `session ${agentId} was set to publish nothing (handoff: local); its worktree was kept`
+        : `${outcome.branch} is not on the remote (${outcome.detail ?? 'not pushed'}); its worktree was kept`
+  }
 }
 
 /**

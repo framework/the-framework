@@ -1,4 +1,4 @@
-import { nodeGitRunner, type GitRunner } from '../project.js'
+import { nodeGitRunner, type GitRunner, legacyAgentBranchName, AGENT_BRANCH_PREFIX, LEGACY_AGENT_BRANCH_PREFIX, currentBranch, repoHasRemote, FRAMEWORK_DIR, pushBranch, gitReason } from '@superskill/branch-management'
 import {
   cachedPrView,
   cachedPrsForBranch,
@@ -17,8 +17,7 @@ import { parseNumstat } from './file-diff.js'
 import { parsePorcelain } from './file-status.js'
 import { errorMessage } from '../error-message.js'
 import type { AutoHandoffSkip, AutoMergeOutcome, MergeWithheldReason } from '../events.js'
-import { legacyAgentBranchName, AGENT_BRANCH_PREFIX, LEGACY_AGENT_BRANCH_PREFIX, currentBranch, repoHasRemote, startedAtFromAgentId, FRAMEWORK_DIR, type AgentMeta } from '../store/index.js'
-
+import { startedAtFromAgentId, type AgentMeta } from '../store/index.js'
 // What a finished session produced, and what is left to do with it (#799).
 //
 // Everything up to "the agent is done" was covered; the handoff back to the human was not. A
@@ -380,27 +379,6 @@ async function countPendingWork(git: GitRunner, checkout: string | undefined): P
 export type HandoffResult = { ok: true; url?: string; number?: number } | { ok: false; error: string }
 
 /**
- * Push a finished session's branch to `origin`.
- *
- * Publishing the agent's work under the user's name is the user's call, but since #1102 that call
- * is made once, up front, by a checkbox that is armed by default, rather than re-taken by hand at
- * the end of every session. The click is still here for a session that opted out, and it is what
- * a failed auto-push falls back to.
- */
-export async function pushAgentBranch(
-  cwd: string,
-  branch: string,
-  git: GitRunner = nodeGitRunner(),
-): Promise<HandoffResult> {
-  try {
-    await git(['push', '--set-upstream', 'origin', branch], cwd)
-    return { ok: true }
-  } catch (err) {
-    return { ok: false, error: gitReason(err) }
-  }
-}
-
-/**
  * {@link AgentHandoff.base} as a base a PR can actually be opened against.
  *
  * The field holds a git ref, because that is what every other use of it needs: `detectBase` reads
@@ -409,24 +387,11 @@ export async function pushAgentBranch(
  * *branch on the remote*, and rejects `origin/main` with "Base ref must be a branch".
  *
  * So the conversion belongs at the `gh` boundary rather than in the field. Stripping `origin/`
- * matches what the rest of this module already assumes: the remote is `origin` (`pushAgentBranch`
+ * matches what the rest of this module already assumes: the remote is `origin` (`pushBranch`
  * pushes there, `detectBase` reads its HEAD).
  */
 export function prBaseName(base: string): string {
   return base.startsWith('origin/') ? base.slice('origin/'.length) : base
-}
-
-/**
- * The line of a failed git invocation worth showing.
- *
- * `execFile` rejects with "Command failed: git push ..." and buries git's own `fatal:` line
- * further down, which in a one-line panel means the user reads the command back instead of the
- * reason it failed.
- */
-export function gitReason(err: unknown): string {
-  const message = errorMessage(err)
-  const lines = message.split('\n').map(line => line.trim()).filter(Boolean)
-  return lines.find(line => /^(fatal|error|remote):/i.test(line)) ?? lines[0] ?? 'git failed'
 }
 
 /** What to put on the PR. */
@@ -460,7 +425,7 @@ export async function openBranchPullRequest(
   const gh = deps.gh ?? nodeGhRunner()
   // gh refuses to open a PR for a branch the remote has never seen, so the push is part of the
   // action rather than a thing the user has to remember to do first.
-  const pushed = await pushAgentBranch(cwd, branch, git)
+  const pushed = await pushBranch(cwd, branch, git)
   if (!pushed.ok) return pushed
   try {
     const args = ['pr', 'create', '--head', branch, '--title', draft.title, '--body', draft.body]
@@ -708,7 +673,7 @@ export async function agentAutoHandoff(
   }
 
   if (state.pushed) return { outcome: 'skipped', reason: 'already-pushed' }
-  const pushed = await pushAgentBranch(cwd, branch, readDeps.git)
+  const pushed = await pushBranch(cwd, branch, readDeps.git)
   if (!pushed.ok) return { outcome: 'failed', step: 'push', error: pushed.error }
   return { outcome: 'done', pushed: true }
 }

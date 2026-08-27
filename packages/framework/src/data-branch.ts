@@ -1,9 +1,6 @@
 import { dirname, join } from 'node:path'
-import { nodeGitRunner, type GitRunner } from './project.js'
-import { FRAMEWORK_DIR, BRANCHES_DIR } from './store/index.js'
-import { DATA_BRANCH } from './branch-names.js'
+import { nodeGitRunner, type GitRunner, FRAMEWORK_DIR, BRANCHES_DIR, DATA_BRANCH, excludeFromGit } from '@superskill/branch-management'
 import { TICKETS_DIR, FLAT_TODO_FILE } from './tickets.js'
-import { excludeFromGit } from './git-exclude.js'
 import { errorMessage } from './error-message.js'
 
 export { DATA_BRANCH }

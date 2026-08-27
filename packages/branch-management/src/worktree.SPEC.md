@@ -15,6 +15,7 @@ The lifecycle of an agent's own checkout: creating it, naming its branch, commit
 - **A checkout is read, never committed** - the framework commits nothing on an agent's behalf; whether a checkout is clean is a read, and a checkout holding uncommitted work is the caller's to keep.
 - **Nothing local is ever the last copy of work** - a checkout may be deleted only when the remote already has its branch tip.
 - **A branch the caller proved holds nothing can be deleted outright** - the deletion is unconditional and forgiving, because the caller has already established the stronger fact.
+- **The checkouts on disk are listed by name** - every directory under `.the-framework/branches/` in the minted `tf-agent-<agent id>` spelling is a checkout, and names the agent that owns it; the rename links beside them are not.
 - **Every read is forgiving; every removal is idempotent** - a git failure yields "unknown" rather than breaking the caller, and removing a checkout twice is harmless.
 
 ## Business logic

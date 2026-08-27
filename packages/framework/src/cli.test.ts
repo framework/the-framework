@@ -5,9 +5,9 @@ import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { appendControl } from './control.js'
 import { BROWSER_MCP_SERVERS, withBrowser } from './browser.js'
-import { EVENTS_FILE, FRAMEWORK_DIR, ARCHIVE_DIR, type StoreFs } from './store/index.js'
+import { EVENTS_FILE, ARCHIVE_DIR, type StoreFs } from './store/index.js'
+import { FRAMEWORK_DIR, nodeGitRunner } from '@superskill/branch-management'
 import { layoutMarker, layoutMarkerPath } from './layout.js'
-import { nodeGitRunner } from './project.js'
 import {
   chooseSessionLink,
   claudeDriverOptions,

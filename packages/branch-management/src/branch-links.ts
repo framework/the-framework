@@ -1,9 +1,8 @@
 import { basename, join } from 'node:path'
-import { nodeGitRunner, type GitRunner } from './project.js'
+import { nodeGitRunner, type GitRunner } from './git.js'
 import { excludeFromGit } from './git-exclude.js'
-import { FRAMEWORK_DIR, BRANCHES_DIR, worktreeDirEntries, worktreeBranch, type WorktreeDirEntry } from './store/index.js'
-import { isWorktreeDirName } from './branch-names.js'
-import { startProjectPass, type ProjectPass, type ProjectsSource } from './project-pass.js'
+import { FRAMEWORK_DIR, BRANCHES_DIR, isWorktreeDirName } from './branch-names.js'
+import { worktreeDirEntries, worktreeBranch, type WorktreeDirEntry } from './worktree.js'
 
 // The branches view (#1580): every checkout under `.the-framework/branches/` is a directory named
 // as its birth branch (`tf-agent-<id>`), and this pass keeps the *current* names reachable beside
@@ -13,7 +12,7 @@ import { startProjectPass, type ProjectPass, type ProjectsSource } from './proje
 // shows, and a rename costs a link, never moving a checkout under a live agent (the #1589
 // review's call).
 //
-// The daemon reconciles on its clock and after each worktree it allocates: derive the wanted
+// A daemon reconciles on its clock and after each worktree it allocates: derive the wanted
 // links from the checkouts on disk, add what is missing, drop only our own stale links.
 
 /** The filesystem the reconcile needs; `node:fs/promises` in production. */
@@ -32,7 +31,7 @@ export interface LinksFs {
   lexists(path: string): Promise<boolean>
 }
 
-/** A {@link LinksFs} over `node:fs/promises`, dynamically imported like {@link nodeDirLister}. */
+/** A {@link LinksFs} over `node:fs/promises`. */
 function nodeLinksFs(): LinksFs {
   const fs = () => import('node:fs/promises')
   return {
@@ -120,22 +119,4 @@ export async function reconcileBranchLinks(cwd: string, deps: BranchLinksDeps = 
     await exclude(cwd, '/branches').catch(() => {})
     await exclude(cwd, '!/branches/').catch(() => {})
   }
-}
-
-/** What {@link startBranchLinksPass} needs from the daemon. */
-export interface BranchLinksOptions {
-  projects: ProjectsSource
-  /** The per-project reconcile (default {@link reconcileBranchLinks}). */
-  reconcile?: (cwd: string) => Promise<void>
-}
-
-/**
- * Keep every registered project's branch links current, one turn per call. Runs on the daemon's
- * clock; renames and reclaimed worktrees settle within a tick, and a freshly-allocated worktree
- * gets its link immediately because allocation calls the reconcile too. Quiet on purpose: links
- * are presentation, and narrating every rename would drown the log.
- */
-export function startBranchLinksPass(opts: BranchLinksOptions): ProjectPass {
-  const reconcile = opts.reconcile ?? reconcileBranchLinks
-  return startProjectPass(opts.projects, cwd => reconcile(cwd).catch(() => {}))
 }

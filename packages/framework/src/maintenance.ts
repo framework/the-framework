@@ -1,8 +1,6 @@
 import { join } from 'node:path'
-import { nodeGitRunner, type GitRunner } from './project.js'
+import { nodeGitRunner, type GitRunner, FRAMEWORK_DIR } from '@superskill/branch-management'
 import { nodeFs } from './node-fs.js'
-import { FRAMEWORK_DIR } from './store/index.js'
-
 /**
  * The maintenance sweep (#298): a background job that walks the registered repos,
  * finds the commits each repo has grown since its last maintenance review, and runs

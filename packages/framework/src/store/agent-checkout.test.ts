@@ -4,9 +4,9 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises'
 import { resolveAgentEventsPath } from './agent-checkout.js'
-import { FRAMEWORK_DIR, EVENTS_FILE, ARCHIVE_DIR } from './agent-store.js'
-import { worktreePath } from './worktree.js'
-
+import { EVENTS_FILE, ARCHIVE_DIR } from './agent-store.js'
+import { FRAMEWORK_DIR } from '@superskill/branch-management'
+import { worktreePath } from '@superskill/branch-management'
 // resolveAgentEventsPath probes the real filesystem (same as resolveAgentCheckout), so these
 // tests build a throwaway project directory rather than a memory fs.
 

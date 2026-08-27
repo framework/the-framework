@@ -1,5 +1,4 @@
-import { nodeGitRunner, type GitRunner } from '../project.js'
-
+import { nodeGitRunner, type GitRunner } from '@superskill/branch-management'
 // The project panel's "Open on GitHub" (#489, part of #488). Derives the repo's github.com
 // URL from its `origin` remote so the panel can link straight to it. A read of git state,
 // safe anywhere — the relay has no local checkout, so it resolves to nothing there.

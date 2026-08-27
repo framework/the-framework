@@ -12,7 +12,7 @@ The settings line for the bridge browser: where the daemon's own browser stands,
 - **A launch names its step** - so a minutes-long download does not read as a hang.
 - **A running browser can be shown and hidden** - shown for the sign-in, hidden again after; the button offered is the one that applies.
 - **The sign-in is asked for by name** - when the browser's Driver tab reports claude.ai's sign-in page, the line says to show the window and sign in once.
-- **A stopped browser says why, and offers a restart** - the reason the daemon recorded, and a Restart button.
+- **A browser that is not running says why, and offers a restart** - the reason the daemon recorded — an exit, a failed launch step, or a launch that could not begin — and a Restart button.
 
 ## Business logic
 
@@ -56,7 +56,7 @@ The bridge browser is running but signed out, so nothing it does reaches a sessi
 
 When the daemon reports the browser running and its claude.ai tab on the sign-in page, the line says so and to show the window, sign in once, then hide it again; the show button is worded for the sign-in. Once the tab is on any other page, the prompt is gone. The daemon reads that page from its own browser, so the user's own Chrome reporting to the bridge at the same time cannot mask it.
 
-### A stopped browser says why, and offers a restart
+### A browser that is not running says why, and offers a restart
 
 #### User story
 
@@ -64,7 +64,7 @@ See `## User story`: the browser was quit, or could not start.
 
 #### Business logic
 
-When the daemon reports the browser as stopped, the line quotes the reason — the exit signal, or the launch step that failed — and offers a Restart, which asks the daemon to launch it again.
+When the daemon reports the browser as stopped, the line says it is not running and quotes the reason — the exit signal, the launch step that failed, or why the launch could not begin (the bridge token the daemon reads at start-up is missing, so a restart is needed) — and offers a Restart, which asks the daemon to launch it again.
 
 ## Before modifying/creating SPEC.md files
 

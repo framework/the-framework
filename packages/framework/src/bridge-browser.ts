@@ -524,9 +524,18 @@ export function bridgeBrowserOwner(launch: BridgeBrowserLauncher, log: (line: st
     if (browser || launching) return launching
     const mine = ++generation
     current = { state: 'starting', detail: 'preparing' }
-    launching = launch(detail => {
-      if (generation === mine) current = { state: 'starting', detail }
-    })
+    // A launcher that throws before it has anything to await — the bridge token it needs does not
+    // exist — is a launch that failed, and goes the same way as one that failed later. Left as a
+    // plain call, that throw would escape `start()` as a rejection nobody handles, and an
+    // unhandled rejection ends the daemon process (#1332). The executor runs at once, so the
+    // launcher is still called synchronously and its first step is readable right away.
+    launching = new Promise<BridgeBrowser>(resolve =>
+      resolve(
+        launch(detail => {
+          if (generation === mine) current = { state: 'starting', detail }
+        }),
+      ),
+    )
       .then(async launched => {
         if (generation !== mine) {
           await launched.close()

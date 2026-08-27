@@ -192,8 +192,17 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
   // so a web run no longer needs the user's Chrome open. Created here, launched only once the
   // dashboard listens (the extension is told the daemon's address) and the preference says so.
   // It needs the bridge: without the token there is nothing to hand the extension.
-  const bridgeBrowser = bridgeBrowserOwner(report => {
-    if (!bridgeToken || !daemonUrl) throw new Error('turn the browser bridge on and restart the dashboard first')
+  const bridgeBrowser = bridgeBrowserOwner(async report => {
+    if (!bridgeToken || !daemonUrl) {
+      // The token is minted at boot, from the bridge preference as it stood then (above). A bridge
+      // switched on since is a restart away; a bridge that is off wants switching on first.
+      const bridgeOnNow = (await readPreferences(undefined, env).catch((): Preferences => ({}))).bridge === true
+      throw new Error(
+        bridgeOnNow
+          ? 'the browser bridge was switched on after the dashboard started — restart the dashboard, and the browser launches on its own'
+          : 'turn the browser bridge on, then restart the dashboard',
+      )
+    }
     return (opts.bridgeBrowser ?? (o => startBridgeBrowser(o)))({ daemonUrl, token: bridgeToken, dir: bridgeBrowserDir(env), report })
   }, console.log)
   // Assigned below, read from the credentials store's `onChange` (#1095): the dashboard mount has

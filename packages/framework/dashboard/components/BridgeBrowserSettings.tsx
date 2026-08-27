@@ -48,7 +48,7 @@ export function BridgeBrowserSettings({ enabled }: { enabled: boolean }) {
       {status.state === 'starting' && <p className="text-muted-foreground">Starting the bridge browser: {status.detail}.</p>}
       {status.state === 'stopped' && (
         <p className="text-danger">
-          The bridge browser stopped: {status.detail}.{' '}
+          The bridge browser is not running: {status.detail}.{' '}
           <Button variant="outline" size="sm" onClick={() => act('restart')}>
             Restart
           </Button>

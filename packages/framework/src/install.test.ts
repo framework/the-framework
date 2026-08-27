@@ -99,7 +99,7 @@ test('installProject records the layout marker, tracked, so a skewed build is re
   assert.match(fs.files.get(gitignorePath(CWD)) ?? '', /^!LAYOUT$/m)
 })
 
-test('installProject on a dirty repo commits the pre-existing changes first', async () => {
+test('installProject on a dirty repo leaves the user’s changes alone and adds only its own directory (#1638)', async () => {
   const fs = memFs()
   const { git, calls } = fakeGit(args => {
     if (args[0] === 'rev-parse') return 'true'
@@ -108,8 +108,8 @@ test('installProject on a dirty repo commits the pre-existing changes first', as
 
   assert.deepEqual(await installProject(CWD, { git, fs }), { ok: true })
 
-  const commits = calls.filter(args => args[0] === 'commit').map(args => args[2])
-  assert.deepEqual(commits, ['[The Framework] uncommitted changes', '[The Framework] install The Framework'])
+  assert.deepEqual(calls.filter(args => args[0] === 'commit').map(args => args[2]), ['[The Framework] install The Framework'])
+  assert.deepEqual(calls.filter(args => args[0] === 'add'), [['add', '.the-framework']], 'never `add -A`: the user’s file.ts is theirs')
 })
 
 test('installProject on an already-activated repo is a no-op that never calls git', async () => {

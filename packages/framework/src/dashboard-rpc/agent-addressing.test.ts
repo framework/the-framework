@@ -187,12 +187,31 @@ async function projectWithDirtyWorktree(): Promise<{
   }
 }
 
-test('the dashboard Remove commits and pushes the checkout it takes away (#982/E5)', async () => {
+test('the dashboard Remove keeps a checkout holding uncommitted work, and says so (#982/E5/#1638)', async () => {
   const ctx = await projectWithDirtyWorktree()
   try {
-    assert.deepEqual(await sendRemoveWorktree(ctx.projectId, ctx.agentId), { ok: true })
+    const result = await sendRemoveWorktree(ctx.projectId, ctx.agentId)
+    assert.equal(result.ok, false)
+    assert.match(result.ok === false ? result.error : '', /uncommitted work/)
     const git = nodeGitRunner()
-    assert.match(await git(['show', `${ctx.branch}:index.html`], ctx.dir), /Welcome!/, 'the uncommitted edit survived on the run branch')
+    assert.match(await readFile(join(ctx.worktree, 'index.html'), 'utf8'), /Welcome!/, 'the edit is still in the checkout, uncommitted')
+    await assert.rejects(() => git(['rev-parse', '--verify', `refs/remotes/origin/${ctx.branch}`], ctx.dir), 'and nothing reached the remote')
+  } finally {
+    ctx.restore()
+    await rm(ctx.dir, { recursive: true, force: true })
+  }
+})
+
+test('the dashboard Remove pushes and takes away a checkout whose agent committed (#982/E5)', async () => {
+  const ctx = await projectWithDirtyWorktree()
+  try {
+    const git = nodeGitRunner()
+    await git(['config', 'user.email', 't@t'], ctx.worktree)
+    await git(['config', 'user.name', 't'], ctx.worktree)
+    await git(['add', '-A'], ctx.worktree)
+    await git(['commit', '-q', '-m', 'work'], ctx.worktree)
+    assert.deepEqual(await sendRemoveWorktree(ctx.projectId, ctx.agentId), { ok: true })
+    assert.match(await git(['show', `${ctx.branch}:index.html`], ctx.dir), /Welcome!/, 'the committed edit survived on the run branch')
     assert.match(
       await git(['show', `refs/remotes/origin/${ctx.branch}:index.html`], ctx.dir),
       /Welcome!/,

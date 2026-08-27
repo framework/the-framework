@@ -9,7 +9,7 @@ What the tests cover: which checkouts the sweep reclaims, what it says, and — 
 - A kept checkout is accounted for once rather than re-announced on every pass; a *changed* keep reason is announced again, because it means the situation changed; and a removal resets the accounting, so a checkout reappearing under the same identity is announced afresh.
 - A stopped sweep does no further work.
 
-Against a real repository with a real remote: an agent whose work reaches the remote loses its checkout while its branch, its commit, and the copy on the remote all remain; an agent with nowhere to push keeps its checkout; work the agent never committed is committed and pushed before anything is deleted, so it ends up on the branch and on the remote rather than destroyed; and a checkout that is already pushed is not pushed again but is still reclaimed.
+Against a real repository with a real remote: an agent whose work reaches the remote loses its checkout while its branch, its commit, and the copy on the remote all remain; an agent with nowhere to push keeps its checkout; work the agent never committed keeps its checkout, reported by the sweep, with nothing committed or pushed on the agent's behalf; and a checkout that is already pushed is not pushed again but is still reclaimed.
 
 ## Before modifying/creating SPEC.md files
 

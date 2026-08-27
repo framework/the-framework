@@ -15,7 +15,7 @@ The Framework's built-in system prompt: the standing instructions every agent st
 - **Analyze the prompt before working** - an unclear prompt becomes a plausibility-ranked list of interpretations offered as a choice, and the agent waits for the answer.
 - **Large scope gets approved first** - large work is written up as a plan file shown to the user and awaits approval; very large work also seeds follow-up entries onto the agent queue.
 - **The workspace is the whole world** - the agent addresses everything relative to its own checkout, never edits the user's outer working tree, and stops rather than reaching outside.
-- **Name the session, then branch** - before the first change the agent invents a session name, creates and checks out `tf-<session name>`, and reports the name back.
+- **Name the session, then branch** - before the first change the agent invents a session name, creates and checks out `tf-<session name>`, commits its work there as it goes, and reports the name back.
 - **Rate variability, offer alternatives** - each problem about to be solved is scored on how obviously optimal its solution is; low scorers are explored and their alternatives offered as a choice.
 - **Ready for merge is explicit** - the agent signals it only when the task is finished; otherwise it states what remains.
 - **The user's prompt is the last section** - the built-in instructions frame the system channel, and the user's own prompt is delivered as its own half.
@@ -62,7 +62,7 @@ See `## User story`: work must be reviewable as a pull request on a branch named
 
 #### Business logic
 
-Before applying its first change the agent picks a session name — an `[a-z0-9-]+` string that succinctly captures the intent of the user's prompt — creates the branch `tf-<session name>`, checks it out, and does all the work there. It then reports the name back to The Framework by calling `setSessionName()`.
+Before applying its first change the agent picks a session name — an `[a-z0-9-]+` string that succinctly captures the intent of the user's prompt — creates the branch `tf-<session name>`, checks it out, and does all the work there, committing it on that branch as it goes — The Framework publishes only what the agent committed and never commits on its behalf. It then reports the name back to The Framework by calling `setSessionName()`.
 
 #### Rationale
 

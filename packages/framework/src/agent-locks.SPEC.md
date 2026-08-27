@@ -19,7 +19,7 @@ Teardown and every user-fired action take the checkout's turn before touching it
 
 #### Rationale
 
-Without this, the loser of the race reported "could not commit the work this session left uncommitted", and a teardown that lost kept a worktree it should have removed. Both actors live in the same daemon process by design — the dashboard's calls are served in-process and only the daemon writes to the project checkout — so serializing inside that one process is the whole fix; there is no second process to coordinate with.
+Without this, the loser of the race failed on the ref it was pushing, and a teardown that lost kept a worktree it should have removed. Both actors live in the same daemon process by design — the dashboard's calls are served in-process and only the daemon writes to the project checkout — so serializing inside that one process is the whole fix; there is no second process to coordinate with.
 
 ### A failure never skips the queue
 

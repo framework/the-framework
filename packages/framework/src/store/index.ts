@@ -39,7 +39,6 @@ export {
   attachWorktree,
   listWorktrees,
   parseWorktreeList,
-  commitPendingWork,
   worktreeClean,
   branchPushed,
   repoHasRemote,

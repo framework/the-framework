@@ -12,7 +12,7 @@ The lifecycle of an agent's own checkout: creating it, naming its branch, commit
 - **A new agent branches; a continued agent re-attaches** - continuing an agent puts it back on the branch its work is already on rather than branching again, recreating that branch if it is gone.
 - **A checkout's own directory, told apart from the repository around it** - whether a directory is a git checkout in its own right is asked before anything reads a branch or runs git there.
 - **The branch is renamed once the agent names itself** - the checkout is created before a session name exists, and gains the readable name afterwards.
-- **Teardown commits before it deletes** - work the agent left uncommitted is committed onto the agent's branch first, and a checkout that cannot be committed is kept.
+- **A checkout is read, never committed** - the framework commits nothing on an agent's behalf; whether a checkout is clean is a read, and a checkout holding uncommitted work is the caller's to keep.
 - **Nothing local is ever the last copy of work** - a checkout may be deleted only when the remote already has its branch tip.
 - **A branch the caller proved holds nothing can be deleted outright** - the deletion is unconditional and forgiving, because the caller has already established the stronger fact.
 - **Every read is forgiving; every removal is idempotent** - a git failure yields "unknown" rather than breaking the caller, and removing a checkout twice is harmless.
@@ -63,21 +63,19 @@ An agent's checkout is created on `tf-agent-<agent id>` because no session name 
 
 The rename happens only if the checkout is still on the original branch. The agent is itself instructed to create and check out its own named branch, so it may have moved off already — in which case it named the branch itself and there is nothing to rename. The rename never fails an agent: a name already taken, or an invalid one, simply leaves the agent on its original branch.
 
-### Teardown commits before it deletes
+### A checkout is read, never committed
 
 #### User story
 
-The agent edits files and stops without committing. The user must still be able to see and keep that diff.
+An agent edits and stops without committing. The user expects that work to still be there — and never to find it swept into a commit made in their name.
 
 #### Business logic
 
-An agent that edits and stops without committing is behaving as instructed: it is told to commit pre-existing changes before it starts, never its own work at the end. Removing its checkout would destroy that diff outright, because unstaged work is not recoverable from git afterwards. So teardown commits whatever is left onto the agent's own branch first, and the branch outlives the checkout. The commit is worded identically to the framework's install-time safety commit, so the user sees one vocabulary.
+Nothing is committed on an agent's behalf. A checkout can be asked whether it is clean, and that read is all the framework does with uncommitted work: a checkout that holds any is reported as dirty, and the caller keeps it — removal forces past a dirty tree, so removing it would destroy the very diff it holds. The work stays uncommitted where the agent left it, until a person commits or deletes it. When git cannot answer, the caller keeps the checkout rather than guessing.
 
-The answer teardown acts on is "is this checkout safe to remove": yes when it was already clean or the work is now committed, no when the commit failed — a missing git identity, or a hook refusing it. A no means keep the checkout, which is the safe direction.
+#### Rationale
 
-The commit is retried a few times before giving up, because the daemon's own committer works in the same checkout and is at its busiest exactly when an agent finishes; a first attempt can lose the race for git's lock. A short wait outlasts that hold, while a persistent failure still answers no.
-
-Separately, a checkout can be asked whether it is clean without committing anything. That read exists for a decision that must not commit on its way to an answer: deciding whether to remove the checkout of an agent that published nothing needs a clean tree, and sweeping up someone's half-typed edits into a commit to find that out would be exactly the intrusion the question exists to avoid. When git cannot answer, the caller keeps the checkout rather than guessing.
+The framework used to commit whatever it found, as a safety net before removal. That net caught everything in the tree, including a 7,632-file build cache that went to a project's main branch unnoticed. A commit path that adds everything it finds is only as safe as the ignore file is complete, and it runs unattended; the agent committing its own work, and the framework only ever reading, has no such failure.
 
 #### Rationale
 

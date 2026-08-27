@@ -44,7 +44,7 @@ import {
 } from './config-layers.js'
 import { loadUserSystemPrompt, SYSTEM_PROMPT_FILE } from './system-prompt-file.js'
 import { checkForUpdate, formatUpdateStatus, nodeVersionFetcher, type VersionFetcher } from './update-check.js'
-import { AgentStore, commitPendingWork, currentBranch, nodeStoreFs, renameAgentBranch, agentBranchName, AGENT_BRANCH_PREFIX, type StoreFs } from './store/index.js'
+import { AgentStore, currentBranch, nodeStoreFs, renameAgentBranch, agentBranchName, AGENT_BRANCH_PREFIX, type StoreFs } from './store/index.js'
 import { materializePresets } from './presets.js'
 import { isLoopbackHost, registerHomeProject, runDaemon, DEFAULT_DAEMON_HOST, DEFAULT_DAEMON_PORT } from './daemon.js'
 import { appendControl, resetControl, watchControl, type ControlWatcher } from './control.js'
@@ -1012,17 +1012,8 @@ async function driveAgent(opts: AgentOptions, io: CliIO): Promise<number> {
     // opposite of what stopping meant. Same call the on-before-mergeable step makes.
     if (journal.stoppedCleanly()) return skip('run-stopped')
     if (fake) return skip('fake-run')
-    // The daemon commits whatever the agent left uncommitted, but only after this process exits
-    // (`tearDownWorktree`), so at this point the tree can still hold real work. Pushing first
-    // would publish a branch missing the session's last edits. Its own checkout only: a plain
-    // `framework "..."` runs in the user's tree, where committing for them is not ours to do.
-    //
-    // The result is load-bearing (#1376): a commit that failed here and was ignored let the
-    // handoff judge a branch missing the session's work — "committed nothing", skip — while the
-    // teardown's identical commit landed seconds later, stranding real work on a local branch
-    // nobody was told about. A failed commit is now its own skip, said out loud, and the
-    // teardown still rescues the work onto the branch afterwards.
-    if (opts.agentId && !(await commitPendingWork(cwd))) return skip('commit-failed')
+    // What is published is what the agent committed (#1638): the framework commits nothing on
+    // its behalf, so work left uncommitted stays in the checkout, named on the agent's page.
 
     // The merge half is authorized, not just configured (#1363; rule settled on #1390): the
     // agent's setReadyForMerge() — the same signal maybeFireOnBeforeMergeable requires above —

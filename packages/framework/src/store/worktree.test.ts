@@ -11,11 +11,11 @@ import {
   deleteBranch,
   isWorktreeRoot,
   worktreeBranch,
-  commitPendingWork,
   listWorktrees,
   parseWorktreeList,
   removeWorktree,
   pruneWorktrees,
+  worktreeClean,
   worktreePath,
   agentBranchName,
   currentBranch,
@@ -199,43 +199,6 @@ test('isWorktreeRoot is true for the main checkout and a linked worktree, false 
   }
 })
 
-test('commitPendingWork stages and commits a dirty checkout (#786)', async () => {
-  const git = recordingGit(' M index.html\n')
-  assert.equal(await commitPendingWork('/wt', git), true)
-  assert.deepEqual(
-    git.calls.map(c => c.args),
-    [['status', '--porcelain'], ['add', '-A'], ['commit', '-m', '[The Framework] uncommitted changes']],
-  )
-  assert.equal(git.calls[1]?.cwd, '/wt', 'commits in the worktree, not the repo')
-})
-
-test('commitPendingWork leaves a clean checkout alone (#786)', async () => {
-  const git = recordingGit('')
-  assert.equal(await commitPendingWork('/wt', git), true)
-  assert.deepEqual(git.calls.map(c => c.args), [['status', '--porcelain']]) // nothing to commit
-})
-
-test('commitPendingWork reports failure so the caller keeps the checkout (#786)', async () => {
-  // No git identity, a refusing hook: the work is still only in the working tree, so the
-  // caller must not go on to remove it.
-  assert.equal(await commitPendingWork('/wt', failingGit, { attempts: 2, delayMs: 1 }), false)
-})
-
-test('commitPendingWork retries past a transient failure (#1376)', async () => {
-  // The daemon's conversation committer works in the same checkout and is busiest at session
-  // end, so the first attempt can lose an index.lock race. Losing it must not become the
-  // handoff's "committed nothing": wait out the lock and commit on the retry.
-  let failures = 1
-  const calls: string[][] = []
-  const git: GitRunner = async args => {
-    calls.push(args)
-    if (args[0] === 'commit' && failures-- > 0) throw new Error('fatal: Unable to create index.lock: File exists')
-    return args[0] === 'status' ? ' M test04.md\n' : ''
-  }
-  assert.equal(await commitPendingWork('/wt', git, { delayMs: 1 }), true)
-  assert.equal(calls.filter(c => c[0] === 'commit').length, 2, 'first commit lost the race, the retry won')
-})
-
 test('removeWorktree tries a plain removal before forcing (#786)', async () => {
   const git = recordingGit()
   await removeWorktree(REPO, '/wt', git)
@@ -256,8 +219,10 @@ test('removeWorktree falls back to --force when git calls the checkout unclean (
   ])
 })
 
-// The whole point of #786: a finished agent's uncommitted edit must survive teardown.
-test('a dirty run worktree keeps its work on the branch after removal (#786)', async () => {
+// #786's point — a finished agent's edit must survive teardown — now holds by keeping, not by
+// committing (#1638): the framework commits nothing for an agent. A dirty checkout reads dirty and
+// is the caller's to keep; once the agent has committed, the branch outlives the checkout.
+test('a run worktree reads dirty until the agent commits; the branch then outlives it (#786/#1638)', async () => {
   const git = nodeGitRunner()
   const repo = await realpath(await mkdtemp(join(tmpdir(), 'framework-worktree-')))
   try {
@@ -272,7 +237,10 @@ test('a dirty run worktree keeps its work on the branch after removal (#786)', a
     // The agent edits and stops without committing, exactly as the system prompt leaves it.
     await writeFile(join(path, 'index.html'), '<h1>Welcome!</h1>\n')
 
-    assert.equal(await commitPendingWork(path, git), true)
+    assert.equal(await worktreeClean(path, git), false, 'the uncommitted edit is reported, never swept into a commit')
+    await git(['add', '-A'], path)
+    await git(['commit', '-m', 'welcome'], path)
+    assert.equal(await worktreeClean(path, git), true)
     await removeWorktree(repo, path, git)
     await assert.rejects(() => stat(path), 'checkout dir is gone')
 

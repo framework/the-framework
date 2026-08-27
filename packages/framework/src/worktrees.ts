@@ -6,7 +6,6 @@ import {
   listAgents,
   readLiveMetas,
   branchPushed,
-  commitPendingWork,
   worktreeClean,
   isWorktreeRoot,
   currentBranch,
@@ -202,10 +201,7 @@ export async function removeProjectWorktree(
     } else if (meta?.handoff && !meta.handoff.push) {
       // A publish-nothing session's checkout goes only once everything it holds is already on
       // the remote by someone's explicit act: a clean tree on a pushed tip — then removing it
-      // publishes nothing. Anything short of that would take a commit or a push of removal's
-      // own, and a kept checkout is a place someone works, re-offered by the sweep every pass:
-      // grabbing half-typed edits as "[The Framework] uncommitted changes" on the way to a
-      // refusal is not cleanup.
+      // publishes nothing. Anything short of that would take a push of removal's own.
       if (!(await worktreeClean(path)) || !(await branchPushed(cwd, branch))) {
         return {
           ok: false,
@@ -213,13 +209,11 @@ export async function removeProjectWorktree(
         }
       }
     } else {
-      // `removeWorktree` forces past a dirty tree, so an uncommitted edit has to be on the branch
-      // before the checkout can go — otherwise the very diff the checkout held is what is deleted.
-      if (!(await commitPendingWork(path))) {
-        return {
-          ok: false,
-          error: `session ${agentId} has uncommitted work that could not be committed; its worktree was kept`,
-        }
+      // `removeWorktree` forces past a dirty tree, and the framework commits nothing on an agent's
+      // behalf (#1638): work the agent left uncommitted stays where it is, and so does the checkout,
+      // until a person commits or deletes it. A tree git cannot read is kept the same way.
+      if (!(await worktreeClean(path).catch(() => false))) {
+        return { ok: false, error: `session ${agentId} has uncommitted work; its worktree was kept` }
       }
       if (!(await branchPushed(cwd, branch))) {
         // Pushing is what makes the removal recoverable, so it is attempted here rather than

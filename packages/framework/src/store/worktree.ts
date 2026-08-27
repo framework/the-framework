@@ -135,53 +135,11 @@ export function parseWorktreeList(porcelain: string): WorktreeInfo[] {
 }
 
 /**
- * Commit whatever the agent left behind, on the agent's own branch (#786).
- *
- * An agent that edits and stops without committing is behaving as instructed: the
- * system prompt has it commit *pre-existing* changes before it starts, never its own
- * work at the end. Removing that checkout would destroy the diff (the work was never
- * staged, so it is not recoverable from git afterwards), so teardown commits it first
- * and the branch outlives the worktree.
- *
- * Returns whether the checkout is safe to remove: true when it was already clean or
- * the work is now committed, false when the commit failed (no git identity, a hook
- * refusing it). False means keep the checkout, which is the safe direction.
- *
- * Retries before giving up (#1376): the daemon's conversation committer works in the same
- * checkout and is busiest exactly when this runs (session end), so a first attempt can lose
- * an `index.lock` race. That transient loss is how a session's real work got judged
- * "committed nothing" by the handoff while the teardown's identical commit, seconds later,
- * succeeded. A short wait outlasts the committer's hold; a persistent failure (identity,
- * hooks) still comes back false.
- */
-export async function commitPendingWork(
-  path: string,
-  agent: GitRunner = nodeGitRunner(),
-  retry: { attempts?: number; delayMs?: number } = {},
-): Promise<boolean> {
-  const attempts = Math.max(1, retry.attempts ?? 3)
-  const delayMs = retry.delayMs ?? 300
-  for (let attempt = 1; attempt <= attempts; attempt++) {
-    try {
-      const status = await agent(['status', '--porcelain'], path)
-      if (!status.trim()) return true
-      await agent(['add', '-A'], path)
-      // Same wording as the install-time safety commit (install.ts), for one vocabulary.
-      await agent(['commit', '-m', '[The Framework] uncommitted changes'], path)
-      return true
-    } catch {
-      if (attempt < attempts) await new Promise(resolve => setTimeout(resolve, delayMs))
-    }
-  }
-  return false
-}
-
-/**
  * Remove an agent's worktree. Tolerant of an already-gone / never-registered path so
  * teardown stays idempotent (the agent child is detached; the daemon only holds its pid).
  *
- * Plain removal first: it refuses a checkout git considers unclean, which after
- * {@link commitPendingWork} means a state we did not anticipate. Falling back to
+ * Plain removal first: it refuses a checkout git considers unclean, which after the
+ * caller's {@link worktreeClean} check means a state we did not anticipate. Falling back to
  * `--force` keeps teardown working (an ignored build artifact must not strand a
  * worktree forever), but it says so, because forcing past unknown state is exactly
  * how uncommitted work got deleted in the first place.
@@ -360,11 +318,9 @@ export async function branchPushed(
 }
 
 /**
- * Whether the checkout has nothing uncommitted — the read half of {@link commitPendingWork}, for
- * a decision that must not commit on the way to its answer: removing a publish-nothing session's
- * checkout requires a clean tree, and grabbing someone's half-typed edits as a commit to find
- * that out would be the intrusion the question exists to avoid. Throws when git cannot answer,
- * so the caller keeps the checkout rather than guessing.
+ * Whether the checkout has nothing uncommitted. A read, never a commit (#1638): the framework
+ * commits nothing on an agent's behalf, so a checkout holding uncommitted work is one the caller
+ * keeps. Throws when git cannot answer, so the caller keeps the checkout rather than guessing.
  */
 export async function worktreeClean(path: string, agent: GitRunner = nodeGitRunner()): Promise<boolean> {
   return !(await agent(['status', '--porcelain'], path)).trim()

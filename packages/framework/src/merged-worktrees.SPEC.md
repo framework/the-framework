@@ -4,7 +4,7 @@ The worktree sweep: reclaims a finished agent's checkout once its work is safely
 
 - **Only what is on the remote may go** - a checkout is reclaimed when, and only when, everything it holds is already on the remote. Every deletion is therefore recoverable, because the remote holds a copy.
 - **The checkout goes, the work stays** - the agent's record and its replayable event log survive, and so does its branch unless the removal proved that branch holds nothing anyone else is missing; only the working copy on disk is reclaimed, and it can be recreated from the branch at any time.
-- **The same decision as the Remove button** - the sweep reuses exactly the removal the user's own Remove button performs: commit what is pending, push the branch, remove only once the remote has it. The automatic path and the manual one cannot disagree.
+- **The same decision as the Remove button** - the sweep reuses exactly the removal the user's own Remove button performs: keep a dirty checkout, push the branch, remove only once the remote has it. The automatic path and the manual one cannot disagree.
 - **Never touches a checkout that is still someone's** - a live agent's checkout is left alone, and so is one the daemon is still responsible for, including an agent between finishing and being archived.
 - **A project with no remote keeps everything** - with nowhere to push, nothing is reclaimable; each retained checkout is still accounted for.
 - **It says what it did** - every removal and every retention is explained once per state, never repeated on each pass, and never silent.

@@ -1,7 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtemp, mkdir, writeFile, readdir, readFile, rm, stat, realpath } from 'node:fs/promises'
-import { join } from 'node:path'
+import { join, delimiter } from 'node:path'
+import { execFile } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { createProjectRuntime, cleanupTimedOutWorktree, markFailedStart, agentStderrPath, isTransientAgentFailure, lastAgentFailureDetail, MAX_TRANSIENT_RETRIES } from './daemon-runtime.js'
 import type { PreflightResult } from './preflight.js'
@@ -14,7 +15,7 @@ import type { PreflightResult } from './preflight.js'
 const agentReady = (): Promise<PreflightResult> => Promise.resolve({ ok: true, checks: [] })
 
 import { EVENTS_FILE, META_FILE, startedAtFromAgentId, type AgentMeta } from './store/index.js'
-import { FRAMEWORK_DIR, BRANCHES_DIR, worktreePath, agentBranchName, nodeGitRunner, GitTimeoutError } from '@superskill/branch-management'
+import { FRAMEWORK_DIR, BRANCHES_DIR, worktreePath, agentBranchName, nodeGitRunner, GitTimeoutError, CLI_BIN_DIR } from '@superskill/branch-management'
 import { addProject, projectId } from './registry.js'
 import type { AgentSpec } from './agent-spec.js'
 
@@ -631,6 +632,50 @@ test('a logged-out agent is re-probed on every start, so logging in is picked up
     assert.equal(probes, 2)
   } finally {
     await runtime.dispose()
+    await rm(cwd, RETRIED_RM)
+  }
+})
+
+/** A stub agent that records the PATH it was spawned with. */
+async function writePathStub(dir: string, log: string): Promise<string> {
+  const stub = join(dir, 'stub-path.cjs')
+  await writeFile(stub, `require('node:fs').appendFileSync(${JSON.stringify(log)}, process.env.PATH + '\\n')\n`)
+  return stub
+}
+
+test('a spawned agent finds the branch-management command on its PATH (#1725)', async () => {
+  const cwd = await realpath(await mkdtemp(join(tmpdir(), 'framework-agent-path-')))
+  try {
+    const git = nodeGitRunner()
+    await git(['init'], cwd)
+    await git(['config', 'user.email', 't@t'], cwd)
+    await git(['config', 'user.name', 't'], cwd)
+    await writeFile(join(cwd, 'README.md'), '# t\n')
+    await git(['add', '-A'], cwd)
+    await git(['commit', '-m', 'init'], cwd)
+    const log = join(cwd, 'path.log')
+    const runtime = createProjectRuntime({ driverPreflight: agentReady, cwd, env: {}, binPath: await writePathStub(cwd, log) })
+    const result = (await runtime.onStart('build a thing', 'build')) as { ok: boolean; agentId?: string }
+    assert.equal(result.ok, true)
+    let recorded = ''
+    for (let i = 0; i < POLL_ATTEMPTS && !recorded; i++) {
+      await new Promise(r => setTimeout(r, 20))
+      recorded = await readFile(log, 'utf8').catch(() => '')
+    }
+    const path = recorded.trim()
+    assert.equal(path.split(delimiter)[0], CLI_BIN_DIR, 'the package bin dir comes first')
+    assert.equal(path.split(delimiter).slice(1).join(delimiter), process.env['PATH'], "after the daemon's own")
+    // By name, the way the agent's shell resolves it, against the project the daemon started it in.
+    const listed = await new Promise<string>((resolvePromise, rejectPromise) =>
+      execFile('branch-management', ['list'], { cwd, env: { ...process.env, PATH: path } }, (err, stdout) => (err ? rejectPromise(err) : resolvePromise(stdout))),
+    )
+    assert.deepEqual(
+      (JSON.parse(listed) as { agentId: string }[]).map(row => row.agentId),
+      [result.agentId],
+      'and it reports the checkout the daemon allocated',
+    )
+    await runtime.dispose()
+  } finally {
     await rm(cwd, RETRIED_RM)
   }
 })

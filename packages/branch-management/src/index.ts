@@ -44,3 +44,7 @@ export { linkDependencies, findDependencyDirs, nodeLinkFs, type LinkFs } from '.
 export { excludeFromGit, type ExcludeFs } from './git-exclude.js'
 export { reconcileBranchLinks, type LinksFs, type BranchLinksDeps } from './branch-links.js'
 export { reclaimWorktree, type ReclaimOptions, type ReclaimOutcome, type ReclaimRefusal } from './reclaim.js'
+export { repoRoot, checkoutRoot } from './git.js'
+export { nameBranch, isSessionName, type NameBranchOutcome, type NameBranchRefusal } from './worktree.js'
+export { runCli, USAGE, type CliIo, type CliRefusal } from './cli.js'
+export { CLI_BIN_DIR } from './bin-dir.js'

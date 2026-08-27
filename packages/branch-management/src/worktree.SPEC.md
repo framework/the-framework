@@ -11,7 +11,7 @@ The lifecycle of an agent's own checkout: creating it, naming its branch, readin
 - **One checkout per agent, under the project's own directory** - each agent's checkout lives at `.the-framework/branches/<agent branch>`, named after its branch.
 - **A new agent branches; a continued agent re-attaches** - continuing an agent puts it back on the branch its work is already on rather than branching again, recreating that branch if it is gone.
 - **A checkout's own directory, told apart from the repository around it** - whether a directory is a git checkout in its own right is asked before anything reads a branch or runs git there.
-- **The branch is renamed once the agent names itself** - the checkout is created before a session name exists, and gains the readable name afterwards.
+- **The branch is renamed once the agent names itself** - the checkout is created before a session name exists, and gains the readable name afterwards: a rename, only of a branch The Framework minted, and a taken name gets a numeric suffix.
 - **A checkout is read, never committed** - the framework commits nothing on an agent's behalf; whether a checkout is clean is a read, and a checkout holding uncommitted work is the caller's to keep.
 - **Nothing local is ever the last copy of work** - a checkout may be deleted only when the remote already has its branch tip.
 - **A branch the caller proved holds nothing can be deleted outright** - the deletion is unconditional and forgiving, because the caller has already established the stronger fact.
@@ -60,9 +60,11 @@ The user reads their branch list and sees `tf-add-comments`, not a timestamp.
 
 #### Business logic
 
-An agent's checkout is created on `tf-agent-<agent id>` because no session name exists yet. Once the agent picks one, the branch is renamed to `tf-<session name>`.
+An agent's checkout is created on `tf-agent-<agent id>` because no session name exists yet. Once the agent picks one, the branch is renamed to `tf-<session name>` — a rename, never a second branch, so the branch the checkout was born on is the branch it ends on and nothing is left behind to clean up.
 
-The rename happens only if the checkout is still on the original branch. The agent is itself instructed to create and check out its own named branch, so it may have moved off already — in which case it named the branch itself and there is nothing to rename. The rename never fails an agent: a name already taken, or an invalid one, simply leaves the agent on its original branch.
+Naming, as the agent asks for it, follows these rules. The name must be `[a-z0-9-]+`. Only a branch The Framework minted is renamed: a checkout on the user's own branch, or on the data branch, is refused, so an agent that somehow runs in the user's checkout can never rename `main`. A name already taken — by any local branch or any remote-tracking branch, so that the later push cannot land on someone else's branch — gets a numeric suffix (`tf-<name>-2`, then `-3`, and so on) rather than a refusal, and the caller reads back the name it got. Asking for the name the checkout already has changes nothing.
+
+An older form of the rename, used by the framework's own agent runner until the agent names itself through the command line, renames only while the checkout is still on its original branch: the agent may have created and checked out its own named branch already, in which case there is nothing to rename. That form never fails an agent: a name already taken, or an invalid one, simply leaves the agent on its original branch.
 
 ### A checkout is read, never committed
 

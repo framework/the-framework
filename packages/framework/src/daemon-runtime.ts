@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { closeSync, mkdirSync, openSync } from 'node:fs'
-import { basename, dirname, join, resolve } from 'node:path'
+import { basename, delimiter, dirname, join, resolve } from 'node:path'
 import { appendFile, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { agentIdFromStartedAt, startedAtFromAgentId, archiveWorktreeAgent, restoreArchivedAgent, listAgents, findAgent, archivedAgentPaths, readLiveMetas, readLiveMeta, resolveAgentEventsPath, EVENTS_FILE, META_FILE, isPidAlive, type AgentMeta } from './store/index.js'
 import { addWorktree, agentBranchName, linkDependencies, attachWorktree, worktreePath, worktreeBranch, removeWorktree, pruneWorktrees, FRAMEWORK_DIR, agentIdFromWorktreeDir, isGitRepo, nodeGitRunner, isGitTimeout } from '@superskill/branch-management'
@@ -16,7 +16,7 @@ import { resolveUserDir } from './agent-archive.js'
 import { withDataBranch } from './data-branch.js'
 import { removeProjectWorktree } from './worktrees.js'
 import { describeDeleted } from './merged-worktrees.js'
-import { reconcileBranchLinks } from '@superskill/branch-management'
+import { reconcileBranchLinks, CLI_BIN_DIR } from '@superskill/branch-management'
 import { scopedKey, parseScopedKey, keyBelongsTo } from './runtime-keys.js'
 import { addProject, listProjects, projectId } from './registry.js'
 import { isTicketPath } from './tickets.js'
@@ -105,9 +105,14 @@ function spawnDetached(binPath: string, specPath: string, stderrFile?: string, e
   return child
 }
 
-/** A spawned run's environment: ours, plus the daemon's URL when it has one (#1328). */
+/**
+ * A spawned run's environment: ours, with the `branch-management` command on its PATH (#1725) —
+ * the agent names its session and checks its tree through the same package the daemon allocated
+ * its checkout with — plus the daemon's URL when it has one (#1328).
+ */
 function childEnv(daemonUrl: string | undefined, base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
-  return daemonUrl ? { ...base, [DAEMON_URL_ENV]: daemonUrl } : base
+  const env = { ...base, PATH: [CLI_BIN_DIR, base['PATH']].filter(Boolean).join(delimiter) }
+  return daemonUrl ? { ...env, [DAEMON_URL_ENV]: daemonUrl } : env
 }
 
 /** Where a spawned agent's stderr lands (#1261), so a child that dies at boot leaves a trace. */

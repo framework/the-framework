@@ -5,6 +5,7 @@ Running git on a caller's behalf: every command gets a time budget matched to it
 - **Every git command gets a time budget matched to its cost** - reads get the shortest budget, ordinary local mutations a longer one, and anything touching the network or writing a whole checkout the longest.
 - **A timeout is not a git failure** - a command killed for outrunning its budget is reported as a timeout, recognisable across package boundaries, so a caller can clean up after an interrupted checkout creation without mistaking git's own refusals for one.
 - **"Not a repo" is distinguishable from "git failed"** - a directory can be asked whether it sits inside a git working tree; anything unreadable reads as "not a repo".
+- **The project, and the checkout, from anywhere inside** - from any directory in a repo, the main checkout's path can be read (the same answer from inside an agent's checkout, through git's common directory), and so can the root of the checkout the directory is in.
 - **The line worth showing** - a failed invocation is reduced to git's own `fatal:` / `error:` / `remote:` line when there is one, else its first line.
 - **Pushing a branch** - a branch is pushed to `origin` with its upstream set; the failure, if any, is that one line.
 

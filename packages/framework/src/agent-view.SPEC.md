@@ -3,6 +3,7 @@ The dashboard's summary of an agent, derived entirely from that agent's event lo
 ## Business logic — TL;DR
 
 - **Every summary is a projection of the event log** - nothing is stored beside the agent's events, so a live agent and a reopened finished agent show the identical summary.
+- **One spelling of the name** - every view that shows a session name (this summary, the overview, the open questions) gets it from the same place: the branch's name as a field that is present only when there is one.
 - **Lifecycle progress: named, then ready** - the summary carries the session name read off the agent's latest observed branch and whether it has signalled ready for merge, which is what the dashboard's status label and dot show.
 - **Errors accumulate, oldest first** - every error the agent reported stays in the list, so the dashboard can show a count and the latest headline.
 - **The handoff is shown armed, then resolved** - what the agent will do with its work when it ends — push, open a PR, merge — and, once it has ended, whether that was done, skipped or failed.

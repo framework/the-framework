@@ -1,5 +1,5 @@
 import { readAllAgents, readEventLog, readLiveMetas, type AgentMeta, type LiveAgent } from '../store/index.js'
-import { sessionNameOf } from '@better-skills/branch-management'
+import { sessionNameField } from '../agent-view.js'
 import type { ChoiceRequest, FrameworkEvent } from '../events.js'
 import { bridgeChoiceRequest, type BridgeQuestion } from './bridge-question.js'
 import { bridgeQuestions } from './bridge-store.js'
@@ -100,16 +100,11 @@ export async function buildOpenQuestions(
   const bridged = (deps.bridged ?? unansweredBridgeQuestions)()
   const claimed = new Set<string>()
   const items: OpenQuestion[] = []
-  // The session name is the branch's (#1725): read off it, never stored beside it.
-  const named = (meta: AgentMeta) => {
-    const sessionName = sessionNameOf(meta.branch)
-    return sessionName ? { sessionName } : {}
-  }
   const card = (project: ProjectSummary, meta: AgentMeta, choice: ChoiceRequest, rest: Pick<OpenQuestion, 'bridge' | 'updatedAt'>): OpenQuestion => ({
     projectId: project.id,
     projectName: project.name,
     agentId: meta.id,
-    ...named(meta),
+    ...sessionNameField(meta.branch),
     ...(meta.intent ? { intent: meta.intent } : {}),
     choice,
     ...rest,

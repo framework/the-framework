@@ -1,5 +1,5 @@
 import { readAllAgents, readLiveMetas, type LiveAgent, type AgentMeta, type AgentStatus } from '../store/index.js'
-import { sessionNameOf } from '@better-skills/branch-management'
+import { sessionNameField } from '../agent-view.js'
 import type { ProjectSummary } from './projects.js'
 import { collectQueue, type ProjectQueue } from './queue.js'
 import { readTickets, type WorkspaceTicket } from './tickets.js'
@@ -297,11 +297,6 @@ export async function buildOverview(projects: ProjectSummary[], deps: OverviewDe
   // One entry per web run across projects: two checkouts of one repository share their archive,
   // so the same run is in both projects' lists; the first project to list it keeps it.
   const cloudSeen = new Set<string>()
-  // The session name is the branch's (#1725): read off it, never stored beside it.
-  const named = (meta: AgentMeta) => {
-    const sessionName = sessionNameOf(meta.branch)
-    return sessionName ? { sessionName } : {}
-  }
   const entry = (project: ProjectSummary, meta: AgentMeta, cwd: string): ActiveAgent => ({
     projectId: project.id,
     projectName: project.name,
@@ -310,7 +305,7 @@ export async function buildOverview(projects: ProjectSummary[], deps: OverviewDe
     status: meta.status,
     ...(meta.intent ? { intent: meta.intent } : {}),
     ...(meta.updatedAt ? { updatedAt: meta.updatedAt } : {}),
-    ...named(meta),
+    ...sessionNameField(meta.branch),
     ...(meta.readyForMerge ? { readyForMerge: true } : {}),
     // Another machine's daemon started it (#1648): the shared data branch shows its runs here too.
     ...(meta.host !== undefined && meta.host !== thisHost ? { host: meta.host } : {}),

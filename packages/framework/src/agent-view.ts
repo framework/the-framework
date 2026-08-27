@@ -22,16 +22,23 @@ export interface AgentProgress {
  * green ready). Always returns a value — an untouched agent is `{ readyForMerge: false }`.
  */
 export function agentProgress(events: readonly FrameworkEvent[]): AgentProgress {
-  const progress: AgentProgress = { readyForMerge: false }
+  let branch: string | undefined
+  let readyForMerge = false
   for (const event of events) {
-    if (event.kind === 'branch') {
-      const name = sessionNameOf(event.branch)
-      if (name) progress.sessionName = name
-      else delete progress.sessionName
-    }
-    else if (event.kind === 'ready-for-merge') progress.readyForMerge = true
+    if (event.kind === 'branch') branch = event.branch
+    else if (event.kind === 'ready-for-merge') readyForMerge = true
   }
-  return progress
+  return { ...sessionNameField(branch), readyForMerge }
+}
+
+/**
+ * The `sessionName` a derived view carries (#1725): the name the branch carries, as a field
+ * that is present only when there is one — so a view of an unnamed agent has no name, rather
+ * than a name that is `undefined`. The one spelling behind every view that shows the name.
+ */
+export function sessionNameField(branch: string | undefined): { sessionName?: string } {
+  const sessionName = sessionNameOf(branch)
+  return sessionName ? { sessionName } : {}
 }
 
 /** One error the agent reported through an `error` block (#1500). */

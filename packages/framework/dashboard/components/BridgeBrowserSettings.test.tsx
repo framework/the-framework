@@ -43,7 +43,7 @@ describe('BridgeBrowserSettings (#1332)', () => {
   test('a browser that stopped says why and offers a restart, because quitting it was an act', async () => {
     onBridgeBrowser.mockResolvedValue({ state: 'stopped', detail: 'Chrome exited on SIGTERM' })
     render(<BridgeBrowserSettings enabled />)
-    const line = await screen.findByText(/The bridge browser stopped/)
+    const line = await screen.findByText(/The bridge browser is not running/)
     expect(line.textContent).toContain('Chrome exited on SIGTERM')
     fireEvent.click(screen.getByText('Restart'))
     expect(sendBridgeBrowser).toHaveBeenCalledWith('restart')

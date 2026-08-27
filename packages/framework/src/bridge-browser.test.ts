@@ -309,6 +309,19 @@ test('a failed launch is stopped with the reason; a second start tries again', a
   assert.equal((await owner.status()).state, 'running')
 })
 
+test('a launcher that throws before launching is a failed launch with the reason, not a crash (#1332)', async () => {
+  const lines: string[] = []
+  const owner = bridgeBrowserOwner(
+    () => {
+      throw new Error('turn the browser bridge on, then restart the dashboard')
+    },
+    line => lines.push(line),
+  )
+  await owner.start()
+  assert.deepEqual(await owner.status(), { state: 'stopped', detail: 'turn the browser bridge on, then restart the dashboard' })
+  assert.ok(lines.some(line => line.includes('could not start')))
+})
+
 test('a stop during a launch closes the browser the launch then hands over', async () => {
   const launch = controlledLaunch()
   const owner = bridgeBrowserOwner(launch.launch)

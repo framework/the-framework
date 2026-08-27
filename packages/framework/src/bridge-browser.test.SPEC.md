@@ -12,7 +12,7 @@ What the bridge browser's tests cover. Every launch runs against a fake Chrome (
 - **A failed set-up step** - the browser is asked to close and killed when it does not, and the launch fails naming the step.
 - **A worker that refuses the token** - fails the launch quoting the worker's answer.
 - **An exit on its own** - reported once with the signal; an exit the daemon's own close caused is not reported, and a browser already gone is not killed again.
-- **The owner** - reports the launch's step, then running (and whether shown), then stopped with the reason when the browser exits; show and hide do nothing once it is gone. A failed launch is stopped with the reason and a later start tries again. A stop during a launch closes the browser the launch hands over. Repeated starts are one launch; restart is a stop then a start.
+- **The owner** - reports the launch's step, then running (and whether shown), then stopped with the reason when the browser exits; show and hide do nothing once it is gone. A failed launch is stopped with the reason and a later start tries again — including a launch that fails before it begins, when the launcher throws outright. A stop during a launch closes the browser the launch hands over. Repeated starts are one launch; restart is a stop then a start.
 
 ## Before modifying/creating SPEC.md files
 

@@ -18,7 +18,7 @@ Composes an agent's system channel — the built-in system prompt, the repo-cont
 
 - **The built-in system prompt is a template in two halves** - the system half frames the session; the user-prompt half is the slot the user's prompt lands in. The boundary is fixed by the template itself, so a user prompt that contains the boundary heading can never move it.
 - **The agent's repo context rides in the channel** - a `Context:` block lists the user's picked directories and then the framework's context docs, each with a one-line gloss; the two format-bearing docs point at format specs that travel in the same channel rather than at files to go open.
-- **Composition is additive and ordered** - context first, then the format specs, the built-in prompt, and the user's `SYSTEM.md`; a repo can keep the built-in prompt *and* add its own, replace it, or leave both off.
+- **Composition is additive and ordered** - context first, then the format specs, the built-in prompt, the "Branch management" section (the branch-management skill in a checkout The Framework created, else the section that has the agent branch with git itself), and the user's `SYSTEM.md`; a repo can keep the built-in prompt *and* add its own, replace it, or leave both off.
 - **Vanilla drops everything framework-authored except the emit protocols** - the built-in prompt, the context docs, and the format specs all go together; the user's own dirs and `SYSTEM.md` survive, and the emit protocols stay because they are the contract the dashboard's gates run on, not prompt content.
 - **Transparent drops the whole channel** - no prompt, no docs, no protocols: the agent runs byte-identical to the raw wrapped CLI. It overrides every other option.
 - **Per-agent capability sections** - an agent with a real browser attached is told so; a hands-off agent is told to land its own work; the signal protocol is always the last thing in the channel.
@@ -33,7 +33,7 @@ The user types one prompt; the agent must analyze it before coding — an ambigu
 
 #### Business logic
 
-The built-in system prompt is a template whose text lives in the package's `prompts/system_prompt.md`. It carries the analyze-the-prompt flow, the workspace and session-name rules, the alternatives flow, and the after-changes steps, and it names `TODO_AGENTS.md` as where an unattended agent writes its backlog — derived from the same constant the queue promotion reads, so the two can never disagree. Rendering fills the template's one variable, the user's prompt, and splits the result at the user-prompt heading into a system half and a user half; the split happens on the template *before* the user's prompt is substituted, so a user prompt that itself contains the heading cannot move the boundary. Only the system half is injected into the system channel; delivering the user half is the caller's job.
+The built-in system prompt is a template whose text lives in the package's `prompts/system_prompt.md`. It carries the analyze-the-prompt flow, the session-name step, the alternatives flow, and the after-changes steps; the workspace rules are the branch-management skill's. The "Branch management" section is appended right after the built-in prompt, before the user's own system prompt: for an agent in a checkout The Framework created — a daemon-started agent on this machine, with `branch-management` on its PATH — it is the branch-management package's own `SKILL.md`, read from wherever that package is installed with its catalogue front matter dropped; for any other agent (a terminal run in the user's own checkout, a GitHub Actions runner, a cloud session) it is the fallback that has the agent create its `tf-<session name>` branch with git itself. Both are framework-authored, so vanilla drops them with the built-in prompt — the session-name step is exactly what the vanilla follow-up must not run.
 
 ### The repo context and the formats that travel with it
 
@@ -65,7 +65,7 @@ By default the channel is the context block, the format specs, the built-in prom
 
 #### User story
 
-The dashboard's gates, the session name, and ready for merge must work even when the built-in prompt is off; an agent with a browser attached should actually use it; a hands-off agent must land its own work, and must decide instead of parking when nothing can answer it.
+The dashboard's gates and ready for merge must work even when the built-in prompt is off; an agent with a browser attached should actually use it; a hands-off agent must land its own work, and must decide instead of parking when nothing can answer it.
 
 #### Business logic
 

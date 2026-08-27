@@ -327,7 +327,7 @@ const MAX_STALLS = 2
  * signal ends any turn, a hard item cap bounds the agent, and two check-offs in a row failing to
  * land stop the loop instead of re-working the same entry. A backlog turn is a turn like any
  * other: await gates (`showChoices()` / `showMultiSelect()`) and the signals (`showMarkdown()`,
- * `setSessionName()`, `setReadyForMerge()`) are honored here too.
+ * `setReadyForMerge()`, `open-pr`) are honored here too.
  */
 export async function runTodoLoop(opts: TodoLoopOptions): Promise<TodoLoopResult> {
   const { session, cwd, emit } = opts

@@ -3,12 +3,12 @@ The turn-boundary protocol: what an agent may tell The Framework in the final me
 ## User story
 
 - The user is away. An agent hits a genuine fork in the road, parks the question on the dashboard as a choice, and the user answers it later — or autopilot answers it for them.
-- The user watches an agent's card fill in as it works: the session name it picked, the views it pushed, the errors it hit, and finally the ready-for-merge badge.
+- The user watches an agent's card fill in as it works: the views it pushed, the errors it hit, and finally the ready-for-merge badge.
 - The user reviews the pull request the agent asked for and finds a title and a description the agent wrote, not a copy of the prompt.
 
 ## Glossary
 
-- **signal block** - a fenced code block, tagged by name, that the agent writes into its turn's final message: `await-choices`, `show-markdown`, `set-session-name`, `open-pr`, `error`, `ready-for-merge`. The block is the whole channel; The Framework never inspects the agent's individual tool calls.
+- **signal block** - a fenced code block, tagged by name, that the agent writes into its turn's final message: `await-choices`, `show-markdown`, `open-pr`, `error`, `ready-for-merge`. The block is the whole channel; The Framework never inspects the agent's individual tool calls.
 - **await round** - one cycle of the agent stopping to ask and being resumed with the user's pick.
 - **span of turns** - the stretch of consecutive turns one caller runs under a single dedupe memory: a build and all its await rounds, or a whole backlog loop.
 
@@ -20,7 +20,7 @@ The turn-boundary protocol: what an agent may tell The Framework in the final me
 - **A pick that stops instead of resuming** - the agent can mark options whose meaning is "I will take it from here"; picking one ends the agent rather than resuming it, and tells a cloud session that cannot be ended from here that the user is taking over.
 - **A cap on stopping to ask** - after five await rounds the agent stops being gated and finishes.
 - **One resume wording for every path** - every caller resumes a gated agent with the same sentence.
-- **Non-blocking signals** - views, errors, session name, pull request, and ready for merge are recorded and reflected in the dashboard while the agent keeps going.
+- **Non-blocking signals** - views, errors, pull request, and ready for merge are recorded and reflected in the dashboard while the agent keeps going.
 - **Each signal reported once per span** - repeating a block turn after turn does not repeat it on the dashboard.
 
 ## Business logic
@@ -33,7 +33,7 @@ The user gets an agent that reliably parks its questions and reports its state, 
 
 #### Business logic
 
-Four protocol snippets are available for the system prompt. The **await protocol** pins how to emit a question the agent stopped on. The **signal protocol** pins how to emit the session name, ready for merge, errors, views, and a pull request. Both describe only the emission mechanics — *when* to use each one is the system prompt's business, not theirs.
+Four protocol snippets are available for the system prompt. The **await protocol** pins how to emit a question the agent stopped on. The **signal protocol** pins how to emit ready for merge, errors, views, and a pull request. Both describe only the emission mechanics — *when* to use each one is the system prompt's business, not theirs.
 
 Two more are conditional on the agent rather than on the prompt:
 
@@ -112,15 +112,14 @@ The resume prompt carries no "and do not ask that again" tail. A capable agent d
 
 #### User story
 
-The user watches an agent's dashboard card fill in while the agent keeps working: a named session, rendered notes, the errors it hit, a pull request request, and finally ready for merge.
+The user watches an agent's dashboard card fill in while the agent keeps working: rendered notes, the errors it hit, a pull request request, and finally ready for merge.
 
 #### Business logic
 
-Five signals are read out of every turn and never stop the agent:
+Four signals are read out of every turn and never stop the agent:
 
 - **Views** — each `show-markdown` block becomes a rendered panel. A turn may carry several. The block's first heading line is the panel's title and the rest is its body; a block with no heading is titled "Note", and an empty one is skipped. Two blocks with the same title in one turn collapse to the later one, and re-showing an existing title updates that panel in place rather than adding another.
-- **Session name** — the last `set-session-name` block wins, so an agent may rename its work mid-turn. Its first non-empty line is reduced to lowercase letters, digits and dashes, which is the shape a branch name needs. A block that reduces to nothing sets no name; a name is judged empty on its own merits, so a session legitimately named the same as one of the framework's own fallback words is not mistaken for an unnamed one.
-- **Pull request** — the last non-empty `open-pr` block is read like a commit message: the first line names the work and the rest describes it. A first line longer than 100 characters is not a name but a paragraph, so the whole block becomes the description and the title falls back to the session name. Writing no block at all simply leaves the handoff to describe the work itself.
+- **Pull request** — the last non-empty `open-pr` block is read like a commit message: the first line names the work and the rest describes it. A first line longer than 100 characters is not a name but a paragraph, so the whole block becomes the description and the title falls back to the session name the branch carries. Writing no block at all simply leaves the handoff to describe the work itself.
 - **Errors** — every non-empty `error` block is kept, in the order written; the first line is the headline and the rest is the detail. Empty blocks are skipped.
 - **Ready for merge** — a `ready-for-merge` block anywhere in the turn, with no body, flips the agent from building to ready for review.
 

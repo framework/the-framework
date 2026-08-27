@@ -1,4 +1,5 @@
 import { readdir, readFile, writeFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -41,14 +42,25 @@ function constName(relPath) {
     .toUpperCase()
 }
 
-const files = await findMarkdown(promptsDir)
-const entries = await Promise.all(
-  files.map(async path => {
+// The branch-management skill (#1725) rides in the system channel the way the prompts above do,
+// but its text is the package's, not this directory's: read from wherever the package is
+// installed, so the instructions and the command they name can never come from two versions.
+// Its front matter is the skill catalogue's metadata, not instructions, and is dropped.
+const skillPath = createRequire(import.meta.url).resolve('@better-skills/branch-management/SKILL.md')
+const sources = [
+  ...(await findMarkdown(promptsDir)).map(path => {
     const relPath = relative(promptsDir, path).split('\\').join('/')
-    const raw = await readFile(path, 'utf8')
+    return { label: `prompts/${relPath}`, name: constName(relPath), path, frontMatter: false }
+  }),
+  { label: '@better-skills/branch-management/SKILL.md', name: 'BRANCH_MANAGEMENT_SKILL', path: skillPath, frontMatter: true },
+]
+const entries = await Promise.all(
+  sources.map(async source => {
+    const raw = await readFile(source.path, 'utf8')
+    const text = source.frontMatter ? raw.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n+/, '') : raw
     // Strip exactly one trailing newline: the files end with one so they are well-formed on
     // disk, the prompts they carry do not.
-    return { relPath, name: constName(relPath), text: raw.replace(/\n$/, '') }
+    return { ...source, text: text.replace(/\n$/, '') }
   }),
 )
 
@@ -56,7 +68,7 @@ const body = entries
   // JSON.stringify, not a template literal: the prompts contain backticks and `${{ }}`
   // fragments, and hand-rolled escaping is exactly the kind of thing that silently corrupts
   // a prompt. Unreadable output is fine, nobody reads this file.
-  .map(e => `/** \`prompts/${e.relPath}\` */\nexport const ${e.name} = ${JSON.stringify(e.text)}\n`)
+  .map(e => `/** \`${e.label}\` */\nexport const ${e.name} = ${JSON.stringify(e.text)}\n`)
   .join('\n')
 
 const out = `// Generated from prompts/**/*.md by scripts/gen-prompts.mjs. Do not edit.

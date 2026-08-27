@@ -3,7 +3,7 @@ The vocabulary of the event log: every kind of thing an agent can report, and th
 ## Business logic — TL;DR
 
 - **One timeline out of three sources** - The Framework's own narration, the wrapped coding-agent CLI's progress forwarded verbatim, and framework-level status all arrive as the same kind of event, so a reader follows one chronological story instead of three.
-- **Facts about the agent travel as events** - the branch, the ticket being implemented, the pull request number, the chosen session name, the model, the cloud session's hand-off anchor: each is announced the moment it becomes true, because only an event reaches the agent's `agent.json`, and that record is what a surface opened later reads instead of guessing.
+- **Facts about the agent travel as events** - the branch (and with it the session name), the ticket being implemented, the pull request number, the model, the cloud session's hand-off anchor: each is announced the moment it becomes true, because only an event reaches the agent's `agent.json`, and that record is what a surface opened later reads instead of guessing.
 - **A gate is an event, and so is its answer** - a choice carries its question, its options, and its recommended default; the resolution records who answered it.
 - **Every decline is reported, never silent** - the end-of-agent handoff, the auto-merge, and the post-merge quality step each report why they did nothing, so "I ticked the box and nothing happened" always has an answer in the log.
 - **Errors are history, not status** - an error event says what went wrong at that point and stays in the log; nothing clears it, because nothing can un-happen it.
@@ -37,8 +37,7 @@ A user opens the dashboard in the middle of an agent's work, or comes back to a 
 
 Each of these becomes an event the moment it becomes true, and is folded into the agent's `agent.json`:
 
-- The **session name** the agent invents for its task, re-announced on a rename.
-- The **branch** the agent's work is on, observed off the checkout: announced at start with the branch the agent actually begins on, and again when The Framework renames the agent branch after the agent picks its session name.
+- The **branch** the agent's work is on, observed off the checkout: announced at start with the branch the agent actually begins on, and again whenever a later read — at the end of every turn, and before the ending — finds it changed, which is how the agent's own `branch-management name` reaches the record. The session name is that branch minus its `tf-` prefix; the birth branch `tf-agent-<agent id>` is no name.
 - The **ticket** the agent was started to implement, as a repo-relative `tickets/<file>.md` path — only when The Framework itself chose the ticket, which today means an agent drained from the agent queue. Its absence means nobody knows what this agent is implementing, which is the case for every hand-written prompt.
 - The **pull request** the work is on, the moment one is opened for it.
 - The **hand-off anchor** a `web`-target agent pushed for its cloud session to start from: an empty commit unique to this agent, so that the `claude/*` branch the cloud session actually picks is recognisable later by plain ancestry. The daemon's adoption pass matches it against the remote's `claude/*` heads.

@@ -1,4 +1,4 @@
-import { nodeGitRunner, type GitRunner, agentBranchName, AGENT_BRANCH_PREFIX, currentBranch, repoHasRemote, FRAMEWORK_DIR, pushBranch, gitReason } from '@better-skills/branch-management'
+import { nodeGitRunner, type GitRunner, agentBranchName, AGENT_BRANCH_PREFIX, sessionNameOf, currentBranch, repoHasRemote, FRAMEWORK_DIR, pushBranch, gitReason } from '@better-skills/branch-management'
 import {
   cachedPrView,
   cachedPrsForBranch,
@@ -118,15 +118,12 @@ export interface AgentHandoffDeps {
 /**
  * The branch an agent's work is on.
  *
- * Prefers what was recorded while the worktree existed (#799), because the built-in system prompt (#326) lets the
- * agent name its own branch, which makes both derivations below a guess. They stay as a fallback
- * for runs archived before the branch was recorded.
+ * What was recorded while the worktree existed (#799/#1277): the agent renames its branch itself
+ * (#1725), so anything but the record is a guess. The birth branch stays as the one fallback, for
+ * an archive that never recorded a branch.
  */
-export function agentBranchFor(agent: { id: string; branch?: string; sessionName?: string }): string {
-  if (agent.branch) return agent.branch
-  // The fallbacks go through the package's own builders rather than assembling the same names a
-  // second time here — two spellings of one branch name is how the prefix once went stale.
-  return agent.sessionName ? `${AGENT_BRANCH_PREFIX}${agent.sessionName}` : agentBranchName(agent.id)
+export function agentBranchFor(agent: { id: string; branch?: string }): string {
+  return agent.branch ?? agentBranchName(agent.id)
 }
 
 /**
@@ -146,7 +143,6 @@ export type CachedBranchPrLookup = (cwd: string, branch?: string) => Promise<Cac
 export interface PrAgent {
   id: string
   branch?: string
-  sessionName?: string
   /** The pull request the agent recorded when one was opened for it (E6). */
   pr?: { number: number; url: string }
 }
@@ -158,9 +154,9 @@ export interface PrAgent {
  * the PR, or when the dashboard's button does after the process is gone. Every surface then reads
  * the same integer instead of re-deriving it.
  *
- * What that replaced: a three-way branch-name ladder (the recorded branch, then the session-name
- * branch, then the run-id branch, because a hands-off web agent's checkout is gone and its session
- * name may be a reused pin) plus a timestamp heuristic on top of it, so that a predecessor's PR on
+ * What that replaced: a three-way branch-name ladder (the recorded branch, then a branch built from
+ * the session name, then the run-id branch, because a hands-off web agent's checkout is gone and its
+ * session name may be a reused pin) plus a timestamp heuristic on top of it, so that a predecessor's PR on
  * a shared branch name was not mistaken for this agent's. Three sources and a guess, standing in for
  * one integer nobody had written down — the same lesson the `branch` event (#1277) already learned.
  *
@@ -681,7 +677,7 @@ export async function agentAutoHandoff(
  * the PR. Narrower than {@link AgentMeta} so the agent process can call this before its meta is
  * final, and so a caller cannot quietly start depending on the rest of the agent's state.
  */
-export type HandoffAgent = Pick<AgentMeta, 'id' | 'branch' | 'sessionName' | 'intent'> &
+export type HandoffAgent = Pick<AgentMeta, 'id' | 'branch' | 'intent'> &
   Partial<Pick<AgentMeta, 'startedAt'>> & {
     /**
      * The GitHub issue the agent's ticket tracks (`#42`), when it implements one (#1334). Carried
@@ -706,15 +702,15 @@ export type HandoffAgent = Pick<AgentMeta, 'id' | 'branch' | 'sessionName' | 'in
  * The PR title for a session (#1102), with the ticket's issue reference riding along (#1334).
  *
  * Three rungs, each a name for the work the session did: what the agent called it in its
- * `open-pr` block (#1618), else the session's own name, else the session id — which says little,
- * but says it honestly.
+ * `open-pr` block (#1618), else the session's own name (its branch minus the prefix, #1725), else
+ * the session id — which says little, but says it honestly.
  *
  * The prompt the session was given is not among them. It used to be, cut to 72 characters, and a
  * squash merge made that permanent: `main` ended up carrying instructions truncated mid-sentence
  * as commit subjects, which describe neither what changed nor even a whole thought (#1618).
  */
-function agentPrTitle(agent: Pick<HandoffAgent, 'id' | 'sessionName' | 'prTitle' | 'fixes'>): string {
-  const title = agent.prTitle ?? agent.sessionName ?? `Session ${agent.id}`
+function agentPrTitle(agent: Pick<HandoffAgent, 'id' | 'branch' | 'prTitle' | 'fixes'>): string {
+  const title = agent.prTitle ?? sessionNameOf(agent.branch) ?? `Session ${agent.id}`
   return agent.fixes ? `${title} (fix ${agent.fixes})` : title
 }
 
@@ -741,6 +737,6 @@ function agentPrBody(agent: HandoffAgent): string {
   const lines: string[] = []
   const opening = agent.description?.trim() || agent.intent?.trim()
   if (opening) lines.push(opening, '')
-  lines.push(`Opened from The Framework session \`${agent.sessionName ?? agent.id}\`.`)
+  lines.push(`Opened from The Framework session \`${sessionNameOf(agent.branch) ?? agent.id}\`.`)
   return lines.join('\n')
 }

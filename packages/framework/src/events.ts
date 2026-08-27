@@ -53,7 +53,7 @@ export type OnBeforeMergeableSkip =
   | 'run-stopped'
   /** A fake/offline run: no agent to hand the follow-up prompt to. */
   | 'fake-run'
-  /** The agent never called `setSessionName()`, which every line of the prompt names. */
+  /** The agent never named its session — its branch is still the birth branch — and every line of the prompt names the session. */
   | 'no-session-name'
   /** `process.argv[1]` was empty, so there is no binary to spawn the follow-up with. */
   | 'no-bin-path'
@@ -214,12 +214,6 @@ export type FrameworkEvent =
    */
   | { kind: 'view'; id: string; title: string; markdown: string }
   /**
-   * The agent named the session (#326): the `[a-z0-9-]` slug it chose (also its
-   * `tf-<name>` branch), from a `setSessionName()` signal. Non-blocking;
-   * the dashboard shows it as the agent's label. Re-emitted on a rename.
-   */
-  | { kind: 'session-name'; name: string }
-  /**
    * The agent signalled `setReadyForMerge()` (#326): it believes the work is complete
    * and ready for human review. Non-blocking — it flips the agent's dashboard status from
    * building (orange) to ready (green); the on-before-mergeable quality prompts hang off it.
@@ -278,10 +272,12 @@ export type FrameworkEvent =
   | { kind: 'pull-request'; number: number; url: string }
   /**
    * The branch the agent's work is on (#1277), observed off the checkout rather than guessed:
-   * emitted at start with the branch the agent actually begins on, and again when the framework
-   * renames the run-id branch after the agent names the session. Folded to `AgentMeta.branch`,
-   * which every surface resolves first — before this event the branch was stamped only at
-   * teardown (#799), so any read before that guessed between three naming schemes.
+   * emitted at start with the branch the agent actually begins on, and again whenever a later
+   * read finds it changed — the agent renames its branch itself, through `branch-management name`
+   * (#1725), and the session name is that branch minus its prefix. Folded to `AgentMeta.branch`
+   * (and `sessionName` beside it), which every surface resolves first — before this event the
+   * branch was stamped only at teardown (#799), so any read before that guessed between three
+   * naming schemes.
    */
   | { kind: 'branch'; branch: string }
   /**

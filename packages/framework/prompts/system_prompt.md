@@ -24,20 +24,10 @@ If it isn't clear what you should do (e.g. unclear scope, unclear user prompt), 
 
 Do the following before applying your first change.
 
-### Workspace
-
-Your working directory is the whole of your workspace. Every file you read or write is under it.
-
-- Address files relative to it. An absolute path is how you leave it without noticing
-- It may sit *inside* another checkout of the same repo. That outer copy is the user's own working tree — not another view of your files, and never yours to edit
-- The same file can therefore exist twice. The one under your working directory is yours; editing the other one puts your work somewhere your branch and your commits cannot reach it
-- If something you need is genuinely outside, say so and stop — do not reach for it
-
 ### Session name
 
 1. Create a <SESSION_NAME> as a string [a-z0-9-]+ that succinctly represents the intention of the user prompt
-2. Create a new branch `tf-<SESSION_NAME>` and `$ git checkout` it — do all the work in that branch, and commit it there as you go: The Framework publishes only what you committed, and never commits for you
-3. Call setSessionName(<SESSION_NAME>)
+2. Name your branch after it, as the "Branch management" section below says — and if the name you end up with differs, that is your <SESSION_NAME> from now on
 
 
 ## Before applying changes

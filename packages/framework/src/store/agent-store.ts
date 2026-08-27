@@ -87,15 +87,14 @@ export interface AgentMeta {
   sessionId?: string
   /** The link shown to jump into the live agent session. */
   sessionLink?: string
-  /** The session name the agent chose (#326), also its `tf-<name>` branch. */
-  sessionName?: string
   /**
    * The branch the agent's work is on: folded from `branch` events as the agent observes it (#1277),
-   * and corrected at teardown while the worktree still exists (#799).
+   * and corrected at teardown while the worktree still exists (#799). The session name is this
+   * branch minus its prefix (#1725) — read off it by every surface, never stored beside it.
    *
-   * Not reliably derivable instead of recorded: a clean agent loses its checkout, and the #326
-   * prompt lets the agent create its own branch, so neither `tf-<sessionName>` nor
-   * the run-id branch is guaranteed to be the one holding the commits.
+   * Not reliably derivable instead of recorded: a clean agent loses its checkout, and the agent
+   * renames its branch itself (#1725), so the run-id branch is not guaranteed to be the one
+   * holding the commits.
    */
   branch?: string
   /**
@@ -318,9 +317,6 @@ export function applyEventToMeta(meta: AgentMeta, event: FrameworkEvent, at: str
     case 'session-update':
       next.sessionId = event.sessionId
       if (event.sessionLink) next.sessionLink = event.sessionLink
-      break
-    case 'session-name':
-      next.sessionName = event.name
       break
     case 'ready-for-merge':
       next.readyForMerge = true

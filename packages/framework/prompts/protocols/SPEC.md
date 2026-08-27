@@ -1,8 +1,8 @@
-The protocols appended to every agent's system channel: how an agent signals to The Framework. They pin the exact shape of an awaited choice, of the session name and the ready-for-merge signal, and they tell an agent what this particular agent can do — whether it has a browser, and whether it has to land its own work.
+The protocols appended to every agent's system channel: how an agent signals to The Framework. They pin the exact shape of an awaited choice, of the ready-for-merge signal, and they tell an agent what this particular agent can do — whether it has a browser, and whether it has to land its own work.
 
 ## User story
 
-- The user drives coding agents through The Framework's dashboard: answering their questions, watching them name their work, and merging it when they say it is done. All of that only works if an agent's message can be recognized as a question, a name, or a finished-signal.
+- The user drives coding agents through The Framework's dashboard: answering their questions and merging their work when they say it is done. All of that only works if an agent's message can be recognized as a question or a finished-signal.
 - The user turns on a browser for an agent, or hands a task to a place nothing local can steer. The agent has to be told which of those it is in.
 
 ## Glossary
@@ -13,7 +13,7 @@ The protocols appended to every agent's system channel: how an agent signals to 
 
 - **The protocols are the emit contract, not prompt content** - they are appended even when the user has dropped The Framework's built-in system prompt, because without them the agent cannot signal anything.
 - **Awaiting** - one block shape for every question an agent stops to ask, including handing a stuck browser to a human, plus a non-blocking way to show a document.
-- **Signalling** - the non-blocking blocks: the session name, ready for merge, the pull request to open, and an error only the user can fix.
+- **Signalling** - the non-blocking blocks: ready for merge, the pull request to open, and an error only the user can fix.
 - **Browser** - added only when this agent has a real browser, telling it so and when to prefer the browser over plain page fetching.
 - **Hands-off** - added to every agent handed somewhere nothing local can steer, requiring it to land everything as a pull request.
 - **Order is fixed** - the browser section comes first, then awaiting, then hands-off, and signalling stays last.
@@ -39,7 +39,7 @@ See `## User story`.
 #### Business logic
 
 - **Awaiting** — how an agent parks at a gate: one block ending the turn, in one shape for an approval, a multi-select, a plan sign-off or handing a stuck browser to a human, carrying which option is safe to take when nobody answers and which option ends the agent instead of resuming it. It also covers pushing a document to the dashboard without stopping.
-- **Signalling** — the blocks an agent emits mid-turn without stopping: the session name it chose, the ready-for-merge declaration, the title and description of the pull request The Framework then opens for it, and errors only the user can fix.
+- **Signalling** — the blocks an agent emits mid-turn without stopping: the ready-for-merge declaration, the title and description of the pull request The Framework then opens for it, and errors only the user can fix.
 - **Browser** — added only to an agent that has a real browser: that it has one, that the browser is for what it must see or act on while plain fetching remains better for reading, and that it should stay within one page so the user can watch.
 - **Hands-off** — added to every agent handed somewhere nothing local can steer: no machine here sees its workspace, so it must commit its work and open a pull request for it, and write any analysis, plan or decision into committed files, because the conversation reaches nobody.
 

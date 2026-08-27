@@ -1,3 +1,4 @@
+import { sessionNameOf } from '@better-skills/branch-management/branch-names'
 import type { AutoHandoffSkip, FrameworkEvent } from './events.js'
 
 // Derived agent state for the dashboard's overview cards (#431): the production-grade
@@ -9,24 +10,35 @@ import type { AutoHandoffSkip, FrameworkEvent } from './events.js'
 
 /** The agent's lifecycle progress (#326): the session name it chose and whether it is ready for merge. */
 export interface AgentProgress {
-  /** The `[a-z0-9-]` session name (also the branch), once the agent set one via `setSessionName()`. */
+  /** The session name, read off the agent's `tf-<name>` branch (#1725), once the agent named it. */
   sessionName?: string
   /** True once the agent signalled `setReadyForMerge()`: building (false) -> ready (true). */
   readyForMerge: boolean
 }
 
 /**
- * The agent's lifecycle progress (#326): the latest `session-name` the agent set and whether
- * a `ready-for-merge` has fired. Drives the dashboard status label + dot (orange building,
+ * The agent's lifecycle progress (#326): the session name its latest observed branch carries and
+ * whether a `ready-for-merge` has fired. Drives the dashboard status label + dot (orange building,
  * green ready). Always returns a value — an untouched agent is `{ readyForMerge: false }`.
  */
 export function agentProgress(events: readonly FrameworkEvent[]): AgentProgress {
-  const progress: AgentProgress = { readyForMerge: false }
+  let branch: string | undefined
+  let readyForMerge = false
   for (const event of events) {
-    if (event.kind === 'session-name') progress.sessionName = event.name
-    else if (event.kind === 'ready-for-merge') progress.readyForMerge = true
+    if (event.kind === 'branch') branch = event.branch
+    else if (event.kind === 'ready-for-merge') readyForMerge = true
   }
-  return progress
+  return { ...sessionNameField(branch), readyForMerge }
+}
+
+/**
+ * The `sessionName` a derived view carries (#1725): the name the branch carries, as a field
+ * that is present only when there is one — so a view of an unnamed agent has no name, rather
+ * than a name that is `undefined`. The one spelling behind every view that shows the name.
+ */
+export function sessionNameField(branch: string | undefined): { sessionName?: string } {
+  const sessionName = sessionNameOf(branch)
+  return sessionName ? { sessionName } : {}
 }
 
 /** One error the agent reported through an `error` block (#1500). */

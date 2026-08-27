@@ -8,10 +8,11 @@ Every prompt The Framework sends an agent lives here as markdown. Nothing agent-
 ## Business logic — TL;DR
 
 - **Markdown is the only source of truth** - the prompts are compiled into the package at build time and the code uses the compiled copies; a prompt is edited in exactly one place.
-- **The built-in system prompt** - the standing instructions every agent starts with: analyze the prompt, park at a gate when the user should decide, branch before the first change, declare ready for merge only when finished.
+- **The built-in system prompt** - the standing instructions every agent starts with: analyze the prompt, park at a gate when the user should decide, name the session before the first change, declare ready for merge only when finished.
 - **The file formats** - the shapes agents must follow for tickets and for the agent queue, carried in the agent's own context rather than pointed at.
+- **Branch management** - the section after the built-in prompt saying how the agent names its branch: the branch-management package's own skill for an agent in a checkout The Framework created, else the fallback that has it branch with git itself.
 - **The data-branch protocol** - where the framework's own data lives and how to read and write it without putting it on a code branch.
-- **The protocols** - how an agent signals: awaited choices, session name and ready for merge, plus the sections added only when it has a browser, when it runs hands-off, and when nothing can answer its questions.
+- **The protocols** - how an agent signals: awaited choices and ready for merge, plus the sections added only when it has a browser, when it runs hands-off, and when nothing can answer its questions.
 - **The presets** - one file per launcher button and per routine prompt.
 - **The on-before-mergeable prompt** - the optional extra turn a finished agent gets, queueing quality follow-ups and folding what it learned into the knowledge base.
 - **Prompts are reviewed before they land** - a prompt change goes through review like any other change.

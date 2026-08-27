@@ -15,6 +15,7 @@ export {
   isSafeAgentId,
   agentBranchName,
   agentIdFromWorktreeDir,
+  sessionNameOf,
 } from './branch-names.js'
 export {
   worktreePath,

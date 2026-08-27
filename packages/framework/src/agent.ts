@@ -40,6 +40,8 @@ export interface RunAgentOptions {
    * see {@link isHandsOff}.
    */
   location?: AgentLocation
+  /** The agent runs in a checkout The Framework created, with `branch-management` on its PATH (#1725). */
+  ownedCheckout?: boolean
   /** The wrapped coding agent. */
   driver: Driver
   /** Absolute workspace path the agent works in. */
@@ -152,6 +154,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<RunAgentResult> {
     vanilla: opts.vanilla,
     browser: opts.browser,
     handsOff,
+    ownedCheckout: opts.ownedCheckout,
     transparent: opts.transparent,
     user: opts.systemPrompt,
     tf,

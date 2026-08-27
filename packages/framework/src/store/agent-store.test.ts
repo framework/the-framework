@@ -243,14 +243,18 @@ test('applyEventToMeta tracks whether the run is working or parked on the user (
   assert.equal(ended.status, 'done')
 })
 
-test('applyEventToMeta records the session name + ready-for-merge lifecycle signals (#326)', () => {
-  assert.equal(BASE.sessionName, undefined)
+test('applyEventToMeta records the branch as observed, and ready-for-merge beside it (#326/#1725)', () => {
+  assert.equal(BASE.branch, undefined)
   assert.equal(BASE.readyForMerge, undefined)
-  const named = applyEventToMeta(BASE, { kind: 'session-name', name: 'add-comments' }, AT)
-  assert.equal(named.sessionName, 'add-comments')
+  const born = applyEventToMeta(BASE, { kind: 'branch', branch: 'tf-agent-r1' }, AT)
+  assert.equal(born.branch, 'tf-agent-r1')
+  // The agent's own rename lands as the next branch event; the session name is read off it, never stored.
+  const named = applyEventToMeta(born, { kind: 'branch', branch: 'tf-add-comments' }, AT)
+  assert.equal(named.branch, 'tf-add-comments')
+  assert.ok(!('sessionName' in named))
   const ready = applyEventToMeta(named, { kind: 'ready-for-merge' }, AT)
   assert.equal(ready.readyForMerge, true)
-  assert.equal(ready.sessionName, 'add-comments') // ready doesn't clobber the name
+  assert.equal(ready.branch, 'tf-add-comments') // ready doesn't clobber the branch
 })
 
 test('applyEventToMeta records the ticket a run is implementing (#1117)', () => {

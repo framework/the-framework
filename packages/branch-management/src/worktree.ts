@@ -1,7 +1,7 @@
 import { basename, dirname, join } from 'node:path'
 import { realpath } from 'node:fs/promises'
 import { nodeGitRunner, checkoutRoot, type GitRunner } from './git.js'
-import { FRAMEWORK_DIR, BRANCHES_DIR, AGENT_BRANCH_PREFIX, isSafeAgentId, isRunBranch, worktreeDirName, agentIdFromWorktreeDir, isWorktreeDirName } from './branch-names.js'
+import { FRAMEWORK_DIR, BRANCHES_DIR, AGENT_BRANCH_PREFIX, isSafeAgentId, isRunBranch, worktreeDirName, agentIdFromWorktreeDir, isWorktreeDirName, isNamedRunBranch } from './branch-names.js'
 
 /**
  * Git-worktree lifecycle for concurrent agents (#453/#735): give each agent its own
@@ -302,7 +302,7 @@ const NAME_ATTEMPTS = 3
 export async function nameBranch(path: string, name: string, agent: GitRunner = nodeGitRunner()): Promise<NameBranchOutcome> {
   if (!isSessionName(name)) return { ok: false, reason: 'invalid-name' }
   const wanted = `${AGENT_BRANCH_PREFIX}${name}`
-  if (!isRunBranch(wanted) || isWorktreeDirName(wanted)) return { ok: false, reason: 'reserved-name' }
+  if (!isNamedRunBranch(wanted)) return { ok: false, reason: 'reserved-name' }
   if (!(await isWorktreeRoot(path, agent))) return { ok: false, reason: 'not-a-worktree' }
   const current = await currentBranch(path, agent)
   if (!current) return { ok: false, reason: 'no-branch' }

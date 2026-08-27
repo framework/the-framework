@@ -1,4 +1,5 @@
 import { readAllAgents, readLiveMetas, type LiveAgent, type AgentMeta, type AgentStatus } from '../store/index.js'
+import { sessionNameField } from '../agent-view.js'
 import type { ProjectSummary } from './projects.js'
 import { collectQueue, type ProjectQueue } from './queue.js'
 import { readTickets, type WorkspaceTicket } from './tickets.js'
@@ -304,7 +305,7 @@ export async function buildOverview(projects: ProjectSummary[], deps: OverviewDe
     status: meta.status,
     ...(meta.intent ? { intent: meta.intent } : {}),
     ...(meta.updatedAt ? { updatedAt: meta.updatedAt } : {}),
-    ...(meta.sessionName ? { sessionName: meta.sessionName } : {}),
+    ...sessionNameField(meta.branch),
     ...(meta.readyForMerge ? { readyForMerge: true } : {}),
     // Another machine's daemon started it (#1648): the shared data branch shows its runs here too.
     ...(meta.host !== undefined && meta.host !== thisHost ? { host: meta.host } : {}),

@@ -45,7 +45,7 @@ import {
 import { loadUserSystemPrompt, SYSTEM_PROMPT_FILE } from './system-prompt-file.js'
 import { checkForUpdate, formatUpdateStatus, nodeVersionFetcher, type VersionFetcher } from './update-check.js'
 import { AgentStore, nodeStoreFs, type StoreFs } from './store/index.js'
-import { currentBranch, nameBranch, agentBranchName, nodeGitRunner } from '@better-skills/branch-management'
+import { currentBranch, agentBranchName, nodeGitRunner, sessionNameOf } from '@better-skills/branch-management'
 import { materializePresets } from './presets.js'
 import { isLoopbackHost, registerHomeProject, runDaemon, DEFAULT_DAEMON_HOST, DEFAULT_DAEMON_PORT } from './daemon.js'
 import { appendControl, resetControl, watchControl, type ControlWatcher } from './control.js'
@@ -422,6 +422,8 @@ interface AgentEpilogue {
   /** The preview of that browser (#802), stopped with the agent. */
   browserStream: BrowserStream | undefined
   clearInterrupt: () => void
+  /** Read the checkout's branch one last time (#1725), before either step below reads it. */
+  observeBranch: () => Promise<void>
   maybeFireOnBeforeMergeable: () => Promise<void>
   /** Hand the session's work back (#1102): push its branch and open a draft PR, if still armed. */
   maybeAutoHandoff: () => Promise<void>
@@ -444,6 +446,10 @@ async function settleAgent(ctx: AgentEpilogue, run: () => Promise<{ successLine:
     const { successLine } = await run()
     ctx.clearInterrupt()
     io.out(successLine)
+    // The branch as the agent left it (#1725): the agent renamed it in its own shell, and both
+    // steps below — the session name the quality step needs, the branch the handoff publishes,
+    // the TODO file the merge gate reads — read what this observed.
+    await ctx.observeBranch()
     // Before the close, not after (#835): close() archives the log into `agents/`, so an
     // outcome appended afterwards would miss the copy the dashboard's history reads.
     await ctx.maybeFireOnBeforeMergeable()
@@ -560,7 +566,15 @@ function armInterrupt(controller: AbortController, io: CliIO): () => void {
 /** What the agent journal exposes to the epilogue. See {@link createAgentJournal}. */
 export interface AgentJournal {
   onEvent: (event: FrameworkEvent) => void
-  /** The session name the agent chose via setSessionName() (#326), once it has. */
+  /**
+   * Read the checkout's branch and record it as a `branch` event when it changed (#1277/#1725):
+   * at start, after every turn, and before the epilogue reads it. The agent renames its branch
+   * itself, in its shell, through `branch-management name`; this process only observes.
+   */
+  observeBranch: () => Promise<void>
+  /** The branch the checkout was last observed on; undefined outside a git checkout, or once detached. */
+  branch: () => string | undefined
+  /** The session name (#326/#1725): the observed branch minus its `tf-` prefix, once the agent named it. */
   sessionName: () => string | undefined
   /** The agent signalled setReadyForMerge() this agent (#326). */
   sawReadyForMerge: () => boolean
@@ -578,17 +592,15 @@ export interface AgentJournal {
 
 /**
  * The agent's event sink and the state its epilogue reads. One event arrives and this prints it,
- * persists it, tracks the settle flags (#322/#326), renames the framework-owned branch once the
- * agent names its session (#736), and re-emits a held browser-stream port right after `session` so
- * it lands in the slice the dashboard renders (#829). These jobs sat inline in runCli across six
- * mutable locals; the journal is their one owner, and runCli reads the getters. Exported for the
- * rename-records-the-branch test (#1277).
+ * persists it, tracks the settle flags (#322/#326), keeps the observed branch current (#1725), and
+ * re-emits a held browser-stream port right after `session` so it lands in the slice the dashboard
+ * renders (#829). These jobs sat inline in runCli across six mutable locals; the journal is their
+ * one owner, and runCli reads the getters. Exported for the branch-observation test (#1277).
  */
 export function createAgentJournal(deps: {
   io: CliIO
   cwd: string
   store: AgentStore | undefined
-  agentId: string | undefined
 }): AgentJournal {
   const { io, cwd, store } = deps
   // The framework's own verdict that the agent stopped cleanly rather than failed — set by a
@@ -596,7 +608,9 @@ export function createAgentJournal(deps: {
   // stop trips an internal signal the CLI never sees.
   let stoppedCleanly = false
   let sawReadyForMerge = false
-  let sessionName: string | undefined
+  // The branch as last read off the checkout (#1277): what the `branch` events said, so the
+  // epilogue and the dashboard agree on it without a second read.
+  let branch: string | undefined
   // The pull request the agent asked for (#1567), latest wins: it may revise it as the work
   // changes, and the handoff wants what it said last.
   let pullRequest: ParsedPullRequest | undefined
@@ -615,24 +629,7 @@ export function createAgentJournal(deps: {
   const onEvent = (event: FrameworkEvent) => {
     if (event.kind === 'ready-for-merge') sawReadyForMerge = true
     if (event.kind === 'open-pr') pullRequest = { ...(event.title ? { title: event.title } : {}), ...(event.description ? { description: event.description } : {}) }
-    if (event.kind === 'session-name') {
-      sessionName = event.name
-      // The framework-owned checkout (#736) was branched as `tf-agent-<id>` before a
-      // name existed; put the readable name on it now, by the package's naming rule (#1725):
-      // a rename, suffixed when the name is taken, a no-op when the agent already checked out
-      // `tf-<name>` itself. Only the branch the checkout is then actually on is recorded
-      // (#1277) — a guessed name on the meta is exactly what the branch event exists to end —
-      // and a refusal (the agent on a branch of its own making) records nothing. Never fails
-      // the agent: a run outlives a branch name.
-      if (deps.agentId) {
-        void nameBranch(cwd, event.name).then(
-          outcome => {
-            if (outcome.ok) onEvent({ kind: 'branch', branch: outcome.branch })
-          },
-          () => {},
-        )
-      }
-    }
+    if (event.kind === 'branch') branch = event.branch
     if (event.kind === 'end' && event.stopped) stoppedCleanly = true
     io.out(formatFrameworkEvent(event))
     void store?.append(event)
@@ -647,11 +644,28 @@ export function createAgentJournal(deps: {
       }
       if (latestBrowserUrl !== undefined) onEvent({ kind: 'browser', url: latestBrowserUrl })
     }
+    // The agent names its branch in its own shell (#1725), invisibly to this process until it
+    // looks: at the end of every turn, read the branch again so the dashboard's label follows the
+    // name without waiting for the agent to end. Every path — a build, its await rounds, the chat,
+    // the backlog loop — ends its turns with the driver's result.
+    if (event.kind === 'driver' && event.event.type === 'result') void observeBranch()
+  }
+
+  // Undefined outside a git checkout (a non-repo project) and on a detached HEAD, and then
+  // nothing is recorded — but the loss is remembered, so the epilogue does not publish a branch
+  // the checkout has left. Only a change is an event: the same branch read twice is one fact.
+  const observeBranch = async (): Promise<void> => {
+    const current = await currentBranch(cwd).catch(() => undefined)
+    if (current === branch) return
+    branch = current
+    if (current) onEvent({ kind: 'branch', branch: current })
   }
 
   return {
     onEvent,
-    sessionName: () => sessionName,
+    observeBranch,
+    branch: () => branch,
+    sessionName: () => sessionNameOf(branch),
     sawReadyForMerge: () => sawReadyForMerge,
     pullRequest: () => pullRequest,
     stoppedCleanly: () => stoppedCleanly,
@@ -960,7 +974,7 @@ async function driveAgent(opts: AgentOptions, io: CliIO): Promise<number> {
   // Everything the agent reports that its epilogue needs — the settle flags, the deferred
   // browser-port announcement — plus the fan-out of every event to the terminal and the store,
   // lives in the journal. runCli reads its getters below.
-  const journal = createAgentJournal({ io, cwd, store, agentId: opts.agentId })
+  const journal = createAgentJournal({ io, cwd, store })
   const onEvent = journal.onEvent
 
   // Put the armed state on the agent's meta (#1102), and keep it there as the checkboxes change it.
@@ -976,10 +990,8 @@ async function driveAgent(opts: AgentOptions, io: CliIO): Promise<number> {
   // Overview mark that ticket as being implemented right now.
   if (opts.ticket && isTicketPath(opts.ticket)) onEvent({ kind: 'ticket', path: opts.ticket })
   // The branch this agent actually starts on (#1277): recorded, not guessed, so surfaces reading
-  // the meta mid-run resolve the same name teardown will later confirm. Undefined outside a git
-  // checkout (a non-repo project), and then nothing is recorded.
-  const startBranch = await currentBranch(cwd)
-  if (startBranch) onEvent({ kind: 'branch', branch: startBranch })
+  // the meta mid-run resolve the same name teardown will later confirm.
+  await journal.observeBranch()
   // Fire the built-in on-before-mergeable (#326) prompt once a --on-before-mergeable agent has settled and the agent
   // signalled setReadyForMerge(). Skipped for a fake/offline run and when the agent was stopped —
   // and every outcome, including each skip, is emitted as an event so the dashboard can show it (#835).
@@ -1039,11 +1051,11 @@ async function driveAgent(opts: AgentOptions, io: CliIO): Promise<number> {
       if (mergeGate) armed.merge = false
     }
 
-    // The branch as it is now, not as it was named at start: #326 lets the agent rename it, and
-    // the rename is exactly what the PR should be opened against.
-    const branch = await currentBranch(cwd)
+    // The branch as it is now, not as it was named at start: the agent renames it (#1725), and
+    // the rename is exactly what the PR should be opened against. Read once for the whole
+    // epilogue, before the merge gate above asked for the session name.
+    const branch = journal.branch()
     if (!branch) return skip('branch-gone')
-    const sessionName = journal.sessionName()
     // The ticket's GitHub issue rides the PR title as `(fix #42)` (#1334): the squash-merge
     // subject inherits the title, so the merge closes the issue — without it, an auto-merged
     // quick-win leaves its ticket open. Not on a plan agent (#1327): its PR lands the plan, not
@@ -1070,7 +1082,6 @@ async function driveAgent(opts: AgentOptions, io: CliIO): Promise<number> {
     const agent = {
       id: opts.agentId ?? '',
       branch,
-      ...(sessionName ? { sessionName } : {}),
       ...(intent ? { intent } : {}),
       ...(fixes ? { fixes } : {}),
       ...(prTitle ? { prTitle } : {}),
@@ -1235,6 +1246,7 @@ async function driveAgent(opts: AgentOptions, io: CliIO): Promise<number> {
     sharedBrowser,
     browserStream,
     clearInterrupt,
+    observeBranch: journal.observeBranch,
     maybeFireOnBeforeMergeable,
     maybeAutoHandoff,
     isStopped: () => controller.signal.aborted || journal.stoppedCleanly(),
@@ -1275,6 +1287,9 @@ async function driveAgent(opts: AgentOptions, io: CliIO): Promise<number> {
     ...sharedAgentOptions,
     kind,
     ...(opts.target ? { location: opts.target } : {}),
+    // The daemon's checkout on this machine (#1725): `--run-id` says the framework owns the checkout,
+    // and only a local agent has the daemon's PATH with `branch-management` on it.
+    ownedCheckout: opts.agentId !== undefined && (opts.target ?? 'local') === 'local',
     prompt: isResearch ? presets.research.render(intent) : intent,
     // Resume the stopped leg's conversation (#720/#1467); the prompt above is the continuation
     // message, which `runAgent` then sends verbatim.
@@ -1441,7 +1456,7 @@ export async function runOnBeforeMergeable(
   binPath: string,
   io: CliIO,
   tf: OnBeforeMergeableContext,
-  // Vanilla by default: the follow-up must not run the session-name step and branch (#560).
+  // Vanilla by default: the follow-up must not run the session-name step and rename the branch (#560).
   agent: PromptRunner = (prompt, cwd, binPath) => spawnPromptAgent(prompt, cwd, binPath, true),
   fs: StoreFs = nodeStoreFs(),
 ): Promise<'queued' | 'incomplete'> {

@@ -1,4 +1,5 @@
 import { readAllAgents, readEventLog, readLiveMetas, type AgentMeta, type LiveAgent } from '../store/index.js'
+import { sessionNameField } from '../agent-view.js'
 import type { ChoiceRequest, FrameworkEvent } from '../events.js'
 import { bridgeChoiceRequest, type BridgeQuestion } from './bridge-question.js'
 import { bridgeQuestions } from './bridge-store.js'
@@ -103,7 +104,7 @@ export async function buildOpenQuestions(
     projectId: project.id,
     projectName: project.name,
     agentId: meta.id,
-    ...(meta.sessionName ? { sessionName: meta.sessionName } : {}),
+    ...sessionNameField(meta.branch),
     ...(meta.intent ? { intent: meta.intent } : {}),
     choice,
     ...rest,

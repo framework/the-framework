@@ -1,7 +1,7 @@
 The deliverables The Framework ships, one directory each:
 
 - `framework/` — the product: the `framework` npm package (CLI, daemon, agent lifecycle, dashboard).
-- `branch-management/` — the `@better-skills/branch-management` npm package: the git conventions and operations behind an agent's own checkout, the first skill of the skills-plus architecture (#1725). The product depends on it; nothing else does yet.
+- `branch-management/` — the `@better-skills/branch-management` npm package: the git conventions and operations behind an agent's own checkout, with the skill's instructions (`SKILL.md`) and the `branch-management` command an agent follows them with: the first skill of the skills-plus architecture (#1725). The product depends on it; nothing else does yet.
 - `chrome-extension/` — the Claude web bridge, a companion Chrome extension that connects Claude Code cloud sessions on claude.ai back to the local dashboard.
 - `the-framework.ai/` — the marketing website.
 

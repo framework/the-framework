@@ -5,7 +5,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/framework/the-framework",
+    "url": "git+https://github.com/framework/the-framework.git",
     "directory": "packages/branch-management"
   },
   "type": "module",
@@ -21,7 +21,7 @@
     "SKILL.md"
   ],
   "bin": {
-    "branch-management": "./bin/branch-management"
+    "branch-management": "bin/branch-management"
   },
   "exports": {
     ".": {

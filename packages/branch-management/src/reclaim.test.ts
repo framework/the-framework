@@ -89,8 +89,9 @@ test('a checkout whose branch cannot reach the remote is kept, with what git sai
     const result = await reclaimWorktree(repo, path, ORDINARY)
     assert.equal(result.ok, false)
     assert.equal(result.ok === false ? result.reason : '', 'not-on-remote')
-    assert.equal(result.ok === false ? result.branch : '', branch)
-    assert.match(result.ok === false ? (result.detail ?? '') : '', /origin/)
+    const refusal = result.ok === false && result.reason === 'not-on-remote' ? result : undefined
+    assert.equal(refusal?.branch, branch)
+    assert.match(refusal?.detail ?? '', /origin/)
     assert.equal((await stat(path)).isDirectory(), true, 'the checkout is still on disk')
   } finally {
     await rm(repo, { recursive: true, force: true })

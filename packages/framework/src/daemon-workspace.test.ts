@@ -4,7 +4,6 @@ import { mkdtemp, mkdir, writeFile, readdir, readFile, rm, stat, realpath } from
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { createProjectRuntime, cleanupTimedOutWorktree, markFailedStart, agentStderrPath, isTransientAgentFailure, lastAgentFailureDetail, MAX_TRANSIENT_RETRIES } from './daemon-runtime.js'
-import { CliTimeoutError } from './cli-exec.js'
 import type { PreflightResult } from './preflight.js'
 
 /**
@@ -15,7 +14,7 @@ import type { PreflightResult } from './preflight.js'
 const agentReady = (): Promise<PreflightResult> => Promise.resolve({ ok: true, checks: [] })
 
 import { EVENTS_FILE, META_FILE, startedAtFromAgentId, type AgentMeta } from './store/index.js'
-import { FRAMEWORK_DIR, BRANCHES_DIR, worktreePath, agentBranchName, nodeGitRunner } from '@superskill/branch-management'
+import { FRAMEWORK_DIR, BRANCHES_DIR, worktreePath, agentBranchName, nodeGitRunner, GitTimeoutError } from '@superskill/branch-management'
 import { addProject, projectId } from './registry.js'
 import type { AgentSpec } from './agent-spec.js'
 
@@ -252,7 +251,7 @@ test('a SIGTERMed worktree add has its partial checkout removed, other failures 
     await cleanupTimedOutWorktree(repo, 'run1', new Error('fatal: invalid reference: HEAD'))
     assert.equal(await exists(), true, 'a plain git rejection leaves the path alone')
 
-    await cleanupTimedOutWorktree(repo, 'run1', new CliTimeoutError('git', ['worktree', 'add'], 120_000))
+    await cleanupTimedOutWorktree(repo, 'run1', new GitTimeoutError(['worktree', 'add'], 120_000))
     assert.equal(await exists(), false, 'a timeout kill takes its half-written checkout with it')
   } finally {
     await rm(repo, RETRIED_RM)

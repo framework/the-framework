@@ -68,11 +68,12 @@ export type ReclaimOutcome =
        */
       branchesDeleted?: string[]
     }
+  | { ok: false; reason: 'not-a-worktree' | 'no-branch' }
   | {
       ok: false
-      reason: ReclaimRefusal
-      /** The branch the checkout is on, once known. */
-      branch?: string
+      reason: 'dirty' | 'not-on-remote'
+      /** The branch the checkout is on. */
+      branch: string
       /** What git said, for a push that did not land. */
       detail?: string
     }
@@ -89,12 +90,15 @@ export async function reclaimWorktree(repo: string, path: string, opts: ReclaimO
   if (!(await isWorktreeRoot(path, git))) return { ok: false, reason: 'not-a-worktree' }
   const branch = await currentBranch(path, git)
   if (!branch) return { ok: false, reason: 'no-branch' }
+  // Every way out below needs a clean tree: `removeWorktree` forces past a dirty one, so a dirty
+  // tree is kept (#1638), and so is a tree git cannot read. Asked once, for all of them.
+  if (!(await worktreeClean(path, git).catch(() => false))) return { ok: false, reason: 'dirty', branch }
 
   // Whether the checkout's branch goes with it (#1650): only when it provably holds nothing.
   let emptyBranch = false
   if (opts.heldBy && (await coveredBy(path, branch, opts.heldBy, git))) {
-    // A clean tree whose tip is inside a commit the remote already has: nothing to push (#1601).
-  } else if (isRunBranch(branch) && (await branchHoldsNothing(repo, path, branch, git))) {
+    // A tip inside a commit the remote already has: nothing to push (#1601).
+  } else if (isRunBranch(branch) && (await branchHoldsNothing(repo, branch, git))) {
     // A branch whose tip the remote already has under another name — an agent that committed
     // nothing (#1650). The rule is satisfied before any push: what the checkout holds *is* on
     // the remote, so the branch goes with it; it is not the last copy of anything, by
@@ -104,9 +108,6 @@ export async function reclaimWorktree(repo: string, path: string, opts: ReclaimO
     // the guard.
     emptyBranch = true
   } else {
-    // `removeWorktree` forces past a dirty tree, so a dirty tree is kept (#1638). A tree git
-    // cannot read is kept the same way.
-    if (!(await worktreeClean(path, git).catch(() => false))) return { ok: false, reason: 'dirty', branch }
     if (!(await branchPushed(repo, branch, git))) {
       if (!opts.mayPush) return { ok: false, reason: 'not-on-remote', branch }
       // Pushing is what makes the removal recoverable, so it is attempted here rather than
@@ -136,9 +137,8 @@ export async function reclaimWorktree(repo: string, path: string, opts: ReclaimO
   return deleted.length ? { ok: true, branchesDeleted: deleted } : { ok: true }
 }
 
-/** Whether the tree is clean and the branch tip is an ancestor of `anchor`. False on any doubt. */
+/** Whether the branch tip is an ancestor of `anchor`. False on any doubt. */
 async function coveredBy(path: string, branch: string, anchor: string, git: GitRunner): Promise<boolean> {
-  if (!(await worktreeClean(path, git).catch(() => false))) return false
   return git(['merge-base', '--is-ancestor', branch, anchor], path).then(
     () => true,
     () => false,
@@ -146,15 +146,14 @@ async function coveredBy(path: string, branch: string, anchor: string, git: GitR
 }
 
 /**
- * Whether a branch holds nothing the remote lacks (#1650): the tree is clean and the tip is
+ * Whether a branch holds nothing the remote lacks (#1650): the tip is
  * reachable from some remote-tracking branch *other than the branch's own* — a commit `origin`
  * already has under another name, so nothing on the branch is unique to it. Its own remote copy
  * does not count: a pushed branch with a PR contains its own tip and is exactly the branch that
  * must stay. Read from the local remote-tracking refs, which are only ever behind the remote: a
  * tip they do not cover yet answers false, and the caller falls back to the push.
  */
-async function branchHoldsNothing(repo: string, path: string, branch: string, git: GitRunner): Promise<boolean> {
-  if (!(await worktreeClean(path, git).catch(() => false))) return false
+async function branchHoldsNothing(repo: string, branch: string, git: GitRunner): Promise<boolean> {
   return git(['branch', '--remotes', '--contains', `refs/heads/${branch}`, '--format=%(refname:short)'], repo).then(
     out =>
       out

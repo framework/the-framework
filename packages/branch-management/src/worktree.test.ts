@@ -16,13 +16,11 @@ import {
   pruneWorktrees,
   worktreeClean,
   worktreePath,
-  agentBranchName,
   currentBranch,
   renameAgentBranch,
-  FRAMEWORK_DIR,
-  BRANCHES_DIR,
   listWorktreeDirs,
-} from './index.js'
+} from './worktree.js'
+import { agentBranchName, FRAMEWORK_DIR, BRANCHES_DIR } from './branch-names.js'
 
 const REPO = '/repo'
 

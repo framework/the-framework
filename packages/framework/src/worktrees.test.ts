@@ -214,6 +214,45 @@ test("a branches/ directory that is not a git worktree is refused before any git
   }
 })
 
+test('the run-id branch the agent branched away from goes with the checkout when the kept branch contains it (#1657)', async () => {
+  // The framework names the checkout's birth branch to the rule; without it nothing would go.
+  const { repo, path, branch: runBranch } = await repoWithDirtyWorktree()
+  const git = nodeGitRunner()
+  try {
+    await git(['push', '-q', 'origin', 'HEAD:main'], repo)
+    await git(['checkout', '-q', '-b', 'tf-cool-name'], path)
+    await commitWork(path)
+    assert.deepEqual(await removeProjectWorktree(repo, RUN_ID), { ok: true, branchesDeleted: [runBranch] })
+    assert.match(await git(['show', 'refs/remotes/origin/tf-cool-name:index.html'], repo), /Welcome!/, 'the work branch stays, pushed')
+    await assert.rejects(() => git(['rev-parse', '--verify', `refs/heads/${runBranch}`], repo), 'the run-id branch is gone')
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})
+
+test('a publish-nothing session with committed, unpushed work keeps its checkout: the push is never made for it (B5)', async () => {
+  // Clean tree, so the only thing standing between the checkout and removal is the push the
+  // handoff forbids — which is exactly what the framework must tell the rule.
+  const { repo, path, branch } = await repoWithDirtyWorktree()
+  const git = nodeGitRunner()
+  try {
+    await commitWork(path)
+    const now = new Date().toISOString()
+    await mkdir(join(path, '.the-framework'), { recursive: true })
+    await writeFile(
+      join(path, '.the-framework', 'agent.json'),
+      JSON.stringify({ status: 'done', id: RUN_ID, startedAt: now, updatedAt: now, handoff: { push: false, pr: false } }),
+    )
+    const result = await removeProjectWorktree(repo, RUN_ID)
+    assert.equal(result.ok, false)
+    assert.match(result.ok === false ? result.error : '', /publish nothing/)
+    assert.equal((await stat(path)).isDirectory(), true, 'the checkout is still on disk')
+    await assert.rejects(() => git(['rev-parse', '--verify', `refs/remotes/origin/${branch}`], repo), 'and nothing reached the remote')
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})
+
 test('an unknown session is refused before any git runs (#982)', async () => {
   const { repo, path } = await repoWithDirtyWorktree()
   try {

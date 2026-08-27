@@ -5,7 +5,7 @@ The deliverables The Framework ships, one directory each:
 - `chrome-extension/` — the Claude web bridge, a companion Chrome extension that connects Claude Code cloud sessions on claude.ai back to the local dashboard.
 - `the-framework.ai/` — the marketing website.
 
-The product depends on the branch-management package in code; the extension and the website depend on the product only in what they present. See the root `SPEC.md` for how the three relate as a product.
+The product depends on the branch-management package in code; the extension and the website depend on the product only in what they present. See the root `SPEC.md` for how they relate as a product.
 
 ## Before modifying/creating SPEC.md files
 

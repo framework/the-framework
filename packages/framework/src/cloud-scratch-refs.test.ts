@@ -25,7 +25,6 @@ const OLD_RUN_ID = '2026-08-16T10-00-00-000Z'
 /** A run branch started one hour before {@link NOW}: inside the safe age. */
 const YOUNG_RUN = 'tf-agent-2026-08-17T11-00-00-000Z'
 /** An aged run branch under the pre-#1581 slashed spelling: still on remotes, still swept. */
-const LEGACY_OLD_RUN = 'the-framework/agent-2026-08-16T10-00-00-000Z'
 /** The shape the cloud driver pushes (#1320): counter + 8-hex tag, slash-free. */
 const CLOUD_REF = 'cloud-1-3955352b'
 
@@ -127,14 +126,6 @@ test('an aged run branch whose work is on the default branch is deleted from ori
   assert.deepEqual(result.deleted, [OLD_RUN])
   assert.deepEqual(deleted, [OLD_RUN])
   assert.deepEqual(result.failed, [])
-})
-
-test('an aged run branch under the legacy slashed spelling is still swept (#1581)', async () => {
-  const { git, deleted } = fakeGit({ heads: { main: MAIN_SHA, [LEGACY_OLD_RUN]: SHA } })
-  const { fs } = memFs()
-  const result = await sweepCloudScratchRefs('/repo', { git, fs, prs: noPrs, now: () => NOW })
-  assert.deepEqual(result.deleted, [LEGACY_OLD_RUN])
-  assert.deepEqual(deleted, [LEGACY_OLD_RUN])
 })
 
 test('a run branch inside the safe age is kept: its run may still be provisioning (#1547)', async () => {

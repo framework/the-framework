@@ -29,10 +29,9 @@ const REPO = { 'rev-parse --git-dir': '.git' }
 
 test('the recorded branch wins over both derivations (#799)', () => {
   assert.equal(agentBranchFor({ id: 'r1', branch: 'feat/mine', sessionName: 'named' }), 'feat/mine')
-  // The fallbacks guess with the legacy slashed spellings on purpose: they only apply to runs
-  // archived before the branch was recorded, which all predate the slash-free rename (#1581).
-  assert.equal(agentBranchFor({ id: 'r1', sessionName: 'named' }), 'the-framework/named')
-  assert.equal(agentBranchFor({ id: 'r1' }), 'the-framework/agent-r1')
+  // The fallbacks guess from the session name, else the agent id.
+  assert.equal(agentBranchFor({ id: 'r1', sessionName: 'named' }), 'tf-named')
+  assert.equal(agentBranchFor({ id: 'r1' }), 'tf-agent-r1')
 })
 
 test('a non-repo yields no handoff at all', async () => {
@@ -616,7 +615,7 @@ test('a failed push is reported with git’s own reason, so the bar can offer th
 
 test('a session branch is recognised by its prefix, a hand-made one is not (#1102)', () => {
   assert.equal(isAgentBranch('tf-x'), true)
-  assert.equal(isAgentBranch('the-framework/x'), true) // legacy spelling (pre-#1581) still counts
+  assert.equal(isAgentBranch('the-framework/x'), false) // the retired slashed spelling is nobody's
   assert.equal(isAgentBranch('feat/mine'), false)
   assert.equal(isAgentBranch(undefined), false)
 })

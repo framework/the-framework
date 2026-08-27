@@ -1,4 +1,4 @@
-import { nodeGitRunner, type GitRunner, legacyAgentBranchName, AGENT_BRANCH_PREFIX, LEGACY_AGENT_BRANCH_PREFIX, currentBranch, repoHasRemote, FRAMEWORK_DIR, pushBranch, gitReason } from '@superskill/branch-management'
+import { nodeGitRunner, type GitRunner, agentBranchName, AGENT_BRANCH_PREFIX, currentBranch, repoHasRemote, FRAMEWORK_DIR, pushBranch, gitReason } from '@superskill/branch-management'
 import {
   cachedPrView,
   cachedPrsForBranch,
@@ -124,11 +124,9 @@ export interface AgentHandoffDeps {
  */
 export function agentBranchFor(agent: { id: string; branch?: string; sessionName?: string }): string {
   if (agent.branch) return agent.branch
-  // The fallbacks go through the store's own builders rather than assembling the same names a
-  // second time here — two spellings of one branch name is how the prefix went stale under D5.
-  // They use the *legacy* slashed spellings on purpose: every run they can apply to was archived
-  // before the branch was recorded, which predates the slash-free rename (#1581).
-  return agent.sessionName ? `${LEGACY_AGENT_BRANCH_PREFIX}${agent.sessionName}` : legacyAgentBranchName(agent.id)
+  // The fallbacks go through the package's own builders rather than assembling the same names a
+  // second time here — two spellings of one branch name is how the prefix once went stale.
+  return agent.sessionName ? `${AGENT_BRANCH_PREFIX}${agent.sessionName}` : agentBranchName(agent.id)
 }
 
 /**
@@ -219,7 +217,7 @@ export async function mergeAgentPr(
  * branch name. Every caller uses it to decide how loudly to surface something, never to act.
  */
 export function isAgentBranch(branch: string | undefined): boolean {
-  return Boolean(branch && (branch.startsWith(AGENT_BRANCH_PREFIX) || branch.startsWith(LEGACY_AGENT_BRANCH_PREFIX)))
+  return Boolean(branch?.startsWith(AGENT_BRANCH_PREFIX))
 }
 
 /** `git` that resolves to '' instead of rejecting, for reads where "no answer" is a fine answer. */

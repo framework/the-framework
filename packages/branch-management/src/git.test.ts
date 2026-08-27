@@ -32,6 +32,12 @@ const BUDGETS: { args: string[]; ms: number }[] = [
   { args: ['remote', 'get-url', 'origin'], ms: GIT_READ_TIMEOUT_MS },
   { args: ['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'], ms: GIT_READ_TIMEOUT_MS },
   { args: ['branch', '--list', '--merged', 'main', 'topic'], ms: GIT_READ_TIMEOUT_MS },
+  { args: ['branch', '--remotes', '--contains', 'refs/heads/tf-x', '--format=%(refname:short)'], ms: GIT_READ_TIMEOUT_MS },
+  { args: ['branch'], ms: GIT_READ_TIMEOUT_MS },
+  { args: ['branch', '-D', 'tf-agent-1'], ms: GIT_WRITE_TIMEOUT_MS },
+  { args: ['branch', '-m', 'tf-agent-1', 'tf-cool'], ms: GIT_WRITE_TIMEOUT_MS },
+  { args: ['branch', 'tf-data', 'abc123'], ms: GIT_WRITE_TIMEOUT_MS },
+  { args: ['show-ref', '--verify', '--quiet', 'refs/heads/tf-x'], ms: GIT_READ_TIMEOUT_MS },
   { args: ['worktree', 'list', '--porcelain'], ms: GIT_READ_TIMEOUT_MS },
 ]
 

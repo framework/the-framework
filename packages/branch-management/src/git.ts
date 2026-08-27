@@ -42,6 +42,9 @@ const GIT_READ_OPS = new Set([
 /** Subcommands bounded by the network rather than by this machine. */
 const GIT_SLOW_OPS = new Set(['clone', 'fetch', 'pull', 'push', 'ls-remote'])
 
+/** `git branch` flags that only list or query; any other `branch` invocation writes a ref. */
+const GIT_BRANCH_READ_FLAGS = new Set(['--list', '-l', '--contains', '--no-contains', '--merged', '--no-merged', '--points-at', '--show-current', '-r', '--remotes', '-a', '--all', '-v', '-vv', '--verbose'])
+
 /** Global options whose value is the next word, so that word is not the subcommand. */
 const GIT_GLOBAL_VALUE_OPTIONS = new Set(['-C', '-c', '--git-dir', '--work-tree', '--namespace', '--exec-path'])
 
@@ -74,6 +77,12 @@ export function gitTimeoutMs(args: string[]): number {
     // Only `add` writes a checkout; `list` is a read, and remove/prune are ordinary mutations.
     if (words[1] === 'add') return GIT_SLOW_TIMEOUT_MS
     return words[1] === 'list' ? GIT_READ_TIMEOUT_MS : GIT_WRITE_TIMEOUT_MS
+  }
+  if (op === 'branch') {
+    // A bare `branch` or one carrying a listing flag reads; `-D`, `-m`, or `branch <new> [start]` writes a ref.
+    const flags = args.filter(arg => arg.startsWith('-'))
+    const reads = words.length === 1 || flags.some(flag => GIT_BRANCH_READ_FLAGS.has(flag))
+    return reads && !flags.some(flag => !GIT_BRANCH_READ_FLAGS.has(flag) && !flag.startsWith('--format')) ? GIT_READ_TIMEOUT_MS : GIT_WRITE_TIMEOUT_MS
   }
   return GIT_READ_OPS.has(op) ? GIT_READ_TIMEOUT_MS : GIT_WRITE_TIMEOUT_MS
 }

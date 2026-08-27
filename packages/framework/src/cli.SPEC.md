@@ -20,7 +20,7 @@ The framework's command-line entry point. Its human surface is four options whos
 - **Refuse before spending anything** - a mismatched layout marker, an empty prompt, a resume asked of a build, or a missing GitHub remote/token for the `actions` target stops the agent before a driver exists, and records the failure rather than leaving the agent stuck at "running".
 - **Files are the seam for steering** - Stop, live chat messages, handoff changes, the Merge action and choice picks all arrive over the control channel; the agent's own narration goes out over the event log.
 - **Gates park only where someone can answer** - an unattended or unsteerable agent takes each gate's recommended option instead of waiting; a parked agent is held alive so the answer has someone to reach.
-- **The agent names itself and its branch follows** - once the agent picks a session name, the framework-owned branch is renamed by the branch-management package's naming rule and the branch the checkout is then on is recorded as fact, never guessed.
+- **The agent names its own branch, and the agent runner only looks** - the agent renames its branch through the branch-management command in its own shell; the runner re-reads the branch after every settled turn and before the ending, records what it finds as fact, and reads the session name off it.
 - **Quality follow-ups queue before the work is published** - the on-before-mergeable prompt runs first, then the handoff, then the archive, so nothing it wrote is left behind.
 - **The handoff is a ladder, and merging is authorized** - push, then pull request, then merge; the merge rung additionally needs the agent's ready-for-merge signal and an empty agent TODO file, unless a human pressed Merge.
 - **A stopped agent is not a failure and publishes nothing** - a clean stop reports itself and exits 0, and neither the quality step nor the handoff runs.
@@ -142,11 +142,11 @@ Beyond the driver's own narration the agent records these facts about itself:
 - **The armed handoff rung**, at start and again whenever it changes, spelled out stage by stage. The control channel carries the instruction but only an event reaches the agent meta, and the meta is the only thing a tab opened mid-agent can read the state back from. The stages are always derived from the single rung, so they cannot contradict each other.
 - **The ticket it implements**, once, when the daemon named one — a fact about why the agent exists, and what lets the Overview mark that ticket as being worked right now.
 - **The branch it actually started on**, read rather than guessed. Outside a git checkout nothing is recorded.
-- **The renamed branch.** When the agent announces its session name, the framework-owned branch born as `tf-agent-<agent id>` is renamed to `tf-<session name>` by the branch-management package's naming rule — suffixed when that name is taken, a no-op when the agent already checked `tf-<session name>` out itself — and the branch the checkout is then actually on is recorded. A refusal (the agent on a branch of its own making, or a reserved name) records nothing and never fails the agent.
+- **The renamed branch.** The agent renames its branch itself, through `branch-management name` (#1725), invisibly to the runner until it looks: the branch is re-read after every settled turn and before the ending, and a change is recorded. The session name is the recorded branch minus its `tf-` prefix — none while the branch is still the birth spelling `tf-agent-<agent id>`.
 - **The browser preview's port and page.** The port is held until the driver session opens, and the current page is re-announced after every session opens.
 - **The pull request** it ends up opening, by number and URL.
 
-It also tracks, for its own ending: whether the agent signalled ready for merge, which session name it chose, the pull request title and description the agent asked for (the latest wins, since the agent may revise them as the work changes), and whether it stopped cleanly rather than failed.
+It also tracks, for its own ending: whether the agent signalled ready for merge, the branch last observed and the session name it carries, the pull request title and description the agent asked for (the latest wins, since the agent may revise them as the work changes), and whether it stopped cleanly rather than failed.
 
 #### Rationale
 
@@ -186,7 +186,7 @@ An agent that believes it is done should not be the last word on quality, but a 
 
 When the agent was started with the on-before-mergeable step enabled and it signalled ready for merge, one child agent is spawned on the same checkout that appends quality follow-ups to the agent's own TODO file, for the backlog loop to work through. Before the prompt runs, the presets are materialized so the queued entries' file references resolve even in a fresh clone or a project activated before those presets existed; a failure to materialize is reported and does not block the queueing.
 
-Every outcome is recorded as an event, including every reason for not running: the agent never signalled ready for merge, it was stopped, it is a fake agent, it never chose a session name, or there is no executable path to spawn from. The step is skipped silently only when it was never asked for.
+Every outcome is recorded as an event, including every reason for not running: the agent never signalled ready for merge, it was stopped, it is a fake agent, it never named its session (its branch is still the birth spelling), or there is no executable path to spawn from. The step is skipped silently only when it was never asked for.
 
 The child runs vanilla, which keeps it on the agent's current branch, and its spec deliberately carries no on-before-mergeable step of its own. Spawning is refused outright from a test entry point.
 
@@ -194,7 +194,7 @@ The child runs vanilla, which keeps it on the agent's current branch, and its sp
 
 Announcing the skips as events, rather than to standard output, exists because a dashboard-started agent has its output discarded — silence there read as "it ran and found nothing".
 
-Running vanilla is not an optimization: the built-in system prompt's session-name step would otherwise make the follow-up commit and branch a new session of its own, stranding its output on a branch nothing merges.
+Running vanilla is not an optimization: the built-in system prompt's session-name step and the branch-management skill would otherwise make the follow-up rename the branch after a session of its own, stranding its output under a name nothing expects.
 
 Queueing follow-ups replaced running the quality presets inline, back to back, as three full passes serialized on the same git index. Queueing is both what the built-in prompt asks for and the cheaper thing: one short turn that writes a few lines.
 

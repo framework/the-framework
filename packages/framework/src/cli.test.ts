@@ -181,9 +181,10 @@ test('promptAgentSpec runs a headless prompt and carries NO onBeforeMergeable (r
   })
 })
 
-test('promptAgentSpec goes vanilla so the on-before-mergeable follow-up skips the session-name branch step (#560)', () => {
-  // The follow-up is not a session; vanilla drops the built-in system prompt (#326) (and its `### Session
-  // name` step), so the agent stays on the session branch instead of stranding its output.
+test('promptAgentSpec goes vanilla so the on-before-mergeable follow-up skips the session-name step (#560)', () => {
+  // The follow-up is not a session; vanilla drops the built-in system prompt (#326) (its `### Session
+  // name` step and the branch-management skill), so the agent stays on the session branch instead of
+  // renaming it after a session of its own.
   assert.equal(promptAgentSpec('queue follow-ups', '/work/app', true).options.vanilla, true)
 })
 
@@ -669,7 +670,7 @@ test('an unreachable npm registry costs the footer nothing (#312)', async () => 
   assert.ok(!out.some(l => l.includes('Up to date') || l.includes('Update available')))
 })
 
-test('naming the session renames the run-id branch and records it as a branch event (#1277)', async t => {
+test('the journal reads the branch off the checkout, and sees the agent\'s own rename once a turn settles (#1277/#1725)', async t => {
   const { execFileSync } = await import('node:child_process')
   const repo = await mkdtemp(join(tmpdir(), 'fw-journal-'))
   t.after(() => rm(repo, { recursive: true, force: true }))
@@ -681,32 +682,32 @@ test('naming the session renames the run-id branch and records it as a branch ev
   // The state allocateWorkspace leaves an agent in: checked out on its run-id branch (#736).
   git('checkout', '-q', '-b', 'tf-agent-r1')
   const { io, out } = capture()
-  const journal = createAgentJournal({
-    io,
-    cwd: repo,
-    store: undefined,
-    agentId: 'r1',
-  })
-  journal.onEvent({ kind: 'session-name', name: 'cool-name' })
-  // The rename runs off the event asynchronously; wait for the recorded branch to come through.
+  const journal = createAgentJournal({ io, cwd: repo, store: undefined })
+  await journal.observeBranch()
+  assert.equal(journal.branch(), 'tf-agent-r1')
+  assert.equal(journal.sessionName(), undefined, 'the birth branch is not a name')
+  // The agent names its branch in its own shell (#1725) — `branch-management name cool-name` is
+  // this rename — and the journal only learns of it by looking again.
+  git('branch', '-m', 'tf-agent-r1', 'tf-cool-name')
+  assert.equal(journal.sessionName(), undefined, 'nothing is recorded until the branch is read again')
+  journal.onEvent({ kind: 'settled' })
   for (let i = 0; i < 200 && !out.some(line => line.includes('branch: tf-cool-name')); i++) {
     await new Promise(res => setTimeout(res, 10))
   }
   assert.ok(
     out.some(line => line.includes('branch: tf-cool-name')),
-    `expected a branch event, got: ${out.join('; ')}`,
+    `expected a branch event after the settled turn, got: ${out.join('; ')}`,
   )
-  assert.equal(git('rev-parse', '--abbrev-ref', 'HEAD').trim(), 'tf-cool-name')
+  assert.equal(journal.branch(), 'tf-cool-name')
+  assert.equal(journal.sessionName(), 'cool-name')
+  // The same branch read again is one fact, not a second event.
+  await journal.observeBranch()
+  assert.equal(out.filter(line => line.includes('branch: tf-cool-name')).length, 1)
 })
 
 test('a browser URL is held until the session opens, then re-said after every later session (#1455 item 6b)', () => {
   const { io, out } = capture()
-  const journal = createAgentJournal({
-    io,
-    cwd: '/tmp',
-    store: undefined,
-    agentId: undefined,
-  })
+  const journal = createAgentJournal({ io, cwd: '/tmp', store: undefined })
   journal.announceBrowserUrl('https://early.test/')
   assert.ok(
     !out.some(l => l.includes('browser: https://early.test/')),

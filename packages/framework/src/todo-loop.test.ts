@@ -334,9 +334,6 @@ test('a backlog turn emits its signals: views, errors, session name, ready-for-m
           '',
           'ran `ls test/fixtures`: No such file or directory',
           '```',
-          '```set-session-name',
-          'login-redirect-fix',
-          '```',
           '```ready-for-merge',
           '```',
         ].join('\n'),
@@ -356,7 +353,6 @@ test('a backlog turn emits its signals: views, errors, session name, ready-for-m
         },
       ],
     )
-    assert.equal(events.find(e => e.kind === 'session-name')?.name, 'login-redirect-fix')
     assert.equal(events.filter(e => e.kind === 'ready-for-merge').length, 1)
   } finally {
     await rm(repo, RETRIED_RM)

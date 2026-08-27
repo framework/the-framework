@@ -14,8 +14,7 @@ The Framework's built-in system prompt: the standing instructions every agent st
 
 - **Analyze the prompt before working** - an unclear prompt becomes a plausibility-ranked list of interpretations offered as a choice, and the agent waits for the answer.
 - **Large scope gets approved first** - large work is written up as a plan file shown to the user and awaits approval; very large work also seeds follow-up entries onto the agent queue.
-- **The workspace is the whole world** - the agent addresses everything relative to its own checkout, never edits the user's outer working tree, and stops rather than reaching outside.
-- **Name the session, then branch** - before the first change the agent invents a session name, creates and checks out `tf-<session name>`, commits its work there as it goes, and reports the name back.
+- **Name the session** - before the first change the agent names the session through `branch-management name`, and uses the name the command prints.
 - **Rate variability, offer alternatives** - each problem about to be solved is scored on how obviously optimal its solution is; low scorers are explored and their alternatives offered as a choice.
 - **Ready for merge is explicit** - the agent signals it only when the task is finished; otherwise it states what remains.
 - **The user's prompt is the last section** - the built-in instructions frame the system channel, and the user's own prompt is delivered as its own half.
@@ -44,17 +43,7 @@ When the scope of the work is *large*, the agent writes a plan file named `PLAN_
 
 When the scope is *potentially very large* — spanning many hours or days — the agent additionally considers appending follow-up tasks to the agent queue (`TODO_AGENTS.md`) and showing the new entries as a markdown view, so the overflow becomes queued work rather than being lost.
 
-### The workspace is the whole world
-
-#### User story
-
-An agent works in its own checkout, which lives under `.the-framework/branches/` inside the user's own checkout of the same repo. The same file therefore exists twice, and edits landing in the wrong copy never reach the agent's branch, its commits or its pull request.
-
-#### Business logic
-
-The agent is told that its working directory is the entirety of its workspace and that every file it reads or writes lies under it. Four rules follow: address files relative to the working directory, because an absolute path is how it leaves without noticing; treat the surrounding checkout as the user's own working tree, never as another view of its own files and never as something to edit; understand that a file existing twice means only the copy under its working directory is its own; and, when something it genuinely needs lies outside, say so and stop rather than reach for it.
-
-### Name the session, then branch
+### Name the session
 
 #### User story
 
@@ -62,11 +51,11 @@ See `## User story`: work must be reviewable as a pull request on a branch named
 
 #### Business logic
 
-Before applying its first change the agent picks a session name — an `[a-z0-9-]+` string that succinctly captures the intent of the user's prompt — creates the branch `tf-<session name>`, checks it out, and does all the work there, committing it on that branch as it goes — The Framework publishes only what the agent committed and never commits on its behalf. It then reports the name back to The Framework by calling `setSessionName()`.
+Before applying its first change the agent picks a session name — an `[a-z0-9-]+` string that succinctly captures the intent of the user's prompt — and runs `branch-management name <session name>`. The command renames the agent's branch to `tf-<session name>` and prints the name the branch got; when that differs (the name was taken), the printed name is the session name from then on. The prompt points the agent at the branch-management skill, appended right after it, for everything else about its checkout: the workspace boundary, committing as it goes, and the clean tree it must leave.
 
 #### Rationale
 
-Branching before the first change, rather than after the work is done, means there is never a moment where changes sit on the wrong branch.
+Naming before the first change, rather than after the work is done, means there is never a moment where changes sit on a branch that says nothing about them. The workspace rules that used to live here are the skill's: they describe the checkout the branch-management package created, so they ship with that package.
 
 ### Rate variability, offer alternatives
 

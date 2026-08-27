@@ -1,3 +1,4 @@
+import { sessionNameOf } from '@better-skills/branch-management/branch-names'
 import type { AutoHandoffSkip, FrameworkEvent } from './events.js'
 
 // Derived agent state for the dashboard's overview cards (#431): the production-grade
@@ -9,21 +10,25 @@ import type { AutoHandoffSkip, FrameworkEvent } from './events.js'
 
 /** The agent's lifecycle progress (#326): the session name it chose and whether it is ready for merge. */
 export interface AgentProgress {
-  /** The `[a-z0-9-]` session name (also the branch), once the agent set one via `setSessionName()`. */
+  /** The session name, read off the agent's `tf-<name>` branch (#1725), once the agent named it. */
   sessionName?: string
   /** True once the agent signalled `setReadyForMerge()`: building (false) -> ready (true). */
   readyForMerge: boolean
 }
 
 /**
- * The agent's lifecycle progress (#326): the latest `session-name` the agent set and whether
- * a `ready-for-merge` has fired. Drives the dashboard status label + dot (orange building,
+ * The agent's lifecycle progress (#326): the session name its latest observed branch carries and
+ * whether a `ready-for-merge` has fired. Drives the dashboard status label + dot (orange building,
  * green ready). Always returns a value — an untouched agent is `{ readyForMerge: false }`.
  */
 export function agentProgress(events: readonly FrameworkEvent[]): AgentProgress {
   const progress: AgentProgress = { readyForMerge: false }
   for (const event of events) {
-    if (event.kind === 'session-name') progress.sessionName = event.name
+    if (event.kind === 'branch') {
+      const name = sessionNameOf(event.branch)
+      if (name) progress.sessionName = name
+      else delete progress.sessionName
+    }
     else if (event.kind === 'ready-for-merge') progress.readyForMerge = true
   }
   return progress

@@ -31,13 +31,14 @@ export const HANDS_OFF_PROTOCOL = PROTOCOLS_HANDS_OFF
 export const BROWSER_PROTOCOL = PROTOCOLS_BROWSER
 
 /**
- * The session-lifecycle protocol (#326): the code side of the `setSessionName()` and
- * `setReadyForMerge()` actions the system prompt calls out. Like {@link AWAIT_PROTOCOL},
+ * The session-lifecycle protocol (#326): the code side of the `setReadyForMerge()` action the
+ * system prompt calls out, plus the pull request and error blocks. Like {@link AWAIT_PROTOCOL},
  * it does not restate *when* to act — the system prompt owns that — it only pins *how* to
- * emit the signal so the turn-boundary can detect it. Both are non-blocking: the agent
+ * emit the signal so the turn-boundary can detect it. All are non-blocking: the agent
  * emits the block and keeps going (the framework records it and reflects it in the
  * dashboard). Injected alongside AWAIT_PROTOCOL. The text lives in
- * `prompts/protocols/signal.md` (#551).
+ * `prompts/protocols/signal.md` (#551). The session name is not a signal (#1725): the agent
+ * names its branch through `branch-management name`, and the name is read off the branch.
  */
 export const SIGNAL_PROTOCOL = PROTOCOLS_SIGNAL
 
@@ -169,25 +170,6 @@ export function parseMarkdownViews(text: string): ParsedMarkdownView[] {
     byId.set(id, { id, title, markdown })
   }
   return [...byId.values()]
-}
-
-/**
- * Parse the session name the agent set this turn (#326), from the last `set-session-name`
- * block (per {@link SIGNAL_PROTOCOL}) — its first non-empty line, slugified to `[a-z0-9-]`
- * so it matches the branch-name shape. Returns `undefined` when the agent did not set one
- * (the common case) or the block is blank. A later block in the same turn wins (a rename).
- */
-export function parseSessionName(text: string): string | undefined {
-  const re = /```set-session-name\s+([\s\S]*?)```/g
-  let name: string | undefined
-  for (const m of text.matchAll(re)) {
-    const line = (m[1] ?? '').split('\n').map(l => l.trim()).find(Boolean)
-    // Emptiness is tested directly rather than via a fallback sentinel: a sentinel made a
-    // session legitimately named `view` indistinguishable from no name at all (#939).
-    const slug = line ? slugify(line, '') : ''
-    if (slug) name = slug
-  }
-  return name
 }
 
 /**
@@ -355,13 +337,12 @@ function parseGateBody(body: string): ParsedAwaitGate | undefined {
  * agent is told it can signal on any turn, so any turn we don't parse drops the signal.
  *
  * The returned function holds the dedupe state for the turns it covers: `ready-for-merge`
- * fires once, a session name and a pull-request description only re-emit on an actual
+ * fires once, a pull-request description only re-emits on an actual
  * change, and an error is logged once however often the agent restates it. Each caller makes one
  * for its own span of turns (a build's await rounds, the whole backlog), so keep it for as
  * many turns as should share that dedupe rather than making one per turn.
  */
 export function createTurnSignalEmitter(emit: (event: FrameworkEvent) => void): (text: string) => void {
-  let named: string | undefined
   let ready = false
   let described: string | undefined
   const reported = new Set<string>()
@@ -375,11 +356,6 @@ export function createTurnSignalEmitter(emit: (event: FrameworkEvent) => void): 
       if (reported.has(key)) continue
       reported.add(key)
       emit({ kind: 'error', ...error })
-    }
-    const name = parseSessionName(text)
-    if (name && name !== named) {
-      named = name
-      emit({ kind: 'session-name', name })
     }
     if (!ready && parseReadyForMerge(text)) {
       ready = true

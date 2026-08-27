@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { continuationPrompt, createTurnSignalEmitter, parseAwaitGate, parseErrors, parseMarkdownViews, parseSessionName, parseReadyForMerge, parsePullRequest } from './turn-gate.js'
+import { continuationPrompt, createTurnSignalEmitter, parseAwaitGate, parseErrors, parseMarkdownViews, parseReadyForMerge, parsePullRequest } from './turn-gate.js'
 import type { FrameworkEvent } from './events.js'
 
 const block = (json: string): string => 'Here are the options.\n```await-choices\n' + json + '\n```'
@@ -122,32 +122,7 @@ test('parseMarkdownViews skips a blank block (#441)', () => {
   assert.deepEqual(parseMarkdownViews('```show-markdown\n# Empty\n```'), [])
 })
 
-test('parseSessionName returns undefined when the turn set no session name (#326)', () => {
-  assert.equal(parseSessionName('Working on the branch, no signal here.'), undefined)
-})
-
-test('parseSessionName reads + slugifies the name from a set-session-name block (#326)', () => {
-  assert.equal(parseSessionName('```set-session-name\nadd-comments\n```'), 'add-comments')
-  // Free-form text is slugified to the [a-z0-9-] branch shape.
-  assert.equal(parseSessionName('done.\n```set-session-name\nAdd Comments Feature!\n```'), 'add-comments-feature')
-  // The first non-empty line is the name.
-  assert.equal(parseSessionName('```set-session-name\n\n  my-slug  \nignored\n```'), 'my-slug')
-})
-
-test('parseSessionName keeps the later block when the agent renames mid-turn (#326)', () => {
-  assert.equal(parseSessionName('```set-session-name\nfirst\n```\nthen\n```set-session-name\nsecond\n```'), 'second')
-})
-
-test('a session legitimately named "view" is kept, not dropped as a sentinel (#939)', () => {
-  // `view` used to be slugify's fallback sentinel, and parseSessionName rejected it, so an
-  // agent that wrote View had its rename silently ignored.
-  assert.equal(parseSessionName('```set-session-name\nView\n```'), 'view')
-  assert.equal(parseSessionName('```set-session-name\nview\n```'), 'view')
-})
-
-test('a name with no usable characters is still no name (#939)', () => {
-  assert.equal(parseSessionName('```set-session-name\n!!! ***\n```'), undefined)
-  // The markdown-view fallback is unaffected: a heading with no usable characters still ids as `view`.
+test('a heading with no usable characters still ids as `view` (#939)', () => {
   assert.deepEqual(parseMarkdownViews('```show-markdown\n# !!!\nbody\n```'), [
     { id: 'view', title: '!!!', markdown: 'body' },
   ])

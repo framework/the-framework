@@ -1,9 +1,9 @@
-The dashboard's summary of an agent, derived entirely from that agent's event log: the session name it chose and whether it is ready for merge, the errors it reported, what it is armed to publish and how that turned out, and the wrapped CLI session behind it.
+The dashboard's summary of an agent, derived entirely from that agent's event log: the session name its branch carries and whether it is ready for merge, the errors it reported, what it is armed to publish and how that turned out, and the wrapped CLI session behind it.
 
 ## Business logic — TL;DR
 
 - **Every summary is a projection of the event log** - nothing is stored beside the agent's events, so a live agent and a reopened finished agent show the identical summary.
-- **Lifecycle progress: named, then ready** - the summary carries the session name the agent picked and whether it has signalled ready for merge, which is what the dashboard's status label and dot show.
+- **Lifecycle progress: named, then ready** - the summary carries the session name read off the agent's latest observed branch and whether it has signalled ready for merge, which is what the dashboard's status label and dot show.
 - **Errors accumulate, oldest first** - every error the agent reported stays in the list, so the dashboard can show a count and the latest headline.
 - **The handoff is shown armed, then resolved** - what the agent will do with its work when it ends — push, open a PR, merge — and, once it has ended, whether that was done, skipped or failed.
 - **The wrapped session survives its worktree** - the driver, the workspace, the model, the session id and the deep link all come from events, which is what still works after the agent's checkout has been removed.
@@ -28,7 +28,7 @@ The user watches an agent go from "still building" to "ready for merge", and wan
 
 #### Business logic
 
-The summary reports the latest session name the agent set, and whether the agent has signalled ready for merge. The dashboard shows this as its status label and dot: orange while building, green once ready. An agent that has done neither reports no session name and not ready — there is always an answer.
+The summary reports the session name the agent's latest observed branch carries — none while it is still on its birth branch — and whether the agent has signalled ready for merge. The dashboard shows this as its status label and dot: orange while building, green once ready. An agent that has done neither reports no session name and not ready — there is always an answer.
 
 ### Errors accumulate, oldest first
 

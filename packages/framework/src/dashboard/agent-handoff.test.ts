@@ -27,10 +27,9 @@ function fakeGit(answers: Record<string, string>): { git: GitRunner; calls: stri
 
 const REPO = { 'rev-parse --git-dir': '.git' }
 
-test('the recorded branch wins over both derivations (#799)', () => {
-  assert.equal(agentBranchFor({ id: 'r1', branch: 'feat/mine', sessionName: 'named' }), 'feat/mine')
-  // The fallbacks guess from the session name, else the agent id.
-  assert.equal(agentBranchFor({ id: 'r1', sessionName: 'named' }), 'tf-named')
+test('the recorded branch wins; the birth spelling is the only fallback (#799/#1725)', () => {
+  assert.equal(agentBranchFor({ id: 'r1', branch: 'feat/mine' }), 'feat/mine')
+  assert.equal(agentBranchFor({ id: 'r1', branch: 'tf-named' }), 'tf-named')
   assert.equal(agentBranchFor({ id: 'r1' }), 'tf-agent-r1')
 })
 
@@ -173,7 +172,7 @@ test('a remote-only branch gets its draft PR without any push (#1601)', async ()
   const ghCalls: string[][] = []
   const result = await openRemoteBranchPullRequest(
     '/repo',
-    { id: 'r1', sessionName: 'fix the thing', intent: 'fix it' },
+    { id: 'r1', branch: 'tf-fix-the-thing', intent: 'fix it' },
     'claude/fix-the-thing',
     {
       gh: async args => {
@@ -196,7 +195,7 @@ test("the agent's own description becomes the PR body, in place of the intent (#
   const ghCalls: string[][] = []
   await openRemoteBranchPullRequest(
     '/repo',
-    { id: 'r1', sessionName: 'fix-the-thing', intent: 'fix it', description: '## What changed\n\nThe queue reader keeps its state across a reload.' },
+    { id: 'r1', branch: 'tf-fix-the-thing', intent: 'fix it', description: '## What changed\n\nThe queue reader keeps its state across a reload.' },
     'claude/fix-the-thing',
     {
       gh: async args => {
@@ -213,7 +212,7 @@ test("the agent's own description becomes the PR body, in place of the intent (#
 
 test('without a description the PR body still says what was asked for (#1567)', async () => {
   const ghCalls: string[][] = []
-  await openRemoteBranchPullRequest('/repo', { id: 'r1', sessionName: 'x', intent: 'fix it' }, 'claude/x', {
+  await openRemoteBranchPullRequest('/repo', { id: 'r1', branch: 'tf-x', intent: 'fix it' }, 'claude/x', {
     gh: async args => {
       ghCalls.push(args)
       return 'https://github.com/o/r/pull/15\n'
@@ -343,7 +342,7 @@ test('an armed session opens a DRAFT PR, and pushes on the way (#1102)', async (
   const { git } = fakeGit({ ...READY, push: '' })
   const outcome = await agentAutoHandoff(
     '/repo',
-    { id: 'r1', branch: 'the-framework/x', sessionName: 'x', intent: 'build it' },
+    { id: 'r1', branch: 'the-framework/x', intent: 'build it' },
     { push: true, pr: true },
     {
       git,
@@ -465,7 +464,7 @@ test('an armed merge follows the PR it just opened (#1216)', async () => {
   const { git } = fakeGit({ ...READY, push: '' })
   const outcome = await agentAutoHandoff(
     '/repo',
-    { id: 'r1', branch: 'the-framework/x', sessionName: 'x', intent: 'build it' },
+    { id: 'r1', branch: 'the-framework/x', intent: 'build it' },
     { push: true, pr: true, merge: true },
     {
       git,
@@ -738,7 +737,7 @@ test('resolveAgentPr reads the PR the run recorded, and asks gh only for its sta
 
 test('resolveAgentPr answers nothing for a run that recorded no PR (E6)', async () => {
   let asked = 0
-  const found = await resolveAgentPr('/repo', { id: 'r1', sessionName: 'named' }, async () => {
+  const found = await resolveAgentPr('/repo', { id: 'r1', branch: 'tf-named' }, async () => {
     asked++
     return { value: undefined, pending: false }
   })
@@ -783,10 +782,10 @@ test("a run implementing a ticket carries its issue as `(fix #42)` in the PR tit
   // The squash-merge subject inherits the title, so this is what closes the ticket's issue on
   // merge; without it an auto-merged quick-win leaves its ticket open.
   const gh: string[][] = []
-  const { git } = fakeGit({ ...READY, push: '' })
+  const { git } = fakeGit({ ...READY, 'rev-parse --verify --quiet refs/heads/tf-fix-login': 'abc123\n', push: '' })
   await agentAutoHandoff(
     '/repo',
-    { id: 'r1', branch: 'the-framework/x', sessionName: 'fix-login', fixes: '#42' },
+    { id: 'r1', branch: 'tf-fix-login', fixes: '#42' },
     { push: true, pr: true },
     {
       git,
@@ -803,7 +802,7 @@ test("a run implementing a ticket carries its issue as `(fix #42)` in the PR tit
 
 async function titleOf(agent: Parameters<typeof agentAutoHandoff>[1]): Promise<string | undefined> {
   const gh: string[][] = []
-  const { git } = fakeGit({ ...READY, push: '' })
+  const { git } = fakeGit({ ...READY, [`rev-parse --verify --quiet refs/heads/${agent.branch ?? 'the-framework/x'}`]: 'abc123\n', push: '' })
   await agentAutoHandoff('/repo', agent, { push: true, pr: true }, {
     git,
     pr: async () => undefined,
@@ -820,8 +819,7 @@ test("the PR is titled with the agent's own name for the work (#1618)", async ()
   // be, in a whole sentence, rather than the slug the session happens to be called.
   const title = await titleOf({
     id: 'r1',
-    branch: 'the-framework/x',
-    sessionName: 'queue-reader',
+    branch: 'tf-queue-reader',
     prTitle: 'Keep the queued state across a reload',
     fixes: '#42',
   })

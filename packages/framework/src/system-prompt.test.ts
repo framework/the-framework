@@ -12,7 +12,7 @@ import {
   SYSTEM_PROMPT_TEMPLATE,
 } from './system-prompt.js'
 import { FLAT_TODO_FILE } from './tickets.js'
-import { DATA_BRANCH_PROTOCOL, TICKETING_FORMAT, TODO_FORMAT } from './prompts.generated.js'
+import { BRANCH_MANAGEMENT_SKILL, DATA_BRANCH_PROTOCOL, TICKETING_FORMAT, TODO_FORMAT } from './prompts.generated.js'
 import { loadUserSystemPrompt, SYSTEM_PROMPT_FILE } from './system-prompt-file.js'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 
@@ -83,7 +83,6 @@ test('SYSTEM_PROMPT_TEMPLATE carries the built-in prompt sections (#326) verbati
     '### Ambiguous prompt',
     '### Scope',
     '## Before starting changes',
-    '### Workspace',
     '### Session name',
     '## Before applying changes',
     '### Alternatives',
@@ -104,7 +103,9 @@ test('SYSTEM_PROMPT_TEMPLATE carries the built-in prompt sections (#326) verbati
   // relative ones in its worktree, and finished `done` with a commit holding none of the work.
   // The worktree is nested inside the repo, so the user's tree is a path prefix of the agent's
   // cwd — nothing else in the prompt tells it where its workspace ends.
-  assert.ok(SYSTEM_PROMPT_TEMPLATE.includes('Your working directory is the whole of your workspace'))
+  // The workspace rules moved to the branch-management skill (#1725); the prompt keeps the step that names the session.
+  assert.ok(!SYSTEM_PROMPT_TEMPLATE.includes('Your working directory is the whole of your workspace'))
+  assert.ok(SYSTEM_PROMPT_TEMPLATE.includes('branch-management name <SESSION_NAME>'))
   assert.ok(SYSTEM_PROMPT_TEMPLATE.includes('${{tf.prompt}}'))
   // The whole block is the branch-free doc now: #326 moved the one `tf.params.autopilot`
   // ternary out with the maintenance section, so `tf.prompt` is the only fragment left.
@@ -161,7 +162,7 @@ test('the channel carries the ticket and backlog format specs, so a spec can be 
 })
 
 test('systemPromptBlock defaults to the knowledge-doc context line + the built-in #326 prompt', () => {
-  assert.equal(systemPromptBlock(), [CONTEXT_BLOCK, renderSystemPrompt().system].join('\n\n'))
+  assert.equal(systemPromptBlock(), [CONTEXT_BLOCK, renderSystemPrompt().system, BRANCH_MANAGEMENT_SKILL].join('\n\n'))
 })
 
 test('systemPromptBlock appends the user prompt after the built-in one', () => {
@@ -204,11 +205,11 @@ test('systemPromptBlock is the built-in system prompt (#326) and the user prompt
   // The knowledge docs (#537) join the Context line, which is paths, not prompt text.
   const block = systemPromptBlock({ user: 'Ship small PRs.', context: ['/work/api'] })
   const context = `Context: /work/api\n${KNOWLEDGE_LINES}`
-  assert.equal(block, [context, TICKETING_FORMAT, TODO_FORMAT, DATA_BRANCH_PROTOCOL, renderSystemPrompt().system, 'Ship small PRs.'].join('\n\n'))
+  assert.equal(block, [context, TICKETING_FORMAT, TODO_FORMAT, DATA_BRANCH_PROTOCOL, renderSystemPrompt().system, BRANCH_MANAGEMENT_SKILL, 'Ship small PRs.'].join('\n\n'))
 })
 
 test('systemPromptBlock ignores a whitespace-only user prompt', () => {
-  assert.equal(systemPromptBlock({ user: '   ' }), [CONTEXT_BLOCK, renderSystemPrompt().system].join('\n\n'))
+  assert.equal(systemPromptBlock({ user: '   ' }), [CONTEXT_BLOCK, renderSystemPrompt().system, BRANCH_MANAGEMENT_SKILL].join('\n\n'))
   assert.equal(systemPromptBlock({ vanilla: true, user: '  \n ' }), '')
 })
 
@@ -224,7 +225,7 @@ test('composeAgentSystem is exactly the built-in prompt block (#326) + both emit
   // the point: no persona, skill, or memory framing may ever be appended again. The #537
   // knowledge docs are in front of that, on the context (#439) line: paths, not prompt text.
   const system = composeAgentSystem()
-  assert.equal(system, [CONTEXT_BLOCK, renderSystemPrompt().system, AWAIT_PROTOCOL, SIGNAL_PROTOCOL].join('\n\n'))
+  assert.equal(system, [CONTEXT_BLOCK, renderSystemPrompt().system, BRANCH_MANAGEMENT_SKILL, AWAIT_PROTOCOL, SIGNAL_PROTOCOL].join('\n\n'))
 })
 
 test('composeAgentSystem appends nothing after the protocols, whatever the options (#547)', () => {
@@ -301,4 +302,30 @@ test('composeAgentSystem is empty under transparent mode — no prompt, no emit 
     composeAgentSystem({ transparent: true, vanilla: false, user: 'ignored', context: ['/work/api'] }),
     '',
   )
+})
+
+test('the branch-management skill rides after the built-in prompt, and vanilla drops it (#1725)', () => {
+  // The skill is the package's SKILL.md, front matter stripped: instructions, not catalogue metadata.
+  assert.ok(BRANCH_MANAGEMENT_SKILL.startsWith('# Branch management'), BRANCH_MANAGEMENT_SKILL.slice(0, 40))
+  assert.ok(BRANCH_MANAGEMENT_SKILL.includes('branch-management name <name>'))
+  assert.ok(BRANCH_MANAGEMENT_SKILL.includes('branch-management status'))
+  const block = systemPromptBlock({ user: 'Mine too.' })
+  const prompt = block.indexOf('### Session name')
+  const skill = block.indexOf(BRANCH_MANAGEMENT_SKILL)
+  assert.ok(prompt !== -1 && skill !== -1 && prompt < skill, 'the prompt names the session first, the skill says how')
+  assert.ok(skill < block.indexOf('Mine too.'), "the user's own prompt stays last")
+  // The prompt's session-name step is the command, not a branch the agent creates itself.
+  assert.ok(block.includes('branch-management name <SESSION_NAME>'))
+  assert.ok(!block.includes('git checkout'))
+  assert.ok(!block.includes('setSessionName'))
+  // Framework-authored, so `--vanilla` drops it: the on-before-mergeable follow-up must not rename
+  // the branch after a session of its own (#560).
+  const vanilla = systemPromptBlock({ vanilla: true, user: 'Only mine.' })
+  assert.ok(!vanilla.includes(BRANCH_MANAGEMENT_SKILL))
+  assert.ok(!vanilla.includes('branch-management'))  // Nor a hands-off agent: no daemon put the command on its PATH, the remote service names its
+  // branch, and the hands-off protocol tells it to open its own pull request.
+  const handsOff = composeAgentSystem({ handsOff: true })
+  assert.ok(!handsOff.includes(BRANCH_MANAGEMENT_SKILL))
+  assert.ok(handsOff.includes('The `branch-management` command is not here either'))
+  assert.ok(handsOff.includes('branch-management name <SESSION_NAME>'), 'the built-in prompt still names the session')
 })

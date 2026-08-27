@@ -166,7 +166,7 @@ test('formatFrameworkEvent renders every post-merge cleanup outcome, naming the 
   assert.match(skipped('not-ready-for-merge'), /skipped: the session never signalled ready-for-merge/)
   assert.match(skipped('run-stopped'), /skipped: the run was stopped/)
   assert.match(skipped('fake-run'), /skipped: this was a fake run/)
-  assert.match(skipped('no-session-name'), /skipped: the session never called setSessionName\(\)/)
+  assert.match(skipped('no-session-name'), /skipped: the session was never named/)
   assert.match(skipped('no-bin-path'), /skipped: the framework binary path is unknown/)
 })
 

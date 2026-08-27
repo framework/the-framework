@@ -1,5 +1,5 @@
 import { renderTemplate } from './prompt-template.js'
-import { DATA_BRANCH_PROTOCOL, SYSTEM_PROMPT, TICKETING_FORMAT, TODO_FORMAT } from './prompts.generated.js'
+import { BRANCH_MANAGEMENT_SKILL, DATA_BRANCH_PROTOCOL, SYSTEM_PROMPT, TICKETING_FORMAT, TODO_FORMAT } from './prompts.generated.js'
 import { AWAIT_PROTOCOL, BROWSER_PROTOCOL, HANDS_OFF_PROTOCOL, SIGNAL_PROTOCOL } from './turn-gate.js'
 
 // No Node imports here, deliberately. This module composes the prompt and the
@@ -39,9 +39,9 @@ export interface TfContext {
   /** The user's prompt (the session's intent, or the typed prompt): fills `${{tf.prompt}}`. */
   prompt: string
   /**
-   * The session name the agent set via setSessionName(), carried on session state. Only the
-   * on-before-mergeable prompt reads it, never the system prompt: it is set before the agent makes
-   * changes and read afterwards, so it is not chicken-and-egg.
+   * The session name, read off the agent's branch (#1725) once it named it. Only the
+   * on-before-mergeable prompt reads it, never the system prompt: the name exists before the agent
+   * makes changes and is read afterwards, so it is not chicken-and-egg.
    */
   session_name?: string | undefined
 }
@@ -226,7 +226,13 @@ export function systemPromptBlock(opts: SystemPromptOptions = {}): string {
     parts.push([head, ...bullets].join('\n'))
   }
   // The formats the two format-bearing bullets name, right under the list that names them (#1163).
-  if (includeBuiltin) parts.push(...CONTEXT_FORMATS, renderSystemPrompt(opts.tf).system)
+  // The branch-management skill (#1725) follows the built-in prompt, whose session-name step
+  // points at it: the agent's workspace, the `branch-management` command that names its branch,
+  // commit-as-you-go, and the clean tree it must leave. Framework-authored, so `--vanilla` drops it
+  // — which is what keeps the on-before-mergeable follow-up from naming a session of its own (#560).
+  // Not for a hands-off agent: it runs where no daemon put the command on its PATH, on a branch the
+  // remote service named, and the hands-off protocol tells it the opposite of "never push".
+  if (includeBuiltin) parts.push(...CONTEXT_FORMATS, renderSystemPrompt(opts.tf).system, ...(opts.handsOff ? [] : [BRANCH_MANAGEMENT_SKILL]))
   const user = opts.user?.trim()
   if (user) parts.push(user)
   return parts.join('\n\n')
@@ -246,7 +252,7 @@ export type AgentSystemOptions = SystemPromptOptions
  * first, then the emit protocols. Nothing else is appended — a build agent's system channel
  * is exactly this (#547), which is what lets the dashboard show the whole prompt before an agent
  * starts (#520). The protocols are otherwise unconditional — they are the *emit contract* (how
- * the agent signals an awaited choice and the setSessionName()/setReadyForMerge() lifecycle),
+ * the agent signals an awaited choice and the setReadyForMerge() lifecycle),
  * not prompt content — so the agent needs them even with the built-in prompt off (`--vanilla`).
  *
  * The one exception is transparent mode (#625): there is no framework behavior to signal to, so

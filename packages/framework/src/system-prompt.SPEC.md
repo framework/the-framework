@@ -33,7 +33,7 @@ The user types one prompt; the agent must analyze it before coding — an ambigu
 
 #### Business logic
 
-The built-in system prompt is a template whose text lives in the package's `prompts/system_prompt.md`. It carries the analyze-the-prompt flow, the workspace and session-name rules, the alternatives flow, and the after-changes steps, and it names `TODO_AGENTS.md` as where an unattended agent writes its backlog — derived from the same constant the queue promotion reads, so the two can never disagree. Rendering fills the template's one variable, the user's prompt, and splits the result at the user-prompt heading into a system half and a user half; the split happens on the template *before* the user's prompt is substituted, so a user prompt that itself contains the heading cannot move the boundary. Only the system half is injected into the system channel; delivering the user half is the caller's job.
+The built-in system prompt is a template whose text lives in the package's `prompts/system_prompt.md`. It carries the analyze-the-prompt flow, the session-name step, the alternatives flow, and the after-changes steps; the workspace rules are the branch-management skill's. The skill — the branch-management package's own `SKILL.md`, read from wherever that package is installed, its catalogue front matter dropped — is appended right after the built-in prompt, before the user's own system prompt, and is dropped with the built-in prompt under vanilla, since it is framework-authored and its session-name command is exactly what the vanilla follow-up must not run. A hands-off agent never gets it: no daemon put the command on its PATH, the remote service names its branch, and the hands-off protocol tells it to open its own pull request.
 
 ### The repo context and the formats that travel with it
 
@@ -65,7 +65,7 @@ By default the channel is the context block, the format specs, the built-in prom
 
 #### User story
 
-The dashboard's gates, the session name, and ready for merge must work even when the built-in prompt is off; an agent with a browser attached should actually use it; a hands-off agent must land its own work, and must decide instead of parking when nothing can answer it.
+The dashboard's gates and ready for merge must work even when the built-in prompt is off; an agent with a browser attached should actually use it; a hands-off agent must land its own work, and must decide instead of parking when nothing can answer it.
 
 #### Business logic
 

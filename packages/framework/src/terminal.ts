@@ -29,8 +29,6 @@ export function formatFrameworkEvent(event: FrameworkEvent): string {
       return `✗ ${event.headline}${event.detail ? `\n    ${event.detail.replace(/\n/g, '\n    ')}` : ''}`
     case 'view':
       return `▶ view: ${event.title}`
-    case 'session-name':
-      return `  session: ${event.name}`
     case 'ready-for-merge':
       return `✓ ready for merge`
     case 'open-pr':
@@ -143,7 +141,7 @@ function skipReason(reason: OnBeforeMergeableSkip): string {
     case 'fake-run':
       return 'this was a fake run'
     case 'no-session-name':
-      return 'the session never called setSessionName()'
+      return 'the session was never named'
     case 'no-bin-path':
       return 'the framework binary path is unknown'
   }

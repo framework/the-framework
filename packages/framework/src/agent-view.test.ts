@@ -5,18 +5,23 @@ import type { FrameworkEvent } from './events.js'
 
 test('agentProgress starts building with no name and flips to ready on setReadyForMerge (#326)', () => {
   assert.deepEqual(agentProgress([]), { readyForMerge: false })
-  const building: FrameworkEvent[] = [{ kind: 'session-name', name: 'add-comments' }]
+  // The birth branch is not a name (#1725): the agent is unnamed until it renames its branch.
+  assert.deepEqual(agentProgress([{ kind: 'branch', branch: 'tf-agent-r1' }]), { readyForMerge: false })
+  const building: FrameworkEvent[] = [{ kind: 'branch', branch: 'tf-add-comments' }]
   assert.deepEqual(agentProgress(building), { sessionName: 'add-comments', readyForMerge: false })
   const ready: FrameworkEvent[] = [...building, { kind: 'ready-for-merge' }]
   assert.deepEqual(agentProgress(ready), { sessionName: 'add-comments', readyForMerge: true })
 })
 
-test('agentProgress takes the latest session name when the agent renames it (#326)', () => {
+test('agentProgress reads the session name off the latest observed branch (#326/#1725)', () => {
   const events: FrameworkEvent[] = [
-    { kind: 'session-name', name: 'first-guess' },
-    { kind: 'session-name', name: 'better-name' },
+    { kind: 'branch', branch: 'tf-agent-r1' },
+    { kind: 'branch', branch: 'tf-first-guess' },
+    { kind: 'branch', branch: 'tf-better-name-2' },
   ]
-  assert.equal(agentProgress(events).sessionName, 'better-name')
+  assert.equal(agentProgress(events).sessionName, 'better-name-2')
+  // A branch The Framework did not mint carries no session name.
+  assert.equal(agentProgress([...events, { kind: 'branch', branch: 'feat/mine' }]).sessionName, undefined)
 })
 
 test('sessionInfo merges the opening session with the latest session-update link (#431)', () => {
@@ -107,7 +112,7 @@ test('agentErrors folds the errors the agent reported, oldest first (#1500)', ()
   assert.deepEqual(agentErrors([]), [])
   const events: FrameworkEvent[] = [
     { kind: 'error', headline: 'gh is not logged in', detail: 'ran `gh auth status`' },
-    { kind: 'session-name', name: 'update-tickets' },
+    { kind: 'branch', branch: 'tf-update-tickets' },
     { kind: 'error', headline: 'tickets/meta.json has no lastImportedAt' },
   ]
   assert.deepEqual(agentErrors(events), [

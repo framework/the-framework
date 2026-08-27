@@ -1,4 +1,5 @@
 import { readdir, readFile, writeFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -52,11 +53,19 @@ const entries = await Promise.all(
   }),
 )
 
+// The branch-management skill (#1725) rides in the system channel the way the prompts above do,
+// but its text is the package's, not this directory's: read from wherever the package is
+// installed, so the instructions and the command they name can never come from two versions.
+// The front matter is the skill catalogue's metadata, not instructions, and is dropped.
+const skillPath = createRequire(import.meta.url).resolve('@better-skills/branch-management/SKILL.md')
+const skill = (await readFile(skillPath, 'utf8')).replace(/^---\n[\s\S]*?\n---\n+/, '').replace(/\n$/, '')
+entries.push({ relPath: '@better-skills/branch-management/SKILL.md', name: 'BRANCH_MANAGEMENT_SKILL', text: skill })
+
 const body = entries
   // JSON.stringify, not a template literal: the prompts contain backticks and `${{ }}`
   // fragments, and hand-rolled escaping is exactly the kind of thing that silently corrupts
   // a prompt. Unreadable output is fine, nobody reads this file.
-  .map(e => `/** \`prompts/${e.relPath}\` */\nexport const ${e.name} = ${JSON.stringify(e.text)}\n`)
+  .map(e => `/** \`${e.relPath.startsWith('@') ? e.relPath : `prompts/${e.relPath}`}\` */\nexport const ${e.name} = ${JSON.stringify(e.text)}\n`)
   .join('\n')
 
 const out = `// Generated from prompts/**/*.md by scripts/gen-prompts.mjs. Do not edit.

@@ -76,7 +76,7 @@ The user reads a finished agent's work, and asks it to carry on rather than star
 
 #### Business logic
 
-A continuation reuses the agent's id, its checkout, its branch and its event log, so the dashboard keeps showing one agent rather than a second row. If the checkout was retained it is used as is; otherwise the agent's own branch — the one recorded on its archive, not a guess from its session name — is checked out fresh, and its archived history is restored into the checkout so the agent reopens its log instead of starting empty. When none of that is possible, the start falls back to a new agent.
+A continuation reuses the agent's id, its checkout, its branch and its event log, so the dashboard keeps showing one agent rather than a second row. If the checkout was retained it is used as is; otherwise the agent's own branch — the one recorded on its archive, since the agent renamed it itself — is checked out fresh, and its archived history is restored into the checkout so the agent reopens its log instead of starting empty. When none of that is possible, the start falls back to a new agent.
 
 The continuation inherits the project's resolved agent options, with anything the caller sent explicitly on top. A continuation start carries only its seed, so without this an agent whose first leg was armed to merge would resume with the merge silently disarmed and end in a draft pull request.
 

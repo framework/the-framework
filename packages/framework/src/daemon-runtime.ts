@@ -474,8 +474,8 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
         const existing = await stat(path).then(s => s.isDirectory()).catch(() => false)
         if (!existing) {
           const archived = (await listAgents(projectCwd).catch(() => [])).find(agent => agent.id === agentId)
-          // The recorded branch first (#1277): an agent that branched itself (#326 allows it) has
-          // its work there, and re-attaching by the session-name guess would continue the agent on a
+          // The recorded branch (#1277): the agent renamed its branch itself (#1725) and the archive
+          // says which name it got; re-attaching by the birth spelling would continue the agent on a
           // branch without its previous commits.
           const branch = agentBranchFor(archived ?? { id: agentId })
           await attachCheckout(projectCwd, { agentId, branch })

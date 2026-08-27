@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { hostname } from 'node:os'
 import type { AutoHandoffSkip, FrameworkEvent } from '../events.js'
 import { nodeFs } from '../node-fs.js'
-import { FRAMEWORK_DIR, BRANCHES_DIR, DATA_BRANCH, isSafeAgentId, worktreeDirEntries } from '@better-skills/branch-management'
+import { FRAMEWORK_DIR, BRANCHES_DIR, DATA_BRANCH, isSafeAgentId, worktreeDirEntries, sessionNameOf } from '@better-skills/branch-management'
 
 /**
  * Persisted orchestration state (#211). The dashboard is a pure projection of the
@@ -87,15 +87,15 @@ export interface AgentMeta {
   sessionId?: string
   /** The link shown to jump into the live agent session. */
   sessionLink?: string
-  /** The session name the agent chose (#326), also its `tf-<name>` branch. */
+  /** The session name (#326/#1725): the branch below minus its `tf-` prefix, once the agent named it. Folded with the branch, never signalled. */
   sessionName?: string
   /**
    * The branch the agent's work is on: folded from `branch` events as the agent observes it (#1277),
    * and corrected at teardown while the worktree still exists (#799).
    *
-   * Not reliably derivable instead of recorded: a clean agent loses its checkout, and the #326
-   * prompt lets the agent create its own branch, so neither `tf-<sessionName>` nor
-   * the run-id branch is guaranteed to be the one holding the commits.
+   * Not reliably derivable instead of recorded: a clean agent loses its checkout, and the agent
+   * renames its branch itself (#1725), so the run-id branch is not guaranteed to be the one
+   * holding the commits.
    */
   branch?: string
   /**
@@ -319,9 +319,6 @@ export function applyEventToMeta(meta: AgentMeta, event: FrameworkEvent, at: str
       next.sessionId = event.sessionId
       if (event.sessionLink) next.sessionLink = event.sessionLink
       break
-    case 'session-name':
-      next.sessionName = event.name
-      break
     case 'ready-for-merge':
       next.readyForMerge = true
       break
@@ -355,9 +352,13 @@ export function applyEventToMeta(meta: AgentMeta, event: FrameworkEvent, at: str
     case 'pull-request':
       next.pr = { number: event.number, url: event.url }
       break
-    case 'branch':
+    case 'branch': {
       next.branch = event.branch
+      const name = sessionNameOf(event.branch)
+      if (name) next.sessionName = name
+      else delete next.sessionName
       break
+    }
     case 'cloud-anchor':
       next.cloudAnchor = event.sha
       break

@@ -54,17 +54,17 @@ A handoff is empty when the branch carries no commit the base does not already h
 
 Every agent branch carries The Framework's own paper trail: the pre-work commit sweeps in the conversation record the daemon just wrote. Publishing that alone produced junk PRs of pure bookkeeping, so bookkeeping-only counts as nothing. Bookkeeping alongside real work does not make a branch empty.
 
-### Uncommitted leftovers are named, and committable
+### Uncommitted leftovers are named
 
 #### User story
 
-The agent is instructed to commit what it *found*, never what it *wrote* — so a settled agent can be holding its entire output as uncommitted changes in its checkout, with the branch itself empty.
+The agent is told to commit its work, but one that ends without doing so holds its entire output as uncommitted changes in its checkout, with the branch itself empty — and nothing commits it on the agent's behalf.
 
 #### Business logic
 
 When the caller names the agent's own checkout, the handoff read lists the files sitting uncommitted there, by path. It lists paths rather than a count because a no-commit branch must *name* what is waiting instead of offering an Open PR that GitHub can only refuse. The field is absent — not an empty list — when no checkout was given: "nobody asked" and "asked, tree clean" are different answers, and only the second may be rendered as a clean tree.
 
-A finishing action commits those leftovers, so what the agent did is what gets handed off. It is the same sweep the automatic handoff performs when the agent process exits, offered earlier — the finishing step appears as soon as the agent settles, which for an agent left open for another turn is much sooner than its exit. Two guards, because both failure modes end with the user's own work committed for them: the checkout must be the agent's own, never the project root (which is what checkout resolution falls back to once a worktree is gone), and it must be sitting on the agent's branch. Either guard failing, or nothing pending, quietly counts as "may proceed". The commit is idempotent — pressing the button twice never makes a second, empty commit.
+Those leftovers are only ever named, never committed by The Framework: the user commits them in the checkout, or deletes the checkout with them.
 
 ### The agent's branch and PR are recorded facts
 

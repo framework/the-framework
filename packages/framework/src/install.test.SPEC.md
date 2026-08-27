@@ -4,7 +4,7 @@ What the tests cover: activating a repository.
 - The quality presets are written out during activation, so a queued quality follow-up points at a document that really exists.
 - The seeded ignore file ignores everything transient under `.the-framework/` and un-ignores only itself and the layout marker — the lasting records live on the data branch, so nothing else is kept.
 - The layout marker is written and is tracked, which is what lets a build with a different layout refuse to run in the repository.
-- A repository with uncommitted work commits that work first, under its own message, and only then commits the activation.
+- A repository with uncommitted work keeps it uncommitted: only `.the-framework/` is added, and the one commit is the activation.
 - An already-activated repository is left completely untouched and reported as already activated.
 - A folder that is not a git repository is initialised first and reported as such, and still gets a single install commit.
 - A git failure anywhere in activation is reported as a failed outcome carrying the reason, never as a crash.

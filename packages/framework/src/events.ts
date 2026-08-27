@@ -72,11 +72,6 @@ export type AutoHandoffSkip =
   | 'branch-gone'
   /** The session committed nothing the base branch does not already have. */
   | 'no-commits'
-  /**
-   * The session's pending work could not be committed (#1376), so publishing would hand off a
-   * branch missing its last edits. The work stays in the checkout; teardown retries the commit.
-   */
-  | 'commit-failed'
   /** The repo has no remote to push to. */
   | 'no-remote'
   /** The branch already has a PR: opening a second one is the one mistake this must not make. */

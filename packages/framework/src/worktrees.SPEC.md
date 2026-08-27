@@ -58,11 +58,11 @@ The user reclaims disk space without ever wondering whether they just deleted th
 
 #### Business logic
 
-Reclaiming one checkout follows a single rule: the work is committed to the agent's branch, the branch is pushed, and the checkout comes off disk only once the remote has it. Uncommitted work is committed first, because removal forces past a dirty tree — without that commit, the very diff the checkout held is what gets deleted. Pushing is attempted as part of removal rather than demanded of the caller.
+Reclaiming one checkout follows a single rule: the checkout comes off disk only once the remote has everything it holds — its tree clean, its branch pushed. Nothing is committed on the agent's behalf: a checkout holding uncommitted work is kept, and says so, until a person commits or deletes it — removal forces past a dirty tree, so removing it would delete the very diff it held. Pushing is attempted as part of removal rather than demanded of the caller.
 
 The cases below where nothing is pushed do not bend that rule, they satisfy it early: each is a case where the remote provably holds everything the checkout does already, so there is nothing left to push.
 
-Any step that does not complete leaves the checkout in place and reports why: the work could not be committed, or the branch is not on the remote. A project with no remote configured therefore never gets past this, which is the honest answer — there is nowhere for the work to be recoverable from. A checkout sitting on no branch at all is also kept.
+Any step that does not complete leaves the checkout in place and reports why: the checkout holds uncommitted work, or the branch is not on the remote. A project with no remote configured therefore never gets past this, which is the honest answer — there is nowhere for the work to be recoverable from. A checkout sitting on no branch at all is also kept.
 
 Once removal is decided, the calling surface gets to do its own cleanup first — the dashboard stops any preview being served out of that tree — and then the checkout is removed and git's worktree bookkeeping is tidied up. Any branch that goes with it is deleted last, after the checkout is off disk, because git refuses to delete a branch a checkout still has out. Removing a checkout reports which branches went with it, if any, so no surface has to say "removed" without saying what was removed.
 

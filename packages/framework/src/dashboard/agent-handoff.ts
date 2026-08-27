@@ -17,7 +17,7 @@ import { parseNumstat } from './file-diff.js'
 import { parsePorcelain } from './file-status.js'
 import { errorMessage } from '../error-message.js'
 import type { AutoHandoffSkip, AutoMergeOutcome, MergeWithheldReason } from '../events.js'
-import { legacyAgentBranchName, AGENT_BRANCH_PREFIX, LEGACY_AGENT_BRANCH_PREFIX, commitPendingWork, currentBranch, repoHasRemote, startedAtFromAgentId, FRAMEWORK_DIR, type AgentMeta } from '../store/index.js'
+import { legacyAgentBranchName, AGENT_BRANCH_PREFIX, LEGACY_AGENT_BRANCH_PREFIX, currentBranch, repoHasRemote, startedAtFromAgentId, FRAMEWORK_DIR, type AgentMeta } from '../store/index.js'
 
 // What a finished session produced, and what is left to do with it (#799).
 //
@@ -83,8 +83,9 @@ export interface AgentHandoff {
   /**
    * The files the session changed and never committed, read from its own checkout (#1173).
    *
-   * The agent is instructed to commit what it *found*, never what it *wrote*, so a settled session
-   * can hold its whole output in an uncommitted tree. That work is not on the branch yet, so it is
+   * The agent is told to commit its work, but one that ended without doing so holds its whole
+   * output in an uncommitted tree, and nothing commits it on the agent's behalf (#1638). That work
+   * is not on the branch yet, so it is
    * not in {@link commits} and it does not make {@link empty} false. Paths rather than a count,
    * because a no-diff branch must *name* what is waiting instead of offering an Open PR that
    * GitHub can only refuse. Absent when the caller did not say which checkout the session worked
@@ -368,35 +369,6 @@ async function countPendingWork(git: GitRunner, checkout: string | undefined): P
   const status = await git(['status', '--porcelain'], checkout).catch(() => undefined)
   if (status === undefined) return {}
   return { pendingFiles: parsePorcelain(status).map(entry => entry.path) }
-}
-
-/**
- * Commit what a session left uncommitted, so what it did is what gets handed off (#1173).
- *
- * The automatic handoff commits the session's leftovers on the agent's way out, but that happens
- * when the agent process exits, and the finishing step is offered as soon as the agent settles
- * (#1178), which for a session left open for another turn is much earlier. Pressing the button is
- * the same instruction given by hand, so it sweeps the same leftovers into what it publishes. The
- * button only shows for a branch that already carries commits (#1173): a no-diff branch names its
- * uncommitted work instead of offering a step, so this never turns "nothing committed" into a PR
- * by itself.
- *
- * Two guards, because both failure modes end with the user's own work committed for them: the
- * checkout has to be the session's own (#453) rather than the project root that `resolveAgentCheckout`
- * falls back to once a worktree is gone, and it has to be sitting on the session's branch.
- *
- * Returns whether the handoff may go ahead: true when there was nothing to do, when the guards say
- * this is not ours to commit, or when the commit succeeded.
- */
-export async function commitAgentWork(
-  checkout: string,
-  projectCwd: string,
-  branch: string,
-  git: GitRunner = nodeGitRunner(),
-): Promise<boolean> {
-  if (checkout === projectCwd) return true
-  if ((await currentBranch(checkout, git)) !== branch) return true
-  return commitPendingWork(checkout, git)
 }
 
 /** The outcome of a handoff action, in the `{ ok }` shape the dashboard's `useAction` understands. */

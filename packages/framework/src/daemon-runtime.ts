@@ -593,10 +593,9 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
   /** The project half of a preview key from a checkout: the registry id every preview RPC keys by. */
   const projectKeyFor = (projectCwd: string): string => projectId(resolve(projectCwd))
   // Under the agent lock: a Push/Remove/Resume fired off a freshly-`done` meta lands in the daemon
-  // while this is mid-archive, and both sides commit in the same checkout. The loser used to
-  // report "could not commit the work this session left uncommitted" — or worse, this side lost
-  // and kept a worktree it should have removed. Serialized, whoever runs first commits the whole
-  // pending state (`add -A`) and the other side finds a clean tree and carries on.
+  // while this is mid-archive, and both sides push the same branch from the same checkout. The
+  // loser used to fail on the ref — or worse, this side lost and kept a worktree it should have
+  // removed. Serialized, whoever runs first pushes and the other side finds the remote has it.
   const tearDownWorktree = (projectCwd: string, worktree: string, agentId?: string): Promise<void> =>
     withAgentLock(worktree, async () => {
       try {
@@ -619,7 +618,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
         if (!archived.ok && !archived.committed)
           console.log(`[framework] could not archive session ${basename(worktree)}: ${archived.error}`)
         // One rule (E5): the checkout goes once its work is on the remote, whatever state the agent
-        // ended in. `removeProjectWorktree` owns the whole sequence — commit what is pending, push
+        // ended in. `removeProjectWorktree` owns the whole sequence — keep a dirty checkout, push
         // the branch, remove only if the remote has it — so teardown, the sweep and the dashboard's
         // Remove button are one behaviour. A push that cannot land keeps the checkout, and the
         // sweep retries it later. It used to keep a failed or stopped run's checkout "for

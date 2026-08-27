@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { readAgentHandoff, resolveAgentPr, mergeAgentPr, agentBranchFor, pushAgentBranch, openBranchPullRequest, openRemoteBranchPullRequest, openAgentPullRequest, gitReason, agentAutoHandoff, isAgentBranch, prBaseName, commitAgentWork, withheldMerge } from './agent-handoff.js'
+import { readAgentHandoff, resolveAgentPr, mergeAgentPr, agentBranchFor, pushAgentBranch, openBranchPullRequest, openRemoteBranchPullRequest, openAgentPullRequest, gitReason, agentAutoHandoff, isAgentBranch, prBaseName, withheldMerge } from './agent-handoff.js'
 import { pickAgentPr } from './gh.js'
 import { nodeGitRunner, GIT_SLOW_TIMEOUT_MS, type GitRunner } from '../project.js'
 import { CliTimeoutError, isCliTimeout } from '../cli-exec.js'
@@ -720,60 +720,6 @@ test('pending is absent, not zero, when no session checkout was given (#1173)', 
   // "Nobody asked" must not read as "asked, tree clean": only the second may be shown as a dead end.
   assert.equal(handoff?.pendingFiles, undefined)
   assert.ok(!calls.some(args => args[0] === 'status'), 'no checkout means no status read')
-})
-
-test('commitAgentWork leaves the project checkout and other branches alone (#1173)', async () => {
-  const onBranch = fakeGit({ 'rev-parse --abbrev-ref HEAD': 'main\n' })
-  // The checkout IS the project root: the dirt there is the user's, whatever branch it is on. This
-  // is what `resolveAgentCheckout` falls back to once a session's worktree is gone.
-  assert.equal(await commitAgentWork('/repo', '/repo', 'the-framework/x', onBranch.git), true)
-  assert.equal(onBranch.calls.length, 0, 'the project root should not even be inspected')
-
-  // Its own checkout, but parked on another branch: not this session's work to commit.
-  const elsewhere = fakeGit({ 'rev-parse --abbrev-ref HEAD': 'main\n' })
-  assert.equal(await commitAgentWork('/wt', '/repo', 'the-framework/x', elsewhere.git), true)
-  assert.ok(!elsewhere.calls.some(args => args[0] === 'commit'), 'nothing should be committed')
-})
-
-test('a real repo: the finishing step commits what the agent left in its worktree (#1173)', async () => {
-  // Rom's dead-end session, reproduced end to end: the agent edited a file, never committed, and
-  // the branch was 0 commits ahead, so `gh pr create` could only answer "No commits between main
-  // and the-framework/agent-r1".
-  const dir = await mkdtemp(join(tmpdir(), 'handoff-settle-'))
-  const git = nodeGitRunner()
-  const branch = 'the-framework/agent-r1'
-  try {
-    await exec('git', ['init', '-b', 'main', dir])
-    await exec('git', ['config', 'user.email', 'test@example.com'], { cwd: dir })
-    await exec('git', ['config', 'user.name', 'Test'], { cwd: dir })
-    await writeFile(join(dir, 'README.md'), 'base\n')
-    await exec('git', ['add', '-A'], { cwd: dir })
-    await exec('git', ['commit', '-m', 'base'], { cwd: dir })
-
-    // The session's own checkout, as #453 allocates it.
-    const checkout = join(dir, '.the-framework', 'worktrees', 'r1')
-    await exec('git', ['worktree', 'add', '-b', branch, checkout], { cwd: dir })
-    await writeFile(join(checkout, 'index.html'), '<h1>hi</h1>\n')
-
-    const before = await readAgentHandoff(dir, branch, { git, pr: async () => undefined, checkout })
-    assert.equal(before?.empty, true, 'the branch carries nothing yet')
-    assert.deepEqual(before?.pendingFiles, ['index.html'], 'and the work is sitting in the checkout, by name')
-
-    assert.equal(await commitAgentWork(checkout, dir, branch, git), true)
-
-    const after = await readAgentHandoff(dir, branch, { git, pr: async () => undefined, checkout })
-    assert.equal(after?.empty, false, 'the work is on the branch now, so a PR has something to say')
-    assert.deepEqual(after?.pendingFiles, [])
-    assert.deepEqual(after?.commits.map(c => c.subject), ['[The Framework] uncommitted changes'])
-    assert.deepEqual(after?.files.map(f => f.path), ['index.html'])
-
-    // Idempotent: pressing the button twice must not make an empty commit.
-    assert.equal(await commitAgentWork(checkout, dir, branch, git), true)
-    const again = await readAgentHandoff(dir, branch, { git, pr: async () => undefined, checkout })
-    assert.equal(again?.commits.length, 1)
-  } finally {
-    await rm(dir, { recursive: true, force: true })
-  }
 })
 
 test('pickAgentPr trusts an open PR, and otherwise only one created after the run started (#1251)', () => {

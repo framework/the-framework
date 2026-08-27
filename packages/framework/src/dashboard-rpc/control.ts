@@ -12,7 +12,7 @@ import { findAgent, isSafeAgentId, worktreePath, type AgentMeta } from '../store
 import { withAgentLock } from '../agent-locks.js'
 import { removeProjectWorktree, deleteProjectAgent } from '../worktrees.js'
 import { patchArchivedAgentOnDataBranch } from '../archived-agent-patch.js'
-import { commitAgentWork, mergeAgentPr, openAgentPullRequest, pushAgentBranch, agentBranchFor, type HandoffResult } from '../dashboard/agent-handoff.js'
+import { mergeAgentPr, openAgentPullRequest, pushAgentBranch, agentBranchFor, type HandoffResult } from '../dashboard/agent-handoff.js'
 import type { ChoiceBy } from '../events.js'
 import { isHandoffLevel, type HandoffLevel } from '../handoff-level.js'
 import type {
@@ -248,21 +248,12 @@ export async function sendPushBranch(projectId: string, agentId: string): Promis
     const target = await handoffTargetFor(projectId, agentId)
     if (!target) return { ok: false, error: 'unknown session' }
     const branch = agentBranchFor(target.agent)
-    // Commit *and* push under the agent lock: clicked the moment a session flips `done`, this used
-    // to commit against the checkout teardown was committing in and lose. Serialized, whichever
-    // side runs first commits everything pending; the other finds a clean tree — or no checkout
-    // at all, which commitAgentWork already reads as "the branch is authoritative".
-    //
-    // The push belongs inside the same hold, not just the commit. Teardown pushes the very same
-    // branch from inside this lock, so a push left outside it raced teardown's to create the ref
-    // and one of the two lost with `cannot lock ref … reference already exists` — which, when
-    // teardown was the loser, meant E5 kept the worktree rather than retiring it.
-    return withAgentLock(target.checkout, async () => {
-      if (!(await commitAgentWork(target.checkout, target.cwd, branch))) {
-        return { ok: false, error: 'could not commit the work this session left uncommitted' }
-      }
-      return pushAgentBranch(target.cwd, branch)
-    })
+    // Under the agent lock: teardown pushes the very same branch from inside this lock, so a push
+    // left outside it raced teardown's to create the ref and one of the two lost with `cannot lock
+    // ref … reference already exists` — which, when teardown was the loser, meant E5 kept the
+    // worktree rather than retiring it. What is pushed is the branch as the agent committed it
+    // (#1638): nothing is committed on its behalf first.
+    return withAgentLock(target.checkout, () => pushAgentBranch(target.cwd, branch))
   }, { ok: false, error: 'could not reach the device' })
 }
 
@@ -277,17 +268,9 @@ export async function sendOpenPullRequest(projectId: string, agentId: string): P
   return relayOr(agentId, 'sendOpenPullRequest', [projectId, agentId], async () => {
     const target = await handoffTargetFor(projectId, agentId)
     if (!target) return { ok: false, error: 'unknown session' }
-    // Same run lock as sendPushBranch, held across the same span and for the same reasons: the
-    // click-at-`done` commit race, and the push inside `openAgentPullRequest` racing teardown's.
-    const opened = await withAgentLock(target.checkout, async () => {
-      if (!(await commitAgentWork(target.checkout, target.cwd, agentBranchFor(target.agent)))) {
-        return undefined
-      }
-      return openAgentPullRequest(target.cwd, target.agent)
-    })
-    if (!opened) {
-      return { ok: false, error: 'could not commit the work this session left uncommitted' }
-    }
+    // Same run lock as sendPushBranch, for the same reason: the push inside `openAgentPullRequest`
+    // racing teardown's.
+    const opened = await withAgentLock(target.checkout, () => openAgentPullRequest(target.cwd, target.agent))
     // Record it on the agent (E6). The session's own process is gone by now, so there is no event
     // stream to carry the fact — but it is the same fact, and every surface reads it from the same
     // place either way rather than re-deriving it from branch names.

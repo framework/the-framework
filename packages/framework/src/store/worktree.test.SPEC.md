@@ -6,10 +6,10 @@ What the tests cover: the lifecycle of an agent's own checkout.
 - Removal tries a plain removal first and only forces when git calls the checkout unclean; removing a path that is already gone is harmless. Pruning is likewise tolerant of failure.
 - Re-attaching a continued agent recreates its branch from the current head when the branch is gone, and still refuses a branch git will not attach — one another checkout already has out.
 - A directory is judged a checkout root only when it is one: the project's main checkout and an agent's own both are, while a subdirectory of a checkout, a leftover `.the-framework/branches/` directory git no longer knows, and a directory in no repository at all are not. Asked plainly, that leftover directory reports the enclosing repository's branch — the bug — while the guarded read reports nothing for it and the real branch for a real checkout.
-- Committing what an agent left behind stages and commits it in the agent's own checkout, leaves a clean checkout untouched, retries past a transient failure to win the lock, and reports failure so the caller keeps the checkout rather than deleting uncommitted work.
+- Whether a checkout is clean is a read that commits nothing: a checkout with uncommitted work reads dirty, a clean one reads clean.
 - The branch currently checked out is reported, and a detached checkout or a non-repo reads as unknown.
 - The branch is renamed to the session name only while the checkout is still on its original branch; an agent that already made its own branch is left alone, and a rename that fails never brings the agent down.
-- Against a real repo: creating, listing and removing a checkout round-trips, and an agent's uncommitted edit survives teardown on the agent's branch after the checkout is gone.
+- Against a real repo: creating, listing and removing a checkout round-trips; an agent's uncommitted edit reads dirty and is never swept into a commit, and once the agent commits, the edit survives on the agent's branch after the checkout is gone.
 
 ## Before modifying/creating SPEC.md files
 

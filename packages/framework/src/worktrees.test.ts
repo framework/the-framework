@@ -37,16 +37,42 @@ async function repoWithDirtyWorktree(opts: { remote?: boolean } = {}): Promise<{
   return { repo, path, branch }
 }
 
-test('removing a retained worktree keeps the work it was holding, on the branch and the remote (#982/E5)', async () => {
+/** The agent commits its own work, as the system prompt tells it to (#1638). */
+async function commitWork(path: string): Promise<void> {
+  const git = nodeGitRunner()
+  await git(['config', 'user.email', 't@t'], path)
+  await git(['config', 'user.name', 't'], path)
+  await git(['add', '-A'], path)
+  await git(['commit', '-q', '-m', 'work'], path)
+}
+
+test('a checkout holding uncommitted work is kept, and says so — nothing is committed for the agent (#1638)', async () => {
   const { repo, path, branch } = await repoWithDirtyWorktree()
   const git = nodeGitRunner()
   try {
+    const result = await removeProjectWorktree(repo, RUN_ID)
+    assert.equal(result.ok, false)
+    assert.match(result.ok === false ? result.error : '', /uncommitted work/)
+    assert.equal((await stat(path)).isDirectory(), true, 'the checkout is still on disk')
+    assert.match(await readFile(join(path, 'index.html'), 'utf8'), /Welcome!/, 'with the work still in it, uncommitted')
+    assert.equal((await git(['log', '--format=%s', branch], repo)).trim(), 'init', 'no commit was grabbed')
+    await assert.rejects(() => git(['rev-parse', '--verify', `refs/remotes/origin/${branch}`], repo), 'and nothing reached the remote')
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})
+
+test('removing a retained worktree keeps the work its agent committed, on the branch and the remote (#982/E5)', async () => {
+  const { repo, path, branch } = await repoWithDirtyWorktree()
+  const git = nodeGitRunner()
+  try {
+    await commitWork(path)
     assert.deepEqual(await removeProjectWorktree(repo, RUN_ID), { ok: true })
     await assert.rejects(() => stat(path), 'the checkout is gone')
     assert.match(
       await git(['show', `${branch}:index.html`], repo),
       /Welcome!/,
-      'the uncommitted edit survived on the branch instead of being forced away',
+      'the committed edit survived on the branch instead of being forced away',
     )
     assert.match(
       await git(['show', `refs/remotes/origin/${branch}:index.html`], repo),
@@ -62,6 +88,7 @@ test('a worktree whose branch cannot reach the remote is kept, and says so (E5)'
   // No remote configured: nothing is recoverable, so nothing is deleted.
   const { repo, path } = await repoWithDirtyWorktree({ remote: false })
   try {
+    await commitWork(path)
     const result = await removeProjectWorktree(repo, RUN_ID)
     assert.equal(result.ok, false)
     assert.match(result.ok === false ? result.error : '', /not on the remote/)
@@ -178,8 +205,8 @@ test("a web run's checkout goes without pushing its empty run branch to origin (
 })
 
 test('a web run whose checkout holds more than the hand-off carried falls back to the ordinary rule (#1601)', async () => {
-  // The dirty tree is exactly the doubt the carve-out must not swallow: the ordinary rule
-  // commits and pushes, which is never worse than what every web run got before.
+  // The dirty tree is exactly the doubt the carve-out must not swallow: the ordinary rule keeps a
+  // dirty checkout (#1638), which is never worse than what every web run got before.
   const { repo, path, branch } = await repoWithDirtyWorktree()
   const git = nodeGitRunner()
   try {
@@ -190,12 +217,11 @@ test('a web run whose checkout holds more than the hand-off carried falls back t
       join(path, '.the-framework', 'agent.json'),
       JSON.stringify({ status: 'done', id: RUN_ID, startedAt: now, updatedAt: now, target: 'web', cloudAnchor: anchor }),
     )
-    assert.deepEqual(await removeProjectWorktree(repo, RUN_ID), { ok: true })
-    assert.match(
-      await git(['show', `refs/remotes/origin/${branch}:index.html`], repo),
-      /Welcome!/,
-      'the edit survived on the remote, exactly as a non-web run would have it',
-    )
+    const result = await removeProjectWorktree(repo, RUN_ID)
+    assert.equal(result.ok, false)
+    assert.match(result.ok === false ? result.error : '', /uncommitted work/)
+    assert.equal((await stat(path)).isDirectory(), true, 'the checkout is kept, exactly as a non-web run’s would be')
+    await assert.rejects(() => git(['rev-parse', '--verify', `refs/remotes/origin/${branch}`], repo), 'and nothing reached origin')
   } finally {
     await rm(repo, { recursive: true, force: true })
   }
@@ -377,26 +403,6 @@ test('a run-id branch carrying a commit the kept branch lacks stays (#1657)', as
     await git(['commit', '-q', '-m', 'later work elsewhere'], path)
     assert.deepEqual(await removeProjectWorktree(repo, RUN_ID), { ok: true })
     assert.match(await git(['show', `${runBranch}:index.html`], repo), /Welcome!/, 'the early commit is still on the run-id branch')
-  } finally {
-    await rm(repo, { recursive: true, force: true })
-  }
-})
-
-test('a worktree whose work cannot be committed is refused, not force-removed (#982)', async () => {
-  const { repo, path } = await repoWithDirtyWorktree()
-  try {
-    // A refusing pre-commit hook is the reproducible version of "no git identity": the commit
-    // fails, so the work only exists in the working tree and the checkout must survive.
-    const hooks = join(repo, 'hooks')
-    await mkdir(hooks, { recursive: true })
-    await writeFile(join(hooks, 'pre-commit'), '#!/bin/sh\nexit 1\n', { mode: 0o755 })
-    await nodeGitRunner()(['config', 'core.hooksPath', hooks], repo)
-
-    const result = await removeProjectWorktree(repo, RUN_ID)
-    assert.equal(result.ok, false, 'removal is refused rather than forced')
-    assert.match(result.ok === false ? result.error : '', /uncommitted work/)
-    assert.equal((await stat(path)).isDirectory(), true, 'the checkout is still on disk')
-    assert.match(await readFile(join(path, 'index.html'), 'utf8'), /Welcome!/, 'with the work still in it')
   } finally {
     await rm(repo, { recursive: true, force: true })
   }

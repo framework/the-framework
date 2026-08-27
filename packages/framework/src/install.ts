@@ -25,7 +25,7 @@ export interface InstallDeps {
 }
 
 /**
- * Activate the repo at `cwd`: commit any pre-existing dirty changes, create `.the-framework/` with
+ * Activate the repo at `cwd`: create `.the-framework/` with
  * its ignore file and layout marker (#1575), and commit the install. A repo whose ignore file is
  * already there is a no-op (`alreadyActivated`) — the ignore file is the activation marker.
  * Forgiving: any git/fs failure surfaces as `{ ok: false, error }`.
@@ -44,13 +44,6 @@ export async function installProject(cwd: string, deps: InstallDeps = {}): Promi
       .catch(() => false)
     if (!insideRepo) await git(['init'], cwd)
 
-    // Commit pre-existing changes first so the install commit is clean.
-    const status = await git(['status', '--porcelain'], cwd)
-    if (status.trim()) {
-      await git(['add', '-A'], cwd)
-      await git(['commit', '-m', '[The Framework] uncommitted changes'], cwd)
-    }
-
     await fs.mkdir(join(cwd, THE_FRAMEWORK_DIR))
     // Keep the transient agent state (events.jsonl / agent.json / agents/) out of git and the session
     // archive in it (#313/#1179). The early return above established the file is absent.
@@ -67,7 +60,9 @@ export async function installProject(cwd: string, deps: InstallDeps = {}): Promi
     // The ticket-format spec is NOT materialized (#674): it ships inside the package and the
     // #683 context fragment points at its node_modules path, so it versions with the package.
 
-    await git(['add', '-A'], cwd)
+    // Only The Framework's own directory (#1638): whatever the user has uncommitted stays theirs,
+    // uncommitted. Nothing is ever swept into a commit on their behalf.
+    await git(['add', THE_FRAMEWORK_DIR], cwd)
     await git(['commit', '-m', '[The Framework] install The Framework'], cwd)
     return insideRepo ? { ok: true } : { ok: true, initialized: true }
   } catch (err) {

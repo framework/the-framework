@@ -208,7 +208,7 @@ The user should get a pull request without asking for one, and should never get 
 
 When the armed rung reaches at least push, the finished agent publishes itself. It does not publish at all when it was stopped — stopping means the opposite of publishing what it happened to reach — nor when it is a fake agent, nor when the rung is below push; each of those is recorded with its reason.
 
-In its own checkout it first commits whatever the agent left uncommitted, and a failed commit is its own recorded skip rather than being ignored. It publishes against the branch as it stands at that moment, which is the renamed one, and a branch that has disappeared is a recorded skip.
+It publishes only what the agent committed — nothing is committed on the agent's behalf, and work left uncommitted stays in the checkout — against the branch as it stands at that moment, which is the renamed one, and a branch that has disappeared is a recorded skip.
 
 The merge rung is authorized rather than merely configured. Unless a human pressed Merge, merging additionally requires the agent's ready-for-merge signal and that the agent's own TODO file has no open entries — never the shared agent queue, which is decoupled from any one agent. A merge withheld this way is not a skipped handoff: the push and the pull request go ahead, the pull request opens as a draft for a human, and the withholding and its reason are recorded.
 

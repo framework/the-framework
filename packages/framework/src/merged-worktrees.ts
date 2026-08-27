@@ -56,7 +56,7 @@ export interface MergedSweepDeps {
 /**
  * Reclaim every retained worktree in `cwd` whose work can reach the remote (E5).
  *
- * The decision is entirely {@link removeProjectWorktree}'s — commit what is pending, push the
+ * The decision is entirely {@link removeProjectWorktree}'s — keep a dirty checkout, push the
  * branch, remove only once the remote has it — so the automatic path and the manual one (the
  * dashboard's Remove button) are one behaviour rather than two that can disagree. This adds the
  * loop, the one thing it must never touch (a live agent's checkout, where its agent is working), and

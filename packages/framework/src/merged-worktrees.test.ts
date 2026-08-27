@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { mkdtemp, realpath, rm, stat, writeFile } from 'node:fs/promises'
+import { readFile, mkdtemp, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { removeMergedWorktrees, startMergedWorktreeSweep, type MergedSweepResult } from './merged-worktrees.js'
 import { addWorktree, agentBranchName } from './store/index.js'
 import { nodeGitRunner } from './project.js'
@@ -272,21 +272,19 @@ test('a session with nowhere to push keeps its checkout (E5)', async () => {
   }
 })
 
-test('uncommitted work is committed and pushed before the checkout goes, never destroyed (#982/E5)', async () => {
+test('uncommitted work keeps its checkout: the sweep reports it and destroys nothing (#982/E5/#1638)', async () => {
   const { repo, path, branch } = await repoWithAgentWork()
   const git = nodeGitRunner()
   try {
     await writeFile(join(path, 'notes.txt'), 'something the agent had not committed\n')
 
     const result = await removeMergedWorktrees(repo)
-    assert.deepEqual(result.failed, [])
-    await assert.rejects(() => stat(path), 'the checkout is gone')
-    assert.match(await git(['show', `${branch}:notes.txt`], repo), /had not committed/, 'the stray work is on the branch')
-    assert.match(
-      await git(['show', `refs/remotes/origin/${branch}:notes.txt`], repo),
-      /had not committed/,
-      'and it reached the remote before anything was deleted',
-    )
+    assert.deepEqual(result.removed, [])
+    assert.equal(result.failed.length, 1)
+    assert.match(result.failed[0]?.error ?? '', /uncommitted work/)
+    assert.equal((await stat(path)).isDirectory(), true, 'the checkout is still on disk')
+    assert.match(await readFile(join(path, 'notes.txt'), 'utf8'), /had not committed/, 'with the stray work still in it, uncommitted')
+    await assert.rejects(() => git(['show', `${branch}:notes.txt`], repo), 'nothing was committed on the agent’s behalf')
   } finally {
     await rm(repo, { recursive: true, force: true })
   }

@@ -1,6 +1,6 @@
 import { QuotaPoller } from '../quota-poller.js'
 import { quotaBoundaryStatus, type QuotaBoundaryStatus } from '../quota-boundary.js'
-import { ClaudeCodeDriver, type DriverQuotaUnavailableReason, type DriverQuotaWindow } from '../driver/index.js'
+import { ClaudeCodeDriver, type DriverQuotaUnavailableReason, type DriverQuotaWindow } from 'agent-driver'
 import { readPreferences, type Preferences } from '../registry.js'
 import { DEFAULT_SPEND_OFFSET } from '../preference-defaults.js'
 

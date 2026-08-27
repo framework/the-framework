@@ -1,10 +1,9 @@
 import { randomUUID } from 'node:crypto'
-import { makeEmit } from './session-support.js'
 import { nodeGitRunner, type GitRunner } from '@better-skills/branch-management'
 import { errorMessage } from '../error-message.js'
 import { githubSlugFor } from '../dashboard/github.js'
 import { WEB_START_PREFIX } from '../dashboard/web-start-endpoints.js'
-import type { Driver, DriverEvent, DriverPromptOptions, DriverSession, DriverStartOptions, DriverTurn } from './types.js'
+import { makeEmit, type Driver, type DriverEvent, type DriverPromptOptions, type DriverSession, type DriverStartOptions, type DriverTurn } from 'agent-driver'
 
 /**
  * A {@link Driver} that hands the task to **Claude Code on the web** (#610): it has a cloud

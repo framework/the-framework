@@ -1,4 +1,4 @@
-import type { Driver, DriverSession } from './driver/index.js'
+import type { Driver, DriverSession } from 'agent-driver'
 import { composeAgentSystem, renderSystemPrompt, type TfContext } from './system-prompt.js'
 import { createAgentControls, emitSessionStart, endStopDetail } from './agent-telemetry.js'
 import { createTurnSignalEmitter } from './turn-gate.js'

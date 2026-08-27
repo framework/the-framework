@@ -1,6 +1,6 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { DriverSession } from './driver/index.js'
+import type { DriverSession } from 'agent-driver'
 import type { ChoicePick, ChoiceRequest, FrameworkEvent } from './events.js'
 import { requestChoices, runAwaitRounds } from './await-gate.js'
 import { FLAT_TODO_FILE, ticketFromQueueEntry } from './tickets.js'

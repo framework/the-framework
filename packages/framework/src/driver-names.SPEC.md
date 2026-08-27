@@ -3,7 +3,7 @@ The driver vocabulary: which coding-agent CLIs the user can pick, how each is na
 ## Business logic — TL;DR
 
 - **The drivers a user can pick** - Claude Code and Codex, in that order wherever a surface lists them; the labels shown in sentences and on buttons are "Claude Code" and "Codex".
-- **Driver versus implementation** - the driver is the user's choice of coding-agent CLI; the implementation recorded on an agent's `agent.json` is the concrete thing that ran it, and one driver has several because it can run in several places.
+- **Driver versus implementation** - the driver is the user's choice of coding-agent CLI; the implementation recorded on an agent's `agent.json` is the concrete thing that ran it, and one driver has several because it can run in several places. The set of implementation ids is the `agent-driver` package's; this module owns the choice and the mapping back to it.
 - **Every place Claude runs is still the `claude` driver** - the local CLI, the cloud session, and the GitHub Actions runner all collapse back to Claude Code; where the agent ran is its run target, not its driver.
 - **An unclaimed implementation has no driver** - a record written by the fake driver, or by a newer version of The Framework, maps to no driver at all rather than being guessed.
 

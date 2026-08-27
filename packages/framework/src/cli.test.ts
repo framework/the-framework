@@ -30,7 +30,7 @@ import {
 } from './cli.js'
 import { writeAgentSpec, type AgentSpec } from './agent-spec.js'
 import { createDriver } from './driver-cli.js'
-import { FakeDriver } from './driver/index.js'
+import { FakeDriver } from 'agent-driver'
 import type { FrameworkEvent } from './events.js'
 
 function capture(): { io: CliIO; out: string[]; err: string[] } {

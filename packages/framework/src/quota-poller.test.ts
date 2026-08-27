@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { DEFAULT_POLL_MS, MAX_POLL_MS, QuotaPoller } from './quota-poller.js'
-import type { DriverQuota } from './driver/index.js'
+import type { DriverQuota } from 'agent-driver'
 
 const T0 = 1_800_000_000_000
 

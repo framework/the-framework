@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { createDriverEventHandler, emitSessionStart } from './agent-telemetry.js'
-import type { Driver } from './driver/index.js'
+import type { Driver } from 'agent-driver'
 import type { FrameworkEvent } from './events.js'
 
 // #1322: the resume button needed a `session-update`, which only fired at `result` — a turn

@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { isHandsOff } from '../agent-location.js'
 import { CLOUD_PROMPT_SEPARATOR, CloudDriver, cloudHandOffPrompt, type ExtensionStart } from './cloud.js'
-import type { DriverEvent } from './types.js'
+import type { DriverEvent } from 'agent-driver'
 
 const SESSION = 'session_01ABCdefGHIjklMNO'
 const URL = `https://claude.ai/code/${SESSION}`

@@ -1,6 +1,7 @@
 import type { AgentLocation } from './agent-location.js'
 import { createDriver, type CreateDriverOptions } from './driver-cli.js'
-import { ActionsDriver, CloudDriver, type ActionsDriverOptions, type CloudDriverOptions, type Driver } from './driver/index.js'
+import { ActionsDriver, type ActionsDriverOptions, type Driver } from 'agent-driver'
+import { CloudDriver, type CloudDriverOptions } from './driver/cloud.js'
 
 /**
  * Build the {@link Driver} for an agent's *target* (#1050): where the turn runs, on top of the agent

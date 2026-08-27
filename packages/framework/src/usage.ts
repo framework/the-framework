@@ -1,4 +1,4 @@
-import type { DriverUsage } from './driver/index.js'
+import type { DriverUsage } from 'agent-driver'
 
 /**
  * Cumulative token + cost usage for an agent (#322). Extends {@link DriverUsage}

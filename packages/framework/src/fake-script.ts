@@ -1,4 +1,4 @@
-import { FakeDriver, type FakeTurn } from './driver/index.js'
+import { FakeDriver, type FakeTurn } from 'agent-driver'
 
 /**
  * The deterministic fake scenario: a small Vike + Prisma orders app.

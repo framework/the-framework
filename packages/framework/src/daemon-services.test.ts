@@ -10,7 +10,7 @@ import { projectErrorStore } from './project-errors.js'
 import { dataWorktreePath, withDataBranch } from './data-branch.js'
 import { pollerQuotaSource, type QuotaSource } from './dashboard/quota.js'
 import { QuotaPoller } from './quota-poller.js'
-import type { DriverQuotaWindow } from './driver/index.js'
+import type { DriverQuotaWindow } from 'agent-driver'
 import type { StartAgentOptions, StartAgentResult } from './dashboard/types.js'
 
 /**

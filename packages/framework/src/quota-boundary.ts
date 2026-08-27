@@ -16,7 +16,7 @@
  *   see {@link QuotaLimit}.
  */
 
-import type { DriverQuotaWindow } from './driver/index.js'
+import type { DriverQuotaWindow } from 'agent-driver'
 
 /** The quota week, in ms. */
 export const QUOTA_WEEK_MS = 7 * 24 * 60 * 60 * 1000

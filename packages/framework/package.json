@@ -19,7 +19,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/framework/the-framework",
+    "url": "git+https://github.com/framework/the-framework.git",
     "directory": "packages/framework"
   },
   "type": "module",
@@ -30,7 +30,7 @@
     "dist"
   ],
   "bin": {
-    "the-framework": "./dist/bin.js"
+    "the-framework": "dist/bin.js"
   },
   "scripts": {
     "build": "pnpm -C ../branch-management build && node scripts/gen-prompts.mjs && tsc -p tsconfig.build.json && cd dashboard && vite build",

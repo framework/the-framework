@@ -12,7 +12,7 @@ The package knows git and the filesystem, nothing else. It is the first skill of
 - **Reachable by branch name** (`branch-links`, `git-exclude`) - a symlink per current branch name beside the checkouts, and a `branches` shortcut at the repo root, hidden from git.
 - **Reclaiming a checkout** (`reclaim`) - the one rule: keep a dirty tree, push the branch when allowed, remove only once the remote has it, and delete a framework-minted branch that holds nothing.
 - **The command line** (`cli`, `bin/`) - the same operations as commands for a shell: JSON on stdout, a reason on stderr, an exit code that tells a refusal from a usage error; the executable's directory is exported (`bin-dir`) for a caller that spawns agents.
-- **The skill** (`SKILL.md`) - what the agent is told: it was started inside its own checkout and never edits the repository around it; it names its session with `branch-management name` before its first change and uses the name that command prints; it commits as it goes, since nothing is committed on its behalf; `branch-management status` must report a clean tree before it finishes; and it neither pushes nor opens the pull request itself — publishing is done for it. The Framework appends the skill to every agent's built-in system prompt; a skill catalogue may install it as `skills/branch-management.md`.
+- **The skill** (`SKILL.md`) - what the agent is told: its checkout is its whole workspace, it names its session with `branch-management name` before its first change and uses the name the command prints, it commits as it goes, leaves a clean tree, and never publishes itself. The Framework appends it to the built-in system prompt of every agent it starts in a checkout it created.
 
 ## Before modifying/creating SPEC.md files
 

@@ -27,7 +27,7 @@ function fakeGit(answers: Record<string, string>): { git: GitRunner; calls: stri
 
 const REPO = { 'rev-parse --git-dir': '.git' }
 
-test('the recorded branch wins; the birth spelling is the only fallback (#799/#1725)', () => {
+test('the recorded branch wins; the birth branch is the only fallback (#799/#1725)', () => {
   assert.equal(agentBranchFor({ id: 'r1', branch: 'feat/mine' }), 'feat/mine')
   assert.equal(agentBranchFor({ id: 'r1', branch: 'tf-named' }), 'tf-named')
   assert.equal(agentBranchFor({ id: 'r1' }), 'tf-agent-r1')
@@ -781,23 +781,7 @@ test('withheldMerge authorizes only a declared-done session with an empty sessio
 test("a run implementing a ticket carries its issue as `(fix #42)` in the PR title (#1334)", async () => {
   // The squash-merge subject inherits the title, so this is what closes the ticket's issue on
   // merge; without it an auto-merged quick-win leaves its ticket open.
-  const gh: string[][] = []
-  const { git } = fakeGit({ ...READY, 'rev-parse --verify --quiet refs/heads/tf-fix-login': 'abc123\n', push: '' })
-  await agentAutoHandoff(
-    '/repo',
-    { id: 'r1', branch: 'tf-fix-login', fixes: '#42' },
-    { push: true, pr: true },
-    {
-      git,
-      pr: async () => undefined,
-      gh: async args => {
-        gh.push(args)
-        return 'https://github.com/o/r/pull/9\n'
-      },
-    },
-  )
-  const title = gh[0]?.[gh[0].indexOf('--title') + 1]
-  assert.equal(title, 'fix-login (fix #42)')
+  assert.equal(await titleOf({ id: 'r1', branch: 'tf-fix-login', fixes: '#42' }), 'fix-login (fix #42)')
 })
 
 async function titleOf(agent: Parameters<typeof agentAutoHandoff>[1]): Promise<string | undefined> {

@@ -17,7 +17,7 @@ What the tests cover: how an agent's record is written, summarized, archived and
 - The handoff's report (done, skipped, failed) is recorded; a skip reason is recorded only for a skip and is cleared by any later handoff that published; the merge outcome is recorded when the handoff had a merge half.
 - An agent that threw is failed; one the user stopped is stopped, not failed.
 - Being parked on the user is tracked separately from the outcome: a parked agent is still running, the next driver turn un-parks it, and ending clears it.
-- The session name is read off each recorded branch — none for the birth spelling or a branch The Framework did not mint — and the ready-for-merge signal is recorded beside it; neither overwrites the other.
+- The branch is recorded as observed — the birth branch, then the agent's own rename — with no session name stored beside it, and the ready-for-merge signal is recorded without clobbering it.
 - The ticket an agent implements outlives the agent, so a finished agent still shows which ticket it was.
 - A gate opens on a choice and closes only on the matching resolution; ending clears it.
 - The pull request opened for the agent, and the branch its work is on, are recorded; a mid-flight rename replaces the branch; both survive the ending.

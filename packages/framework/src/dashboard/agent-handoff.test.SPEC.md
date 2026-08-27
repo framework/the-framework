@@ -1,6 +1,6 @@
 What the tests cover: reading a finished agent's work off its agent branch, and publishing that work as a push, a pull request and a merge.
 
-- **Which branch is read** - the branch recorded on the agent wins, and the birth spelling from its agent id is the only fallback; a branch is recognised as an agent branch by its prefix, and a hand-made branch is not.
+- **Which branch is read** - the branch recorded on the agent wins, and the birth branch from its agent id is the only fallback; a branch is recognised as an agent branch by its prefix, and a hand-made branch is not.
 - **What the branch report says** - a missing branch reports "does not exist" instead of failing; a branch whose work is already in the base, or that only carries The Framework's own bookkeeping files, is reported as empty; a branch with real work reports its commits, the changed files (binary files listed without line counts), the added and removed line counts, and the base it is compared against; a branch already merged into its base says so.
 - **Uncommitted work** - when the agent's checkout is known, the files the agent left uncommitted are listed by name alongside an empty branch, so the dashboard can name them instead of offering an action that could only fail; when no checkout is known, "nobody asked" is reported rather than "asked, tree clean".
 - **Push and remote** - a repo with no remote is distinguished from a branch that merely has not been pushed.

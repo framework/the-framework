@@ -69,14 +69,23 @@ export function isRunBranch(name: string): boolean {
 }
 
 /**
+ * Whether a branch is a run branch carrying a session name: `tf-<session name>`, as opposed to
+ * the birth branch `tf-agent-<agent id>` (a checkout directory's spelling), the data branch, or
+ * a branch The Framework did not mint. The one predicate behind both naming a branch — a name
+ * that would not produce one of these is reserved — and reading the name back.
+ */
+export function isNamedRunBranch(branch: string): boolean {
+  return isRunBranch(branch) && !isWorktreeDirName(branch)
+}
+
+/**
  * The session name a branch carries (#1725): `tf-<session name>` minus the prefix. The name is
  * read off the branch and never recorded beside it — a checkout has one branch, and that branch
- * is the name. Undefined while the agent has not named its session (the birth spelling
- * `tf-agent-<agent id>` is not a name) and for every branch The Framework did not mint.
+ * is the name. Undefined while the agent has not named its session (the birth branch is not a
+ * name) and for every branch The Framework did not mint.
  */
 export function sessionNameOf(branch: string | undefined): string | undefined {
-  if (!branch || !isRunBranch(branch) || isWorktreeDirName(branch)) return undefined
-  return branch.slice(AGENT_BRANCH_PREFIX.length)
+  return branch && isNamedRunBranch(branch) ? branch.slice(AGENT_BRANCH_PREFIX.length) : undefined
 }
 
 /**

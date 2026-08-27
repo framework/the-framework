@@ -15,7 +15,7 @@ The protocols appended to every agent's system channel: how an agent signals to 
 - **Awaiting** - one block shape for every question an agent stops to ask, including handing a stuck browser to a human, plus a non-blocking way to show a document.
 - **Signalling** - the non-blocking blocks: ready for merge, the pull request to open, and an error only the user can fix.
 - **Browser** - added only when this agent has a real browser, telling it so and when to prefer the browser over plain page fetching.
-- **Hands-off** - added to every agent handed somewhere nothing local can steer, requiring it to branch with git itself (the branch-management command is not there) and land everything as a pull request.
+- **Hands-off** - added to every agent handed somewhere nothing local can steer, requiring it to land everything as a pull request.
 - **Order is fixed** - the browser section comes first, then awaiting, then hands-off, and signalling stays last.
 
 ## Business logic

@@ -53,7 +53,7 @@ export type OnBeforeMergeableSkip =
   | 'run-stopped'
   /** A fake/offline run: no agent to hand the follow-up prompt to. */
   | 'fake-run'
-  /** The agent never named its session — its branch is still the birth spelling — and every line of the prompt names the session. */
+  /** The agent never named its session — its branch is still the birth branch — and every line of the prompt names the session. */
   | 'no-session-name'
   /** `process.argv[1]` was empty, so there is no binary to spawn the follow-up with. */
   | 'no-bin-path'

@@ -37,7 +37,7 @@ A user opens the dashboard in the middle of an agent's work, or comes back to a 
 
 Each of these becomes an event the moment it becomes true, and is folded into the agent's `agent.json`:
 
-- The **branch** the agent's work is on, observed off the checkout: announced at start with the branch the agent actually begins on, and again whenever a later read — after a settled turn, and before the ending — finds it changed, which is how the agent's own `branch-management name` reaches the record. The session name is that branch minus its `tf-` prefix; the birth spelling `tf-agent-<agent id>` is no name.
+- The **branch** the agent's work is on, observed off the checkout: announced at start with the branch the agent actually begins on, and again whenever a later read — at the end of every turn, and before the ending — finds it changed, which is how the agent's own `branch-management name` reaches the record. The session name is that branch minus its `tf-` prefix; the birth branch `tf-agent-<agent id>` is no name.
 - The **ticket** the agent was started to implement, as a repo-relative `tickets/<file>.md` path — only when The Framework itself chose the ticket, which today means an agent drained from the agent queue. Its absence means nobody knows what this agent is implementing, which is the case for every hand-written prompt.
 - The **pull request** the work is on, the moment one is opened for it.
 - The **hand-off anchor** a `web`-target agent pushed for its cloud session to start from: an empty commit unique to this agent, so that the `claude/*` branch the cloud session actually picks is recognisable later by plain ancestry. The daemon's adoption pass matches it against the remote's `claude/*` heads.

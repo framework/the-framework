@@ -15,7 +15,7 @@ You were started inside your own checkout of the repository: a git worktree at `
 
 ## Name the session
 
-Before your first change, pick a name for the session — `[a-z0-9-]+`, saying succinctly what the work is — and run:
+Before your first change, pick a name for the session — `[a-z0-9-]+`, not starting with `agent-` (that spelling is the framework's own), saying succinctly what the work is — and run:
 
 ```
 branch-management name <name>

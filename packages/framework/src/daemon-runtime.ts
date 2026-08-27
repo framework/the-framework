@@ -475,7 +475,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
         if (!existing) {
           const archived = (await listAgents(projectCwd).catch(() => [])).find(agent => agent.id === agentId)
           // The recorded branch (#1277): the agent renamed its branch itself (#1725) and the archive
-          // says which name it got; re-attaching by the birth spelling would continue the agent on a
+          // says which name it got; re-attaching by the birth branch would continue the agent on a
           // branch without its previous commits.
           const branch = agentBranchFor(archived ?? { id: agentId })
           await attachCheckout(projectCwd, { agentId, branch })

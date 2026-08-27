@@ -119,8 +119,8 @@ export interface AgentHandoffDeps {
  * The branch an agent's work is on.
  *
  * What was recorded while the worktree existed (#799/#1277): the agent renames its branch itself
- * (#1725), so anything but the record is a guess. The birth spelling stays as the one fallback,
- * for an agent whose branch was never observed — one started outside a git checkout.
+ * (#1725), so anything but the record is a guess. The birth branch stays as the one fallback, for
+ * an archive that never recorded a branch.
  */
 export function agentBranchFor(agent: { id: string; branch?: string }): string {
   return agent.branch ?? agentBranchName(agent.id)

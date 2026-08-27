@@ -670,7 +670,7 @@ test('an unreachable npm registry costs the footer nothing (#312)', async () => 
   assert.ok(!out.some(l => l.includes('Up to date') || l.includes('Update available')))
 })
 
-test('the journal reads the branch off the checkout, and sees the agent\'s own rename once a turn settles (#1277/#1725)', async t => {
+test('the journal reads the branch off the checkout, and sees the agent\'s own rename at the end of a turn (#1277/#1725)', async t => {
   const { execFileSync } = await import('node:child_process')
   const repo = await mkdtemp(join(tmpdir(), 'fw-journal-'))
   t.after(() => rm(repo, { recursive: true, force: true }))
@@ -690,19 +690,26 @@ test('the journal reads the branch off the checkout, and sees the agent\'s own r
   // this rename — and the journal only learns of it by looking again.
   git('branch', '-m', 'tf-agent-r1', 'tf-cool-name')
   assert.equal(journal.sessionName(), undefined, 'nothing is recorded until the branch is read again')
-  journal.onEvent({ kind: 'settled' })
+  journal.onEvent({ kind: 'driver', event: { type: 'result', text: 'named it' } })
   for (let i = 0; i < 200 && !out.some(line => line.includes('branch: tf-cool-name')); i++) {
     await new Promise(res => setTimeout(res, 10))
   }
   assert.ok(
     out.some(line => line.includes('branch: tf-cool-name')),
-    `expected a branch event after the settled turn, got: ${out.join('; ')}`,
+    `expected a branch event after the turn, got: ${out.join('; ')}`,
   )
   assert.equal(journal.branch(), 'tf-cool-name')
   assert.equal(journal.sessionName(), 'cool-name')
   // The same branch read again is one fact, not a second event.
   await journal.observeBranch()
   assert.equal(out.filter(line => line.includes('branch: tf-cool-name')).length, 1)
+  // A checkout that left its branch (a detached HEAD) is remembered as having none: the epilogue
+  // must not publish the last name it saw.
+  git('checkout', '-q', '--detach')
+  await journal.observeBranch()
+  assert.equal(journal.branch(), undefined)
+  assert.equal(journal.sessionName(), undefined)
+  assert.equal(out.filter(line => line.includes('branch: ')).length, 2, 'a lost branch is no event')
 })
 
 test('a browser URL is held until the session opens, then re-said after every later session (#1455 item 6b)', () => {

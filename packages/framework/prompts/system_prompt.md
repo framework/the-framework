@@ -27,7 +27,7 @@ Do the following before applying your first change.
 ### Session name
 
 1. Create a <SESSION_NAME> as a string [a-z0-9-]+ that succinctly represents the intention of the user prompt
-2. Run `$ branch-management name <SESSION_NAME>` — it renames your branch to `tf-<SESSION_NAME>` and prints the name the branch got; if that differs, it is your <SESSION_NAME> from now on. See "Branch management" below: your workspace, committing as you go, and what must hold before you finish
+2. Name your branch after it, as the "Branch management" section below says — and if the name you end up with differs, that is your <SESSION_NAME> from now on
 
 
 ## Before applying changes

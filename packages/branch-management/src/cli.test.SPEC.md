@@ -12,6 +12,11 @@ What the tests cover: every command of the command line against real git, and th
 - **Usage** - no command, an unknown command, a missing or extra argument, an unknown option: the usage on stderr, no JSON, exit code 2.
 - **A git failure** - reported with git's own line, exit code 1.
 - **The executable** - runs by name from the exported bin directory: JSON on stdout, the reason on stderr, the exit codes 0, 1 and 2.
+- **Naming again** - asking again for the name the checkout already carries changes nothing, whether it got the plain name or a suffixed one, and whether or not its own branch has been pushed.
+- **Reserved names** - `data` and any `agent-…` name are refused, the branch stays, and no phantom checkout appears in the listing.
+- **The project from its layout** - a project that is itself a linked worktree gets its checkouts under its own directory, lists them from inside one of them, and its links follow a rename; the main checkout it was made from sees none of them.
+- **Before the project is looked for** - a bad id is refused even outside a repository; `status <path>` on a directory outside a repository answers "not a checkout"; `attach` outside a repository is refused as such.
+- **Not commands** - names of built-in object properties are not commands.
 
 ## Before modifying/creating SPEC.md files
 

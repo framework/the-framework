@@ -150,17 +150,6 @@ export async function isGitRepo(cwd: string, agent: GitRunner = nodeGitRunner())
     .catch(() => false)
 }
 
-/**
- * The main checkout's path for whatever repo `cwd` is in — the same answer from the main checkout
- * and from any linked worktree, which is what a command run inside an agent's checkout needs to
- * act on the project. Git's common dir is `<main checkout>/.git`, whichever worktree asks.
- * Rejects outside a repo.
- */
-export async function repoRoot(cwd: string, agent: GitRunner = nodeGitRunner()): Promise<string> {
-  const { dirname } = await import('node:path')
-  return dirname((await agent(['rev-parse', '--path-format=absolute', '--git-common-dir'], cwd)).trim())
-}
-
 /** The root of the checkout `cwd` is in — an agent's own, from anywhere under it. Rejects outside a repo. */
 export async function checkoutRoot(cwd: string, agent: GitRunner = nodeGitRunner()): Promise<string> {
   return (await agent(['rev-parse', '--show-toplevel'], cwd)).trim()

@@ -39,7 +39,6 @@ const BUDGETS: { args: string[]; ms: number }[] = [
   { args: ['branch', 'tf-data', 'abc123'], ms: GIT_WRITE_TIMEOUT_MS },
   { args: ['show-ref', '--verify', '--quiet', 'refs/heads/tf-x'], ms: GIT_READ_TIMEOUT_MS },
   { args: ['for-each-ref', '--format=%(refname)', 'refs/heads/', 'refs/remotes/'], ms: GIT_READ_TIMEOUT_MS },
-  { args: ['rev-parse', '--path-format=absolute', '--git-common-dir'], ms: GIT_READ_TIMEOUT_MS },
   { args: ['worktree', 'list', '--porcelain'], ms: GIT_READ_TIMEOUT_MS },
 ]
 

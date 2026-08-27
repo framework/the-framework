@@ -1,15 +1,14 @@
 import { parseArgs } from 'node:util'
 import { resolve } from 'node:path'
 import { stat } from 'node:fs/promises'
-import { nodeGitRunner, checkoutRoot, repoRoot, gitReason, type GitRunner } from './git.js'
+import { nodeGitRunner, checkoutRoot, gitReason, type GitRunner } from './git.js'
 import { agentBranchName, isSafeAgentId } from './branch-names.js'
 import {
-  addWorktree,
-  attachWorktree,
   branchPushed,
   currentBranch,
   isWorktreeRoot,
   nameBranch,
+  projectRoot,
   type NameBranchRefusal,
   worktreeBranch,
   worktreeClean,
@@ -17,9 +16,9 @@ import {
   worktreePath,
   worktreeSize,
 } from './worktree.js'
-import { linkDependencies } from './worktree-deps.js'
+import { createCheckout, attachCheckout } from './checkout.js'
 import { reconcileBranchLinks } from './branch-links.js'
-import { reclaimWorktree, type ReclaimOutcome } from './reclaim.js'
+import { reclaimWorktree, type ReclaimOutcome, type ReclaimRefusal } from './reclaim.js'
 
 /**
  * The command line over the package (#1725): the same functions the daemon calls, for an agent
@@ -31,10 +30,11 @@ import { reclaimWorktree, type ReclaimOutcome } from './reclaim.js'
  * reported on stdout as `{ ok: false, reason }` so a caller parsing the output learns why, and
  * on stderr so a person does.
  *
- * Where the project is comes from the working directory: the main checkout for every command
- * that acts on the project (`create`, `attach`, `list`, `remove`, `prune`), found through git's
- * common dir, so the same command works from inside an agent's checkout; the enclosing checkout
- * for the commands that act on one (`name`, `status`).
+ * Where the project is comes from the working directory: for every command that acts on the
+ * project (`create`, `attach`, `list`, `remove`, `prune`) it is the checkout whose
+ * `.the-framework/branches/` the working directory is under, else the checkout itself — so the
+ * same command works from inside an agent's checkout; the commands that act on one checkout
+ * (`name`, `status`) act on the one the working directory is in.
  */
 
 export const USAGE = `usage: branch-management <command>
@@ -72,7 +72,7 @@ class Usage extends Error {}
 /** Run the CLI: `argv` is everything after the program name. Resolves to the exit code. */
 export async function runCli(argv: string[], io: CliIo, git: GitRunner = nodeGitRunner()): Promise<number> {
   const [command, ...rest] = argv
-  const run = command ? COMMANDS[command] : undefined
+  const run = command && Object.hasOwn(COMMANDS, command) ? COMMANDS[command] : undefined
   if (!run) {
     io.stderr(USAGE)
     return 2
@@ -104,18 +104,14 @@ const COMMANDS: Record<string, Command> = {
     const { positionals, values } = parse(args, { base: { type: 'string' } }, 1)
     const agentId = agentIdArg(positionals[0]!)
     const repo = await project(cwd, git)
-    const worktree = await addWorktree(repo, { agentId, branch: agentBranchName(agentId), ...(values.base ? { base: values.base } : {}) }, git)
-    await afterCheckout(repo, worktree.path, git)
-    return { ok: true, ...worktree }
+    return { ok: true, ...(await createCheckout(repo, { agentId, ...(values.base ? { base: values.base } : {}) }, git)) }
   },
 
   async attach(args, cwd, git) {
     const { positionals } = parse(args, {}, 2)
     const [agentId, branch] = [agentIdArg(positionals[0]!), positionals[1]!]
     const repo = await project(cwd, git)
-    const worktree = await attachWorktree(repo, { agentId, branch }, git)
-    await afterCheckout(repo, worktree.path, git)
-    return { ok: true, ...worktree }
+    return { ok: true, ...(await attachCheckout(repo, { agentId, branch }, git)) }
   },
 
   async name(args, cwd, git) {
@@ -125,7 +121,7 @@ const COMMANDS: Record<string, Command> = {
     const outcome = await nameBranch(checkout, name, git)
     if (!outcome.ok) throw new Refused(outcome, NAME_REFUSALS[outcome.reason](name, checkout))
     // The `branches/<name>` link follows the rename now, not at the daemon's next pass.
-    await reconcileBranchLinks(await repoRoot(checkout, git), { git })
+    await reconcileBranchLinks(await projectRoot(checkout, git), { git })
     return outcome
   },
 
@@ -135,7 +131,7 @@ const COMMANDS: Record<string, Command> = {
     if (!(await isWorktreeRoot(path, git))) throw new Refused({ ok: false, reason: 'not-a-worktree', path }, `${path} is not a git worktree`)
     const branch = await currentBranch(path, git)
     const clean = await worktreeClean(path, git)
-    const onRemote = branch ? await branchPushed(await repoRoot(path, git), branch, git) : false
+    const onRemote = branch ? await branchPushed(await projectRoot(path, git), branch, git) : false
     return { ok: true, path, ...(branch ? { branch } : {}), clean, onRemote }
   },
 
@@ -153,10 +149,12 @@ const COMMANDS: Record<string, Command> = {
 
   async remove(args, cwd, git) {
     const { positionals, values } = parse(args, { 'no-push': { type: 'boolean' } }, 1)
-    const agentId = positionals[0]!
+    const agentId = agentIdArg(positionals[0]!)
     const repo = await project(cwd, git)
     const outcome = await reclaim(repo, agentId, !values['no-push'], git)
     if (!outcome.ok) throw new Refused(outcome, refusalLine(agentId, outcome))
+    // A link named after a branch that just went with its checkout is stale from this moment.
+    await reconcileBranchLinks(repo, { git })
     return outcome
   },
 
@@ -170,26 +168,26 @@ const COMMANDS: Record<string, Command> = {
       if (outcome.ok) removed.push(agentId)
       else skipped.push({ agentId, reason: outcome.reason, detail: refusalLine(agentId, outcome) })
     }
+    // Once for the whole pass: a reconcile reads every checkout that is left.
+    if (removed.length) await reconcileBranchLinks(repo, { git })
     return { ok: true, removed, skipped }
   },
 }
 
+/** A refusal `remove` and `prune` can add to the reclaim rule's own: there is no such checkout. */
+type RemoveRefusal = { ok: false; reason: 'no-checkout'; agentId: string }
+
 /** One agent's checkout under the reclaim rule; a missing checkout is its own refusal. */
-async function reclaim(repo: string, agentId: string, mayPush: boolean, git: GitRunner): Promise<ReclaimOutcome | CliRefusal> {
-  if (!isSafeAgentId(agentId)) return { ok: false, reason: 'invalid-id', agentId }
+async function reclaim(repo: string, agentId: string, mayPush: boolean, git: GitRunner): Promise<ReclaimOutcome | RemoveRefusal> {
   const path = worktreePath(repo, agentId)
   if (!(await stat(path).then(s => s.isDirectory(), () => false))) return { ok: false, reason: 'no-checkout', agentId }
-  const outcome = await reclaimWorktree(repo, path, { birthBranch: agentBranchName(agentId), mayPush, git })
-  // A link named after a branch that just went with its checkout is stale from this moment.
-  if (outcome.ok) await reconcileBranchLinks(repo, { git })
-  return outcome
+  return reclaimWorktree(repo, path, { birthBranch: agentBranchName(agentId), mayPush, git })
 }
 
 /** Why a checkout stayed, as one line for a person. */
-function refusalLine(agentId: string, outcome: (ReclaimOutcome & { ok: false }) | CliRefusal): string {
-  switch (outcome.reason) {
-    case 'invalid-id':
-      return `${agentId} is not an agent id`
+function refusalLine(agentId: string, outcome: (ReclaimOutcome & { ok: false }) | RemoveRefusal): string {
+  const reason: ReclaimRefusal | 'no-checkout' = outcome.reason
+  switch (reason) {
     case 'no-checkout':
       return `no checkout for agent ${agentId}`
     case 'not-a-worktree':
@@ -197,16 +195,18 @@ function refusalLine(agentId: string, outcome: (ReclaimOutcome & { ok: false }) 
     case 'no-branch':
       return `agent ${agentId}'s checkout is on no branch; kept`
     case 'dirty':
-      return `${String(outcome['branch'])} has uncommitted work; the checkout was kept`
+      return `${branchOf(outcome)} has uncommitted work; the checkout was kept`
     case 'not-on-remote':
-      return `${String(outcome['branch'])} is not on the remote (${String(outcome['detail'] ?? 'not pushed')}); the checkout was kept`
-    default:
-      return `agent ${agentId}'s checkout was kept: ${outcome.reason}`
+      return `${branchOf(outcome)} is not on the remote (${detailOf(outcome) ?? 'not pushed'}); the checkout was kept`
   }
 }
 
+const branchOf = (outcome: object): string => String((outcome as { branch?: string }).branch)
+const detailOf = (outcome: object): string | undefined => (outcome as { detail?: string }).detail
+
 const NAME_REFUSALS: Record<NameBranchRefusal, (name: string, checkout: string) => string> = {
   'invalid-name': name => `${name} is not a session name: use [a-z0-9-]+`,
+  'reserved-name': name => `${name} is The Framework's own: not "data", and not "agent-…"`,
   'not-a-worktree': (_, checkout) => `${checkout} is not a git worktree`,
   'no-branch': (_, checkout) => `${checkout} is on no branch`,
   'not-a-run-branch': (_, checkout) => `${checkout} is not on a branch The Framework minted; only tf-* branches are renamed`,
@@ -218,24 +218,23 @@ function agentIdArg(agentId: string): string {
   return agentId
 }
 
-/** The project's main checkout, from anywhere in the repo. */
+/** The project the working directory belongs to. */
 async function project(cwd: string, git: GitRunner): Promise<string> {
-  return inRepo(() => repoRoot(cwd, git))
+  return inRepo(() => projectRoot(cwd, git))
 }
 
-/** Outside a repo, the commands have nothing to act on: said as a refusal, not a git failure. */
+/**
+ * Outside a repo, the commands have nothing to act on: said as a refusal, not a git failure.
+ * Only git's own "not a git repository" reads as that; a timeout, a missing git, or a corrupt
+ * repo stays the failure it is.
+ */
 async function inRepo<T>(read: () => Promise<T>): Promise<T> {
   try {
     return await read()
-  } catch {
+  } catch (err) {
+    if (!/not a git repository/i.test(err instanceof Error ? err.message : String(err))) throw err
     throw new Refused({ ok: false, reason: 'not-a-repo' }, 'not inside a git repository')
   }
-}
-
-/** What a new checkout gets besides its files: the parent's dependencies, and its link in `branches/`. */
-async function afterCheckout(repo: string, path: string, git: GitRunner): Promise<void> {
-  await linkDependencies(repo, path).catch(() => [])
-  await reconcileBranchLinks(repo, { git })
 }
 
 type Options = Record<string, { type: 'string' | 'boolean' }>

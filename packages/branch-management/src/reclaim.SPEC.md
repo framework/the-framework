@@ -60,7 +60,7 @@ An agent that commits nothing on its own branch must leave neither a branch on t
 
 A checkout whose branch provably holds nothing the remote lacks is removed without any push, and that branch is deleted along with it. "Holds nothing" means the tree is clean and the branch tip is reachable from some remote-tracking branch *other than the branch's own copy* — a commit the remote already has under another name. The branch's own copy deliberately does not count: a branch pushed under its own name contains its own tip, so counting it would read every published agent branch as holding nothing.
 
-Only branches The Framework itself minted are ever deleted this way: any `tf-` name, never the data branch. A leftover checkout can be sitting on a branch of the user's own, and deleting that is not this package's call even when it holds nothing. Only local remote-tracking references are read, never the remote itself; a tip they do not yet cover simply answers no and falls back to the push.
+The branch's own copy is the one under its name and the one it tracks: a branch renamed after it was pushed still tracks the remote copy under its old name, and that copy holding the tip proves nothing about another name having it, so such a branch is pushed under its new name rather than deleted. Only branches The Framework itself minted are ever deleted this way: any `tf-` name, never the data branch. A leftover checkout can be sitting on a branch of the user's own, and deleting that is not this package's call even when it holds nothing. Only local remote-tracking references are read, never the remote itself; a tip they do not yet cover simply answers no and falls back to the push.
 
 ### A birth branch the agent walked away from goes too
 

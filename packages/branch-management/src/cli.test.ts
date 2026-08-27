@@ -359,3 +359,81 @@ test('the executable runs by name from CLI_BIN_DIR: JSON on stdout, the reason o
     await rm(repo, { recursive: true, force: true })
   }
 })
+
+test('name: asking again for the name the checkout already carries, suffixed or not, changes nothing (review)', async () => {
+  const repo = await repoWithOrigin()
+  try {
+    await run(repo, 'create', 'a1')
+    await run(repo, 'create', 'a2')
+    assert.deepEqual((await run(worktreePath(repo, 'a1'), 'name', 'fix-login')).out, { ok: true, branch: 'tf-fix-login' })
+    assert.deepEqual((await run(worktreePath(repo, 'a2'), 'name', 'fix-login')).out, { ok: true, branch: 'tf-fix-login-2' })
+    assert.deepEqual((await run(worktreePath(repo, 'a2'), 'name', 'fix-login')).out, { ok: true, branch: 'tf-fix-login-2' }, 'no drift to -3')
+    // Its own pushed copy does not count as taken either.
+    await git(['push', '-q', '--set-upstream', 'origin', 'tf-fix-login-2'], worktreePath(repo, 'a2'))
+    await git(['fetch', '-q', 'origin'], repo)
+    assert.deepEqual((await run(worktreePath(repo, 'a2'), 'name', 'fix-login')).out, { ok: true, branch: 'tf-fix-login-2' })
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})
+
+test("name: The Framework's own spellings are refused — the data branch, and the checkout-directory form (review)", async () => {
+  const repo = await repoWithOrigin()
+  try {
+    await run(repo, 'create', 'a1')
+    const path = worktreePath(repo, 'a1')
+    for (const name of ['data', 'agent-zz', 'agent-']) {
+      const ran = await run(path, 'name', name)
+      assert.equal(ran.code, 1, name)
+      assert.deepEqual(ran.out, { ok: false, reason: 'reserved-name' }, name)
+    }
+    assert.equal((await git(['rev-parse', '--abbrev-ref', 'HEAD'], path)).trim(), 'tf-agent-a1')
+    assert.deepEqual((await run(repo, 'list')).out, [{ agentId: 'a1', path, branch: 'tf-agent-a1' }], 'and no phantom checkout appeared')
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})
+
+test('the project is the checkout whose branches/ the command runs under — a project that is itself a linked worktree included (review)', async () => {
+  const repo = await repoWithOrigin()
+  try {
+    const project = join(repo, 'project-wt')
+    await git(['worktree', 'add', '-q', '-b', 'project-branch', project], repo)
+    await mkdir(join(project, 'node_modules', 'dep'), { recursive: true })
+    const created = await run(project, 'create', 'a1')
+    assert.equal(created.code, 0)
+    assert.equal((created.out as { path: string }).path, worktreePath(project, 'a1'), 'under the registered project, not the main checkout')
+    assert.deepEqual(((await run(worktreePath(project, 'a1'), 'list')).out as { agentId: string }[]).map(r => r.agentId), ['a1'])
+    assert.deepEqual((await run(repo, 'list')).out, [], 'the main checkout has none')
+    assert.deepEqual((await run(worktreePath(project, 'a1'), 'name', 'nested')).out, { ok: true, branch: 'tf-nested' })
+    assert.equal(await readlink(join(project, '.the-framework', 'branches', 'tf-nested')), 'tf-agent-a1')
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})
+
+test('an id that is not path-safe is refused before the project is even looked for (review)', async () => {
+  const dir = await realpath(await mkdtemp(join(tmpdir(), 'branch-management-norepo-')))
+  try {
+    assert.deepEqual((await run(dir, 'remove', '../x')).out, { ok: false, reason: 'invalid-id', agentId: '../x' })
+    assert.deepEqual((await run(dir, 'create', '../x')).out, { ok: false, reason: 'invalid-id', agentId: '../x' })
+    // `status <path>` names a directory, and answers about that directory: not a checkout.
+    assert.deepEqual((await run(dir, 'status', dir)).out, { ok: false, reason: 'not-a-worktree', path: dir })
+    assert.deepEqual((await run(dir, 'attach', 'a1', 'main')).out, { ok: false, reason: 'not-a-repo' })
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('a command named like an Object property is not a command (review)', async () => {
+  const repo = await repoWithOrigin()
+  try {
+    for (const argv of [['constructor'], ['toString'], ['hasOwnProperty']]) {
+      const ran = await run(repo, ...argv)
+      assert.equal(ran.code, 2, argv.join(' '))
+      assert.equal(ran.out, undefined)
+    }
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})

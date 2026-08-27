@@ -45,7 +45,7 @@ import {
 import { loadUserSystemPrompt, SYSTEM_PROMPT_FILE } from './system-prompt-file.js'
 import { checkForUpdate, formatUpdateStatus, nodeVersionFetcher, type VersionFetcher } from './update-check.js'
 import { AgentStore, nodeStoreFs, type StoreFs } from './store/index.js'
-import { currentBranch, renameAgentBranch, agentBranchName, AGENT_BRANCH_PREFIX, nodeGitRunner } from '@superskill/branch-management'
+import { currentBranch, nameBranch, agentBranchName, nodeGitRunner } from '@superskill/branch-management'
 import { materializePresets } from './presets.js'
 import { isLoopbackHost, registerHomeProject, runDaemon, DEFAULT_DAEMON_HOST, DEFAULT_DAEMON_PORT } from './daemon.js'
 import { appendControl, resetControl, watchControl, type ControlWatcher } from './control.js'
@@ -618,14 +618,19 @@ export function createAgentJournal(deps: {
     if (event.kind === 'session-name') {
       sessionName = event.name
       // The framework-owned checkout (#736) was branched as `tf-agent-<id>` before a
-      // name existed; put the readable name on it now. No-ops when the agent branched itself,
-      // and only a rename that happened is recorded (#1277) — a guessed name on the meta is
-      // exactly what the branch event exists to end.
+      // name existed; put the readable name on it now, by the package's naming rule (#1725):
+      // a rename, suffixed when the name is taken, a no-op when the agent already checked out
+      // `tf-<name>` itself. Only the branch the checkout is then actually on is recorded
+      // (#1277) — a guessed name on the meta is exactly what the branch event exists to end —
+      // and a refusal (the agent on a branch of its own making) records nothing. Never fails
+      // the agent: a run outlives a branch name.
       if (deps.agentId) {
-        const renamed = `${AGENT_BRANCH_PREFIX}${event.name}`
-        void renameAgentBranch(cwd, agentBranchName(deps.agentId), renamed).then(didRename => {
-          if (didRename) onEvent({ kind: 'branch', branch: renamed })
-        })
+        void nameBranch(cwd, event.name).then(
+          outcome => {
+            if (outcome.ok) onEvent({ kind: 'branch', branch: outcome.branch })
+          },
+          () => {},
+        )
       }
     }
     if (event.kind === 'end' && event.stopped) stoppedCleanly = true

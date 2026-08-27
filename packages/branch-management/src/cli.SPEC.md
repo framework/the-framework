@@ -14,7 +14,7 @@ The package's command line: the same operations The Framework's daemon calls, fo
 
 - **Seven commands over the package** - `create`, `attach`, `name`, `status`, `list`, `remove`, `prune`; each is the corresponding package operation and nothing more.
 - **JSON out, a reason for a person, an exit code that says which** - every result is one JSON document on stdout; a refusal or a git failure also puts one line on stderr and exits 1; a command that cannot be read gets the usage on stderr and exits 2.
-- **The project is found from where the command runs** - commands acting on the project find its main checkout from anywhere inside it, an agent's checkout included; commands acting on a checkout act on the one they run in.
+- **The project is found from where the command runs** - commands acting on the project find it by the checkout layout, from anywhere inside it, an agent's checkout included; commands acting on a checkout act on the one they run in.
 - **What the package does not know is not decided here** - whether an agent is still running is not read; whether its branch may be pushed is `--no-push`, the caller's fact.
 
 ## Business logic
@@ -29,11 +29,11 @@ See `## User story`.
 
 - `create <id> [--base <ref>]` - a checkout for the agent, on a fresh `tf-agent-<id>` branch from the stated base or the project's current head; the parent checkout's dependency directories are linked in and the `branches/` links are refreshed. Reports the checkout's path and branch.
 - `attach <id> <branch>` - a checkout for a continued agent on an existing branch, with the same linking. An id that is not path-safe is refused by both, before git runs.
-- `name <name>` - renames the branch of the checkout the command runs in to `tf-<name>`, refreshes the `branches/` links, and reports the name the branch ended up with — suffixed when the wanted one was taken. Refused for a name that is not `[a-z0-9-]+`, and for a checkout on a branch The Framework did not mint, so the user's own branch is never renamed. The rules are the checkout lifecycle's (`worktree`).
+- `name <name>` - renames the branch of the checkout the command runs in to `tf-<name>`, refreshes the `branches/` links, and reports the name the branch ended up with — suffixed when the wanted one was taken. Refused for a name that is not `[a-z0-9-]+`, for one that spells The Framework's own branches (`data`, `agent-…`), and for a checkout on a branch The Framework did not mint, so the user's own branch is never renamed. The rules are the checkout lifecycle's (`worktree`).
 - `status [path]` - the branch, whether the tree is clean, and whether the branch tip is on the remote, for the checkout the command runs in or the one at the stated path. A path that is not a checkout of its own is refused.
 - `list [--sizes]` - every agent checkout under `.the-framework/branches/`: the agent id, the path, the branch it is on now, and, on request, its size on disk.
-- `remove <id> [--no-push]` - reclaims one agent's checkout under the reclaim rule (`reclaim`): a dirty tree is kept, the branch is pushed unless `--no-push`, the checkout goes only once the remote has it, and a branch that holds nothing goes with it. The `branches/` links are refreshed afterwards, so a link named after a branch that just went is dropped. An id with no checkout is refused as such.
-- `prune [--no-push]` - `remove` for every checkout; reports which were removed and, for each kept, the reason. Exits 0: a checkout kept under the rule is the rule working, not a refusal of the command.
+- `remove <id> [--no-push]` - reclaims one agent's checkout under the reclaim rule (`reclaim`): a dirty tree is kept, the branch is pushed unless `--no-push`, the checkout goes only once the remote has it, and a branch that holds nothing goes with it. The `branches/` links are refreshed afterwards, so a link named after a branch that just went is dropped. An id that is not path-safe is refused before anything is looked up; an id with no checkout is refused as such.
+- `prune [--no-push]` - `remove` for every checkout, with the links refreshed once at the end rather than after each; reports which were removed and, for each kept, the reason. Exits 0: a checkout kept under the rule is the rule working, not a refusal of the command.
 
 ### JSON out, a reason for a person, an exit code that says which
 
@@ -53,7 +53,7 @@ An agent runs the commands from inside its own checkout, from whichever subdirec
 
 #### Business logic
 
-`create`, `attach`, `list`, `remove` and `prune` act on the project: its main checkout is found from the working directory through git's common directory, which is the same whether the command runs in the main checkout or in any agent checkout under it. `name` and `status` act on a checkout: the root of the one the working directory is in. Outside any repository every command is refused as `not-a-repo` rather than failing on git.
+`create`, `attach`, `list`, `remove` and `prune` act on the project: the checkout whose `.the-framework/branches/` the working directory is under, else the checkout the working directory is in (the checkout lifecycle's rule, `worktree`). So the same command names the same project from the project's own checkout and from any agent checkout under it — including when the project is itself a linked worktree of some other repository. `name` and `status` act on a checkout: the root of the one the working directory is in, or, for `status`, the directory named on the command line. Outside any repository every command that looks for the project or the checkout is refused as `not-a-repo` rather than failing on git — only git's own "not a repository" reads as that; a timeout or a broken git stays the failure it is. `status <path>` answers about the named directory, which outside a repository is simply not a checkout.
 
 ## Before modifying/creating SPEC.md files
 

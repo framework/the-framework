@@ -273,3 +273,20 @@ test('a birth branch carrying a commit the kept branch lacks stays (#1657)', asy
     await rm(repo, { recursive: true, force: true })
   }
 })
+
+test('a branch renamed after its birth name was pushed is pushed under its new name, never read as empty (#1725 review)', async () => {
+  const { repo, path } = await repoWithDirtyWorktree()
+  const git = nodeGitRunner()
+  try {
+    await commitWork(path)
+    await git(['push', '-q', '--set-upstream', 'origin', 'tf-agent-run1'], path)
+    await git(['branch', '-m', 'tf-agent-run1', 'tf-renamed'], path)
+    // The tip is on the remote under the old name only — the branch's own tracked copy, not
+    // another name holding it. So it is not "empty": it is pushed under the name it has now.
+    assert.deepEqual(await reclaimWorktree(repo, path, ORDINARY), { ok: true })
+    assert.match(await git(['show', 'refs/remotes/origin/tf-renamed:index.html'], repo), /Welcome!/, 'pushed under the new name')
+    assert.equal((await git(['rev-parse', '--verify', 'refs/heads/tf-renamed'], repo)).trim().length, 40, 'and the local branch stays')
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})

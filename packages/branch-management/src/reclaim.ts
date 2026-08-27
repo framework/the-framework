@@ -150,16 +150,23 @@ async function coveredBy(path: string, branch: string, anchor: string, git: GitR
  * reachable from some remote-tracking branch *other than the branch's own* — a commit `origin`
  * already has under another name, so nothing on the branch is unique to it. Its own remote copy
  * does not count: a pushed branch with a PR contains its own tip and is exactly the branch that
- * must stay. Read from the local remote-tracking refs, which are only ever behind the remote: a
- * tip they do not cover yet answers false, and the caller falls back to the push.
+ * must stay. The branch's own copy is the one under its name, and the one it tracks — a branch
+ * renamed after it was pushed (#1725) still tracks the remote copy under its old name, and that
+ * copy holding the tip proves nothing about another name having it. Read from the local
+ * remote-tracking refs, which are only ever behind the remote: a tip they do not cover yet
+ * answers false, and the caller falls back to the push.
  */
 async function branchHoldsNothing(repo: string, branch: string, git: GitRunner): Promise<boolean> {
+  const upstream = await git(['rev-parse', '--abbrev-ref', `${branch}@{upstream}`], repo).then(
+    out => out.trim(),
+    () => undefined,
+  )
   return git(['branch', '--remotes', '--contains', `refs/heads/${branch}`, '--format=%(refname:short)'], repo).then(
     out =>
       out
         .split('\n')
         .map(line => line.trim())
-        .some(name => name !== '' && !name.endsWith(`/${branch}`)),
+        .some(name => name !== '' && !name.endsWith(`/${branch}`) && name !== upstream),
     () => false,
   )
 }

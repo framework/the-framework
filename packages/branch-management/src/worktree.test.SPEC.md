@@ -8,7 +8,7 @@ What the tests cover: the lifecycle of an agent's own checkout.
 - A directory is judged a checkout root only when it is one: the project's main checkout and an agent's own both are, while a subdirectory of a checkout, a leftover `.the-framework/branches/` directory git no longer knows, and a directory in no repository at all are not. Asked plainly, that leftover directory reports the enclosing repository's branch — the bug — while the guarded read reports nothing for it and the real branch for a real checkout.
 - Whether a checkout is clean is a read that commits nothing: a checkout with uncommitted work reads dirty, a clean one reads clean.
 - The branch currently checked out is reported, and a detached checkout or a non-repo reads as unknown.
-- The branch is renamed to the session name only while the checkout is still on its original branch; an agent that already made its own branch is left alone, and a rename that fails never brings the agent down.
+- Naming: a rename that loses the race to a sibling taking the same name re-reads the branches and takes the next suffix; any other rename failure is raised. (The rest of naming — the suffix rule, the refusals — is covered against real git by the command-line tests.)
 - Listing the checkouts on disk names the agent of each `tf-agent-<agent id>` directory, ignores anything else in the branches directory, yields nothing for a project that never ran an agent, and never mistakes a rename link for a checkout.
 - Against a real repo: creating, listing and removing a checkout round-trips; an agent's uncommitted edit reads dirty and is never swept into a commit, and once the agent commits, the edit survives on the agent's branch after the checkout is gone.
 

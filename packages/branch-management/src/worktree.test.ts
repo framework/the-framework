@@ -5,6 +5,7 @@ import { mkdir, mkdtemp, rm, writeFile, stat, realpath } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { nodeGitRunner, type GitRunner } from './git.js'
 import {
+  nameBranch,
   addWorktree,
   attachWorktree,
   deleteBranch,
@@ -17,7 +18,6 @@ import {
   worktreeClean,
   worktreePath,
   currentBranch,
-  renameAgentBranch,
   listWorktreeDirs,
 } from './worktree.js'
 import { agentBranchName, FRAMEWORK_DIR, BRANCHES_DIR } from './branch-names.js'
@@ -261,30 +261,6 @@ test('currentBranch reads the checked-out branch, and reads detached/non-repo as
   assert.equal(await currentBranch(REPO, failingGit), undefined)
 })
 
-test('renameAgentBranch renames only while the worktree is still on the run-id branch (#736)', async () => {
-  // On the run-id branch: renamed to the session name.
-  const onAgentBranch = recordingGit('tf-agent-1\n')
-  assert.equal(await renameAgentBranch('/wt', 'tf-agent-1', 'tf-add-auth', onAgentBranch), true)
-  assert.deepEqual(onAgentBranch.calls[1]?.args, ['branch', '-m', 'tf-agent-1', 'tf-add-auth'])
-
-  // The agent already made its own branch (today's #326 prompt still tells it to):
-  // there is nothing to rename, and we must not touch the branch it is sitting on.
-  const selfBranched = recordingGit('tf-add-auth\n')
-  assert.equal(await renameAgentBranch('/wt', 'tf-agent-1', 'tf-add-auth', selfBranched), false)
-  assert.equal(selfBranched.calls.length, 1, 'only the read, never a rename')
-})
-
-test('renameAgentBranch never throws: a run outlives a failed rename', async () => {
-  // Reads the branch fine, then fails the rename (e.g. the target name is taken).
-  let call = 0
-  const failsOnRename: GitRunner = async () => {
-    if (call++ === 0) return 'tf-agent-1\n'
-    throw new Error('a branch named tf-x already exists')
-  }
-  assert.equal(await renameAgentBranch('/wt', 'tf-agent-1', 'tf-x', failsOnRename), false)
-  assert.equal(await renameAgentBranch('/wt', 'a', 'b', failingGit), false)
-})
-
 /** A directory reader over one listing: `entries[dir]` are the names under `dir`. */
 const listing = (entries: Record<string, string[]>) => async (dir: string) => entries[dir] ?? []
 
@@ -300,4 +276,31 @@ test('listWorktreeDirs never mistakes a rename link for a run (#1580)', async ()
   // A rename link beside the checkouts: its name has no run prefix, so it is not a run.
   const readdir = listing({ [root]: ['tf-agent-r1', 'tf-cool-name'] })
   assert.deepEqual(await listWorktreeDirs('/repo', readdir), ['r1'])
+})
+
+test('nameBranch: a rename lost to a sibling naming the same thing at the same moment takes the next suffix (review)', async () => {
+  // The branches read says `tf-x` is free; the rename then loses the race; the re-read shows it taken.
+  let renames = 0
+  const racing: GitRunner = async (args, cwd) => {
+    if (args[0] === 'rev-parse' && args[1] === '--show-toplevel') return cwd + '\n'
+    if (args[0] === 'rev-parse') return 'tf-agent-1\n'
+    if (args[0] === 'for-each-ref') return renames === 0 ? 'refs/heads/tf-agent-1\n' : 'refs/heads/tf-agent-1\nrefs/heads/tf-x\n'
+    if (args[0] === 'branch' && args[1] === '-m') {
+      if (renames++ === 0) throw new Error("fatal: a branch named 'tf-x' already exists")
+      return ''
+    }
+    throw new Error(`unexpected git ${args.join(' ')}`)
+  }
+  const wt = await realpath(tmpdir())
+  assert.deepEqual(await nameBranch(wt, 'x', racing), { ok: true, branch: 'tf-x-2' })
+  assert.equal(renames, 2)
+
+  // Any other rename failure is the caller's to see.
+  const broken: GitRunner = async (args, cwd) => {
+    if (args[0] === 'rev-parse' && args[1] === '--show-toplevel') return cwd + '\n'
+    if (args[0] === 'rev-parse') return 'tf-agent-1\n'
+    if (args[0] === 'for-each-ref') return ''
+    throw new Error('fatal: disk full')
+  }
+  await assert.rejects(() => nameBranch(wt, 'x', broken), /disk full/)
 })

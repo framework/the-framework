@@ -1,7 +1,7 @@
-import { join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { realpath } from 'node:fs/promises'
-import { nodeGitRunner, type GitRunner } from './git.js'
-import { FRAMEWORK_DIR, BRANCHES_DIR, isSafeAgentId, worktreeDirName, agentIdFromWorktreeDir, isWorktreeDirName } from './branch-names.js'
+import { nodeGitRunner, checkoutRoot, type GitRunner } from './git.js'
+import { FRAMEWORK_DIR, BRANCHES_DIR, AGENT_BRANCH_PREFIX, isSafeAgentId, isRunBranch, worktreeDirName, agentIdFromWorktreeDir, isWorktreeDirName } from './branch-names.js'
 
 /**
  * Git-worktree lifecycle for concurrent agents (#453/#735): give each agent its own
@@ -241,31 +241,98 @@ export async function currentBranch(path: string, agent: GitRunner = nodeGitRunn
 }
 
 /**
- * Rename an agent's branch once the agent names the session (#736): the worktree is
- * created on `tf-agent-<agentId>` before a name exists, and this puts the
- * readable `tf-<sessionName>` on it.
- *
- * Only renames when `path` is still on `from`. The #326 system prompt currently
- * tells the agent to create and check out its own `tf-<name>` branch,
- * and until that step is dropped there (the prompt ships verbatim from the issue,
- * so it is not ours to edit) the agent may already have moved off `from` — in
- * which case it named the branch itself and there is nothing to rename. Returns
- * whether it renamed, and never throws: an agent must not die over a branch name.
+ * The project a directory belongs to (#1725): the checkout whose `.the-framework/branches/`
+ * holds the agent checkouts. From inside an agent's checkout that is three levels up, by the
+ * layout every checkout is created with; from anywhere else it is the checkout itself. Read from
+ * the layout rather than from git's common dir, so a project that is itself a linked worktree,
+ * or a submodule, answers with the directory the daemon registered. Rejects outside a repo.
  */
-export async function renameAgentBranch(
-  path: string,
-  from: string,
-  to: string,
-  agent: GitRunner = nodeGitRunner(),
-): Promise<boolean> {
-  if ((await currentBranch(path, agent)) !== from) return false
-  try {
-    await agent(['branch', '-m', from, to], path)
-    return true
-  } catch {
-    // Target name taken, or an invalid slug: keep the run-id branch.
-    return false
+export async function projectRoot(cwd: string, agent: GitRunner = nodeGitRunner()): Promise<string> {
+  const checkout = await checkoutRoot(cwd, agent)
+  const parent = dirname(checkout)
+  const nested = basename(parent) === BRANCHES_DIR && basename(dirname(parent)) === FRAMEWORK_DIR
+  return nested ? dirname(dirname(parent)) : checkout
+}
+
+/** A session name as the agent picks it: the charset the system prompt asks for. */
+export function isSessionName(name: string): boolean {
+  return /^[a-z0-9-]+$/.test(name)
+}
+
+/** Why {@link nameBranch} left the branch as it was. */
+export type NameBranchRefusal =
+  /** Not `[a-z0-9-]+`. */
+  | 'invalid-name'
+  /** `tf-<name>` would be the data branch or a checkout directory's spelling: the framework's own. */
+  | 'reserved-name'
+  /** The directory is not a git worktree root: nothing was run in it. */
+  | 'not-a-worktree'
+  /** The checkout is on no branch (detached). */
+  | 'no-branch'
+  /** The checkout is on a branch the framework did not mint — the user's own, or the data branch. */
+  | 'not-a-run-branch'
+
+export type NameBranchOutcome =
+  | {
+      ok: true
+      /** The name the branch ends up with: `tf-<name>`, suffixed when that was taken. */
+      branch: string
+    }
+  | { ok: false; reason: NameBranchRefusal }
+
+/** How often a rename lost to a sibling naming the same thing at the same moment is retried. */
+const NAME_ATTEMPTS = 3
+
+/**
+ * Name the session (#1725): rename the checkout's branch to `tf-<name>`. A rename, not a new
+ * branch, so the branch the checkout was born on is the branch it ends on and nothing is left
+ * behind to clean up. Only a branch the framework minted is ever renamed — an agent that somehow
+ * runs in the user's own checkout must not rename `main` — and only to a name that is not the
+ * framework's own: `tf-data` is the data branch, and `tf-agent-<x>` is how checkout directories
+ * are spelled, so a branch link of that name would read as a phantom checkout.
+ *
+ * A taken name gets a numeric suffix (`tf-<name>-2`, `-3`, …) rather than a refusal: the agent
+ * asked for a name, and the caller reads back the one it got. Taken means any local branch or
+ * any remote-tracking branch, so the later push does not land on someone else's branch — except
+ * the checkout's own branch, pushed or not, which is why asking again for the name the checkout
+ * already carries (suffixed or not) changes nothing. Two checkouts naming the same thing at the
+ * same moment race on the rename itself; the loser reads the branches again and takes the next
+ * free suffix.
+ */
+export async function nameBranch(path: string, name: string, agent: GitRunner = nodeGitRunner()): Promise<NameBranchOutcome> {
+  if (!isSessionName(name)) return { ok: false, reason: 'invalid-name' }
+  const wanted = `${AGENT_BRANCH_PREFIX}${name}`
+  if (!isRunBranch(wanted) || isWorktreeDirName(wanted)) return { ok: false, reason: 'reserved-name' }
+  if (!(await isWorktreeRoot(path, agent))) return { ok: false, reason: 'not-a-worktree' }
+  const current = await currentBranch(path, agent)
+  if (!current) return { ok: false, reason: 'no-branch' }
+  if (!isRunBranch(current)) return { ok: false, reason: 'not-a-run-branch' }
+  for (let attempt = 1; ; attempt++) {
+    const taken = await branchNames(path, agent)
+    taken.delete(current)
+    let branch = wanted
+    for (let n = 2; taken.has(branch); n++) branch = `${wanted}-${n}`
+    if (branch === current) return { ok: true, branch }
+    try {
+      await agent(['branch', '-m', current, branch], path)
+      return { ok: true, branch }
+    } catch (err) {
+      if (attempt >= NAME_ATTEMPTS || !/already exists/.test(err instanceof Error ? err.message : String(err))) throw err
+    }
   }
+}
+
+/** Every branch name the repo knows, local and remote-tracking, without the remote's prefix. */
+async function branchNames(path: string, agent: GitRunner): Promise<Set<string>> {
+  const out = await agent(['for-each-ref', '--format=%(refname)', 'refs/heads/', 'refs/remotes/'], path)
+  const names = new Set<string>()
+  for (const ref of out.split('\n')) {
+    const heads = ref.match(/^refs\/heads\/(.+)$/)
+    if (heads?.[1]) names.add(heads[1])
+    const remotes = ref.match(/^refs\/remotes\/[^/]+\/(.+)$/)
+    if (remotes?.[1]) names.add(remotes[1])
+  }
+  return names
 }
 
 /**

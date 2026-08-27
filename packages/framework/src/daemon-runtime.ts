@@ -1,9 +1,9 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { closeSync, mkdirSync, openSync } from 'node:fs'
-import { basename, dirname, join, resolve } from 'node:path'
+import { basename, delimiter, dirname, join, resolve } from 'node:path'
 import { appendFile, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { agentIdFromStartedAt, startedAtFromAgentId, archiveWorktreeAgent, restoreArchivedAgent, listAgents, findAgent, archivedAgentPaths, readLiveMetas, readLiveMeta, resolveAgentEventsPath, EVENTS_FILE, META_FILE, isPidAlive, type AgentMeta } from './store/index.js'
-import { addWorktree, agentBranchName, linkDependencies, attachWorktree, worktreePath, worktreeBranch, removeWorktree, pruneWorktrees, FRAMEWORK_DIR, agentIdFromWorktreeDir, isGitRepo, nodeGitRunner, isGitTimeout } from '@superskill/branch-management'
+import { createCheckout, attachCheckout, agentBranchName, worktreePath, worktreeBranch, removeWorktree, pruneWorktrees, FRAMEWORK_DIR, agentIdFromWorktreeDir, isGitRepo, nodeGitRunner, isGitTimeout, CLI_BIN_DIR } from '@superskill/branch-management'
 import type { FrameworkEvent } from './events.js'
 import { removeAgentSpec, writeAgentSpec } from './agent-spec.js'
 import type { StartAgentKind, StartAgentOptions, StartAgentResult, AddProjectResult } from './dashboard/index.js'
@@ -16,7 +16,6 @@ import { resolveUserDir } from './agent-archive.js'
 import { withDataBranch } from './data-branch.js'
 import { removeProjectWorktree } from './worktrees.js'
 import { describeDeleted } from './merged-worktrees.js'
-import { reconcileBranchLinks } from '@superskill/branch-management'
 import { scopedKey, parseScopedKey, keyBelongsTo } from './runtime-keys.js'
 import { addProject, listProjects, projectId } from './registry.js'
 import { isTicketPath } from './tickets.js'
@@ -105,9 +104,14 @@ function spawnDetached(binPath: string, specPath: string, stderrFile?: string, e
   return child
 }
 
-/** A spawned run's environment: ours, plus the daemon's URL when it has one (#1328). */
+/**
+ * A spawned run's environment: ours, with the `branch-management` command on its PATH (#1725) —
+ * the agent names its session and checks its tree through the same package the daemon allocated
+ * its checkout with — plus the daemon's URL when it has one (#1328).
+ */
 function childEnv(daemonUrl: string | undefined, base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
-  return daemonUrl ? { ...base, [DAEMON_URL_ENV]: daemonUrl } : base
+  const env = { ...base, PATH: [CLI_BIN_DIR, base['PATH']].filter(Boolean).join(delimiter) }
+  return daemonUrl ? { ...env, [DAEMON_URL_ENV]: daemonUrl } : env
 }
 
 /** Where a spawned agent's stderr lands (#1261), so a child that dies at boot leaves a trace. */
@@ -474,8 +478,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
           // its work there, and re-attaching by the session-name guess would continue the agent on a
           // branch without its previous commits.
           const branch = agentBranchFor(archived ?? { id: agentId })
-          await attachWorktree(projectCwd, { agentId, branch })
-          await linkDependencies(projectCwd, path).catch(() => [])
+          await attachCheckout(projectCwd, { agentId, branch })
         }
         await restoreArchivedAgent(projectCwd, path, agentId).catch(() => false)
         return { cwd: path, agentId }
@@ -535,11 +538,9 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
     agentId: string,
   ): Promise<{ ok: true; workspace: { cwd: string; agentId?: string } } | { ok: false; error: string }> => {
     try {
-      const worktree = await addWorktree(projectCwd, { agentId, branch: agentBranchName(agentId) })
-      // `node_modules` is gitignored, so a fresh worktree has none: link the parent's in.
-      await linkDependencies(projectCwd, worktree.path).catch(() => [])
-      // The branches view (#1580) learns about this checkout now rather than at the next tick.
-      void reconcileBranchLinks(projectCwd).catch(() => {})
+      // The package's one sequence (#1725): the worktree, the parent's dependencies linked in,
+      // the branches view (#1580) told now rather than at the next tick.
+      const worktree = await createCheckout(projectCwd, { agentId })
       return { ok: true, workspace: { cwd: worktree.path, agentId } }
     } catch (err) {
       if (await isGitRepo(projectCwd)) {

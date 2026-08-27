@@ -3,7 +3,7 @@ The Framework: autonomous AI programming. Humans make the important decisions; c
 Four top-level pieces, one product:
 
 - `packages/framework` — the product itself, published as the npm package `framework`: one CLI (`the-framework`) that runs a foreground daemon, the agent lifecycle it orchestrates, and the browser dashboard it serves — the product's only user interface.
-- `packages/branch-management` — the git conventions and operations behind an agent's own checkout, published as `@superskill/branch-management`: the first of the skills the product is being split into, and the only one so far. The product depends on it; it depends on nothing of the product.
+- `packages/branch-management` — the git conventions and operations behind an agent's own checkout, as an API and as the `branch-management` command every agent the daemon starts on its machine gets on its PATH, published as `@superskill/branch-management`: the first of the skills the product is being split into, and the only one so far. The product depends on it; it depends on nothing of the product.
 - `packages/chrome-extension` — the Claude web bridge, a companion Chrome extension: when an agent's task was handed to a Claude Code cloud session on claude.ai, it carries the question that session is parked on into the local dashboard, and types the answer picked there back into the session.
 - `packages/the-framework.ai` — the marketing website at https://the-framework.ai.
 

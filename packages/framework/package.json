@@ -46,7 +46,7 @@
   },
   "dependencies": {
     "@base-ui-components/react": "1.0.0-rc.0",
-    "@superskill/branch-management": "workspace:*",
+    "@better-skills/branch-management": "workspace:*",
     "@puppeteer/browsers": "3.2.1",
     "@shadcn/react": "^0.2.1",
     "@tiptap/core": "^2.10.0",

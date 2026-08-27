@@ -1,7 +1,6 @@
 import { join } from 'node:path'
 import { archivedAgentPaths, readLiveMetas, EVENTS_FILE } from './agent-store.js'
-import { isSafeAgentId, FRAMEWORK_DIR } from '@superskill/branch-management'
-import { worktreePath } from '@superskill/branch-management'
+import { isSafeAgentId, FRAMEWORK_DIR, worktreePath } from '@better-skills/branch-management'
 import { nodeFs } from '../node-fs.js'
 
 /**

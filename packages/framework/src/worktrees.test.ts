@@ -5,9 +5,9 @@ import { tmpdir } from 'node:os'
 import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { deleteProjectAgent, removeProjectWorktree } from './worktrees.js'
 import { listAgents } from './store/index.js'
-import { addWorktree, agentBranchName, nodeGitRunner } from '@superskill/branch-management'
+import { addWorktree, agentBranchName, nodeGitRunner } from '@better-skills/branch-management'
 // The agent's side of reclaiming a checkout: what its record allows the git rule to do, and how a
-// refusal is said. The rule itself is tested where it lives, in @superskill/branch-management.
+// refusal is said. The rule itself is tested where it lives, in the branch-management package.
 // Against real git, because "was the diff actually destroyed" is not a question a fake answers.
 
 const RUN_ID = 'run1'

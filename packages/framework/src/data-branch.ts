@@ -1,5 +1,5 @@
 import { dirname, join } from 'node:path'
-import { nodeGitRunner, type GitRunner, FRAMEWORK_DIR, BRANCHES_DIR, DATA_BRANCH, excludeFromGit } from '@superskill/branch-management'
+import { nodeGitRunner, type GitRunner, FRAMEWORK_DIR, BRANCHES_DIR, DATA_BRANCH, excludeFromGit } from '@better-skills/branch-management'
 import { TICKETS_DIR, FLAT_TODO_FILE } from './tickets.js'
 import { errorMessage } from './error-message.js'
 

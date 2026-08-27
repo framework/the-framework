@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { appendFile, mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { FRAMEWORK_DIR } from '@superskill/branch-management'
+import { FRAMEWORK_DIR } from '@better-skills/branch-management'
 import {
   appendControl,
   controlPath,

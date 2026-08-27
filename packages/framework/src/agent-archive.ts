@@ -1,5 +1,5 @@
 import { ARCHIVE_DIR } from './store/index.js'
-import { nodeGitRunner, type GitRunner } from '@superskill/branch-management'
+import { nodeGitRunner, type GitRunner } from '@better-skills/branch-management'
 /**
  * Committed session history (#1179): where a project's finished agents are archived so they survive
  * the repo being cleaned.

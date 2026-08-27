@@ -48,7 +48,7 @@ async function startDaemon(cwd: string, opts: RunDaemonOptions): Promise<{ done:
 }
 import { listAgents } from './store/index.js'
 import { EVENTS_FILE } from './store/index.js'
-import { FRAMEWORK_DIR, addWorktree, worktreePath, nodeGitRunner } from '@superskill/branch-management'
+import { FRAMEWORK_DIR, addWorktree, worktreePath, nodeGitRunner } from '@better-skills/branch-management'
 import { controlPath } from './control.js'
 import { projectId, listProjects, addProject } from './registry.js'
 import { gitignorePath, frameworkGitignore } from './framework-gitignore.js'

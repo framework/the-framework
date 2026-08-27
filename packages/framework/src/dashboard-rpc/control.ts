@@ -9,7 +9,7 @@ import { TICKETS_DIR, planTicketPrompt, todoPriorityForTicket } from '../tickets
 import { isTicketFile } from '../dashboard/tickets.js'
 import { releaseTicketLock } from '../ticket-locks.js'
 import { findAgent, type AgentMeta } from '../store/index.js'
-import { isSafeAgentId, worktreePath, pushBranch } from '@superskill/branch-management'
+import { isSafeAgentId, worktreePath, pushBranch } from '@better-skills/branch-management'
 import { withAgentLock } from '../agent-locks.js'
 import { removeProjectWorktree, deleteProjectAgent } from '../worktrees.js'
 import { patchArchivedAgentOnDataBranch } from '../archived-agent-patch.js'

@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { DATA_BRANCH, BRANCHES_DIR } from '@superskill/branch-management'
+import { DATA_BRANCH, BRANCHES_DIR } from '@better-skills/branch-management'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import { ARCHIVE_DIR, EVENTS_FILE, META_FILE, nodeStoreFs, type StoreFs } from './store/index.js'
 import { FLAT_TODO_FILE, TICKETS_DIR } from './tickets.js'

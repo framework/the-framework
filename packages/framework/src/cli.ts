@@ -45,7 +45,7 @@ import {
 import { loadUserSystemPrompt, SYSTEM_PROMPT_FILE } from './system-prompt-file.js'
 import { checkForUpdate, formatUpdateStatus, nodeVersionFetcher, type VersionFetcher } from './update-check.js'
 import { AgentStore, nodeStoreFs, type StoreFs } from './store/index.js'
-import { currentBranch, nameBranch, agentBranchName, nodeGitRunner } from '@superskill/branch-management'
+import { currentBranch, nameBranch, agentBranchName, nodeGitRunner } from '@better-skills/branch-management'
 import { materializePresets } from './presets.js'
 import { isLoopbackHost, registerHomeProject, runDaemon, DEFAULT_DAEMON_HOST, DEFAULT_DAEMON_PORT } from './daemon.js'
 import { appendControl, resetControl, watchControl, type ControlWatcher } from './control.js'

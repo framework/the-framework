@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { nodeGitRunner, type GitRunner, FRAMEWORK_DIR } from '@superskill/branch-management'
+import { nodeGitRunner, type GitRunner, FRAMEWORK_DIR } from '@better-skills/branch-management'
 import { nodeFs } from './node-fs.js'
 /**
  * The maintenance sweep (#298): a background job that walks the registered repos,

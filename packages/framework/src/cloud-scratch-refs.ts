@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { nodeGitRunner, type GitRunner, FRAMEWORK_DIR, AGENT_BRANCH_PREFIX } from '@superskill/branch-management'
+import { nodeGitRunner, type GitRunner, FRAMEWORK_DIR, AGENT_BRANCH_PREFIX } from '@better-skills/branch-management'
 import { ghPrsForBranch, type LinkedPr } from './dashboard/gh.js'
 import { startedAtFromAgentId } from './store/index.js'
 import { nodeFs } from './node-fs.js'

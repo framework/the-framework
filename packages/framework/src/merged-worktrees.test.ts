@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { readFile, mkdtemp, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { removeMergedWorktrees, startMergedWorktreeSweep, type MergedSweepResult } from './merged-worktrees.js'
-import { addWorktree, agentBranchName, nodeGitRunner } from '@superskill/branch-management'
+import { addWorktree, agentBranchName, nodeGitRunner } from '@better-skills/branch-management'
 import type { WorktreeRow } from './worktrees.js'
 
 // E5: one rule — a checkout may go once its work is on the remote, and not before. Every deletion

@@ -1,4 +1,4 @@
-import { nodeGitRunner, type GitRunner } from '@superskill/branch-management'
+import { nodeGitRunner, type GitRunner } from '@better-skills/branch-management'
 import type { FileGitStatus } from './file-status.js'
 import { cutToPreview, readConfinedFile, safeRepoPath } from './file-read.js'
 

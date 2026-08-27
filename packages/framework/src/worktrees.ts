@@ -13,7 +13,7 @@ import {
   worktreeSize,
   FRAMEWORK_DIR,
   type ReclaimOutcome,
-} from '@superskill/branch-management'
+} from '@better-skills/branch-management'
 import { dataWorktreePath, withDataBranch } from './data-branch.js'
 
 /** A retained worktree and the agent that left it behind (#752). */

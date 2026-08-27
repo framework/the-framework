@@ -1,4 +1,4 @@
-import { nodeGitRunner, type GitRunner, agentBranchName } from '@superskill/branch-management'
+import { nodeGitRunner, type GitRunner, agentBranchName } from '@better-skills/branch-management'
 import { ghPrsForBranchOrThrow, pickAgentPr, type LinkedPr } from './dashboard/gh.js'
 import { openRemoteBranchPullRequest, type HandoffResult } from './dashboard/agent-handoff.js'
 import { listAgents, nodeStoreFs, startedAtFromAgentId, type AgentMeta, type ArchivePatch } from './store/index.js'

@@ -26,15 +26,15 @@ importers:
       '@base-ui-components/react':
         specifier: 1.0.0-rc.0
         version: 1.0.0-rc.0(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      '@better-skills/branch-management':
+        specifier: workspace:*
+        version: link:../branch-management
       '@puppeteer/browsers':
         specifier: 3.2.1
         version: 3.2.1
       '@shadcn/react':
         specifier: ^0.2.1
         version: 0.2.1(@types/react@19.2.17)(react@19.2.7)
-      '@superskill/branch-management':
-        specifier: workspace:*
-        version: link:../branch-management
       '@tiptap/core':
         specifier: ^2.10.0
         version: 2.27.2(@tiptap/pm@2.27.2)

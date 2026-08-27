@@ -1,6 +1,6 @@
 import { listProjectWorktrees, removeProjectWorktree, type RemoveResult, type WorktreeRow } from './worktrees.js'
 import { withAgentLock } from './agent-locks.js'
-import { repoHasRemote, worktreePath } from '@superskill/branch-management'
+import { repoHasRemote, worktreePath } from '@better-skills/branch-management'
 import { startProjectPass, type ProjectPass, type ProjectsSource } from './project-pass.js'
 
 // Reclaim a session's checkout once its work is on the remote (#1036/E5).

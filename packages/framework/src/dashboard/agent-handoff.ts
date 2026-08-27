@@ -1,4 +1,4 @@
-import { nodeGitRunner, type GitRunner, agentBranchName, AGENT_BRANCH_PREFIX, currentBranch, repoHasRemote, FRAMEWORK_DIR, pushBranch, gitReason } from '@superskill/branch-management'
+import { nodeGitRunner, type GitRunner, agentBranchName, AGENT_BRANCH_PREFIX, currentBranch, repoHasRemote, FRAMEWORK_DIR, pushBranch, gitReason } from '@better-skills/branch-management'
 import {
   cachedPrView,
   cachedPrsForBranch,

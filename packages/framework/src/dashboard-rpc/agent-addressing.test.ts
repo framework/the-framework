@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { sendStop, sendMessage, sendChoice, sendRemoveWorktree } from './control.js'
 import { onRetainedWorktrees, onAgents } from './reads.js'
 import { addProject, projectId as idFor } from '../registry.js'
-import { FRAMEWORK_DIR, worktreePath, addWorktree, agentBranchName, nodeGitRunner } from '@superskill/branch-management'
+import { FRAMEWORK_DIR, worktreePath, addWorktree, agentBranchName, nodeGitRunner } from '@better-skills/branch-management'
 import { CONTROL_FILE } from '../control.js'
 import { provideTestContext } from './test-context.js'
 

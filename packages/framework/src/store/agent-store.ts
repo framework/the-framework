@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { hostname } from 'node:os'
 import type { AutoHandoffSkip, FrameworkEvent } from '../events.js'
 import { nodeFs } from '../node-fs.js'
-import { FRAMEWORK_DIR, BRANCHES_DIR, DATA_BRANCH, isSafeAgentId, worktreeDirEntries } from '@superskill/branch-management'
+import { FRAMEWORK_DIR, BRANCHES_DIR, DATA_BRANCH, isSafeAgentId, worktreeDirEntries } from '@better-skills/branch-management'
 
 /**
  * Persisted orchestration state (#211). The dashboard is a pure projection of the

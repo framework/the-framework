@@ -7,7 +7,7 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { readAgentHandoff, resolveAgentPr, mergeAgentPr, agentBranchFor, openBranchPullRequest, openRemoteBranchPullRequest, openAgentPullRequest, agentAutoHandoff, isAgentBranch, prBaseName, withheldMerge } from './agent-handoff.js'
 import { pickAgentPr } from './gh.js'
-import { nodeGitRunner, type GitRunner } from '@superskill/branch-management'
+import { nodeGitRunner, type GitRunner } from '@better-skills/branch-management'
 
 const exec = promisify(execFile)
 const SEP = String.fromCharCode(31)

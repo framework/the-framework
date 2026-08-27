@@ -11,7 +11,6 @@ import {
   archiveWorktreeAgent,
   patchArchivedAgent,
   restoreArchivedAgent,
-  listWorktreeDirs,
   reconcileOrphanedAgents,
   loadAgentEvents,
   agentIdFromStartedAt,
@@ -783,24 +782,6 @@ test('reconcileOrphanedAgents rescues a run a crashed daemon left in a worktree 
   )
 })
 
-test('listWorktreeDirs names the run of each worktree, ignoring anything else in there', async () => {
-  const fs = memFs({
-    ...worktreeFiles('r1', { id: 'r1' }),
-    ...worktreeFiles('r2', { id: 'r2' }),
-    [join(CWD, '.the-framework', 'branches', '.tmp', 'x')]: '',
-  })
-  assert.deepEqual((await listWorktreeDirs(CWD, fs)).sort(), ['r1', 'r2'])
-  assert.deepEqual(await listWorktreeDirs(join(CWD, 'never-ran'), fs), [])
-})
-
-test('listWorktreeDirs never mistakes a rename link for a run (#1580)', async () => {
-  const fs = memFs({
-    ...worktreeFiles('r1', { id: 'r1' }),
-    // A rename link beside the checkouts: its name has no run prefix, so it is not a run.
-    [join(CWD, '.the-framework', 'branches', 'tf-cool-name')]: 'tf-agent-r1',
-  })
-  assert.deepEqual(await listWorktreeDirs(CWD, fs), ['r1'])
-})
 
 // #762: messaging a stopped agent continues THAT run, so the history shows one row rather than an
 // unrelated-looking second one. The follow-up is still a separate process; what makes it one agent is

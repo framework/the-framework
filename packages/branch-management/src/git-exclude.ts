@@ -1,6 +1,22 @@
 import { join, isAbsolute } from 'node:path'
-import { nodeFs, type NodeFs } from './node-fs.js'
-import { nodeGitRunner, type GitRunner } from './project.js'
+import { nodeGitRunner, type GitRunner } from './git.js'
+
+/** The filesystem the exclude write needs; `node:fs/promises` in production. */
+export interface ExcludeFs {
+  read(path: string): Promise<string>
+  /** Recursive mkdir. */
+  mkdir(path: string): Promise<void>
+  append(path: string, contents: string): Promise<void>
+}
+
+function nodeExcludeFs(): ExcludeFs {
+  const fs = () => import('node:fs/promises')
+  return {
+    read: path => fs().then(f => f.readFile(path, 'utf8')),
+    mkdir: path => fs().then(f => f.mkdir(path, { recursive: true })).then(() => {}),
+    append: (path, contents) => fs().then(f => f.appendFile(path, contents)),
+  }
+}
 
 /**
  * Append one ignore rule to the repository's `info/exclude` — the ignore file that is git's, not
@@ -12,7 +28,7 @@ import { nodeGitRunner, type GitRunner } from './project.js'
 export async function excludeFromGit(
   repo: string,
   rule: string,
-  fs: NodeFs = nodeFs(),
+  fs: ExcludeFs = nodeExcludeFs(),
   git: GitRunner = nodeGitRunner(),
 ): Promise<void> {
   const common = (await git(['rev-parse', '--git-common-dir'], repo)).trim()

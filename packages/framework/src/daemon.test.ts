@@ -47,10 +47,10 @@ async function startDaemon(cwd: string, opts: RunDaemonOptions): Promise<{ done:
   return { done, state: await listening }
 }
 import { listAgents } from './store/index.js'
-import { EVENTS_FILE, FRAMEWORK_DIR, addWorktree, worktreePath } from './store/index.js'
+import { EVENTS_FILE } from './store/index.js'
+import { FRAMEWORK_DIR, addWorktree, worktreePath, nodeGitRunner } from '@superskill/branch-management'
 import { controlPath } from './control.js'
 import { projectId, listProjects, addProject } from './registry.js'
-import { nodeGitRunner } from './project.js'
 import { gitignorePath, frameworkGitignore } from './framework-gitignore.js'
 
 // The dashboard steers + starts over the daemon's in-process RPC mount (#405/#426), not the

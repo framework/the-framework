@@ -257,7 +257,7 @@ test("a session's own draft PR still reaches the queue; a hand-made draft does n
   // Auto-handoff opens a draft precisely so it does not ping reviewers. If the queue then dropped
   // it too, nothing would tell anyone the work exists, which is #860 all over again.
   const prs = async (): Promise<OpenPr[]> => [
-    { number: 9, title: 'session work', url: 'u9', isDraft: true, headRefName: 'the-framework/x', createdAt: '2026-07-16T00:00:00Z' },
+    { number: 9, title: 'session work', url: 'u9', isDraft: true, headRefName: 'tf-x', createdAt: '2026-07-16T00:00:00Z' },
     { number: 10, title: 'my own wip', url: 'u10', isDraft: true, headRefName: 'feat/mine', createdAt: '2026-07-17T00:00:00Z' },
   ]
   const { items } = await buildInterventions([project('a', '/a')], { prs, liveAgents: noAgents, agents: async () => [] })

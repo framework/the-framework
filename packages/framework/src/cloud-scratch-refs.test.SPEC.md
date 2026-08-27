@@ -1,6 +1,6 @@
 What the tests cover: the cloud scratch-ref sweep's deletion gates and its bookkeeping, against a scripted origin.
 
-- Only the driver's exact `cloud-<counter>-<8 hex>` naming and agent branches are candidates; a user's own `cloud-…` branch, `claude/*` branches, `tf-<session name>` branches, and agent branches whose age cannot be read from their name are never considered — the legacy slashed agent-branch spelling still is.
+- Only the driver's exact `cloud-<counter>-<8 hex>` naming and agent branches are candidates; a user's own `cloud-…` branch, `claude/*` branches, `tf-<session name>` branches, and agent branches whose age cannot be read from their name are never considered.
 - An aged agent branch whose work is on the default branch is deleted; one inside the safe age, or belonging to an agent the daemon is still responsible for, is kept.
 - A tip not provably on the default branch is kept as possibly holding work, and no PR lookup is spent on it; an open PR keeps a ref while a closed one does not.
 - A hand-off anchor tip (empty commit on a landed parent) counts as holding no work and its ref is deleted; a tip that changes something against its parent is kept.

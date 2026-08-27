@@ -12,6 +12,15 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
 
+  packages/branch-management:
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.43
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
   packages/framework:
     dependencies:
       '@base-ui-components/react':
@@ -23,6 +32,9 @@ importers:
       '@shadcn/react':
         specifier: ^0.2.1
         version: 0.2.1(@types/react@19.2.17)(react@19.2.7)
+      '@superskill/branch-management':
+        specifier: workspace:*
+        version: link:../branch-management
       '@tiptap/core':
         specifier: ^2.10.0
         version: 2.27.2(@tiptap/pm@2.27.2)

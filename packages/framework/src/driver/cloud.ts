@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { makeEmit } from './session-support.js'
-import { nodeGitRunner, type GitRunner } from '../project.js'
+import { nodeGitRunner, type GitRunner } from '@superskill/branch-management'
 import { errorMessage } from '../error-message.js'
 import { githubSlugFor } from '../dashboard/github.js'
 import { WEB_START_PREFIX } from '../dashboard/web-start-endpoints.js'

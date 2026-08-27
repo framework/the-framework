@@ -3,9 +3,9 @@ import { test } from 'node:test'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { mkdir, mkdtemp, readdir, realpath, rm, writeFile } from 'node:fs/promises'
-import { nodeGitRunner } from './project.js'
-import { reconcileBranchLinks, startBranchLinksPass, type LinksFs } from './branch-links.js'
-import { FRAMEWORK_DIR, BRANCHES_DIR, addWorktree, worktreePath, type WorktreeDirEntry } from './store/index.js'
+import { nodeGitRunner } from './git.js'
+import { reconcileBranchLinks, type LinksFs } from './branch-links.js'
+import { FRAMEWORK_DIR, BRANCHES_DIR, addWorktree, worktreePath, type WorktreeDirEntry } from './index.js'
 
 const CWD = '/repo'
 const LINKS = join(CWD, FRAMEWORK_DIR, BRANCHES_DIR)
@@ -107,17 +107,4 @@ test('a branches/ directory that is not a worktree gets no link, against real gi
   } finally {
     await rm(repo, { recursive: true, force: true })
   }
-})
-
-test('the pass covers every registered project and a stopped pass does nothing', async () => {
-  const seen: string[] = []
-  const pass = startBranchLinksPass({
-    projects: async () => [{ path: '/a' }, { path: '/b' }],
-    reconcile: async cwd => void seen.push(cwd),
-  })
-  await pass.tick()
-  assert.deepEqual(seen, ['/a', '/b'])
-  pass.stop()
-  await pass.tick()
-  assert.equal(seen.length, 2)
 })

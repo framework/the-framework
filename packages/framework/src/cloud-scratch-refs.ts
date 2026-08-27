@@ -1,7 +1,7 @@
 import { join } from 'node:path'
-import { nodeGitRunner, type GitRunner } from './project.js'
+import { nodeGitRunner, type GitRunner, FRAMEWORK_DIR, AGENT_BRANCH_PREFIX } from '@superskill/branch-management'
 import { ghPrsForBranch, type LinkedPr } from './dashboard/gh.js'
-import { startedAtFromAgentId, FRAMEWORK_DIR, AGENT_BRANCH_PREFIX, LEGACY_AGENT_BRANCH_PREFIX } from './store/index.js'
+import { startedAtFromAgentId } from './store/index.js'
 import { nodeFs } from './node-fs.js'
 import { errorMessage } from './error-message.js'
 import { startProjectPass, type ProjectPass, type ProjectsSource } from './project-pass.js'
@@ -43,12 +43,8 @@ export const SCRATCH_REF_SAFE_AGE_MS = 24 * 60 * 60 * 1000
  */
 export const CLOUD_SCRATCH_REF = /^cloud-\d+-[0-9a-f]{8}$/
 
-/**
- * What run branches are named under; the rest is the agent id, which carries the start time. The
- * legacy slashed spelling (pre-#1581) is still swept — branches under it remain on remotes until
- * this sweep ages them out, but nothing mints it anymore.
- */
-const RUN_BRANCH_PREFIXES = [`${AGENT_BRANCH_PREFIX}agent-`, `${LEGACY_AGENT_BRANCH_PREFIX}agent-`]
+/** What run branches are named under; the rest is the agent id, which carries the start time. */
+const RUN_BRANCH_PREFIXES = [`${AGENT_BRANCH_PREFIX}agent-`]
 
 /**
  * Where the sweep remembers when it first saw each `cloud-*` ref, under `.the-framework/`

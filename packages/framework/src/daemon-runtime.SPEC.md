@@ -50,7 +50,7 @@ The user runs several agents on the same project at once, and keeps working in t
 
 Each agent is given its own git worktree under the project's `.the-framework/branches/`, on its own `tf-agent-<agent id>` branch. Concurrent agents on one project therefore never fight over a working tree, and the user's own checkout — uncommitted work included — is left untouched.
 
-A fresh worktree has no installed dependencies, since those are not tracked by git, so the project's are mirrored in (`store/worktree-deps`).
+A fresh worktree has no installed dependencies, since those are not tracked by git, so the project's are mirrored in (the branch-management package's dependency linking).
 
 #### Rationale
 

@@ -2,7 +2,7 @@ The cloud scratch-ref sweep: deletes from origin the leftover refs a `web`-targe
 
 ## Glossary
 
-- **scratch ref** — one of the two leftover refs above: the driver's `cloud-<counter>-<8 hex>` clone ref, or a pushed agent branch (`tf-agent-<agent id>`; a legacy `the-framework/agent-<agent id>` spelling is still swept, though nothing creates it anymore).
+- **scratch ref** — one of the two leftover refs above: the driver's `cloud-<counter>-<8 hex>` clone ref, or a pushed agent branch (`tf-agent-<agent id>`).
 - **hand-off anchor** — the empty commit, unique to one agent, that the driver pushes as the ref the cloud session clones at. Its tree equals its parent's tree (it changes nothing), and no merge ever lands the anchor itself — a squash merge rewrites the session's history without it.
 
 ## Business logic — TL;DR

@@ -1,5 +1,4 @@
-import { nodeGitRunner, type GitRunner } from '../project.js'
-
+import { nodeGitRunner, type GitRunner } from '@superskill/branch-management'
 // Per-file git status for the panel's file tree (#492): the working-tree state of each changed
 // file, so the tree can dot untracked/modified/deleted entries. A single `git status --porcelain`
 // read, mapped to repo-relative path -> state. Forgiving: a non-repo / failed git yields `{}`.

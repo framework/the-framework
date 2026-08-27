@@ -74,13 +74,13 @@ Every surface that shows an agent's work needs to know which branch it is on and
 
 #### Business logic
 
-The branch is the one recorded while the agent's worktree existed — authoritative because the built-in system prompt lets the agent name its own branch, which makes any derivation a guess. For agents archived before the branch was recorded, legacy derivations from the session name or the agent id stand in.
+The branch is the one recorded while the agent's worktree existed — authoritative because the built-in system prompt lets the agent name its own branch, which makes any derivation a guess. For agents archived before the branch was recorded, a derivation from the session name, else from the agent id, stands in.
 
 The PR is the number the agent recorded at the moment one was opened for it. The live lookup only refreshes that PR's *state*, which changes without the agent doing anything (a PR merges, a human closes it) — a different PR number found on the branch is some other PR and never this agent's answer, and a recorded PR the live read cannot confirm (a branch this machine cannot see) still answers with its recorded number and URL, state unknown. An agent that recorded no PR costs no lookup at all.
 
 Where no PR was recorded, the branch's whole PR history is filtered by the agent's start time: an open PR always counts (GitHub allows one open PR per head branch, so it is where pushed commits land), a closed one counts only when created after the agent started, and without a start time only an open PR is trusted. This is what keeps a predecessor's merged PR, wearing the same branch name, from showing as a fresh agent's own.
 
-Separately, whether a branch is an agent's at all is judged by its naming prefix (current and legacy spellings). That is only a convention — the agent may name its branch anything — so every caller uses it to decide how loudly to surface something, never to act.
+Separately, whether a branch is an agent's at all is judged by its naming prefix. That is only a convention — the agent may name its branch anything — so every caller uses it to decide how loudly to surface something, never to act.
 
 Live PR state rides the dashboard's read-through cache, and "not known yet" is reported distinctly from "no PR" so a surface can ask again rather than render an absence.
 

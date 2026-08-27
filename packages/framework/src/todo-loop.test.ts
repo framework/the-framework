@@ -8,7 +8,7 @@ import type { ChoicePick, ChoiceRequest, FrameworkEvent } from './events.js'
 import { appendTodoEntry, appendFlatTodoEntry, checkOffEntry, findTodoBacklog, insertTodoEntry, nextQueuedTicket, parseTodoEntries, runTodoLoop, agentTodoPending, ticketForPrompt } from './todo-loop.js'
 import { drainsQueue, presets } from './preset-catalog.js'
 import { AUTO_PM_DRAIN_JOB, AUTO_PM_JOBS } from './auto-pm.js'
-import { nodeGitRunner } from './project.js'
+import { nodeGitRunner } from '@superskill/branch-management'
 import { DATA_BRANCH, dataWorktreePath, withDataBranch } from './data-branch.js'
 
 const git = nodeGitRunner()

@@ -8,7 +8,7 @@ import { sendStart, sendReleaseTicketLock } from './control.js'
 import { presets } from '../preset-catalog.js'
 import { addProject, projectId } from '../registry.js'
 import { withDataBranch } from '../data-branch.js'
-import { nodeGitRunner } from '../project.js'
+import { nodeGitRunner } from '@superskill/branch-management'
 import type { StartAgentOptions } from '../dashboard/types.js'
 
 /** A committed real repo whose framework data sits on the data branch (#1582). */

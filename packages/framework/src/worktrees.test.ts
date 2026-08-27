@@ -4,12 +4,10 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { deleteProjectAgent, removeProjectWorktree } from './worktrees.js'
-import { addWorktree, listAgents, agentBranchName } from './store/index.js'
-import { nodeGitRunner } from './project.js'
-
-// #982/E5: one rule decides every removal — the work is committed to the session's branch, the
-// branch is pushed, and the checkout goes only once the remote has it. So nothing local is ever
-// the last copy of anything, and the one failure mode is legible: the push did not land.
+import { listAgents } from './store/index.js'
+import { addWorktree, agentBranchName, nodeGitRunner } from '@superskill/branch-management'
+// The agent's side of reclaiming a checkout: what its record allows the git rule to do, and how a
+// refusal is said. The rule itself is tested where it lives, in @superskill/branch-management.
 // Against real git, because "was the diff actually destroyed" is not a question a fake answers.
 
 const RUN_ID = 'run1'
@@ -45,44 +43,6 @@ async function commitWork(path: string): Promise<void> {
   await git(['add', '-A'], path)
   await git(['commit', '-q', '-m', 'work'], path)
 }
-
-test('a checkout holding uncommitted work is kept, and says so — nothing is committed for the agent (#1638)', async () => {
-  const { repo, path, branch } = await repoWithDirtyWorktree()
-  const git = nodeGitRunner()
-  try {
-    const result = await removeProjectWorktree(repo, RUN_ID)
-    assert.equal(result.ok, false)
-    assert.match(result.ok === false ? result.error : '', /uncommitted work/)
-    assert.equal((await stat(path)).isDirectory(), true, 'the checkout is still on disk')
-    assert.match(await readFile(join(path, 'index.html'), 'utf8'), /Welcome!/, 'with the work still in it, uncommitted')
-    assert.equal((await git(['log', '--format=%s', branch], repo)).trim(), 'init', 'no commit was grabbed')
-    await assert.rejects(() => git(['rev-parse', '--verify', `refs/remotes/origin/${branch}`], repo), 'and nothing reached the remote')
-  } finally {
-    await rm(repo, { recursive: true, force: true })
-  }
-})
-
-test('removing a retained worktree keeps the work its agent committed, on the branch and the remote (#982/E5)', async () => {
-  const { repo, path, branch } = await repoWithDirtyWorktree()
-  const git = nodeGitRunner()
-  try {
-    await commitWork(path)
-    assert.deepEqual(await removeProjectWorktree(repo, RUN_ID), { ok: true })
-    await assert.rejects(() => stat(path), 'the checkout is gone')
-    assert.match(
-      await git(['show', `${branch}:index.html`], repo),
-      /Welcome!/,
-      'the committed edit survived on the branch instead of being forced away',
-    )
-    assert.match(
-      await git(['show', `refs/remotes/origin/${branch}:index.html`], repo),
-      /Welcome!/,
-      'and on the remote, which is what made the deletion recoverable',
-    )
-  } finally {
-    await rm(repo, { recursive: true, force: true })
-  }
-})
 
 test('a worktree whose branch cannot reach the remote is kept, and says so (E5)', async () => {
   // No remote configured: nothing is recoverable, so nothing is deleted.
@@ -227,91 +187,6 @@ test('a web run whose checkout holds more than the hand-off carried falls back t
   }
 })
 
-test('a run branch holding nothing the remote lacks goes with its checkout, unpushed (#1650)', async () => {
-  // A triage that wrote only to the data branch, or a run stopped before its first commit: the
-  // branch tip is the commit it started from, which origin already has. Pushing it is what put an
-  // empty `tf-triage-quick` on origin; keeping it is what made the next triage stand down behind
-  // a branch that "already exists", back when the prompt aborted on the name (#1293, retired by
-  // the routine lock, #1659).
-  const { repo, path, branch } = await repoWithDirtyWorktree()
-  const git = nodeGitRunner()
-  try {
-    await git(['push', '-q', 'origin', 'HEAD:main'], repo)
-    await git(['checkout', '--', '.'], path)
-    await mkdir(join(repo, '.git', 'info'), { recursive: true })
-    await writeFile(join(repo, '.git', 'info', 'exclude'), '.the-framework/\n')
-    const now = new Date().toISOString()
-    await mkdir(join(path, '.the-framework'), { recursive: true })
-    await writeFile(join(path, '.the-framework', 'agent.json'), JSON.stringify({ status: 'done', id: RUN_ID, startedAt: now, updatedAt: now }))
-    assert.deepEqual(await removeProjectWorktree(repo, RUN_ID), { ok: true, branchesDeleted: [branch] })
-    await assert.rejects(() => stat(path), 'the checkout is gone')
-    await assert.rejects(() => git(['rev-parse', '--verify', `refs/remotes/origin/${branch}`], repo), 'nothing reached origin')
-    await assert.rejects(() => git(['rev-parse', '--verify', `refs/heads/${branch}`], repo), 'and the branch went with the checkout')
-  } finally {
-    await rm(repo, { recursive: true, force: true })
-  }
-})
-
-test('a clean checkout whose commit the remote does not have yet is pushed and keeps its branch (#1650)', async () => {
-  // The carve-out is for a branch that provably holds nothing. A commit origin has never seen is
-  // exactly what the ordinary rule exists to protect, clean tree or not.
-  const { repo, path, branch } = await repoWithDirtyWorktree()
-  const git = nodeGitRunner()
-  try {
-    await git(['push', '-q', 'origin', 'HEAD:main'], repo)
-    await git(['config', 'user.email', 't@t'], path)
-    await git(['config', 'user.name', 't'], path)
-    await git(['add', '-A'], path)
-    await git(['commit', '-q', '-m', 'work'], path)
-    assert.deepEqual(await removeProjectWorktree(repo, RUN_ID), { ok: true })
-    await assert.rejects(() => stat(path), 'the checkout is gone')
-    assert.match(await git(['show', `refs/remotes/origin/${branch}:index.html`], repo), /Welcome!/, 'the commit reached origin')
-    assert.match(await git(['show', `${branch}:index.html`], repo), /Welcome!/, 'and the branch stays')
-  } finally {
-    await rm(repo, { recursive: true, force: true })
-  }
-})
-
-test('a run branch pushed under its own name holds its own work, so it stays (#1650)', async () => {
-  // `origin/<branch>` contains the branch tip by definition. Counting it would read every pushed
-  // run branch — the one with the PR — as holding nothing, and delete the local copy after each run.
-  const { repo, path, branch } = await repoWithDirtyWorktree()
-  const git = nodeGitRunner()
-  try {
-    await git(['config', 'user.email', 't@t'], path)
-    await git(['config', 'user.name', 't'], path)
-    await git(['add', '-A'], path)
-    await git(['commit', '-q', '-m', 'work'], path)
-    await git(['push', '-q', 'origin', branch], path)
-    assert.deepEqual(await removeProjectWorktree(repo, RUN_ID), { ok: true })
-    await assert.rejects(() => stat(path), 'the checkout is gone')
-    assert.match(await git(['show', `${branch}:index.html`], repo), /Welcome!/, 'the branch stays')
-  } finally {
-    await rm(repo, { recursive: true, force: true })
-  }
-})
-
-test("a leftover checkout on a branch the framework did not mint keeps that branch, empty or not (#1650)", async () => {
-  // Found on the rig: a reclaimed checkout sitting on `main`. It held nothing, and `git branch -D
-  // main` failed only because the primary checkout had it out — git's refusal is not the guard.
-  const { repo, path } = await repoWithDirtyWorktree()
-  const git = nodeGitRunner()
-  try {
-    await git(['push', '-q', 'origin', 'HEAD:main'], repo)
-    await git(['checkout', '--', '.'], path)
-    await git(['checkout', '-q', '-b', 'release'], path)
-    await mkdir(join(repo, '.git', 'info'), { recursive: true })
-    await writeFile(join(repo, '.git', 'info', 'exclude'), '.the-framework/\n')
-    // The user's branch stays; the run-id branch it was cut from is ours and holds nothing
-    // `release` does not, so that one goes (#1657).
-    assert.deepEqual(await removeProjectWorktree(repo, RUN_ID), { ok: true, branchesDeleted: [agentBranchName(RUN_ID)] })
-    await assert.rejects(() => stat(path), 'the checkout is gone')
-    await git(['rev-parse', '--verify', 'refs/heads/release'], repo)
-  } finally {
-    await rm(repo, { recursive: true, force: true })
-  }
-})
-
 test("a branches/ directory that is not a git worktree is refused before any git runs in it (#1654)", async () => {
   // Found on the rig: a checkout removed by hand, then a failed-start marker written into the
   // path. Git, asked in that directory, answers for the enclosing repo — so the ordinary rule
@@ -340,69 +215,39 @@ test("a branches/ directory that is not a git worktree is refused before any git
 })
 
 test('the run-id branch the agent branched away from goes with the checkout when the kept branch contains it (#1657)', async () => {
-  // The system prompt has the agent create `tf-<name>` rather than be renamed onto it, so every
-  // run leaves `tf-agent-<id>` behind at the commit it started from — nine of them on the rig.
+  // The framework names the checkout's birth branch to the rule; without it nothing would go.
   const { repo, path, branch: runBranch } = await repoWithDirtyWorktree()
   const git = nodeGitRunner()
   try {
     await git(['push', '-q', 'origin', 'HEAD:main'], repo)
     await git(['checkout', '-q', '-b', 'tf-cool-name'], path)
-    await git(['config', 'user.email', 't@t'], path)
-    await git(['config', 'user.name', 't'], path)
-    await git(['add', '-A'], path)
-    await git(['commit', '-q', '-m', 'work'], path)
+    await commitWork(path)
     assert.deepEqual(await removeProjectWorktree(repo, RUN_ID), { ok: true, branchesDeleted: [runBranch] })
-    assert.match(await git(['show', 'tf-cool-name:index.html'], repo), /Welcome!/, 'the work branch stays, pushed')
-    assert.match(await git(['show', 'refs/remotes/origin/tf-cool-name:index.html'], repo), /Welcome!/)
+    assert.match(await git(['show', 'refs/remotes/origin/tf-cool-name:index.html'], repo), /Welcome!/, 'the work branch stays, pushed')
     await assert.rejects(() => git(['rev-parse', '--verify', `refs/heads/${runBranch}`], repo), 'the run-id branch is gone')
-    await assert.rejects(() => git(['rev-parse', '--verify', `refs/remotes/origin/${runBranch}`], repo), 'and was never pushed')
   } finally {
     await rm(repo, { recursive: true, force: true })
   }
 })
 
-test('a commitless triage leaves neither its pinned branch nor its run-id branch (#1650, #1657)', async () => {
-  // The rig case in full: the checkout ends on an empty `tf-triage-quick`, branched off an
-  // equally empty run-id branch. Both hold nothing; both go; nothing is pushed.
-  const { repo, path, branch: runBranch } = await repoWithDirtyWorktree()
+test('a publish-nothing session with committed, unpushed work keeps its checkout: the push is never made for it (B5)', async () => {
+  // Clean tree, so the only thing standing between the checkout and removal is the push the
+  // handoff forbids — which is exactly what the framework must tell the rule.
+  const { repo, path, branch } = await repoWithDirtyWorktree()
   const git = nodeGitRunner()
   try {
-    await git(['push', '-q', 'origin', 'HEAD:main'], repo)
-    await git(['checkout', '--', '.'], path)
-    await git(['checkout', '-q', '-b', 'tf-triage-quick'], path)
-    await mkdir(join(repo, '.git', 'info'), { recursive: true })
-    await writeFile(join(repo, '.git', 'info', 'exclude'), '.the-framework/\n')
+    await commitWork(path)
     const now = new Date().toISOString()
     await mkdir(join(path, '.the-framework'), { recursive: true })
-    await writeFile(join(path, '.the-framework', 'agent.json'), JSON.stringify({ status: 'done', id: RUN_ID, startedAt: now, updatedAt: now }))
-    assert.deepEqual(await removeProjectWorktree(repo, RUN_ID), { ok: true, branchesDeleted: ['tf-triage-quick', runBranch] })
-    assert.equal((await git(['branch', '--list', 'tf-*'], repo)).trim(), '', 'no tf- branch is left')
-    assert.equal((await git(['ls-remote', '--heads', 'origin', 'tf-*'], repo)).trim(), '', 'and none reached origin')
-  } finally {
-    await rm(repo, { recursive: true, force: true })
-  }
-})
-
-test('a run-id branch carrying a commit the kept branch lacks stays (#1657)', async () => {
-  // The agent committed on the run-id branch, then branched from main and went on from there.
-  // The run-id branch holds something the kept branch does not, so it is not the framework's
-  // to delete.
-  const { repo, path, branch: runBranch } = await repoWithDirtyWorktree()
-  const git = nodeGitRunner()
-  try {
-    await git(['push', '-q', 'origin', 'HEAD:main'], repo)
-    await git(['config', 'user.email', 't@t'], path)
-    await git(['config', 'user.name', 't'], path)
-    await git(['add', '-A'], path)
-    await git(['commit', '-q', '-m', 'early work on the run-id branch'], path)
-    // From the init commit, not from `main`: CI's `git init` names its branch `master`.
-    const init = (await git(['rev-parse', 'HEAD'], repo)).trim()
-    await git(['checkout', '-q', '-b', 'tf-other', init], path)
-    await writeFile(join(path, 'other.txt'), 'later\n')
-    await git(['add', '-A'], path)
-    await git(['commit', '-q', '-m', 'later work elsewhere'], path)
-    assert.deepEqual(await removeProjectWorktree(repo, RUN_ID), { ok: true })
-    assert.match(await git(['show', `${runBranch}:index.html`], repo), /Welcome!/, 'the early commit is still on the run-id branch')
+    await writeFile(
+      join(path, '.the-framework', 'agent.json'),
+      JSON.stringify({ status: 'done', id: RUN_ID, startedAt: now, updatedAt: now, handoff: { push: false, pr: false } }),
+    )
+    const result = await removeProjectWorktree(repo, RUN_ID)
+    assert.equal(result.ok, false)
+    assert.match(result.ok === false ? result.error : '', /publish nothing/)
+    assert.equal((await stat(path)).isDirectory(), true, 'the checkout is still on disk')
+    await assert.rejects(() => git(['rev-parse', '--verify', `refs/remotes/origin/${branch}`], repo), 'and nothing reached the remote')
   } finally {
     await rm(repo, { recursive: true, force: true })
   }

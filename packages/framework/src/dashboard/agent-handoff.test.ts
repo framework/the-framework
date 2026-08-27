@@ -5,10 +5,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { readAgentHandoff, resolveAgentPr, mergeAgentPr, agentBranchFor, pushAgentBranch, openBranchPullRequest, openRemoteBranchPullRequest, openAgentPullRequest, gitReason, agentAutoHandoff, isAgentBranch, prBaseName, withheldMerge } from './agent-handoff.js'
+import { readAgentHandoff, resolveAgentPr, mergeAgentPr, agentBranchFor, openBranchPullRequest, openRemoteBranchPullRequest, openAgentPullRequest, agentAutoHandoff, isAgentBranch, prBaseName, withheldMerge } from './agent-handoff.js'
 import { pickAgentPr } from './gh.js'
-import { nodeGitRunner, GIT_SLOW_TIMEOUT_MS, type GitRunner } from '../project.js'
-import { CliTimeoutError, isCliTimeout } from '../cli-exec.js'
+import { nodeGitRunner, type GitRunner } from '@superskill/branch-management'
 
 const exec = promisify(execFile)
 const SEP = String.fromCharCode(31)
@@ -30,10 +29,9 @@ const REPO = { 'rev-parse --git-dir': '.git' }
 
 test('the recorded branch wins over both derivations (#799)', () => {
   assert.equal(agentBranchFor({ id: 'r1', branch: 'feat/mine', sessionName: 'named' }), 'feat/mine')
-  // The fallbacks guess with the legacy slashed spellings on purpose: they only apply to runs
-  // archived before the branch was recorded, which all predate the slash-free rename (#1581).
-  assert.equal(agentBranchFor({ id: 'r1', sessionName: 'named' }), 'the-framework/named')
-  assert.equal(agentBranchFor({ id: 'r1' }), 'the-framework/agent-r1')
+  // The fallbacks guess from the session name, else the agent id.
+  assert.equal(agentBranchFor({ id: 'r1', sessionName: 'named' }), 'tf-named')
+  assert.equal(agentBranchFor({ id: 'r1' }), 'tf-agent-r1')
 })
 
 test('a non-repo yields no handoff at all', async () => {
@@ -140,38 +138,6 @@ test('the PR is looked up for the session branch, not the checkout HEAD (#799)',
   })
   assert.deepEqual(asked, ['the-framework/x'])
   assert.equal(handoff?.pr?.number, 7)
-})
-
-test('a failed push comes back as an error rather than throwing', async () => {
-  const git: GitRunner = async () => {
-    throw new Error('no upstream configured')
-  }
-  const result = await pushAgentBranch('/repo', 'b', git)
-  assert.deepEqual(result, { ok: false, error: 'no upstream configured' })
-})
-
-test('a timed-out push says so instead of reading like a rejected push (#997)', async () => {
-  const git: GitRunner = async args => {
-    throw new CliTimeoutError('git', args, GIT_SLOW_TIMEOUT_MS)
-  }
-  const result = await pushAgentBranch('/repo', 'b', git)
-  assert.equal(result.ok, false)
-  const error = result.ok === false ? result.error : ''
-  // A SIGTERM'd push has empty stderr, so this used to surface as a bare 'Command failed: git push'.
-  assert.match(error, /timed out after 120000ms/)
-  assert.match(error, /push --set-upstream origin b/)
-})
-
-test('a timeout is distinguishable from a git rejection (#997)', () => {
-  assert.equal(isCliTimeout(new CliTimeoutError('git', ['push'], 120_000)), true)
-  assert.equal(isCliTimeout(new Error("fatal: 'origin' does not appear to be a git repository")), false)
-})
-
-test("a push failure shows git's reason, not the command echoed back", () => {
-  // execFile buries the useful line under its own 'Command failed:' preamble.
-  const err = new Error("Command failed: git push --set-upstream origin b\nfatal: 'origin' does not appear to be a git repository\n")
-  assert.equal(gitReason(err), "fatal: 'origin' does not appear to be a git repository")
-  assert.equal(gitReason(new Error('something odd')), 'something odd')
 })
 
 test('opening a PR pushes first and returns the URL gh printed', async () => {
@@ -649,7 +615,7 @@ test('a failed push is reported with git’s own reason, so the bar can offer th
 
 test('a session branch is recognised by its prefix, a hand-made one is not (#1102)', () => {
   assert.equal(isAgentBranch('tf-x'), true)
-  assert.equal(isAgentBranch('the-framework/x'), true) // legacy spelling (pre-#1581) still counts
+  assert.equal(isAgentBranch('the-framework/x'), false) // the retired slashed spelling is nobody's
   assert.equal(isAgentBranch('feat/mine'), false)
   assert.equal(isAgentBranch(undefined), false)
 })

@@ -1,4 +1,4 @@
-The lifecycle of an agent's own checkout: creating it, naming its branch, committing whatever the agent left behind, deciding whether it is safe to delete, and deleting it. Giving every agent its own checkout is what lets several agents work one repo at once without fighting over a single working tree.
+The lifecycle of an agent's own checkout: creating it, naming its branch, reading whether it is clean and whether its branch is on the remote, and deleting it. Giving every agent its own checkout is what lets several agents work one repo at once without fighting over a single working tree.
 
 ## User story
 
@@ -15,6 +15,7 @@ The lifecycle of an agent's own checkout: creating it, naming its branch, commit
 - **A checkout is read, never committed** - the framework commits nothing on an agent's behalf; whether a checkout is clean is a read, and a checkout holding uncommitted work is the caller's to keep.
 - **Nothing local is ever the last copy of work** - a checkout may be deleted only when the remote already has its branch tip.
 - **A branch the caller proved holds nothing can be deleted outright** - the deletion is unconditional and forgiving, because the caller has already established the stronger fact.
+- **The checkouts on disk are listed by name** - every directory under `.the-framework/branches/` in the minted `tf-agent-<agent id>` spelling is a checkout, and names the agent that owns it; the rename links beside them are not.
 - **Every read is forgiving; every removal is idempotent** - a git failure yields "unknown" rather than breaking the caller, and removing a checkout twice is harmless.
 
 ## Business logic
@@ -77,10 +78,6 @@ Nothing is committed on an agent's behalf. A checkout can be asked whether it is
 
 The framework used to commit whatever it found, as a safety net before removal. That net caught everything in the tree, including a 7,632-file build cache that went to a project's main branch unnoticed. A commit path that adds everything it finds is only as safe as the ignore file is complete, and it runs unattended; the agent committing its own work, and the framework only ever reading, has no such failure.
 
-#### Rationale
-
-Retrying was added because losing that lock race once made a real agent's work be judged as "committed nothing" by its handoff, while the teardown's identical commit seconds later succeeded.
-
 ### Nothing local is ever the last copy of work
 
 #### User story
@@ -107,7 +104,7 @@ Teardown never leaves a stranded checkout behind, and never silently deletes som
 
 #### Business logic
 
-Removal tolerates a path that is already gone or was never registered, so teardown can run more than once. Plain removal is attempted first, because git refuses it for a checkout it considers unclean — which, after the commit step, means a state that was not anticipated. Removal is then retried forcefully so that, for example, an ignored build artifact cannot strand a checkout forever, but the forced removal is logged, because forcing past unknown state is exactly how uncommitted work was destroyed before.
+Removal tolerates a path that is already gone or was never registered, so teardown can run more than once. Plain removal is attempted first, because git refuses it for a checkout it considers unclean — which, after the caller's clean check, means a state that was not anticipated. Removal is then retried forcefully so that, for example, an ignored build artifact cannot strand a checkout forever, but the forced removal is logged, because forcing past unknown state is exactly how uncommitted work was destroyed before.
 
 ## Before modifying/creating SPEC.md files
 

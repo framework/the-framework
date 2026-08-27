@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { hostname } from 'node:os'
 import type { AutoHandoffSkip, FrameworkEvent } from '../events.js'
 import { nodeFs } from '../node-fs.js'
-import { agentIdFromWorktreeDir, isWorktreeDirName, DATA_BRANCH } from '../branch-names.js'
+import { FRAMEWORK_DIR, BRANCHES_DIR, DATA_BRANCH, isSafeAgentId, worktreeDirEntries } from '@superskill/branch-management'
 
 /**
  * Persisted orchestration state (#211). The dashboard is a pure projection of the
@@ -14,24 +14,6 @@ import { agentIdFromWorktreeDir, isWorktreeDirName, DATA_BRANCH } from '../branc
  * model to keep in sync. Per the sync, we do **not** persist the agent's chat
  * transcript (Claude Code owns that); only our own orchestration events.
  */
-
-/**
- * The directory, under the workspace root, that holds the persisted agent (#313):
- * one dir holds both the transient agent state (events.jsonl / agent.json) and the
- * committed agent archive (agents/, #1179); a seeded `.the-framework/.gitignore`
- * keeps the agent state untracked.
- */
-export const FRAMEWORK_DIR = '.the-framework'
-
-/**
- * Per-run worktrees live under `<repo>/.the-framework/branches/` (#736/#1580), each in a dir
- * named as its branch. Kept out of git by the install-time `.the-framework/.gitignore` (`*` rule,
- * #313), so a worktree's checkout never shows up as dirty in the parent. Declared here beside
- * {@link FRAMEWORK_DIR} rather than in `worktree.ts`, which imports from this module:
- * {@link readLiveMetas} needs it to find the runs living in those worktrees, and the other
- * direction would be an import cycle.
- */
-export const BRANCHES_DIR = 'branches'
 
 /** The append-only event log: one {@link FrameworkEvent} per line (JSONL). */
 export const EVENTS_FILE = 'events.jsonl'
@@ -60,11 +42,6 @@ export function agentIdFromStartedAt(startedAt: string): string {
   // ISO is fixed-width, so replacing the `:`/`.` separators keeps lexical order
   // in step with chronological order — the history list sorts by id alone.
   return startedAt.replace(/[:.]/g, '-')
-}
-
-/** An agent id is path-safe: no separators or traversal, only our own charset. */
-export function isSafeAgentId(id: string): boolean {
-  return /^[A-Za-z0-9_-]+$/.test(id)
 }
 
 /**
@@ -781,35 +758,6 @@ export async function restoreArchivedAgent(
   }
 }
 
-/** One checkout on disk: where it is, and whose it is. */
-export interface WorktreeDirEntry {
-  path: string
-  agentId: string
-}
-
-/**
- * Every checkout directory on disk (#1580). Only the run branch spelling counts — the same
- * directory holds the rename links (#1589), which are views, not checkouts. Forgiving: a missing
- * root yields nothing.
- */
-export async function worktreeDirEntries(cwd: string, fs: StoreFs = nodeStoreFs()): Promise<WorktreeDirEntry[]> {
-  const root = join(cwd, FRAMEWORK_DIR, BRANCHES_DIR)
-  const entries: WorktreeDirEntry[] = []
-  for (const name of await fs.readdir(root).catch(() => [])) {
-    const agentId = agentIdFromWorktreeDir(name)
-    if (isWorktreeDirName(name) && isSafeAgentId(agentId)) entries.push({ path: join(root, name), agentId })
-  }
-  return entries
-}
-
-/**
- * The agent ids that have a worktree directory (#737/#1580). Forgiving — a project that never ran
- * concurrently has no such dir and yields `[]`.
- */
-export async function listWorktreeDirs(cwd: string, fs: StoreFs = nodeStoreFs()): Promise<string[]> {
-  return [...new Set((await worktreeDirEntries(cwd, fs)).map(entry => entry.agentId))]
-}
-
 /**
  * Archive a worktree agent's history into the *main repo* (#737), returning the meta it archived.
  *
@@ -1012,7 +960,7 @@ export async function reconcileOrphanedAgents(
   // where nothing reads it. Flip it in place (so the dashboard stops showing it as live) and copy
   // it into the repo's history. The worktree itself is left on disk: an agent that ended this way did
   // not end cleanly, and those are kept for inspection. Removing one is an explicit action.
-  for (const entry of await worktreeDirEntries(cwd, fs)) {
+  for (const entry of await worktreeDirEntries(cwd, path => fs.readdir(path))) {
     const worktreeDir = join(entry.path, FRAMEWORK_DIR)
     const meta = await readMetaFile(fs, join(worktreeDir, META_FILE))
     if (!isDeadRunningAgent(meta, isAlive)) continue
@@ -1096,7 +1044,7 @@ export async function readLiveMetas(
   isAlive: (pid: number) => boolean = isPidAlive,
 ): Promise<LiveAgent[]> {
   // The checkouts under `branches/`: run-branch-named dirs, never the rename links beside them.
-  const candidates = [cwd, ...(await worktreeDirEntries(cwd, fs)).map(entry => entry.path)]
+  const candidates = [cwd, ...(await worktreeDirEntries(cwd, path => fs.readdir(path))).map(entry => entry.path)]
   const agents: LiveAgent[] = []
   for (const candidate of candidates) {
     const meta = await readLiveMeta(candidate, fs, isAlive).catch(() => undefined)

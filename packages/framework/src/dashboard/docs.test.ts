@@ -5,8 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { readDocs, DOC_CATEGORIES } from './docs.js'
 import { withDataBranch } from '../data-branch.js'
-import { nodeGitRunner } from '../project.js'
-
+import { nodeGitRunner } from '@superskill/branch-management'
 /** A real repo whose queue lives on the data branch (#1582), the way readDocs now reads it. */
 async function repoWithQueue(md: string): Promise<string> {
   const git = nodeGitRunner()

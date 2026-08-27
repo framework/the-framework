@@ -3,8 +3,7 @@ import { test } from 'node:test'
 import { join } from 'node:path'
 import { mkdir, mkdtemp, rm, writeFile, stat, realpath } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import type { GitRunner } from '../project.js'
-import { nodeGitRunner } from '../project.js'
+import { nodeGitRunner, type GitRunner } from './git.js'
 import {
   addWorktree,
   attachWorktree,
@@ -17,11 +16,11 @@ import {
   pruneWorktrees,
   worktreeClean,
   worktreePath,
-  agentBranchName,
   currentBranch,
   renameAgentBranch,
-  FRAMEWORK_DIR,
-} from './index.js'
+  listWorktreeDirs,
+} from './worktree.js'
+import { agentBranchName, FRAMEWORK_DIR, BRANCHES_DIR } from './branch-names.js'
 
 const REPO = '/repo'
 
@@ -284,4 +283,21 @@ test('renameAgentBranch never throws: a run outlives a failed rename', async () 
   }
   assert.equal(await renameAgentBranch('/wt', 'tf-agent-1', 'tf-x', failsOnRename), false)
   assert.equal(await renameAgentBranch('/wt', 'a', 'b', failingGit), false)
+})
+
+/** A directory reader over one listing: `entries[dir]` are the names under `dir`. */
+const listing = (entries: Record<string, string[]>) => async (dir: string) => entries[dir] ?? []
+
+test('listWorktreeDirs lists the run-branch-named dirs under branches/ and nothing else (#737/#1580)', async () => {
+  const root = join('/repo', FRAMEWORK_DIR, BRANCHES_DIR)
+  const readdir = listing({ [root]: ['tf-agent-r1', 'tf-agent-r2', '.tmp'] })
+  assert.deepEqual((await listWorktreeDirs('/repo', readdir)).sort(), ['r1', 'r2'])
+  assert.deepEqual(await listWorktreeDirs('/never-ran', readdir), [])
+})
+
+test('listWorktreeDirs never mistakes a rename link for a run (#1580)', async () => {
+  const root = join('/repo', FRAMEWORK_DIR, BRANCHES_DIR)
+  // A rename link beside the checkouts: its name has no run prefix, so it is not a run.
+  const readdir = listing({ [root]: ['tf-agent-r1', 'tf-cool-name'] })
+  assert.deepEqual(await listWorktreeDirs('/repo', readdir), ['r1'])
 })

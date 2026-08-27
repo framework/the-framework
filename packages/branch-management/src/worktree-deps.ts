@@ -1,5 +1,5 @@
 import { join, relative } from 'node:path'
-import { FRAMEWORK_DIR } from './agent-store.js'
+import { FRAMEWORK_DIR } from './branch-names.js'
 
 /**
  * Give a fresh worktree a dependency tree (#736). `node_modules` is gitignored, so

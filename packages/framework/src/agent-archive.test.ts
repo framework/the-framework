@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { join } from 'node:path'
-import type { GitRunner } from './project.js'
+import type { GitRunner } from '@superskill/branch-management'
 import { userDirName, resolveUserDir, forgetUserDirs, ANONYMOUS_USER_DIR } from './agent-archive.js'
 import { frameworkGitignore } from './framework-gitignore.js'
 

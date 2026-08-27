@@ -24,7 +24,8 @@ import { pullDataBranch, withDataBranch } from './data-branch.js'
 import type { ProjectErrors } from './project-errors.js'
 import { readFile, writeFile } from 'node:fs/promises'
 import { startMergedWorktreeSweep, type MergedSweepOptions } from './merged-worktrees.js'
-import { startBranchLinksPass } from './branch-links.js'
+import { reconcileBranchLinks } from '@superskill/branch-management'
+import { startProjectPass } from './project-pass.js'
 import { startCloudScratchSweep } from './cloud-scratch-refs.js'
 import { startCloudWorkAdoption } from './cloud-work.js'
 import { resolveAgentPr } from './dashboard/agent-handoff.js'
@@ -381,7 +382,9 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
 
   // The #1580 branches view: one symlink per worktree under `.the-framework/branches/`, named as
   // its branch, plus the repo-root `branches` shortcut. Quiet, idempotent, near-free per tick.
-  const branchLinks = startBranchLinksPass({ projects })
+  // The branches view (#1580): links settle within a tick, and allocation reconciles its own
+  // checkout immediately. Quiet on purpose — links are presentation.
+  const branchLinks = startProjectPass(projects, cwd => reconcileBranchLinks(cwd).catch(() => {}))
 
   // Delete the scratch refs a web hand-off leaves on origin (#1547): the pre-hand-off `cloud-*`
   // ref and the run branch, one dead pair per web run. Daemon-side rather than in the driver,

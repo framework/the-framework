@@ -1,4 +1,4 @@
-What the tests cover: a process killed for outrunning its time budget rejects as a timeout, while a non-zero exit does not; the timeout rejection names the command and the budget it outran; timeout recognition answers false for a plain error and for a non-error value; and a budget derived from the arguments gives a slow operation the room a short budget denies.
+What the tests cover: a process killed for outrunning its time budget rejects as a timeout, while a non-zero exit does not; and the timeout rejection names the command and the budget it outran.
 
 ## Before modifying/creating SPEC.md files
 

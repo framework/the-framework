@@ -5,10 +5,9 @@ import { BRANCHES_DIR, AGENT_BRANCH_PREFIX, isSafeAgentId, isAgentBranch, agentB
 
 /**
  * Git-worktree lifecycle for concurrent agents (#453/#735): give each agent its own
- * checkout so N runs on one repo never fight over the working tree. Pure plumbing
- * over the existing {@link GitRunner} seam; no daemon wiring, no concurrency, no
- * dashboard changes (those are the sibling #453 slices). This module only knows
- * how to add, list, remove, and prune worktrees.
+ * checkout so N agents on one repo never fight over the working tree. Pure plumbing
+ * over the {@link GitRunner} seam: this module only knows how to add, list, name,
+ * remove, and prune worktrees, and to read what a retention decision needs.
  */
 
 /** The path an agent's worktree gets (#1580): `<repo>/.branches/<agent branch>`. */
@@ -92,11 +91,11 @@ export interface AddedWorktree {
 export async function addWorktree(
   repo: string,
   opts: AddWorktreeOptions,
-  agent: GitRunner = nodeGitRunner(),
+  git: GitRunner = nodeGitRunner(),
 ): Promise<AddedWorktree> {
-  if (!isSafeAgentId(opts.agentId)) throw new Error(`unsafe run id: ${opts.agentId}`)
+  if (!isSafeAgentId(opts.agentId)) throw new Error(`unsafe agent id: ${opts.agentId}`)
   const path = worktreePath(repo, opts.agentId)
-  await agent(['worktree', 'add', '-b', opts.branch, path, ...(opts.base ? [opts.base] : [])], repo)
+  await git(['worktree', 'add', '-b', opts.branch, path, ...(opts.base ? [opts.base] : [])], repo)
   return { path, branch: opts.branch }
 }
 
@@ -113,21 +112,21 @@ export async function addWorktree(
 export async function attachWorktree(
   repo: string,
   opts: { agentId: string; branch: string },
-  agent: GitRunner = nodeGitRunner(),
+  git: GitRunner = nodeGitRunner(),
 ): Promise<AddedWorktree> {
-  if (!isSafeAgentId(opts.agentId)) throw new Error(`unsafe run id: ${opts.agentId}`)
+  if (!isSafeAgentId(opts.agentId)) throw new Error(`unsafe agent id: ${opts.agentId}`)
   const path = worktreePath(repo, opts.agentId)
   try {
-    await agent(['worktree', 'add', path, opts.branch], repo)
+    await git(['worktree', 'add', path, opts.branch], repo)
   } catch (err) {
     // `worktree add <path> <name>` also resolves a remote-only `origin/<name>`, so the existence
     // check comes after the attempt, not before it.
-    const exists = await agent(['show-ref', '--verify', '--quiet', `refs/heads/${opts.branch}`], repo).then(
+    const exists = await git(['show-ref', '--verify', '--quiet', `refs/heads/${opts.branch}`], repo).then(
       () => true,
       () => false,
     )
     if (exists) throw err
-    await agent(['worktree', 'add', '-b', opts.branch, path], repo)
+    await git(['worktree', 'add', '-b', opts.branch, path], repo)
   }
   return { path, branch: opts.branch }
 }
@@ -136,9 +135,9 @@ export async function attachWorktree(
  * Every worktree registered for the repo (the main checkout included). Forgiving:
  * a non-repo / git failure yields `[]` so a reconcile scan never throws.
  */
-export async function listWorktrees(repo: string, agent: GitRunner = nodeGitRunner()): Promise<WorktreeInfo[]> {
+export async function listWorktrees(repo: string, git: GitRunner = nodeGitRunner()): Promise<WorktreeInfo[]> {
   try {
-    return parseWorktreeList(await agent(['worktree', 'list', '--porcelain'], repo))
+    return parseWorktreeList(await git(['worktree', 'list', '--porcelain'], repo))
   } catch {
     return []
   }
@@ -176,15 +175,15 @@ export function parseWorktreeList(porcelain: string): WorktreeInfo[] {
  * worktree forever), but it says so, because forcing past unknown state is exactly
  * how uncommitted work got deleted in the first place.
  */
-export async function removeWorktree(repo: string, path: string, agent: GitRunner = nodeGitRunner()): Promise<void> {
+export async function removeWorktree(repo: string, path: string, git: GitRunner = nodeGitRunner()): Promise<void> {
   try {
-    await agent(['worktree', 'remove', path], repo)
+    await git(['worktree', 'remove', path], repo)
     return
   } catch {
     // Unclean by git's reckoning, already removed, or never registered: try forcing.
   }
   try {
-    await agent(['worktree', 'remove', '--force', path], repo)
+    await git(['worktree', 'remove', '--force', path], repo)
     console.log(`[branches] forced removal of worktree ${path} (git called it unclean)`)
   } catch {
     // Already removed, or never registered: nothing to do.
@@ -197,8 +196,8 @@ export async function removeWorktree(repo: string, path: string, agent: GitRunne
  * Forgiving: the checkout is already gone by the time this runs, and a branch that would not
  * delete is a leftover name, not lost work.
  */
-export async function deleteBranch(repo: string, branch: string, agent: GitRunner = nodeGitRunner()): Promise<void> {
-  await agent(['branch', '-D', branch], repo).catch(() => undefined)
+export async function deleteBranch(repo: string, branch: string, git: GitRunner = nodeGitRunner()): Promise<void> {
+  await git(['branch', '-D', branch], repo).catch(() => undefined)
 }
 
 /**
@@ -210,9 +209,9 @@ export async function deleteBranch(repo: string, branch: string, agent: GitRunne
  * branch. The one question that tells the two apart is whether git's top level is this very
  * directory. False on any failure, and the caller leaves the directory alone.
  */
-export async function isWorktreeRoot(path: string, agent: GitRunner = nodeGitRunner()): Promise<boolean> {
+export async function isWorktreeRoot(path: string, git: GitRunner = nodeGitRunner()): Promise<boolean> {
   try {
-    const top = (await agent(['rev-parse', '--show-toplevel'], path)).trim()
+    const top = (await git(['rev-parse', '--show-toplevel'], path)).trim()
     if (!top) return false
     // Both sides resolved: macOS's tmpdir sits behind the /var -> /private/var link, and git
     // reports the resolved path.
@@ -227,17 +226,17 @@ export async function isWorktreeRoot(path: string, agent: GitRunner = nodeGitRun
  * the read every consumer of a `.branches/<agent>` directory wants, so none of them can take the
  * enclosing repo's branch for the run's.
  */
-export async function worktreeBranch(path: string, agent: GitRunner = nodeGitRunner()): Promise<string | undefined> {
-  return (await isWorktreeRoot(path, agent)) ? currentBranch(path, agent) : undefined
+export async function worktreeBranch(path: string, git: GitRunner = nodeGitRunner()): Promise<string | undefined> {
+  return (await isWorktreeRoot(path, git)) ? currentBranch(path, git) : undefined
 }
 
 /**
  * The branch checked out at `path`, or `undefined` when detached / not a repo.
  * Forgiving, like {@link listWorktrees}: callers use it to decide, not to fail.
  */
-export async function currentBranch(path: string, agent: GitRunner = nodeGitRunner()): Promise<string | undefined> {
+export async function currentBranch(path: string, git: GitRunner = nodeGitRunner()): Promise<string | undefined> {
   try {
-    const name = (await agent(['rev-parse', '--abbrev-ref', 'HEAD'], path)).trim()
+    const name = (await git(['rev-parse', '--abbrev-ref', 'HEAD'], path)).trim()
     return name && name !== 'HEAD' ? name : undefined
   } catch {
     return undefined
@@ -251,13 +250,13 @@ export async function currentBranch(path: string, agent: GitRunner = nodeGitRunn
  * from git's common dir, so a project that is itself a linked worktree, or a submodule, answers
  * with the directory the caller registered. Rejects outside a repo.
  */
-export async function projectRoot(cwd: string, agent: GitRunner = nodeGitRunner()): Promise<string> {
-  const checkout = await checkoutRoot(cwd, agent)
+export async function projectRoot(cwd: string, git: GitRunner = nodeGitRunner()): Promise<string> {
+  const checkout = await checkoutRoot(cwd, git)
   const parent = dirname(checkout)
   return basename(parent) === BRANCHES_DIR ? dirname(parent) : checkout
 }
 
-/** A session name as the agent picks it: the charset the system prompt asks for. */
+/** A session name as the agent picks it: the charset the skill asks for. */
 export function isSessionName(name: string): boolean {
   return /^[a-z0-9-]+$/.test(name)
 }
@@ -298,21 +297,21 @@ const NAME_ATTEMPTS = 3
  * same moment race on the rename itself; the loser reads the branches again and takes the next
  * free suffix.
  */
-export async function nameBranch(path: string, name: string, agent: GitRunner = nodeGitRunner()): Promise<NameBranchOutcome> {
+export async function nameBranch(path: string, name: string, git: GitRunner = nodeGitRunner()): Promise<NameBranchOutcome> {
   if (!isSessionName(name)) return { ok: false, reason: 'invalid-name' }
   const wanted = `${AGENT_BRANCH_PREFIX}${name}`
-  if (!(await isWorktreeRoot(path, agent))) return { ok: false, reason: 'not-a-worktree' }
-  const current = await currentBranch(path, agent)
+  if (!(await isWorktreeRoot(path, git))) return { ok: false, reason: 'not-a-worktree' }
+  const current = await currentBranch(path, git)
   if (!current) return { ok: false, reason: 'no-branch' }
   if (!isAgentBranch(current)) return { ok: false, reason: 'not-an-agent-branch' }
   for (let attempt = 1; ; attempt++) {
-    const taken = await branchNames(path, agent)
+    const taken = await branchNames(path, git)
     taken.delete(current)
     let branch = wanted
     for (let n = 2; taken.has(branch); n++) branch = `${wanted}-${n}`
     if (branch === current) return { ok: true, branch }
     try {
-      await agent(['branch', '-m', current, branch], path)
+      await git(['branch', '-m', current, branch], path)
       return { ok: true, branch }
     } catch (err) {
       if (attempt >= NAME_ATTEMPTS || !/already exists/.test(err instanceof Error ? err.message : String(err))) throw err
@@ -321,8 +320,8 @@ export async function nameBranch(path: string, name: string, agent: GitRunner = 
 }
 
 /** Every branch name the repo knows, local and remote-tracking, without the remote's prefix. */
-async function branchNames(path: string, agent: GitRunner): Promise<Set<string>> {
-  const out = await agent(['for-each-ref', '--format=%(refname)', 'refs/heads/', 'refs/remotes/'], path)
+async function branchNames(path: string, git: GitRunner): Promise<Set<string>> {
+  const out = await git(['for-each-ref', '--format=%(refname)', 'refs/heads/', 'refs/remotes/'], path)
   const names = new Set<string>()
   for (const ref of out.split('\n')) {
     const heads = ref.match(/^refs\/heads\/(.+)$/)
@@ -337,9 +336,9 @@ async function branchNames(path: string, agent: GitRunner): Promise<Set<string>>
  * `git worktree prune`: drop administrative entries for worktree dirs a crash left
  * behind. Never removes a live worktree, so it is always safe. Forgiving.
  */
-export async function pruneWorktrees(repo: string, agent: GitRunner = nodeGitRunner()): Promise<void> {
+export async function pruneWorktrees(repo: string, git: GitRunner = nodeGitRunner()): Promise<void> {
   try {
-    await agent(['worktree', 'prune'], repo)
+    await git(['worktree', 'prune'], repo)
   } catch {
     // Not a repo / nothing to prune: no-op.
   }
@@ -366,9 +365,9 @@ export function nodeSizeRunner(): SizeRunner {
  * throw or a hang would cost the panel it sits in. `du` is absent on Windows, which reads as
  * unknown like any other failure.
  */
-export async function worktreeSize(path: string, agent: SizeRunner = nodeSizeRunner()): Promise<number | undefined> {
+export async function worktreeSize(path: string, size: SizeRunner = nodeSizeRunner()): Promise<number | undefined> {
   try {
-    const kb = Number.parseInt((await agent(path)).trim().split(/\s+/)[0] ?? '', 10)
+    const kb = Number.parseInt((await size(path)).trim().split(/\s+/)[0] ?? '', 10)
     return Number.isFinite(kb) ? kb * 1024 : undefined
   } catch {
     return undefined
@@ -395,15 +394,15 @@ export async function worktreeSize(path: string, agent: SizeRunner = nodeSizeRun
 export async function branchPushed(
   repo: string,
   branch: string,
-  agent: GitRunner = nodeGitRunner(),
+  git: GitRunner = nodeGitRunner(),
 ): Promise<boolean> {
   try {
-    const local = (await agent(['rev-parse', '--verify', `refs/heads/${branch}`], repo)).trim()
-    const remote = (await agent(['rev-parse', '--verify', `refs/remotes/origin/${branch}`], repo)).trim()
+    const local = (await git(['rev-parse', '--verify', `refs/heads/${branch}`], repo)).trim()
+    const remote = (await git(['rev-parse', '--verify', `refs/remotes/origin/${branch}`], repo)).trim()
     if (!local || !remote) return false
     if (local === remote) return true
     // The remote may be ahead (someone pushed on top): what matters is that our tip is in it.
-    await agent(['merge-base', '--is-ancestor', local, remote], repo)
+    await git(['merge-base', '--is-ancestor', local, remote], repo)
     return true
   } catch {
     return false
@@ -415,8 +414,8 @@ export async function branchPushed(
  * commits nothing on an agent's behalf, so a checkout holding uncommitted work is one the caller
  * keeps. Throws when git cannot answer, so the caller keeps the checkout rather than guessing.
  */
-export async function worktreeClean(path: string, agent: GitRunner = nodeGitRunner()): Promise<boolean> {
-  return !(await agent(['status', '--porcelain'], path)).trim()
+export async function worktreeClean(path: string, git: GitRunner = nodeGitRunner()): Promise<boolean> {
+  return !(await git(['status', '--porcelain'], path)).trim()
 }
 
 /**
@@ -426,9 +425,9 @@ export async function worktreeClean(path: string, agent: GitRunner = nodeGitRunn
  * change between two rows of the same sweep. Anything unreadable answers `false`, like
  * {@link branchPushed}: keeping a checkout is the safe direction.
  */
-export async function repoHasRemote(repo: string, agent: GitRunner = nodeGitRunner()): Promise<boolean> {
+export async function repoHasRemote(repo: string, git: GitRunner = nodeGitRunner()): Promise<boolean> {
   try {
-    return (await agent(['remote'], repo)).trim().length > 0
+    return (await git(['remote'], repo)).trim().length > 0
   } catch {
     return false
   }

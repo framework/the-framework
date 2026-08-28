@@ -56,9 +56,9 @@ test('addWorktree appends the base ref when given', async () => {
   assert.deepEqual(git.calls[0]?.args, ['worktree', 'add', '-b', 'b', worktreePath(REPO, 'run1'), 'origin/main'])
 })
 
-test('addWorktree rejects an unsafe run id before touching git (no traversal out of worktrees/)', async () => {
+test('addWorktree rejects an unsafe agent id before touching git (no traversal out of .branches/)', async () => {
   const git = recordingGit()
-  await assert.rejects(() => addWorktree(REPO, { agentId: '../evil', branch: 'b' }, git), /unsafe run id/)
+  await assert.rejects(() => addWorktree(REPO, { agentId: '../evil', branch: 'b' }, git), /unsafe agent id/)
   assert.equal(git.calls.length, 0)
 })
 
@@ -251,7 +251,7 @@ test('a run worktree reads dirty until the agent commits; the branch then outliv
   }
 })
 
-test('agentBranchName names the branch after the run id (#736)', () => {
+test('agentBranchName names the branch after the agent id (#736)', () => {
   assert.equal(agentBranchName('2026-07-19T10-00-00-000Z'), 'agent-2026-07-19T10-00-00-000Z')
 })
 

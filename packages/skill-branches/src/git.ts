@@ -144,15 +144,15 @@ export function nodeGitRunner(): GitRunner {
  * Forgiving in one direction only: an unreadable / missing git reads as "no repo", which is the
  * conservative answer for the caller that treats a repo's failure as fatal.
  */
-export async function isGitRepo(cwd: string, agent: GitRunner = nodeGitRunner()): Promise<boolean> {
-  return agent(['rev-parse', '--is-inside-work-tree'], cwd)
+export async function isGitRepo(cwd: string, git: GitRunner = nodeGitRunner()): Promise<boolean> {
+  return git(['rev-parse', '--is-inside-work-tree'], cwd)
     .then(out => out.trim() === 'true')
     .catch(() => false)
 }
 
 /** The root of the checkout `cwd` is in — an agent's own, from anywhere under it. Rejects outside a repo. */
-export async function checkoutRoot(cwd: string, agent: GitRunner = nodeGitRunner()): Promise<string> {
-  return (await agent(['rev-parse', '--show-toplevel'], cwd)).trim()
+export async function checkoutRoot(cwd: string, git: GitRunner = nodeGitRunner()): Promise<string> {
+  return (await git(['rev-parse', '--show-toplevel'], cwd)).trim()
 }
 
 /**

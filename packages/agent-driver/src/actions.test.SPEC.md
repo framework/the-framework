@@ -1,4 +1,4 @@
-What the tests cover: an agent on the `actions` run target dispatches its workflow, keeps polling while the run is queued and in progress, and turns the run's uploaded transcript into a finished turn with the agent's final message, its session id, and its usage figures.
+What the tests cover: an agent under the GitHub Actions driver dispatches its workflow, keeps polling while the run is queued and in progress, and turns the run's uploaded transcript into a finished turn with the agent's final message, its session id, and its usage figures.
 
 - The prompt is dispatched with the system prompt framing in front of the task text, plus a per-turn correlation id that is the only way back to a run GitHub reports no identifier for; two agents never share a correlation prefix, so a freshly started process cannot latch onto another agent's workflow run.
 - Each run is asked to push to the same branch for the whole agent, and every turn after the first is dispatched from the branch the previous run pushed, so later work builds on earlier work.

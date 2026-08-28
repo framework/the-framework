@@ -1,4 +1,4 @@
-The driver for the `actions` run target: instead of running the coding-agent CLI on this device, it hands each turn to a GitHub Actions runner — dispatch the project's agent workflow, wait for the run to finish, then read back the transcript the run uploaded. To the caller this looks exactly like any other driver; only the tempo differs.
+The GitHub Actions driver (`github-actions`): instead of running the coding-agent CLI on this device, it hands each turn to a GitHub Actions runner — dispatch the project's agent workflow, wait for the run to finish, then read back the transcript the run uploaded. To the caller this looks exactly like any other driver; only the tempo differs.
 
 ## User story
 
@@ -60,7 +60,7 @@ Dispatching a workflow returns no identifier for the run it creates. Each turn t
 
 #### User story
 
-The caller's UI shows an agent's tool calls and messages as an event stream, the same way for every run target.
+The caller's UI shows an agent's tool calls and messages as an event stream, the same way for every driver.
 
 #### Business logic
 

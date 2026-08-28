@@ -14,9 +14,10 @@ import {
   type RoutineLockDeps,
 } from './routine-locks.js'
 import { DATA_BRANCH, dataWorktreePath, type withDataBranch } from './data-branch.js'
+import { DATA_CHECKOUT_DIR } from './framework-dir.js'
 import { nodeGitRunner } from '@gemstack/skill-branches'
 const CWD = '/repo'
-const DATA = join(CWD, '.the-framework', 'branches', 'tf-data')
+const DATA = join(CWD, '.the-framework', 'branches', 'agents-data')
 const T0 = Date.parse('2026-08-23T10:00:00.000Z')
 
 /** An in-memory data checkout behind a fake funnel, like ticket-locks.test.ts's. */
@@ -120,7 +121,7 @@ test("on boot, this machine's locks whose run is gone are released; a run still 
 
 // Against real git: two clones of one bare origin, each with its own data checkout — the
 // cross-machine race the lock exists for. No funnel fake: what the other machine sees is what
-// origin's `tf-data` holds after the push.
+// origin's `agents-data` holds after the push.
 
 const git = nodeGitRunner()
 const RETRIED_RM = { recursive: true, force: true, maxRetries: 10 } as const
@@ -136,7 +137,7 @@ async function initRepo(prefix: string, email: string): Promise<string> {
   return repo
 }
 
-test('two machines sharing tf-data: the second finds the first machine\'s lock on origin, and its release frees it (#1659, real git)', async () => {
+test('two machines sharing agents-data: the second finds the first machine\'s lock on origin, and its release frees it (#1659, real git)', async () => {
   const laptop = await initRepo('framework-routine-lock-a-', 'a@a')
   const bare = await realpath(await mkdtemp(join(tmpdir(), 'framework-routine-lock-bare-')))
   await git(['init', '--bare', bare], bare)
@@ -151,7 +152,7 @@ test('two machines sharing tf-data: the second finds the first machine\'s lock o
     assert.deepEqual(await acquireRoutineLock(laptop, 'triage-quick', { host: 'laptop' }), { ok: true })
     const onLaptop = await readFile(join(dataWorktreePath(laptop), 'routines', 'triage-quick.lock.md'), 'utf8')
     assert.match(onLaptop, /^CLAIMED: laptop\nSINCE: \d{4}-/)
-    // Pushed: origin's tf-data carries it.
+    // Pushed: origin's agents-data carries it.
     assert.equal((await git(['show', `${DATA_BRANCH}:routines/triage-quick.lock.md`], bare)).trim(), onLaptop.trim())
 
     const onDesktop = await acquireRoutineLock(desktop, 'triage-quick', { host: 'desktop' })

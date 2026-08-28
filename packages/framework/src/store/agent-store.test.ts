@@ -18,6 +18,7 @@ import {
   type StoreFs,
   type AgentMeta,
 } from './agent-store.js'
+import { DATA_CHECKOUT_DIR } from '../framework-dir.js'
 import type { FrameworkEvent } from '../events.js'
 
 /** An in-memory {@link StoreFs} so the store logic is tested without touching disk. */
@@ -482,7 +483,7 @@ test('listAgents reads every user archive and the transient one, under their one
   // archives that, with no users, nobody has.
   const meta = (id: string): string =>
     JSON.stringify({ status: 'done', id, startedAt: AT, updatedAt: AT, intent: id })
-  const user = join(CWD, '.the-framework', 'branches', 'tf-data', 'agents', 'dev@example.com')
+  const user = join(CWD, DATA_CHECKOUT_DIR, 'agents', 'dev@example.com')
   const fs = memFs({
     [join(user, '2026-new.json')]: meta('2026-new'),
     [join(CWD, '.the-framework', 'agents', '2026-transient.json')]: meta('2026-transient'),
@@ -706,7 +707,7 @@ test('archiveWorktreeAgent is forgiving of a worktree with no run', async () => 
 
 const USER = 'git@brillout.com'
 const archiveAt = (id: string, ext: string) =>
-  join(CWD, '.the-framework', 'branches', 'tf-data', 'agents', USER, `${id}.${ext}`)
+  join(CWD, DATA_CHECKOUT_DIR, 'agents', USER, `${id}.${ext}`)
 
 test('a named user files the archive under their own sessions, not runs/ (#1179)', async () => {
   // The whole point: `agents/` is gitignored, so a `git clean -fdx` took every session with it.
@@ -723,7 +724,7 @@ test('the history lists every user, and the runs archived before this shipped (#
   const fs = memFs({
     [join(CWD, '.the-framework', 'agents', 'r1.json')]: done('r1'),
     [archiveAt('r2', 'json')]: done('r2'),
-    [join(CWD, '.the-framework', 'branches', 'tf-data', 'agents', 'someone@else.com', 'r3.json')]: done('r3'),
+    [join(CWD, DATA_CHECKOUT_DIR, 'agents', 'someone@else.com', 'r3.json')]: done('r3'),
   })
   assert.deepEqual((await listAgents(CWD, fs)).map(agent => agent.id), ['r3', 'r2', 'r1'])
 })

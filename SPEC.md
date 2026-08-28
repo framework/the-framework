@@ -22,7 +22,7 @@ Every user-facing feature is enumerated in `FEATURES-SPEC.md`.
 - **The agent is the unit of work** - one task, in its own git worktree on its own branch, streaming everything it does as events; finished work is pushed and leaves as a pull request.
 - **Black-box driving** - the framework prompts the wrapped coding-agent CLI, lets the CLI's own loop run a full turn, and learns everything from the turn's final message: the session name the agent invented, the questions it stops to ask, and the ready-for-merge signal.
 - **Autonomy bounded by the account's own quota** - unattended work runs only while the account is under its pro-rated quota boundary; work a human asks for is never blocked, and a running agent is never interrupted over quota.
-- **Framework data on its own branch** - everything The Framework itself writes (tickets, the agent queue, agent archives) lives on the `tf-data` branch, so the default branch stays 100% code.
+- **Framework data on its own branch** - everything The Framework itself writes (tickets, the agent queue, agent archives) lives on the `agents-data` branch, so the default branch stays 100% code.
 
 ## Business logic
 

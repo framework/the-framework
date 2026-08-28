@@ -48,3 +48,4 @@ export { projectRoot, nameBranch, isSessionName, type NameBranchOutcome, type Na
 export { createCheckout, attachCheckout } from './checkout.js'
 export { runCli, USAGE, type CliIo, type CliRefusal } from './cli.js'
 export { CLI_BIN_DIR } from './bin-dir.js'
+export { linkSkill, HARNESS_SKILL_DIRS, SKILL_DIR, SKILL_NAME } from './skill-links.js'

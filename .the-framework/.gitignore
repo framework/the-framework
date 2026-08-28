@@ -1,4 +1,4 @@
-# The Framework: agent state is transient; the lasting records live on the tf-data branch.
+# The Framework: agent state is transient; the lasting records live on the agents-data branch.
 *
 !.gitignore
 !LAYOUT

@@ -50,7 +50,7 @@ test('an archive patch lands as a commit on the data branch, pushed, leaving the
     // Committed, not merely written: a dirty data checkout is what the next sync hard-resets.
     assert.equal((await git('git', ['status', '--porcelain'], { cwd: dir })).stdout.trim(), '')
     assert.equal((await git('git', ['log', '-1', '--format=%s'], { cwd: dir })).stdout.trim(), '[The Framework] adopt r1')
-    assert.equal((await git('git', ['rev-list', '--count', 'origin/tf-data..tf-data'], { cwd: dir })).stdout.trim(), '0', 'and pushed')
+    assert.equal((await git('git', ['rev-list', '--count', 'origin/agents-data..agents-data'], { cwd: dir })).stdout.trim(), '0', 'and pushed')
     // The sync the daemon runs a minute later keeps it.
     await withDataBranch(project, '[The Framework] data sync', async () => {})
     const after = JSON.parse(await readFile(join(dir, 'agents', 'u', 'r1.json'), 'utf8')) as { branch: string }

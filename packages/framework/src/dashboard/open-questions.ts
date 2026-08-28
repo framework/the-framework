@@ -96,7 +96,7 @@ export async function buildOpenQuestions(
   const events = deps.events ?? readEventLog
   const agents = deps.agents ?? readAllAgents
   // One card per bridged question, whichever project claims it first: two checkouts of the same
-  // repository share their `tf-data` archive, so the web run behind a question shows up under each.
+  // repository share their `agents-data` archive, so the web run behind a question shows up under each.
   const bridged = (deps.bridged ?? unansweredBridgeQuestions)()
   const claimed = new Set<string>()
   const items: OpenQuestion[] = []

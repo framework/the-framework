@@ -1,12 +1,12 @@
 import { dirname, join } from 'node:path'
-import { nodeGitRunner, type GitRunner, excludeFromGit } from '@gemstack/skill-branches'
+import { BRANCHES_DIR, nodeGitRunner, type GitRunner, excludeFromGit } from '@gemstack/skill-branches'
 import { DATA_BRANCH, DATA_CHECKOUT_DIR } from './framework-dir.js'
 import { TICKETS_DIR, FLAT_TODO_FILE } from './tickets.js'
 import { errorMessage } from './error-message.js'
 
 export { DATA_BRANCH }
 
-// The `tf-data` branch (#1582): every file The Framework itself writes — the tickets,
+// The `agents-data` branch (#1582): every file The Framework itself writes — the tickets,
 // the queue, the session archives — lives on one branch of the project repo, the way `gh-pages`
 // holds a site's data. Main is 100% code, 0% framework data.
 //
@@ -24,8 +24,9 @@ export { DATA_BRANCH }
 // its own checkout and pushes, and the race is settled by the push itself — whoever loses re-syncs
 // and re-applies.
 //
-// The checkout is a plain git worktree at {@link DATA_CHECKOUT_DIR}. The repo root keeps a
-// `tickets` symlink into it so the roadmap stays one `ls` away for humans.
+// The checkout is a plain git worktree at {@link DATA_CHECKOUT_DIR}, under `.branches/` beside
+// the agent checkouts. The repo root keeps a `tickets` symlink into it so the roadmap stays one
+// `ls` away for humans.
 
 /** The data branch's checkout under a project. */
 export function dataWorktreePath(cwd: string): string {
@@ -129,13 +130,16 @@ async function ensureCore(cwd: string, r: Resolved): Promise<void> {
       if (await refExists(cwd, `refs/remotes/origin/${DATA_BRANCH}`, r.git)) {
         await r.git(['branch', DATA_BRANCH, `origin/${DATA_BRANCH}`], cwd)
       } else {
-        const commit = (await r.git(['commit-tree', EMPTY_TREE, '-m', '[The Framework] tf-data'], cwd)).trim()
+        const commit = (await r.git(['commit-tree', EMPTY_TREE, '-m', `[The Framework] ${DATA_BRANCH}`], cwd)).trim()
         await r.git(['branch', DATA_BRANCH, commit], cwd)
       }
     }
     // A stale registration at this path (the dir was deleted by hand) blocks the add.
     await r.git(['worktree', 'prune'], cwd).catch(() => {})
     await r.git(['worktree', 'add', path, DATA_BRANCH], cwd)
+    // The checkout sits under `.branches/` like the agent checkouts, and is hidden the same way
+    // (git's own exclude, no tracked file) — this may be the first checkout the project gets.
+    await excludeFromGit(cwd, '/' + BRANCHES_DIR, undefined, r.git).catch(() => {})
   }
   // Seed the queue on a branch born empty, so readers and humans find the file, not a mystery.
   // Committed here, so the checkout is clean between cycles and no later write's message lies

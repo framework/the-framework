@@ -157,7 +157,7 @@ test('a web agent\'s question arrives from the bridge and is answerable by label
 })
 
 test('two checkouts of one repository yield one card for a bridged question, not two (#1554)', async () => {
-  // They share a tf-data archive, so the same web run is in both projects' agent lists.
+  // They share a agents-data archive, so the same web run is in both projects' agent lists.
   const agents = async () => [{ status: 'done' as const, id: 'run-web', startedAt: '', updatedAt: '', target: 'web' as const, sessionId: 'session_01Web' }]
   const questions = await buildOpenQuestions([PROJECTS[0]!, { id: 'p2', path: '/two', name: 'two', activated: true }], {
     liveAgents: async () => [],

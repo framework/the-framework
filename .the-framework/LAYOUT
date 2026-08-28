@@ -1,5 +1,5 @@
 framework-dir: .the-framework
-data-branch: tf-data
+data-branch: agents-data
 archive-dir: agents
 events-file: events.jsonl
 meta-file: agent.json

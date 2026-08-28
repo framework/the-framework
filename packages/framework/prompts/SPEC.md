@@ -10,7 +10,7 @@ Every prompt The Framework sends an agent lives here as markdown. Nothing agent-
 - **Markdown is the only source of truth** - the prompts are compiled into the package at build time and the code uses the compiled copies; a prompt is edited in exactly one place.
 - **The built-in system prompt** - the standing instructions every agent starts with: analyze the prompt, park at a gate when the user should decide, name the session before the first change, declare ready for merge only when finished.
 - **The file formats** - the shapes agents must follow for tickets and for the agent queue, carried in the agent's own context rather than pointed at.
-- **Branch management** - the section after the built-in prompt saying how the agent names its branch: the `skill-branches` package's own skill for an agent in a checkout The Framework created, else the fallback that has it branch with git itself.
+- **Branch management** - the section after the built-in prompt for an agent outside a checkout The Framework created: the fallback that has it branch with git itself. An agent in such a checkout has the `branches` skill in the checkout instead, and the prompt sends it there.
 - **The data-branch protocol** - where the framework's own data lives and how to read and write it without putting it on a code branch.
 - **The protocols** - how an agent signals: awaited choices and ready for merge, plus the sections added only when it has a browser, when it runs hands-off, and when nothing can answer its questions.
 - **The presets** - one file per launcher button and per routine prompt.
@@ -43,7 +43,7 @@ See `## User story`.
 
 - **The system prompt** — The Framework's built-in standing instructions for every agent, and the slot the user's own prompt is rendered into. The user's own additions live in their repo instead, not here.
 - **The file formats** — the ticketing format (how a ticket, its lock and its plan are written) and the agent-queue format (how `TODO_AGENTS.md` is banded by priority). They travel with the agent's context, so the agent has already read the format rather than having to find the file that describes it.
-- **The data-branch protocol** — that tickets, the agent queue and the agent archives live on `tf-data`, are read off that branch, and are written straight to it instead of riding a pull request.
+- **The data-branch protocol** — that tickets, the agent queue and the agent archives live on `agents-data`, are read off that branch, and are written straight to it instead of riding a pull request.
 - **The triage scope rule** — the one-paragraph rule appended to both triage presets, that a triage only queues work and never implements it.
 - **The protocols** — how an agent signals to The Framework, and what this particular agent can do.
 - **The presets** — one file per preset: the launcher's buttons and the daemon's routine prompts.

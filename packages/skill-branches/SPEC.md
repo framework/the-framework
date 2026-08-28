@@ -7,12 +7,13 @@ The package knows git and the filesystem, nothing else. The same functions serve
 - **The conventions** (`branch-names`) - branch names, the checkout directory layout under `.branches/`, and the agent-id charset every path is built from.
 - **Running git** (`git`) - one runner with a time budget per subcommand, and a timeout told apart from a git failure.
 - **A checkout's lifecycle** (`worktree`) - create, attach, list, name, remove, prune; the reads every retention decision is built on; the project a directory belongs to.
-- **A checkout as an agent gets it** (`checkout`) - the worktree, `.branches/` hidden from git, the dependencies linked in, the links refreshed: one sequence for a daemon and the command line.
+- **A checkout as an agent gets it** (`checkout`) - the worktree, `.branches/` hidden from git, the dependencies linked in, the skill linked in, the links refreshed: one sequence for a daemon and the command line.
+- **The skill where the harness looks** (`skill-links`) - a link per harness in every checkout the package creates — `.claude/skills/branches`, `.agents/skills/branches` — to the package's own `SKILL.md`, hidden from git; one mechanism for every harness.
 - **Dependencies shared, not copied** (`worktree-deps`) - a fresh checkout gets the parent's dependency trees as directories of links.
 - **Reachable by branch name** (`branch-links`, `git-exclude`) - a symlink per current branch name beside the checkouts; the exclude that hides `.branches/` from the project's git.
 - **Reclaiming a checkout** (`reclaim`) - the one rule: keep a dirty tree, push the branch when allowed, remove only once the remote has it, and delete an agent branch that holds nothing.
 - **The command line** (`cli`, `bin/`) - the same operations as commands for a shell: JSON on stdout, a reason on stderr, an exit code that tells a refusal from a usage error; the executable's directory is exported (`bin-dir`) for a caller that spawns agents.
-- **The skill** (`SKILL.md`) - what the agent is told: its checkout is its whole workspace, it names its session with `branches name` before its first change and uses the name the command prints, it commits as it goes, leaves a clean tree, and never publishes itself. A caller that starts agents puts it in the prompt of every agent it starts in a checkout it created.
+- **The skill** (`SKILL.md`) - what the agent is told: its checkout is its whole workspace, it names its session with `branches name` before its first change and uses the name the command prints, it commits as it goes, leaves a clean tree, and never publishes itself. An agent finds it as a skill of its harness in every checkout the package creates; nothing has to be put in a prompt.
 
 ## Before modifying/creating SPEC.md files
 

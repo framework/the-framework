@@ -109,7 +109,7 @@ happens while nobody is at the keyboard.
 ## Handoff and what lands in git
 
 - Every agent gets its own git worktree under `.branches/` and its own branch (`agent-<id>`), created before it starts; your checkout is never touched
-- The `branches` skill: the system prompt of every agent started in its own checkout carries the `@gemstack/skill-branches` package's `SKILL.md` — that checkout is your whole workspace, name the session with the command, commit as you go, leave a clean tree, never push or open the PR yourself; an agent anywhere else (a terminal run in your checkout, an Actions runner, a cloud session) is told to branch with git itself
+- The `branches` skill: every checkout The Framework creates carries the `@gemstack/skill-branches` package's `SKILL.md` where the agent's harness looks for skills (`.claude/skills/branches` for Claude Code, `.agents/skills/branches` for Codex), and the system prompt tells the agent to use it — that checkout is your whole workspace, name the session with the command, commit as you go, leave a clean tree, never push or open the PR yourself; an agent anywhere else (a terminal run in your checkout, an Actions runner, a cloud session) is told to branch with git itself
 - `branches` on every agent's PATH — the skill's command line: `name <name>` renames the agent's branch to `agent-<name>` and prints the name it got (suffixed when taken); `status` says whether the tree is clean and the branch on the remote; `create`, `attach`, `list`, `remove`, `prune` are the same operations the dashboard runs
 - The session name is the branch: an agent is labelled by its `agent-<name>` branch, read from git after every turn — nothing to signal, nothing to record twice
 - Dependency directories shared from the parent checkout instead of reinstalled — as directories of links, so an agent's own install stays in its checkout and never rewrites or purges the parent's
@@ -122,7 +122,7 @@ happens while nobody is at the keyboard.
 - Empty agents publish nothing
 - Handoff panel: push / open PR / merge, as buttons
 - A withheld merge is reported with its reason
-- Agent history archived on the `tf-data` branch under per-user directories — pushed the moment a session settles
+- Agent history archived on the `agents-data` branch under per-user directories — pushed the moment a session settles
 - Post-merge quality follow-ups queued (maintainability / security)
 - Knowledge folded back into `DECISIONS.md` / `FACTS.md` / `INSIGHTS.md` at merge
 

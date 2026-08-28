@@ -206,7 +206,7 @@ test('a drained entry is checked off on the data branch once its run reports the
     const deadline = Date.now() + 5000
     let subjects = ''
     while (Date.now() < deadline) {
-      subjects = await git('git', ['log', '--format=%s', 'tf-data'], { cwd: projectDir }).then(r => r.stdout, () => '')
+      subjects = await git('git', ['log', '--format=%s', 'agents-data'], { cwd: projectDir }).then(r => r.stdout, () => '')
       if (subjects.includes('check off a drained entry')) break
       await new Promise(resolve => setTimeout(resolve, 25))
     }

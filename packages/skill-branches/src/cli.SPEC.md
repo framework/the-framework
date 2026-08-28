@@ -1,4 +1,4 @@
-The package's command line: the same operations a daemon calls, for an agent (or a person) in a shell inside a project — so an agent names its session, checks its tree and reclaims checkouts through the one implementation the daemon uses, and a second surface is never a second behaviour.
+The package's command line: the same operations a daemon calls, for an agent (or a person) in a shell inside a project — so an agent names its session, checks its tree and reclaims checkouts through the one implementation a daemon uses, and a second surface is never a second behaviour.
 
 ## User story
 

@@ -167,7 +167,7 @@ export function parseWorktreeList(porcelain: string): WorktreeInfo[] {
 
 /**
  * Remove an agent's worktree. Tolerant of an already-gone / never-registered path so
- * teardown stays idempotent (the agent child is detached; the daemon only holds its pid).
+ * teardown stays idempotent (a caller may run it twice).
  *
  * Plain removal first: it refuses a checkout git considers unclean, which after the
  * caller's {@link worktreeClean} check means a state we did not anticipate. Falling back to
@@ -362,7 +362,7 @@ export function nodeSizeRunner(): SizeRunner {
 /**
  * A worktree's size on disk in bytes, or undefined when it cannot be read (#798). Best-effort by
  * design: this only ever labels a "remove this" button, so a missing number costs nothing while a
- * throw or a hang would cost the panel it sits in. `du` is absent on Windows, which reads as
+ * throw or a hang would cost the listing it sits in. `du` is absent on Windows, which reads as
  * unknown like any other failure.
  */
 export async function worktreeSize(path: string, size: SizeRunner = nodeSizeRunner()): Promise<number | undefined> {
@@ -375,7 +375,7 @@ export async function worktreeSize(path: string, size: SizeRunner = nodeSizeRunn
 }
 
 /**
- * Whether a branch is on the remote, with the local tip already there (E5).
+ * Whether a branch is on the remote, with the local tip already there.
  *
  * The one predicate the whole retention story is built on: nothing local is ever the last copy of
  * work, so anything the remote has may be deleted and anything it does not have stays. It replaced
@@ -419,10 +419,10 @@ export async function worktreeClean(path: string, git: GitRunner = nodeGitRunner
 }
 
 /**
- * Whether the repo has any remote configured at all. What the sweep asks once per project: with
+ * Whether the repo has any remote configured at all. What a caller asks once per project before reclaiming its checkouts: with
  * no remote, {@link branchPushed} is false for every checkout and the push cannot land, so the
  * whole per-checkout probe-and-push cycle is doomed before it starts — and that answer cannot
- * change between two rows of the same sweep. Anything unreadable answers `false`, like
+ * change between two checkouts of the same pass. Anything unreadable answers `false`, like
  * {@link branchPushed}: keeping a checkout is the safe direction.
  */
 export async function repoHasRemote(repo: string, git: GitRunner = nodeGitRunner()): Promise<boolean> {

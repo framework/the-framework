@@ -3,8 +3,8 @@ import { test } from 'node:test'
 import { GIT_READ_TIMEOUT_MS, GIT_WRITE_TIMEOUT_MS, GIT_SLOW_TIMEOUT_MS, gitTimeoutMs, gitReason, pushBranch, GitTimeoutError, isGitTimeout, type GitRunner } from './git.js'
 
 /**
- * Every git invocation in the package, taken from the call sites listed in #997, against the
- * budget it should get. The point of the split is that these are not all the same number.
+ * Git invocations a caller may run through the runner — the package's own and a caller's (#997) —
+ * against the budget each should get. The point of the split is that these are not all the same number.
  */
 const BUDGETS: { args: string[]; ms: number }[] = [
   // The network and a whole checkout: the two the flat 10s budget was killing.
@@ -36,7 +36,7 @@ const BUDGETS: { args: string[]; ms: number }[] = [
   { args: ['branch'], ms: GIT_READ_TIMEOUT_MS },
   { args: ['branch', '-D', 'agent-1'], ms: GIT_WRITE_TIMEOUT_MS },
   { args: ['branch', '-m', 'agent-1', 'agent-cool'], ms: GIT_WRITE_TIMEOUT_MS },
-  { args: ['branch', 'agent-data', 'abc123'], ms: GIT_WRITE_TIMEOUT_MS },
+  { args: ['branch', 'topic', 'abc123'], ms: GIT_WRITE_TIMEOUT_MS },
   { args: ['show-ref', '--verify', '--quiet', 'refs/heads/agent-x'], ms: GIT_READ_TIMEOUT_MS },
   { args: ['for-each-ref', '--format=%(refname)', 'refs/heads/', 'refs/remotes/'], ms: GIT_READ_TIMEOUT_MS },
   { args: ['worktree', 'list', '--porcelain'], ms: GIT_READ_TIMEOUT_MS },

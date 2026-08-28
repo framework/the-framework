@@ -36,7 +36,7 @@ Creating a checkout for a new agent creates its branch at the same time, from a 
 
 Everything the repo has registered as a checkout can be listed, the main checkout included, together with the commit and branch each has. A project that is not a repo, or a git failure, yields an empty list, so a reconciliation scan never breaks. Administrative leftovers from checkout directories a crash removed can be pruned; pruning never touches a live checkout.
 
-A checkout's size on disk can be read, best-effort. It only ever labels a "remove this" button, so a number that cannot be read — including on a platform without the tool that measures it — is simply unknown, which costs nothing, while a failure or a hang would cost the whole panel it sits in. The measurement does not follow the linked dependency trees, so an agent's checkout is not reported as the size of the whole dependency store.
+A checkout's size on disk can be read, best-effort. It only ever labels a "remove this" button, so a number that cannot be read — including on a platform without the tool that measures it — is simply unknown, which costs nothing, while a failure or a hang would cost the whole listing it sits in. The measurement does not follow the linked dependency trees, so an agent's checkout is not reported as the size of the whole dependency store.
 
 ### A checkout's own directory, told apart from the repository around it
 
@@ -52,7 +52,7 @@ Reading which branch is checked out therefore comes in two forms. The plain read
 
 #### Rationale
 
-Git answers for any directory *inside* a repository, so a leftover directory under `.branches/` makes every command run in it act on the enclosing repository: the user's own checkout, on the user's own branch. Before this, such a directory had the sweep read an agent's branch as the user's `main`, try to commit the user's working tree and push the user's `main`, and had the rename links gain a link named after the user's own branch.
+Git answers for any directory *inside* a repository, so a leftover directory under `.branches/` makes every command run in it act on the enclosing repository: the user's own checkout, on the user's own branch. Before this, such a directory had a reclaim pass read an agent's branch as the user's `main`, try to commit the user's working tree and push the user's `main`, and had the rename links gain a link named after the user's own branch.
 
 ### The branch is renamed once the agent names itself
 

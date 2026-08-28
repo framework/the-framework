@@ -11,7 +11,7 @@ import {
 } from './worktree.js'
 
 /**
- * Reclaiming a checkout (#752/#737/E5): the one implementation behind every surface that removes
+ * Reclaiming a checkout (#752/#737): the one implementation behind every surface that removes
  * one — a daemon's sweep and teardown, a dashboard's Remove button, an agent's own CLI.
  *
  * **One rule: only what is on the remote may go.** The checkout is removed only once the remote
@@ -33,12 +33,12 @@ export interface ReclaimOptions {
   birthBranch?: string
   /**
    * Whether the branch may be pushed to satisfy the rule. When not, only a clean tree on a tip the
-   * remote already has goes — removing what the remote holds publishes nothing (B5/#1379).
+   * remote already has goes — removing what the remote holds publishes nothing (#1379).
    */
   mayPush: boolean
   /**
-   * A commit the remote already has that provably holds everything this checkout could — a cloud
-   * hand-off anchor (#1601). A clean tree whose tip is inside it goes without a push, and keeps
+   * A commit the remote already has that provably holds everything this checkout could — the commit a
+   * cloud session pushed on the agent's behalf, say (#1601). A clean tree whose tip is inside it goes without a push, and keeps
    * its branch. Anything short of that proof falls back to the ordinary rule.
    */
   heldBy?: string

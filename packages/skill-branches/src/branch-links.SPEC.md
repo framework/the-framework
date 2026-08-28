@@ -2,7 +2,7 @@ Keeps a project's `.branches/` directory navigable by branch name; a daemon runs
 
 ## Business logic — TL;DR
 
-- **Reconcile, don't track** - each pass derives the wanted links from the checkouts actually on disk (one link per worktree whose current branch differs from its directory name), creates what is missing, and drops the package's own links that are stale — no longer wanted, or now belonging to a newer checkout that reuses the name. A detached worktree, or one on a legacy slash-named branch, gets no link.
+- **Reconcile, don't track** - each pass derives the wanted links from the checkouts actually on disk (one link per worktree whose current branch differs from its directory name), creates what is missing, and drops the package's own links that are stale — no longer wanted, or now belonging to a newer checkout that reuses the name. A detached worktree, or one on a slash-named branch, gets no link.
 - **A directory that is not a checkout has no branch** - the branch behind each link is read in the form that answers only for a directory git knows as a checkout of its own. A leftover directory under `.branches/` therefore gets no link at all, where a plain read would have answered with the *enclosing* repository's branch and produced a link named after the user's own branch, sitting among the agents' ones.
 - **Touch only what is provably ours** - a link is created, replaced, or removed only when it points (or would point) at a sibling checkout directory; a user's own file, directory, or foreign symlink at the same path is left alone, and nothing is ever created over it. The pass never throws.
 

@@ -1,5 +1,5 @@
 import { renderTemplate } from './prompt-template.js'
-import { BRANCHES_SKILL, BRANCH_YOURSELF, DATA_BRANCH_PROTOCOL, SYSTEM_PROMPT, TICKETING_FORMAT, TODO_FORMAT } from './prompts.generated.js'
+import { BRANCH_YOURSELF, DATA_BRANCH_PROTOCOL, SYSTEM_PROMPT, TICKETING_FORMAT, TODO_FORMAT } from './prompts.generated.js'
 import { AWAIT_PROTOCOL, BROWSER_PROTOCOL, HANDS_OFF_PROTOCOL, SIGNAL_PROTOCOL } from './turn-gate.js'
 
 // No Node imports here, deliberately. This module composes the prompt and the
@@ -233,13 +233,13 @@ export function systemPromptBlock(opts: SystemPromptOptions = {}): string {
     parts.push([head, ...bullets].join('\n'))
   }
   // The formats the two format-bearing bullets name, right under the list that names them (#1163).
-  // The "Branch management" section (#1725) follows the built-in prompt, whose session-name step
-  // points at it. In a checkout The Framework created it is the package's own skill: the workspace,
-  // the `branches` command that names the branch, commit-as-you-go, the clean tree to
-  // leave. Anywhere else the command is not on the PATH, and the agent branches with git itself.
-  // Framework-authored either way, so `--vanilla` drops it — which is what keeps the
-  // on-before-mergeable follow-up from naming a session of its own (#560).
-  if (includeBuiltin) parts.push(...CONTEXT_FORMATS, renderSystemPrompt(opts.tf).system, opts.ownedCheckout ? BRANCHES_SKILL : BRANCH_YOURSELF)
+  // In a checkout The Framework created, the `branches` skill is the checkout's (#1739): the
+  // package links it where the agent's harness looks for skills, and the built-in prompt's
+  // session-name step tells the agent to use it — nothing rides in this channel. Anywhere else the
+  // command is not on the PATH, so the "Branch management" section that has the agent branch with
+  // git itself follows the prompt. Framework-authored, so `--vanilla` drops it — which is what
+  // keeps the on-before-mergeable follow-up from naming a session of its own (#560).
+  if (includeBuiltin) parts.push(...CONTEXT_FORMATS, renderSystemPrompt(opts.tf).system, ...(opts.ownedCheckout ? [] : [BRANCH_YOURSELF]))
   const user = opts.user?.trim()
   if (user) parts.push(user)
   return parts.join('\n\n')

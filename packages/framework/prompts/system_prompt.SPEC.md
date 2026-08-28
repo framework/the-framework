@@ -14,7 +14,7 @@ The Framework's built-in system prompt: the standing instructions every agent st
 
 - **Analyze the prompt before working** - an unclear prompt becomes a plausibility-ranked list of interpretations offered as a choice, and the agent waits for the answer.
 - **Large scope gets approved first** - large work is written up as a plan file shown to the user and awaits approval; very large work also seeds follow-up entries onto the agent queue.
-- **Name the session** - before the first change the agent names the session and its branch after it, as the "Branch management" section says; the name it ends up with is the session name.
+- **Name the session** - before the first change the agent names the session and its branch after it with the `branches` skill — or, where the skill is not available, as the "Branch management" section says; the name it ends up with is the session name.
 - **Rate variability, offer alternatives** - each problem about to be solved is scored on how obviously optimal its solution is; low scorers are explored and their alternatives offered as a choice.
 - **Ready for merge is explicit** - the agent signals it only when the task is finished; otherwise it states what remains.
 - **The user's prompt is the last section** - the built-in instructions frame the system channel, and the user's own prompt is delivered as its own half.
@@ -51,7 +51,7 @@ See `## User story`: work must be reviewable as a pull request on a branch named
 
 #### Business logic
 
-Before applying its first change the agent picks a session name — an `[a-z0-9-]+` string that succinctly captures the intent of the user's prompt — and names its branch after it the way the "Branch management" section appended after the prompt says: the `branches` skill's command for an agent in a checkout The Framework created, git itself anywhere else. When the name the agent ends up with differs (the skill's command suffixes a taken name), that is the session name from then on.
+Before applying its first change the agent picks a session name — an `[a-z0-9-]+` string that succinctly captures the intent of the user's prompt — and names its branch after it with the `branches` skill, which an agent in a checkout The Framework created finds in that checkout; where the skill is not available, the "Branch management" section appended after the prompt has it branch with git itself. When the name the agent ends up with differs (the skill's command suffixes a taken name), that is the session name from then on.
 
 #### Rationale
 

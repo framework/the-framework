@@ -31,8 +31,7 @@
     "./branch-names": {
       "types": "./dist/branch-names.d.ts",
       "default": "./dist/branch-names.js"
-    },
-    "./SKILL.md": "./SKILL.md"
+    }
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

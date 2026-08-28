@@ -27,7 +27,7 @@ Do the following before applying your first change.
 ### Session name
 
 1. Create a <SESSION_NAME> as a string [a-z0-9-]+ that succinctly represents the intention of the user prompt
-2. Name your branch after it, as the "Branch management" section below says — and if the name you end up with differs, that is your <SESSION_NAME> from now on
+2. Name your branch after it: use the `branches` skill, which says how. Where that skill is not available, the "Branch management" section below says how instead. If the name you end up with differs, that is your <SESSION_NAME> from now on
 
 
 ## Before applying changes

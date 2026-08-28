@@ -1,5 +1,4 @@
 import { readdir, readFile, writeFile } from 'node:fs/promises'
-import { createRequire } from 'node:module'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -42,25 +41,16 @@ function constName(relPath) {
     .toUpperCase()
 }
 
-// The `branches` skill (#1725) rides in the system channel the way the prompts above do,
-// but its text is the package's, not this directory's: read from wherever the package is
-// installed, so the instructions and the command they name can never come from two versions.
-// Its front matter is the skill catalogue's metadata, not instructions, and is dropped.
-const skillPath = createRequire(import.meta.url).resolve('@gemstack/skill-branches/SKILL.md')
-const sources = [
-  ...(await findMarkdown(promptsDir)).map(path => {
-    const relPath = relative(promptsDir, path).split('\\').join('/')
-    return { label: `prompts/${relPath}`, name: constName(relPath), path, frontMatter: false }
-  }),
-  { label: '@gemstack/skill-branches/SKILL.md', name: 'BRANCHES_SKILL', path: skillPath, frontMatter: true },
-]
+const sources = (await findMarkdown(promptsDir)).map(path => {
+  const relPath = relative(promptsDir, path).split('\\').join('/')
+  return { label: `prompts/${relPath}`, name: constName(relPath), path }
+})
 const entries = await Promise.all(
   sources.map(async source => {
     const raw = await readFile(source.path, 'utf8')
-    const text = source.frontMatter ? raw.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n+/, '') : raw
     // Strip exactly one trailing newline: the files end with one so they are well-formed on
     // disk, the prompts they carry do not.
-    return { ...source, text: text.replace(/\n$/, '') }
+    return { ...source, text: raw.replace(/\n$/, '') }
   }),
 )
 

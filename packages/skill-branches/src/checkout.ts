@@ -4,11 +4,13 @@ import { addWorktree, attachWorktree, type AddedWorktree } from './worktree.js'
 import { linkDependencies } from './worktree-deps.js'
 import { reconcileBranchLinks } from './branch-links.js'
 import { excludeFromGit } from './git-exclude.js'
+import { linkSkill } from './skill-links.js'
 
 /**
  * A checkout as an agent gets it (#1725): the worktree, `.branches/` hidden from git, the parent's
- * dependency trees linked in, and the `.branches/` links brought up to date — one sequence,
- * whichever surface asks for it (a daemon allocating a run, the command line).
+ * dependency trees linked in, the skill linked in where the agent's harness looks for it (#1739),
+ * and the `.branches/` links brought up to date — one sequence, whichever surface asks for it (a
+ * daemon allocating a run, the command line).
  */
 
 /** A new agent's checkout, on a fresh `agent-<id>` branch from `base` or the project's head. */
@@ -44,5 +46,6 @@ export async function attachCheckout(
 async function settle(repo: string, path: string, git: GitRunner): Promise<void> {
   await excludeFromGit(repo, `/${BRANCHES_DIR}`, undefined, git).catch(() => {})
   await linkDependencies(repo, path).catch(() => [])
+  await linkSkill(repo, path, undefined, git)
   await reconcileBranchLinks(repo, { git }).catch(() => {})
 }

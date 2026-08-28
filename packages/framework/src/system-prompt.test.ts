@@ -12,7 +12,7 @@ import {
   SYSTEM_PROMPT_TEMPLATE,
 } from './system-prompt.js'
 import { FLAT_TODO_FILE } from './tickets.js'
-import { BRANCHES_SKILL, BRANCH_YOURSELF, DATA_BRANCH_PROTOCOL, TICKETING_FORMAT, TODO_FORMAT } from './prompts.generated.js'
+import { BRANCH_YOURSELF, DATA_BRANCH_PROTOCOL, TICKETING_FORMAT, TODO_FORMAT } from './prompts.generated.js'
 import { loadUserSystemPrompt, SYSTEM_PROMPT_FILE } from './system-prompt-file.js'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 
@@ -105,7 +105,8 @@ test('SYSTEM_PROMPT_TEMPLATE carries the built-in prompt sections (#326) verbati
   // cwd — nothing else in the prompt tells it where its workspace ends.
   // The workspace rules moved to the `branches` skill (#1725); the prompt keeps the step that names the session.
   assert.ok(!SYSTEM_PROMPT_TEMPLATE.includes('Your working directory is the whole of your workspace'))
-  assert.ok(SYSTEM_PROMPT_TEMPLATE.includes('as the "Branch management" section below says'))
+  assert.ok(SYSTEM_PROMPT_TEMPLATE.includes('use the `branches` skill, which says how'))
+  assert.ok(SYSTEM_PROMPT_TEMPLATE.includes('Where that skill is not available, the "Branch management" section below says how instead'))
   assert.ok(SYSTEM_PROMPT_TEMPLATE.includes('${{tf.prompt}}'))
   // The whole block is the branch-free doc now: #326 moved the one `tf.params.autopilot`
   // ternary out with the maintenance section, so `tf.prompt` is the only fragment left.
@@ -304,32 +305,29 @@ test('composeAgentSystem is empty under transparent mode — no prompt, no emit 
   )
 })
 
-test('the `branches` skill rides after the built-in prompt of an agent in its own checkout; anyone else branches with git (#1725)', () => {
-  // The skill is the package's SKILL.md, front matter stripped: instructions, not catalogue metadata.
-  assert.ok(BRANCHES_SKILL.startsWith('# Branch management'), BRANCHES_SKILL.slice(0, 40))
-  assert.ok(BRANCHES_SKILL.includes('branches name <name>'))
-  assert.ok(BRANCHES_SKILL.includes('branches status'))
+test('an agent in its own checkout is sent to the `branches` skill, which the checkout carries; anyone else branches with git (#1725, #1739)', () => {
   const block = systemPromptBlock({ ownedCheckout: true, user: 'Mine too.' })
-  const prompt = block.indexOf('### Session name')
-  const skill = block.indexOf(BRANCHES_SKILL)
-  assert.ok(prompt !== -1 && skill !== -1 && prompt < skill, 'the prompt names the session first, the skill says how')
-  assert.ok(skill < block.indexOf('Mine too.'), "the user's own prompt stays last")
+  // The session-name step sends the agent to the skill. The skill itself is the checkout's — the
+  // skill-branches package links it where the agent's harness looks — so none of it rides here.
+  assert.ok(block.includes('use the `branches` skill'))
+  assert.ok(!block.includes('branches name <name>'))
   assert.ok(!block.includes(BRANCH_YOURSELF))
-  // The prompt's session-name step defers to that section: no branch the agent creates itself, no signal.
+  assert.ok(block.indexOf('### Session name') < block.indexOf('Mine too.'), "the user's own prompt stays last")
+  // The step defers to the skill: no branch the agent creates itself, no signal.
   assert.ok(!block.includes('git checkout'))
   assert.ok(!block.includes('setSessionName'))
   // Outside a checkout The Framework created — a terminal run in the user's own checkout, an Actions
-  // runner, a cloud session — the command is not on the PATH: the same section title, git instead.
+  // runner, a cloud session — the command is not on the PATH: the section that has it branch with git.
   for (const opts of [{}, { handsOff: true }]) {
     const elsewhere = systemPromptBlock(opts)
-    assert.ok(!elsewhere.includes(BRANCHES_SKILL), JSON.stringify(opts))
+    assert.ok(!elsewhere.includes('branches name <name>'), JSON.stringify(opts))
     assert.ok(elsewhere.includes(BRANCH_YOURSELF), JSON.stringify(opts))
     assert.ok(BRANCH_YOURSELF.startsWith('# Branch management') && BRANCH_YOURSELF.includes('git checkout -b agent-<SESSION_NAME>'))
   }
-  // Framework-authored, so `--vanilla` drops both: the on-before-mergeable follow-up must not rename
-  // or create a branch after a session of its own (#560).
+  // Framework-authored, so `--vanilla` drops it with the prompt: the on-before-mergeable follow-up
+  // must not rename or create a branch after a session of its own (#560).
   for (const opts of [{ vanilla: true, ownedCheckout: true, user: 'Only mine.' }, { vanilla: true, user: 'Only mine.' }]) {
     const vanilla = systemPromptBlock(opts)
-    assert.ok(!vanilla.includes(BRANCHES_SKILL) && !vanilla.includes(BRANCH_YOURSELF) && !vanilla.includes('Branch management'), JSON.stringify(opts))
+    assert.ok(!vanilla.includes(BRANCH_YOURSELF) && !vanilla.includes('Branch management') && !vanilla.includes('`branches` skill'), JSON.stringify(opts))
   }
 })

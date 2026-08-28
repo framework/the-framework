@@ -40,6 +40,16 @@ function memFs(seed: Record<string, string> = {}): StoreFs & { files: Map<string
       }
       return [...names]
     },
+    async subdirs(dir) {
+      const prefix = dir.endsWith('/') ? dir : dir + '/'
+      const names = new Set<string>()
+      for (const p of files.keys()) {
+        if (!p.startsWith(prefix)) continue
+        const rest = p.slice(prefix.length)
+        if (rest.includes('/')) names.add(rest.split('/')[0]!)
+      }
+      return [...names]
+    },
   }
 }
 

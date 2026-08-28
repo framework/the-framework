@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { execFile } from 'node:child_process'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { lstat, mkdir, mkdtemp, readlink, realpath, rm, stat, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, mkdtemp, readFile, readlink, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { CLI_BIN_DIR, agentBranchName, nodeGitRunner, runCli, worktreePath } from './index.js'
 
 // #1725: the command line is the package's functions for an agent in a shell, so every command
@@ -19,7 +19,7 @@ async function repoWithOrigin(): Promise<string> {
   await git(['config', 'user.email', 't@t'], repo)
   await git(['config', 'user.name', 't'], repo)
   await writeFile(join(repo, 'index.html'), '<h1>Hello</h1>\n')
-  await writeFile(join(repo, '.gitignore'), 'node_modules\n.the-framework\n')
+  await writeFile(join(repo, '.gitignore'), 'node_modules\n')
   await mkdir(join(repo, 'node_modules', 'dep'), { recursive: true })
   await git(['add', '-A'], repo)
   await git(['commit', '-q', '-m', 'init'], repo)
@@ -55,22 +55,23 @@ async function isSymlink(path: string): Promise<boolean> {
   return lstat(path).then(s => s.isSymbolicLink(), () => false)
 }
 
-test('create: a checkout on tf-agent-<id>, the parent dependencies linked in, reachable under branches/', async () => {
+test('create: a checkout on agent-<id>, the parent dependencies linked in, .branches/ hidden from git', async () => {
   const repo = await repoWithOrigin()
   try {
     const { code, out } = await run(repo, 'create', 'a1')
     const path = worktreePath(repo, 'a1')
     assert.equal(code, 0)
-    assert.deepEqual(out, { ok: true, path, branch: 'tf-agent-a1' })
-    assert.equal((await git(['rev-parse', '--abbrev-ref', 'HEAD'], path)).trim(), 'tf-agent-a1')
+    assert.deepEqual(out, { ok: true, path, branch: 'agent-a1' })
+    assert.equal((await git(['rev-parse', '--abbrev-ref', 'HEAD'], path)).trim(), 'agent-a1')
     assert.equal(await isSymlink(join(path, 'node_modules', 'dep')), true, 'the dependency is a link to the parent tree')
-    assert.equal(await isSymlink(join(repo, 'branches')), true, 'the repo-root branches shortcut exists')
-    assert.equal((await stat(join(repo, 'branches', 'tf-agent-a1'))).isDirectory(), true)
+    assert.equal((await stat(join(repo, '.branches', 'agent-a1'))).isDirectory(), true)
+    assert.match(await readFile(join(repo, '.git', 'info', 'exclude'), 'utf8'), /^\/\.branches$/m, 'the checkouts are hidden through the exclude file')
+    assert.doesNotMatch(await git(['status', '--porcelain'], repo), /\.branches/, "and never show up in the project's status")
 
     // From inside a checkout the same command still acts on the project.
     const nested = await run(join(path, 'node_modules'), 'create', 'a2', '--base', 'HEAD~0')
     assert.equal(nested.code, 0)
-    assert.equal((await git(['rev-parse', '--abbrev-ref', 'HEAD'], worktreePath(repo, 'a2'))).trim(), 'tf-agent-a2')
+    assert.equal((await git(['rev-parse', '--abbrev-ref', 'HEAD'], worktreePath(repo, 'a2'))).trim(), 'agent-a2')
   } finally {
     await rm(repo, { recursive: true, force: true })
   }
@@ -96,14 +97,14 @@ test('create and remove refuse an id that is not path-safe, before any git runs'
     assert.equal(created.code, 1)
     assert.deepEqual(created.out, { ok: false, reason: 'invalid-id', agentId: '../escape' })
     assert.match(created.err, /not an agent id/)
-    assert.equal(await stat(join(repo, '.the-framework')).then(() => true, () => false), false, 'nothing was created')
+    assert.equal(await stat(join(repo, '.branches')).then(() => true, () => false), false, 'nothing was created')
     assert.deepEqual((await run(repo, 'remove', 'a/b')).out, { ok: false, reason: 'invalid-id', agentId: 'a/b' })
   } finally {
     await rm(repo, { recursive: true, force: true })
   }
 })
 
-test('name: renames the branch to tf-<name> from anywhere in the checkout, and the branches/ link follows', async () => {
+test('name: renames the branch to agent-<name> from anywhere in the checkout, and the branches/ link follows', async () => {
   const repo = await repoWithOrigin()
   try {
     await run(repo, 'create', 'a1')
@@ -111,16 +112,16 @@ test('name: renames the branch to tf-<name> from anywhere in the checkout, and t
     await mkdir(join(path, 'src'), { recursive: true })
     const named = await run(join(path, 'src'), 'name', 'add-auth')
     assert.equal(named.code, 0)
-    assert.deepEqual(named.out, { ok: true, branch: 'tf-add-auth' })
-    assert.equal((await git(['rev-parse', '--abbrev-ref', 'HEAD'], path)).trim(), 'tf-add-auth')
-    await assert.rejects(() => git(['rev-parse', '--verify', 'refs/heads/tf-agent-a1'], repo), 'a rename, not a second branch')
-    assert.equal(await readlink(join(repo, '.the-framework', 'branches', 'tf-add-auth')), 'tf-agent-a1', 'the link carries the new name')
+    assert.deepEqual(named.out, { ok: true, branch: 'agent-add-auth' })
+    assert.equal((await git(['rev-parse', '--abbrev-ref', 'HEAD'], path)).trim(), 'agent-add-auth')
+    await assert.rejects(() => git(['rev-parse', '--verify', 'refs/heads/agent-a1'], repo), 'a rename, not a second branch')
+    assert.equal(await readlink(join(repo, '.branches', 'agent-add-auth')), 'agent-a1', 'the link carries the new name')
     assert.equal((await stat(path)).isDirectory(), true, 'the checkout directory did not move')
 
     // The same name again is a no-op; naming again with another name renames again.
-    assert.deepEqual((await run(path, 'name', 'add-auth')).out, { ok: true, branch: 'tf-add-auth' })
-    assert.deepEqual((await run(path, 'name', 'add-oauth')).out, { ok: true, branch: 'tf-add-oauth' })
-    assert.equal(await isSymlink(join(repo, '.the-framework', 'branches', 'tf-add-auth')), false, 'the old link is dropped')
+    assert.deepEqual((await run(path, 'name', 'add-auth')).out, { ok: true, branch: 'agent-add-auth' })
+    assert.deepEqual((await run(path, 'name', 'add-oauth')).out, { ok: true, branch: 'agent-add-oauth' })
+    assert.equal(await isSymlink(join(repo, '.branches', 'agent-add-auth')), false, 'the old link is dropped')
   } finally {
     await rm(repo, { recursive: true, force: true })
   }
@@ -132,18 +133,18 @@ test('name: a taken name — local or on the remote — gets a numeric suffix, a
     await run(repo, 'create', 'a1')
     await run(repo, 'create', 'a2')
     await run(repo, 'create', 'a3')
-    assert.deepEqual((await run(worktreePath(repo, 'a1'), 'name', 'fix-login')).out, { ok: true, branch: 'tf-fix-login' })
-    assert.deepEqual((await run(worktreePath(repo, 'a2'), 'name', 'fix-login')).out, { ok: true, branch: 'tf-fix-login-2' })
+    assert.deepEqual((await run(worktreePath(repo, 'a1'), 'name', 'fix-login')).out, { ok: true, branch: 'agent-fix-login' })
+    assert.deepEqual((await run(worktreePath(repo, 'a2'), 'name', 'fix-login')).out, { ok: true, branch: 'agent-fix-login-2' })
     // A branch only the remote has counts as taken too: the push would otherwise land on it.
-    await git(['push', '-q', 'origin', 'HEAD:refs/heads/tf-remote-only'], repo)
+    await git(['push', '-q', 'origin', 'HEAD:refs/heads/agent-remote-only'], repo)
     await git(['fetch', '-q', 'origin'], repo)
-    assert.deepEqual((await run(worktreePath(repo, 'a3'), 'name', 'remote-only')).out, { ok: true, branch: 'tf-remote-only-2' })
+    assert.deepEqual((await run(worktreePath(repo, 'a3'), 'name', 'remote-only')).out, { ok: true, branch: 'agent-remote-only-2' })
   } finally {
     await rm(repo, { recursive: true, force: true })
   }
 })
 
-test("name: refuses a name that is not a session name, and a branch The Framework did not mint", async () => {
+test('name: refuses a name that is not a session name, and a branch the package did not mint', async () => {
   const repo = await repoWithOrigin()
   try {
     await run(repo, 'create', 'a1')
@@ -152,11 +153,11 @@ test("name: refuses a name that is not a session name, and a branch The Framewor
     assert.equal(invalid.code, 1)
     assert.deepEqual(invalid.out, { ok: false, reason: 'invalid-name' })
     assert.match(invalid.err, /\[a-z0-9-\]\+/)
-    assert.equal((await git(['rev-parse', '--abbrev-ref', 'HEAD'], path)).trim(), 'tf-agent-a1', 'the branch is untouched')
+    assert.equal((await git(['rev-parse', '--abbrev-ref', 'HEAD'], path)).trim(), 'agent-a1', 'the branch is untouched')
 
     const main = await run(repo, 'name', 'my-branch')
     assert.equal(main.code, 1)
-    assert.deepEqual(main.out, { ok: false, reason: 'not-a-run-branch' })
+    assert.deepEqual(main.out, { ok: false, reason: 'not-an-agent-branch' })
     assert.equal((await git(['rev-parse', '--abbrev-ref', 'HEAD'], repo)).trim(), 'main', "the user's own branch keeps its name")
   } finally {
     await rm(repo, { recursive: true, force: true })
@@ -169,15 +170,15 @@ test('status: the branch, whether the tree is clean, whether the tip is on the r
     await run(repo, 'create', 'a1')
     const path = worktreePath(repo, 'a1')
     await writeFile(join(path, 'index.html'), '<h1>Edited</h1>\n')
-    assert.deepEqual((await run(path, 'status')).out, { ok: true, path, branch: 'tf-agent-a1', clean: false, onRemote: false })
+    assert.deepEqual((await run(path, 'status')).out, { ok: true, path, branch: 'agent-a1', clean: false, onRemote: false })
     await commitWork(path)
-    assert.deepEqual((await run(path, 'status')).out, { ok: true, path, branch: 'tf-agent-a1', clean: true, onRemote: false })
-    await git(['push', '-q', '--set-upstream', 'origin', 'tf-agent-a1'], path)
+    assert.deepEqual((await run(path, 'status')).out, { ok: true, path, branch: 'agent-a1', clean: true, onRemote: false })
+    await git(['push', '-q', '--set-upstream', 'origin', 'agent-a1'], path)
     // With a path, from anywhere.
-    assert.deepEqual((await run(repo, 'status', path)).out, { ok: true, path, branch: 'tf-agent-a1', clean: true, onRemote: true })
-    assert.deepEqual((await run(repo, 'status', join('.the-framework', 'branches', 'tf-agent-a1'))).out, { ok: true, path, branch: 'tf-agent-a1', clean: true, onRemote: true })
+    assert.deepEqual((await run(repo, 'status', path)).out, { ok: true, path, branch: 'agent-a1', clean: true, onRemote: true })
+    assert.deepEqual((await run(repo, 'status', join('.branches', 'agent-a1'))).out, { ok: true, path, branch: 'agent-a1', clean: true, onRemote: true })
 
-    const leftover = join(repo, '.the-framework', 'branches', 'tf-agent-gone')
+    const leftover = join(repo, '.branches', 'agent-gone')
     await mkdir(leftover, { recursive: true })
     const refused = await run(repo, 'status', leftover)
     assert.equal(refused.code, 1)
@@ -196,8 +197,8 @@ test('list: every checkout with the branch it is on now, sized on request', asyn
     await run(worktreePath(repo, 'a2'), 'name', 'renamed')
     const rows = (await run(repo, 'list')).out as { agentId: string; path: string; branch?: string; sizeBytes?: number }[]
     assert.deepEqual(rows, [
-      { agentId: 'a1', path: worktreePath(repo, 'a1'), branch: 'tf-agent-a1' },
-      { agentId: 'a2', path: worktreePath(repo, 'a2'), branch: 'tf-renamed' },
+      { agentId: 'a1', path: worktreePath(repo, 'a1'), branch: 'agent-a1' },
+      { agentId: 'a2', path: worktreePath(repo, 'a2'), branch: 'agent-renamed' },
     ])
     const sized = (await run(repo, 'list', '--sizes')).out as { sizeBytes?: number }[]
     assert.equal(sized.length, 2)
@@ -216,8 +217,8 @@ test('remove: a dirty checkout is kept and says so; a committed one is pushed an
     await writeFile(join(path, 'index.html'), '<h1>Edited</h1>\n')
     const kept = await run(repo, 'remove', 'a1')
     assert.equal(kept.code, 1)
-    assert.deepEqual(kept.out, { ok: false, reason: 'dirty', branch: 'tf-add-auth' })
-    assert.match(kept.err, /tf-add-auth has uncommitted work/)
+    assert.deepEqual(kept.out, { ok: false, reason: 'dirty', branch: 'agent-add-auth' })
+    assert.match(kept.err, /agent-add-auth has uncommitted work/)
     assert.equal((await stat(path)).isDirectory(), true)
 
     await commitWork(path)
@@ -225,8 +226,8 @@ test('remove: a dirty checkout is kept and says so; a committed one is pushed an
     assert.equal(removed.code, 0)
     assert.deepEqual(removed.out, { ok: true })
     await assert.rejects(() => stat(path), 'the checkout is gone')
-    assert.match(await git(['show', 'refs/remotes/origin/tf-add-auth:index.html'], repo), /Welcome/, 'the work reached the remote first')
-    assert.equal(await isSymlink(join(repo, '.the-framework', 'branches', 'tf-add-auth')), false, 'its link went with it')
+    assert.match(await git(['show', 'refs/remotes/origin/agent-add-auth:index.html'], repo), /Welcome/, 'the work reached the remote first')
+    assert.equal(await isSymlink(join(repo, '.branches', 'agent-add-auth')), false, 'its link went with it')
     assert.deepEqual((await run(repo, 'remove', 'a1')).out, { ok: false, reason: 'no-checkout', agentId: 'a1' })
   } finally {
     await rm(repo, { recursive: true, force: true })
@@ -241,10 +242,10 @@ test('remove --no-push: a checkout whose tip the remote lacks is kept, and nothi
     await commitWork(path)
     const kept = await run(repo, 'remove', 'a1', '--no-push')
     assert.equal(kept.code, 1)
-    assert.deepEqual(kept.out, { ok: false, reason: 'not-on-remote', branch: 'tf-agent-a1' })
+    assert.deepEqual(kept.out, { ok: false, reason: 'not-on-remote', branch: 'agent-a1' })
     assert.equal((await stat(path)).isDirectory(), true)
-    await assert.rejects(() => git(['rev-parse', '--verify', 'refs/remotes/origin/tf-agent-a1'], repo), 'nothing reached the remote')
-    await git(['push', '-q', '--set-upstream', 'origin', 'tf-agent-a1'], path)
+    await assert.rejects(() => git(['rev-parse', '--verify', 'refs/remotes/origin/agent-a1'], repo), 'nothing reached the remote')
+    await git(['push', '-q', '--set-upstream', 'origin', 'agent-a1'], path)
     assert.deepEqual((await run(repo, 'remove', 'a1', '--no-push')).out, { ok: true })
   } finally {
     await rm(repo, { recursive: true, force: true })
@@ -259,12 +260,12 @@ test('attach: a continued agent is put back on the branch its work is on', async
     await run(path, 'name', 'add-auth')
     await commitWork(path)
     await run(repo, 'remove', 'a1')
-    const attached = await run(repo, 'attach', 'a1', 'tf-add-auth')
+    const attached = await run(repo, 'attach', 'a1', 'agent-add-auth')
     assert.equal(attached.code, 0)
-    assert.deepEqual(attached.out, { ok: true, path, branch: 'tf-add-auth' })
+    assert.deepEqual(attached.out, { ok: true, path, branch: 'agent-add-auth' })
     assert.match(await git(['show', 'HEAD:index.html'], path), /Welcome/, 'with its previous commit')
     assert.equal(await isSymlink(join(path, 'node_modules', 'dep')), true)
-    assert.equal(await readlink(join(repo, '.the-framework', 'branches', 'tf-add-auth')), 'tf-agent-a1')
+    assert.equal(await readlink(join(repo, '.branches', 'agent-add-auth')), 'agent-a1')
   } finally {
     await rm(repo, { recursive: true, force: true })
   }
@@ -282,7 +283,7 @@ test('prune: removes what the rule allows and reports each checkout it kept, wit
     assert.deepEqual(pruned.out, {
       ok: true,
       removed: ['clean'],
-      skipped: [{ agentId: 'dirty', reason: 'dirty', detail: 'tf-agent-dirty has uncommitted work; the checkout was kept' }],
+      skipped: [{ agentId: 'dirty', reason: 'dirty', detail: 'agent-dirty has uncommitted work; the checkout was kept' }],
     })
     await assert.rejects(() => stat(worktreePath(repo, 'clean')))
     assert.equal((await stat(worktreePath(repo, 'dirty'))).isDirectory(), true)
@@ -348,12 +349,12 @@ test('the executable runs by name from CLI_BIN_DIR: JSON on stdout, the reason o
   try {
     const created = await exec(repo, 'create', 'a1')
     assert.equal(created.code, 0, created.stderr)
-    assert.deepEqual(JSON.parse(created.stdout), { ok: true, path: worktreePath(repo, 'a1'), branch: 'tf-agent-a1' })
+    assert.deepEqual(JSON.parse(created.stdout), { ok: true, path: worktreePath(repo, 'a1'), branch: 'agent-a1' })
     await writeFile(join(worktreePath(repo, 'a1'), 'index.html'), '<h1>Edited</h1>\n')
     const kept = await exec(worktreePath(repo, 'a1'), 'remove', 'a1')
     assert.equal(kept.code, 1)
-    assert.deepEqual(JSON.parse(kept.stdout), { ok: false, reason: 'dirty', branch: 'tf-agent-a1' })
-    assert.equal(kept.stderr.trim(), 'tf-agent-a1 has uncommitted work; the checkout was kept')
+    assert.deepEqual(JSON.parse(kept.stdout), { ok: false, reason: 'dirty', branch: 'agent-a1' })
+    assert.equal(kept.stderr.trim(), 'agent-a1 has uncommitted work; the checkout was kept')
     assert.equal((await exec(repo)).code, 2)
   } finally {
     await rm(repo, { recursive: true, force: true })
@@ -365,30 +366,27 @@ test('name: asking again for the name the checkout already carries, suffixed or 
   try {
     await run(repo, 'create', 'a1')
     await run(repo, 'create', 'a2')
-    assert.deepEqual((await run(worktreePath(repo, 'a1'), 'name', 'fix-login')).out, { ok: true, branch: 'tf-fix-login' })
-    assert.deepEqual((await run(worktreePath(repo, 'a2'), 'name', 'fix-login')).out, { ok: true, branch: 'tf-fix-login-2' })
-    assert.deepEqual((await run(worktreePath(repo, 'a2'), 'name', 'fix-login')).out, { ok: true, branch: 'tf-fix-login-2' }, 'no drift to -3')
+    assert.deepEqual((await run(worktreePath(repo, 'a1'), 'name', 'fix-login')).out, { ok: true, branch: 'agent-fix-login' })
+    assert.deepEqual((await run(worktreePath(repo, 'a2'), 'name', 'fix-login')).out, { ok: true, branch: 'agent-fix-login-2' })
+    assert.deepEqual((await run(worktreePath(repo, 'a2'), 'name', 'fix-login')).out, { ok: true, branch: 'agent-fix-login-2' }, 'no drift to -3')
     // Its own pushed copy does not count as taken either.
-    await git(['push', '-q', '--set-upstream', 'origin', 'tf-fix-login-2'], worktreePath(repo, 'a2'))
+    await git(['push', '-q', '--set-upstream', 'origin', 'agent-fix-login-2'], worktreePath(repo, 'a2'))
     await git(['fetch', '-q', 'origin'], repo)
-    assert.deepEqual((await run(worktreePath(repo, 'a2'), 'name', 'fix-login')).out, { ok: true, branch: 'tf-fix-login-2' })
+    assert.deepEqual((await run(worktreePath(repo, 'a2'), 'name', 'fix-login')).out, { ok: true, branch: 'agent-fix-login-2' })
   } finally {
     await rm(repo, { recursive: true, force: true })
   }
 })
 
-test("name: The Framework's own spellings are refused — the data branch, and the checkout-directory form (review)", async () => {
+test('name: a name spelled like a checkout directory is a name like any other; its link is never listed as a checkout', async () => {
   const repo = await repoWithOrigin()
   try {
     await run(repo, 'create', 'a1')
     const path = worktreePath(repo, 'a1')
-    for (const name of ['data', 'agent-zz', 'agent-']) {
-      const ran = await run(path, 'name', name)
-      assert.equal(ran.code, 1, name)
-      assert.deepEqual(ran.out, { ok: false, reason: 'reserved-name' }, name)
-    }
-    assert.equal((await git(['rev-parse', '--abbrev-ref', 'HEAD'], path)).trim(), 'tf-agent-a1')
-    assert.deepEqual((await run(repo, 'list')).out, [{ agentId: 'a1', path, branch: 'tf-agent-a1' }], 'and no phantom checkout appeared')
+    assert.deepEqual((await run(path, 'name', 'agent-zz')).out, { ok: true, branch: 'agent-agent-zz' })
+    assert.equal((await git(['rev-parse', '--abbrev-ref', 'HEAD'], path)).trim(), 'agent-agent-zz')
+    assert.equal(await readlink(join(repo, '.branches', 'agent-agent-zz')), 'agent-a1')
+    assert.deepEqual((await run(repo, 'list')).out, [{ agentId: 'a1', path, branch: 'agent-agent-zz' }], 'the link beside the checkout is not a checkout')
   } finally {
     await rm(repo, { recursive: true, force: true })
   }
@@ -405,8 +403,8 @@ test('the project is the checkout whose branches/ the command runs under — a p
     assert.equal((created.out as { path: string }).path, worktreePath(project, 'a1'), 'under the registered project, not the main checkout')
     assert.deepEqual(((await run(worktreePath(project, 'a1'), 'list')).out as { agentId: string }[]).map(r => r.agentId), ['a1'])
     assert.deepEqual((await run(repo, 'list')).out, [], 'the main checkout has none')
-    assert.deepEqual((await run(worktreePath(project, 'a1'), 'name', 'nested')).out, { ok: true, branch: 'tf-nested' })
-    assert.equal(await readlink(join(project, '.the-framework', 'branches', 'tf-nested')), 'tf-agent-a1')
+    assert.deepEqual((await run(worktreePath(project, 'a1'), 'name', 'nested')).out, { ok: true, branch: 'agent-nested' })
+    assert.equal(await readlink(join(project, '.branches', 'agent-nested')), 'agent-a1')
   } finally {
     await rm(repo, { recursive: true, force: true })
   }

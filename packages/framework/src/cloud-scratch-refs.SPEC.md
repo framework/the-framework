@@ -1,8 +1,8 @@
-The cloud scratch-ref sweep: deletes from origin the leftover refs a `web`-target agent's hand-off pushes and nothing ever consumes again. Every hand-off to a cloud session leaves two: the slash-free `cloud-<counter>-<8 hex>` ref the driver pushes so the cloud session has a ref to clone at, and the agent branch (`tf-agent-<agent id>`) the worktree sweep pushes before reclaiming the checkout. The cloud session does its work on its own `claude/*` branch and opens its PR from there, so once provisioning settles both refs are dead names — one pair per `web`-target agent, accumulating forever. The daemon sweeps them because the driver cannot safely delete its own ref: creating the cloud session only signals "session created", not "clone finished", and a ref deleted in that window strands the session.
+The cloud scratch-ref sweep: deletes from origin the leftover refs a `web`-target agent's hand-off pushes and nothing ever consumes again. Every hand-off to a cloud session leaves two: the slash-free `cloud-<counter>-<8 hex>` ref the driver pushes so the cloud session has a ref to clone at, and the agent branch (`agent-<agent id>`) the worktree sweep pushes before reclaiming the checkout. The cloud session does its work on its own `claude/*` branch and opens its PR from there, so once provisioning settles both refs are dead names — one pair per `web`-target agent, accumulating forever. The daemon sweeps them because the driver cannot safely delete its own ref: creating the cloud session only signals "session created", not "clone finished", and a ref deleted in that window strands the session.
 
 ## Glossary
 
-- **scratch ref** — one of the two leftover refs above: the driver's `cloud-<counter>-<8 hex>` clone ref, or a pushed agent branch (`tf-agent-<agent id>`).
+- **scratch ref** — one of the two leftover refs above: the driver's `cloud-<counter>-<8 hex>` clone ref, or a pushed agent branch (`agent-<agent id>`).
 - **hand-off anchor** — the empty commit, unique to one agent, that the driver pushes as the ref the cloud session clones at. Its tree equals its parent's tree (it changes nothing), and no merge ever lands the anchor itself — a squash merge rewrites the session's history without it.
 
 ## Business logic — TL;DR
@@ -22,7 +22,7 @@ A user who hands tasks to Claude web finds origin accumulating a pair of dead re
 
 #### Business logic
 
-Only two naming shapes are ever candidates: the driver's tightly-matched `cloud-<counter>-<8 hex>` form (a user's own `cloud-…` branch that does not match it is never considered) and agent branches. Every other branch — the default branch, `claude/*`, `tf-<session name>` — is never even listed. A candidate is deleted only when all four gates clear:
+Only two naming shapes are ever candidates: the driver's tightly-matched `cloud-<counter>-<8 hex>` form (a user's own `cloud-…` branch that does not match it is never considered) and agent branches. Every other branch — the default branch, `claude/*`, `agent-<session name>` — is never even listed. A candidate is deleted only when all four gates clear:
 
 1. **Old enough** (~a day), safely past any provisioning window.
 2. **Holds no work**: its tip is already reachable from origin's default branch, or it is a hand-off anchor — an empty commit whose parent landed. This gate runs first (it is local, free, and the one that must never be wrong), and a ref that fails it is spent no PR lookup.

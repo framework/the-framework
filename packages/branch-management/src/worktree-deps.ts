@@ -1,5 +1,4 @@
 import { join, relative } from 'node:path'
-import { FRAMEWORK_DIR } from './branch-names.js'
 
 /**
  * Give a fresh worktree a dependency tree (#736). `node_modules` is gitignored, so
@@ -32,7 +31,7 @@ const NODE_MODULES = 'node_modules'
 const MAX_DEPTH = 2
 
 /** Directory names never descended into while scanning for dependency trees. */
-const SKIP = new Set([NODE_MODULES, '.git', FRAMEWORK_DIR, 'dist', 'build', 'coverage'])
+const SKIP = new Set([NODE_MODULES, '.git', 'dist', 'build', 'coverage'])
 
 /** The one dot-entry of a dependency directory that is linked: the project's executables. */
 const BIN = '.bin'

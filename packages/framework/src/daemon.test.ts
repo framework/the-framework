@@ -48,7 +48,8 @@ async function startDaemon(cwd: string, opts: RunDaemonOptions): Promise<{ done:
 }
 import { listAgents } from './store/index.js'
 import { EVENTS_FILE } from './store/index.js'
-import { FRAMEWORK_DIR, addWorktree, worktreePath, nodeGitRunner } from '@better-skills/branch-management'
+import { addWorktree, worktreePath, nodeGitRunner } from '@better-skills/branch-management'
+import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import { controlPath } from './control.js'
 import { projectId, listProjects, addProject } from './registry.js'
 import { gitignorePath, frameworkGitignore } from './framework-gitignore.js'
@@ -77,7 +78,7 @@ const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(r
 
 /** Fake an activated workspace: the install-written ignore file is the activation marker (#1600). */
 async function activate(cwd: string): Promise<void> {
-  await mkdir(join(cwd, FRAMEWORK_DIR), { recursive: true })
+  await mkdir(join(cwd, THE_FRAMEWORK_DIR), { recursive: true })
   await writeFile(gitignorePath(cwd), frameworkGitignore())
 }
 
@@ -97,7 +98,7 @@ async function configEnv(cwd: string): Promise<NodeJS.ProcessEnv> {
 
 test('EventTailer dispatches only events appended since the last pull', async () => {
   const cwd = await tmpWorkspace()
-  const path = join(cwd, FRAMEWORK_DIR, EVENTS_FILE)
+  const path = join(cwd, THE_FRAMEWORK_DIR, EVENTS_FILE)
   try {
     const seen: string[] = []
     const tailer = new EventTailer(path, e => e.kind === 'log' && seen.push(e.message))
@@ -119,7 +120,7 @@ test('EventTailer dispatches only events appended since the last pull', async ()
 
 test('EventTailer buffers a torn trailing line until its newline arrives', async () => {
   const cwd = await tmpWorkspace()
-  const path = join(cwd, FRAMEWORK_DIR, EVENTS_FILE)
+  const path = join(cwd, THE_FRAMEWORK_DIR, EVENTS_FILE)
   try {
     const seen: string[] = []
     const tailer = new EventTailer(path, e => e.kind === 'log' && seen.push(e.message))
@@ -139,7 +140,7 @@ test('EventTailer buffers a torn trailing line until its newline arrives', async
 
 test('EventTailer resets when the log is truncated by a fresh run', async () => {
   const cwd = await tmpWorkspace()
-  const path = join(cwd, FRAMEWORK_DIR, EVENTS_FILE)
+  const path = join(cwd, THE_FRAMEWORK_DIR, EVENTS_FILE)
   try {
     const seen: string[] = []
     const tailer = new EventTailer(path, e => e.kind === 'log' && seen.push(e.message))
@@ -257,12 +258,12 @@ setTimeout(() => {}, 800)
     }
     assert.notEqual(agents[0]!.cwd, agents[1]!.cwd, 'the two runs got different checkouts')
 
-    // Each agent is on its own `tf-agent-<id>` branch, and the user's own checkout
+    // Each agent is on its own `agent-<id>` branch, and the user's own checkout
     // was never moved off the branch it was sitting on.
     const branches = await git(['branch', '--format=%(refname:short)'], cwd)
-    for (const agent of agents) assert.ok(branches.includes(`tf-agent-${agent.agentId}`), `branch for ${agent.agentId}`)
+    for (const agent of agents) assert.ok(branches.includes(`agent-${agent.agentId}`), `branch for ${agent.agentId}`)
     const head = (await git(['rev-parse', '--abbrev-ref', 'HEAD'], cwd)).trim()
-    assert.equal(head.startsWith('tf-agent-'), false, 'the main checkout stayed on its own branch')
+    assert.equal(head.startsWith('agent-'), false, 'the main checkout stayed on its own branch')
 
     ac.abort()
     await done
@@ -359,9 +360,9 @@ fs.appendFileSync(${JSON.stringify(join(cwd, 'started.log'))}, agentId + '\\n')
     // The branch is the only handle left on the work once the checkout goes, so it is recorded
     // while the worktree still exists (#799) — otherwise the handoff has nothing to read.
     const doneMeta = await archivedMeta(doneId)
-    assert.equal(doneMeta?.branch, `tf-agent-${doneId}`, "the finished run's branch is recorded")
+    assert.equal(doneMeta?.branch, `agent-${doneId}`, "the finished run's branch is recorded")
     assert.match(
-      await git(['log', '--format=%s', `refs/remotes/origin/tf-agent-${doneId}`], cwd),
+      await git(['log', '--format=%s', `refs/remotes/origin/agent-${doneId}`], cwd),
       /\S/,
       'the work reached the remote, which is what let the checkout go',
     )
@@ -377,7 +378,7 @@ fs.appendFileSync(${JSON.stringify(join(cwd, 'started.log'))}, agentId + '\\n')
     // branch's absence is the last thing teardown does, so it is what the test waits on before
     // pulling the repo out from under the daemon.
     for (let i = 0; i < 600; i++) {
-      const gone = await git(['show-ref', '--verify', '--quiet', `refs/heads/tf-agent-${failedId}`], cwd).then(
+      const gone = await git(['show-ref', '--verify', '--quiet', `refs/heads/agent-${failedId}`], cwd).then(
         () => false,
         () => true,
       )
@@ -385,11 +386,11 @@ fs.appendFileSync(${JSON.stringify(join(cwd, 'started.log'))}, agentId + '\\n')
       await new Promise(r => setTimeout(r, 20))
     }
     await assert.rejects(
-      () => git(['show-ref', '--verify', '--quiet', `refs/heads/tf-agent-${failedId}`], cwd),
+      () => git(['show-ref', '--verify', '--quiet', `refs/heads/agent-${failedId}`], cwd),
       'a run that committed nothing leaves no branch behind',
     )
     await assert.rejects(
-      () => git(['rev-parse', '--verify', `refs/remotes/origin/tf-agent-${failedId}`], cwd),
+      () => git(['rev-parse', '--verify', `refs/remotes/origin/agent-${failedId}`], cwd),
       'and nothing of it was pushed',
     )
 

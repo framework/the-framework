@@ -380,8 +380,8 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
   // a push that could not land at teardown.
   const mergedWorktrees = startMergedWorktreeSweep({ projects, log, busy: deps.busyAgentIds })
 
-  // The #1580 branches view: one symlink per worktree under `.the-framework/branches/`, named as
-  // its branch, plus the repo-root `branches` shortcut. Quiet, idempotent, near-free per tick.
+  // The #1580 branches view: one symlink per worktree under `.branches/`, named as its branch.
+  // Quiet, idempotent, near-free per tick.
   // The branches view (#1580): links settle within a tick, and allocation reconciles its own
   // checkout immediately. Quiet on purpose — links are presentation.
   const branchLinks = startProjectPass(projects, cwd => reconcileBranchLinks(cwd).catch(() => {}))

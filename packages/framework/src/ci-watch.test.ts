@@ -90,7 +90,7 @@ test('pending checks wait for the next tick: no merge, no fix', async () => {
 })
 
 /** A repo that genuinely has no CI: `gh` answered, so the read carries the head it read. */
-const NO_CI: PrCiStatus = { checks: 'none', failed: [], headSha: 'abc1234', branch: 'tf-change' }
+const NO_CI: PrCiStatus = { checks: 'none', failed: [], headSha: 'abc1234', branch: 'agent-change' }
 
 test('a check-less PR younger than the attach grace is not merged — the stale-check window (#1406)', async () => {
   const justOpened = openPr({ createdAt: new Date(NOW - NO_CHECKS_GRACE_MS + 1000).toISOString() })

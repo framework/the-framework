@@ -324,7 +324,7 @@ test('the branch-management skill rides after the built-in prompt of an agent in
     const elsewhere = systemPromptBlock(opts)
     assert.ok(!elsewhere.includes(BRANCH_MANAGEMENT_SKILL), JSON.stringify(opts))
     assert.ok(elsewhere.includes(BRANCH_YOURSELF), JSON.stringify(opts))
-    assert.ok(BRANCH_YOURSELF.startsWith('# Branch management') && BRANCH_YOURSELF.includes('git checkout -b tf-<SESSION_NAME>'))
+    assert.ok(BRANCH_YOURSELF.startsWith('# Branch management') && BRANCH_YOURSELF.includes('git checkout -b agent-<SESSION_NAME>'))
   }
   // Framework-authored, so `--vanilla` drops both: the on-before-mergeable follow-up must not rename
   // or create a branch after a session of its own (#560).

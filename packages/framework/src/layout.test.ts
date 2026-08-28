@@ -17,6 +17,7 @@ function markerFs(content?: string): StoreFs {
       return content !== undefined
     },
     async mkdir() {},
+    async subdirs() { return [] },
     async readdir() {
       return []
     },

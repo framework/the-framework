@@ -26,7 +26,7 @@ Triage runs on a schedule, and the user wants every firing of it recognizable in
 
 #### Business logic
 
-The agent always sets its session name to `triage-consensual` rather than inventing one, so this triage's branch is always `tf-triage-consensual`. The name also differs from the sibling triage preset's, so the two never land on the same branch.
+The agent always sets its session name to `triage-consensual` rather than inventing one, so this triage's branch is always `agent-triage-consensual`. The name also differs from the sibling triage preset's, so the two never land on the same branch.
 
 #### Rationale
 

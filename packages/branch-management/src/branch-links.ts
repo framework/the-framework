@@ -1,16 +1,14 @@
 import { basename, join } from 'node:path'
 import { nodeGitRunner, type GitRunner } from './git.js'
-import { excludeFromGit } from './git-exclude.js'
-import { FRAMEWORK_DIR, BRANCHES_DIR, isWorktreeDirName } from './branch-names.js'
+import { BRANCHES_DIR, isAgentBranch } from './branch-names.js'
 import { worktreeDirEntries, worktreeBranch, type WorktreeDirEntry } from './worktree.js'
 
-// The branches view (#1580): every checkout under `.the-framework/branches/` is a directory named
-// as its birth branch (`tf-agent-<id>`), and this pass keeps the *current* names reachable beside
-// them — a symlink named as the branch a checkout is on now, whenever that differs from the dir's
-// own name (the agent checks out `tf-<slug>` early, per #326) — plus the `branches` shortcut at
-// the repo root. So `cd branches/<name>` reaches any session's checkout by the name the dashboard
-// shows, and a rename costs a link, never moving a checkout under a live agent (the #1589
-// review's call).
+// The branches view (#1580): every checkout under `.branches/` is a directory named as the branch
+// it was created on (`agent-<id>`), and this pass keeps the *current* names reachable beside them —
+// a symlink named as the branch a checkout is on now, whenever that differs from the dir's own
+// name (the agent names its session early). So `cd .branches/<name>` reaches any session's
+// checkout by its name, and a rename costs a link, never moving a checkout under a live agent
+// (the #1589 review's call).
 //
 // A daemon reconciles on its clock and after each worktree it allocates: derive the wanted
 // links from the checkouts on disk, add what is missing, drop only our own stale links.
@@ -52,29 +50,26 @@ export interface BranchLinksDeps {
   worktrees?: (cwd: string) => Promise<WorktreeDirEntry[]>
   /** The branch a worktree is on, or none when the path is not a worktree root (default {@link worktreeBranch}). */
   branchOf?: (path: string) => Promise<string | undefined>
-  /** Hide a repo-root entry from git (default {@link excludeFromGit} over `git`). */
-  exclude?: (repo: string, rule: string) => Promise<void>
 }
 
 /**
- * Bring one project's `branches/` links in line with its worktrees: one link per worktree, named
- * as the branch the worktree is on right now, plus the repo-root shortcut. Renames are covered by
- * the same rule — the old name stops being wanted and is dropped, the new one is created.
+ * Bring one project's `.branches/` links in line with its worktrees: one link per worktree, named
+ * as the branch the worktree is on right now. Renames are covered by the same rule — the old name
+ * stops being wanted and is dropped, the new one is created.
  *
  * Touches only what is provably ours: a link is created, replaced, or removed only when it points
- * (or would point) into `worktrees/`; anything else at those paths — a user's own file, dir, or
- * symlink — is left alone. Never throws.
+ * (or would point) at a sibling checkout; anything else at those paths — a user's own file, dir,
+ * or symlink — is left alone. Never throws.
  */
 export async function reconcileBranchLinks(cwd: string, deps: BranchLinksDeps = {}): Promise<void> {
   const git = deps.git ?? nodeGitRunner()
   const fs = deps.fs ?? nodeLinksFs()
   const worktrees = deps.worktrees ?? worktreeDirEntries
-  // A `branches/` directory that is not a worktree root reads as no branch (#1654): otherwise
+  // A `.branches/` directory that is not a worktree root reads as no branch (#1654): otherwise
   // it reads as the enclosing repo's, and a link named after the user's own branch appears.
   const branchOf = deps.branchOf ?? ((path: string) => worktreeBranch(path, git))
-  const exclude = deps.exclude ?? ((repo: string, rule: string) => excludeFromGit(repo, rule, undefined, git))
 
-  const linksDir = join(cwd, FRAMEWORK_DIR, BRANCHES_DIR)
+  const linksDir = join(cwd, BRANCHES_DIR)
   /** Link name -> relative target, derived from what is actually checked out. */
   const wanted = new Map<string, string>()
   for (const entry of await worktrees(cwd).catch((): WorktreeDirEntry[] => [])) {
@@ -93,7 +88,7 @@ export async function reconcileBranchLinks(cwd: string, deps: BranchLinksDeps = 
   for (const name of await fs.readdir(linksDir)) {
     const path = join(linksDir, name)
     const target = await fs.readlink(path)
-    if (target === undefined || !isWorktreeDirName(target)) continue // not ours to touch
+    if (target === undefined || !isAgentBranch(target)) continue // not ours to touch
     if (wanted.get(name) === target) continue
     await fs.unlink(path).catch(() => {})
   }
@@ -103,20 +98,5 @@ export async function reconcileBranchLinks(cwd: string, deps: BranchLinksDeps = 
     if (await fs.lexists(path)) continue // ours-and-current, or someone else's — either way, stay
     await fs.mkdir(linksDir)
     await fs.symlink(target, path).catch(() => {})
-  }
-
-  // The repo-root `branches` shortcut (#1580). Relative, so a checkout that moves keeps working;
-  // created only when nothing sits at that path — a user's own `branches` file or dir is theirs.
-  // The link is framework state, so it is hidden from git the moment it is made (#1600):
-  // uncommitted at the root, it would ride any sweeping `git add -A` onto a code branch. The
-  // same exclude pair as the data checkout's `tickets` link: `/branches` hides root entries of
-  // that name, and `!/branches/` re-includes directories (a trailing slash never matches a
-  // symlink), so a user's own `branches` directory keeps committing while the link stays hidden.
-  const rootLink = join(cwd, 'branches')
-  if (!(await fs.lexists(rootLink))) {
-    await fs.mkdir(linksDir)
-    await fs.symlink(join(FRAMEWORK_DIR, BRANCHES_DIR), rootLink).catch(() => {})
-    await exclude(cwd, '/branches').catch(() => {})
-    await exclude(cwd, '!/branches/').catch(() => {})
   }
 }

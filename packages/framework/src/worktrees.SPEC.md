@@ -9,7 +9,7 @@ Managing the worktrees agents leave behind on a project's disk: listing them, re
 ## Glossary
 
 - **hand-off anchor** - the commit a `web`-target agent pushed when it handed its task to the cloud session; everything that agent's local checkout could contain is contained in it.
-- **birth branch** - the `tf-agent-<agent id>` branch an agent's checkout is created on, before the agent has picked a session name.
+- **birth branch** - the `agent-<agent id>` branch an agent's checkout is created on, before the agent has picked a session name.
 
 ## Business logic — TL;DR
 
@@ -32,7 +32,7 @@ The user's project directory has grown; they want to see which throwaway checkou
 
 #### Business logic
 
-The list is every worktree directory the project still has under `.the-framework/branches/`, newest first. Each entry names the agent that left it (the agent id is also the directory name), the branch its work landed on, how that agent ended, and the checkout's size on disk. A checkout belonging to an agent that is still going is listed too, flagged as in use rather than hidden — "what is this directory and why can I not remove it" is exactly the question the list exists to answer. That checkout's size is left blank, because sizing a tree an agent is still writing to produces a number that is already wrong by the time it is shown; a caller that only wants the rows can skip the sizing entirely.
+The list is every worktree directory the project still has under `.branches/`, newest first. Each entry names the agent that left it (the agent id is also the directory name), the branch its work landed on, how that agent ended, and the checkout's size on disk. A checkout belonging to an agent that is still going is listed too, flagged as in use rather than hidden — "what is this directory and why can I not remove it" is exactly the question the list exists to answer. That checkout's size is left blank, because sizing a tree an agent is still writing to produces a number that is already wrong by the time it is shown; a caller that only wants the rows can skip the sizing entirely.
 
 ### Only what is on the remote may go
 
@@ -42,7 +42,7 @@ The user reclaims disk space without ever wondering whether they just deleted th
 
 #### Business logic
 
-Reclaiming one checkout hands the package's rule what the agent's record says: whether the branch may be pushed at all, and, for a cloud agent, the hand-off anchor that proves what the checkout holds. The checkout's birth branch, `tf-agent-<agent id>`, is named so the rule can delete it when the branch the agent moved to contains it. Once removal is decided, the calling surface gets to do its own cleanup first — the dashboard stops any preview being served out of that tree.
+Reclaiming one checkout hands the package's rule what the agent's record says: whether the branch may be pushed at all, and, for a cloud agent, the hand-off anchor that proves what the checkout holds. The checkout's birth branch, `agent-<agent id>`, is named so the rule can delete it when the branch the agent moved to contains it. Once removal is decided, the calling surface gets to do its own cleanup first — the dashboard stops any preview being served out of that tree.
 
 Every refusal the rule returns is said with the agent named, the way the user reads it: the directory is not a git worktree and was left alone; the checkout is on no branch; it holds uncommitted work; its branch is not on the remote, with what git said when the push failed. For a publish-nothing agent, both a dirty tree and an unpushed tip are reported as the handoff's refusal, since either would take a push of removal's own.
 
@@ -84,7 +84,7 @@ A `web`-target agent's local checkout never holds the work: the hand-off pushed 
 
 #### Rationale
 
-Pushing these local branches purely to satisfy the remote rule is what accreted one empty `tf-agent-<agent id>` branch on the remote per cloud agent.
+Pushing these local branches purely to satisfy the remote rule is what accreted one empty `agent-<agent id>` branch on the remote per cloud agent.
 
 ### Delete is the one action that destroys history
 

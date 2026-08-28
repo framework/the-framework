@@ -11,7 +11,7 @@ import type { FrameworkEvent } from './events.js'
 
 /** The meta after `events`, folded the way a live run folds them: appended to a real store. */
 async function foldLive(events: readonly FrameworkEvent[], at: string): Promise<AgentMeta> {
-  const cwd = await mkdtemp(join(tmpdir(), 'tf-session-link-'))
+  const cwd = await mkdtemp(join(tmpdir(), 'agent-session-link-'))
   try {
     const store = await AgentStore.open(cwd, { now: at, clock: () => at })
     for (const event of events) await store.append(event)

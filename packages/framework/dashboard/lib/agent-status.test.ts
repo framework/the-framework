@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import type { FrameworkEvent } from '../../src/index.js'
 import { agentStatusPill } from './agent-status.js'
 
-const named = { kind: 'branch', branch: 'tf-relay-smoke-test' } as FrameworkEvent
+const named = { kind: 'branch', branch: 'agent-relay-smoke-test', sessionName: 'relay-smoke-test' } as FrameworkEvent
 const readyForMerge = { kind: 'ready-for-merge' } as FrameworkEvent
 const ended = (over: Record<string, unknown>) => ({ kind: 'end', ...over }) as FrameworkEvent
 const armedPush = { kind: 'handoff-armed', push: true, pr: true } as FrameworkEvent

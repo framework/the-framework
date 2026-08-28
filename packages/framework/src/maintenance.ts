@@ -1,5 +1,6 @@
 import { join } from 'node:path'
-import { nodeGitRunner, type GitRunner, FRAMEWORK_DIR } from '@better-skills/branch-management'
+import { nodeGitRunner, type GitRunner } from '@better-skills/branch-management'
+import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import { nodeFs } from './node-fs.js'
 /**
  * The maintenance sweep (#298): a background job that walks the registered repos,
@@ -72,7 +73,7 @@ function nodeMaintenanceFs(): MaintenanceFs {
 
 /** The review-state file path for a repo. */
 export function maintenanceStatePath(cwd: string): string {
-  return join(cwd, FRAMEWORK_DIR, MAINTENANCE_FILE)
+  return join(cwd, THE_FRAMEWORK_DIR, MAINTENANCE_FILE)
 }
 
 /** Read a repo's review state. Forgiving: a missing/unreadable/malformed file yields `{}`. */
@@ -99,7 +100,7 @@ export async function writeMaintenanceState(
   state: MaintenanceState,
   fs: MaintenanceFs = nodeMaintenanceFs(),
 ): Promise<void> {
-  await fs.mkdir(join(cwd, FRAMEWORK_DIR))
+  await fs.mkdir(join(cwd, THE_FRAMEWORK_DIR))
   await fs.write(maintenanceStatePath(cwd), JSON.stringify(state, null, 2))
 }
 

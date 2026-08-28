@@ -15,7 +15,8 @@ import type { PreflightResult } from './preflight.js'
 const agentReady = (): Promise<PreflightResult> => Promise.resolve({ ok: true, checks: [] })
 
 import { EVENTS_FILE, META_FILE, startedAtFromAgentId, type AgentMeta } from './store/index.js'
-import { FRAMEWORK_DIR, BRANCHES_DIR, worktreePath, agentBranchName, nodeGitRunner, GitTimeoutError, CLI_BIN_DIR } from '@better-skills/branch-management'
+import { BRANCHES_DIR, worktreePath, agentBranchName, nodeGitRunner, GitTimeoutError, CLI_BIN_DIR } from '@better-skills/branch-management'
+import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import { addProject, projectId } from './registry.js'
 import type { AgentSpec } from './agent-spec.js'
 
@@ -129,8 +130,8 @@ test('a shutdown refusal takes back the workspace it had already allocated (#983
     const result = (await runtime.onStart('build a thing', 'build')) as { ok: boolean; error?: string }
     assert.equal(result.ok, false)
     assert.match(result.error ?? '', /shutting down/)
-    assert.deepEqual(await readdir(join(cwd, FRAMEWORK_DIR, BRANCHES_DIR)).catch(() => []), [], 'the worktree is gone')
-    assert.equal((await git(['branch', '--list', 'tf-agent-*'], cwd)).trim(), '', 'and so is its branch')
+    assert.deepEqual(await readdir(join(cwd, THE_FRAMEWORK_DIR, BRANCHES_DIR)).catch(() => []), [], 'the worktree is gone')
+    assert.equal((await git(['branch', '--list', 'agent-*'], cwd)).trim(), '', 'and so is its branch')
     assert.deepEqual(await readdir(specHome), [], 'and the spec it wrote')
     await runtime.dispose()
   } finally {
@@ -184,8 +185,7 @@ test('a repo whose worktree could not be created fails the run instead of borrow
     // A *file* where the worktrees directory belongs: git cannot create the leading directories,
     // so `worktree add` rejects. Stands in for the SIGTERM this exists for, which needs a repo big
     // enough to outrun a 120s budget; both arrive here as one rejection from a working git.
-    await mkdir(join(cwd, FRAMEWORK_DIR), { recursive: true })
-    await writeFile(join(cwd, FRAMEWORK_DIR, BRANCHES_DIR), '')
+    await writeFile(join(cwd, BRANCHES_DIR), '')
 
     const log = join(cwd, 'started.log')
     const runtime = createProjectRuntime({ driverPreflight: agentReady, cwd, env: {}, binPath: await writeStub(cwd, log) })
@@ -228,7 +228,7 @@ test('a project that is not a git repo still falls back to the main checkout, an
 
 /** Write an agent's live meta into a checkout, so a teardown/read has a status to act on. */
 async function writeAgentMeta(checkout: string, status: AgentMeta['status'], extra: Partial<AgentMeta> = {}): Promise<void> {
-  const dir = join(checkout, FRAMEWORK_DIR)
+  const dir = join(checkout, THE_FRAMEWORK_DIR)
   await mkdir(dir, { recursive: true })
   const meta: AgentMeta = {
     status,
@@ -285,7 +285,7 @@ async function writeDyingStub(dir: string): Promise<string> {
 /** Poll a checkout until its `agent.json` appears, or time out. */
 async function waitForMeta(cwd: string): Promise<AgentMeta | undefined> {
   for (let i = 0; i < POLL_ATTEMPTS; i++) {
-    const raw = await readFile(join(cwd, FRAMEWORK_DIR, META_FILE), 'utf8').catch(() => '')
+    const raw = await readFile(join(cwd, THE_FRAMEWORK_DIR, META_FILE), 'utf8').catch(() => '')
     if (raw) return JSON.parse(raw) as AgentMeta
     await new Promise(r => setTimeout(r, 20))
   }
@@ -297,7 +297,7 @@ async function waitForLogLine(cwd: string, pattern: RegExp): Promise<string> {
   let events = ''
   for (let i = 0; i < POLL_ATTEMPTS && !pattern.test(events); i++) {
     await new Promise(r => setTimeout(r, 20))
-    events = await readFile(join(cwd, FRAMEWORK_DIR, EVENTS_FILE), 'utf8').catch(() => '')
+    events = await readFile(join(cwd, THE_FRAMEWORK_DIR, EVENTS_FILE), 'utf8').catch(() => '')
   }
   return events
 }
@@ -388,16 +388,16 @@ test('a child that wrote its own lifecycle is left alone by the failed-start mar
   try {
     await writeAgentMeta(base, 'done')
     assert.equal(await markFailedStart(base, 'run1', 'build a thing', 'its process exited with code 0'), false)
-    const meta = JSON.parse(await readFile(join(base, FRAMEWORK_DIR, META_FILE), 'utf8')) as AgentMeta
+    const meta = JSON.parse(await readFile(join(base, THE_FRAMEWORK_DIR, META_FILE), 'utf8')) as AgentMeta
     assert.equal(meta.status, 'done', 'the run reported its own end; the marker does not rewrite history')
-    assert.equal(await stat(join(base, FRAMEWORK_DIR, EVENTS_FILE)).then(() => true, () => false), false, 'and no failure line is invented')
+    assert.equal(await stat(join(base, THE_FRAMEWORK_DIR, EVENTS_FILE)).then(() => true, () => false), false, 'and no failure line is invented')
   } finally {
     await rm(base, RETRIED_RM)
   }
 })
 
 test('the failed-start marker is not written where the checkout is gone (#1654)', async () => {
-  // A marker written into a missing path creates a `branches/` directory that is not a worktree,
+  // A marker written into a missing path creates a `.branches/` directory that is not a worktree,
   // and every git command later run in it acts on the enclosing repo instead.
   const base = await realpath(await mkdtemp(join(tmpdir(), 'framework-bootfail-gone-')))
   try {
@@ -548,9 +548,9 @@ test('a start on a logged-out agent is refused, and spends no branch or worktree
     assert.match(result.error!, /auth login/)
 
     // Nothing was spent: no worktrees directory, and no agent branch on the repo.
-    const worktrees = await stat(join(cwd, FRAMEWORK_DIR, BRANCHES_DIR)).then(() => true, () => false)
+    const worktrees = await stat(join(cwd, THE_FRAMEWORK_DIR, BRANCHES_DIR)).then(() => true, () => false)
     assert.equal(worktrees, false, 'a refused start creates no worktree')
-    const branches = await git(['branch', '--list', 'tf-agent-*'], cwd)
+    const branches = await git(['branch', '--list', 'agent-*'], cwd)
     assert.equal(branches.trim(), '', 'a refused start creates no run branch')
 
     // And no agent was spawned, so there is no dead run to explain afterwards.

@@ -41,7 +41,7 @@ test('the extension is the checkout’s, next to this package', () => {
 })
 
 test('the profile lock names the process holding it, and nothing when there is no lock', async () => {
-  const profile = await mkdtemp(join(tmpdir(), 'tf-bridge-profile-'))
+  const profile = await mkdtemp(join(tmpdir(), 'agent-bridge-profile-'))
   assert.equal(await profileLockOwner(profile), undefined)
   await symlink('mac-12345', join(profile, 'SingletonLock'))
   assert.equal(await profileLockOwner(profile), 12345)
@@ -146,7 +146,7 @@ function fakeDeps(chrome: ReturnType<typeof fakeChrome>, child: ReturnType<typeo
 const options = (dir: string) => ({ daemonUrl: 'http://127.0.0.1:4200', token: 'tok', dir, extensionDir: '/repo/packages/chrome-extension' })
 
 test('the launch installs the extension over CDP, turns developer mode on, seeds the token, and minimizes (#1332)', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'tf-bridge-'))
+  const dir = await mkdtemp(join(tmpdir(), 'agent-bridge-'))
   const chrome = fakeChrome()
   const child = fakeProcess()
   const { deps, log } = fakeDeps(chrome, child, { binary: async (_c, report) => (report('downloading'), '/bin/chrome') })
@@ -192,7 +192,7 @@ test('a stale browser holding the profile is stopped before the launch, gently f
 })
 
 test('a browser that never listens is killed and the launch fails with the reason', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'tf-bridge-'))
+  const dir = await mkdtemp(join(tmpdir(), 'agent-bridge-'))
   const child = fakeProcess()
   const { deps } = fakeDeps(fakeChrome(), child, { ready: async () => false })
   await assert.rejects(startBridgeBrowser(options(dir), deps), /never opened its debugging port/)
@@ -200,7 +200,7 @@ test('a browser that never listens is killed and the launch fails with the reaso
 })
 
 test('a setup step that fails closes the browser again rather than leaving it half set up', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'tf-bridge-'))
+  const dir = await mkdtemp(join(tmpdir(), 'agent-bridge-'))
   const chrome = fakeChrome({ targets: () => [{ id: 'page-1', type: 'page', url: 'about:blank', webSocketDebuggerUrl: 'ws://page-1' }] })
   const child = fakeProcess()
   const { deps } = fakeDeps(chrome, child)
@@ -210,13 +210,13 @@ test('a setup step that fails closes the browser again rather than leaving it ha
 })
 
 test('a worker that never takes the token fails the launch by name', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'tf-bridge-'))
+  const dir = await mkdtemp(join(tmpdir(), 'agent-bridge-'))
   const { deps } = fakeDeps(fakeChrome({ seed: 'nope' }), fakeProcess())
   await assert.rejects(startBridgeBrowser(options(dir), deps), /did not take the token: nope/)
 })
 
 test('Chrome exiting on its own is reported once; a close asked for is not', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'tf-bridge-'))
+  const dir = await mkdtemp(join(tmpdir(), 'agent-bridge-'))
   const child = fakeProcess()
   const { deps } = fakeDeps(fakeChrome(), child)
   const browser = await startBridgeBrowser(options(dir), deps)

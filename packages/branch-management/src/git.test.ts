@@ -8,9 +8,9 @@ import { GIT_READ_TIMEOUT_MS, GIT_WRITE_TIMEOUT_MS, GIT_SLOW_TIMEOUT_MS, gitTime
  */
 const BUDGETS: { args: string[]; ms: number }[] = [
   // The network and a whole checkout: the two the flat 10s budget was killing.
-  { args: ['push', '--set-upstream', 'origin', 'tf-agent-1'], ms: GIT_SLOW_TIMEOUT_MS },
-  { args: ['worktree', 'add', '-b', 'tf-agent-1', '/wt', 'main'], ms: GIT_SLOW_TIMEOUT_MS },
-  { args: ['worktree', 'add', '/wt', 'tf-agent-1'], ms: GIT_SLOW_TIMEOUT_MS },
+  { args: ['push', '--set-upstream', 'origin', 'agent-1'], ms: GIT_SLOW_TIMEOUT_MS },
+  { args: ['worktree', 'add', '-b', 'agent-1', '/wt', 'main'], ms: GIT_SLOW_TIMEOUT_MS },
+  { args: ['worktree', 'add', '/wt', 'agent-1'], ms: GIT_SLOW_TIMEOUT_MS },
   { args: ['clone', 'https://example.com/repo.git', '/dest'], ms: GIT_SLOW_TIMEOUT_MS },
   { args: ['fetch', 'origin'], ms: GIT_SLOW_TIMEOUT_MS },
   // Local mutations.
@@ -32,12 +32,12 @@ const BUDGETS: { args: string[]; ms: number }[] = [
   { args: ['remote', 'get-url', 'origin'], ms: GIT_READ_TIMEOUT_MS },
   { args: ['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'], ms: GIT_READ_TIMEOUT_MS },
   { args: ['branch', '--list', '--merged', 'main', 'topic'], ms: GIT_READ_TIMEOUT_MS },
-  { args: ['branch', '--remotes', '--contains', 'refs/heads/tf-x', '--format=%(refname:short)'], ms: GIT_READ_TIMEOUT_MS },
+  { args: ['branch', '--remotes', '--contains', 'refs/heads/agent-x', '--format=%(refname:short)'], ms: GIT_READ_TIMEOUT_MS },
   { args: ['branch'], ms: GIT_READ_TIMEOUT_MS },
-  { args: ['branch', '-D', 'tf-agent-1'], ms: GIT_WRITE_TIMEOUT_MS },
-  { args: ['branch', '-m', 'tf-agent-1', 'tf-cool'], ms: GIT_WRITE_TIMEOUT_MS },
-  { args: ['branch', 'tf-data', 'abc123'], ms: GIT_WRITE_TIMEOUT_MS },
-  { args: ['show-ref', '--verify', '--quiet', 'refs/heads/tf-x'], ms: GIT_READ_TIMEOUT_MS },
+  { args: ['branch', '-D', 'agent-1'], ms: GIT_WRITE_TIMEOUT_MS },
+  { args: ['branch', '-m', 'agent-1', 'agent-cool'], ms: GIT_WRITE_TIMEOUT_MS },
+  { args: ['branch', 'agent-data', 'abc123'], ms: GIT_WRITE_TIMEOUT_MS },
+  { args: ['show-ref', '--verify', '--quiet', 'refs/heads/agent-x'], ms: GIT_READ_TIMEOUT_MS },
   { args: ['for-each-ref', '--format=%(refname)', 'refs/heads/', 'refs/remotes/'], ms: GIT_READ_TIMEOUT_MS },
   { args: ['worktree', 'list', '--porcelain'], ms: GIT_READ_TIMEOUT_MS },
 ]

@@ -12,6 +12,6 @@ import { formatDateTimeShort } from './format-date.js'
 // The fallbacks in order: the session name its branch carries (#326/#1725), then the branch
 // itself when it carries none, then when nothing describes the agent, the time it started. A date is
 // a poor name but a real one, and it belongs on the line that identifies the row.
-export function agentLabel(agent: Pick<AgentMeta, 'intent' | 'branch' | 'startedAt'>): string {
-  return agent.intent?.trim() || sessionNameOf(agent.branch) || agent.branch?.trim() || formatDateTimeShort(agent.startedAt)
+export function agentLabel(agent: Pick<AgentMeta, 'id' | 'intent' | 'branch' | 'startedAt'>): string {
+  return agent.intent?.trim() || sessionNameOf(agent.branch, agent.id) || agent.branch?.trim() || formatDateTimeShort(agent.startedAt)
 }

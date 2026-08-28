@@ -28,7 +28,7 @@ function webRun(over: Partial<AgentMeta> = {}): AgentMeta {
     startedAt: AT,
     updatedAt: AT,
     target: 'web',
-    branch: `tf-agent-${ID}`,
+    branch: `agent-${ID}`,
     cloudAnchor: ANCHOR,
     ...over,
   }
@@ -227,7 +227,7 @@ test('a PR listing that fails records the branch but opens nothing: "none" and "
 test('a run whose record names a branch that is neither its birth branch nor the matched head is left alone (#1601)', async () => {
   // Its PR would otherwise be opened from the claude/* head and recorded against a branch it
   // does not live on.
-  const { d, recorded } = deps([webRun({ branch: 'tf-renamed-by-hand' })])
+  const { d, recorded } = deps([webRun({ branch: 'agent-renamed-by-hand' })])
   const result = await adoptCloudWork(CWD, d)
   assert.deepEqual(recorded.branches, [])
   assert.deepEqual(recorded.opened, [])
@@ -277,11 +277,11 @@ async function repoWithCloudHeads(): Promise<{
   await git('checkout', '-q', '-b', 'run', base)
   await git('commit', '-q', '--allow-empty', '-m', 'hand-off anchor')
   const anchor = await head()
-  await git('push', '-q', 'origin', 'HEAD:refs/heads/tf-agent-run')
+  await git('push', '-q', 'origin', 'HEAD:refs/heads/agent-run')
   await git('checkout', '-q', '-b', 'stranded', base)
   await git('commit', '-q', '--allow-empty', '-m', 'hand-off anchor 2')
   const strandedAnchor = await head()
-  await git('push', '-q', 'origin', 'HEAD:refs/heads/tf-agent-stranded')
+  await git('push', '-q', 'origin', 'HEAD:refs/heads/agent-stranded')
   await git('checkout', '-q', 'main')
 
   // The cloud VM: a different clone, which is where every `claude/*` branch is pushed from.

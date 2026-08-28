@@ -2,7 +2,7 @@ import { mkdir } from 'node:fs/promises'
 import { basename, join, relative, isAbsolute } from 'node:path'
 import type { FrameworkEvent } from './events.js'
 import { isPidAlive, reconcileOrphanedAgents } from './store/index.js'
-import { FRAMEWORK_DIR } from '@better-skills/branch-management'
+import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import { startDashboard, type Dashboard, type StartAgentOptions } from './dashboard/index.js'
 import { createProjectRuntime, type ProjectRuntimeOptions } from './daemon-runtime.js'
 import { defaultQuotaSource } from './dashboard/quota.js'
@@ -66,7 +66,7 @@ export interface DaemonState {
 
 /** The `.the-framework/` directory for a workspace. */
 function daemonDir(cwd: string): string {
-  return join(cwd, FRAMEWORK_DIR)
+  return join(cwd, THE_FRAMEWORK_DIR)
 }
 
 /** True when `child` lives strictly inside `parent` (not equal, not outside). */

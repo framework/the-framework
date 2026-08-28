@@ -4,7 +4,7 @@ Reading an agent's event log: each pull dispatches only the events appended sinc
 
 The daemon serves the dashboard's page, reports the address it bound to (the only way a caller learns it, since there is no liveness file), and on shutdown frees the port. It comes up in a workspace that has no framework directory yet.
 
-Starting agents on a git project: two agents run concurrently on the same project, each in its own checkout named by its own branch, each containing the repository's content, each on its own `tf-agent-<agent id>` branch — and the user's own checkout is never moved off the branch it was sitting on. A project that cannot be given a worktree keeps the one-at-a-time rule: the first start succeeds, a second while that agent is alive is refused as busy, and once it exits starting works again. Each spawned agent is handed its prompt, the kind of task, and the checkout to work in.
+Starting agents on a git project: two agents run concurrently on the same project, each in its own checkout named by its own branch, each containing the repository's content, each on its own `agent-<agent id>` branch — and the user's own checkout is never moved off the branch it was sitting on. A project that cannot be given a worktree keeps the one-at-a-time rule: the first start succeeds, a second while that agent is alive is refused as busy, and once it exits starting works again. Each spawned agent is handed its prompt, the kind of task, and the checkout to work in.
 
 The kinds of start: a research task travels as its own kind, and is allowed an empty subject that the agent itself defaults; a preset the user reviewed in the composer runs verbatim rather than being re-rendered.
 

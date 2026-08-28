@@ -55,7 +55,7 @@ test('start a session, watch it live, and read the archived row when it ends', a
     // the branch the work is on, and the driver that ran it.
     const meta = await world.waitAgent(project, agentId, 'done')
     assert.equal(meta.intent, 'Add a login page')
-    assert.equal(meta.branch, `tf-agent-${agentId}`)
+    assert.equal(meta.branch, `agent-${agentId}`)
     assert.equal(meta.driver, 'fake')
 
     // A publish-nothing session keeps its checkout (B5): retiring one means pushing its branch,
@@ -67,7 +67,7 @@ test('start a session, watch it live, and read the archived row when it ends', a
       'the kept worktree to reach the Remove list',
     )
     const remoteBranches = await git(project.cwd, 'ls-remote', '--heads', 'origin')
-    assert.ok(!remoteBranches.includes(`tf-agent-${agentId}`), 'publish nothing: the branch never reached origin')
+    assert.ok(!remoteBranches.includes(`agent-${agentId}`), 'publish nothing: the branch never reached origin')
     const worktree = await rpc(onAgentWorktree)(project.id, agentId)
     assert.equal(worktree?.own, true)
 
@@ -179,7 +179,7 @@ test("publish a finished session: push its branch from the handoff panel (#799)"
     const pushed = await rpc(sendPushBranch)(project.id, agentId)
     assert.equal(pushed.ok, true, `push failed: ${'error' in pushed ? pushed.error : ''}`)
     const remoteBranches = await git(project.cwd, 'ls-remote', '--heads', 'origin')
-    assert.ok(remoteBranches.includes(`tf-agent-${agentId}`), 'the run branch is on origin')
+    assert.ok(remoteBranches.includes(`agent-${agentId}`), 'the run branch is on origin')
     await world.waitRetired(project, agentId)
     assert.deepEqual(await rpc(onRetainedWorktrees)(project.id), [], 'the concurrent push must not strand the worktree')
 
@@ -188,7 +188,7 @@ test("publish a finished session: push its branch from the handoff panel (#799)"
       const handoff = await rpc(onAgentHandoff)(project.id, agentId)
       return handoff?.pushed ? handoff : undefined
     }, 'the panel to report the branch pushed')
-    assert.equal(after.branch, `tf-agent-${agentId}`)
+    assert.equal(after.branch, `agent-${agentId}`)
     assert.equal(after.exists, true)
     assert.equal(after.hasRemote, true)
   } finally {

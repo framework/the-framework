@@ -56,6 +56,17 @@ function memFs(seed: Record<string, string> = {}): StoreFs & { files: Map<string
       }
       return [...names]
     },
+    async subdirs(dir) {
+      // A directory is a path segment with something under it.
+      const prefix = dir.endsWith('/') ? dir : dir + '/'
+      const names = new Set<string>()
+      for (const p of files.keys()) {
+        if (!p.startsWith(prefix)) continue
+        const rest = p.slice(prefix.length)
+        if (rest.includes('/')) names.add(rest.split('/')[0]!)
+      }
+      return [...names]
+    },
   }
 }
 
@@ -246,15 +257,15 @@ test('applyEventToMeta tracks whether the run is working or parked on the user (
 test('applyEventToMeta records the branch as observed, and ready-for-merge beside it (#326/#1725)', () => {
   assert.equal(BASE.branch, undefined)
   assert.equal(BASE.readyForMerge, undefined)
-  const born = applyEventToMeta(BASE, { kind: 'branch', branch: 'tf-agent-r1' }, AT)
-  assert.equal(born.branch, 'tf-agent-r1')
+  const born = applyEventToMeta(BASE, { kind: 'branch', branch: 'agent-r1' }, AT)
+  assert.equal(born.branch, 'agent-r1')
   // The agent's own rename lands as the next branch event; the session name is read off it, never stored.
-  const named = applyEventToMeta(born, { kind: 'branch', branch: 'tf-add-comments' }, AT)
-  assert.equal(named.branch, 'tf-add-comments')
+  const named = applyEventToMeta(born, { kind: 'branch', branch: 'agent-add-comments' }, AT)
+  assert.equal(named.branch, 'agent-add-comments')
   assert.ok(!('sessionName' in named))
   const ready = applyEventToMeta(named, { kind: 'ready-for-merge' }, AT)
   assert.equal(ready.readyForMerge, true)
-  assert.equal(ready.branch, 'tf-add-comments') // ready doesn't clobber the branch
+  assert.equal(ready.branch, 'agent-add-comments') // ready doesn't clobber the branch
 })
 
 test('applyEventToMeta records the ticket a run is implementing (#1117)', () => {
@@ -591,21 +602,21 @@ test('fresh open adopts the id the daemon allocated, ignoring an unsafe one (#73
 })
 
 // #738: since #736 an agent lives in its own worktree, so a project's live agents are spread across
-// `.the-framework/branches/*` rather than sitting at the project path.
+// `.branches/*` rather than sitting at the project path.
 const worktreeMeta = (agentId: string, over: Partial<AgentMeta> = {}): string =>
   JSON.stringify({ version: 1, status: 'running', id: agentId, startedAt: AT, updatedAt: AT, ...over })
 
 test('readLiveMetas finds a run living in each worktree, newest first (#738)', async () => {
   const fs = memFs({
-    [join(CWD, '.the-framework', 'branches', 'tf-agent-r1', '.the-framework', 'agent.json')]: worktreeMeta('r1'),
-    [join(CWD, '.the-framework', 'branches', 'tf-agent-r2', '.the-framework', 'agent.json')]: worktreeMeta('r2'),
+    [join(CWD, '.branches', 'agent-r1', '.the-framework', 'agent.json')]: worktreeMeta('r1'),
+    [join(CWD, '.branches', 'agent-r2', '.the-framework', 'agent.json')]: worktreeMeta('r2'),
   })
   const agents = await readLiveMetas(CWD, fs)
   assert.deepEqual(
     agents.map(r => ({ id: r.id, cwd: r.cwd })),
     [
-      { id: 'r2', cwd: join(CWD, '.the-framework', 'branches', 'tf-agent-r2') },
-      { id: 'r1', cwd: join(CWD, '.the-framework', 'branches', 'tf-agent-r1') },
+      { id: 'r2', cwd: join(CWD, '.branches', 'agent-r2') },
+      { id: 'r1', cwd: join(CWD, '.branches', 'agent-r1') },
     ],
     'both runs, newest id first, each carrying its own checkout',
   )
@@ -614,7 +625,7 @@ test('readLiveMetas finds a run living in each worktree, newest first (#738)', a
 test('readLiveMetas also returns a run at the project root (the non-git fallback, and pre-#736 runs)', async () => {
   const fs = memFs({
     [META]: worktreeMeta('root-run'),
-    [join(CWD, '.the-framework', 'branches', 'tf-agent-r1', '.the-framework', 'agent.json')]: worktreeMeta('r1'),
+    [join(CWD, '.branches', 'agent-r1', '.the-framework', 'agent.json')]: worktreeMeta('r1'),
   })
   const agents = await readLiveMetas(CWD, fs)
   assert.deepEqual(agents.map(r => r.id).sort(), ['r1', 'root-run'])
@@ -625,13 +636,13 @@ test('readLiveMetas is empty on a project that never ran, and skips a junk workt
   assert.deepEqual(await readLiveMetas(CWD, memFs()), [])
   // Only our own `<agentId>` directories are read; anything else in there is not an agent of ours.
   const fs = memFs({
-    [join(CWD, '.the-framework', 'branches', '.tmp-scratch', '.the-framework', 'agent.json')]: worktreeMeta('x'),
+    [join(CWD, '.branches', '.tmp-scratch', '.the-framework', 'agent.json')]: worktreeMeta('x'),
   })
   assert.deepEqual(await readLiveMetas(CWD, fs), [])
 })
 
 test('readLiveMetas self-heals a dead run in a worktree, same as the single reader (#716)', async () => {
-  const path = join(CWD, '.the-framework', 'branches', 'tf-agent-r1', '.the-framework', 'agent.json')
+  const path = join(CWD, '.branches', 'agent-r1', '.the-framework', 'agent.json')
   const fs = memFs({ [path]: worktreeMeta('r1', { pid: 999999, host: hostname() }) })
   const agents = await readLiveMetas(CWD, fs, () => false)
   assert.equal(agents[0]?.status, 'stopped', 'a running meta whose process is gone reads as stopped')
@@ -640,7 +651,7 @@ test('readLiveMetas self-heals a dead run in a worktree, same as the single read
 
 // #737: an agent's history lives inside its worktree, so removing that worktree would delete the agent
 // from the dashboard's history. It is copied into the repo first, which is what makes teardown safe.
-const worktreeAt = (agentId: string) => join(CWD, '.the-framework', 'branches', `tf-agent-${agentId}`)
+const worktreeAt = (agentId: string) => join(CWD, '.branches', `agent-${agentId}`)
 const worktreeFiles = (agentId: string, meta: Record<string, unknown>, events = '') => ({
   [join(worktreeAt(agentId), '.the-framework', 'agent.json')]: JSON.stringify(meta),
   [join(worktreeAt(agentId), '.the-framework', 'events.jsonl')]: events,
@@ -675,7 +686,7 @@ test('patchArchivedAgent records a PR opened after the run on its archived meta 
 test('patchArchivedAgent records the branch the cloud work landed on (#1601)', async () => {
   // The cloud VM pushes its `claude/*` branch after the wrapper's process is gone, so the fact
   // arrives the same way a late PR does: patched onto the archive, read by every surface.
-  const fs = memFs(worktreeFiles('r1', { version: 1, status: 'done', id: 'r1', startedAt: AT, updatedAt: AT, branch: 'tf-agent-r1' }))
+  const fs = memFs(worktreeFiles('r1', { version: 1, status: 'done', id: 'r1', startedAt: AT, updatedAt: AT, branch: 'agent-r1' }))
   await archiveWorktreeAgent(worktreeAt('r1'), CWD, fs)
   assert.equal(await patchArchivedAgent(CWD, 'r1', { branch: 'claude/fix-the-thing' }, fs), true)
   assert.equal((await listAgents(CWD, fs)).find(r => r.id === 'r1')?.branch, 'claude/fix-the-thing')
@@ -821,7 +832,7 @@ test('restoreArchivedAgent puts a torn-down run history back in its worktree (#7
     [join(CWD, '.the-framework', 'agents', 'r1.json')]: JSON.stringify({ version: 1, status: 'done', id: 'r1', startedAt: AT, updatedAt: AT }),
     [join(CWD, '.the-framework', 'agents', 'r1.jsonl')]: '{"kind":"log","message":"archived"}\n',
   })
-  const wt = join(CWD, '.the-framework', 'branches', 'tf-agent-r1')
+  const wt = join(CWD, '.branches', 'agent-r1')
   assert.equal(await restoreArchivedAgent(CWD, wt, 'r1', fs), true)
   assert.equal(fs.files.get(join(wt, '.the-framework', 'events.jsonl')), '{"kind":"log","message":"archived"}\n')
   assert.equal((JSON.parse(fs.files.get(join(wt, '.the-framework', 'agent.json'))!) as AgentMeta).id, 'r1')
@@ -874,11 +885,11 @@ test('applyEventToMeta records the pull request a session opened (E6)', () => {
 })
 
 test('applyEventToMeta records the branch a branch event names (#1277)', () => {
-  const on = applyEventToMeta(BASE, { kind: 'branch', branch: 'tf-agent-r1' }, AT)
-  assert.equal(on.branch, 'tf-agent-r1')
+  const on = applyEventToMeta(BASE, { kind: 'branch', branch: 'agent-r1' }, AT)
+  assert.equal(on.branch, 'agent-r1')
   // A rename mid-run replaces it: the meta always names the branch the work is on now.
-  const renamed = applyEventToMeta(on, { kind: 'branch', branch: 'tf-cool-name' }, AT)
-  assert.equal(renamed.branch, 'tf-cool-name')
+  const renamed = applyEventToMeta(on, { kind: 'branch', branch: 'agent-cool-name' }, AT)
+  assert.equal(renamed.branch, 'agent-cool-name')
 })
 
 // #1359: an agent that dies holding an open gate. The process exited without writing `end` (the

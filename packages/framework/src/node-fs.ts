@@ -23,6 +23,8 @@ export interface NodeFs {
   mkdir(path: string): Promise<void>
   /** List a directory's entries (names only). Missing dir yields `[]`. */
   readdir(path: string): Promise<string[]>
+  /** The names of the *directories* under `path` — a symlink is not one. Missing dir yields `[]`. */
+  subdirs(path: string): Promise<string[]>
   /** Replace `to` with `from`. Atomic within one filesystem, which is the point of having it. */
   rename(from: string, to: string): Promise<void>
   /** Set a file's permission bits. Rejects when the path is absent, or the fs cannot express them. */
@@ -68,6 +70,14 @@ export function nodeFs(): NodeFs {
       const { readdir } = await import('node:fs/promises')
       try {
         return await readdir(path)
+      } catch {
+        return []
+      }
+    },
+    async subdirs(path) {
+      const { readdir } = await import('node:fs/promises')
+      try {
+        return (await readdir(path, { withFileTypes: true })).filter(entry => entry.isDirectory()).map(entry => entry.name)
       } catch {
         return []
       }

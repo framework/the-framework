@@ -10,7 +10,7 @@ import type { AutoHandoffSkip, FrameworkEvent } from './events.js'
 
 /** The agent's lifecycle progress (#326): the session name it chose and whether it is ready for merge. */
 export interface AgentProgress {
-  /** The session name, read off the agent's `tf-<name>` branch (#1725), once the agent named it. */
+  /** The session name, read off the agent's `agent-<name>` branch (#1725), once the agent named it. */
   sessionName?: string
   /** True once the agent signalled `setReadyForMerge()`: building (false) -> ready (true). */
   readyForMerge: boolean
@@ -22,22 +22,23 @@ export interface AgentProgress {
  * green ready). Always returns a value — an untouched agent is `{ readyForMerge: false }`.
  */
 export function agentProgress(events: readonly FrameworkEvent[]): AgentProgress {
-  let branch: string | undefined
+  let sessionName: string | undefined
   let readyForMerge = false
   for (const event of events) {
-    if (event.kind === 'branch') branch = event.branch
+    if (event.kind === 'branch') sessionName = event.sessionName
     else if (event.kind === 'ready-for-merge') readyForMerge = true
   }
-  return { ...sessionNameField(branch), readyForMerge }
+  return { ...(sessionName ? { sessionName } : {}), readyForMerge }
 }
 
 /**
- * The `sessionName` a derived view carries (#1725): the name the branch carries, as a field
- * that is present only when there is one — so a view of an unnamed agent has no name, rather
- * than a name that is `undefined`. The one spelling behind every view that shows the name.
+ * The `sessionName` a derived view carries (#1725): the name the agent's branch carries, as a
+ * field that is present only when there is one — so a view of an unnamed agent has no name,
+ * rather than a name that is `undefined`. The one spelling behind every view built from an
+ * agent's record; a view built from the event stream reads the name off the `branch` event.
  */
-export function sessionNameField(branch: string | undefined): { sessionName?: string } {
-  const sessionName = sessionNameOf(branch)
+export function sessionNameField(branch: string | undefined, agentId: string): { sessionName?: string } {
+  const sessionName = sessionNameOf(branch, agentId)
   return sessionName ? { sessionName } : {}
 }
 

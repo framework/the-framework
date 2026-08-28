@@ -51,7 +51,7 @@ test('a resolved gate is closed, and a re-fired one is open again', () => {
 test('a parked run yields its question with the full gate, read from the run own checkout (#1455)', async () => {
   const readFrom: string[] = []
   const questions = await buildOpenQuestions(PROJECTS, {
-    liveAgents: async () => [liveAgent({ branch: 'tf-triage', intent: 'triage the queue' })],
+    liveAgents: async () => [liveAgent({ branch: 'agent-triage', intent: 'triage the queue' })],
     events: async cwd => {
       readFrom.push(cwd)
       return [CHOICE]

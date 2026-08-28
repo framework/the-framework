@@ -5,14 +5,13 @@ import { tmpdir } from 'node:os'
 import { mkdir, mkdtemp, readdir, realpath, rm, writeFile } from 'node:fs/promises'
 import { nodeGitRunner } from './git.js'
 import { reconcileBranchLinks, type LinksFs } from './branch-links.js'
-import { FRAMEWORK_DIR, BRANCHES_DIR, addWorktree, worktreePath, type WorktreeDirEntry } from './index.js'
+import { BRANCHES_DIR, addWorktree, worktreePath, type WorktreeDirEntry } from './index.js'
 
 const CWD = '/repo'
-const LINKS = join(CWD, FRAMEWORK_DIR, BRANCHES_DIR)
-const ROOT_LINK = join(CWD, 'branches')
+const LINKS = join(CWD, BRANCHES_DIR)
 
-/** A checkout at the #1580 location, dir named as its birth branch. */
-const current = (agentId: string): WorktreeDirEntry => ({ agentId, path: join(LINKS, `tf-agent-${agentId}`) })
+/** A checkout at the #1580 location, dir named as the branch it was created on. */
+const current = (agentId: string): WorktreeDirEntry => ({ agentId, path: join(LINKS, `agent-${agentId}`) })
 
 /** An in-memory {@link LinksFs}: `links` maps absolute path -> target; `files` are non-symlinks. */
 function memFs(opts: { links?: Record<string, string>; files?: string[] } = {}) {
@@ -39,57 +38,42 @@ const branchLinksOf = (links: Map<string, string>) =>
 
 test('a checkout still on its birth branch gets no link — the dir already carries the name (#1580)', async () => {
   const { fs, links } = memFs()
-  await reconcileBranchLinks(CWD, { fs, worktrees: async () => [current('r1')], branchOf: async () => 'tf-agent-r1' })
+  await reconcileBranchLinks(CWD, { fs, worktrees: async () => [current('r1')], branchOf: async () => 'agent-r1' })
   assert.deepEqual(branchLinksOf(links), {})
 })
 
 test('a renamed branch gets a sibling link, and the stale name goes in the same pass', async () => {
-  const { fs, links } = memFs({ links: { [join(LINKS, 'tf-old-name')]: 'tf-agent-r1' } })
-  await reconcileBranchLinks(CWD, { fs, worktrees: async () => [current('r1')], branchOf: async () => 'tf-cool-name' })
-  assert.deepEqual(branchLinksOf(links), { 'tf-cool-name': 'tf-agent-r1' })
+  const { fs, links } = memFs({ links: { [join(LINKS, 'agent-old-name')]: 'agent-r1' } })
+  await reconcileBranchLinks(CWD, { fs, worktrees: async () => [current('r1')], branchOf: async () => 'agent-cool-name' })
+  assert.deepEqual(branchLinksOf(links), { 'agent-cool-name': 'agent-r1' })
 })
 
 test('a reclaimed checkout loses its link; detached and slash-named branches never get one', async () => {
-  const { fs, links } = memFs({ links: { [join(LINKS, 'tf-done')]: 'tf-agent-gone' } })
+  const { fs, links } = memFs({ links: { [join(LINKS, 'agent-done')]: 'agent-gone' } })
   await reconcileBranchLinks(CWD, {
     fs,
     worktrees: async () => [current('detached'), current('old')],
-    branchOf: async path => (path.endsWith('old') ? 'the-framework/old-name' : undefined),
+    branchOf: async path => (path.endsWith('old') ? 'feature/old-name' : undefined),
   })
   assert.deepEqual(branchLinksOf(links), {}, 'the dead link is gone, nothing new appeared')
 })
 
 test('only our own links are touched: user files and foreign symlinks stay', async () => {
-  const userFile = join(LINKS, 'tf-mine')
+  const userFile = join(LINKS, 'agent-mine')
   const foreignLink = join(LINKS, 'elsewhere')
   const { fs, links, files } = memFs({ files: [userFile], links: { [foreignLink]: '/somewhere/else' } })
-  await reconcileBranchLinks(CWD, { fs, worktrees: async () => [current('r1')], branchOf: async () => 'tf-mine' })
+  await reconcileBranchLinks(CWD, { fs, worktrees: async () => [current('r1')], branchOf: async () => 'agent-mine' })
   assert.ok(files.has(userFile), 'the user file at the wanted name is untouched')
   assert.equal(links.get(foreignLink), '/somewhere/else', 'a foreign symlink is never removed')
-  assert.equal(links.has(join(LINKS, 'tf-mine')), false, 'nothing was created over the user file')
+  assert.equal(links.has(join(LINKS, 'agent-mine')), false, 'nothing was created over the user file')
 })
 
-test('the repo-root branches shortcut is created once, relative, hidden from git, and never clobbers (#1600)', async () => {
-  const fresh = memFs()
-  const excluded: string[] = []
-  const exclude = async (_repo: string, rule: string) => void excluded.push(rule)
-  await reconcileBranchLinks(CWD, { fs: fresh.fs, worktrees: async () => [], exclude })
-  assert.equal(fresh.links.get(ROOT_LINK), join(FRAMEWORK_DIR, BRANCHES_DIR))
-  assert.deepEqual(excluded, ['/branches', '!/branches/'], 'the link is excluded the moment it is made')
-
-  const taken = memFs({ files: [ROOT_LINK] })
-  excluded.length = 0
-  await reconcileBranchLinks(CWD, { fs: taken.fs, worktrees: async () => [], exclude })
-  assert.equal(taken.links.has(ROOT_LINK), false, 'an occupied path is left alone')
-  assert.deepEqual(excluded, [], "a user's own entry is never hidden from their git status")
-})
-
-test('a branches/ directory that is not a worktree gets no link, against real git (#1654)', async () => {
+test('a .branches/ directory that is not a worktree gets no link, against real git (#1654)', async () => {
   // Default seams on purpose: the bug was in the default branch read. Git asked in a residue
-  // directory answers with the enclosing repo's branch, which left a `main -> tf-agent-…` link
+  // directory answers with the enclosing repo's branch, which left a `main -> agent-…` link
   // beside the checkouts on the rig.
   const git = nodeGitRunner()
-  const repo = await realpath(await mkdtemp(join(tmpdir(), 'framework-links-')))
+  const repo = await realpath(await mkdtemp(join(tmpdir(), 'branch-links-')))
   try {
     await git(['init', '-b', 'main'], repo)
     await git(['config', 'user.email', 't@t'], repo)
@@ -97,13 +81,13 @@ test('a branches/ directory that is not a worktree gets no link, against real gi
     await writeFile(join(repo, 'README.md'), '# t\n')
     await git(['add', '-A'], repo)
     await git(['commit', '-m', 'init'], repo)
-    const { path } = await addWorktree(repo, { agentId: 'r1', branch: 'tf-agent-r1' }, git)
-    await git(['checkout', '-q', '-b', 'tf-real-name'], path)
-    await mkdir(join(worktreePath(repo, 'r2'), FRAMEWORK_DIR), { recursive: true })
+    const { path } = await addWorktree(repo, { agentId: 'r1', branch: 'agent-r1' }, git)
+    await git(['checkout', '-q', '-b', 'agent-real-name'], path)
+    await mkdir(join(worktreePath(repo, 'r2'), 'leftover'), { recursive: true })
 
     await reconcileBranchLinks(repo)
-    const names = (await readdir(join(repo, FRAMEWORK_DIR, BRANCHES_DIR))).sort()
-    assert.deepEqual(names, ['tf-agent-r1', 'tf-agent-r2', 'tf-real-name'], 'the real rename is linked; no `main` link for the residue')
+    const names = (await readdir(join(repo, BRANCHES_DIR))).sort()
+    assert.deepEqual(names, ['agent-r1', 'agent-r2', 'agent-real-name'], 'the real rename is linked; no `main` link for the residue')
   } finally {
     await rm(repo, { recursive: true, force: true })
   }

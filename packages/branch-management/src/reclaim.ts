@@ -1,5 +1,5 @@
 import { nodeGitRunner, pushBranch, type GitRunner } from './git.js'
-import { isRunBranch } from './branch-names.js'
+import { isAgentBranch } from './branch-names.js'
 import {
   branchPushed,
   currentBranch,
@@ -84,7 +84,7 @@ export type ReclaimOutcome =
  */
 export async function reclaimWorktree(repo: string, path: string, opts: ReclaimOptions): Promise<ReclaimOutcome> {
   const git = opts.git ?? nodeGitRunner()
-  // Before any git runs in it (#1654): a directory under `branches/` that git does not know as
+  // Before any git runs in it (#1654): a directory under `.branches/` that git does not know as
   // a worktree root makes every command below act on the enclosing repo — the user's checkout,
   // the user's branch. Nothing is pushed or deleted through it; it is left where it is.
   if (!(await isWorktreeRoot(path, git))) return { ok: false, reason: 'not-a-worktree' }
@@ -98,7 +98,7 @@ export async function reclaimWorktree(repo: string, path: string, opts: ReclaimO
   let emptyBranch = false
   if (opts.heldBy && (await coveredBy(path, branch, opts.heldBy, git))) {
     // A tip inside a commit the remote already has: nothing to push (#1601).
-  } else if (isRunBranch(branch) && (await branchHoldsNothing(repo, branch, git))) {
+  } else if (isAgentBranch(branch) && (await branchHoldsNothing(repo, branch, git))) {
     // A branch whose tip the remote already has under another name — an agent that committed
     // nothing (#1650). The rule is satisfied before any push: what the checkout holds *is* on
     // the remote, so the branch goes with it; it is not the last copy of anything, by

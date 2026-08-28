@@ -22,7 +22,7 @@ async function repoWithArchive(): Promise<{ project: string; cleanup: () => Prom
   await git('git', ['remote', 'add', 'origin', origin], { cwd: project })
   const seeded = await withDataBranch(project, 'seed', async dir => {
     await mkdir(join(dir, 'agents', 'u'), { recursive: true })
-    const meta = { version: 1, status: 'done', id: 'r1', startedAt: '2026-08-20T10:00:00.000Z', updatedAt: '2026-08-20T10:00:00.000Z', branch: 'tf-agent-r1' }
+    const meta = { version: 1, status: 'done', id: 'r1', startedAt: '2026-08-20T10:00:00.000Z', updatedAt: '2026-08-20T10:00:00.000Z', branch: 'agent-r1' }
     await writeFile(join(dir, 'agents', 'u', 'r1.json'), JSON.stringify(meta))
     await writeFile(join(dir, 'agents', 'u', 'r1.jsonl'), '')
   })

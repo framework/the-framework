@@ -104,7 +104,7 @@ export async function buildOpenQuestions(
     projectId: project.id,
     projectName: project.name,
     agentId: meta.id,
-    ...sessionNameField(meta.branch),
+    ...sessionNameField(meta.branch, meta.id),
     ...(meta.intent ? { intent: meta.intent } : {}),
     choice,
     ...rest,

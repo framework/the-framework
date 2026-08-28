@@ -239,7 +239,7 @@ test('ghRepoAutoMerge reads the repo setting, and an unreadable answer is unknow
 // for, and what it keeps of the answer — was the one thing nothing exercised.
 test('the PR read asks gh for every field LinkedPr carries (#1334)', async () => {
   const { gh, calls } = fakeGh('{}')
-  await ghPrView('/repo', 'tf-thing', gh)
+  await ghPrView('/repo', 'agent-thing', gh)
   const fields = calls[0]?.[calls[0].indexOf('--json') + 1] ?? ''
   for (const field of ['number', 'url', 'state', 'title', 'createdAt', 'headRefOid'])
     assert.ok(fields.split(',').includes(field), `--json must ask for ${field}, got "${fields}"`)
@@ -256,7 +256,7 @@ test('the PR read keeps the creation time the CI watch decides on (#1334)', asyn
       headRefOid: 'f1789c5ebaab4cfb79e4ea214508daee147a4092',
     }),
   )
-  const pr = await ghPrView('/repo', 'tf-thing', gh)
+  const pr = await ghPrView('/repo', 'agent-thing', gh)
   assert.equal(pr?.createdAt, '2026-08-21T10:47:50Z')
   assert.equal(pr?.headRefOid, 'f1789c5ebaab4cfb79e4ea214508daee147a4092')
 })
@@ -265,7 +265,7 @@ test('a field gh does not answer with is absent rather than undefined-valued', a
   // The copy-out stays conditional: a PR read that came back without a creation time must not
   // manufacture the key, or "we do not know" becomes indistinguishable from "it has none".
   const { gh } = fakeGh(JSON.stringify({ number: 2, url: 'u', state: 'OPEN', title: 't' }))
-  const pr = await ghPrView('/repo', 'tf-thing', gh)
+  const pr = await ghPrView('/repo', 'agent-thing', gh)
   assert.ok(pr && !('createdAt' in pr), 'createdAt must not be present when gh did not answer with it')
 })
 

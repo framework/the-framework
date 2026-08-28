@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { join } from 'node:path'
-import { mkdir, mkdtemp, rm, writeFile, stat, realpath } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile, stat, realpath, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { nodeGitRunner, type GitRunner } from './git.js'
 import {
@@ -20,7 +20,7 @@ import {
   currentBranch,
   listWorktreeDirs,
 } from './worktree.js'
-import { agentBranchName, FRAMEWORK_DIR, BRANCHES_DIR } from './branch-names.js'
+import { agentBranchName, BRANCHES_DIR } from './branch-names.js'
 
 const REPO = '/repo'
 
@@ -38,16 +38,16 @@ const failingGit: GitRunner = async () => {
   throw new Error('not a git repository')
 }
 
-test('worktreePath nests the run under .the-framework/branches, named as its branch (#1580)', () => {
-  assert.equal(worktreePath(REPO, '2026-07-19T10-00-00-000Z'), join(REPO, FRAMEWORK_DIR, 'branches', 'tf-agent-2026-07-19T10-00-00-000Z'))
+test('worktreePath nests the checkout under .branches/, named as its branch (#1580)', () => {
+  assert.equal(worktreePath(REPO, '2026-07-19T10-00-00-000Z'), join(REPO, BRANCHES_DIR, 'agent-2026-07-19T10-00-00-000Z'))
 })
 
 test('addWorktree builds `worktree add -b <branch> <path>` and returns the path + branch', async () => {
   const git = recordingGit()
-  const added = await addWorktree(REPO, { agentId: 'run1', branch: 'tf-agent-run1' }, git)
+  const added = await addWorktree(REPO, { agentId: 'run1', branch: 'agent-run1' }, git)
   const path = worktreePath(REPO, 'run1')
-  assert.deepEqual(added, { path, branch: 'tf-agent-run1' })
-  assert.deepEqual(git.calls, [{ args: ['worktree', 'add', '-b', 'tf-agent-run1', path], cwd: REPO }])
+  assert.deepEqual(added, { path, branch: 'agent-run1' })
+  assert.deepEqual(git.calls, [{ args: ['worktree', 'add', '-b', 'agent-run1', path], cwd: REPO }])
 })
 
 test('addWorktree appends the base ref when given', async () => {
@@ -68,9 +68,9 @@ test('parseWorktreeList reads path/head/branch and strips refs/heads/, dropping 
     'HEAD aaaa',
     'branch refs/heads/main',
     '',
-    'worktree /repo/.the-framework/worktrees/run1',
+    'worktree /repo/.branches/agent-run1',
     'HEAD bbbb',
-    'branch refs/heads/tf-agent-run1',
+    'branch refs/heads/agent-run1',
     '',
     'worktree /repo/detached',
     'HEAD cccc',
@@ -79,7 +79,7 @@ test('parseWorktreeList reads path/head/branch and strips refs/heads/, dropping 
   ].join('\n')
   assert.deepEqual(parseWorktreeList(porcelain), [
     { path: '/repo', head: 'aaaa', branch: 'main' },
-    { path: '/repo/.the-framework/worktrees/run1', head: 'bbbb', branch: 'tf-agent-run1' },
+    { path: '/repo/.branches/agent-run1', head: 'bbbb', branch: 'agent-run1' },
     { path: '/repo/detached', head: 'cccc' },
   ])
 })
@@ -115,7 +115,7 @@ test('add/list/remove round-trips against a real git repo', async () => {
   // realpath so the mkdtemp path matches what `git worktree list` reports: on
   // macOS tmpdir is under the /var -> /private/var symlink (same gotcha as
   // enumerateGitRepos in install.ts).
-  const repo = await realpath(await mkdtemp(join(tmpdir(), 'framework-worktree-')))
+  const repo = await realpath(await mkdtemp(join(tmpdir(), 'worktree-')))
   try {
     await git(['init'], repo)
     await git(['config', 'user.email', 't@t'], repo)
@@ -124,7 +124,7 @@ test('add/list/remove round-trips against a real git repo', async () => {
     await git(['add', '-A'], repo)
     await git(['commit', '-m', 'init'], repo)
 
-    const { path, branch } = await addWorktree(repo, { agentId: 'run1', branch: 'tf-agent-run1' }, git)
+    const { path, branch } = await addWorktree(repo, { agentId: 'run1', branch: 'agent-run1' }, git)
     assert.equal((await stat(path)).isDirectory(), true, 'worktree checkout dir exists')
     assert.equal((await stat(join(path, 'README.md'))).isFile(), true, 'checkout has the repo content')
 
@@ -142,10 +142,10 @@ test('add/list/remove round-trips against a real git repo', async () => {
 })
 
 test('attachWorktree recreates a branch that is gone from HEAD, and still refuses one git will not attach (#1650)', async () => {
-  // The only branch the framework deletes held nothing past a commit the remote already had, so
+  // The only branch the package deletes held nothing past a commit the remote already had, so
   // continuing that agent on a fresh branch from HEAD puts it exactly where it was.
   const git = nodeGitRunner()
-  const repo = await realpath(await mkdtemp(join(tmpdir(), 'framework-worktree-')))
+  const repo = await realpath(await mkdtemp(join(tmpdir(), 'worktree-')))
   try {
     await git(['init'], repo)
     await git(['config', 'user.email', 't@t'], repo)
@@ -154,11 +154,11 @@ test('attachWorktree recreates a branch that is gone from HEAD, and still refuse
     await git(['add', '-A'], repo)
     await git(['commit', '-m', 'init'], repo)
 
-    const { path } = await attachWorktree(repo, { agentId: 'run1', branch: 'tf-agent-run1' }, git)
-    assert.equal(await currentBranch(path, git), 'tf-agent-run1', 'the missing branch was created and checked out')
+    const { path } = await attachWorktree(repo, { agentId: 'run1', branch: 'agent-run1' }, git)
+    assert.equal(await currentBranch(path, git), 'agent-run1', 'the missing branch was created and checked out')
     await removeWorktree(repo, path, git)
-    await deleteBranch(repo, 'tf-agent-run1', git)
-    await assert.rejects(() => git(['show-ref', '--verify', 'refs/heads/tf-agent-run1'], repo), 'deleteBranch removed it')
+    await deleteBranch(repo, 'agent-run1', git)
+    await assert.rejects(() => git(['show-ref', '--verify', 'refs/heads/agent-run1'], repo), 'deleteBranch removed it')
 
     // A branch that exists but is checked out by the main checkout is git's refusal, not ours.
     const head = (await git(['rev-parse', '--abbrev-ref', 'HEAD'], repo)).trim()
@@ -170,7 +170,7 @@ test('attachWorktree recreates a branch that is gone from HEAD, and still refuse
 
 test('isWorktreeRoot is true for the main checkout and a linked worktree, false inside them and for a plain directory (#1654)', async () => {
   const git = nodeGitRunner()
-  const repo = await realpath(await mkdtemp(join(tmpdir(), 'framework-worktree-')))
+  const repo = await realpath(await mkdtemp(join(tmpdir(), 'worktree-')))
   try {
     await git(['init'], repo)
     await git(['config', 'user.email', 't@t'], repo)
@@ -178,21 +178,21 @@ test('isWorktreeRoot is true for the main checkout and a linked worktree, false 
     await writeFile(join(repo, 'README.md'), '# t\n')
     await git(['add', '-A'], repo)
     await git(['commit', '-m', 'init'], repo)
-    const { path } = await addWorktree(repo, { agentId: 'run1', branch: 'tf-agent-run1' }, git)
-    // The hazard: a `branches/` directory that is not a worktree. Git still answers in it — with
+    const { path } = await addWorktree(repo, { agentId: 'run1', branch: 'agent-run1' }, git)
+    // The hazard: a `.branches/` directory that is not a worktree. Git still answers in it — with
     // the enclosing repo's toplevel and branch.
     const residue = worktreePath(repo, 'run2')
-    await mkdir(join(residue, FRAMEWORK_DIR), { recursive: true })
+    await mkdir(join(residue, 'leftover'), { recursive: true })
 
     assert.equal(await isWorktreeRoot(repo, git), true)
     assert.equal(await isWorktreeRoot(path, git), true)
-    assert.equal(await isWorktreeRoot(join(repo, FRAMEWORK_DIR), git), false, 'a subdirectory of a checkout is not its root')
+    assert.equal(await isWorktreeRoot(join(repo, BRANCHES_DIR), git), false, 'a subdirectory of a checkout is not its root')
     assert.equal(await isWorktreeRoot(residue, git), false, 'and neither is a residue directory')
     assert.equal(await isWorktreeRoot(join(tmpdir()), git), false, 'nor a directory outside any repo')
 
     assert.equal(await currentBranch(residue, git), (await currentBranch(repo, git)), 'a plain read in the residue answers with the enclosing repo\'s branch — the bug')
     assert.equal(await worktreeBranch(residue, git), undefined, 'the guarded read answers with nothing')
-    assert.equal(await worktreeBranch(path, git), 'tf-agent-run1')
+    assert.equal(await worktreeBranch(path, git), 'agent-run1')
   } finally {
     await rm(repo, { recursive: true, force: true })
   }
@@ -219,11 +219,11 @@ test('removeWorktree falls back to --force when git calls the checkout unclean (
 })
 
 // #786's point — a finished agent's edit must survive teardown — now holds by keeping, not by
-// committing (#1638): the framework commits nothing for an agent. A dirty checkout reads dirty and
+// committing (#1638): the package commits nothing for an agent. A dirty checkout reads dirty and
 // is the caller's to keep; once the agent has committed, the branch outlives the checkout.
 test('a run worktree reads dirty until the agent commits; the branch then outlives it (#786/#1638)', async () => {
   const git = nodeGitRunner()
-  const repo = await realpath(await mkdtemp(join(tmpdir(), 'framework-worktree-')))
+  const repo = await realpath(await mkdtemp(join(tmpdir(), 'worktree-')))
   try {
     await git(['init'], repo)
     await git(['config', 'user.email', 't@t'], repo)
@@ -232,7 +232,7 @@ test('a run worktree reads dirty until the agent commits; the branch then outliv
     await git(['add', '-A'], repo)
     await git(['commit', '-m', 'init'], repo)
 
-    const { path, branch } = await addWorktree(repo, { agentId: 'run1', branch: 'tf-agent-run1' }, git)
+    const { path, branch } = await addWorktree(repo, { agentId: 'run1', branch: 'agent-run1' }, git)
     // The agent edits and stops without committing, exactly as the system prompt leaves it.
     await writeFile(join(path, 'index.html'), '<h1>Welcome!</h1>\n')
 
@@ -252,53 +252,60 @@ test('a run worktree reads dirty until the agent commits; the branch then outliv
 })
 
 test('agentBranchName names the branch after the run id (#736)', () => {
-  assert.equal(agentBranchName('2026-07-19T10-00-00-000Z'), 'tf-agent-2026-07-19T10-00-00-000Z')
+  assert.equal(agentBranchName('2026-07-19T10-00-00-000Z'), 'agent-2026-07-19T10-00-00-000Z')
 })
 
 test('currentBranch reads the checked-out branch, and reads detached/non-repo as undefined', async () => {
-  assert.equal(await currentBranch(REPO, recordingGit('tf-agent-1\n')), 'tf-agent-1')
+  assert.equal(await currentBranch(REPO, recordingGit('agent-1\n')), 'agent-1')
   assert.equal(await currentBranch(REPO, recordingGit('HEAD\n')), undefined, 'detached HEAD is not a branch')
   assert.equal(await currentBranch(REPO, failingGit), undefined)
 })
 
-/** A directory reader over one listing: `entries[dir]` are the names under `dir`. */
+/** A directory reader over one listing: `entries[dir]` are the directory names under `dir`. */
 const listing = (entries: Record<string, string[]>) => async (dir: string) => entries[dir] ?? []
 
-test('listWorktreeDirs lists the run-branch-named dirs under branches/ and nothing else (#737/#1580)', async () => {
-  const root = join('/repo', FRAMEWORK_DIR, BRANCHES_DIR)
-  const readdir = listing({ [root]: ['tf-agent-r1', 'tf-agent-r2', '.tmp'] })
+test('listWorktreeDirs lists the agent-branch-named dirs under .branches/ and nothing else (#737/#1580)', async () => {
+  const root = join('/repo', BRANCHES_DIR)
+  const readdir = listing({ [root]: ['agent-r1', 'agent-r2', '.tmp'] })
   assert.deepEqual((await listWorktreeDirs('/repo', readdir)).sort(), ['r1', 'r2'])
   assert.deepEqual(await listWorktreeDirs('/never-ran', readdir), [])
 })
 
-test('listWorktreeDirs never mistakes a rename link for a run (#1580)', async () => {
-  const root = join('/repo', FRAMEWORK_DIR, BRANCHES_DIR)
-  // A rename link beside the checkouts: its name has no run prefix, so it is not a run.
-  const readdir = listing({ [root]: ['tf-agent-r1', 'tf-cool-name'] })
-  assert.deepEqual(await listWorktreeDirs('/repo', readdir), ['r1'])
+test('listWorktreeDirs never mistakes a rename link for a checkout: a link is not a directory (#1580)', async () => {
+  // A rename link beside the checkouts is named as an agent branch too; only the real directory
+  // is a checkout, so the default reader must tell them apart by type, not by name.
+  const repo = await realpath(await mkdtemp(join(tmpdir(), 'worktree-')))
+  try {
+    await mkdir(join(repo, BRANCHES_DIR, 'agent-r1'), { recursive: true })
+    await symlink('agent-r1', join(repo, BRANCHES_DIR, 'agent-cool-name'))
+    await writeFile(join(repo, BRANCHES_DIR, 'agent-note'), 'not a checkout either\n')
+    assert.deepEqual(await listWorktreeDirs(repo), ['r1'])
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
 })
 
 test('nameBranch: a rename lost to a sibling naming the same thing at the same moment takes the next suffix (review)', async () => {
-  // The branches read says `tf-x` is free; the rename then loses the race; the re-read shows it taken.
+  // The branches read says `agent-x` is free; the rename then loses the race; the re-read shows it taken.
   let renames = 0
   const racing: GitRunner = async (args, cwd) => {
     if (args[0] === 'rev-parse' && args[1] === '--show-toplevel') return cwd + '\n'
-    if (args[0] === 'rev-parse') return 'tf-agent-1\n'
-    if (args[0] === 'for-each-ref') return renames === 0 ? 'refs/heads/tf-agent-1\n' : 'refs/heads/tf-agent-1\nrefs/heads/tf-x\n'
+    if (args[0] === 'rev-parse') return 'agent-1\n'
+    if (args[0] === 'for-each-ref') return renames === 0 ? 'refs/heads/agent-1\n' : 'refs/heads/agent-1\nrefs/heads/agent-x\n'
     if (args[0] === 'branch' && args[1] === '-m') {
-      if (renames++ === 0) throw new Error("fatal: a branch named 'tf-x' already exists")
+      if (renames++ === 0) throw new Error("fatal: a branch named 'agent-x' already exists")
       return ''
     }
     throw new Error(`unexpected git ${args.join(' ')}`)
   }
   const wt = await realpath(tmpdir())
-  assert.deepEqual(await nameBranch(wt, 'x', racing), { ok: true, branch: 'tf-x-2' })
+  assert.deepEqual(await nameBranch(wt, 'x', racing), { ok: true, branch: 'agent-x-2' })
   assert.equal(renames, 2)
 
   // Any other rename failure is the caller's to see.
   const broken: GitRunner = async (args, cwd) => {
     if (args[0] === 'rev-parse' && args[1] === '--show-toplevel') return cwd + '\n'
-    if (args[0] === 'rev-parse') return 'tf-agent-1\n'
+    if (args[0] === 'rev-parse') return 'agent-1\n'
     if (args[0] === 'for-each-ref') return ''
     throw new Error('fatal: disk full')
   }

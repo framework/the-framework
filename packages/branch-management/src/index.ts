@@ -8,13 +8,12 @@ export {
   pushBranch,
 } from './git.js'
 export {
-  FRAMEWORK_DIR,
   BRANCHES_DIR,
   AGENT_BRANCH_PREFIX,
-  DATA_BRANCH,
   isSafeAgentId,
   agentBranchName,
   agentIdFromWorktreeDir,
+  isAgentBranch,
   sessionNameOf,
 } from './branch-names.js'
 export {

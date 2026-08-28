@@ -20,10 +20,10 @@ const SHA = 'a'.repeat(40)
 const MAIN_SHA = 'b'.repeat(40)
 
 /** A run branch started 26 hours before {@link NOW}: past the safe age. */
-const OLD_RUN = 'tf-agent-2026-08-16T10-00-00-000Z'
+const OLD_RUN = 'agent-2026-08-16T10-00-00-000Z'
 const OLD_RUN_ID = '2026-08-16T10-00-00-000Z'
 /** A run branch started one hour before {@link NOW}: inside the safe age. */
-const YOUNG_RUN = 'tf-agent-2026-08-17T11-00-00-000Z'
+const YOUNG_RUN = 'agent-2026-08-17T11-00-00-000Z'
 /** An aged run branch under the pre-#1581 slashed spelling: still on remotes, still swept. */
 /** The shape the cloud driver pushes (#1320): counter + 8-hex tag, slash-free. */
 const CLOUD_REF = 'cloud-1-3955352b'
@@ -255,8 +255,8 @@ test('every other branch is never even a candidate', async () => {
   const heads = {
     main: MAIN_SHA,
     'claude/implement-something-abc123': SHA,
-    'tf-some-session-name': SHA,
-    'tf-agent-not-a-timestamp': SHA,
+    'agent-some-session-name': SHA,
+    'agent-not-a-timestamp': SHA,
     'the-framework/some-session-name': SHA,
     'the-framework/agent-not-a-timestamp': SHA,
     'feature/cloud-1-3955352b': SHA,

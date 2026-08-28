@@ -5,7 +5,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { readAgentHandoff, resolveAgentPr, mergeAgentPr, agentBranchFor, openBranchPullRequest, openRemoteBranchPullRequest, openAgentPullRequest, agentAutoHandoff, isAgentBranch, prBaseName, withheldMerge } from './agent-handoff.js'
+import { isAgentBranch } from '@better-skills/branch-management'
+import { readAgentHandoff, resolveAgentPr, mergeAgentPr, agentBranchFor, openBranchPullRequest, openRemoteBranchPullRequest, openAgentPullRequest, agentAutoHandoff, prBaseName, withheldMerge } from './agent-handoff.js'
 import { pickAgentPr } from './gh.js'
 import { nodeGitRunner, type GitRunner } from '@better-skills/branch-management'
 
@@ -29,8 +30,8 @@ const REPO = { 'rev-parse --git-dir': '.git' }
 
 test('the recorded branch wins; the birth branch is the only fallback (#799/#1725)', () => {
   assert.equal(agentBranchFor({ id: 'r1', branch: 'feat/mine' }), 'feat/mine')
-  assert.equal(agentBranchFor({ id: 'r1', branch: 'tf-named' }), 'tf-named')
-  assert.equal(agentBranchFor({ id: 'r1' }), 'tf-agent-r1')
+  assert.equal(agentBranchFor({ id: 'r1', branch: 'agent-named' }), 'agent-named')
+  assert.equal(agentBranchFor({ id: 'r1' }), 'agent-r1')
 })
 
 test('a non-repo yields no handoff at all', async () => {
@@ -172,7 +173,7 @@ test('a remote-only branch gets its draft PR without any push (#1601)', async ()
   const ghCalls: string[][] = []
   const result = await openRemoteBranchPullRequest(
     '/repo',
-    { id: 'r1', branch: 'tf-fix-the-thing', intent: 'fix it' },
+    { id: 'r1', branch: 'agent-fix-the-thing', intent: 'fix it' },
     'claude/fix-the-thing',
     {
       gh: async args => {
@@ -195,7 +196,7 @@ test("the agent's own description becomes the PR body, in place of the intent (#
   const ghCalls: string[][] = []
   await openRemoteBranchPullRequest(
     '/repo',
-    { id: 'r1', branch: 'tf-fix-the-thing', intent: 'fix it', description: '## What changed\n\nThe queue reader keeps its state across a reload.' },
+    { id: 'r1', branch: 'agent-fix-the-thing', intent: 'fix it', description: '## What changed\n\nThe queue reader keeps its state across a reload.' },
     'claude/fix-the-thing',
     {
       gh: async args => {
@@ -212,7 +213,7 @@ test("the agent's own description becomes the PR body, in place of the intent (#
 
 test('without a description the PR body still says what was asked for (#1567)', async () => {
   const ghCalls: string[][] = []
-  await openRemoteBranchPullRequest('/repo', { id: 'r1', branch: 'tf-x', intent: 'fix it' }, 'claude/x', {
+  await openRemoteBranchPullRequest('/repo', { id: 'r1', branch: 'agent-x', intent: 'fix it' }, 'claude/x', {
     gh: async args => {
       ghCalls.push(args)
       return 'https://github.com/o/r/pull/15\n'
@@ -613,10 +614,9 @@ test('a failed push is reported with git’s own reason, so the bar can offer th
 })
 
 test('a session branch is recognised by its prefix, a hand-made one is not (#1102)', () => {
-  assert.equal(isAgentBranch('tf-x'), true)
+  assert.equal(isAgentBranch('agent-x'), true)
   assert.equal(isAgentBranch('the-framework/x'), false) // the retired slashed spelling is nobody's
   assert.equal(isAgentBranch('feat/mine'), false)
-  assert.equal(isAgentBranch(undefined), false)
 })
 
 test('the PR base is the remote branch name, not the tracking ref (#1102)', async () => {
@@ -737,7 +737,7 @@ test('resolveAgentPr reads the PR the run recorded, and asks gh only for its sta
 
 test('resolveAgentPr answers nothing for a run that recorded no PR (E6)', async () => {
   let asked = 0
-  const found = await resolveAgentPr('/repo', { id: 'r1', branch: 'tf-named' }, async () => {
+  const found = await resolveAgentPr('/repo', { id: 'r1', branch: 'agent-named' }, async () => {
     asked++
     return { value: undefined, pending: false }
   })
@@ -781,7 +781,7 @@ test('withheldMerge authorizes only a declared-done session with an empty sessio
 test("a run implementing a ticket carries its issue as `(fix #42)` in the PR title (#1334)", async () => {
   // The squash-merge subject inherits the title, so this is what closes the ticket's issue on
   // merge; without it an auto-merged quick-win leaves its ticket open.
-  assert.equal(await titleOf({ id: 'r1', branch: 'tf-fix-login', fixes: '#42' }), 'fix-login (fix #42)')
+  assert.equal(await titleOf({ id: 'r1', branch: 'agent-fix-login', fixes: '#42' }), 'fix-login (fix #42)')
 })
 
 async function titleOf(agent: Parameters<typeof agentAutoHandoff>[1]): Promise<string | undefined> {
@@ -803,7 +803,7 @@ test("the PR is titled with the agent's own name for the work (#1618)", async ()
   // be, in a whole sentence, rather than the slug the session happens to be called.
   const title = await titleOf({
     id: 'r1',
-    branch: 'tf-queue-reader',
+    branch: 'agent-queue-reader',
     prTitle: 'Keep the queued state across a reload',
     fixes: '#42',
   })

@@ -1,6 +1,7 @@
 import { listAgents, readLiveMetas, type LiveAgent, type AgentMeta } from '../store/index.js'
 import type { ProjectSummary, ProjectionRead } from './projects.js'
-import { isAgentBranch, readAgentHandoff, agentBranchFor, type AgentHandoff } from './agent-handoff.js'
+import { isAgentBranch } from '@better-skills/branch-management'
+import { readAgentHandoff, agentBranchFor, type AgentHandoff } from './agent-handoff.js'
 import { ghPrList, type OpenPr, type PrLister } from './gh.js'
 import { interventionKey } from './keys.js'
 import { postDiscordWebhook } from './discord-webhook.js'
@@ -105,7 +106,7 @@ export async function buildInterventions(
       // framework opened for a session is the opposite (#1102): auto-handoff opens it as a draft
       // precisely so it does not ping reviewers, and if the queue then dropped it too, nothing
       // would tell anyone the work exists — which is the whole of #860 again.
-      if (pr.isDraft && !isAgentBranch(pr.headRefName)) continue
+      if (pr.isDraft && !(pr.headRefName !== undefined && isAgentBranch(pr.headRefName))) continue
       items.push({
         projectId: project.id,
         projectName: project.name,

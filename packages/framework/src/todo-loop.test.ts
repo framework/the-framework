@@ -149,8 +149,8 @@ test('appendTodoEntry resolves the project root from an agent worktree (#1582)',
   // A paused agent calls this from its own checkout; the data checkout lives beside the main repo.
   const repo = await repoWorkspace()
   try {
-    const worktree = join(repo, '.the-framework', 'branches', 'tf-agent-x')
-    await git(['worktree', 'add', '-b', 'tf-agent-x', worktree], repo)
+    const worktree = join(repo, '.branches', 'agent-x')
+    await git(['worktree', 'add', '-b', 'agent-x', worktree], repo)
     assert.equal(await appendTodoEntry(worktree, 'from the worktree'), 'TODO_AGENTS.md')
     assert.equal(await queueOnBranch(repo), '- [ ] from the worktree\n')
   } finally {

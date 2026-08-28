@@ -1,6 +1,6 @@
 What the tests cover: every command of the command line against real git, and the contract around them.
 
-- **`create`** - makes the checkout on `tf-agent-<id>`, links the parent's dependency directory in, creates the repo-root `branches` shortcut; works from inside another checkout; `--base` puts the branch on the stated commit.
+- **`create`** - makes the checkout on `agent-<id>`, links the parent's dependency directory in, hides `.branches/` from the project's git through the exclude file; works from inside another checkout; `--base` puts the branch on the stated commit.
 - **Ids** - an id that could escape the branches directory is refused by `create` and `remove` with nothing created.
 - **`name`** - renames from a subdirectory of the checkout, leaves no second branch, moves the `branches/` link to the new name without moving the checkout; the same name again is a no-op and another name renames again, dropping the old link; a name taken locally or only on the remote gets a numeric suffix that the caller reads back; a name outside `[a-z0-9-]+` is refused with the branch untouched; the project's main checkout is refused and keeps its branch.
 - **`status`** - reads dirty before the agent commits, clean after, on the remote after a push; accepts an absolute or a relative path; refuses a leftover directory that is not a checkout.

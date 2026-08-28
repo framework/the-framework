@@ -1,4 +1,4 @@
-Covers the naming rules: the session name is read off a branch — `tf-<session name>` gives the name, suffixed or not, while the birth branch `tf-agent-<agent id>`, the data branch, a user's own branch and no branch at all give none — and the birth branch is both a framework-minted branch and a checkout directory name, where only a named run branch carries a name.
+Covers the naming rules: the session name is read off a branch — `agent-<session name>` gives the name, suffixed or not, a name that itself starts with `agent-` included, while the branch the checkout was created on, a user's own branch and no branch at all give none — and which branches are agent branches: the one a checkout was created on and a renamed one, never the user's own.
 
 ## Before modifying/creating SPEC.md files
 

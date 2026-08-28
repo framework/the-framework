@@ -31,7 +31,7 @@ An agent used to get its own separately styled chip, so the identical facts wore
 
 #### User story
 
-While an agent works, it commits, and near the end it renames its branch to `tf-<session name>`. The user watching the bar should see that happen rather than a stale line.
+While an agent works, it commits, and near the end it renames its branch to `agent-<session name>`. The user watching the bar should see that happen rather than a stale line.
 
 #### Business logic
 

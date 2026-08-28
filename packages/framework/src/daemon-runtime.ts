@@ -3,7 +3,8 @@ import { closeSync, mkdirSync, openSync } from 'node:fs'
 import { basename, delimiter, dirname, join, resolve } from 'node:path'
 import { appendFile, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { agentIdFromStartedAt, startedAtFromAgentId, archiveWorktreeAgent, restoreArchivedAgent, listAgents, findAgent, archivedAgentPaths, readLiveMetas, readLiveMeta, resolveAgentEventsPath, EVENTS_FILE, META_FILE, isPidAlive, type AgentMeta } from './store/index.js'
-import { createCheckout, attachCheckout, agentBranchName, worktreePath, worktreeBranch, removeWorktree, pruneWorktrees, FRAMEWORK_DIR, agentIdFromWorktreeDir, isGitRepo, nodeGitRunner, isGitTimeout, CLI_BIN_DIR } from '@better-skills/branch-management'
+import { createCheckout, attachCheckout, agentBranchName, worktreePath, worktreeBranch, removeWorktree, pruneWorktrees, agentIdFromWorktreeDir, isGitRepo, nodeGitRunner, isGitTimeout, CLI_BIN_DIR } from '@better-skills/branch-management'
+import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import type { FrameworkEvent } from './events.js'
 import { removeAgentSpec, writeAgentSpec } from './agent-spec.js'
 import type { StartAgentKind, StartAgentOptions, StartAgentResult, AddProjectResult } from './dashboard/index.js'
@@ -75,7 +76,7 @@ export async function cleanupTimedOutWorktree(repo: string, agentId: string, err
  * run whose own process wrote every other line. Never throws. */
 async function appendAgentLog(cwd: string, message: string): Promise<void> {
   const event: FrameworkEvent = { kind: 'log', message }
-  await appendFile(join(cwd, FRAMEWORK_DIR, EVENTS_FILE), JSON.stringify(event) + '\n').catch(() => {})
+  await appendFile(join(cwd, THE_FRAMEWORK_DIR, EVENTS_FILE), JSON.stringify(event) + '\n').catch(() => {})
 }
 
 /**
@@ -116,7 +117,7 @@ function childEnv(daemonUrl: string | undefined, base: NodeJS.ProcessEnv = proce
 
 /** Where a spawned agent's stderr lands (#1261), so a child that dies at boot leaves a trace. */
 export function agentStderrPath(cwd: string): string {
-  return join(cwd, FRAMEWORK_DIR, 'stderr.log')
+  return join(cwd, THE_FRAMEWORK_DIR, 'stderr.log')
 }
 
 /** One line saying how a child ended, for the failed-start marker (#1261). */
@@ -137,11 +138,11 @@ function exitDetail(code: number | null, signal: NodeJS.Signals | null): string 
  * own meta is left alone: its lifecycle is its own to report.
  */
 export async function markFailedStart(cwd: string, agentId: string, intent: string, detail: string): Promise<boolean> {
-  const metaPath = join(cwd, FRAMEWORK_DIR, META_FILE)
+  const metaPath = join(cwd, THE_FRAMEWORK_DIR, META_FILE)
   if (await stat(metaPath).then(() => true, () => false)) return false
   // Only into a checkout that exists (#1654). A marker written where the worktree is gone — removed
   // by hand while the child was still alive, or never created — makes a directory under
-  // `branches/` that is not a worktree, and every later git command run in it acts on the
+  // `.branches/` that is not a worktree, and every later git command run in it acts on the
   // enclosing repo. The daemon's log line below is the record instead.
   if (!(await stat(cwd).then(s => s.isDirectory(), () => false))) {
     console.log(`[framework] run ${agentId} failed to start: ${detail}; its checkout is gone, so no marker is written`)
@@ -156,7 +157,7 @@ export async function markFailedStart(cwd: string, agentId: string, intent: stri
     ...(intent.trim() ? { intent } : {}),
   }
   const stderrTail = (await readFile(agentStderrPath(cwd), 'utf8').catch(() => '')).trim().slice(-2000)
-  await mkdir(join(cwd, FRAMEWORK_DIR), { recursive: true }).catch(() => {})
+  await mkdir(join(cwd, THE_FRAMEWORK_DIR), { recursive: true }).catch(() => {})
   await writeFile(metaPath, JSON.stringify(meta, null, 2) + '\n').catch(() => {})
   await appendAgentLog(cwd, `The session failed to start: ${detail}.` + (stderrTail ? `\n\n${stderrTail}` : ''))
   console.log(`[framework] run ${agentId} failed to start: ${detail}`)
@@ -518,7 +519,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
 
   /**
    * The checkout an agent gets (#736). Each agent is given its own git worktree under the project's
-   * `.the-framework/branches/<branch name>` (#1580), on a `tf-agent-<agentId>` branch, so N runs on one
+   * `.branches/<branch name>` (#1580), on an `agent-<agentId>` branch, so N runs on one
    * repo never fight over the working tree — and the user's own checkout, uncommitted work
    * included, is left untouched.
    *
@@ -920,7 +921,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
   // archive, and the device's fixed-path tail went silent without the agent's final events. The
   // initial attach takes whatever the resolver answers (a non-git fallback agent's journal IS the
   // root one); a relocation refuses the root fallback — there it is another agent's feed.
-  const rootJournal = join(cwd, FRAMEWORK_DIR, EVENTS_FILE)
+  const rootJournal = join(cwd, THE_FRAMEWORK_DIR, EVENTS_FILE)
   const tailRelayEvents = (agentId: string, onEvent: (event: FrameworkEvent) => void): (() => void) => {
     let initial = true
     return tailAgentEvents<FrameworkEvent>(async () => {

@@ -6,7 +6,8 @@ import { join, dirname } from 'node:path'
 import { appendControl } from './control.js'
 import { BROWSER_MCP_SERVERS, withBrowser } from './browser.js'
 import { EVENTS_FILE, ARCHIVE_DIR, type StoreFs } from './store/index.js'
-import { FRAMEWORK_DIR, nodeGitRunner } from '@better-skills/branch-management'
+import { nodeGitRunner } from '@better-skills/branch-management'
+import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import { layoutMarker, layoutMarkerPath } from './layout.js'
 import {
   chooseSessionLink,
@@ -85,6 +86,7 @@ function memFs(): StoreFs & { files: Map<string, string> } {
     async exists(p) { return files.has(p) },
     async mkdir() {},
     async readdir() { return [] },
+    async subdirs() { return [] },
   }
 }
 
@@ -497,7 +499,7 @@ test('the dashboard steers a dashboard-less run through its gates via control.js
   process.env.FRAMEWORK_FAKE_AWAIT = 'choices' // the fake build stops to ask (#341)
   process.env.XDG_CONFIG_HOME = cfg
   try {
-    await mkdir(join(cwd, FRAMEWORK_DIR), { recursive: true })
+    await mkdir(join(cwd, THE_FRAMEWORK_DIR), { recursive: true })
 
     const { io, out } = capture()
     let settled = false
@@ -510,7 +512,7 @@ test('the dashboard steers a dashboard-less run through its gates via control.js
     // Play the daemon: tail events.jsonl for the build's parked await-choices gate and
     // answer it with its recommended pick, exactly as the daemon page's Accept button would.
     const answered = new Set<string>()
-    const eventsPath = join(cwd, FRAMEWORK_DIR, EVENTS_FILE)
+    const eventsPath = join(cwd, THE_FRAMEWORK_DIR, EVENTS_FILE)
     for (let i = 0; i < 500 && !settled; i++) {
       const lines = await readFile(eventsPath, 'utf8').then(s => s.split('\n').filter(Boolean), () => [])
       for (const l of lines) {
@@ -571,7 +573,7 @@ test('a declined post-merge cleanup lands in the archived event log, not on stdo
     // decline is *reported*: it has to survive into runs/, which close() copies the log into.
     const code = await runAgentCli({ prompt: 'review the auth flow', kind: 'prompt', cwd: dir, options: { onBeforeMergeable: true } }, io)
     assert.equal(code, 0)
-    const agents = join(dir, FRAMEWORK_DIR, ARCHIVE_DIR)
+    const agents = join(dir, THE_FRAMEWORK_DIR, ARCHIVE_DIR)
     const archived = (await readdir(agents)).filter(f => f.endsWith('.jsonl'))
     assert.equal(archived.length, 1, 'the run was archived')
     const events = (await readFile(join(agents, archived[0]!), 'utf8'))
@@ -592,7 +594,7 @@ test('a run that never asked for the post-merge cleanup stays quiet about it (#8
   try {
     const { io } = capture()
     assert.equal(await runAgentCli({ prompt: 'review the auth flow', kind: 'prompt', cwd: dir }, io), 0)
-    const events = (await readFile(join(dir, FRAMEWORK_DIR, EVENTS_FILE), 'utf8'))
+    const events = (await readFile(join(dir, THE_FRAMEWORK_DIR, EVENTS_FILE), 'utf8'))
       .split('\n')
       .filter(Boolean)
       .map(l => JSON.parse(l) as FrameworkEvent)
@@ -680,29 +682,29 @@ test('the journal reads the branch off the checkout, and sees the agent\'s own r
   git('config', 'user.name', 'Test')
   git('commit', '--allow-empty', '-q', '-m', 'seed')
   // The state allocateWorkspace leaves an agent in: checked out on its run-id branch (#736).
-  git('checkout', '-q', '-b', 'tf-agent-r1')
+  git('checkout', '-q', '-b', 'agent-r1')
   const { io, out } = capture()
-  const journal = createAgentJournal({ io, cwd: repo, store: undefined })
+  const journal = createAgentJournal({ io, cwd: repo, store: undefined, agentId: 'r1' })
   await journal.observeBranch()
-  assert.equal(journal.branch(), 'tf-agent-r1')
+  assert.equal(journal.branch(), 'agent-r1')
   assert.equal(journal.sessionName(), undefined, 'the birth branch is not a name')
   // The agent names its branch in its own shell (#1725) — `branch-management name cool-name` is
   // this rename — and the journal only learns of it by looking again.
-  git('branch', '-m', 'tf-agent-r1', 'tf-cool-name')
+  git('branch', '-m', 'agent-r1', 'agent-cool-name')
   assert.equal(journal.sessionName(), undefined, 'nothing is recorded until the branch is read again')
   journal.onEvent({ kind: 'driver', event: { type: 'result', text: 'named it' } })
-  for (let i = 0; i < 200 && !out.some(line => line.includes('branch: tf-cool-name')); i++) {
+  for (let i = 0; i < 200 && !out.some(line => line.includes('branch: agent-cool-name')); i++) {
     await new Promise(res => setTimeout(res, 10))
   }
   assert.ok(
-    out.some(line => line.includes('branch: tf-cool-name')),
+    out.some(line => line.includes('branch: agent-cool-name')),
     `expected a branch event after the turn, got: ${out.join('; ')}`,
   )
-  assert.equal(journal.branch(), 'tf-cool-name')
+  assert.equal(journal.branch(), 'agent-cool-name')
   assert.equal(journal.sessionName(), 'cool-name')
   // The same branch read again is one fact, not a second event.
   await journal.observeBranch()
-  assert.equal(out.filter(line => line.includes('branch: tf-cool-name')).length, 1)
+  assert.equal(out.filter(line => line.includes('branch: agent-cool-name')).length, 1)
   // A checkout that left its branch (a detached HEAD) is remembered as having none: the epilogue
   // must not publish the last name it saw.
   git('checkout', '-q', '--detach')
@@ -714,7 +716,7 @@ test('the journal reads the branch off the checkout, and sees the agent\'s own r
 
 test('a browser URL is held until the session opens, then re-said after every later session (#1455 item 6b)', () => {
   const { io, out } = capture()
-  const journal = createAgentJournal({ io, cwd: '/tmp', store: undefined })
+  const journal = createAgentJournal({ io, cwd: '/tmp', store: undefined, agentId: undefined })
   journal.announceBrowserUrl('https://early.test/')
   assert.ok(
     !out.some(l => l.includes('browser: https://early.test/')),
@@ -785,11 +787,11 @@ test('a --run-on actions run with no token anywhere ends failed instead of hangi
   })
   assert.equal(exit, 2)
 
-  const meta = JSON.parse(await readFile(join(repo, FRAMEWORK_DIR, 'agent.json'), 'utf8')) as {
+  const meta = JSON.parse(await readFile(join(repo, THE_FRAMEWORK_DIR, 'agent.json'), 'utf8')) as {
     status: string
   }
   assert.equal(meta.status, 'failed')
-  const events = (await readFile(join(repo, FRAMEWORK_DIR, EVENTS_FILE), 'utf8'))
+  const events = (await readFile(join(repo, THE_FRAMEWORK_DIR, EVENTS_FILE), 'utf8'))
     .split('\n')
     .filter(Boolean)
     .map(l => JSON.parse(l) as { kind: string; ok?: boolean; detail?: string })
@@ -806,7 +808,7 @@ test('runCli continues a build run through the build flow, not the prompt path (
   try {
     const first = capture()
     assert.equal(await runAgentCli({ prompt: 'build a thing', cwd: dir }, first.io), 0)
-    const metaPath = join(dir, FRAMEWORK_DIR, 'agent.json')
+    const metaPath = join(dir, THE_FRAMEWORK_DIR, 'agent.json')
     assert.equal((JSON.parse(await readFile(metaPath, 'utf8')) as { kind?: string }).kind, 'build')
 
     const second = capture()
@@ -816,7 +818,7 @@ test('runCli continues a build run through the build flow, not the prompt path (
     )
     assert.equal(code, 0)
     // The continuation re-entered the build flow: a second session opened after the first end.
-    const lines = (await readFile(join(dir, FRAMEWORK_DIR, EVENTS_FILE), 'utf8'))
+    const lines = (await readFile(join(dir, THE_FRAMEWORK_DIR, EVENTS_FILE), 'utf8'))
       .trim()
       .split('\n')
       .map(l => JSON.parse(l) as { kind: string })
@@ -843,7 +845,7 @@ test('runCli keeps a prompt run continuation on the prompt path (#1467)', async 
       second.io,
     )
     assert.equal(code, 0)
-    const lines = (await readFile(join(dir, FRAMEWORK_DIR, EVENTS_FILE), 'utf8'))
+    const lines = (await readFile(join(dir, THE_FRAMEWORK_DIR, EVENTS_FILE), 'utf8'))
       .trim()
       .split('\n')
       .map(l => JSON.parse(l) as { kind: string })

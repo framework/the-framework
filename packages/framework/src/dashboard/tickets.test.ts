@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { readTickets, readTicket, readTicketsMeta, hasTickets } from './tickets.js'
 
 async function repo(files: Record<string, string> = {}): Promise<string> {
-  const cwd = await mkdtemp(join(tmpdir(), 'tf-tickets-'))
+  const cwd = await mkdtemp(join(tmpdir(), 'agent-tickets-'))
   if (Object.keys(files).length) await mkdir(join(cwd, 'tickets'), { recursive: true })
   for (const [name, content] of Object.entries(files)) {
     await writeFile(join(cwd, 'tickets', name), content, 'utf8')

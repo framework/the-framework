@@ -6,7 +6,8 @@ import { tmpdir } from 'node:os'
 import { sendStop, sendMessage, sendChoice, sendRemoveWorktree } from './control.js'
 import { onRetainedWorktrees, onAgents } from './reads.js'
 import { addProject, projectId as idFor } from '../registry.js'
-import { FRAMEWORK_DIR, worktreePath, addWorktree, agentBranchName, nodeGitRunner } from '@better-skills/branch-management'
+import { worktreePath, addWorktree, agentBranchName, nodeGitRunner } from '@better-skills/branch-management'
+import { THE_FRAMEWORK_DIR } from '../framework-dir.js'
 import { CONTROL_FILE } from '../control.js'
 import { provideTestContext } from './test-context.js'
 
@@ -29,10 +30,10 @@ async function projectWithWorktreeAgent(): Promise<{
   const dir = await realpath(await mkdtemp(join(tmpdir(), 'framework-addressing-')))
   const agentId = '2026-07-19T10-00-00-000Z'
   const worktree = worktreePath(dir, agentId)
-  await mkdir(join(worktree, FRAMEWORK_DIR), { recursive: true })
+  await mkdir(join(worktree, THE_FRAMEWORK_DIR), { recursive: true })
   // The live meta is what readLiveMetas discovers, and its id is what the caller addresses.
   await writeFile(
-    join(worktree, FRAMEWORK_DIR, 'agent.json'),
+    join(worktree, THE_FRAMEWORK_DIR, 'agent.json'),
     JSON.stringify({ version: 1, status: 'running', id: agentId, startedAt: agentId, updatedAt: agentId }),
   )
 
@@ -48,8 +49,8 @@ async function projectWithWorktreeAgent(): Promise<{
     dir,
     projectId: idFor(dir),
     agentId,
-    agentControl: join(worktree, FRAMEWORK_DIR, CONTROL_FILE),
-    rootControl: join(dir, FRAMEWORK_DIR, CONTROL_FILE),
+    agentControl: join(worktree, THE_FRAMEWORK_DIR, CONTROL_FILE),
+    rootControl: join(dir, THE_FRAMEWORK_DIR, CONTROL_FILE),
     restore: () => {
       if (previous === undefined) delete process.env.XDG_CONFIG_HOME
       else process.env.XDG_CONFIG_HOME = previous
@@ -240,7 +241,7 @@ test('onRetainedWorktrees hides a live run, and lists one that has finished (#73
     assert.deepEqual(await onRetainedWorktrees(ctx.projectId), [], 'a running run has nothing to offer removing')
     // Once it is no longer running, its retained checkout is listed.
     await writeFile(
-      join(worktreePath(ctx.dir, ctx.agentId), FRAMEWORK_DIR, 'agent.json'),
+      join(worktreePath(ctx.dir, ctx.agentId), THE_FRAMEWORK_DIR, 'agent.json'),
       JSON.stringify({ version: 1, status: 'failed', id: ctx.agentId, startedAt: ctx.agentId, updatedAt: ctx.agentId }),
     )
     assert.deepEqual(await onRetainedWorktrees(ctx.projectId), [ctx.agentId])
@@ -262,7 +263,7 @@ test('a run that has a worktree but has not written its state yet still resolves
     await mkdir(worktree, { recursive: true }) // the daemon has made the checkout; the run has not started writing
     await sendStop(ctx.projectId, fresh)
     assert.deepEqual(
-      await entries(join(worktree, FRAMEWORK_DIR, CONTROL_FILE)),
+      await entries(join(worktree, THE_FRAMEWORK_DIR, CONTROL_FILE)),
       [{ kind: 'stop' }],
       'addressed at the run whose worktree exists, not the project root',
     )
@@ -292,9 +293,9 @@ test('a continued run reads as running, not as its archived first leg (#768)', a
   const ctx = await projectWithWorktreeAgent() // its worktree meta says `running`
   try {
     // Its first leg was archived when it finished, exactly as teardown (#737) leaves things.
-    await mkdir(join(ctx.dir, FRAMEWORK_DIR, 'agents'), { recursive: true })
+    await mkdir(join(ctx.dir, THE_FRAMEWORK_DIR, 'agents'), { recursive: true })
     await writeFile(
-      join(ctx.dir, FRAMEWORK_DIR, 'agents', `${ctx.agentId}.json`),
+      join(ctx.dir, THE_FRAMEWORK_DIR, 'agents', `${ctx.agentId}.json`),
       JSON.stringify({ version: 1, status: 'done', id: ctx.agentId, startedAt: ctx.agentId, updatedAt: ctx.agentId }),
     )
     const agents = (await onAgents(ctx.projectId)) as { id: string; status: string }[]

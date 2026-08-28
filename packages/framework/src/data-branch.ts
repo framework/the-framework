@@ -1,5 +1,6 @@
 import { dirname, join } from 'node:path'
-import { nodeGitRunner, type GitRunner, FRAMEWORK_DIR, BRANCHES_DIR, DATA_BRANCH, excludeFromGit } from '@better-skills/branch-management'
+import { nodeGitRunner, type GitRunner, excludeFromGit } from '@better-skills/branch-management'
+import { DATA_BRANCH, DATA_CHECKOUT_DIR } from './framework-dir.js'
 import { TICKETS_DIR, FLAT_TODO_FILE } from './tickets.js'
 import { errorMessage } from './error-message.js'
 
@@ -23,13 +24,12 @@ export { DATA_BRANCH }
 // its own checkout and pushes, and the race is settled by the push itself — whoever loses re-syncs
 // and re-applies.
 //
-// The checkout lives at `.the-framework/branches/tf-data`, a plain git worktree in the
-// #1580 branches dir, named as its branch like every checkout there. The repo root keeps a
+// The checkout is a plain git worktree at {@link DATA_CHECKOUT_DIR}. The repo root keeps a
 // `tickets` symlink into it so the roadmap stays one `ls` away for humans.
 
-/** The data branch's checkout under a project: `<repo>/.the-framework/branches/tf-data`. */
+/** The data branch's checkout under a project. */
 export function dataWorktreePath(cwd: string): string {
-  return join(cwd, FRAMEWORK_DIR, BRANCHES_DIR, DATA_BRANCH)
+  return join(cwd, DATA_CHECKOUT_DIR)
 }
 
 /**
@@ -155,7 +155,7 @@ async function ensureCore(cwd: string, r: Resolved): Promise<void> {
   // the link stays hidden while the data checkout's own directory keeps committing.
   const rootLink = join(cwd, TICKETS_DIR)
   if (!(await r.lexists(rootLink))) {
-    await r.symlink(join(FRAMEWORK_DIR, BRANCHES_DIR, DATA_BRANCH, TICKETS_DIR), rootLink).catch(() => {})
+    await r.symlink(join(DATA_CHECKOUT_DIR, TICKETS_DIR), rootLink).catch(() => {})
     await excludeFromGit(cwd, '/' + TICKETS_DIR, undefined, r.git).catch(() => {})
     await excludeFromGit(cwd, '!/' + TICKETS_DIR + '/', undefined, r.git).catch(() => {})
   }

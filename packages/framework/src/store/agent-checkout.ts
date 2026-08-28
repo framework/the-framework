@@ -1,6 +1,7 @@
 import { join } from 'node:path'
 import { archivedAgentPaths, readLiveMetas, EVENTS_FILE } from './agent-store.js'
-import { isSafeAgentId, FRAMEWORK_DIR, worktreePath } from '@better-skills/branch-management'
+import { isSafeAgentId, worktreePath } from '@better-skills/branch-management'
+import { THE_FRAMEWORK_DIR } from '../framework-dir.js'
 import { nodeFs } from '../node-fs.js'
 
 /**
@@ -43,13 +44,13 @@ export async function resolveAgentCheckout(projectCwd: string, agentId: string |
  * thing to act on.
  */
 export async function resolveAgentEventsPath(projectCwd: string, agentId: string | undefined): Promise<string> {
-  const rootJournal = join(projectCwd, FRAMEWORK_DIR, EVENTS_FILE)
+  const rootJournal = join(projectCwd, THE_FRAMEWORK_DIR, EVENTS_FILE)
   if (!agentId || !isSafeAgentId(agentId)) return rootJournal
   const live = await readLiveMetas(projectCwd).catch(() => [])
   const running = live.find(agent => agent.id === agentId)?.cwd
-  if (running) return join(running, FRAMEWORK_DIR, EVENTS_FILE)
+  if (running) return join(running, THE_FRAMEWORK_DIR, EVENTS_FILE)
   const path = worktreePath(projectCwd, agentId)
-  if (await nodeFs().isDirectory(path)) return join(path, FRAMEWORK_DIR, EVENTS_FILE)
+  if (await nodeFs().isDirectory(path)) return join(path, THE_FRAMEWORK_DIR, EVENTS_FILE)
   const [, archivedEvents] = await archivedAgentPaths(projectCwd, agentId)
   return archivedEvents ?? rootJournal
 }

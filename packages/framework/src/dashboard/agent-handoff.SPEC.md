@@ -74,7 +74,7 @@ Every surface that shows an agent's work needs to know which branch it is on and
 
 #### Business logic
 
-The branch is the one recorded while the agent's worktree existed — authoritative because the agent renames its branch itself, which makes any derivation a guess. For an agent whose branch was never recorded (one started outside a git checkout) the birth branch `tf-agent-<agent id>` is the one fallback.
+The branch is the one recorded while the agent's worktree existed — authoritative because the agent renames its branch itself, which makes any derivation a guess. For an agent whose branch was never recorded (one started outside a git checkout) the birth branch `agent-<agent id>` is the one fallback.
 
 The PR is the number the agent recorded at the moment one was opened for it. The live lookup only refreshes that PR's *state*, which changes without the agent doing anything (a PR merges, a human closes it) — a different PR number found on the branch is some other PR and never this agent's answer, and a recorded PR the live read cannot confirm (a branch this machine cannot see) still answers with its recorded number and URL, state unknown. An agent that recorded no PR costs no lookup at all.
 

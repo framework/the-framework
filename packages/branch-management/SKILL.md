@@ -5,7 +5,7 @@ description: One git checkout per agent, named as its branch. How to name your s
 
 # Branch management
 
-You were started inside your own checkout of the repository: a git worktree at `.the-framework/branches/tf-agent-<id>/`, on a branch of the same name. Your working directory is the whole of your workspace.
+You were started inside your own checkout of the repository: a git worktree at `.branches/agent-<id>/`, on a branch of the same name. Your working directory is the whole of your workspace.
 
 ## Workspace
 
@@ -15,13 +15,13 @@ You were started inside your own checkout of the repository: a git worktree at `
 
 ## Name the session
 
-Before your first change, pick a name for the session — `[a-z0-9-]+`, not starting with `agent-` (that spelling is the framework's own), saying succinctly what the work is — and run:
+Before your first change, pick a name for the session — `[a-z0-9-]+`, saying succinctly what the work is — and run:
 
 ```
 branch-management name <name>
 ```
 
-It renames your branch to `tf-<name>` (a rename: your commits stay where they are) and prints the name the branch got, as JSON: `{"ok":true,"branch":"tf-<name>"}`. When `<name>` was already taken, the branch is `tf-<name>-2`, `-3`, … — use the name it printed, not the one you asked for. The session name is read from your branch; there is nothing else to report.
+It renames your branch to `agent-<name>` (a rename: your commits stay where they are) and prints the name the branch got, as JSON: `{"ok":true,"branch":"agent-<name>"}`. When `<name>` was already taken, the branch is `agent-<name>-2`, `-3`, … — use the name it printed, not the one you asked for. The session name is read from your branch; there is nothing else to report.
 
 ## Commit as you go
 

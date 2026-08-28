@@ -65,16 +65,16 @@ test('against real git: everything under .the-framework is transient on main (#1
 
     const fw = join(repo, '.the-framework')
     await mkdir(join(fw, 'agents'), { recursive: true })
-    await mkdir(join(fw, 'branches', 'tf-agent-r9'), { recursive: true })
+    await mkdir(join(fw, 'branches', 'agent-r9'), { recursive: true })
     await writeFile(join(fw, '.gitignore'), frameworkGitignore())
     await writeFile(join(fw, 'agents', 'old.json'), '{}\n')
     await writeFile(join(fw, 'events.jsonl'), '\n')
-    await writeFile(join(fw, 'branches', 'tf-agent-r9', 'file.txt'), 'x\n')
+    await writeFile(join(fw, 'branches', 'agent-r9', 'file.txt'), 'x\n')
 
     const status = git('status', '--porcelain', '-uall')
     assert.ok(!status.includes('.the-framework/agents/'), 'the transient archive stays ignored')
     assert.ok(!status.includes('.the-framework/events.jsonl'), 'the live log stays ignored')
-    assert.ok(!status.includes('.the-framework/branches/'), 'a run checkout stays ignored')
+    assert.ok(!status.includes('.branches/'), 'a run checkout stays ignored')
     assert.ok(status.includes('.the-framework/.gitignore'), 'the ignore file itself is the one tracked thing')
   } finally {
     await rm(repo, { recursive: true, force: true })

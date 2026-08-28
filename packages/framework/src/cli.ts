@@ -6,7 +6,7 @@ import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { type ClaudeCodeDriverOptions, type Driver, type DriverSession, type PermissionMode } from 'agent-driver'
 import { DRIVERS, DRIVER_SPECS, isDriverName, type DriverName } from './driver-cli.js'
-import { createAgentDriver } from './agent-driver.js'
+import { createTargetDriver } from './target-driver.js'
 import type { CloudDriverOptions } from './driver/cloud.js'
 import { checkLayout } from './layout.js'
 import { githubSlugFor } from './dashboard/github.js'
@@ -1198,7 +1198,7 @@ async function driveAgent(opts: AgentOptions, io: CliIO): Promise<number> {
   const cloudConfig = opts.target === 'web' && !fake ? await extensionStartConfig(process.env) : undefined
   const driver: Driver = fake
     ? fakeDriver()
-    : createAgentDriver({
+    : createTargetDriver({
         driver: opts.driver,
         claudeOpts: withBrowser(claudeOpts, opts.browser, sharedBrowser?.browserUrl),
         ...(opts.target ? { target: opts.target } : {}),

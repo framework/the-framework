@@ -8,6 +8,7 @@ The user picks which coding agent does the work — Claude Code or Codex — and
 
 - **caller** - the product that embeds the package and drives agents through it.
 - **turn** - one prompt handed to the wrapped CLI and the whole loop it runs in response, ending with the agent's final message. A turn is the unit the caller gates on.
+- **hand-off** - the caller giving a whole task to a coding-agent session that runs and pushes on its own, such as a Claude Code cloud session; its **anchor** is the commit that session pushed, by whose ancestry the caller recognises the session's branch afterwards.
 - **quota window** - one named allowance the account's subscription is measured in: the current session, the current week across all models, or the current week for one model.
 
 ## Business logic — TL;DR
@@ -58,7 +59,7 @@ The caller's UI shows a quota bar for a Claude Code agent and none for a Codex o
 
 #### Business logic
 
-Three capabilities are optional. Reading where the account's subscription quota stands belongs to the driver rather than to any one agent, because it is an account-wide fact — and a coding agent that cannot report it offers nothing rather than a guess, which is exactly what makes a caller's spending limits inapplicable rather than wrongly applied. Reading a file out of the agent's workspace is offered only when that workspace is on this machine. Continuing a previous conversation is best-effort: a driver that cannot resume runs a fresh prompt instead, which is the ordinary case and never an error.
+Three capabilities are optional. Reading where the account's subscription quota stands belongs to the driver rather than to any one agent, because it is an account-wide fact — and a coding agent that cannot report it offers nothing rather than a guess, which is exactly what makes a caller's spending limits inapplicable rather than wrongly applied. Reading a file out of the agent's workspace is offered only by a driver that can still reach that workspace — from disk, or from the branch a runner pushed; a driver whose work lives where it cannot read offers nothing. Continuing a previous conversation is best-effort: a driver that cannot resume runs a fresh prompt instead, which is the ordinary case and never an error.
 
 ### Events are for looking, not for deciding
 
@@ -94,7 +95,7 @@ The price is notional in any case: under a subscription the user pays a flat fee
 
 #### Rationale
 
-There are deliberately no daily allowances. The subscription is measured in a several-hour session window and in weeks, with individual models getting weeks of their own; nothing is measured per day, and an earlier plan for a daily limit was written against an allowance that does not exist.
+There are deliberately no daily allowances. The subscription is measured in a several-hour session window and in weeks, with individual models getting weeks of their own; nothing is measured per day.
 
 ### "We could not ask" is never "nothing is used", and a failure says whether to ask again
 

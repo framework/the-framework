@@ -74,7 +74,7 @@ export async function reconcileBranchLinks(cwd: string, deps: BranchLinksDeps = 
   const wanted = new Map<string, string>()
   for (const entry of await worktrees(cwd).catch((): WorktreeDirEntry[] => [])) {
     const branch = await branchOf(entry.path).catch(() => undefined)
-    // A detached worktree has no name to link; a slashed name (a pre-#1581 branch) cannot be a
+    // A detached worktree has no name to link; a slashed name cannot be a
     // link name at all — both simply get no link.
     if (!branch || branch.includes('/')) continue
     // The link is a sibling of the checkout. A dir already carrying the branch's name needs none.

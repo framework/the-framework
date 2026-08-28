@@ -9,7 +9,7 @@ Reclaiming an agent's checkout: the one implementation behind every surface that
 ## Glossary
 
 - **birth branch** - the `agent-<agent id>` branch a checkout is created on, before the agent has named its session.
-- **held by** - a commit the remote already has that provably contains everything a checkout could hold, such as the commit a cloud hand-off pushed.
+- **held by** - a commit the remote already has that provably contains everything a checkout could hold, such as the commit a cloud session pushed on the agent's behalf.
 
 ## Business logic — TL;DR
 
@@ -48,7 +48,7 @@ The user's remote never fills up with empty branches, one per task they handed t
 
 #### Business logic
 
-When the caller names a commit the remote already has that holds everything the checkout could — a cloud hand-off's anchor — and the tree is clean with its tip inside that commit, the checkout is removed without any push and its branch stays. Anything short of that proof falls back to the ordinary rule.
+When the caller names a commit the remote already has that holds everything the checkout could — the commit a cloud session pushed on the agent's behalf, say — and the tree is clean with its tip inside that commit, the checkout is removed without any push and its branch stays. Anything short of that proof falls back to the ordinary rule.
 
 ### A branch that holds nothing goes with the checkout
 

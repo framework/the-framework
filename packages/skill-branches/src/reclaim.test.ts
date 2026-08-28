@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { addWorktree, agentBranchName, nodeGitRunner, reclaimWorktree, type ReclaimOptions } from './index.js'
 
-// #982/E5: one rule decides every removal — the checkout goes only once the remote has it. So
+// #982: one rule decides every removal — the checkout goes only once the remote has it. So
 // nothing local is ever the last copy of anything, and the one failure mode is legible: the push
 // did not land. Against real git, because "was the diff actually destroyed" is not a question a
 // fake answers.
@@ -67,7 +67,7 @@ test('a checkout holding uncommitted work is kept — nothing is committed for t
   }
 })
 
-test('a reclaimed checkout keeps the work its agent committed, on the branch and the remote (#982/E5)', async () => {
+test('a reclaimed checkout keeps the work its agent committed, on the branch and the remote (#982)', async () => {
   const { repo, path, branch } = await repoWithDirtyWorktree()
   const git = nodeGitRunner()
   try {
@@ -81,7 +81,7 @@ test('a reclaimed checkout keeps the work its agent committed, on the branch and
   }
 })
 
-test('a checkout whose branch cannot reach the remote is kept, with what git said (E5)', async () => {
+test('a checkout whose branch cannot reach the remote is kept, with what git said', async () => {
   // No remote configured: nothing is recoverable, so nothing is deleted.
   const { repo, path, branch } = await repoWithDirtyWorktree({ remote: false })
   try {
@@ -98,7 +98,7 @@ test('a checkout whose branch cannot reach the remote is kept, with what git sai
   }
 })
 
-test('a checkout that may not be pushed goes only from a clean tree on a tip the remote already has (B5)', async () => {
+test('a checkout that may not be pushed goes only from a clean tree on a tip the remote already has', async () => {
   const { repo, path, branch } = await repoWithDirtyWorktree()
   const git = nodeGitRunner()
   try {

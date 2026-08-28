@@ -113,8 +113,7 @@ test('pruneWorktrees runs `worktree prune` and tolerates failure', async () => {
 test('add/list/remove round-trips against a real git repo', async () => {
   const git = nodeGitRunner()
   // realpath so the mkdtemp path matches what `git worktree list` reports: on
-  // macOS tmpdir is under the /var -> /private/var symlink (same gotcha as
-  // enumerateGitRepos in install.ts).
+  // macOS tmpdir is under the /var -> /private/var symlink.
   const repo = await realpath(await mkdtemp(join(tmpdir(), 'worktree-')))
   try {
     await git(['init'], repo)

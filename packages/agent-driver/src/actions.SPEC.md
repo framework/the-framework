@@ -26,6 +26,8 @@ See `## User story`.
 
 Each prompt dispatches the workflow the caller named when it configured the driver — one that echoes the correlation id into its run name and uploads the transcript — with the prompt text, then polls until that run completes. A run that concludes as anything other than success fails the turn and reports the run's URL. The wait gives up after an hour by default — GitHub's own job cap is six — and the user pressing Stop, at either the agent level or for the single turn, ends the wait immediately.
 
+What the workflow must do for the driver to find its run and read its result: accept the inputs `prompt`, `correlation_id` and `branch`, and the optional `model` and `resume_session_id`; put the correlation id in the run's display name; push the agent's work to the branch it was given; and upload one artifact whose name contains the correlation id, holding `execution.json` — the CLI's transcript, a JSON array of the same messages it prints one per line locally — and `meta.json` with the branch it pushed, as `{ "branch": "…" }`. A run that uploads no artifact, or an artifact without `execution.json`, fails the turn.
+
 The system prompt framing is prepended to the prompt text rather than passed as a separate input.
 
 #### Rationale

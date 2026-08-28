@@ -28,8 +28,8 @@ export type DriverImplId = 'claude-code' | 'claude-web' | 'github-actions' | 'co
 export interface Driver {
   /**
    * Stable id for this concrete implementation, e.g. `"claude-code"`. Not the driver's *name*
-   * (`claude`), which is the user's choice: one driver has an implementation per place it can run
-   * (D5); the caller maps it back to the choice.
+   * (`claude`), which is the user's choice: one driver has an implementation per place it can run —
+   * the caller maps it back to the choice.
    */
   readonly id: DriverImplId
   /** Boot a session bound to a workspace directory. */
@@ -76,7 +76,7 @@ export interface DriverStartOptions {
 
 /** A booted agent session, bound to one workspace. */
 export interface DriverSession {
-  /** Stable id (the agent's own session id when it exposes one). */
+  /** Stable id the driver mints for this session. The wrapped CLI's own session id, when it has one, is {@link DriverTurn.sessionId}. */
   readonly id: string
   /** Absolute workspace path the agent is bound to. */
   readonly cwd: string
@@ -194,8 +194,7 @@ export interface DriverQuotaWindow {
    * `week-model` a single model's week (Opus/Sonnet get their own).
    *
    * Note there is deliberately no `day`: Claude measures a 5-hour session and a
-   * week, and nothing per day (#519 was specced against a daily limit that does
-   * not exist).
+   * week, and nothing per day.
    */
   kind: 'session' | 'week' | 'week-model' | 'unknown'
   /** How much of the window is gone, 0-100. */

@@ -13,6 +13,7 @@ The npm package `agent-driver`: a coding-agent CLI wrapped as a black box, for a
 - **caller** — the product that embeds the package and drives agents through it.
 - **turn** — one prompt to the wrapped CLI: the CLI's own loop runs to completion, and the turn resolves with the CLI's final message, plus the CLI's session id and the turn's usage when the CLI reports them.
 - **framing** — the role text a driver delivers as the wrapped CLI's system prompt: fixed for the agent when the driver starts, optionally extended per turn.
+- **hand-off** — the caller giving a whole task to a coding-agent session that runs and pushes on its own, such as a Claude Code cloud session. Its **anchor** is the commit that session pushed; the caller recognises the session's branch afterwards by that commit's ancestry.
 
 ## Business logic — TL;DR
 

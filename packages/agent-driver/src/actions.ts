@@ -56,7 +56,12 @@ export interface ActionsDriverOptions {
    * in its `allowed_bots`.
    */
   token: string
-  /** Workflow file to dispatch, e.g. `"agent.yml"`; it must echo the correlation id and upload the transcript. */
+  /**
+   * Workflow file to dispatch, e.g. `"agent.yml"`. Its contract: inputs `prompt`, `correlation_id`,
+   * `branch`, and optionally `model` and `resume_session_id`; the correlation id in the run's
+   * display name; the work pushed to `branch`; one artifact named after the correlation id holding
+   * `execution.json` (the CLI's transcript as a JSON array) and `meta.json` (`{ "branch": "…" }`).
+   */
   workflow: string
   /** Git ref the first turn runs on. Later turns follow the branch the agent pushed. */
   ref?: string
@@ -220,7 +225,7 @@ export class ActionsSession implements DriverSession {
   private async readRunArtifact(runId: number, correlationId: string): Promise<{ execution: string; branch?: string }> {
     const list = await this.api<{ artifacts?: { id: number; name: string }[] }>(`/repos/${this.owner}/actions/runs/${runId}/artifacts`)
     const artifact = (list.artifacts ?? []).find(a => a.name.includes(correlationId)) ?? list.artifacts?.[0]
-    if (!artifact) throw new Error(`Run ${runId} uploaded no artifact; the workflow's collect step did not run.`)
+    if (!artifact) throw new Error(`Run ${runId} uploaded no artifact; the workflow must upload the transcript as one.`)
 
     const res = await this.request(`/repos/${this.owner}/actions/artifacts/${artifact.id}/zip`)
     const entries = readZip(Buffer.from(await res.arrayBuffer()))

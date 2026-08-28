@@ -2,7 +2,6 @@ import { appendFile, mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { ChoiceBy } from './events.js'
 import { isHandoffLevel, type HandoffLevel } from './handoff-level.js'
-import {  } from '@better-skills/branch-management'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import { JsonlTailer, followFile } from './jsonl-tail.js'
 

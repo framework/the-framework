@@ -92,11 +92,9 @@ test('installProject seeds .the-framework/.gitignore ignoring everything transie
   await installProject(CWD, { git, fs })
   const ignore = fs.files.get(gitignorePath(CWD)) ?? ''
   // Everything under .the-framework/ is transient on main: the lasting records live on the data
-  // branch (#1582), so nothing is un-ignored except the file itself.
-  assert.match(ignore, /^\*$/m)
-  assert.match(ignore, /^!\.gitignore$/m)
-  assert.doesNotMatch(ignore, /agents/)
-  assert.doesNotMatch(ignore, /sessions/)
+  // branch (#1582), so nothing is un-ignored except the file itself and the layout marker (#1575).
+  const rules = ignore.split('\n').filter(line => line && !line.startsWith('#'))
+  assert.deepEqual(rules, ['*', '!.gitignore', '!LAYOUT'])
 })
 
 test('installProject records the layout marker, tracked, so a skewed build is refused (#1575)', async () => {

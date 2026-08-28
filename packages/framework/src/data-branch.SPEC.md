@@ -1,4 +1,4 @@
-The data branch `tf-data`: the one branch of a project's repository that holds everything The Framework itself writes — the tickets, the agent queue, the agent archives — so the project's own branches stay 100% code. This is where that branch is created, kept in step with the remote, written to, and read from.
+The data branch `agents-data`: the one branch of a project's repository that holds everything The Framework itself writes — the tickets, the agent queue, the agent archives — so the project's own branches stay 100% code. This is where that branch is created, kept in step with the remote, written to, and read from.
 
 ## User story
 
@@ -6,9 +6,9 @@ The user works from two machines and lets agents run in the cloud. The roadmap, 
 
 ## Business logic — TL;DR
 
-- **One branch for the framework's own files** - everything The Framework writes lives on `tf-data`, the way a site's published files live on their own branch, so the code branches carry no framework data.
+- **One branch for the framework's own files** - everything The Framework writes lives on `agents-data`, the way a site's published files live on their own branch, so the code branches carry no framework data.
 - **The branch is born unattached to the code** - its first commit has no parent and no content, so no code commit is ever an ancestor of the data history.
-- **Its checkout, and the roadmap shortcut** - the branch is checked out under `.the-framework/branches/tf-data`, and the repo root gets a `tickets` link into it that git is told to ignore.
+- **Its checkout, and the roadmap shortcut** - the branch is checked out under `.branches/agents-data`, and the repo root gets a `tickets` link into it that git is told to ignore.
 - **One local writer, one funnel** - every local write goes through a single cycle per project — sync, apply, commit, push — serialized so two of them can never interleave.
 - **A write is an intent, not a commit** - the change is re-applied against fresher state when the push loses a race, rather than force-fitting a stale commit.
 - **A push is owed until it lands** - a commit that could not be pushed stays local and is carried by the next cycle.
@@ -27,7 +27,7 @@ The user reviews a pull request and sees only code — no ticket churn, no queue
 
 #### Business logic
 
-Every file The Framework itself writes — the tickets, the agent queue, the agent archives — lives on one branch of the project's repository, `tf-data`. Because nothing on that branch is anyone's working tree, it is safe to push and pull eagerly, which is what gives every machine and every cloud session the same view: fetch the branch, read the files, commit onto it, push.
+Every file The Framework itself writes — the tickets, the agent queue, the agent archives — lives on one branch of the project's repository, `agents-data`. Because nothing on that branch is anyone's working tree, it is safe to push and pull eagerly, which is what gives every machine and every cloud session the same view: fetch the branch, read the files, commit onto it, push.
 
 The branch is created from the remote's copy when there is one — the case on every machine after the first — and otherwise born locally.
 
@@ -49,7 +49,7 @@ The user wants to read the roadmap by listing the repository, not by learning wh
 
 #### Business logic
 
-The branch is checked out at `.the-framework/branches/tf-data`, named after its branch like every other checkout there. The repository root gets a `tickets` link pointing into that checkout, so the roadmap is one listing away.
+The branch is checked out at `.branches/agents-data`, named after its branch like every other checkout there. The repository root gets a `tickets` link pointing into that checkout, so the roadmap is one listing away.
 
 The link is created only where nothing already exists — a real `tickets` directory from before, or a file of the user's own, is left alone. Because the link is framework state and lives uncommitted at the repository root, it is hidden from git the moment it is made, or it would ride along on any sweeping commit onto a code branch. Hiding it takes a pair of rules, because the repository-level ignore speaks for every checkout at once — including the data checkout, whose own root holds the real `tickets` directory the branch exists to carry: one rule hides root entries of that name, and a second re-includes directories, which never matches a link. So the link stays hidden while the data checkout's own directory keeps being committed.
 

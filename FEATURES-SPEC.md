@@ -122,7 +122,7 @@ happens while nobody is at the keyboard.
 - Empty agents publish nothing
 - Handoff panel: push / open PR / merge, as buttons
 - A withheld merge is reported with its reason
-- Agent history archived on the `tf-data` branch under per-user directories — pushed the moment a session settles
+- Agent history archived on the `agents-data` branch under per-user directories — pushed the moment a session settles
 - Post-merge quality follow-ups queued (maintainability / security)
 - Knowledge folded back into `DECISIONS.md` / `FACTS.md` / `INSIGHTS.md` at merge
 

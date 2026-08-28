@@ -8,7 +8,7 @@ is written in TypeScript any more, so prompting can change without touching the 
 | `system_prompt.md` | The built-in system prompt (#326). Rom's doc. Its `# User prompt` slot is where the user's own text is rendered, for a build and a prompt session alike (#1691). |
 | `ticketing_format.md` | The ticket file format: how a ticket, its plan and its lock are written under `tickets/`. Travels in every agent's context. |
 | `todo_format.md` | The agent-queue format: how `TODO_AGENTS.md` is banded by priority. Travels in every agent's context. |
-| `data_branch_protocol.md` | The data-branch protocol: tickets, the queue and the session archives live on `tf-data`, read and written there directly, never on a code branch. Travels in every agent's context. |
+| `data_branch_protocol.md` | The data-branch protocol: tickets, the queue and the session archives live on `agents-data`, read and written there directly, never on a code branch. Travels in every agent's context. |
 | `branch_yourself.md` | The "Branch management" section for an agent that runs outside a checkout The Framework created (#1725): the command is not there, so it branches with git itself. Agents in their own checkout get the `skill-branches` package's `SKILL.md` instead. |
 | `triage_scope.md` | The queue-only rule appended to both triage presets: a triage writes `TODO_AGENTS.md`, never a ticket's code (#1641). |
 | `on_before_mergeable_prompt.md` | The optional extra turn an agent gets when it signals ready for merge: queue quality follow-ups, fold what it learned into the knowledge base. |

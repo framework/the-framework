@@ -9,13 +9,13 @@ import { resolveDataFileDeps, type DataFileDeps } from './data-branch.js'
 // machines, and locally it was a name the *agent* checked from its prompt — every false abort
 // spent a started agent. The lock is the ticket claim (#1420) applied to a routine: minted by the
 // sweep through the data-branch write funnel before the run starts, so the daemon decides and no
-// agent is started to find out, and read by every machine that shares `tf-data`.
+// agent is started to find out, and read by every machine that shares `agents-data`.
 //
 // Release is the daemon's, not a PR's: a triage never opens one. The daemon that minted a lock
 // drops it when the run ends, whatever the ending, and on boot for any it holds whose run is
 // gone — so a crash on this machine frees the routine at once. A lock another machine left
 // behind counts as dead after {@link ROUTINE_LOCK_TTL_MS}, fixed: a triage over hundreds of
-// tickets can take hours, and a heartbeat would cost code and `tf-data` churn.
+// tickets can take hours, and a heartbeat would cost code and `agents-data` churn.
 
 /** Where routine state lives on the data branch; only the lock files, for now (#1660). */
 const ROUTINES_DIR = 'routines'

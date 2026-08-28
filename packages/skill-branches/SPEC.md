@@ -1,6 +1,6 @@
 Branch management for coding agents, as an npm package: one git checkout per agent under a project's `.branches/`, named as its branch; the parent checkout's dependencies shared into it; a navigable link per branch name; one retention rule under which a checkout is reclaimed — only once everything it holds is on the remote; and the instructions an agent follows to live inside that rule (`SKILL.md`).
 
-The package knows git and the filesystem, nothing else. The same functions serve every caller: a daemon that starts agents (allocation, teardown, the reclaim sweep), a dashboard (the retained-checkouts list, the Remove and Prune buttons), and an agent's own shell, through the `branches` command a daemon puts on the PATH of every agent it starts on its machine. What a caller knows beyond git — whether an agent is still running, whether its handoff allows a push, what a cloud hand-off already pushed — is passed in; the package never reads an agent's record.
+The package knows git and the filesystem, nothing else. The same functions serve every caller: a daemon that starts agents, a dashboard that lists and reclaims checkouts, and an agent's own shell, through the `branches` command a daemon puts on the PATH of every agent it starts on its machine. What a caller knows beyond git — whether an agent is still running, whether its handoff allows a push, what a cloud hand-off already pushed — is passed in; the package never reads an agent's record.
 
 ## Business logic — TL;DR
 

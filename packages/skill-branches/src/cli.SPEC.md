@@ -4,7 +4,7 @@ The package's command line: the same operations a daemon calls, for an agent (or
 
 - An agent, started inside its own checkout, names its session and learns the branch name it got.
 - An agent checks, before it finishes, that it has left nothing uncommitted.
-- The user, in a terminal, lists and reclaims the checkouts under a project without opening the dashboard.
+- The user, in a terminal, lists and reclaims the checkouts under a project without any other tool.
 
 ## Glossary
 

@@ -87,7 +87,7 @@ export interface ReadClaudeQuotaOptions {
  * Runs the CLI's own `/usage` command in print mode. Costs nothing: verified on
  * 2.1.210 as `total_cost_usd: 0` across zero turns and zero tokens, because the
  * CLI answers it locally rather than by prompting a model. It reaches Anthropic
- * itself, with its own credentials, so The Framework never reads or handles the
+ * itself, with its own credentials, so the caller never reads or handles the
  * user's token.
  *
  * Never pass `--bare` here: it pins the CLI to API-key auth and never reads the

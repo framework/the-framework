@@ -411,7 +411,7 @@ test('the failed-start marker is not written where the checkout is gone (#1654)'
 
 test('isTransientAgentFailure names transport deaths, not work failures (#1281)', () => {
   assert.equal(
-    isTransientAgentFailure('[framework] claude-code exited (1): API Error: Connection closed mid-response. The response above may be incomplete.'),
+    isTransientAgentFailure('claude-code exited (1): API Error: Connection closed mid-response. The response above may be incomplete.'),
     true,
   )
   assert.equal(isTransientAgentFailure('read ECONNRESET'), true)
@@ -473,7 +473,7 @@ async function waitForSpawns(worktree: string, expected: number): Promise<string
 
 test('a run that dies to a transient API error is continued, at most twice (#1281)', async () => {
   const cwd = await initRepo('framework-transient-')
-  const detail = '[framework] claude-code exited (1): API Error: Connection closed mid-response. The response above may be incomplete.'
+  const detail = 'claude-code exited (1): API Error: Connection closed mid-response. The response above may be incomplete.'
   const runtime = createProjectRuntime({ driverPreflight: agentReady, cwd, env: {}, binPath: await writeFailingAgentStub(cwd, detail), retryDelayMs: 25 })
   try {
     const result = (await runtime.onStart('build a thing', 'build')) as { ok: boolean; agentId?: string }

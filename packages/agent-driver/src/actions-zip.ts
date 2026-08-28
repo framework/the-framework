@@ -2,7 +2,7 @@ import { inflateRawSync } from 'node:zlib'
 
 // A minimal zip reader, for one job: the GitHub artifact download API always returns a zip,
 // even for a single file, and that is the only REST-readable channel out of an Actions run
-// (#610). Node ships deflate but no zip, and the framework has no runtime dependencies worth
+// (#610). Node ships deflate but no zip, and the package has no runtime dependencies worth
 // adding for ~60 lines. Reading only, and only what upload-artifact writes: stored or
 // deflated entries, no zip64, no encryption.
 

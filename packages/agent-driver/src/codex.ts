@@ -41,8 +41,7 @@ export interface CodexDriverOptions {
  *   framing is prepended to the prompt instead. Same words reach the agent.
  * - **Tokens, no price.** Codex reports token counts but never a price, so usage
  *   carries the counts and omits `costUsd` rather than claim a turn cost `$0`,
- *   which would read as free (#540). The budget cap (#322) gates on a price, so
- *   it cannot fire here; the CLI says so at startup instead of implying it.
+ *   which would read as free (#540).
  * - **No quota read.** No `readQuota`, for the same reason: the seam is optional
  *   precisely so an agent that can't report one simply doesn't.
  */

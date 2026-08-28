@@ -20,14 +20,12 @@ export {
   ClaudeCodeDriver,
   ClaudeCodeSession,
   StreamJsonParser,
-  runClaude,
   type ClaudeCodeDriverOptions,
   type McpServerSpec,
   type PermissionMode,
 } from './claude-code.js'
 export { ActionsDriver, ActionsSession, replayTranscript, type ActionsDriverOptions, type FetchLike } from './actions.js'
-// `makeEmit` is what a driver implemented outside this package (The Framework's cloud hand-off) builds
-// its event stream with.
+// `makeEmit` is what a driver implemented outside this package builds its event stream with.
 export { makeEmit } from './session-support.js'
 // `readZip`/`ZipEntry` are deliberately absent (#947): the Actions driver's internal zip reader
 // rode this barrel onto the published surface with no importer outside the driver and its own

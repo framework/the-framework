@@ -2,8 +2,8 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { Readable, Writable } from 'node:stream'
 import { existsSync, readFileSync } from 'node:fs'
-import { ClaudeCodeDriver, StreamJsonParser, runClaude } from './claude-code.js'
-import type { SpawnLike, SpawnedProcess } from './cli-session.js'
+import { ClaudeCodeDriver, StreamJsonParser } from './claude-code.js'
+import { runCliSession, type SpawnLike, type SpawnedProcess } from './cli-session.js'
 import type { DriverEvent } from './types.js'
 
 test('StreamJsonParser surfaces assistant text + tool names, keeps the result', () => {
@@ -109,14 +109,14 @@ function fakeSpawn(lines: string[], code = 0, stderr = ''): SpawnLike {
   }
 }
 
-test('runClaude drives a fake process and returns the final turn', async () => {
+test('runCliSession with the Claude parser drives a fake process and returns the final turn', async () => {
   const events: DriverEvent[] = []
   const lines = [
     JSON.stringify({ type: 'system', subtype: 'init', session_id: 's9' }),
     JSON.stringify({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Bash' }] } }),
     JSON.stringify({ type: 'result', subtype: 'success', result: 'built it', session_id: 's9' }),
   ]
-  const turn = await runClaude({
+  const turn = await runCliSession({
     bin: 'claude',
     args: ['-p'],
     cwd: '/ws',
@@ -125,6 +125,8 @@ test('runClaude drives a fake process and returns the final turn', async () => {
     spawn: fakeSpawn(lines),
     emit: e => events.push(e),
     signals: [],
+    parser: new StreamJsonParser(),
+    driver: 'claude-code',
   })
   assert.deepEqual(turn, { text: 'built it', sessionId: 's9' })
   assert.equal(events[0]!.type, 'start')
@@ -132,10 +134,10 @@ test('runClaude drives a fake process and returns the final turn', async () => {
   assert.equal(events.at(-1)!.type, 'result')
 })
 
-test('runClaude rejects on a non-zero exit with no result text', async () => {
+test('runCliSession with the Claude parser rejects on a non-zero exit with no result text', async () => {
   await assert.rejects(
     () =>
-      runClaude({
+      runCliSession({
         bin: 'claude',
         args: [],
         cwd: '/ws',
@@ -144,17 +146,19 @@ test('runClaude rejects on a non-zero exit with no result text', async () => {
         spawn: fakeSpawn([], 1, 'boom'),
         emit: () => {},
         signals: [],
+        parser: new StreamJsonParser(),
+        driver: 'claude-code',
       }),
     /boom/,
   )
 })
 
-test('runClaude rejects on a non-zero exit even when the agent streamed text', async () => {
+test('runCliSession with the Claude parser rejects on a non-zero exit even when the agent streamed text', async () => {
   const events: DriverEvent[] = []
   const lines = [JSON.stringify({ type: 'assistant', message: { content: [{ type: 'text', text: 'started building' }] } })]
   await assert.rejects(
     () =>
-      runClaude({
+      runCliSession({
         bin: 'claude',
         args: [],
         cwd: '/ws',
@@ -163,6 +167,8 @@ test('runClaude rejects on a non-zero exit even when the agent streamed text', a
         spawn: fakeSpawn(lines, 1),
         emit: e => events.push(e),
         signals: [],
+        parser: new StreamJsonParser(),
+        driver: 'claude-code',
       }),
     /exited \(1\): started building/,
   )

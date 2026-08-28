@@ -22,7 +22,7 @@ import type { Driver, DriverEvent, DriverPromptOptions, DriverSession, DriverSta
  * - **Minutes, not seconds.** Every `prompt` is a fresh runner and a fresh
  *   checkout. Continuity comes from the branch the previous turn pushed, which the
  *   session tracks and dispatches onto next time.
- * - **No live stream.** The transcript arrives once, at the end, so the dashboard's
+ * - **No live stream.** The transcript arrives once, at the end, so the
  *   {@link DriverStartOptions.onEvent} feed replays in a burst rather than trickling.
  * - **Quota is the account's, not the runner's.** Free minutes on a public repo
  *   change nothing about the subscription window every run draws down.
@@ -56,8 +56,8 @@ export interface ActionsDriverOptions {
    * in its `allowed_bots`.
    */
   token: string
-  /** Workflow file to dispatch. Default `"framework-agent.yml"`. */
-  workflow?: string
+  /** Workflow file to dispatch, e.g. `"agent.yml"`; it must echo the correlation id and upload the transcript. */
+  workflow: string
   /** Git ref the first turn runs on. Later turns follow the branch the agent pushed. */
   ref?: string
   /** How often to poll the run, in ms. Default 5000. */
@@ -113,9 +113,9 @@ export class ActionsSession implements DriverSession {
   ) {
     this.cwd = startOpts.cwd
     // The counter reads well in logs within one process; the random tag is what keeps the
-    // correlation id unique across processes, since the daemon spawns a fresh one per run.
+    // correlation id unique across processes, since a caller may spawn a fresh one per run.
     this.id = `actions-${++sessionCounter}-${(config.runTag ?? randomRunTag)()}`
-    this.runBranch = `${config.branchPrefix ?? 'claude/'}framework-${this.id}`
+    this.runBranch = `${config.branchPrefix ?? 'claude/'}${this.id}`
     this.lastSessionId = startOpts.resumeSessionId
   }
 
@@ -168,13 +168,12 @@ export class ActionsSession implements DriverSession {
 
   /** Fire the workflow. Returns nothing useful: dispatch is 204 with no body, hence the correlation id. */
   private async dispatch(prompt: string, correlationId: string, resume: string | undefined): Promise<void> {
-    const workflow = this.config.workflow ?? 'framework-agent.yml'
     const inputs: Record<string, string> = { prompt, correlation_id: correlationId, branch: this.runBranch }
     // These reach a shell on the runner as environment variables. They are ids and
     // model names, so anything outside that alphabet is a bug or an attack.
     if (this.startOpts.model) inputs['model'] = assertToken(this.startOpts.model, 'model')
     if (resume) inputs['resume_session_id'] = assertToken(resume, 'resume session id')
-    await this.api(`/repos/${this.owner}/actions/workflows/${encodeURIComponent(workflow)}/dispatches`, {
+    await this.api(`/repos/${this.owner}/actions/workflows/${encodeURIComponent(this.config.workflow)}/dispatches`, {
       method: 'POST',
       body: JSON.stringify({ ref: this.branch ?? this.config.ref ?? 'main', inputs }),
     })
@@ -286,7 +285,7 @@ interface WorkflowRun {
  * difference between running locally and running on a runner is array-vs-JSONL.
  *
  * Events replay in a burst at the end rather than live — that is the honest cost of
- * this driver, and the dashboard sees the same event stream either way.
+ * this driver, and a caller sees the same event stream either way.
  */
 export function replayTranscript(json: string, emit: (event: DriverEvent) => void = () => {}): DriverTurn {
   let messages: unknown

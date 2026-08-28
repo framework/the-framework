@@ -55,8 +55,8 @@ export interface RunCliSessionOptions {
   signals: AbortSignal[]
   /** The agent's own output dialect. */
   parser: AgentCliParser
-  /** The agent's name, for error messages. Default `"claude-code"`. */
-  driver?: string
+  /** The driver's id, for error messages, e.g. `"claude-code"`. */
+  driver: string
 }
 
 /**
@@ -73,7 +73,7 @@ export function runCliSession(opts: RunCliSessionOptions): Promise<DriverTurn> {
   return new Promise<DriverTurn>((resolvePromise, rejectPromise) => {
     for (const s of opts.signals) {
       if (s.aborted) {
-        rejectPromise(new Error(`[framework] ${opts.driver ?? 'claude-code'} prompt aborted`))
+        rejectPromise(new Error(`${opts.driver} prompt aborted`))
         return
       }
     }
@@ -86,7 +86,7 @@ export function runCliSession(opts: RunCliSessionOptions): Promise<DriverTurn> {
     const pid = child.pid
     if (pid != null) registerChild(pid)
     const parser = opts.parser
-    const agent = opts.driver ?? 'claude-code'
+    const agent = opts.driver
     let settled = false
     let hardKillTimer: ReturnType<typeof setTimeout> | undefined
     // Raw bytes, decoded once at close: a per-chunk `String(chunk)` corrupts a multibyte
@@ -123,7 +123,7 @@ export function runCliSession(opts: RunCliSessionOptions): Promise<DriverTurn> {
       const handler = () => {
         if (settled) return
         terminate()
-        finish(() => rejectPromise(new Error(`[framework] ${agent} prompt aborted`)))
+        finish(() => rejectPromise(new Error(`${agent} prompt aborted`)))
       }
       signal.addEventListener('abort', handler)
       return { signal, handler }
@@ -156,7 +156,7 @@ export function runCliSession(opts: RunCliSessionOptions): Promise<DriverTurn> {
       if (code !== 0) {
         const detail = Buffer.concat(stderrChunks).toString('utf8').trim() || turn.text.trim() || `exit code ${code ?? 'null'}`
         opts.emit({ type: 'error', message: detail })
-        finish(() => rejectPromise(new Error(`[framework] ${agent} exited (${code ?? 'null'}): ${detail}`)))
+        finish(() => rejectPromise(new Error(`${agent} exited (${code ?? 'null'}): ${detail}`)))
         return
       }
       opts.emit({
@@ -171,7 +171,7 @@ export function runCliSession(opts: RunCliSessionOptions): Promise<DriverTurn> {
     // Feed the prompt over stdin so long prompts never hit arg-length limits.
     if (child.stdin) {
       // A CLI that exits before reading stdin (bad flag, instant crash) surfaces an async
-      // EPIPE on the stream; with no listener that is an uncaught exception in the daemon
+      // EPIPE on the stream; with no listener that is an uncaught exception in the calling process
       // (#943). The close handler already reports the failed turn, so the error carries
       // nothing the caller needs.
       child.stdin.on('error', () => {})

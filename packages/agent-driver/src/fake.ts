@@ -32,10 +32,10 @@ function asTurn(value: FakeTurn | string): FakeTurn {
 }
 
 /**
- * An in-memory {@link Driver} for tests and `FRAMEWORK_FAKE` runs: it never spawns a
+ * An in-memory {@link Driver} for tests and offline runs: it never spawns a
  * process, replays scripted turns deterministically, and emits the same
- * {@link DriverEvent} shape a real driver does. Mirrors `AiFake` /
- * `FakeRunner`, so the whole flow runs offline with no CLI and no model.
+ * {@link DriverEvent} shape a real driver does, so a whole product can run
+ * with no CLI installed and no model called.
  */
 export class FakeDriver implements Driver {
   readonly id = 'fake'
@@ -65,7 +65,7 @@ export class FakeDriverSession implements DriverSession {
 
   prompt(text: string, opts: DriverPromptOptions = {}): Promise<DriverTurn> {
     if (this.startOpts.signal?.aborted || opts.signal?.aborted) {
-      return Promise.reject(new Error('[framework] fake prompt aborted'))
+      return Promise.reject(new Error('fake prompt aborted'))
     }
     const i = this.index++
     this.prompts.push(text)
@@ -81,7 +81,7 @@ export class FakeDriverSession implements DriverSession {
 
   readCode(path: string): Promise<string> {
     const contents = this.config.files?.[path]
-    if (contents === undefined) return Promise.reject(new Error(`[framework] fake driver has no file ${path}`))
+    if (contents === undefined) return Promise.reject(new Error(`fake driver has no file ${path}`))
     return Promise.resolve(contents)
   }
 

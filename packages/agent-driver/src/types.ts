@@ -1,22 +1,20 @@
 /**
- * The **driver** seam: the one abstraction The Framework wraps a coding-agent
- * CLI behind. A driver treats the agent (Claude Code today, Codex / opencode
- * later) as a **black box**: we hand it a prompt, let its *own* loop run to
- * completion, then read the code it produced and gate on the outcome ourselves.
+ * The **driver** seam: the one abstraction a coding-agent CLI is wrapped behind.
+ * A driver treats the CLI (Claude Code, Codex) as a **black box**: hand it a
+ * prompt, let its *own* loop run to completion, then read the code it produced
+ * and gate on the outcome.
  *
  * The seam is deliberately the **code and the outcome**, never the agent's
- * individual tool calls (guardrail from #165). We drive by prompting and verify
- * by result (builds / serves / review-passes), so the wrapped agent keeps its
- * subscription-based auth and its internal loop stays untouched and swappable.
+ * individual tool calls (#165): drive by prompting, verify by result, so the
+ * wrapped CLI keeps its subscription-based auth and its internal loop stays
+ * untouched and swappable.
  *
- * Decision (#166, option A): a single execution path. Everything runs *through*
- * the driver; personas become prompt-framing ({@link DriverStartOptions.system}),
- * and each loop pass (review / security / QA / UX) is a **fresh** {@link
- * DriverSession.prompt} call, so `prompt` is the fresh-context unit.
+ * Everything runs *through* the driver: a role is prompt framing
+ * ({@link DriverStartOptions.system}), and each pass is a **fresh**
+ * {@link DriverSession.prompt} call, so `prompt` is the fresh-context unit.
  *
  * `Driver` is intentionally tiny: `start` a session, `prompt` it, read the code,
- * `dispose`. It mirrors the runner seam's shape so a second agent slots in behind
- * the same three methods.
+ * `dispose` — four moves a second CLI slots in behind.
  */
 
 /**
@@ -52,8 +50,8 @@ export interface DriverStartOptions {
   /** Absolute path to the workspace the agent reads and edits. */
   cwd: string
   /**
-   * Role framing prepended to every prompt in this session (option A: personas
-   * are prompt-framing, not a separate agent). Maps to the agent's system prompt.
+   * Role framing prepended to every prompt in this session (a role is prompt
+   * framing, not a separate kind of agent). Maps to the agent's system prompt.
    */
   system?: string
   /** Model id to pass through when the wrapped agent supports selecting one. */
@@ -63,14 +61,14 @@ export interface DriverStartOptions {
   /**
    * Resume a prior agent session id (#720): seed the session so its very first
    * prompt (with `resume`) continues that conversation instead of starting fresh.
-   * This is how a finished agent is revived from the dashboard — its captured session
+   * This is how a finished agent is revived from a UI — its captured session
    * id is threaded here so the opening message lands with the full prior context.
    * A driver that can't resume ignores it and runs fresh (the best-effort contract).
    */
   resumeSessionId?: string
   /**
    * Observe the agent's *own* progress as it works. Black-box granularity: we
-   * forward these for visibility (the dashboard) but never branch control flow
+   * forward these for visibility (a UI) but never branch control flow
    * on them. Isolated: a throwing callback must not break the agent.
    */
   onEvent?: (event: DriverEvent) => void
@@ -117,11 +115,7 @@ export interface DriverPromptOptions {
 export interface DriverTurn {
   /** The agent's final assistant text for this prompt. */
   text: string
-  /**
-   * The agent's session id for this turn, when it exposes one. The MVP
-   * persistence shortcut is to forward the agent's own transcript rather than
-   * keep our own store (#165), so this is the handle a UI links to.
-   */
+  /** The agent's session id for this turn, when it exposes one: the handle a UI links to. */
   sessionId?: string
   /** Token + cost accounting for this turn, when the agent reports it (#322). */
   usage?: DriverUsage
@@ -145,7 +139,7 @@ export interface DriverUsage {
    * Note this is a notional price under a subscription: the user pays a flat fee,
    * and the agent reports what the turn would have cost on metered API pricing.
    * What a subscription actually spends is quota, which {@link DriverQuota}
-   * carries and the consumption limits (#519) gate on.
+   * carries and a spending limit (#519) gates on.
    */
   costUsd?: number
   /** Non-cached input tokens. */
@@ -239,7 +233,7 @@ export type DriverQuotaUnavailableReason =
    *
    * Transient, because it describes one answer rather than the install: an
    * update notice printed ahead of the JSON, or empty stdout while the CLI
-   * swaps itself under a long-lived daemon, both land here and both are gone by
+   * swaps itself under a long-lived process, both land here and both are gone by
    * the next read (#960).
    */
   | 'unrecognized'
@@ -260,9 +254,9 @@ export type DriverQuota =
   | { available: false; reason: DriverQuotaUnavailableReason }
 
 /**
- * A black-box progress event from the wrapped agent. We forward these to the
- * dashboard for visibility but never gate on them: the loop gates on the code /
- * outcome, not on which tool the agent reached for.
+ * A black-box progress event from the wrapped agent. A caller shows these for
+ * visibility but never gates on them: the gate is the code and the outcome, not
+ * which tool the agent reached for.
  */
 export type DriverEvent =
   /** A prompt was sent; the agent's loop is starting. */
@@ -270,8 +264,8 @@ export type DriverEvent =
   /**
    * The agent announced its session id, at the start of the turn (#1322). `result` repeats it,
    * but a turn that never settles — a manual Stop, an error, a kill — used to take the id down
-   * with it, and with it the agent's `claude --resume` handle. Telemetry consumes this one rather
-   * than forwarding it: the id is plumbing, not conversation.
+   * with it, and with it the agent's `claude --resume` handle. A caller records this one rather
+   * than showing it: the id is plumbing, not conversation.
    */
   | { type: 'session'; sessionId: string }
   /** An assistant text chunk streamed out. */
@@ -280,8 +274,8 @@ export type DriverEvent =
   | { type: 'action'; label: string }
   /**
    * The turn settled with this final text. `sessionLink` is the real URL of the session,
-   * for a driver whose session has one of its own (#1317) — the cloud hand-off — so the
-   * meta can link there instead of the generic entry point; drivers without one omit it.
+   * for a driver whose session has one of its own (#1317) — a cloud session, say — so a
+   * caller can link there instead of the generic entry point; drivers without one omit it.
    * `anchorSha` is the hand-off anchor commit (#1601), for a driver whose session does its
    * work on a branch of its own naming that this machine can only recognize later by
    * ancestry; drivers whose work stays on the designated branch omit it.

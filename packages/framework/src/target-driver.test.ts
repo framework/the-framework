@@ -8,7 +8,7 @@ import { CloudDriver } from './driver/cloud.js'
 // `--run-on web` a CloudDriver; anything else falls through to the driver for the chosen CLI,
 // byte-identical to before.
 
-const ACTIONS = { owner: 'gemstack-land', repo: 'gemstack', token: 't' }
+const ACTIONS = { owner: 'gemstack-land', repo: 'gemstack', token: 't', workflow: 'framework-agent.yml' }
 
 test('createTargetDriver returns an ActionsDriver for target "actions"', () => {
   const driver = createTargetDriver({ driver: 'claude', target: 'actions', actionsConfig: ACTIONS })

@@ -1,4 +1,4 @@
-The driver for the `actions` run target: instead of running the coding-agent CLI on this device, it hands each turn to a GitHub Actions runner — dispatch the project's agent workflow, wait for the run to finish, then read back the transcript the run uploaded. From the rest of The Framework this looks exactly like any other driver; only the tempo differs.
+The driver for the `actions` run target: instead of running the coding-agent CLI on this device, it hands each turn to a GitHub Actions runner — dispatch the project's agent workflow, wait for the run to finish, then read back the transcript the run uploaded. To the caller this looks exactly like any other driver; only the tempo differs.
 
 ## User story
 
@@ -6,7 +6,7 @@ The user wants an agent to work a task without tying up their own machine — th
 
 ## Business logic — TL;DR
 
-- **One turn is one workflow run** - every prompt dispatches a fresh runner with a fresh checkout; nothing survives on the runner between turns.
+- **One turn is one workflow run** - every prompt dispatches the workflow the caller names, on a fresh runner with a fresh checkout; nothing survives on the runner between turns.
 - **The pushed branch is the continuity** - each run pushes to one branch that stays the same for the whole agent, and the next turn is dispatched from it, so later turns build on earlier work.
 - **A correlation id finds the run** - GitHub's dispatch reports no run identifier, so a unique per-turn tag is echoed into the run's name and its uploaded artifact and matched on.
 - **The transcript replays in a burst** - there is no live stream from a runner; the whole turn's events arrive at once when the run completes.
@@ -24,7 +24,7 @@ See `## User story`.
 
 #### Business logic
 
-Each prompt dispatches the project's agent workflow (`framework-agent.yml` unless the project names another) with the prompt text, then polls until that run completes. A run that concludes as anything other than success fails the turn and reports the run's URL. The wait gives up after an hour by default — GitHub's own job cap is six — and the user pressing Stop, at either the agent level or for the single turn, ends the wait immediately.
+Each prompt dispatches the workflow the caller named when it configured the driver — one that echoes the correlation id into its run name and uploads the transcript — with the prompt text, then polls until that run completes. A run that concludes as anything other than success fails the turn and reports the run's URL. The wait gives up after an hour by default — GitHub's own job cap is six — and the user pressing Stop, at either the agent level or for the single turn, ends the wait immediately.
 
 The system prompt framing is prepended to the prompt text rather than passed as a separate input.
 
@@ -40,11 +40,11 @@ See `## User story`.
 
 #### Business logic
 
-The agent's session picks one branch name up front — `claude/framework-<session id>` by default — and asks every run to push to it. The first turn runs on the project's default ref; once a run reports the branch it pushed, every later turn is dispatched from that branch, so the runner's fresh checkout already contains the previous turns' work. The agent's own session id is carried across turns as well, so a turn can resume the CLI's conversation rather than starting cold.
+The agent's session picks one branch name up front — `claude/<session id>` unless the caller sets another prefix — and asks every run to push to it. The first turn runs on the project's default ref; once a run reports the branch it pushed, every later turn is dispatched from that branch, so the runner's fresh checkout already contains the previous turns' work. The agent's own session id is carried across turns as well, so a turn can resume the CLI's conversation rather than starting cold.
 
 #### Rationale
 
-The branch is named by The Framework and handed to the workflow rather than discovered afterwards, because a dispatched run reports no branch name of its own — there would be nothing to discover.
+The branch is named by the driver and handed to the workflow rather than discovered afterwards, because a dispatched run reports no branch name of its own — there would be nothing to discover.
 
 ### A correlation id finds the run
 
@@ -54,13 +54,13 @@ See `## User story`.
 
 #### Business logic
 
-Dispatching a workflow returns no identifier for the run it creates. Each turn therefore carries a correlation id that the workflow writes into the run's display name and into the name of the artifact it uploads; polling matches recent dispatched runs on that id. The id mixes a random tag with a per-turn counter, so two agents — or the same agent after the daemon restarts — never match each other's runs.
+Dispatching a workflow returns no identifier for the run it creates. Each turn therefore carries a correlation id that the workflow writes into the run's display name and into the name of the artifact it uploads; polling matches recent dispatched runs on that id. The id mixes a random tag with a per-turn counter, so two agents — or the same agent after the calling process restarts — never match each other's runs.
 
 ### The transcript replays in a burst
 
 #### User story
 
-The dashboard shows an agent's tool calls and messages as an event stream, the same way for every run target.
+The caller's UI shows an agent's tool calls and messages as an event stream, the same way for every run target.
 
 #### Business logic
 
@@ -72,7 +72,7 @@ An artifact with no transcript file fails the turn and says so, naming what the 
 
 #### User story
 
-The framework reads files the agent produced — its plan, its notes, its config — as part of a turn's follow-up.
+The caller reads files the agent produced — its plan, its notes, its config — as part of a turn's follow-up.
 
 #### Business logic
 
@@ -92,7 +92,7 @@ The model name and the resumed session id are passed into the workflow and end u
 
 #### User story
 
-The dashboard shows how much of the account's quota week is left, so unattended work can stand down near the quota boundary.
+The caller's UI shows how much of the account's quota week is left, so unattended work can stand down near the quota boundary.
 
 #### Business logic
 

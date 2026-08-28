@@ -1,7 +1,7 @@
 /**
  * Process-tree kill registry.
  *
- * The framework spawns the Claude Code CLI, which in turn spawns a deep subtree
+ * A driver spawns a coding-agent CLI, which in turn spawns a deep subtree
  * (node workers, ripgrep, bash tool calls, MCP servers). Signaling only the
  * top-level `claude` orphans that subtree: it reparents to init and keeps
  * burning CPU — the runaway-process leak we hit (a swarm of stray `claude`
@@ -9,7 +9,7 @@
  *
  * Fix: spawn each long-lived child as its own process-group leader (`detached`)
  * and signal the whole group at once via a negative pid. Register every live
- * child here so a hard framework exit (crash, uncaught error, process.exit)
+ * child here so a hard exit of this process (crash, uncaught error, process.exit)
  * still reaps the trees on the way out.
  */
 
@@ -30,7 +30,7 @@ export function killTree(pid: number, signal: NodeJS.Signals): void {
   }
 }
 
-/** Track a detached child so it is force-killed if the framework exits first. */
+/** Track a detached child so it is force-killed if this process exits first. */
 export function registerChild(pid: number): void {
   installExitHook()
   live.add(pid)
@@ -46,8 +46,8 @@ function installExitHook(): void {
   exitHookInstalled = true
   // `exit` fires on normal completion, process.exit(), and after an uncaught
   // error unwinds — sync-only, so a plain group SIGKILL is all we can (and need
-  // to) do. Signal deaths (SIGINT/SIGTERM) are handled by the CLI, which aborts
-  // the agent first; this is the last-resort net for every other exit path.
+  // to) do. Signal deaths (SIGINT/SIGTERM) are the caller's to handle, by aborting
+  // each session first; this is the last-resort net for every other exit path.
   process.on('exit', () => {
     for (const pid of live) killTree(pid, 'SIGKILL')
   })

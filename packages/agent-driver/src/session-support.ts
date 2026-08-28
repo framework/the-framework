@@ -10,7 +10,7 @@ import type { DriverEvent } from './types.js'
 
 /**
  * A {@link DriverStartOptions.onEvent} caller that never lets a listener throw into the
- * driver — a throwing dashboard handler must not abort the agent. An absent `onEvent`
+ * driver — a throwing UI handler must not abort the agent. An absent `onEvent`
  * is a no-op. `driver` names it in the swallow log so a thrown handler stays traceable.
  */
 export function makeEmit(onEvent: ((event: DriverEvent) => void) | undefined, driver: string): (event: DriverEvent) => void {
@@ -19,7 +19,7 @@ export function makeEmit(onEvent: ((event: DriverEvent) => void) | undefined, dr
     try {
       onEvent(event)
     } catch (err) {
-      console.error(`[framework] ${driver} onEvent threw; ignoring:`, err)
+      console.error(`${driver} onEvent threw; ignoring:`, err)
     }
   }
 }

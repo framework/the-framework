@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { readClaudeQuota } from './claude-code-quota.js'
 import { combineFraming, combineSignals, makeEmit, readWorkspaceFile } from './session-support.js'
-import { runCliSession, type RunCliSessionOptions, type SpawnLike } from './cli-session.js'
+import { runCliSession, type SpawnLike } from './cli-session.js'
 import type { Driver, DriverEvent, DriverPromptOptions, DriverQuota, DriverRateLimit, DriverSession, DriverStartOptions, DriverTurn, DriverUsage } from './types.js'
 
 /** Claude Code permission modes we pass through to the CLI. */
@@ -34,8 +34,7 @@ export interface ClaudeCodeDriverOptions {
   /**
    * MCP servers to expose to the agent for this session (#452). Written to a
    * temp config file passed via `--mcp-config`, so they merge with the user's
-   * own configured MCP servers rather than replacing them. Used by `--browser`
-   * to wire chrome-devtools-mcp (a real browser + DevTools tools) into the agent.
+   * own configured MCP servers rather than replacing them.
    */
   mcpServers?: Record<string, McpServerSpec>
   /** Environment for the child process. Default `process.env`. */
@@ -48,8 +47,8 @@ export interface ClaudeCodeDriverOptions {
  * The first real {@link Driver}: wraps the **Claude Code CLI** in print mode
  * (`claude -p --output-format stream-json`). Each {@link DriverSession.prompt}
  * spawns a fresh non-interactive invocation, so every loop pass gets fresh
- * context (option A). We stream its JSON events to {@link DriverStartOptions.onEvent}
- * for the dashboard and return the final `result` text as the turn.
+ * context. We stream its JSON events to {@link DriverStartOptions.onEvent}
+ * for the caller's UI and return the final `result` text as the turn.
  *
  * True black box: we prompt and read the result; Claude Code owns its own loop,
  * tools, and (subscription-based) auth. A second agent slots in behind the same
@@ -106,7 +105,7 @@ export class ClaudeCodeSession implements DriverSession {
     const emit = makeEmit(this.startOpts.onEvent, 'claude-code')
     const signals = combineSignals(this.startOpts.signal, opts.signal)
     const agent = (id: string | undefined, emitFn: (event: DriverEvent) => void): Promise<DriverTurn> =>
-      runClaude({
+      runCliSession({
         bin: this.config.bin ?? 'claude',
         args: this.buildArgs(system, id),
         cwd: this.cwd,
@@ -115,6 +114,8 @@ export class ClaudeCodeSession implements DriverSession {
         spawn: this.config.spawn ?? (nodeSpawn as unknown as SpawnLike),
         emit: emitFn,
         signals,
+        parser: new StreamJsonParser(),
+        driver: 'claude-code',
       })
 
     let turn: DriverTurn
@@ -195,7 +196,7 @@ export class ClaudeCodeSession implements DriverSession {
     const servers = this.config.mcpServers
     if (!servers || Object.keys(servers).length === 0) return undefined
     if (!this.mcpConfigPath) {
-      const dir = mkdtempSync(join(tmpdir(), 'framework-mcp-'))
+      const dir = mkdtempSync(join(tmpdir(), 'agent-driver-mcp-'))
       this.mcpConfigPath = join(dir, 'mcp.json')
       writeFileSync(this.mcpConfigPath, JSON.stringify({ mcpServers: servers }))
     }
@@ -209,11 +210,6 @@ const CONVERSATION_GONE = /No conversation found with session ID/i
 /** Whether a failed turn failed because the conversation we tried to resume no longer exists. */
 function isConversationGone(err: unknown): boolean {
   return CONVERSATION_GONE.test(err instanceof Error ? err.message : String(err))
-}
-
-/** Spawn one Claude Code invocation and resolve with its final turn. */
-export function runClaude(opts: Omit<RunCliSessionOptions, 'parser' | 'driver'>): Promise<DriverTurn> {
-  return runCliSession({ ...opts, parser: new StreamJsonParser() })
 }
 
 /**
@@ -313,7 +309,7 @@ function parseRateLimit(obj: Record<string, unknown>): DriverRateLimit | undefin
   const resetsAt = info['resetsAt']
   if (typeof status !== 'string' || typeof window !== 'string') return undefined
   if (typeof resetsAt !== 'number' || !Number.isFinite(resetsAt)) return undefined
-  // The agent reports epoch seconds; the rest of the framework speaks millis.
+  // The agent reports epoch seconds; `resetsAt` is millis.
   return { status, window, resetsAt: resetsAt * 1000 }
 }
 
@@ -329,7 +325,7 @@ function parseUsage(obj: Record<string, unknown>): DriverUsage | undefined {
   if (typeof cost !== 'number' && !hasUsage) return undefined
   const usage = (hasUsage ? raw : {}) as Record<string, unknown>
   const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
-  // Omit costUsd when there is no price, never 0: the budget gate reads 0 as "free"
+  // Omit costUsd when there is no price, never 0: a spending limit reads 0 as "free"
   // and undefined as "unknown" (#540), and Codex reports tokens without a price.
   return {
     ...(typeof cost === 'number' && Number.isFinite(cost) ? { costUsd: cost } : {}),

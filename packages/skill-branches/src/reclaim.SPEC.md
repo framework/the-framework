@@ -1,4 +1,4 @@
-Reclaiming an agent's checkout: the one implementation behind every surface that removes one — a daemon's sweep and teardown, a dashboard's Remove button, an agent's own command line — so a second surface is never a second behaviour.
+Reclaiming an agent's checkout: the one implementation behind every surface that removes one — a daemon's sweep and teardown, a dashboard's remove action, an agent's own command line — so a second surface is never a second behaviour.
 
 ## User story
 

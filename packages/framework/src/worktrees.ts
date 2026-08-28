@@ -12,7 +12,7 @@ import {
   worktreePath,
   worktreeSize,
   type ReclaimOutcome,
-} from '@better-skills/branch-management'
+} from '@gemstack/skill-branches'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import { dataWorktreePath, withDataBranch } from './data-branch.js'
 

@@ -1,4 +1,4 @@
-import { nodeGitRunner, type GitRunner, agentBranchName, sessionNameOf, currentBranch, repoHasRemote, pushBranch, gitReason } from '@better-skills/branch-management'
+import { nodeGitRunner, type GitRunner, agentBranchName, sessionNameOf, currentBranch, repoHasRemote, pushBranch, gitReason } from '@gemstack/skill-branches'
 import { THE_FRAMEWORK_DIR } from '../framework-dir.js'
 import {
   cachedPrView,

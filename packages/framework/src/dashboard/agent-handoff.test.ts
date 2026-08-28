@@ -5,10 +5,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { isAgentBranch } from '@better-skills/branch-management'
+import { isAgentBranch } from '@gemstack/skill-branches'
 import { readAgentHandoff, resolveAgentPr, mergeAgentPr, agentBranchFor, openBranchPullRequest, openRemoteBranchPullRequest, openAgentPullRequest, agentAutoHandoff, prBaseName, withheldMerge } from './agent-handoff.js'
 import { pickAgentPr } from './gh.js'
-import { nodeGitRunner, type GitRunner } from '@better-skills/branch-management'
+import { nodeGitRunner, type GitRunner } from '@gemstack/skill-branches'
 
 const exec = promisify(execFile)
 const SEP = String.fromCharCode(31)

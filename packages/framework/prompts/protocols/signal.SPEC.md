@@ -1,4 +1,4 @@
-Pins how an agent reports on itself without stopping: the three blocks it emits mid-turn to declare the work ready for merge, dictate the pull request The Framework opens for it, and report something only the user can fix. The session name is not among them: the agent names its branch with the branch-management skill's command, and The Framework reads the name off the branch.
+Pins how an agent reports on itself without stopping: the three blocks it emits mid-turn to declare the work ready for merge, dictate the pull request The Framework opens for it, and report something only the user can fix. The session name is not among them: the agent names its branch with the `branches` skill's command, and The Framework reads the name off the branch.
 
 ## User story
 

@@ -1,4 +1,4 @@
-import { sessionNameOf } from '@better-skills/branch-management/branch-names'
+import { sessionNameOf } from '@gemstack/skill-branches/branch-names'
 import type { AutoHandoffSkip, FrameworkEvent } from './events.js'
 
 // Derived agent state for the dashboard's overview cards (#431): the production-grade

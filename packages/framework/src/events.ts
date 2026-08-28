@@ -273,7 +273,7 @@ export type FrameworkEvent =
   /**
    * The branch the agent's work is on (#1277), observed off the checkout rather than guessed:
    * emitted at start with the branch the agent actually begins on, and again whenever a later
-   * read finds it changed — the agent renames its branch itself, through `branch-management name`
+   * read finds it changed — the agent renames its branch itself, through `branches name`
    * (#1725), and the session name is that branch minus its prefix. Folded to `AgentMeta.branch`
    * (and `sessionName` beside it), which every surface resolves first — before this event the
    * branch was stamped only at teardown (#799), so any read before that guessed between three

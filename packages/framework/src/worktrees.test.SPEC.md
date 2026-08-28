@@ -1,4 +1,4 @@
-What the tests cover: the agent's side of reclaiming a checkout — what its record allows, and how a refusal is said — and deleting an agent, checked against real git because "was the work actually destroyed" and "did the branch survive" are the whole subject. The git rule itself is covered where it lives, in the branch-management package.
+What the tests cover: the agent's side of reclaiming a checkout — what its record allows, and how a refusal is said — and deleting an agent, checked against real git because "was the work actually destroyed" and "did the branch survive" are the whole subject. The git rule itself is covered where it lives, in the `skill-branches` package.
 
 **Reclaiming a checkout**
 

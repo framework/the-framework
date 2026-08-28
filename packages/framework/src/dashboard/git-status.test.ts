@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { readGitStatus } from './git-status.js'
-import type { GitRunner } from '@better-skills/branch-management'
+import type { GitRunner } from '@gemstack/skill-branches'
 const gitWith =
   (branch: string, porcelain: string): GitRunner =>
   async args => {

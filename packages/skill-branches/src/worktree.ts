@@ -185,7 +185,7 @@ export async function removeWorktree(repo: string, path: string, agent: GitRunne
   }
   try {
     await agent(['worktree', 'remove', '--force', path], repo)
-    console.log(`[branch-management] forced removal of worktree ${path} (git called it unclean)`)
+    console.log(`[branches] forced removal of worktree ${path} (git called it unclean)`)
   } catch {
     // Already removed, or never registered: nothing to do.
   }

@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { crawlRepoFiles, isActivated, type ProjectFs } from './project.js'
-import { type GitRunner } from '@better-skills/branch-management'
+import { type GitRunner } from '@gemstack/skill-branches'
 import { gitignorePath } from './framework-gitignore.js'
 
 const CWD = '/proj'

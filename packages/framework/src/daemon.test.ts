@@ -48,7 +48,7 @@ async function startDaemon(cwd: string, opts: RunDaemonOptions): Promise<{ done:
 }
 import { listAgents } from './store/index.js'
 import { EVENTS_FILE } from './store/index.js'
-import { addWorktree, worktreePath, nodeGitRunner } from '@better-skills/branch-management'
+import { addWorktree, worktreePath, nodeGitRunner } from '@gemstack/skill-branches'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import { controlPath } from './control.js'
 import { projectId, listProjects, addProject } from './registry.js'

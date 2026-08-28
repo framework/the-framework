@@ -1,5 +1,5 @@
 ---
-name: branch-management
+name: branches
 description: One git checkout per agent, named as its branch. How to name your session, where your work lives, and what must be true before you finish.
 ---
 
@@ -18,7 +18,7 @@ You were started inside your own checkout of the repository: a git worktree at `
 Before your first change, pick a name for the session — `[a-z0-9-]+`, saying succinctly what the work is — and run:
 
 ```
-branch-management name <name>
+branches name <name>
 ```
 
 It renames your branch to `agent-<name>` (a rename: your commits stay where they are) and prints the name the branch got, as JSON: `{"ok":true,"branch":"agent-<name>"}`. When `<name>` was already taken, the branch is `agent-<name>-2`, `-3`, … — use the name it printed, not the one you asked for. The session name is read from your branch; there is nothing else to report.
@@ -32,7 +32,7 @@ Work on that branch and commit to it as you go. Only what you committed is ever 
 Run:
 
 ```
-branch-management status
+branches status
 ```
 
 It must report `"clean": true`. Uncommitted work blocks the checkout from being reclaimed, and is not part of what gets published.

@@ -14,7 +14,7 @@ const git = nodeGitRunner()
 
 /** A repo with one commit, a bare `origin`, and a dependency directory for a checkout to inherit. */
 async function repoWithOrigin(): Promise<string> {
-  const repo = await realpath(await mkdtemp(join(tmpdir(), 'branch-management-cli-')))
+  const repo = await realpath(await mkdtemp(join(tmpdir(), 'branches-cli-')))
   await git(['init', '-q', '-b', 'main'], repo)
   await git(['config', 'user.email', 't@t'], repo)
   await git(['config', 'user.name', 't'], repo)
@@ -293,7 +293,7 @@ test('prune: removes what the rule allows and reports each checkout it kept, wit
 })
 
 test('outside a repository every command refuses rather than failing on git', async () => {
-  const dir = await realpath(await mkdtemp(join(tmpdir(), 'branch-management-norepo-')))
+  const dir = await realpath(await mkdtemp(join(tmpdir(), 'branches-norepo-')))
   try {
     for (const argv of [['list'], ['create', 'a1'], ['name', 'x'], ['status'], ['remove', 'a1'], ['prune']]) {
       const ran = await run(dir, ...argv)
@@ -313,7 +313,7 @@ test('a command that cannot be read gets the usage and exit code 2, and no JSON'
       const ran = await run(repo, ...argv)
       assert.equal(ran.code, 2, argv.join(' '))
       assert.equal(ran.out, undefined, argv.join(' '))
-      assert.match(ran.err, /usage: branch-management/)
+      assert.match(ran.err, /usage: branches/)
     }
   } finally {
     await rm(repo, { recursive: true, force: true })
@@ -336,7 +336,7 @@ test('a git failure past the decision is exit 1 with git\'s own line', async () 
 function exec(cwd: string, ...argv: string[]): Promise<{ code: number; stdout: string; stderr: string }> {
   return new Promise(resolvePromise => {
     execFile(
-      'branch-management',
+      'branches',
       argv,
       { cwd, env: { ...process.env, PATH: `${CLI_BIN_DIR}:${process.env['PATH'] ?? ''}` } },
       (err, stdout, stderr) => resolvePromise({ code: (err as { code?: number } | null)?.code ?? 0, stdout, stderr }),
@@ -411,7 +411,7 @@ test('the project is the checkout whose branches/ the command runs under — a p
 })
 
 test('an id that is not path-safe is refused before the project is even looked for (review)', async () => {
-  const dir = await realpath(await mkdtemp(join(tmpdir(), 'branch-management-norepo-')))
+  const dir = await realpath(await mkdtemp(join(tmpdir(), 'branches-norepo-')))
   try {
     assert.deepEqual((await run(dir, 'remove', '../x')).out, { ok: false, reason: 'invalid-id', agentId: '../x' })
     assert.deepEqual((await run(dir, 'create', '../x')).out, { ok: false, reason: 'invalid-id', agentId: '../x' })

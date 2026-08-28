@@ -51,11 +51,11 @@ See `## User story`: work must be reviewable as a pull request on a branch named
 
 #### Business logic
 
-Before applying its first change the agent picks a session name — an `[a-z0-9-]+` string that succinctly captures the intent of the user's prompt — and names its branch after it the way the "Branch management" section appended after the prompt says: the branch-management skill's command for an agent in a checkout The Framework created, git itself anywhere else. When the name the agent ends up with differs (the skill's command suffixes a taken name), that is the session name from then on.
+Before applying its first change the agent picks a session name — an `[a-z0-9-]+` string that succinctly captures the intent of the user's prompt — and names its branch after it the way the "Branch management" section appended after the prompt says: the `branches` skill's command for an agent in a checkout The Framework created, git itself anywhere else. When the name the agent ends up with differs (the skill's command suffixes a taken name), that is the session name from then on.
 
 #### Rationale
 
-Naming before the first change, rather than after the work is done, means there is never a moment where changes sit on a branch that says nothing about them. The workspace rules that used to live here are the skill's: they describe the checkout the branch-management package created, so they ship with that package.
+Naming before the first change, rather than after the work is done, means there is never a moment where changes sit on a branch that says nothing about them. The workspace rules that used to live here are the skill's: they describe the checkout the `skill-branches` package created, so they ship with that package.
 
 ### Rate variability, offer alternatives
 

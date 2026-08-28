@@ -1,6 +1,6 @@
 import { listAgents, readLiveMetas, type LiveAgent, type AgentMeta } from '../store/index.js'
 import type { ProjectSummary, ProjectionRead } from './projects.js'
-import { isAgentBranch } from '@better-skills/branch-management'
+import { isAgentBranch } from '@gemstack/skill-branches'
 import { readAgentHandoff, agentBranchFor, type AgentHandoff } from './agent-handoff.js'
 import { ghPrList, type OpenPr, type PrLister } from './gh.js'
 import { interventionKey } from './keys.js'

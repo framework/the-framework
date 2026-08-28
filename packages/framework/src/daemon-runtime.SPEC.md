@@ -48,7 +48,7 @@ The user runs several agents on the same project at once, and keeps working in t
 
 #### Business logic
 
-Each agent is given its own git worktree under the project's `.the-framework/branches/`, on its own `tf-agent-<agent id>` branch. Concurrent agents on one project therefore never fight over a working tree, and the user's own checkout — uncommitted work included — is left untouched.
+Each agent is given its own git worktree under the project's `.branches/`, on its own `agent-<agent id>` branch. Concurrent agents on one project therefore never fight over a working tree, and the user's own checkout — uncommitted work included — is left untouched.
 
 A fresh worktree has no installed dependencies, since those are not tracked by git, so the project's are mirrored in (the branch-management package's dependency linking).
 
@@ -120,7 +120,7 @@ An agent's process dies before it manages to say anything — it could not be sp
 
 When a spawned process ends, the daemon checks whether the agent ever wrote its own status record. If it did, the agent's lifecycle is its own to report and the daemon leaves it alone. If it did not, the daemon writes a minimal `failed` status for it and appends a log entry to the agent's event log saying how the process ended, with the tail of the process's error output attached, and prints the same to the terminal.
 
-The status is written only into a checkout that still exists. When the checkout is gone — removed by hand while the process was alive, or never created at all — the daemon says so in the terminal instead and writes nothing, because a record written where a checkout used to be creates a directory under `.the-framework/branches/` that git does not know as a checkout, and every later git command run in it would act on the user's own repository.
+The status is written only into a checkout that still exists. When the checkout is gone — removed by hand while the process was alive, or never created at all — the daemon says so in the terminal instead and writes nothing, because a record written where a checkout used to be creates a directory under `.branches/` that git does not know as a checkout, and every later git command run in it would act on the user's own repository.
 
 The task description written for the agent is deleted when the process ends without consuming it, so an abandoned prompt (and any device token in it) does not stay on disk.
 
@@ -152,7 +152,7 @@ An agent finishes. Its work must survive, its history must stay visible in the d
 
 When an agent's process exits, its history — which lives inside its own checkout — is copied out into the project first, as an archive filed under the identity the repo commits as, on the data branch, through the data branch's single write cycle so it is committed and pushed the moment it lands. The branch the work ended on is recorded with it, because the branch outlives the checkout and is the only handle the dashboard has left on a finished agent. That branch is read only from a directory git knows as a checkout in its own right: a leftover directory would answer with the *enclosing* repository's branch, and the archive would record the user's own branch as the agent's.
 
-Then the checkout goes, under one rule: it is removed once its work is on the remote, whatever state the agent ended in — pending changes are committed and the branch is pushed, unless everything the checkout holds is already there, and only then does the checkout come off disk. A push that cannot land keeps the checkout, and a later sweep retries it. Teardown, the sweep and the dashboard's Remove button are the same behaviour by construction. When branches went with the checkout — one that provably held nothing the remote lacks, or the `tf-agent-<agent id>` branch the agent had branched away from — the teardown names them, because a branch disappearing unannounced reads as a bug.
+Then the checkout goes, under one rule: it is removed once its work is on the remote, whatever state the agent ended in — pending changes are committed and the branch is pushed, unless everything the checkout holds is already there, and only then does the checkout come off disk. A push that cannot land keeps the checkout, and a later sweep retries it. Teardown, the sweep and the dashboard's Remove button are the same behaviour by construction. When branches went with the checkout — one that provably held nothing the remote lacks, or the `agent-<agent id>` branch the agent had branched away from — the teardown names them, because a branch disappearing unannounced reads as a bug.
 
 Retirement is best-effort from end to end: it runs off a process-exit event with nobody to report to, so a failure must not take the daemon down, and a checkout that could not be retired is left on disk, which is the safe direction.
 

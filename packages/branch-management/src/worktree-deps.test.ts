@@ -64,10 +64,10 @@ test('findDependencyDirs never descends into node_modules or dot dirs', async ()
     '/repo/node_modules/dep/node_modules',
     '/repo/.git',
     '/repo/.git/node_modules',
-    '/repo/.the-framework',
-    '/repo/.the-framework/worktrees',
-    '/repo/.the-framework/worktrees/x',
-    '/repo/.the-framework/worktrees/x/node_modules',
+    '/repo/.branches',
+    '/repo/.branches',
+    '/repo/.branches/x',
+    '/repo/.branches/x/node_modules',
   ])
   assert.deepEqual(await findDependencyDirs('/repo', fs), ['node_modules'])
 })
@@ -138,7 +138,7 @@ test('linkDependencies swallows a filesystem that refuses the link (a run still 
 // pnpm-shaped tree on disk — a package entry that is itself a relative link into `.pnpm` —
 // and read a file back through the chain.
 test('linkDependencies gives a real worktree a working dependency tree, and an install there stays there (#736, #1262)', async () => {
-  const root = await realpath(await mkdtemp(join(tmpdir(), 'framework-deps-')))
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'worktree-deps-')))
   try {
     const repo = join(root, 'repo')
     const wt = join(root, 'wt')

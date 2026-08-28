@@ -108,10 +108,10 @@ happens while nobody is at the keyboard.
 
 ## Handoff and what lands in git
 
-- Every agent gets its own git worktree and branch (`tf-agent-<id>`), created before it starts; your checkout is never touched
+- Every agent gets its own git worktree under `.branches/` and its own branch (`agent-<id>`), created before it starts; your checkout is never touched
 - The branch-management skill: the system prompt of every agent started in its own checkout carries the `@better-skills/branch-management` package's `SKILL.md` — that checkout is your whole workspace, name the session with the command, commit as you go, leave a clean tree, never push or open the PR yourself; an agent anywhere else (a terminal run in your checkout, an Actions runner, a cloud session) is told to branch with git itself
-- `branch-management` on every agent's PATH — the skill's command line: `name <name>` renames the agent's branch to `tf-<name>` and prints the name it got (suffixed when taken); `status` says whether the tree is clean and the branch on the remote; `create`, `attach`, `list`, `remove`, `prune` are the same operations the dashboard runs
-- The session name is the branch: an agent is labelled by its `tf-<name>` branch, read from git after every turn — nothing to signal, nothing to record twice
+- `branch-management` on every agent's PATH — the skill's command line: `name <name>` renames the agent's branch to `agent-<name>` and prints the name it got (suffixed when taken); `status` says whether the tree is clean and the branch on the remote; `create`, `attach`, `list`, `remove`, `prune` are the same operations the dashboard runs
+- The session name is the branch: an agent is labelled by its `agent-<name>` branch, read from git after every turn — nothing to signal, nothing to record twice
 - Dependency directories shared from the parent checkout instead of reinstalled — as directories of links, so an agent's own install stays in its checkout and never rewrites or purges the parent's
 - A checkout whose work is not on the remote is kept — and a publish-nothing (`handoff: local`) agent's is kept until you publish or delete it
 - Only what the agent committed is published — nothing is ever committed on the agent's or your behalf; work left uncommitted keeps its checkout, named on the agent's page
@@ -139,7 +139,7 @@ happens while nobody is at the keyboard.
 - CI watch: one fix agent per red head commit, max two attempts
 - Reclaim the checkout of an agent whose work is on the remote — never by publishing what a `handoff: local` agent refused to
 - An agent that committed nothing leaves no branch behind: its empty branch goes with its checkout, never pushed — and the run-id branch it started on goes too, once the branch it moved to holds everything the run-id branch did
-- A directory under `branches/` that git does not know as a worktree is never committed, pushed, linked or deleted through — it is reported and left alone, so a leftover can never stand in for your own checkout
+- A directory under `.branches/` that git does not know as a worktree is never committed, pushed, linked or deleted through — it is reported and left alone, so a leftover can never stand in for your own checkout
 - One triage at a time, across machines: a routine lock (`routines/<name>.lock.md` on the data branch) taken by the daemon before the run starts and released when it ends, whatever the ending; a held lock stands the routine down naming the machine holding it, with no agent spent; a lock left by a dead machine expires after four hours, and a daemon frees its own on boot
 - The agent drains its own TODO backlog, one entry per turn
 

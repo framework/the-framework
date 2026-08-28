@@ -2,7 +2,8 @@ import { appendFile, mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { ChoiceBy } from './events.js'
 import { isHandoffLevel, type HandoffLevel } from './handoff-level.js'
-import { FRAMEWORK_DIR } from '@better-skills/branch-management'
+import {  } from '@better-skills/branch-management'
+import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import { JsonlTailer, followFile } from './jsonl-tail.js'
 
 /**
@@ -48,12 +49,12 @@ export type ControlEntry =
 
 /** The control log path for a workspace. */
 export function controlPath(cwd: string): string {
-  return join(cwd, FRAMEWORK_DIR, CONTROL_FILE)
+  return join(cwd, THE_FRAMEWORK_DIR, CONTROL_FILE)
 }
 
 /** Append one entry to the workspace's control log, creating it as needed. */
 export async function appendControl(cwd: string, entry: ControlEntry): Promise<void> {
-  await mkdir(join(cwd, FRAMEWORK_DIR), { recursive: true })
+  await mkdir(join(cwd, THE_FRAMEWORK_DIR), { recursive: true })
   await appendFile(controlPath(cwd), JSON.stringify(entry) + '\n')
 }
 
@@ -62,7 +63,7 @@ export async function appendControl(cwd: string, entry: ControlEntry): Promise<v
  * can never fire into this one (gate ids like `plan-approval` repeat across runs).
  */
 export async function resetControl(cwd: string): Promise<void> {
-  await mkdir(join(cwd, FRAMEWORK_DIR), { recursive: true })
+  await mkdir(join(cwd, THE_FRAMEWORK_DIR), { recursive: true })
   await writeFile(controlPath(cwd), '')
 }
 
@@ -86,7 +87,7 @@ export function watchControl(
     if (isControlEntry(entry)) onEntry(entry)
   })
   // unref: never keep the process alive just for steering.
-  const stop = followFile(join(cwd, FRAMEWORK_DIR), () => tailer.pull(), { pollMs, unref: true })
+  const stop = followFile(join(cwd, THE_FRAMEWORK_DIR), () => tailer.pull(), { pollMs, unref: true })
   return { close: stop }
 }
 

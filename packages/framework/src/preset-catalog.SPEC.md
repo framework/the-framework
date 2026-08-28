@@ -52,7 +52,7 @@ Auto PM refills the agent queue from the ticket backlog on a schedule, with nobo
 
 #### Business logic
 
-Both triage presets read `tickets/*.md`, pick tickets that are consensual (zero open questions, zero uncertainty), and append them to the agent queue. They split on cost only: triage_quick picks quick wins (low effort, zero uncertainty per the plan's own numbers), triage_consensual picks significant work — kept apart so the cheap batch and the significant batch queue on separate turns. Both run unattended and never gate. Each pins its own fixed session name and aborts when the branch `tf-<session name>` already exists: a triage still in flight owns the branch, so the next scheduled firing does nothing instead of triaging twice. Both end with the same queue-only rule, appended verbatim from one shared prompt file so the pair cannot drift apart on it: a triage changes only `TODO_AGENTS.md`, never a ticket's code.
+Both triage presets read `tickets/*.md`, pick tickets that are consensual (zero open questions, zero uncertainty), and append them to the agent queue. They split on cost only: triage_quick picks quick wins (low effort, zero uncertainty per the plan's own numbers), triage_consensual picks significant work — kept apart so the cheap batch and the significant batch queue on separate turns. Both run unattended and never gate. Each pins its own fixed session name and aborts when the branch `agent-<session name>` already exists: a triage still in flight owns the branch, so the next scheduled firing does nothing instead of triaging twice. Both end with the same queue-only rule, appended verbatim from one shared prompt file so the pair cannot drift apart on it: a triage changes only `TODO_AGENTS.md`, never a ticket's code.
 
 #### Rationale
 

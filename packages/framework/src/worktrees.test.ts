@@ -137,7 +137,7 @@ test('a publish-nothing session whose branch is already on the remote still lets
 test("a web run's checkout goes without pushing its empty run branch to origin (#1601)", async () => {
   // The hand-off pushed everything the cloud session clones at, and the work lands on the
   // session's own remote branch — pushing the local run branch just to satisfy the remote rule
-  // is what accreted one dead `tf-agent-*` ref on origin per web run.
+  // is what accreted one dead `agent-*` ref on origin per web run.
   const { repo, path, branch } = await repoWithDirtyWorktree()
   const git = nodeGitRunner()
   try {
@@ -220,10 +220,10 @@ test('the run-id branch the agent branched away from goes with the checkout when
   const git = nodeGitRunner()
   try {
     await git(['push', '-q', 'origin', 'HEAD:main'], repo)
-    await git(['checkout', '-q', '-b', 'tf-cool-name'], path)
+    await git(['checkout', '-q', '-b', 'agent-cool-name'], path)
     await commitWork(path)
     assert.deepEqual(await removeProjectWorktree(repo, RUN_ID), { ok: true, branchesDeleted: [runBranch] })
-    assert.match(await git(['show', 'refs/remotes/origin/tf-cool-name:index.html'], repo), /Welcome!/, 'the work branch stays, pushed')
+    assert.match(await git(['show', 'refs/remotes/origin/agent-cool-name:index.html'], repo), /Welcome!/, 'the work branch stays, pushed')
     await assert.rejects(() => git(['rev-parse', '--verify', `refs/heads/${runBranch}`], repo), 'the run-id branch is gone')
   } finally {
     await rm(repo, { recursive: true, force: true })

@@ -186,7 +186,7 @@ export interface AgentOptions {
   /**
    * `--run-id <id>` (#736): the id the daemon allocated for this agent before spawning it. Its
    * presence says the framework owns this agent's checkout — `--cwd` is a worktree the daemon
-   * created on a `tf-agent-<id>` branch, which the agent renames once the agent names
+   * created on an `agent-<id>` branch, which the agent renames once the agent names
    * the session. Absent for a plain `framework "..."`, which runs in the user's own checkout.
    */
   agentId?: string | undefined
@@ -574,7 +574,7 @@ export interface AgentJournal {
   observeBranch: () => Promise<void>
   /** The branch the checkout was last observed on; undefined outside a git checkout, or once detached. */
   branch: () => string | undefined
-  /** The session name (#326/#1725): the observed branch minus its `tf-` prefix, once the agent named it. */
+  /** The session name (#326/#1725): the observed branch minus its `agent-` prefix, once the agent named it. */
   sessionName: () => string | undefined
   /** The agent signalled setReadyForMerge() this agent (#326). */
   sawReadyForMerge: () => boolean
@@ -601,8 +601,10 @@ export function createAgentJournal(deps: {
   io: CliIO
   cwd: string
   store: AgentStore | undefined
+  /** The agent's id, when it has one: names the branch its checkout was created on. */
+  agentId: string | undefined
 }): AgentJournal {
-  const { io, cwd, store } = deps
+  const { io, cwd, store, agentId } = deps
   // The framework's own verdict that the agent stopped cleanly rather than failed — set by a
   // user interrupt or a budget cap (#322). Trusted over which signal aborted, since a budget
   // stop trips an internal signal the CLI never sees.
@@ -658,14 +660,16 @@ export function createAgentJournal(deps: {
     const current = await currentBranch(cwd).catch(() => undefined)
     if (current === branch) return
     branch = current
-    if (current) onEvent({ kind: 'branch', branch: current })
+    if (!current) return
+    const sessionName = sessionNameOf(current, agentId)
+    onEvent({ kind: 'branch', branch: current, ...(sessionName ? { sessionName } : {}) })
   }
 
   return {
     onEvent,
     observeBranch,
     branch: () => branch,
-    sessionName: () => sessionNameOf(branch),
+    sessionName: () => sessionNameOf(branch, agentId),
     sawReadyForMerge: () => sawReadyForMerge,
     pullRequest: () => pullRequest,
     stoppedCleanly: () => stoppedCleanly,
@@ -974,7 +978,7 @@ async function driveAgent(opts: AgentOptions, io: CliIO): Promise<number> {
   // Everything the agent reports that its epilogue needs — the settle flags, the deferred
   // browser-port announcement — plus the fan-out of every event to the terminal and the store,
   // lives in the journal. runCli reads its getters below.
-  const journal = createAgentJournal({ io, cwd, store })
+  const journal = createAgentJournal({ io, cwd, store, agentId: opts.agentId })
   const onEvent = journal.onEvent
 
   // Put the armed state on the agent's meta (#1102), and keep it there as the checkboxes change it.

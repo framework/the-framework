@@ -1,7 +1,6 @@
 framework-dir: .the-framework
 data-branch: tf-data
 archive-dir: agents
-branches-dir: branches
 events-file: events.jsonl
 meta-file: agent.json
 tickets-dir: tickets

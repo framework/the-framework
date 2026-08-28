@@ -6,6 +6,7 @@ import { realpath } from 'node:fs/promises'
 import { test } from 'node:test'
 import { nodeGitRunner } from '@better-skills/branch-management'
 import { DATA_BRANCH, dataWorktreePath, ensureDataWorktree, pullDataBranch, withDataBranch } from './data-branch.js'
+import { DATA_CHECKOUT_DIR } from './framework-dir.js'
 
 const git = nodeGitRunner()
 
@@ -71,7 +72,7 @@ test('ensure births the branch parentless, checks it out, seeds the queue, links
     await assert.rejects(git(['merge-base', DATA_BRANCH, 'main'], repo))
     assert.equal(await readFile(join(wt, 'TODO_AGENTS.md'), 'utf8'), '')
     // The root symlink reaches into the checkout, relatively, so a moved repo keeps working.
-    assert.equal(await readlink(join(repo, 'tickets')), join('.the-framework', 'branches', DATA_BRANCH, 'tickets'))
+    assert.equal(await readlink(join(repo, 'tickets')), join(DATA_CHECKOUT_DIR, 'tickets'))
     // The link is hidden from git, so no sweeping `git add -A` ever commits it onto a code branch.
     const status = await git(['status', '--porcelain'], repo)
     assert.ok(!status.split('\n').some(line => line.trim() === '?? tickets'), status)

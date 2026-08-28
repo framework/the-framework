@@ -26,7 +26,7 @@ The user presses Stop on one agent, or watches its live feed, while other agents
 
 #### Business logic
 
-A call that names a project alone resolves to the project's workspace. A call that also names an agent resolves to that agent's own checkout under `.the-framework/branches/` when one exists, and to the project's workspace otherwise — for an agent with no worktree, and for one whose worktree has already been cleaned up.
+A call that names a project alone resolves to the project's workspace. A call that also names an agent resolves to that agent's own checkout under `.branches/` when one exists, and to the project's workspace otherwise — for an agent with no worktree, and for one whose worktree has already been cleaned up.
 
 #### Rationale
 

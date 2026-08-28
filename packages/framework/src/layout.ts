@@ -1,6 +1,5 @@
 import { join } from 'node:path'
-import { DATA_BRANCH, BRANCHES_DIR } from '@better-skills/branch-management'
-import { THE_FRAMEWORK_DIR } from './framework-dir.js'
+import { DATA_BRANCH, THE_FRAMEWORK_DIR } from './framework-dir.js'
 import { ARCHIVE_DIR, EVENTS_FILE, META_FILE, nodeStoreFs, type StoreFs } from './store/index.js'
 import { FLAT_TODO_FILE, TICKETS_DIR } from './tickets.js'
 
@@ -39,7 +38,6 @@ export function layoutMarker(): string {
     `framework-dir: ${THE_FRAMEWORK_DIR}`,
     `data-branch: ${DATA_BRANCH}`,
     `archive-dir: ${ARCHIVE_DIR}`,
-    `branches-dir: ${BRANCHES_DIR}`,
     `events-file: ${EVENTS_FILE}`,
     `meta-file: ${META_FILE}`,
     `tickets-dir: ${TICKETS_DIR}`,

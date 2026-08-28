@@ -37,7 +37,7 @@ Triage runs on a schedule, and the user wants every firing of it recognizable in
 
 #### Business logic
 
-The agent always sets its session name to `triage-quick` rather than inventing one, so this triage's branch is always `tf-triage-quick`.
+The agent always sets its session name to `triage-quick` rather than inventing one, so this triage's branch is always `agent-triage-quick`.
 
 #### Rationale
 

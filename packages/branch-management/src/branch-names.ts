@@ -1,20 +1,15 @@
 /**
- * The naming rules for everything The Framework mints in git (#736/#1581), and the layout they
- * imply on disk. Pure: no node imports, so browser-safe code can name branches too.
+ * The naming rules for everything the package mints in git, and the layout they imply on disk.
+ * Pure: no node imports, so browser-safe code can name branches too.
  */
 
 /**
- * The directory, under a project's root, that holds The Framework's state (#313): the agent
- * checkouts, and inside each checkout the agent's own record.
+ * Where a project's agent checkouts live: `<repo>/.branches/`, one directory per checkout, each
+ * named as the branch it was created on. Dotted on purpose: a `*` glob does not match a leading
+ * dot, so type-checkers, test runners and formatters run in the project never descend into N
+ * copies of the repository.
  */
-export const FRAMEWORK_DIR = '.the-framework'
-
-/**
- * Per-agent checkouts live under `<repo>/.the-framework/branches/` (#736/#1580), each in a dir
- * named as its branch. Kept out of git by the install-time `.the-framework/.gitignore`, so a
- * checkout never shows up as dirty in the parent.
- */
-export const BRANCHES_DIR = 'branches'
+export const BRANCHES_DIR = '.branches'
 
 /** An agent id is path-safe: no separators or traversal, only our own charset. */
 export function isSafeAgentId(id: string): boolean {
@@ -22,77 +17,43 @@ export function isSafeAgentId(id: string): boolean {
 }
 
 /**
- * What every framework-minted branch is named under (#1581). Slash-free on purpose: a `/` in a
- * ref name never resolves as a cloud session's revision (anthropics/claude-code#87235), and it
- * keeps the planned flat `branches/` dir (#1580) possible, where each dir is named as its branch.
+ * What every branch the package mints is named under. Slash-free on purpose: a `/` in a ref name
+ * never resolves as a cloud session's revision (anthropics/claude-code#87235), and it is what
+ * lets a checkout directory be named exactly as its branch.
  */
-export const AGENT_BRANCH_PREFIX = 'tf-'
+export const AGENT_BRANCH_PREFIX = 'agent-'
 
 /**
- * The branch holding everything The Framework writes (#1582) — tickets, queue, session archives —
- * checked out under `.the-framework/branches/` in a dir named as itself, like every checkout
- * there. Named here beside the other branch names so the store can build its paths without
- * importing the data-branch module (which imports the store).
- */
-export const DATA_BRANCH = 'tf-data'
-
-/**
- * The branch a framework-allocated worktree starts on (#736). The agent id exists
- * before the session name does, so the branch is created from the id and renamed
- * once the agent picks a name.
+ * The branch a checkout is created on: `agent-<agent id>`. The agent id exists before the session
+ * name does, so the branch is created from the id and renamed once the agent picks a name. It is
+ * also the checkout directory's name under `.branches/`, so the listing reads as branch names.
  */
 export function agentBranchName(agentId: string): string {
-  return `${AGENT_BRANCH_PREFIX}agent-${agentId}`
+  return `${AGENT_BRANCH_PREFIX}${agentId}`
 }
 
-/**
- * The directory an agent's worktree lives in under `.the-framework/branches/` (#1580): the run
- * branch's own name, so the flat `branches/` listing reads as branch names. #1581 (slash-free
- * names) is what makes this equality possible at all.
- */
-export function worktreeDirName(agentId: string): string {
-  return agentBranchName(agentId)
-}
-
-/** The inverse of {@link worktreeDirName}: the agent id a checkout directory's name carries. */
+/** The inverse of {@link agentBranchName}: the agent id a checkout directory's name carries. */
 export function agentIdFromWorktreeDir(name: string): string {
-  return name.slice(`${AGENT_BRANCH_PREFIX}agent-`.length)
+  return name.slice(AGENT_BRANCH_PREFIX.length)
 }
 
 /**
- * Whether a branch is one the framework minted for a run (#1650): the run-id spelling or a
- * session-named `tf-<name>` — and never the data branch, which shares the prefix. The only
- * branches the framework may delete on its own.
+ * Whether a branch is one the package minted for an agent: the branch a checkout was created on,
+ * or the session-named `agent-<name>` it was renamed to. The only branches the package ever
+ * renames or deletes; a branch of the user's own is out of reach by name alone.
  */
-export function isRunBranch(name: string): boolean {
-  return name !== DATA_BRANCH && name.startsWith(AGENT_BRANCH_PREFIX)
+export function isAgentBranch(name: string): boolean {
+  return name.startsWith(AGENT_BRANCH_PREFIX)
 }
 
 /**
- * Whether a branch is a run branch carrying a session name: `tf-<session name>`, as opposed to
- * the birth branch `tf-agent-<agent id>` (a checkout directory's spelling), the data branch, or
- * a branch The Framework did not mint. The one predicate behind both naming a branch — a name
- * that would not produce one of these is reserved — and reading the name back.
+ * The session name a checkout's branch carries: `agent-<session name>` minus the prefix. The name
+ * is read off the branch and never recorded beside it — a checkout has one branch, and that
+ * branch is the name. Undefined for a branch the package did not mint, and while the agent has
+ * not named its session: the branch is still the one the checkout was created on, which the
+ * agent id names — a caller without an id has no such branch to rule out.
  */
-export function isNamedRunBranch(branch: string): boolean {
-  return isRunBranch(branch) && !isWorktreeDirName(branch)
-}
-
-/**
- * The session name a branch carries (#1725): `tf-<session name>` minus the prefix. The name is
- * read off the branch and never recorded beside it — a checkout has one branch, and that branch
- * is the name. Undefined while the agent has not named its session (the birth branch is not a
- * name) and for every branch The Framework did not mint.
- */
-export function sessionNameOf(branch: string | undefined): string | undefined {
-  return branch && isNamedRunBranch(branch) ? branch.slice(AGENT_BRANCH_PREFIX.length) : undefined
-}
-
-/**
- * Whether a name under `branches/` is a framework checkout directory. The same directory also
- * holds the rename links (#1589) and possibly a user's own entries, and only names the framework
- * mints — the run branch spelling — are checkouts.
- */
-export function isWorktreeDirName(name: string): boolean {
-  return name.startsWith(`${AGENT_BRANCH_PREFIX}agent-`)
+export function sessionNameOf(branch: string | undefined, agentId: string | undefined): string | undefined {
+  if (!branch || !isAgentBranch(branch) || (agentId !== undefined && branch === agentBranchName(agentId))) return undefined
+  return branch.slice(AGENT_BRANCH_PREFIX.length)
 }

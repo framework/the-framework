@@ -3,19 +3,19 @@ The lifecycle of an agent's own checkout: creating it, naming its branch, readin
 ## User story
 
 - The user starts several agents on the same project at the same time and each works undisturbed.
-- The user's uncommitted work is never destroyed by the framework tidying up after an agent.
+- The user's uncommitted work is never destroyed by the package tidying up after an agent.
 - The user's disk does not fill with the checkouts of agents that finished long ago.
 
 ## Business logic — TL;DR
 
-- **One checkout per agent, under the project's own directory** - each agent's checkout lives at `.the-framework/branches/<agent branch>`, named after its branch; from any directory inside, the project is the checkout that directory layout is under, else the checkout itself.
+- **One checkout per agent, under the project's own directory** - each agent's checkout lives at `.branches/<agent branch>`, named after its branch; from any directory inside, the project is the checkout that directory layout is under, else the checkout itself.
 - **A new agent branches; a continued agent re-attaches** - continuing an agent puts it back on the branch its work is already on rather than branching again, recreating that branch if it is gone.
 - **A checkout's own directory, told apart from the repository around it** - whether a directory is a git checkout in its own right is asked before anything reads a branch or runs git there.
-- **The branch is renamed once the agent names itself** - the checkout is created before a session name exists, and gains the readable name afterwards: a rename, only of a branch The Framework minted, never to one of The Framework's own names, and a taken name gets a numeric suffix.
-- **A checkout is read, never committed** - the framework commits nothing on an agent's behalf; whether a checkout is clean is a read, and a checkout holding uncommitted work is the caller's to keep.
+- **The branch is renamed once the agent names itself** - the checkout is created before a session name exists, and gains the readable name afterwards: a rename, only of a branch the package minted, and a taken name gets a numeric suffix.
+- **A checkout is read, never committed** - the package commits nothing on an agent's behalf; whether a checkout is clean is a read, and a checkout holding uncommitted work is the caller's to keep.
 - **Nothing local is ever the last copy of work** - a checkout may be deleted only when the remote already has its branch tip.
 - **A branch the caller proved holds nothing can be deleted outright** - the deletion is unconditional and forgiving, because the caller has already established the stronger fact.
-- **The checkouts on disk are listed by name** - every directory under `.the-framework/branches/` in the minted `tf-agent-<agent id>` spelling is a checkout, and names the agent that owns it; the rename links beside them are not.
+- **The checkouts on disk are listed by name** - every *directory* under `.branches/` named as an agent branch is a checkout, and names the agent that owns it; the rename links beside them are symlinks, and are not.
 - **Every read is forgiving; every removal is idempotent** - a git failure yields "unknown" rather than breaking the caller, and removing a checkout twice is harmless.
 
 ## Business logic
@@ -28,9 +28,11 @@ The user runs three agents against one repo simultaneously and none of them sees
 
 #### Business logic
 
-An agent's checkout sits inside the project at `.the-framework/branches/`, in a directory named after the agent's branch. The agent id is required to be path-safe before it is ever used to build that path, so no caller can place a checkout outside that directory.
+An agent's checkout sits inside the project at `.branches/`, in a directory named after the agent's branch. The agent id is required to be path-safe before it is ever used to build that path, so no caller can place a checkout outside that directory.
 
-Creating a checkout for a new agent creates its branch at the same time, from a stated base or from the project's current head. Creating a checkout for a continued agent instead attaches the branch that already exists, so the agent resumes on top of what it did last time rather than branching afresh and stranding it. If that branch is gone it is recreated from the project's current head, which strands nothing: a branch The Framework deletes on its own is always one it first proved held nothing that is not held elsewhere. Anything else git refuses — the branch already checked out somewhere else, say — is raised rather than swallowed, as a failed creation is: an agent that cannot get its checkout cannot run.
+The checkouts survive the project's own `git clean -fdx`, which skips them because each carries a `.git` file of its own; `git clean -ffdx` removes them, uncommitted work included.
+
+Creating a checkout for a new agent creates its branch at the same time, from a stated base or from the project's current head. Creating a checkout for a continued agent instead attaches the branch that already exists, so the agent resumes on top of what it did last time rather than branching afresh and stranding it. If that branch is gone it is recreated from the project's current head, which strands nothing: a branch the package deletes on its own is always one it first proved held nothing that is not held elsewhere. Anything else git refuses — the branch already checked out somewhere else, say — is raised rather than swallowed, as a failed creation is: an agent that cannot get its checkout cannot run.
 
 Everything the repo has registered as a checkout can be listed, the main checkout included, together with the commit and branch each has. A project that is not a repo, or a git failure, yields an empty list, so a reconciliation scan never breaks. Administrative leftovers from checkout directories a crash removed can be pruned; pruning never touches a live checkout.
 
@@ -40,31 +42,31 @@ A checkout's size on disk can be read, best-effort. It only ever labels a "remov
 
 #### User story
 
-The user removes an agent's checkout by hand, or something recreates its directory afterwards. Nothing The Framework then does about that directory may be aimed at the user's own repository instead.
+The user removes an agent's checkout by hand, or something recreates its directory afterwards. Nothing the package then does about that directory may be aimed at the user's own repository instead.
 
 #### Business logic
 
-Any directory can be asked whether it is the root of a git checkout — the project's main one or an agent's own. The answer is yes only when git's top level *is* that very directory, and no on any failure. Every user of a `.the-framework/branches/` path asks it before acting, so a directory git no longer knows as a checkout is recognised as a leftover rather than acted on.
+Any directory can be asked whether it is the root of a git checkout — the project's main one or an agent's own. The answer is yes only when git's top level *is* that very directory, and no on any failure. Every user of a `.branches/` path asks it before acting, so a directory git no longer knows as a checkout is recognised as a leftover rather than acted on.
 
-Reading which branch is checked out therefore comes in two forms. The plain read answers for whatever repository the directory belongs to, and answers "unknown" for a detached checkout or a directory in no repository at all, since callers use the answer to decide rather than to fail. The guarded read answers only for a directory that is a checkout root, and "unknown" for anything else — and that is the read every user of a `.the-framework/branches/` path takes.
+Reading which branch is checked out therefore comes in two forms. The plain read answers for whatever repository the directory belongs to, and answers "unknown" for a detached checkout or a directory in no repository at all, since callers use the answer to decide rather than to fail. The guarded read answers only for a directory that is a checkout root, and "unknown" for anything else — and that is the read every user of a `.branches/` path takes.
 
 #### Rationale
 
-Git answers for any directory *inside* a repository, so a leftover directory under `.the-framework/branches/` makes every command run in it act on the enclosing repository: the user's own checkout, on the user's own branch. Before this, such a directory had the sweep read an agent's branch as the user's `main`, try to commit the user's working tree and push the user's `main`, and had the rename links gain a link named after the user's own branch.
+Git answers for any directory *inside* a repository, so a leftover directory under `.branches/` makes every command run in it act on the enclosing repository: the user's own checkout, on the user's own branch. Before this, such a directory had the sweep read an agent's branch as the user's `main`, try to commit the user's working tree and push the user's `main`, and had the rename links gain a link named after the user's own branch.
 
 ### The branch is renamed once the agent names itself
 
 #### User story
 
-The user reads their branch list and sees `tf-add-comments`, not a timestamp.
+The user reads their branch list and sees `agent-add-comments`, not a timestamp.
 
 #### Business logic
 
-An agent's checkout is created on `tf-agent-<agent id>` because no session name exists yet. Once the agent picks one, the branch is renamed to `tf-<session name>` — a rename, never a second branch, so the branch the checkout was born on is the branch it ends on and nothing is left behind to clean up.
+An agent's checkout is created on `agent-<agent id>` because no session name exists yet. Once the agent picks one, the branch is renamed to `agent-<session name>` — a rename, never a second branch, so the branch the checkout was born on is the branch it ends on and nothing is left behind to clean up.
 
-Naming, as the agent asks for it, follows these rules. The name must be `[a-z0-9-]+`, and must not spell one of The Framework's own branches: `data` is the data branch, and `agent-…` is how checkout directories are named, so a link of that name would read as a checkout of an agent that does not exist. Only a branch The Framework minted is renamed: a checkout on the user's own branch, or on the data branch, is refused, so an agent that somehow runs in the user's checkout can never rename `main`. A name already taken — by any local branch or any remote-tracking branch, so that the later push cannot land on someone else's branch — gets a numeric suffix (`tf-<name>-2`, then `-3`, and so on) rather than a refusal, and the caller reads back the name it got. The checkout's own branch never counts as taken, pushed or not, so asking again for the name the checkout already carries — plain or suffixed — changes nothing. Two checkouts naming the same thing at the same moment race on the rename itself: the loser reads the branches again and takes the next free suffix, a few times over, before giving up.
+Naming, as the agent asks for it, follows these rules. The name must be `[a-z0-9-]+`. Only a branch the package minted is renamed: a checkout on the user's own branch is refused, so an agent that somehow runs in the user's checkout can never rename `main`. A name already taken — by any local branch or any remote-tracking branch, so that the later push cannot land on someone else's branch — gets a numeric suffix (`agent-<name>-2`, then `-3`, and so on) rather than a refusal, and the caller reads back the name it got. The checkout's own branch never counts as taken, pushed or not, so asking again for the name the checkout already carries — plain or suffixed — changes nothing. Two checkouts naming the same thing at the same moment race on the rename itself: the loser reads the branches again and takes the next free suffix, a few times over, before giving up.
 
-The agent itself asks for the name, from its own shell, through the command line's `name`; The Framework's agent runner only reads the branch afterwards and records what it finds. Asking for the name the checkout already carries changes nothing, so an agent that names its session twice keeps the branch it has.
+The agent itself asks for the name, from its own shell, through the command line's `name`; the caller that runs the agent only reads the branch afterwards and records what it finds. Asking for the name the checkout already carries changes nothing, so an agent that names its session twice keeps the branch it has.
 
 ### A checkout is read, never committed
 
@@ -74,11 +76,11 @@ An agent edits and stops without committing. The user expects that work to still
 
 #### Business logic
 
-Nothing is committed on an agent's behalf. A checkout can be asked whether it is clean, and that read is all the framework does with uncommitted work: a checkout that holds any is reported as dirty, and the caller keeps it — removal forces past a dirty tree, so removing it would destroy the very diff it holds. The work stays uncommitted where the agent left it, until a person commits or deletes it. When git cannot answer, the caller keeps the checkout rather than guessing.
+Nothing is committed on an agent's behalf. A checkout can be asked whether it is clean, and that read is all the package does with uncommitted work: a checkout that holds any is reported as dirty, and the caller keeps it — removal forces past a dirty tree, so removing it would destroy the very diff it holds. The work stays uncommitted where the agent left it, until a person commits or deletes it. When git cannot answer, the caller keeps the checkout rather than guessing.
 
 #### Rationale
 
-The framework used to commit whatever it found, as a safety net before removal. That net caught everything in the tree, including a 7,632-file build cache that went to a project's main branch unnoticed. A commit path that adds everything it finds is only as safe as the ignore file is complete, and it runs unattended; the agent committing its own work, and the framework only ever reading, has no such failure.
+The package's first caller used to commit whatever it found, as a safety net before removal. That net caught everything in the tree, including a 7,632-file build cache that went to a project's main branch unnoticed. A commit path that adds everything it finds is only as safe as the ignore file is complete, and it runs unattended; the agent committing its own work, and the package only ever reading, has no such failure.
 
 ### Nothing local is ever the last copy of work
 

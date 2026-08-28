@@ -279,7 +279,16 @@ export type FrameworkEvent =
    * branch was stamped only at teardown (#799), so any read before that guessed between three
    * naming schemes.
    */
-  | { kind: 'branch'; branch: string }
+  | {
+      kind: 'branch'
+      branch: string
+      /**
+       * The session name the branch carries (#1725/#1736), when it does. Read off the branch by the
+       * journal, the one writer that knows which branch the checkout was created on; a reader of
+       * the stream alone cannot tell that branch from a named one.
+       */
+      sessionName?: string
+    }
   /**
    * The hand-off anchor a cloud run pushed for its session to clone at (#1601): an empty commit
    * unique to this run, so the branch the session actually works on — a `claude/*` name of the

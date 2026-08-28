@@ -11,7 +11,7 @@ import { startProjectPass, type ProjectPass, type ProjectsSource } from './proje
 // A web run is a local wrapper that hands the task to claude.ai and ends; the cloud session does
 // the work on a branch of its own naming (`claude/*`), never the designated run branch. Nothing
 // ever told the run's record about that branch, so every surface keyed to it — the session row,
-// the PR resolution, CI watch, merge — stared at an empty `tf-agent-*` branch, and the run read
+// the PR resolution, CI watch, merge — stared at an empty `agent-*` branch, and the run read
 // as "nothing committed" while its work sat on origin.
 //
 // The hand-off anchor (#1601) makes the match exact rather than guessed: the driver pushes an

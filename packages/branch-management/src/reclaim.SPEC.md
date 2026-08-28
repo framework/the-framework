@@ -8,7 +8,7 @@ Reclaiming an agent's checkout: the one implementation behind every surface that
 
 ## Glossary
 
-- **birth branch** - the `tf-agent-<agent id>` branch a checkout is created on, before the agent has named its session.
+- **birth branch** - the `agent-<agent id>` branch a checkout is created on, before the agent has named its session.
 - **held by** - a commit the remote already has that provably contains everything a checkout could hold, such as the commit a cloud hand-off pushed.
 
 ## Business logic — TL;DR
@@ -17,7 +17,7 @@ Reclaiming an agent's checkout: the one implementation behind every surface that
 - **Nothing is committed on the agent's behalf** - a dirty tree keeps its checkout, and says so, until a person commits or deletes it.
 - **A caller that forbids the push gets removal only for what is already there** - when the branch may not be pushed, only a clean tree on a tip the remote already has goes.
 - **A checkout held by a pushed commit goes without a push** - a clean tree whose tip is inside the stated commit provably holds nothing new, so it is removed with no push and keeps its branch.
-- **A branch that holds nothing goes with the checkout** - a framework-minted branch whose tip the remote already has under another name is deleted along with the checkout instead of being pushed.
+- **A branch that holds nothing goes with the checkout** - an agent branch whose tip the remote already has under another name is deleted along with the checkout instead of being pushed.
 - **A birth branch the agent walked away from goes too** - when the branch the checkout ended on contains it.
 - **A directory that is not a git worktree is left alone** - refused before a single git command runs in it.
 - **Every refusal names its reason** - not a worktree, no branch, dirty, or not on the remote (with what git said, when a push failed), and the branch where known.
@@ -60,13 +60,13 @@ An agent that commits nothing on its own branch must leave neither a branch on t
 
 A checkout whose branch provably holds nothing the remote lacks is removed without any push, and that branch is deleted along with it. "Holds nothing" means the tree is clean and the branch tip is reachable from some remote-tracking branch *other than the branch's own copy* — a commit the remote already has under another name. The branch's own copy deliberately does not count: a branch pushed under its own name contains its own tip, so counting it would read every published agent branch as holding nothing.
 
-The branch's own copy is the one under its name and the one it tracks: a branch renamed after it was pushed still tracks the remote copy under its old name, and that copy holding the tip proves nothing about another name having it, so such a branch is pushed under its new name rather than deleted. Only branches The Framework itself minted are ever deleted this way: any `tf-` name, never the data branch. A leftover checkout can be sitting on a branch of the user's own, and deleting that is not this package's call even when it holds nothing. Only local remote-tracking references are read, never the remote itself; a tip they do not yet cover simply answers no and falls back to the push.
+The branch's own copy is the one under its name and the one it tracks: a branch renamed after it was pushed still tracks the remote copy under its old name, and that copy holding the tip proves nothing about another name having it, so such a branch is pushed under its new name rather than deleted. Only branches the package itself minted are ever deleted this way: any `agent-` name. A leftover checkout can be sitting on a branch of the user's own, and deleting that is not this package's call even when it holds nothing. Only local remote-tracking references are read, never the remote itself; a tip they do not yet cover simply answers no and falls back to the push.
 
 ### A birth branch the agent walked away from goes too
 
 #### User story
 
-The user's branch list does not collect one dead `tf-agent-<agent id>` branch per agent that ever ran.
+The user's branch list does not collect one dead `agent-<agent id>` branch per agent that ever ran.
 
 #### Business logic
 
@@ -76,7 +76,7 @@ When the caller names the checkout's birth branch and the branch the checkout en
 
 #### User story
 
-A checkout was removed by hand and something later recreated the directory. The user's own repository must not be pushed or have a branch deleted because of what is left under `.the-framework/branches/`.
+A checkout was removed by hand and something later recreated the directory. The user's own repository must not be pushed or have a branch deleted because of what is left under `.branches/`.
 
 #### Business logic
 

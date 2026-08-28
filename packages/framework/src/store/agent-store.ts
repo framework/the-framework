@@ -3,7 +3,8 @@ import { join } from 'node:path'
 import { hostname } from 'node:os'
 import type { AutoHandoffSkip, FrameworkEvent } from '../events.js'
 import { nodeFs } from '../node-fs.js'
-import { FRAMEWORK_DIR, BRANCHES_DIR, DATA_BRANCH, isSafeAgentId, worktreeDirEntries } from '@better-skills/branch-management'
+import { isSafeAgentId, worktreeDirEntries } from '@better-skills/branch-management'
+import { THE_FRAMEWORK_DIR, DATA_CHECKOUT_DIR } from '../framework-dir.js'
 
 /**
  * Persisted orchestration state (#211). The dashboard is a pure projection of the
@@ -235,6 +236,8 @@ export interface StoreFs {
   mkdir(path: string): Promise<void>
   /** List a directory's entries (names only). Missing dir yields `[]`. */
   readdir(path: string): Promise<string[]>
+  /** The names of the *directories* under `path` — a symlink is not one. Missing dir yields `[]`. */
+  subdirs(path: string): Promise<string[]>
   /**
    * Replace `to` with `from` in one step. Optional: an adapter that has it gets torn-proof meta
    * writes (see {@link writeMetaFile}), and one that does not writes in place, which is right for
@@ -557,7 +560,7 @@ export class AgentStore {
    */
   static async open(cwd: string, opts: OpenStoreOptions = {}): Promise<AgentStore> {
     const fs = opts.fs ?? nodeStoreFs()
-    const dir = join(cwd, FRAMEWORK_DIR)
+    const dir = join(cwd, THE_FRAMEWORK_DIR)
     const now = opts.now ?? new Date().toISOString()
     await fs.mkdir(dir)
     const owner = opts.owner ?? { pid: process.pid, host: hostname() }
@@ -656,7 +659,7 @@ function archiveDir(dir: string): string {
  * history; per user, so two people's machines write side by side instead of conflicting.
  */
 function committedArchiveDir(cwd: string, user: string): string {
-  return join(cwd, FRAMEWORK_DIR, BRANCHES_DIR, DATA_BRANCH, ARCHIVE_DIR, user)
+  return join(cwd, DATA_CHECKOUT_DIR, ARCHIVE_DIR, user)
 }
 
 /** Paths of an agent's archived log + meta inside one archive directory. */
@@ -690,12 +693,12 @@ async function findArchive(fs: StoreFs, cwd: string, agentId: string): Promise<{
  */
 async function archiveDirs(fs: StoreFs, cwd: string): Promise<string[]> {
   const dirs: string[] = []
-  const committed = join(cwd, FRAMEWORK_DIR, BRANCHES_DIR, DATA_BRANCH, ARCHIVE_DIR)
+  const committed = join(cwd, DATA_CHECKOUT_DIR, ARCHIVE_DIR)
   for (const name of await fs.readdir(committed)) {
     const candidate = join(committed, name)
     if ((await fs.readdir(candidate)).length > 0) dirs.push(candidate)
   }
-  dirs.push(join(cwd, FRAMEWORK_DIR, ARCHIVE_DIR))
+  dirs.push(join(cwd, THE_FRAMEWORK_DIR, ARCHIVE_DIR))
   return dirs
 }
 
@@ -741,7 +744,7 @@ export async function restoreArchivedAgent(
 ): Promise<boolean> {
   try {
     if (!isSafeAgentId(agentId)) return false
-    const dir = join(worktree, FRAMEWORK_DIR)
+    const dir = join(worktree, THE_FRAMEWORK_DIR)
     if (await fs.exists(join(dir, META_FILE))) return false
     const archive = await findArchive(fs, repo, agentId)
     if (!archive) return false
@@ -782,7 +785,7 @@ export async function archiveWorktreeAgent(
   user?: string,
 ): Promise<AgentMeta | undefined> {
   try {
-    const worktreeDir = join(worktree, FRAMEWORK_DIR)
+    const worktreeDir = join(worktree, THE_FRAMEWORK_DIR)
     const live = await readMetaFile(fs, join(worktreeDir, META_FILE))
     if (!live?.id || !isSafeAgentId(live.id)) return undefined
     // The flip writes the worktree's own log + meta too (#1359): the death gains its `end`
@@ -792,7 +795,7 @@ export async function archiveWorktreeAgent(
     // The branch is read from the checkout by the caller and stamped here, because this is the
     // last moment it can be observed: the worktree is about to go (#799).
     const meta: AgentMeta = branch ? { ...stopped, branch } : stopped
-    const dest = user ? committedArchiveDir(repo, user) : archiveDir(join(repo, FRAMEWORK_DIR))
+    const dest = user ? committedArchiveDir(repo, user) : archiveDir(join(repo, THE_FRAMEWORK_DIR))
     await archiveAgent(fs, dest, meta, join(worktreeDir, EVENTS_FILE))
     return meta
   } catch {
@@ -925,7 +928,7 @@ export async function reconcileOrphanedAgents(
   fs: StoreFs = nodeStoreFs(),
   isAlive: (pid: number) => boolean = isPidAlive,
 ): Promise<number> {
-  const dir = join(cwd, FRAMEWORK_DIR)
+  const dir = join(cwd, THE_FRAMEWORK_DIR)
   let fixed = 0
   // Archived agents stuck at `running` (e.g. a prior live agent the next agent never rescued), wherever
   // they are archived. Done before the live agent so its fresh archive isn't re-counted here.
@@ -956,8 +959,8 @@ export async function reconcileOrphanedAgents(
   // where nothing reads it. Flip it in place (so the dashboard stops showing it as live) and copy
   // it into the repo's history. The worktree itself is left on disk: an agent that ended this way did
   // not end cleanly, and those are kept for inspection. Removing one is an explicit action.
-  for (const entry of await worktreeDirEntries(cwd, path => fs.readdir(path))) {
-    const worktreeDir = join(entry.path, FRAMEWORK_DIR)
+  for (const entry of await worktreeDirEntries(cwd, path => fs.subdirs(path))) {
+    const worktreeDir = join(entry.path, THE_FRAMEWORK_DIR)
     const meta = await readMetaFile(fs, join(worktreeDir, META_FILE))
     if (!isDeadRunningAgent(meta, isAlive)) continue
     // recordOrphanEnd rather than a bare status flip (#1359): the worktree's log gains the
@@ -1004,7 +1007,7 @@ export async function readLiveMeta(
   fs: StoreFs = nodeStoreFs(),
   isAlive: (pid: number) => boolean = isPidAlive,
 ): Promise<AgentMeta | undefined> {
-  const dir = join(cwd, FRAMEWORK_DIR)
+  const dir = join(cwd, THE_FRAMEWORK_DIR)
   const meta = await readMetaFile(fs, join(dir, META_FILE))
   if (!meta) return undefined
   // Only a provably dead owner heals here — 'unknown' (no pid / another host) is left alone.
@@ -1018,7 +1021,7 @@ export async function readLiveMeta(
  * project path: `cwd` says which checkout to read that agent's git/file status from.
  */
 export interface LiveAgent extends AgentMeta {
-  /** The agent's own checkout: a worktree under `.the-framework/branches/`, or the repo root. */
+  /** The agent's own checkout: a worktree under `.branches/`, or the repo root. */
   cwd: string
 }
 
@@ -1027,7 +1030,7 @@ export interface LiveAgent extends AgentMeta {
  *
  * An agent started from the dashboard gets its own worktree (#736) and writes its `agent.json`
  * inside it, so the project path alone no longer sees any of them. This looks in both places:
- * each `.the-framework/branches/*` checkout, and the repo root itself, which is where a
+ * each `.branches/*` checkout, and the repo root itself, which is where a
  * project that cannot be given a worktree (not a git repo) still runs and where every agent
  * from before #736 lives.
  *
@@ -1039,8 +1042,8 @@ export async function readLiveMetas(
   fs: StoreFs = nodeStoreFs(),
   isAlive: (pid: number) => boolean = isPidAlive,
 ): Promise<LiveAgent[]> {
-  // The checkouts under `branches/`: run-branch-named dirs, never the rename links beside them.
-  const candidates = [cwd, ...(await worktreeDirEntries(cwd, path => fs.readdir(path))).map(entry => entry.path)]
+  // The checkouts under `.branches/`: the agent-branch-named directories, never the rename links beside them.
+  const candidates = [cwd, ...(await worktreeDirEntries(cwd, path => fs.subdirs(path))).map(entry => entry.path)]
   const agents: LiveAgent[] = []
   for (const candidate of candidates) {
     const meta = await readLiveMeta(candidate, fs, isAlive).catch(() => undefined)
@@ -1069,8 +1072,8 @@ export async function loadAgentEvents(
 export function nodeStoreFs(): StoreFs {
   // Destructured rather than returned whole: the narrow interface is the contract,
   // so the object should not carry methods the store was never handed.
-  const { read, write, append, exists, mkdir, readdir, rename } = nodeFs()
-  return { read, write, append, exists, mkdir, readdir, rename }
+  const { read, write, append, exists, mkdir, readdir, subdirs, rename } = nodeFs()
+  return { read, write, append, exists, mkdir, readdir, subdirs, rename }
 }
 
 /**
@@ -1109,7 +1112,7 @@ export async function findAgent(cwd: string, agentId: string, fs: StoreFs = node
  * lookup) cannot keep a second parser with a drifted torn-line policy.
  */
 export async function readEventLog(cwd: string, fs: StoreFs = nodeStoreFs()): Promise<FrameworkEvent[]> {
-  const path = join(cwd, FRAMEWORK_DIR, EVENTS_FILE)
+  const path = join(cwd, THE_FRAMEWORK_DIR, EVENTS_FILE)
   try {
     if (!(await fs.exists(path))) return []
     return parseEventLog(await fs.read(path))

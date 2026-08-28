@@ -21,7 +21,7 @@ import { reconcileBranchLinks } from './branch-links.js'
 import { reclaimWorktree, type ReclaimOutcome, type ReclaimRefusal } from './reclaim.js'
 
 /**
- * The command line over the package (#1725): the same functions the daemon calls, for an agent
+ * The command line over the package (#1725): the same functions a daemon calls, for an agent
  * (and a person) in a shell. One implementation, every surface a caller.
  *
  * The contract: JSON on stdout, one line for a person on stderr, and the exit code says how it
@@ -31,19 +31,19 @@ import { reclaimWorktree, type ReclaimOutcome, type ReclaimRefusal } from './rec
  * on stderr so a person does.
  *
  * Where the project is comes from the working directory: for every command that acts on the
- * project (`create`, `attach`, `list`, `remove`, `prune`) it is the checkout whose
- * `.the-framework/branches/` the working directory is under, else the checkout itself — so the
+ * project (`create`, `attach`, `list`, `remove`, `prune`) it is the checkout whose `.branches/`
+ * the working directory is under, else the checkout itself — so the
  * same command works from inside an agent's checkout; the commands that act on one checkout
  * (`name`, `status`) act on the one the working directory is in.
  */
 
 export const USAGE = `usage: branch-management <command>
 
-  create <id> [--base <ref>]   a checkout for agent <id>, on a fresh branch tf-agent-<id>
+  create <id> [--base <ref>]   a checkout for agent <id>, on a fresh branch agent-<id>
   attach <id> <branch>         a checkout for agent <id>, on an existing branch
-  name <name>                  rename this checkout's branch to tf-<name>; prints the name it got
+  name <name>                  rename this checkout's branch to agent-<name>; prints the name it got
   status [path]                the checkout's branch, whether it is clean, whether it is on the remote
-  list [--sizes]               every agent checkout under .the-framework/branches/
+  list [--sizes]               every agent checkout under .branches/
   remove <id> [--no-push]      reclaim agent <id>'s checkout, once the remote has everything it holds
   prune [--no-push]            remove, for every checkout
 
@@ -120,7 +120,7 @@ const COMMANDS: Record<string, Command> = {
     const checkout = await inRepo(() => checkoutRoot(cwd, git))
     const outcome = await nameBranch(checkout, name, git)
     if (!outcome.ok) throw new Refused(outcome, NAME_REFUSALS[outcome.reason](name, checkout))
-    // The `branches/<name>` link follows the rename now, not at the daemon's next pass.
+    // The `.branches/<name>` link follows the rename now, not at a daemon's next pass.
     await reconcileBranchLinks(await projectRoot(checkout, git), { git })
     return outcome
   },
@@ -206,10 +206,9 @@ const detailOf = (outcome: object): string | undefined => (outcome as { detail?:
 
 const NAME_REFUSALS: Record<NameBranchRefusal, (name: string, checkout: string) => string> = {
   'invalid-name': name => `${name} is not a session name: use [a-z0-9-]+`,
-  'reserved-name': name => `${name} is The Framework's own: not "data", and not "agent-…"`,
   'not-a-worktree': (_, checkout) => `${checkout} is not a git worktree`,
   'no-branch': (_, checkout) => `${checkout} is on no branch`,
-  'not-a-run-branch': (_, checkout) => `${checkout} is not on a branch The Framework minted; only tf-* branches are renamed`,
+  'not-an-agent-branch': (_, checkout) => `${checkout} is not on an agent branch; only agent-* branches are renamed`,
 }
 
 /** An agent id is path-safe, or the command has nothing to name a checkout with. */

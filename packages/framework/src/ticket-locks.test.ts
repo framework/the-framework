@@ -148,7 +148,7 @@ test('the default write creates tickets/ when the checkout has none (#1582)', as
   // born without it — the next drain claim must not fail on the missing parent.
   const { mkdtemp, rm: rmDir, readFile: readReal } = await import('node:fs/promises')
   const { tmpdir } = await import('node:os')
-  const dir = await mkdtemp(join(tmpdir(), 'tf-lock-'))
+  const dir = await mkdtemp(join(tmpdir(), 'agent-lock-'))
   try {
     const funnel: typeof withDataBranch = async (_cwd, _message, op) => {
       await op(dir)

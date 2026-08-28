@@ -45,12 +45,12 @@ async function commitWork(path: string, message = 'work'): Promise<void> {
   await git(['commit', '-q', '-m', message], path)
 }
 
-/** Hides the checkout's own bookkeeping directory from `git status`, as the install's ignore file does. */
-async function ignoreFrameworkDir(repo: string, path: string): Promise<void> {
+/** A caller's own bookkeeping directory inside the checkout, hidden from `git status` the way that caller does it. */
+async function ignoreStateDir(repo: string, path: string): Promise<void> {
   await mkdir(join(repo, '.git', 'info'), { recursive: true })
-  await writeFile(join(repo, '.git', 'info', 'exclude'), '.the-framework/\n')
-  await mkdir(join(path, '.the-framework'), { recursive: true })
-  await writeFile(join(path, '.the-framework', 'agent.json'), '{}')
+  await writeFile(join(repo, '.git', 'info', 'exclude'), '.state/\n')
+  await mkdir(join(path, '.state'), { recursive: true })
+  await writeFile(join(path, '.state', 'agent.json'), '{}')
 }
 
 test('a checkout holding uncommitted work is kept — nothing is committed for the agent (#1638)', async () => {
@@ -120,7 +120,7 @@ test('a clean checkout whose tip is inside a pushed anchor goes without a push, 
   const git = nodeGitRunner()
   try {
     await git(['checkout', '--', '.'], path)
-    await ignoreFrameworkDir(repo, path)
+    await ignoreStateDir(repo, path)
     const anchor = (await git(['rev-parse', 'HEAD'], repo)).trim()
     await git(['push', '-q', 'origin', 'HEAD:main'], repo)
     assert.deepEqual(await reclaimWorktree(repo, path, { ...ORDINARY, heldBy: anchor }), { ok: true })
@@ -139,7 +139,7 @@ test('a run branch holding nothing the remote lacks goes with its checkout, unpu
   try {
     await git(['push', '-q', 'origin', 'HEAD:main'], repo)
     await git(['checkout', '--', '.'], path)
-    await ignoreFrameworkDir(repo, path)
+    await ignoreStateDir(repo, path)
     assert.deepEqual(await reclaimWorktree(repo, path, ORDINARY), { ok: true, branchesDeleted: [branch] })
     await assert.rejects(() => stat(path), 'the checkout is gone')
     await assert.rejects(() => git(['rev-parse', '--verify', `refs/remotes/origin/${branch}`], repo), 'nothing reached origin')
@@ -191,7 +191,7 @@ test('a leftover checkout on a branch not minted for an agent keeps that branch,
     await git(['push', '-q', 'origin', 'HEAD:main'], repo)
     await git(['checkout', '--', '.'], path)
     await git(['checkout', '-q', '-b', 'release'], path)
-    await ignoreFrameworkDir(repo, path)
+    await ignoreStateDir(repo, path)
     // The user's branch stays; the birth branch it was cut from is ours and holds nothing
     // `release` does not, so that one goes (#1657).
     assert.deepEqual(await reclaimWorktree(repo, path, ORDINARY), { ok: true, branchesDeleted: [agentBranchName(RUN_ID)] })
@@ -210,8 +210,8 @@ test('a directory that is not a git worktree is refused before any git runs in i
   const git = nodeGitRunner()
   try {
     await git(['worktree', 'remove', '--force', worktree], repo)
-    await mkdir(join(worktree, '.the-framework'), { recursive: true })
-    await writeFile(join(worktree, '.the-framework', 'agent.json'), '{}')
+    await mkdir(join(worktree, '.state'), { recursive: true })
+    await writeFile(join(worktree, '.state', 'agent.json'), '{}')
     await writeFile(join(repo, 'index.html'), '<h1>half-typed</h1>\n')
     assert.deepEqual(await reclaimWorktree(repo, worktree, ORDINARY), { ok: false, reason: 'not-a-worktree' })
     assert.match(await git(['status', '--porcelain'], repo), /index\.html/, "the user's edit is still uncommitted")
@@ -227,11 +227,11 @@ test('the birth branch the agent branched away from goes with the checkout when 
   const git = nodeGitRunner()
   try {
     await git(['push', '-q', 'origin', 'HEAD:main'], repo)
-    await git(['checkout', '-q', '-b', 'tf-cool-name'], path)
+    await git(['checkout', '-q', '-b', 'agent-cool-name'], path)
     await commitWork(path)
     assert.deepEqual(await reclaimWorktree(repo, path, ORDINARY), { ok: true, branchesDeleted: [birth] })
-    assert.match(await git(['show', 'tf-cool-name:index.html'], repo), /Welcome!/, 'the work branch stays, pushed')
-    assert.match(await git(['show', 'refs/remotes/origin/tf-cool-name:index.html'], repo), /Welcome!/)
+    assert.match(await git(['show', 'agent-cool-name:index.html'], repo), /Welcome!/, 'the work branch stays, pushed')
+    assert.match(await git(['show', 'refs/remotes/origin/agent-cool-name:index.html'], repo), /Welcome!/)
     await assert.rejects(() => git(['rev-parse', '--verify', `refs/heads/${birth}`], repo), 'the birth branch is gone')
     await assert.rejects(() => git(['rev-parse', '--verify', `refs/remotes/origin/${birth}`], repo), 'and was never pushed')
   } finally {
@@ -245,11 +245,11 @@ test('a commitless run leaves neither the branch it ended on nor its birth branc
   try {
     await git(['push', '-q', 'origin', 'HEAD:main'], repo)
     await git(['checkout', '--', '.'], path)
-    await git(['checkout', '-q', '-b', 'tf-triage-quick'], path)
-    await ignoreFrameworkDir(repo, path)
-    assert.deepEqual(await reclaimWorktree(repo, path, ORDINARY), { ok: true, branchesDeleted: ['tf-triage-quick', birth] })
-    assert.equal((await git(['branch', '--list', 'tf-*'], repo)).trim(), '', 'no tf- branch is left')
-    assert.equal((await git(['ls-remote', '--heads', 'origin', 'tf-*'], repo)).trim(), '', 'and none reached origin')
+    await git(['checkout', '-q', '-b', 'agent-triage-quick'], path)
+    await ignoreStateDir(repo, path)
+    assert.deepEqual(await reclaimWorktree(repo, path, ORDINARY), { ok: true, branchesDeleted: ['agent-triage-quick', birth] })
+    assert.equal((await git(['branch', '--list', 'agent-*'], repo)).trim(), '', 'no agent- branch is left')
+    assert.equal((await git(['ls-remote', '--heads', 'origin', 'agent-*'], repo)).trim(), '', 'and none reached origin')
   } finally {
     await rm(repo, { recursive: true, force: true })
   }
@@ -264,7 +264,7 @@ test('a birth branch carrying a commit the kept branch lacks stays (#1657)', asy
     await git(['push', '-q', 'origin', 'HEAD:main'], repo)
     await commitWork(path, 'early work on the birth branch')
     const init = (await git(['rev-parse', 'HEAD'], repo)).trim()
-    await git(['checkout', '-q', '-b', 'tf-other', init], path)
+    await git(['checkout', '-q', '-b', 'agent-other', init], path)
     await writeFile(join(path, 'other.txt'), 'later\n')
     await commitWork(path, 'later work elsewhere')
     assert.deepEqual(await reclaimWorktree(repo, path, ORDINARY), { ok: true })
@@ -279,13 +279,13 @@ test('a branch renamed after its birth name was pushed is pushed under its new n
   const git = nodeGitRunner()
   try {
     await commitWork(path)
-    await git(['push', '-q', '--set-upstream', 'origin', 'tf-agent-run1'], path)
-    await git(['branch', '-m', 'tf-agent-run1', 'tf-renamed'], path)
+    await git(['push', '-q', '--set-upstream', 'origin', 'agent-run1'], path)
+    await git(['branch', '-m', 'agent-run1', 'agent-renamed'], path)
     // The tip is on the remote under the old name only — the branch's own tracked copy, not
     // another name holding it. So it is not "empty": it is pushed under the name it has now.
     assert.deepEqual(await reclaimWorktree(repo, path, ORDINARY), { ok: true })
-    assert.match(await git(['show', 'refs/remotes/origin/tf-renamed:index.html'], repo), /Welcome!/, 'pushed under the new name')
-    assert.equal((await git(['rev-parse', '--verify', 'refs/heads/tf-renamed'], repo)).trim().length, 40, 'and the local branch stays')
+    assert.match(await git(['show', 'refs/remotes/origin/agent-renamed:index.html'], repo), /Welcome!/, 'pushed under the new name')
+    assert.equal((await git(['rev-parse', '--verify', 'refs/heads/agent-renamed'], repo)).trim().length, 40, 'and the local branch stays')
   } finally {
     await rm(repo, { recursive: true, force: true })
   }

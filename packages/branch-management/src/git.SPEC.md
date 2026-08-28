@@ -29,7 +29,7 @@ Removing or pruning worktrees counts as an ordinary local mutation; listing them
 
 #### Rationale
 
-A single flat budget, sized for reads, once covered every git call in The Framework. That made the two slowest operations — creating a worktree and pushing — routinely die mid-flight on large repos, which is precisely the case where being killed is most destructive.
+A single flat budget, sized for reads, once covered every git call. That made the two slowest operations — creating a worktree and pushing — routinely die mid-flight on large repos, which is precisely the case where being killed is most destructive.
 
 ## Before modifying/creating SPEC.md files
 

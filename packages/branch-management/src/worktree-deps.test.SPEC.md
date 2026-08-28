@@ -1,6 +1,6 @@
 What the tests cover: giving a worktree its dependencies.
 
-- The scan finds the repo root's dependency tree and each workspace package's, and never descends into a dependency tree, the git directory, or the framework's own directory.
+- The scan finds the repo root's dependency tree and each workspace package's, and never descends into a dependency tree, the git directory, or a dot-directory.
 - Each tree is mirrored into the worktree at the same relative path as a real directory holding one link per entry, creating any missing parent directory; a tree already present in the worktree is left alone, and mirroring twice adds nothing.
 - The package manager's private state — every dot-entry but the executables directory — is not linked.
 - A filesystem that refuses to make a link, or the directory, is tolerated: the agent still starts.

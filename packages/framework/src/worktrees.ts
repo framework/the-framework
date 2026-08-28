@@ -11,9 +11,9 @@ import {
   pruneWorktrees,
   worktreePath,
   worktreeSize,
-  FRAMEWORK_DIR,
   type ReclaimOutcome,
 } from '@better-skills/branch-management'
+import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import { dataWorktreePath, withDataBranch } from './data-branch.js'
 
 /** A retained worktree and the agent that left it behind (#752). */
@@ -186,7 +186,7 @@ function refusal(agentId: string, outcome: ReclaimOutcome & { ok: false }, publi
  * exists but cannot be read or parsed throws, so the caller refuses rather than guesses.
  */
 async function readMetaFor(cwd: string, path: string, agentId: string): Promise<AgentMeta | undefined> {
-  const live = await readMetaStrict(join(path, FRAMEWORK_DIR, META_FILE))
+  const live = await readMetaStrict(join(path, THE_FRAMEWORK_DIR, META_FILE))
   if (live) return live
   const archived = (await archivedAgentPaths(cwd, agentId)).find(p => p.endsWith('.json'))
   return archived ? readMetaStrict(archived) : undefined
@@ -231,7 +231,7 @@ async function rmFile(path: string): Promise<void> {
  * why the surfaces that call it confirm first. Since #1179 that archive is committed, so the files
  * go but the deletion is itself a change git will record.
  *
- * What it deliberately leaves is git's, not the dashboard's: the branch `tf-agent-<id>`
+ * What it deliberately leaves is git's, not the dashboard's: the branch `agent-<id>`
  * (or the name the agent gave it) and its commits. Deleting a branch that may carry merged work
  * or an open PR is not a thing a
  * dashboard action should do silently, so the branch stays and delete means "remove from the

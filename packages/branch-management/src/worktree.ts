@@ -1,7 +1,7 @@
 import { basename, dirname, join } from 'node:path'
 import { realpath } from 'node:fs/promises'
 import { nodeGitRunner, checkoutRoot, type GitRunner } from './git.js'
-import { FRAMEWORK_DIR, BRANCHES_DIR, AGENT_BRANCH_PREFIX, isSafeAgentId, isRunBranch, worktreeDirName, agentIdFromWorktreeDir, isWorktreeDirName, isNamedRunBranch } from './branch-names.js'
+import { BRANCHES_DIR, AGENT_BRANCH_PREFIX, isSafeAgentId, isAgentBranch, agentBranchName, agentIdFromWorktreeDir } from './branch-names.js'
 
 /**
  * Git-worktree lifecycle for concurrent agents (#453/#735): give each agent its own
@@ -11,9 +11,9 @@ import { FRAMEWORK_DIR, BRANCHES_DIR, AGENT_BRANCH_PREFIX, isSafeAgentId, isRunB
  * how to add, list, remove, and prune worktrees.
  */
 
-/** The path an agent's worktree gets (#1580): `<repo>/.the-framework/branches/<run branch name>`. */
+/** The path an agent's worktree gets (#1580): `<repo>/.branches/<agent branch>`. */
 export function worktreePath(repo: string, agentId: string): string {
-  return join(repo, FRAMEWORK_DIR, BRANCHES_DIR, worktreeDirName(agentId))
+  return join(repo, BRANCHES_DIR, agentBranchName(agentId))
 }
 
 /** One checkout on disk: where it is, and whose it is. */
@@ -22,25 +22,29 @@ export interface WorktreeDirEntry {
   agentId: string
 }
 
-/** Lists a directory's entry names. A missing or unreadable directory yields `[]`. */
+/**
+ * Lists the names of the *directories* under `path` — a symlink is not one, whatever it points
+ * to. A missing or unreadable directory yields `[]`.
+ */
 export type DirReader = (path: string) => Promise<string[]>
 
 async function nodeReaddir(path: string): Promise<string[]> {
   const { readdir } = await import('node:fs/promises')
-  return readdir(path).catch(() => [])
+  const entries = await readdir(path, { withFileTypes: true }).catch(() => [])
+  return entries.filter(entry => entry.isDirectory()).map(entry => entry.name)
 }
 
 /**
- * Every checkout directory on disk (#1580). Only the run branch spelling counts — the same
- * directory holds the rename links (#1589), which are views, not checkouts. Forgiving: a missing
- * root yields nothing.
+ * Every checkout directory on disk (#1580): a directory under `.branches/` named as an agent
+ * branch. Only directories count — the same place holds the rename links (#1589), symlinks named
+ * as agent branches too, which are views, not checkouts. Forgiving: a missing root yields nothing.
  */
 export async function worktreeDirEntries(repo: string, readdir: DirReader = nodeReaddir): Promise<WorktreeDirEntry[]> {
-  const root = join(repo, FRAMEWORK_DIR, BRANCHES_DIR)
+  const root = join(repo, BRANCHES_DIR)
   const entries: WorktreeDirEntry[] = []
   for (const name of await readdir(root).catch((): string[] => [])) {
     const agentId = agentIdFromWorktreeDir(name)
-    if (isWorktreeDirName(name) && isSafeAgentId(agentId)) entries.push({ path: join(root, name), agentId })
+    if (isAgentBranch(name) && isSafeAgentId(agentId)) entries.push({ path: join(root, name), agentId })
   }
   return entries
 }
@@ -82,7 +86,7 @@ export interface AddedWorktree {
  * Create a worktree for an agent on a fresh branch: `git worktree add -b <branch>
  * <path> [base]`. Git makes the leaf dir (and any missing parents) itself. The
  * `agentId` is validated as path-safe first so a caller can never traverse out of
- * `.the-framework/branches/`. Rejects on any git failure (a caller that wants a
+ * `.branches/`. Rejects on any git failure (a caller that wants a
  * run needs its checkout, so failure must surface, not be swallowed).
  */
 export async function addWorktree(
@@ -101,7 +105,7 @@ export async function addWorktree(
  * no `-b`. Continuing an agent puts it back on the branch its work is already on, rather than
  * branching again from HEAD and stranding what it did last time.
  *
- * A branch that is gone is recreated from HEAD (#1650): the only branch the framework deletes is
+ * A branch that is gone is recreated from HEAD (#1650): the only branch the package deletes is
  * one that held nothing past a commit the remote already had, so HEAD is where its work was.
  * Anything else git refuses — the branch checked out elsewhere, say — still rejects, like
  * {@link addWorktree}: a continued agent needs its checkout.
@@ -181,7 +185,7 @@ export async function removeWorktree(repo: string, path: string, agent: GitRunne
   }
   try {
     await agent(['worktree', 'remove', '--force', path], repo)
-    console.log(`[framework] forced removal of worktree ${path} (git called it unclean)`)
+    console.log(`[branch-management] forced removal of worktree ${path} (git called it unclean)`)
   } catch {
     // Already removed, or never registered: nothing to do.
   }
@@ -200,7 +204,7 @@ export async function deleteBranch(repo: string, branch: string, agent: GitRunne
 /**
  * Whether `path` is the root of a git worktree — the main checkout's or a linked one (#1654).
  *
- * Git answers for any directory *inside* a repository, so a `branches/<run>` directory that is
+ * Git answers for any directory *inside* a repository, so a `.branches/<agent>` directory that is
  * no longer a worktree (a checkout removed by hand, a marker written after teardown) makes every
  * git command run in it act on the enclosing repo: the user's own checkout, on the user's own
  * branch. The one question that tells the two apart is whether git's top level is this very
@@ -220,7 +224,7 @@ export async function isWorktreeRoot(path: string, agent: GitRunner = nodeGitRun
 
 /**
  * The branch checked out at `path` when `path` is a worktree root (#1654), else `undefined` —
- * the read every consumer of a `branches/<run>` directory wants, so none of them can take the
+ * the read every consumer of a `.branches/<agent>` directory wants, so none of them can take the
  * enclosing repo's branch for the run's.
  */
 export async function worktreeBranch(path: string, agent: GitRunner = nodeGitRunner()): Promise<string | undefined> {
@@ -241,17 +245,16 @@ export async function currentBranch(path: string, agent: GitRunner = nodeGitRunn
 }
 
 /**
- * The project a directory belongs to (#1725): the checkout whose `.the-framework/branches/`
- * holds the agent checkouts. From inside an agent's checkout that is three levels up, by the
- * layout every checkout is created with; from anywhere else it is the checkout itself. Read from
- * the layout rather than from git's common dir, so a project that is itself a linked worktree,
- * or a submodule, answers with the directory the daemon registered. Rejects outside a repo.
+ * The project a directory belongs to (#1725): the checkout whose `.branches/` holds the agent
+ * checkouts. From inside an agent's checkout that is two levels up, by the layout every checkout
+ * is created with; from anywhere else it is the checkout itself. Read from the layout rather than
+ * from git's common dir, so a project that is itself a linked worktree, or a submodule, answers
+ * with the directory the caller registered. Rejects outside a repo.
  */
 export async function projectRoot(cwd: string, agent: GitRunner = nodeGitRunner()): Promise<string> {
   const checkout = await checkoutRoot(cwd, agent)
   const parent = dirname(checkout)
-  const nested = basename(parent) === BRANCHES_DIR && basename(dirname(parent)) === FRAMEWORK_DIR
-  return nested ? dirname(dirname(parent)) : checkout
+  return basename(parent) === BRANCHES_DIR ? dirname(parent) : checkout
 }
 
 /** A session name as the agent picks it: the charset the system prompt asks for. */
@@ -263,19 +266,17 @@ export function isSessionName(name: string): boolean {
 export type NameBranchRefusal =
   /** Not `[a-z0-9-]+`. */
   | 'invalid-name'
-  /** `tf-<name>` would be the data branch or a checkout directory's spelling: the framework's own. */
-  | 'reserved-name'
   /** The directory is not a git worktree root: nothing was run in it. */
   | 'not-a-worktree'
   /** The checkout is on no branch (detached). */
   | 'no-branch'
-  /** The checkout is on a branch the framework did not mint — the user's own, or the data branch. */
-  | 'not-a-run-branch'
+  /** The checkout is on a branch the package did not mint — the user's own. */
+  | 'not-an-agent-branch'
 
 export type NameBranchOutcome =
   | {
       ok: true
-      /** The name the branch ends up with: `tf-<name>`, suffixed when that was taken. */
+      /** The name the branch ends up with: `agent-<name>`, suffixed when that was taken. */
       branch: string
     }
   | { ok: false; reason: NameBranchRefusal }
@@ -284,14 +285,12 @@ export type NameBranchOutcome =
 const NAME_ATTEMPTS = 3
 
 /**
- * Name the session (#1725): rename the checkout's branch to `tf-<name>`. A rename, not a new
+ * Name the session (#1725): rename the checkout's branch to `agent-<name>`. A rename, not a new
  * branch, so the branch the checkout was born on is the branch it ends on and nothing is left
- * behind to clean up. Only a branch the framework minted is ever renamed — an agent that somehow
- * runs in the user's own checkout must not rename `main` — and only to a name that is not the
- * framework's own: `tf-data` is the data branch, and `tf-agent-<x>` is how checkout directories
- * are spelled, so a branch link of that name would read as a phantom checkout.
+ * behind to clean up. Only a branch the package minted is ever renamed: an agent that somehow
+ * runs in the user's own checkout must not rename `main`.
  *
- * A taken name gets a numeric suffix (`tf-<name>-2`, `-3`, …) rather than a refusal: the agent
+ * A taken name gets a numeric suffix (`agent-<name>-2`, `-3`, …) rather than a refusal: the agent
  * asked for a name, and the caller reads back the one it got. Taken means any local branch or
  * any remote-tracking branch, so the later push does not land on someone else's branch — except
  * the checkout's own branch, pushed or not, which is why asking again for the name the checkout
@@ -302,11 +301,10 @@ const NAME_ATTEMPTS = 3
 export async function nameBranch(path: string, name: string, agent: GitRunner = nodeGitRunner()): Promise<NameBranchOutcome> {
   if (!isSessionName(name)) return { ok: false, reason: 'invalid-name' }
   const wanted = `${AGENT_BRANCH_PREFIX}${name}`
-  if (!isNamedRunBranch(wanted)) return { ok: false, reason: 'reserved-name' }
   if (!(await isWorktreeRoot(path, agent))) return { ok: false, reason: 'not-a-worktree' }
   const current = await currentBranch(path, agent)
   if (!current) return { ok: false, reason: 'no-branch' }
-  if (!isRunBranch(current)) return { ok: false, reason: 'not-a-run-branch' }
+  if (!isAgentBranch(current)) return { ok: false, reason: 'not-an-agent-branch' }
   for (let attempt = 1; ; attempt++) {
     const taken = await branchNames(path, agent)
     taken.delete(current)
@@ -413,7 +411,7 @@ export async function branchPushed(
 }
 
 /**
- * Whether the checkout has nothing uncommitted. A read, never a commit (#1638): the framework
+ * Whether the checkout has nothing uncommitted. A read, never a commit (#1638): the package
  * commits nothing on an agent's behalf, so a checkout holding uncommitted work is one the caller
  * keeps. Throws when git cannot answer, so the caller keeps the checkout rather than guessing.
  */

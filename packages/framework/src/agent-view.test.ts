@@ -6,18 +6,20 @@ import type { FrameworkEvent } from './events.js'
 test('agentProgress starts building with no name and flips to ready on setReadyForMerge (#326)', () => {
   assert.deepEqual(agentProgress([]), { readyForMerge: false })
   // The birth branch is not a name (#1725): the agent is unnamed until it renames its branch.
-  assert.deepEqual(agentProgress([{ kind: 'branch', branch: 'tf-agent-r1' }]), { readyForMerge: false })
-  const building: FrameworkEvent[] = [{ kind: 'branch', branch: 'tf-add-comments' }]
+  assert.deepEqual(agentProgress([{ kind: 'branch', branch: 'agent-r1' }]), { readyForMerge: false })
+  const building: FrameworkEvent[] = [{ kind: 'branch', branch: 'agent-add-comments', sessionName: 'add-comments' }]
   assert.deepEqual(agentProgress(building), { sessionName: 'add-comments', readyForMerge: false })
   const ready: FrameworkEvent[] = [...building, { kind: 'ready-for-merge' }]
   assert.deepEqual(agentProgress(ready), { sessionName: 'add-comments', readyForMerge: true })
 })
 
 test('agentProgress reads the session name off the latest observed branch (#326/#1725)', () => {
+  // The name rides the event: only the journal that wrote it knows which branch the checkout was
+  // created on, so the projection never derives it from the branch itself (#1736).
   const events: FrameworkEvent[] = [
-    { kind: 'branch', branch: 'tf-agent-r1' },
-    { kind: 'branch', branch: 'tf-first-guess' },
-    { kind: 'branch', branch: 'tf-better-name-2' },
+    { kind: 'branch', branch: 'agent-r1' },
+    { kind: 'branch', branch: 'agent-first-guess', sessionName: 'first-guess' },
+    { kind: 'branch', branch: 'agent-better-name-2', sessionName: 'better-name-2' },
   ]
   assert.equal(agentProgress(events).sessionName, 'better-name-2')
   // A branch The Framework did not mint carries no session name.
@@ -112,7 +114,7 @@ test('agentErrors folds the errors the agent reported, oldest first (#1500)', ()
   assert.deepEqual(agentErrors([]), [])
   const events: FrameworkEvent[] = [
     { kind: 'error', headline: 'gh is not logged in', detail: 'ran `gh auth status`' },
-    { kind: 'branch', branch: 'tf-update-tickets' },
+    { kind: 'branch', branch: 'agent-update-tickets' },
     { kind: 'error', headline: 'tickets/meta.json has no lastImportedAt' },
   ]
   assert.deepEqual(agentErrors(events), [

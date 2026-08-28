@@ -25,7 +25,7 @@ See `## User story`: the agent works immediately, and ten agents cost no extra d
 
 Dependency directories are ignored by git, so a new worktree is handed an empty one and every command in it fails. Instead of copying or installing, each of the parent checkout's dependency directories is mirrored into the worktree at the same relative path: a real directory is created there, and inside it one link per entry of the parent's directory, pointing at that entry. A tree already present in the worktree is left alone, since the agent may have installed for itself already, and any missing parent directory is created first.
 
-The scan looks for a dependency directory at the repo root and at every directory down to two levels below it, which covers a workspace's per-package dependencies without walking the whole tree. Dependency directories, the git directory, the framework's own directory, build outputs and dot-directories are never descended into. The result is ordered, so mirroring happens in a stable order.
+The scan looks for a dependency directory at the repo root and at every directory down to two levels below it, which covers a workspace's per-package dependencies without walking the whole tree. Dependency directories, the git directory, build outputs and dot-directories are never descended into. The result is ordered, so mirroring happens in a stable order.
 
 #### Rationale
 

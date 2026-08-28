@@ -36,6 +36,7 @@ test('materializePresets writes every preset verbatim under the repo (#326)', as
     async append() {},
     async exists(path) { return written.has(path) },
     async mkdir(path) { dirs.push(path) },
+    async subdirs() { return [] },
     async readdir() { return [] },
   }
   await materializePresets('/repo', fs)

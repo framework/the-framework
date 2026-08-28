@@ -1,9 +1,10 @@
+import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { appendFile, mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { FRAMEWORK_DIR } from '@better-skills/branch-management'
+
 import {
   appendControl,
   controlPath,
@@ -161,7 +162,7 @@ test('a handoff entry needs both booleans, so a half-written line cannot disarm 
  * in there is runtime state that belongs to one machine and one moment.
  */
 function isCommittedFrameworkFile(path: string): boolean {
-  const rest = path.slice(path.indexOf(`${FRAMEWORK_DIR}/`) + FRAMEWORK_DIR.length + 1)
+  const rest = path.slice(path.indexOf(`${THE_FRAMEWORK_DIR}/`) + THE_FRAMEWORK_DIR.length + 1)
   if (rest === '.gitignore' || rest === 'LAYOUT' || rest === 'LOGS.md') return true
   if (rest.startsWith('conversations/')) return true
   const [, sessions] = rest.split('/')
@@ -185,7 +186,7 @@ test('no runtime state under .the-framework is tracked in git (#1298/#1311)', as
 
   const tracked = git(['ls-files'], root)
     .split('\n')
-    .filter(path => path.includes(`${FRAMEWORK_DIR}/`))
+    .filter(path => path.includes(`${THE_FRAMEWORK_DIR}/`))
     .filter(path => !isCommittedFrameworkFile(path))
 
   assert.deepEqual(tracked, [], `runtime state is tracked:\n${tracked.join('\n')}`)

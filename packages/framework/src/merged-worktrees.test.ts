@@ -85,9 +85,9 @@ test('a live session keeps its checkout: its agent is working in there (#1036)',
 test('a checkout that could not be reclaimed is reported with its reason (E5)', async () => {
   // The one failure mode the rule has: the push did not land, so the checkout stays and says why.
   const { agent: agent } = fakeSweep([row({ agentId: 'stuck' })])
-  const result = await agent({ remove: async () => ({ ok: false, error: 'tf-agent-stuck is not on the remote' }) })
+  const result = await agent({ remove: async () => ({ ok: false, error: 'agent-stuck is not on the remote' }) })
   assert.deepEqual(result.removed, [])
-  assert.deepEqual(result.failed, [{ agentId: 'stuck', error: 'tf-agent-stuck is not on the remote' }])
+  assert.deepEqual(result.failed, [{ agentId: 'stuck', error: 'agent-stuck is not on the remote' }])
 })
 
 test('an unlisted project sweeps nothing rather than failing (#1036)', async () => {
@@ -105,7 +105,7 @@ test('the sweep says what it removed and what it kept, per project (#1036)', asy
   const lines: string[] = []
   const results: Record<string, MergedSweepResult> = {
     '/a': { removed: [{ agentId: 'r1' }], failed: [] },
-    '/b': { removed: [{ agentId: 'r2', branchesDeleted: ['tf-triage-quick', 'tf-agent-r2'] }], failed: [{ agentId: 'r3', error: 'not on the remote' }] },
+    '/b': { removed: [{ agentId: 'r2', branchesDeleted: ['agent-triage-quick', 'agent-r2'] }], failed: [{ agentId: 'r3', error: 'not on the remote' }] },
   }
   const sweep = startMergedWorktreeSweep({
     projects: async () => [{ path: '/a' }, { path: '/b' }],
@@ -116,7 +116,7 @@ test('the sweep says what it removed and what it kept, per project (#1036)', asy
   sweep.stop()
   assert.match(lines[0] ?? '', /removed the worktree for session r1: its branch is on the remote/)
   assert.match(lines[0] ?? '', /The branch and the session are kept/, 'a checkout vanishing silently reads as a bug')
-  assert.match(lines[1] ?? '', /removed the worktree for session r2 and its branches tf-triage-quick and tf-agent-r2: nothing on it is missing elsewhere/, 'branches going say so (#1650, #1657)')
+  assert.match(lines[1] ?? '', /removed the worktree for session r2 and its branches agent-triage-quick and agent-r2: nothing on it is missing elsewhere/, 'branches going say so (#1650, #1657)')
   assert.match(lines[2] ?? '', /kept the worktree for session r3: not on the remote/)
 })
 
@@ -141,8 +141,8 @@ test('a changed keep reason is a changed state, and is said again (E5)', async (
   const lines: string[] = []
   const outcomes: MergedSweepResult[] = [
     { removed: [], failed: [{ agentId: 'r1', error: 'the repo has no remote; its worktree was kept' }] },
-    { removed: [], failed: [{ agentId: 'r1', error: 'tf-agent-r1 is not on the remote (auth failed); its worktree was kept' }] },
-    { removed: [], failed: [{ agentId: 'r1', error: 'tf-agent-r1 is not on the remote (auth failed); its worktree was kept' }] },
+    { removed: [], failed: [{ agentId: 'r1', error: 'agent-r1 is not on the remote (auth failed); its worktree was kept' }] },
+    { removed: [], failed: [{ agentId: 'r1', error: 'agent-r1 is not on the remote (auth failed); its worktree was kept' }] },
   ]
   const sweep = startMergedWorktreeSweep({
     projects: async () => [{ path: '/a' }],

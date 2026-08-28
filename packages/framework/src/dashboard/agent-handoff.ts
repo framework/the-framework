@@ -1,4 +1,5 @@
-import { nodeGitRunner, type GitRunner, agentBranchName, AGENT_BRANCH_PREFIX, sessionNameOf, currentBranch, repoHasRemote, FRAMEWORK_DIR, pushBranch, gitReason } from '@better-skills/branch-management'
+import { nodeGitRunner, type GitRunner, agentBranchName, sessionNameOf, currentBranch, repoHasRemote, pushBranch, gitReason } from '@better-skills/branch-management'
+import { THE_FRAMEWORK_DIR } from '../framework-dir.js'
 import {
   cachedPrView,
   cachedPrsForBranch,
@@ -206,16 +207,6 @@ export async function mergeAgentPr(
   return { ok: true, url: pr.url, number: pr.number }
 }
 
-/**
- * Whether a branch is one a session made, rather than one the user did.
- *
- * Only a naming convention, so it is a guess for the case #326 allows — the agent picking its own
- * branch name. Every caller uses it to decide how loudly to surface something, never to act.
- */
-export function isAgentBranch(branch: string | undefined): boolean {
-  return Boolean(branch?.startsWith(AGENT_BRANCH_PREFIX))
-}
-
 /** `git` that resolves to '' instead of rejecting, for reads where "no answer" is a fine answer. */
 function soft(git: GitRunner, cwd: string): (args: string[]) => Promise<string> {
   return args => git(args, cwd).catch(() => '')
@@ -252,7 +243,7 @@ function parseHandoffFiles(out: string): HandoffFile[] {
 
 /** The framework's own paper trail (#1291): the agent archive, plus pre-B3 records (conversations, LOGS.md). */
 function isBookkeepingPath(path: string): boolean {
-  return path === FRAMEWORK_DIR || path.startsWith(`${FRAMEWORK_DIR}/`)
+  return path === THE_FRAMEWORK_DIR || path.startsWith(`${THE_FRAMEWORK_DIR}/`)
 }
 
 /**
@@ -710,7 +701,7 @@ export type HandoffAgent = Pick<AgentMeta, 'id' | 'branch' | 'intent'> &
  * as commit subjects, which describe neither what changed nor even a whole thought (#1618).
  */
 function agentPrTitle(agent: Pick<HandoffAgent, 'id' | 'branch' | 'prTitle' | 'fixes'>): string {
-  const title = agent.prTitle ?? sessionNameOf(agent.branch) ?? `Session ${agent.id}`
+  const title = agent.prTitle ?? sessionNameOf(agent.branch, agent.id) ?? `Session ${agent.id}`
   return agent.fixes ? `${title} (fix ${agent.fixes})` : title
 }
 
@@ -737,6 +728,6 @@ function agentPrBody(agent: HandoffAgent): string {
   const lines: string[] = []
   const opening = agent.description?.trim() || agent.intent?.trim()
   if (opening) lines.push(opening, '')
-  lines.push(`Opened from The Framework session \`${sessionNameOf(agent.branch) ?? agent.id}\`.`)
+  lines.push(`Opened from The Framework session \`${sessionNameOf(agent.branch, agent.id) ?? agent.id}\`.`)
   return lines.join('\n')
 }

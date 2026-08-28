@@ -2,7 +2,7 @@ What the tests cover: every command of the command line against real git, and th
 
 - **`create`** - makes the checkout on `agent-<id>`, links the parent's dependency directory in, hides `.branches/` from the project's git through the exclude file; works from inside another checkout; `--base` puts the branch on the stated commit.
 - **Ids** - an id that could escape the branches directory is refused by `create` and `remove` with nothing created.
-- **`name`** - renames from a subdirectory of the checkout, leaves no second branch, moves the `branches/` link to the new name without moving the checkout; the same name again is a no-op and another name renames again, dropping the old link; a name taken locally or only on the remote gets a numeric suffix that the caller reads back; a name outside `[a-z0-9-]+` is refused with the branch untouched; the project's main checkout is refused and keeps its branch.
+- **`name`** - renames from a subdirectory of the checkout, leaves no second branch, moves the `.branches/` link to the new name without moving the checkout; the same name again is a no-op and another name renames again, dropping the old link; a name taken locally or only on the remote gets a numeric suffix that the caller reads back; a name outside `[a-z0-9-]+` is refused with the branch untouched; the project's main checkout is refused and keeps its branch.
 - **`status`** - reads dirty before the agent commits, clean after, on the remote after a push; accepts an absolute or a relative path; refuses a leftover directory that is not a checkout.
 - **`list`** - empty for a project with no checkouts; each checkout with the branch it is on now, renamed or not; a number per checkout with `--sizes`.
 - **`remove`** - a dirty checkout is kept with the reason on stderr; a committed one is pushed, removed, and its link dropped; a second removal reports no checkout; with `--no-push` an unpushed checkout is kept and nothing reaches the remote, until someone pushes it by hand.
@@ -13,7 +13,7 @@ What the tests cover: every command of the command line against real git, and th
 - **A git failure** - reported with git's own line, exit code 1.
 - **The executable** - runs by name from the exported bin directory: JSON on stdout, the reason on stderr, the exit codes 0, 1 and 2.
 - **Naming again** - asking again for the name the checkout already carries changes nothing, whether it got the plain name or a suffixed one, and whether or not its own branch has been pushed.
-- **Reserved names** - `data` and any `agent-…` name are refused, the branch stays, and no phantom checkout appears in the listing.
+- **A name spelled like a checkout directory** - `agent-<x>` as a session name is a name like any other: the branch becomes `agent-agent-<x>`, its link follows, and the link is never listed as a checkout.
 - **The project from its layout** - a project that is itself a linked worktree gets its checkouts under its own directory, lists them from inside one of them, and its links follow a rename; the main checkout it was made from sees none of them.
 - **Before the project is looked for** - a bad id is refused even outside a repository; `status <path>` on a directory outside a repository answers "not a checkout"; `attach` outside a repository is refused as such.
 - **Not commands** - names of built-in object properties are not commands.

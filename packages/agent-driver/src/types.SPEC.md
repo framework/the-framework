@@ -13,7 +13,7 @@ The user picks which coding agent does the work — Claude Code or Codex — and
 ## Business logic — TL;DR
 
 - **The CLI is a black box** - the caller prompts it, lets its own loop run to completion, and then reads the code it produced. It never gates on which tool the agent reached for.
-- **Every pass is a fresh prompt** - review, security, QA, UX: each is its own prompt with its own fresh context, and a role is framing added to the prompt rather than a separate kind of agent.
+- **Every prompt is a fresh context** - each prompt the caller sends is its own turn with its own fresh context, and a role is framing added to the prompt rather than a separate kind of agent.
 - **Capabilities are optional, never faked** - reading the account's quota, reading a file from the agent's workspace, and continuing a previous conversation are each offered only by drivers that can genuinely do them; a driver that cannot simply does not, and the product copes.
 - **Events are for looking, not for deciding** - everything the agent streams reaches the caller's UI for visibility, and no control flow ever branches on it.
 - **Spend, traffic light, and proportion are three different things** - what an agent spent, whether the account may still spend, and how much of the allowance is gone are kept strictly apart and never substituted for one another.
@@ -36,17 +36,17 @@ The contract is deliberately tiny: start an agent bound to a checkout, prompt it
 
 #### Rationale
 
-Two identities are kept apart. The **driver** is the user's choice — Claude Code or Codex. Each driver has a separate implementation for each place it can run, since running on a GitHub Actions runner or in a cloud session is a different mechanism from running on this device, and the run target is a fact about *where*, not about *which agent*. The contract fixes the set of implementation ids (`claude-code`, `codex`, `claude-web`, `github-actions`, `fake`), because an agent's record names the implementation that ran it and every reader of that record must agree on the vocabulary; mapping an id back to the user's choice is the caller's business, not the package's.
+Two identities are kept apart. The **driver** is the user's choice — Claude Code or Codex. Each driver has a separate implementation for each place it can run, since running on a GitHub Actions runner or in a cloud session is a different mechanism from running on this device, and where it runs is a fact about *where*, not about *which agent*. The contract fixes the set of implementation ids (`claude-code`, `codex`, `claude-web`, `github-actions`, `fake`), because an agent's record names the implementation that ran it and every reader of that record must agree on the vocabulary; mapping an id back to the user's choice is the caller's business, not the package's.
 
-### Every pass is a fresh prompt
+### Every prompt is a fresh context
 
 #### User story
 
-An agent plans, then builds, then reviews its own work for quality, security, and user experience — and each of those passes should think about the task with a clear head rather than dragging the previous pass's context along.
+The caller sends an agent several prompts in a row — a plan, then the build, then a review of its own work — and wants each to think about the task with a clear head rather than dragging the previous prompt's context along.
 
 #### Business logic
 
-Each pass is its own prompt, and a prompt is the unit of fresh context. Everything runs through the driver — there is no second execution path — and a role is delivered as framing prepended to the prompt rather than as a separate kind of agent. Framing exists at two levels: framing that applies to every prompt of an agent, and framing added for one prompt only.
+A prompt is the unit of fresh context. Everything runs through the driver — there is no second execution path — and a role is delivered as framing prepended to the prompt rather than as a separate kind of agent. Framing exists at two levels: framing that applies to every prompt of an agent, and framing added for one prompt only.
 
 The one deliberate exception is continuing a conversation: a prompt may ask to pick up the agent's previous turn instead of starting fresh, which is how a live chat message lands in the ongoing conversation with its full history, and how a finished agent is revived from the caller's UI with everything it already knew.
 

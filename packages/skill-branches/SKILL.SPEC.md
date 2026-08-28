@@ -1,8 +1,8 @@
-The skill's instructions: what an agent is told about living inside its own checkout, under the package's conventions. Given to every agent a caller starts in a checkout it created, and installable by a skills catalogue as `skills/branches.md`.
+The skill's instructions: what an agent is told about living inside its own checkout, under the package's conventions. Found by every agent a caller starts in a checkout the package created, as a skill of its harness (`src/skill-links`).
 
 ## User story
 
-- The user starts an agent from the dashboard and expects its work on a branch named after what it did, reviewable as a pull request, with nothing touched in the user's own checkout.
+- The user starts an agent from the caller's UI and expects its work on a branch named after what it did, reviewable as a pull request, with nothing touched in the user's own checkout.
 
 ## Business logic — TL;DR
 

@@ -40,7 +40,7 @@ export interface RunAgentOptions {
    * see {@link isHandsOff}.
    */
   location?: AgentLocation
-  /** The agent runs in a checkout The Framework created, with `branch-management` on its PATH (#1725). */
+  /** The agent runs in a checkout The Framework created, with `branches` on its PATH (#1725). */
   ownedCheckout?: boolean
   /** The wrapped coding agent. */
   driver: Driver

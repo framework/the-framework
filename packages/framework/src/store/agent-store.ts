@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { hostname } from 'node:os'
 import type { AutoHandoffSkip, FrameworkEvent } from '../events.js'
 import { nodeFs } from '../node-fs.js'
-import { isSafeAgentId, worktreeDirEntries } from '@better-skills/branch-management'
+import { isSafeAgentId, worktreeDirEntries } from '@gemstack/skill-branches'
 import { THE_FRAMEWORK_DIR, DATA_CHECKOUT_DIR } from '../framework-dir.js'
 
 /**

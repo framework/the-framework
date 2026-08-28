@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { nodeGitRunner, type GitRunner, AGENT_BRANCH_PREFIX } from '@better-skills/branch-management'
+import { nodeGitRunner, type GitRunner, AGENT_BRANCH_PREFIX } from '@gemstack/skill-branches'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import { ghPrsForBranch, type LinkedPr } from './dashboard/gh.js'
 import { startedAtFromAgentId } from './store/index.js'

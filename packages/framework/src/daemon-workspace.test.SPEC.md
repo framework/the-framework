@@ -12,7 +12,7 @@ Refusing a start the driver cannot serve: a start on a logged-out driver is refu
 
 Held slots: a live agent's slot names the agent and its process id, and stopping the agents reports the same name and clears the slot.
 
-The agent's environment: the spawned process's PATH starts with the branch-management package's executable directory and continues with the daemon's own, and the `branch-management` command found through it lists the very checkout the daemon allocated.
+The agent's environment: the spawned process's PATH starts with the `skill-branches` package's executable directory and continues with the daemon's own, and the `branches` command found through it lists the very checkout the daemon allocated.
 
 ## Before modifying/creating SPEC.md files
 

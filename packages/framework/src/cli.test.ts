@@ -6,7 +6,7 @@ import { join, dirname } from 'node:path'
 import { appendControl } from './control.js'
 import { BROWSER_MCP_SERVERS, withBrowser } from './browser.js'
 import { EVENTS_FILE, ARCHIVE_DIR, type StoreFs } from './store/index.js'
-import { nodeGitRunner } from '@better-skills/branch-management'
+import { nodeGitRunner } from '@gemstack/skill-branches'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import { layoutMarker, layoutMarkerPath } from './layout.js'
 import {
@@ -185,7 +185,7 @@ test('promptAgentSpec runs a headless prompt and carries NO onBeforeMergeable (r
 
 test('promptAgentSpec goes vanilla so the on-before-mergeable follow-up skips the session-name step (#560)', () => {
   // The follow-up is not a session; vanilla drops the built-in system prompt (#326) (its `### Session
-  // name` step and the branch-management skill), so the agent stays on the session branch instead of
+  // name` step and the `branches` skill), so the agent stays on the session branch instead of
   // renaming it after a session of its own.
   assert.equal(promptAgentSpec('queue follow-ups', '/work/app', true).options.vanilla, true)
 })
@@ -688,7 +688,7 @@ test('the journal reads the branch off the checkout, and sees the agent\'s own r
   await journal.observeBranch()
   assert.equal(journal.branch(), 'agent-r1')
   assert.equal(journal.sessionName(), undefined, 'the birth branch is not a name')
-  // The agent names its branch in its own shell (#1725) — `branch-management name cool-name` is
+  // The agent names its branch in its own shell (#1725) — `branches name cool-name` is
   // this rename — and the journal only learns of it by looking again.
   git('branch', '-m', 'agent-r1', 'agent-cool-name')
   assert.equal(journal.sessionName(), undefined, 'nothing is recorded until the branch is read again')

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { realpath } from 'node:fs/promises'
 import { test } from 'node:test'
-import { nodeGitRunner } from '@better-skills/branch-management'
+import { nodeGitRunner } from '@gemstack/skill-branches'
 import { DATA_BRANCH, dataWorktreePath, ensureDataWorktree, pullDataBranch, withDataBranch } from './data-branch.js'
 import { DATA_CHECKOUT_DIR } from './framework-dir.js'
 

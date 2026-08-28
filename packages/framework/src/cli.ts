@@ -45,7 +45,7 @@ import {
 import { loadUserSystemPrompt, SYSTEM_PROMPT_FILE } from './system-prompt-file.js'
 import { checkForUpdate, formatUpdateStatus, nodeVersionFetcher, type VersionFetcher } from './update-check.js'
 import { AgentStore, nodeStoreFs, type StoreFs } from './store/index.js'
-import { currentBranch, agentBranchName, nodeGitRunner, sessionNameOf } from '@better-skills/branch-management'
+import { currentBranch, agentBranchName, nodeGitRunner, sessionNameOf } from '@gemstack/skill-branches'
 import { materializePresets } from './presets.js'
 import { isLoopbackHost, registerHomeProject, runDaemon, DEFAULT_DAEMON_HOST, DEFAULT_DAEMON_PORT } from './daemon.js'
 import { appendControl, resetControl, watchControl, type ControlWatcher } from './control.js'
@@ -569,7 +569,7 @@ export interface AgentJournal {
   /**
    * Read the checkout's branch and record it as a `branch` event when it changed (#1277/#1725):
    * at start, after every turn, and before the epilogue reads it. The agent renames its branch
-   * itself, in its shell, through `branch-management name`; this process only observes.
+   * itself, in its shell, through `branches name`; this process only observes.
    */
   observeBranch: () => Promise<void>
   /** The branch the checkout was last observed on; undefined outside a git checkout, or once detached. */
@@ -1292,7 +1292,7 @@ async function driveAgent(opts: AgentOptions, io: CliIO): Promise<number> {
     kind,
     ...(opts.target ? { location: opts.target } : {}),
     // The daemon's checkout on this machine (#1725): `--run-id` says the framework owns the checkout,
-    // and only a local agent has the daemon's PATH with `branch-management` on it.
+    // and only a local agent has the daemon's PATH with `branches` on it.
     ownedCheckout: opts.agentId !== undefined && (opts.target ?? 'local') === 'local',
     prompt: isResearch ? presets.research.render(intent) : intent,
     // Resume the stopped leg's conversation (#720/#1467); the prompt above is the continuation

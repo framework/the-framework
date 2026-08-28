@@ -3,7 +3,7 @@ import { closeSync, mkdirSync, openSync } from 'node:fs'
 import { basename, delimiter, dirname, join, resolve } from 'node:path'
 import { appendFile, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { agentIdFromStartedAt, startedAtFromAgentId, archiveWorktreeAgent, restoreArchivedAgent, listAgents, findAgent, archivedAgentPaths, readLiveMetas, readLiveMeta, resolveAgentEventsPath, EVENTS_FILE, META_FILE, isPidAlive, type AgentMeta } from './store/index.js'
-import { createCheckout, attachCheckout, agentBranchName, worktreePath, worktreeBranch, removeWorktree, pruneWorktrees, agentIdFromWorktreeDir, isGitRepo, nodeGitRunner, isGitTimeout, CLI_BIN_DIR } from '@better-skills/branch-management'
+import { createCheckout, attachCheckout, agentBranchName, worktreePath, worktreeBranch, removeWorktree, pruneWorktrees, agentIdFromWorktreeDir, isGitRepo, nodeGitRunner, isGitTimeout, CLI_BIN_DIR } from '@gemstack/skill-branches'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import type { FrameworkEvent } from './events.js'
 import { removeAgentSpec, writeAgentSpec } from './agent-spec.js'
@@ -106,7 +106,7 @@ function spawnDetached(binPath: string, specPath: string, stderrFile?: string, e
 }
 
 /**
- * A spawned run's environment: ours, with the `branch-management` command on its PATH (#1725) —
+ * A spawned run's environment: ours, with the `branches` command on its PATH (#1725) —
  * the agent names its session and checks its tree through the same package the daemon allocated
  * its checkout with — plus the daemon's URL when it has one (#1328).
  */

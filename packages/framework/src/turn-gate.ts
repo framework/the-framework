@@ -38,7 +38,7 @@ export const BROWSER_PROTOCOL = PROTOCOLS_BROWSER
  * emits the block and keeps going (the framework records it and reflects it in the
  * dashboard). Injected alongside AWAIT_PROTOCOL. The text lives in
  * `prompts/protocols/signal.md` (#551). The session name is not a signal (#1725): the agent
- * names its branch through `branch-management name`, and the name is read off the branch.
+ * names its branch through `branches name`, and the name is read off the branch.
  */
 export const SIGNAL_PROTOCOL = PROTOCOLS_SIGNAL
 

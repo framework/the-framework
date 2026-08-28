@@ -37,7 +37,7 @@ import { reclaimWorktree, type ReclaimOutcome, type ReclaimRefusal } from './rec
  * (`name`, `status`) act on the one the working directory is in.
  */
 
-export const USAGE = `usage: branch-management <command>
+export const USAGE = `usage: branches <command>
 
   create <id> [--base <ref>]   a checkout for agent <id>, on a fresh branch agent-<id>
   attach <id> <branch>         a checkout for agent <id>, on an existing branch

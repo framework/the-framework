@@ -12,7 +12,7 @@ import {
   SYSTEM_PROMPT_TEMPLATE,
 } from './system-prompt.js'
 import { FLAT_TODO_FILE } from './tickets.js'
-import { BRANCH_MANAGEMENT_SKILL, BRANCH_YOURSELF, DATA_BRANCH_PROTOCOL, TICKETING_FORMAT, TODO_FORMAT } from './prompts.generated.js'
+import { BRANCHES_SKILL, BRANCH_YOURSELF, DATA_BRANCH_PROTOCOL, TICKETING_FORMAT, TODO_FORMAT } from './prompts.generated.js'
 import { loadUserSystemPrompt, SYSTEM_PROMPT_FILE } from './system-prompt-file.js'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 
@@ -103,7 +103,7 @@ test('SYSTEM_PROMPT_TEMPLATE carries the built-in prompt sections (#326) verbati
   // relative ones in its worktree, and finished `done` with a commit holding none of the work.
   // The worktree is nested inside the repo, so the user's tree is a path prefix of the agent's
   // cwd — nothing else in the prompt tells it where its workspace ends.
-  // The workspace rules moved to the branch-management skill (#1725); the prompt keeps the step that names the session.
+  // The workspace rules moved to the `branches` skill (#1725); the prompt keeps the step that names the session.
   assert.ok(!SYSTEM_PROMPT_TEMPLATE.includes('Your working directory is the whole of your workspace'))
   assert.ok(SYSTEM_PROMPT_TEMPLATE.includes('as the "Branch management" section below says'))
   assert.ok(SYSTEM_PROMPT_TEMPLATE.includes('${{tf.prompt}}'))
@@ -304,14 +304,14 @@ test('composeAgentSystem is empty under transparent mode — no prompt, no emit 
   )
 })
 
-test('the branch-management skill rides after the built-in prompt of an agent in its own checkout; anyone else branches with git (#1725)', () => {
+test('the `branches` skill rides after the built-in prompt of an agent in its own checkout; anyone else branches with git (#1725)', () => {
   // The skill is the package's SKILL.md, front matter stripped: instructions, not catalogue metadata.
-  assert.ok(BRANCH_MANAGEMENT_SKILL.startsWith('# Branch management'), BRANCH_MANAGEMENT_SKILL.slice(0, 40))
-  assert.ok(BRANCH_MANAGEMENT_SKILL.includes('branch-management name <name>'))
-  assert.ok(BRANCH_MANAGEMENT_SKILL.includes('branch-management status'))
+  assert.ok(BRANCHES_SKILL.startsWith('# Branch management'), BRANCHES_SKILL.slice(0, 40))
+  assert.ok(BRANCHES_SKILL.includes('branches name <name>'))
+  assert.ok(BRANCHES_SKILL.includes('branches status'))
   const block = systemPromptBlock({ ownedCheckout: true, user: 'Mine too.' })
   const prompt = block.indexOf('### Session name')
-  const skill = block.indexOf(BRANCH_MANAGEMENT_SKILL)
+  const skill = block.indexOf(BRANCHES_SKILL)
   assert.ok(prompt !== -1 && skill !== -1 && prompt < skill, 'the prompt names the session first, the skill says how')
   assert.ok(skill < block.indexOf('Mine too.'), "the user's own prompt stays last")
   assert.ok(!block.includes(BRANCH_YOURSELF))
@@ -322,7 +322,7 @@ test('the branch-management skill rides after the built-in prompt of an agent in
   // runner, a cloud session — the command is not on the PATH: the same section title, git instead.
   for (const opts of [{}, { handsOff: true }]) {
     const elsewhere = systemPromptBlock(opts)
-    assert.ok(!elsewhere.includes(BRANCH_MANAGEMENT_SKILL), JSON.stringify(opts))
+    assert.ok(!elsewhere.includes(BRANCHES_SKILL), JSON.stringify(opts))
     assert.ok(elsewhere.includes(BRANCH_YOURSELF), JSON.stringify(opts))
     assert.ok(BRANCH_YOURSELF.startsWith('# Branch management') && BRANCH_YOURSELF.includes('git checkout -b agent-<SESSION_NAME>'))
   }
@@ -330,6 +330,6 @@ test('the branch-management skill rides after the built-in prompt of an agent in
   // or create a branch after a session of its own (#560).
   for (const opts of [{ vanilla: true, ownedCheckout: true, user: 'Only mine.' }, { vanilla: true, user: 'Only mine.' }]) {
     const vanilla = systemPromptBlock(opts)
-    assert.ok(!vanilla.includes(BRANCH_MANAGEMENT_SKILL) && !vanilla.includes(BRANCH_YOURSELF) && !vanilla.includes('Branch management'), JSON.stringify(opts))
+    assert.ok(!vanilla.includes(BRANCHES_SKILL) && !vanilla.includes(BRANCH_YOURSELF) && !vanilla.includes('Branch management'), JSON.stringify(opts))
   }
 })

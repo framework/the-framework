@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { archivedAgentPaths, readLiveMetas, EVENTS_FILE } from './agent-store.js'
-import { isSafeAgentId, worktreePath } from '@better-skills/branch-management'
+import { isSafeAgentId, worktreePath } from '@gemstack/skill-branches'
 import { THE_FRAMEWORK_DIR } from '../framework-dir.js'
 import { nodeFs } from '../node-fs.js'
 

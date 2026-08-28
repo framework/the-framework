@@ -1,6 +1,6 @@
 /**
  * One `execFile`-backed CLI runner, configured per binary — `gh`'s reads and writes. Git runs
- * through the branch-management package's own runner, which budgets per subcommand.
+ * through the `skill-branches` package's own runner, which budgets per subcommand.
  */
 
 /** Runs a CLI binary in `cwd`, resolving its stdout. Rejects on a non-zero exit. */

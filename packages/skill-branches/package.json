@@ -1,12 +1,12 @@
 {
-  "name": "@better-skills/branch-management",
+  "name": "@gemstack/skill-branches",
   "version": "0.0.1",
   "description": "Branch management for coding agents: one git checkout per agent under .branches/, named as its branch, reclaimed once its work is on the remote.",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/framework/the-framework.git",
-    "directory": "packages/branch-management"
+    "directory": "packages/skill-branches"
   },
   "type": "module",
   "engines": {
@@ -17,11 +17,11 @@
   },
   "files": [
     "dist",
-    "bin/branch-management",
+    "bin/branches",
     "SKILL.md"
   ],
   "bin": {
-    "branch-management": "bin/branch-management"
+    "branches": "bin/branches"
   },
   "exports": {
     ".": {

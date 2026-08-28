@@ -1,4 +1,4 @@
-import { sessionNameOf } from '@better-skills/branch-management/branch-names'
+import { sessionNameOf } from '@gemstack/skill-branches/branch-names'
 import type { AgentMeta } from '../../src/index.js'
 import { formatDateTimeShort } from './format-date.js'
 

@@ -5,7 +5,7 @@ import { installProject } from './install.js'
 import { PRESETS, PRESET_DIR } from './presets.js'
 import { frameworkGitignore, gitignorePath } from './framework-gitignore.js'
 import { layoutMarker, layoutMarkerPath } from './layout.js'
-import type { GitRunner } from '@better-skills/branch-management'
+import type { GitRunner } from '@gemstack/skill-branches'
 import type { StoreFs } from './store/index.js'
 
 /** An in-memory {@link StoreFs} so the install logic is tested without touching disk. */

@@ -42,17 +42,17 @@ function constName(relPath) {
     .toUpperCase()
 }
 
-// The branch-management skill (#1725) rides in the system channel the way the prompts above do,
+// The `branches` skill (#1725) rides in the system channel the way the prompts above do,
 // but its text is the package's, not this directory's: read from wherever the package is
 // installed, so the instructions and the command they name can never come from two versions.
 // Its front matter is the skill catalogue's metadata, not instructions, and is dropped.
-const skillPath = createRequire(import.meta.url).resolve('@better-skills/branch-management/SKILL.md')
+const skillPath = createRequire(import.meta.url).resolve('@gemstack/skill-branches/SKILL.md')
 const sources = [
   ...(await findMarkdown(promptsDir)).map(path => {
     const relPath = relative(promptsDir, path).split('\\').join('/')
     return { label: `prompts/${relPath}`, name: constName(relPath), path, frontMatter: false }
   }),
-  { label: '@better-skills/branch-management/SKILL.md', name: 'BRANCH_MANAGEMENT_SKILL', path: skillPath, frontMatter: true },
+  { label: '@gemstack/skill-branches/SKILL.md', name: 'BRANCHES_SKILL', path: skillPath, frontMatter: true },
 ]
 const entries = await Promise.all(
   sources.map(async source => {

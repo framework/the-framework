@@ -20,7 +20,7 @@ const ORDINARY: ReclaimOptions = { birthBranch: agentBranchName(RUN_ID), mayPush
 async function repoWithDirtyWorktree(opts: { remote?: boolean } = {}): Promise<{ repo: string; path: string; branch: string }> {
   const git = nodeGitRunner()
   // realpath so the mkdtemp path matches what git reports (the /var -> /private/var symlink).
-  const repo = await realpath(await mkdtemp(join(tmpdir(), 'branch-management-reclaim-')))
+  const repo = await realpath(await mkdtemp(join(tmpdir(), 'branches-reclaim-')))
   await git(['init'], repo)
   await git(['config', 'user.email', 't@t'], repo)
   await git(['config', 'user.name', 't'], repo)

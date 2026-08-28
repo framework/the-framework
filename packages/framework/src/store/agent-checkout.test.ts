@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises'
 import { resolveAgentEventsPath } from './agent-checkout.js'
 import { EVENTS_FILE, ARCHIVE_DIR } from './agent-store.js'
-import { worktreePath } from '@better-skills/branch-management'
+import { worktreePath } from '@gemstack/skill-branches'
 import { THE_FRAMEWORK_DIR } from '../framework-dir.js'
 // resolveAgentEventsPath probes the real filesystem (same as resolveAgentCheckout), so these
 // tests build a throwaway project directory rather than a memory fs.

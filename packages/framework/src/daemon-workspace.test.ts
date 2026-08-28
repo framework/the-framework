@@ -15,7 +15,7 @@ import type { PreflightResult } from './preflight.js'
 const agentReady = (): Promise<PreflightResult> => Promise.resolve({ ok: true, checks: [] })
 
 import { EVENTS_FILE, META_FILE, startedAtFromAgentId, type AgentMeta } from './store/index.js'
-import { BRANCHES_DIR, worktreePath, agentBranchName, nodeGitRunner, GitTimeoutError, CLI_BIN_DIR } from '@better-skills/branch-management'
+import { BRANCHES_DIR, worktreePath, agentBranchName, nodeGitRunner, GitTimeoutError, CLI_BIN_DIR } from '@gemstack/skill-branches'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import { addProject, projectId } from './registry.js'
 import type { AgentSpec } from './agent-spec.js'
@@ -643,7 +643,7 @@ async function writePathStub(dir: string, log: string): Promise<string> {
   return stub
 }
 
-test('a spawned agent finds the branch-management command on its PATH (#1725)', async () => {
+test('a spawned agent finds the `branches` command on its PATH (#1725)', async () => {
   const cwd = await realpath(await mkdtemp(join(tmpdir(), 'framework-agent-path-')))
   try {
     const git = nodeGitRunner()
@@ -667,7 +667,7 @@ test('a spawned agent finds the branch-management command on its PATH (#1725)', 
     assert.equal(path.split(delimiter).slice(1).join(delimiter), process.env['PATH'], "after the daemon's own")
     // By name, the way the agent's shell resolves it, against the project the daemon started it in.
     const listed = await new Promise<string>((resolvePromise, rejectPromise) =>
-      execFile('branch-management', ['list'], { cwd, env: { ...process.env, PATH: path } }, (err, stdout) => (err ? rejectPromise(err) : resolvePromise(stdout))),
+      execFile('branches', ['list'], { cwd, env: { ...process.env, PATH: path } }, (err, stdout) => (err ? rejectPromise(err) : resolvePromise(stdout))),
     )
     assert.deepEqual(
       (JSON.parse(listed) as { agentId: string }[]).map(row => row.agentId),

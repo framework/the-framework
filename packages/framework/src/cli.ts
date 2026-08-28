@@ -1181,7 +1181,7 @@ async function driveAgent(opts: AgentOptions, io: CliIO): Promise<number> {
           'workflow refuses a bot-triggered run.',
       )
     }
-    actionsConfig = { owner: slug.owner, repo: slug.repo, token }
+    actionsConfig = { owner: slug.owner, repo: slug.repo, token, workflow: 'framework-agent.yml' }
     io.out(`◆ run on: GitHub Actions (${slug.owner}/${slug.repo})`)
   }
 

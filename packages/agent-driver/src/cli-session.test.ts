@@ -34,6 +34,7 @@ test('runCliSession streams the parser events and resolves the final turn', asyn
     spawn,
     emit: e => events.push(e),
     signals: [],
+    driver: 'agent',
     parser,
   })
   assert.deepEqual(turn, { text: 'done', sessionId: 's1' })
@@ -68,6 +69,7 @@ test('an stdin write error fails the turn cleanly, not as an uncaught exception 
     spawn,
     emit: () => {},
     signals: [],
+    driver: 'agent',
     parser: { push: () => [], result: () => ({ text: '' }) },
   })
   // Let the stream's async 'error' emission land; with no listener it is an uncaught exception.
@@ -88,6 +90,7 @@ test('a real CLI that exits before reading stdin does not crash the process (#94
     spawn: spawn as unknown as SpawnLike,
     emit: () => {},
     signals: [],
+    driver: 'agent',
     parser: { push: () => [], result: () => ({ text: 'ok' }) },
   })
   assert.equal(turn.text, 'ok')
@@ -123,6 +126,7 @@ test('runCliSession emits no telemetry when the process closes after an abort', 
     spawn,
     emit: e => events.push(e),
     signals: [controller.signal],
+    driver: 'agent',
     parser: { push: () => [], result: () => ({ text: '' }) },
   })
   controller.abort()

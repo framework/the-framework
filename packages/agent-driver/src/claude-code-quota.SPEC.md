@@ -1,8 +1,8 @@
-Asks Claude Code where the account's subscription quota stands, and turns its answer into the reading the daemon uses to decide whether unattended work may keep spending.
+Asks Claude Code where the account's subscription quota stands, and turns its answer into the reading a caller uses to decide whether unattended work may keep spending.
 
 ## User story
 
-The user's coding-agent subscription is a fixed weekly allowance. The Framework spends it on the user's behalf while nobody is watching, so it has to know how much is left — and it must never spend the week dry because it guessed wrong.
+The user's coding-agent subscription is a fixed weekly allowance. The caller spends it on the user's behalf while nobody is watching, so it has to know how much is left — and it must never spend the week dry because it guessed wrong.
 
 ## Glossary
 
@@ -10,10 +10,10 @@ The user's coding-agent subscription is a fixed weekly allowance. The Framework 
 
 ## Business logic — TL;DR
 
-- **The CLI answers for itself** - the reading comes from Claude Code's own usage command, run non-interactively; The Framework never talks to Anthropic and never touches the user's credentials.
+- **The CLI answers for itself** - the reading comes from Claude Code's own usage command, run non-interactively; the caller never talks to Anthropic and never touches the user's credentials.
 - **Reading the quota costs nothing** - the command is answered locally by the CLI, spending no tokens and no turns of the user's allowance.
 - **A failed read is never a zero** - an unreadable answer is reported as unreadable, never as "nothing used".
-- **"No subscription" and "could not read it" are different answers** - an account with no subscription quota at all is distinguished from a subscription whose readout The Framework failed to understand.
+- **"No subscription" and "could not read it" are different answers** - an account with no subscription quota at all is distinguished from a subscription whose readout the package failed to understand.
 - **The read always ends** - a missing CLI, a failing CLI, a hung CLI, or the user cancelling each produce their own distinct outcome rather than leaving the caller waiting.
 
 ## Business logic
@@ -26,7 +26,7 @@ See `## User story`.
 
 #### Business logic
 
-The reading is obtained by running the Claude Code CLI's own usage command in non-interactive mode and reading what it prints. The CLI reaches Anthropic with its own stored credentials, so The Framework never reads, stores, or forwards the user's token. The command must be run in the CLI's normal subscription mode; running it in the mode that forces API-key authentication would make the subscription quota disappear entirely.
+The reading is obtained by running the Claude Code CLI's own usage command in non-interactive mode and reading what it prints. The CLI reaches Anthropic with its own stored credentials, so the caller never reads, stores, or forwards the user's token. The command must be run in the CLI's normal subscription mode; running it in the mode that forces API-key authentication would make the subscription quota disappear entirely.
 
 The command spends nothing — no tokens, no turns, no cost — because the CLI answers it locally instead of prompting a model.
 
@@ -34,7 +34,7 @@ The command spends nothing — no tokens, no turns, no cost — because the CLI 
 
 #### User story
 
-Unattended work stands down once the quota boundary is reached. A reading of "0% used" would tell the daemon it has the whole week to spend.
+Unattended work stands down once the quota boundary is reached. A reading of "0% used" would tell the caller it has the whole week to spend.
 
 #### Business logic
 

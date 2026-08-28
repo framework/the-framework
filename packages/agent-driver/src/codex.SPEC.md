@@ -2,17 +2,17 @@ The driver for Codex: wraps the `codex` CLI as a black box on the user's own Cha
 
 ## User story
 
-The user prefers Codex, or already pays for it. They pick it as their driver and everything else about The Framework — the dashboard, the gates, the queue, the pull requests — works exactly as it does with Claude Code.
+The user prefers Codex, or already pays for it. They pick it as their driver and everything else about the caller's product works exactly as it does with Claude Code.
 
 ## Business logic — TL;DR
 
-- **The user's own subscription does the work** - the CLI is run non-interactively on the user's existing ChatGPT sign-in; The Framework never supplies an API key.
+- **The user's own subscription does the work** - the CLI is run non-interactively on the user's existing ChatGPT sign-in; the caller never supplies an API key.
 - **The agent may edit its workspace and nothing else** - the CLI runs under a sandbox limited to the checkout it was pointed at. The mode that disables the sandbox entirely is never used.
-- **The framing rides in front of the task** - Codex has no separate channel for a system prompt, so The Framework's framing is prepended to the prompt as its own block. The same words reach the agent.
+- **The framing rides in front of the task** - Codex has no separate channel for a system prompt, so the framing is prepended to the prompt as its own block. The same words reach the agent.
 - **The last thing the agent says is the turn's answer** - Codex narrates as it works; each message is streamed as it arrives, and the final one is the turn's outcome.
-- **Tool use surfaces as its kind, never its arguments** - what The Framework gates on is the code and the outcome, not the individual tool calls.
+- **Tool use surfaces as its kind, never its arguments** - what the caller gates on is the code and the outcome, not the individual tool calls.
 - **Tokens without a price** - Codex reports token counts but never a cost, so usage carries the counts and reports no cost at all rather than a cost of zero, which would read as "free".
-- **No quota reporting** - a driver that cannot say where the account's subscription stands simply does not, and the rest of the product copes.
+- **No quota reporting** - a driver that cannot say where the account's subscription stands simply does not, and the caller copes.
 
 ## Business logic
 
@@ -20,11 +20,11 @@ The user prefers Codex, or already pays for it. They pick it as their driver and
 
 #### User story
 
-The dashboard shows what each agent spent, and a user can cap how much an agent may spend before it stops.
+The caller's UI shows what each agent spent, and a user can cap how much an agent may spend before it stops.
 
 #### Business logic
 
-The CLI's end-of-turn accounting yields token counts only. Those counts are reported as the turn's usage, and no cost is reported — never a cost of zero, which spending limits would read as "this turn was free". Since the spending cap is expressed as a price, it cannot apply to a Codex agent at all, and The Framework says so when it starts rather than leaving the user to assume the cap is protecting them.
+The CLI's end-of-turn accounting yields token counts only. Those counts are reported as the turn's usage, and no cost is reported — never a cost of zero, which a caller's spending limit would read as "this turn was free". A spending limit expressed as a price therefore cannot apply to a Codex agent at all, and the caller must not pretend it does.
 
 #### Rationale
 

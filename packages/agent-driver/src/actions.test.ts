@@ -91,12 +91,12 @@ function fakeGitHub(opts: FakeOptions = {}): { fetch: FetchLike; calls: Call[] }
       const correlation = calls.filter(c => c.url.includes('/dispatches')).at(-1)?.body as { inputs?: { correlation_id?: string } } | undefined
       return json({
         workflow_runs: [
-          { id: 77, name: `framework-agent ${correlation?.inputs?.correlation_id}`, status: state.status, conclusion: state.conclusion ?? null, html_url: 'https://github.com/o/r/actions/runs/77' },
+          { id: 77, name: `agent ${correlation?.inputs?.correlation_id}`, status: state.status, conclusion: state.conclusion ?? null, html_url: 'https://github.com/o/r/actions/runs/77' },
         ],
       })
     }
 
-    if (url.includes('/artifacts') && !url.endsWith('/zip')) return json({ artifacts: [{ id: 5, name: 'framework-run-actions-1-turn-1' }] })
+    if (url.includes('/artifacts') && !url.endsWith('/zip')) return json({ artifacts: [{ id: 5, name: 'run-actions-1-turn-1' }] })
 
     if (url.endsWith('/zip')) {
       const zip = makeZip([
@@ -127,6 +127,7 @@ function makeDriver(opts: FakeOptions = {}): { driver: ActionsDriver; calls: Cal
     owner: 'o',
     repo: 'r',
     token: 't',
+    workflow: 'agent.yml',
     fetch,
     pollIntervalMs: 1000,
     timeoutMs: 10_000,
@@ -154,7 +155,7 @@ test('ActionsDriver dispatches the prompt with a correlation id and the framing 
   await session.prompt('do the thing', { system: 'Also: be brief.' })
 
   const dispatch = calls.find(c => c.url.includes('/dispatches'))!
-  assert.match(dispatch.url, /\/repos\/o\/r\/actions\/workflows\/framework-agent\.yml\/dispatches$/)
+  assert.match(dispatch.url, /\/repos\/o\/r\/actions\/workflows\/agent\.yml\/dispatches$/)
   const body = dispatch.body as { ref: string; inputs: Record<string, string> }
   assert.equal(body.ref, 'main')
   // The action takes the prompt as an input, so the framing can ride in front of it safely.
@@ -180,7 +181,7 @@ test('ActionsDriver names the branch each run pushes to, stable across turns (#1
   const branches = calls.filter(c => c.url.includes('/dispatches')).map(c => (c.body as { inputs: Record<string, string> }).inputs['branch'])
   // The driver names the branch instead of discovering it: the action leaves branch_name empty
   // for a workflow_dispatch run, so this is the only thing that lets readCode + continuity work.
-  assert.equal(branches[0], `claude/framework-${session.id}`)
+  assert.equal(branches[0], `claude/${session.id}`)
   // Same branch every turn, so a later turn's push builds on the earlier one.
   assert.equal(branches[0], branches[1])
 })
@@ -235,7 +236,7 @@ test('ActionsDriver fails the turn when the run does, naming the run (#610)', as
 test('ActionsDriver gives up rather than polling a run forever (#610)', async () => {
   const { fetch } = fakeGitHub({ agents: [{ status: 'in_progress' }] })
   let clock = 0
-  const driver = new ActionsDriver({ owner: 'o', repo: 'r', token: 't', fetch, pollIntervalMs: 1000, timeoutMs: 5000, now: () => clock, sleep: async ms => void (clock += ms) })
+  const driver = new ActionsDriver({ owner: 'o', repo: 'r', token: 't', workflow: 'agent.yml', fetch, pollIntervalMs: 1000, timeoutMs: 5000, now: () => clock, sleep: async ms => void (clock += ms) })
   const session = await driver.start({ cwd: '/ws' })
   await assert.rejects(() => session.prompt('go'), /Timed out waiting/)
 })
@@ -272,7 +273,7 @@ test('ActionsDriver replays the run events for the dashboard, in a burst at the 
 test('ActionsDriver cannot report a quota, so it says so by omission (#610)', () => {
   // The quota belongs to whichever account's token the repo holds, and the runner that
   // could have answered is torn down before we ever read it.
-  const driver: Driver = new ActionsDriver({ owner: 'o', repo: 'r', token: 't' })
+  const driver: Driver = new ActionsDriver({ owner: 'o', repo: 'r', token: 't', workflow: 'agent.yml' })
   assert.equal(driver.readQuota, undefined)
 })
 

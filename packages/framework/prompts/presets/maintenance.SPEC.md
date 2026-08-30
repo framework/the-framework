@@ -2,7 +2,7 @@ The maintenance preset: the periodic sweep that turns a codebase into queued qua
 
 ## Business logic — TL;DR
 
-- **It queues work, it does not refactor** - for every part of the codebase that needs it, the agent appends entries to the agent queue (`TODO_AGENTS.md`) asking for the maintainability preset and the security-audit preset to be applied to that part.
+- **It queues work, it does not refactor** - for every part of the codebase that needs it, the agent puts entries on the agent queue (`TODO_AGENTS.md`), with the `tickets` skill's command, asking for the maintainability preset and the security-audit preset to be applied to that part.
 - **Each entry names its own target** - the agent replaces the placeholder with a clear designation of the codebase subset, so the queued entry stands on its own when a later drain picks it up.
 - **Queued low** - the entries usually go on at low priority, so routine quality work never displaces the roadmap.
 
@@ -16,7 +16,7 @@ The user wants quality passes to happen across the whole codebase over time, wit
 
 #### Business logic
 
-The agent's output is entries on the agent queue rather than code changes. It divides the analyzed area into codebase subsets, and for each subset that needs it appends two entries: one applying the maintainability preset to that subset, one applying the security-audit preset to it. Each entry names the subset explicitly, and the entries usually go on at low priority. A later drain of the queue turns each entry into its own agent.
+The agent's output is entries on the agent queue rather than code changes. It divides the analyzed area into codebase subsets, and for each subset that needs it queues two entries through the `tickets` skill's command: one applying the maintainability preset to that subset, one applying the security-audit preset to it. Each entry names the subset explicitly, and the entries are given a low priority. A later drain of the queue turns each entry into its own agent.
 
 ## Before modifying/creating SPEC.md files
 

@@ -8,6 +8,7 @@ One file per preset: the canned prompts behind the dashboard's launcher buttons 
 ## Business logic — TL;DR
 
 - **Two families** - the quality presets take a target from the user; the ticket and queue presets scope themselves to the repo's own tickets, plans and queue and take no input at all.
+- **The ticket and queue presets go through the `tickets` skill** - they name the skill and its command as how a ticket or a queue entry is read, written, claimed or taken off the queue; none of them edits a file in the agent's checkout.
 - **A quality preset's target defaults to something useful** - left blank, it runs against the session it was launched from, or against the entire codebase when there is no session yet.
 - **Presets can queue other presets** - a preset's text can name another preset's file, so the queued entry tells a later agent exactly which preset to apply and to what.
 - **Some presets end in a question, others end in work** - which one a preset does decides whether it is safe to fire unattended.
@@ -27,6 +28,16 @@ The quality presets — maintainability, readability, security audit, UX, mainte
 
 The ticket and queue presets — the two triages, plan tickets, update tickets, suggest new tickets, suggest new features, suggest tickets to work on, drain queue, market research — take no input: each scopes itself to the repo's own tickets, plans or agent queue, so there is no blank for the user to fill.
 
+### The ticket and queue presets go through the `tickets` skill
+
+#### User story
+
+The user's tickets and agent queue are not in the agent's checkout: they live on the `tickets` branch. A preset that told the agent to open a file would send it to a file that is not there.
+
+#### Business logic
+
+Every preset that touches a ticket or the queue names the `tickets` skill and the command it provides: listing the tickets, reading one with its plan, writing a ticket, a plan or the import stamp, closing a ticket, putting an entry on the queue at a priority, and taking a finished entry off it. No preset edits a ticket or the queue as a file, and none of them commits one on the agent's own branch.
+
 ### A quality preset's target defaults to something useful
 
 #### User story
@@ -45,7 +56,7 @@ The user wants a maintenance sweep, or a finished agent, to leave behind quality
 
 #### Business logic
 
-A preset's text can name another preset by file path, and the presets that need it write agent-queue entries of the form "apply this preset with its target set to that". A later drain of the agent queue turns each entry into its own agent, which opens the named preset file and runs it. This is how the maintenance preset spreads maintainability and security work across the codebase, and how a finished agent queues quality follow-ups on its own changes.
+A preset's text can name another preset by file path, and the presets that need it put agent-queue entries of the form "apply this preset with its target set to that" on the queue with the `tickets` skill's command. A later drain of the agent queue turns each entry into its own agent, which opens the named preset file and runs it. This is how the maintenance preset spreads maintainability and security work across the codebase, and how a finished agent queues quality follow-ups on its own changes.
 
 ### Some presets end in a question, others end in work
 

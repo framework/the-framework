@@ -27,8 +27,26 @@ export const HARNESS_SKILL_DIRS = ['.claude/skills', '.agents/skills'] as const
 export const SKILL_DIR = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 /**
- * Link the skill into `checkout` for every harness, and hide the links from the project's git
- * through the repository's exclude file — a symlink at the checkout root would otherwise ride any
+ * A skill to link into a checkout: its name (the directory a harness lists it under) and the
+ * directory holding its `SKILL.md`.
+ *
+ * TEMPORARY (#1748): a caller names the *other* skills it wants in a checkout — the `tickets`
+ * skill, today — because nothing else puts a skill there yet. Dies when the skills are committed
+ * into the repository by use-npm-skills: a tracked `.claude/skills/<name>` is in every worktree by
+ * itself, and this package goes back to linking only its own.
+ */
+export interface SkillLink {
+  name: string
+  dir: string
+}
+
+/** This package's own skill, as a {@link SkillLink}. */
+export const OWN_SKILL: SkillLink = { name: SKILL_NAME, dir: SKILL_DIR }
+
+/**
+ * Link the skill into `checkout` for every harness — this package's own, plus whatever `skills`
+ * the caller names (temporary, see {@link SkillLink}) — and hide the links from the project's git
+ * through the repository's exclude file: a symlink at the checkout root would otherwise ride any
  * sweeping `git add -A` onto the agent's branch. Best-effort: an entry already at a link's path is
  * left alone, and a link that cannot be made is a worse run, not a failed one.
  */
@@ -37,17 +55,20 @@ export async function linkSkill(
   checkout: string,
   fs: LinkFs = nodeLinkFs(),
   git: GitRunner = nodeGitRunner(),
+  skills: readonly SkillLink[] = [],
 ): Promise<void> {
-  for (const dir of HARNESS_SKILL_DIRS) {
-    const rel = `${dir}/${SKILL_NAME}`
-    await excludeFromGit(repo, `/${rel}`, undefined, git).catch(() => {})
-    try {
-      const path = join(checkout, rel)
-      if (await fs.entryExists(path)) continue
-      await fs.mkdir(join(checkout, dir))
-      await fs.symlinkDir(SKILL_DIR, path)
-    } catch {
-      // A filesystem that refuses the link: the agent still starts, without the skill.
+  for (const skill of [OWN_SKILL, ...skills]) {
+    for (const dir of HARNESS_SKILL_DIRS) {
+      const rel = `${dir}/${skill.name}`
+      await excludeFromGit(repo, `/${rel}`, undefined, git).catch(() => {})
+      try {
+        const path = join(checkout, rel)
+        if (await fs.entryExists(path)) continue
+        await fs.mkdir(join(checkout, dir))
+        await fs.symlinkDir(skill.dir, path)
+      } catch {
+        // A filesystem that refuses the link: the agent still starts, without the skill.
+      }
     }
   }
 }

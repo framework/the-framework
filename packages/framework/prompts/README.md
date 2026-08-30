@@ -6,11 +6,9 @@ is written in TypeScript any more, so prompting can change without touching the 
 | file | what it is |
 |---|---|
 | `system_prompt.md` | The built-in system prompt (#326). Rom's doc. Its `# User prompt` slot is where the user's own text is rendered, for a build and a prompt session alike (#1691). |
-| `ticketing_format.md` | The ticket file format: how a ticket, its plan and its lock are written under `tickets/`. Travels in every agent's context. |
-| `todo_format.md` | The agent-queue format: how `TODO_AGENTS.md` is banded by priority. Travels in every agent's context. |
-| `data_branch_protocol.md` | The data-branch protocol: tickets, the queue and the session archives live on `agents-data`, read and written there directly, never on a code branch. Travels in every agent's context. |
 | `branch_yourself.md` | The "Branch management" section for an agent that runs outside a checkout The Framework created (#1725): the command is not there, so it branches with git itself. Agents in their own checkout get the `skill-branches` package's `SKILL.md` instead. |
-| `triage_scope.md` | The queue-only rule appended to both triage presets: a triage writes `TODO_AGENTS.md`, never a ticket's code (#1641). |
+| `tickets_yourself.md` | `branch_yourself.md`'s counterpart for the tickets and the agent queue (#1748): the `tickets` command is not there either, so the agent reads and writes the `tickets` branch with git itself, and the `skill-tickets` package's `SKILL.md` follows it for the formats. Agents in their own checkout get the `tickets` skill in the checkout instead. Temporary: it goes when the skill is committed into the repository. |
+| `triage_scope.md` | The queue-only rule appended to both triage presets: a triage writes the queue through the skill, never a ticket's code (#1641). |
 | `on_before_mergeable_prompt.md` | The optional extra turn an agent gets when it signals ready for merge: queue quality follow-ups, fold what it learned into the knowledge base. |
 | `protocols/await.md` | How to emit an awaited choice so the turn-boundary gate can detect it (#337/#339). |
 | `protocols/signal.md` | How to emit `setReadyForMerge()`, the pull request to open, and an error only the user can fix (#326). |
@@ -23,6 +21,9 @@ is written in TypeScript any more, so prompting can change without touching the 
 Edit the markdown, then `pnpm build`. `scripts/gen-prompts.mjs` compiles this directory into
 `src/prompts.generated.ts` (git-ignored, rebuilt by `build` / `test` / `typecheck`), which is
 what the code imports. The markdown is the only source of truth.
+
+It also compiles one file from outside this directory: the `@gemstack/skill-tickets` package's
+`SKILL.md`, which `tickets_yourself.md` is followed by. Temporary, with that prompt (#1748).
 
 Adding `foo/bar.md` exports `FOO_BAR`. A file's exact bytes become the string, minus one
 trailing newline.

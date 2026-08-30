@@ -6,7 +6,7 @@ The suggest-new-features preset: the agent studies what the product does today a
 - **Net-new capabilities only** - features a user would want, not bugs, refactors or chores.
 - **No duplicates** - anything an existing ticket already covers, or that is already built, is skipped.
 - **Worth building, and in the product's direction** - proposals are favoured on those two grounds.
-- **Proposals become tickets** - each one is written as a new ticket under `tickets/`, following the ticket format, and the agent ends by showing a short summary.
+- **Proposals become tickets** - each one is written as a new ticket with the `tickets` skill's command, in the ticket format the skill gives, and the agent ends by showing a short summary.
 
 ## Business logic
 
@@ -28,7 +28,7 @@ Proposals only land if they fit what the product already is and do not repeat wh
 
 #### Business logic
 
-Before proposing, the agent studies what the product does today — the README, the docs, the main user-facing surfaces — and the existing tickets. That reading sets both filters: it skips what an existing ticket covers and what is already built, and it favours features that fit the product's direction and are worth building. What it proposes is net-new capabilities a user would want, explicitly not bugs, refactors or chores.
+Before proposing, the agent studies what the product does today — the README, the docs, the main user-facing surfaces — and the existing tickets, which it lists through the `tickets` skill. That reading sets both filters: it skips what an existing ticket covers and what is already built, and it favours features that fit the product's direction and are worth building. What it proposes is net-new capabilities a user would want, explicitly not bugs, refactors or chores.
 
 ## Before modifying/creating SPEC.md files
 

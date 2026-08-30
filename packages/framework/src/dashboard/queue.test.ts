@@ -74,7 +74,7 @@ test('link-style entries with no checkbox are open items, like the sweep reads t
 })
 
 test('parseTodoItems agrees with the sweep parser on which entries are open (#1296)', async () => {
-  const { parseTodoEntries } = await import('../todo-loop.js')
+  const { parseQueueEntries } = await import('@gemstack/skill-tickets')
   const md = [
     '- [Link entry](tickets/a.md) — do the thing',
     '- [ ] open checkbox entry',
@@ -85,5 +85,5 @@ test('parseTodoItems agrees with the sweep parser on which entries are open (#12
     '## a heading',
   ].join('\n')
   const open = parseTodoItems(md).filter(i => !i.done).map(i => i.text)
-  assert.deepEqual(open, parseTodoEntries(md))
+  assert.deepEqual(open, parseQueueEntries(md))
 })

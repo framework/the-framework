@@ -30,7 +30,7 @@ The user wants to paste an agent's address to a colleague, reload without losing
 
 #### Business logic
 
-The address alone says what is on screen: the Overview at the root, a project's home and launcher under the project, one agent under that project, plus the settings page, the tickets list, one ticket's page, and that ticket's plan page. Every navigation the shell offers — picking a project, picking an agent, opening a ticket, going to settings — is an ordinary history entry, so Back and Forward work throughout, and reopening the dashboard returns to the project the user was last in.
+The address alone says what is on screen: the Overview at the root, a project's home and launcher under the project, one agent under that project, plus the settings page, the tickets list, one ticket's page, and that ticket's plan page. Every navigation the shell offers — picking a project, picking an agent, opening a ticket, opening the agent that holds a ticket's claim (from the tickets list or from the ticket's own page, in that ticket's own project), going to settings — is an ordinary history entry, so Back and Forward work throughout, and reopening the dashboard returns to the project the user was last in.
 
 #### Rationale
 

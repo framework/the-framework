@@ -7,7 +7,7 @@ Adoption: the pass that matches a cloud session's actual `claude/*` branch back 
 ## Business logic — TL;DR
 
 - **Ancestry makes the match exact** - a `claude/*` head on origin belongs to the agent whose hand-off anchor it descends from; exactly one descendant adopts, zero or several adopt nothing and are retried next pass.
-- **What is learned lands as one commit** - the branch (first time only) and the PR (once known) are recorded onto the agent's archive on the data branch; nothing learned, nothing written.
+- **What is learned lands as one commit** - the branch (first time only) and the PR (once known) are recorded onto the agent's archive on the logs branch; nothing learned, nothing written.
 - **The armed draft PR finally opens** - an agent set to open a PR whose session pushed work but never opened one gets its draft PR opened by this pass.
 - **"None" and "could not tell" never look alike** - a PR listing that fails records the branch but opens nothing this pass, so a transient failure can never produce a second PR on a branch that already has one.
 - **Bounded and quiet** - only settled `web`-target agents started within the last 48 hours are asked about, the archive is read by that window so old history costs nothing, and only adoptions and failures are logged.
@@ -36,7 +36,7 @@ The publish level the user armed the agent with must still come true when the se
 
 For the matched branch, the session's own PR is looked up from the branch's PR history, filtered by the agent's start time so a predecessor's PR on a reused branch name is never this agent's, latest one wins. When the listing succeeds and finds none, the agent finished, its handoff includes the PR stage, and the head carries commits beyond the anchor itself, the pass opens the draft PR the agent's own epilogue never could (it saw only the empty agent branch) — the armed handoff finally resolving against the facts. A head that *is* the anchor gets no PR: the session pushed nothing, and a PR over nothing helps nobody. A listing that fails is a reported failure, records the branch (a fact regardless), opens nothing this pass, and leaves the agent to be asked again — "the session opened no PR" and "the listing could not be read" must not look alike, because guessing cost a duplicate draft PR once.
 
-Whatever the pass learned — the branch on first adoption, the PR once known — is recorded onto the agent's archive as one commit on the data branch. A record that cannot be written is a reported failure and is retried.
+Whatever the pass learned — the branch on first adoption, the PR once known — is recorded onto the agent's archive as one commit on the logs branch. A record that cannot be written is a reported failure and is retried.
 
 ### The adoption pass as a daemon service
 

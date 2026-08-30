@@ -132,7 +132,7 @@ The user presses Ctrl-C. Nothing may be started while everything is being stoppe
 
 On an interrupt or termination signal, the shutdown runs in a fixed order. The background services quiesce first, so that Auto PM or an arriving notification cannot start an agent while the rest are being stopped. Then the agents this daemon spawned are stopped, and the ids of those that were still alive are logged by name — a process still alive at shutdown that the dashboard showed as finished is the one fact that explains a busy slot nothing else can account for, and a bare count hides it. Finally the quota meter is stopped, the bridge browser is closed — left running it would serve a daemon that is gone, and hold the profile the next daemon needs — the runtime is disposed, and the server is closed.
 
-Finished agents' archives need no flushing step here: each one is committed and pushed through the data branch's write cycle the moment that agent settles.
+Finished agents' archives need no flushing step here: each one is committed and pushed through the logs branch's write cycle the moment that agent settles.
 
 ## Before modifying/creating SPEC.md files
 

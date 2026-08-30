@@ -9,7 +9,7 @@ Auto PM: the policy that decides whether the daemon may spend leftover quota on 
 ## Glossary
 
 - **ended dry** - work Auto PM already gave an agent that finished without producing anything to hand off. It is not handed out again for the rest of the daemon's lifetime.
-- **routine lock** - a routine's lock file on the data branch, naming the machine that is running that routine and since when, so no two machines run it at once. A routine declares whether it holds one.
+- **routine lock** - a routine's lock file on The Framework's `agents-logs` branch, naming the machine that is running that routine and since when, so no two machines run it at once. A routine declares whether it holds one.
 
 ## Business logic — TL;DR
 
@@ -21,7 +21,7 @@ Auto PM: the policy that decides whether the daemon may spend leftover quota on 
 - **Claims are files, not memory** - a ticket a batch is about to work gets a pushed `.lock.md` claim before its agent starts, so another machine's daemon does not book the same ticket.
 - **One triage at a time, on any machine** - a routine that rewrites the shared queue takes a routine lock before its agent starts, and the lock lifts when the run ends.
 - **Land finished work before judging** - a finished agent's queue writes are promoted into the checkout first, so the emptiness check is not made against a stale queue.
-- **Dead claims are freed, and their work is not re-offered** - an agent that ended without commits will never open the pull request that lifts its claim, so the sweep lifts it, and remembers not to hand that work out again.
+- **Dead claims are freed, and their work is not re-offered** - an agent that ended without commits will never publish the work whose landing lifts its claim, so the sweep lifts it, and remembers not to hand that work out again.
 - **Run now is asking, so it outranks the switch** - a click runs with the preference off and skips the cooldown, but never past the concurrency cap, a switched-off routine, or the quota boundary.
 - **Every decision is on the record** - each sweep leaves one sentence per project, both in the daemon log and for the dashboard.
 
@@ -126,7 +126,7 @@ Only two kinds of work fan out, because only they touch disjoint files: draining
 
 A fan-out fills the remaining slots up to the concurrency cap, and each agent is pinned:
 
-- A drain agent is told the one queue entry it may work on, told not to check it off (the daemon retires the entry once the agent's work lands), and told to stop and do nothing if that entry is already checked off or gone — the assignment is a snapshot, and a human may retire the entry in between.
+- A drain agent is told the one queue entry it may work on, told not to take it off the queue (the daemon retires the entry once the agent's work lands), and told to stop and do nothing if that entry is no longer on the queue — the assignment is a snapshot, and a human may retire the entry in between.
 - A plan agent is told the one ticket it may plan. The pin is appended to the preset's own prompt rather than spliced into it, so the preset's rules keep riding along verbatim and a rewritten preset cannot silently lose the pin.
 
 Entries and tickets already pinned to an agent still in flight are not offered again, and neither is anything marked ended dry.
@@ -139,7 +139,7 @@ The user may run The Framework on more than one machine, and hands some work to 
 
 #### Business logic
 
-Before a fanned-out batch starts, the sweep writes one `.lock.md` sibling per ticket on the data branch, holding a `CLAIMED: <agent id>` line, commits them as a batch and pushes them. Each pinned agent is told which claim is its own, and told to stop if the lock file is missing or names anyone else. The agent removes the ticket's files (and the lock) on the data branch once its work is published; nothing else releases a claim, because there is no staleness timer.
+Before a fanned-out batch starts, the sweep claims one ticket per agent through the `tickets` skill — a `.lock.md` sibling naming a holder, committed as a batch and pushed. The holder it names is the id of the agent that claim was made for, minted before the claim, and that agent is then started under exactly that id: the claim and the run are one thing, which is what lets the Tickets page name the session holding a ticket. Each pinned agent is told its ticket is already claimed for it and told to ask the skill who holds it, stopping if the ticket turns out to be unclaimed or claimed by anyone else. A plan agent lifts its own claim once it has written the plan; a drain agent closes its ticket once its work is published, which retires the ticket, its plan and its claim together. Nothing else releases a claim, because there is no staleness timer.
 
 Claiming is per ticket, not per batch: a ticket lost to a race costs the batch one agent, not the batch. Planning skips a ticket that already has a plan or a lock; draining skips only on an existing lock, because a plan is a drain's input rather than a competing claim. A queue entry that links no ticket has nothing on disk to lock and uses the queue document itself as its coordination point.
 
@@ -155,7 +155,7 @@ The user wants triage fired on a schedule without two triages ever overlapping �
 
 A routine declares whether it holds a routine lock; the two triage routines do, each under its own name. The lock is taken before the agent is started and never by the agent itself. A lock already held stands that routine down with a sentence naming the machine holding it and since when, and nothing is started — this is a stand-down rather than a refusal of the sweep, so it is reported like any other.
 
-The lock lifts when the run ends, whatever the ending: the routines that hold one write to the data branch and open no pull request that could carry the release. A release that could not land is retried on the next couple of sweeps, bounded so a run whose release keeps failing cannot be tracked forever — past the bound the lock stands until it expires. A lock taken for a start the daemon then refused is given back at once, since no run will ever release it. On a project's first sweep, the locks a previous daemon on this machine left behind whose runs are gone are released too — nothing else would free them before their expiry.
+The lock lifts when the run ends, whatever the ending: the routines that hold one land their work by writing to a branch directly and open no pull request that could carry the release. A release that could not land is retried on the next couple of sweeps, bounded so a run whose release keeps failing cannot be tracked forever — past the bound the lock stands until it expires. A lock taken for a start the daemon then refused is given back at once, since no run will ever release it. On a project's first sweep, the locks a previous daemon on this machine left behind whose runs are gone are released too — nothing else would free them before their expiry.
 
 A routine that declares no lock never takes one, and a daemon wired without the routine-lock machinery runs every routine unguarded.
 
@@ -173,7 +173,7 @@ An agent that just finished writing new queue entries must not have its work inv
 
 Every tick first tries to promote the queue written by each agent this loop previously started: their entries live on their own branch until promoted, where the checkout cannot see them. If anything landed, the tick stops there for that project and logs it — the queue the decision would read was just changed, so that read would be stale, and the next tick decides on the fresh picture.
 
-An agent that has finished but whose handoff has not reported yet is held for a couple more sweeps rather than settled, when it carries a claim or a pinned queue entry: the reported ending is the fact that both the claim release and the entry check-off key off, and settling blind would lose them. The hold is bounded, so a process that died mid-handoff cannot pin its entry forever.
+An agent that has finished but whose handoff has not reported yet is held for a couple more sweeps rather than settled, when it carries a claim or a pinned queue entry: the reported ending is the fact that both the claim release and the entry's removal from the queue key off, and settling blind would lose them. The hold is bounded, so a process that died mid-handoff cannot pin its entry forever.
 
 ### Freeing a claim whose agent produced nothing
 

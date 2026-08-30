@@ -45,7 +45,26 @@ export { reconcileBranchLinks, type LinksFs, type BranchLinksDeps } from './bran
 export { reclaimWorktree, type ReclaimOptions, type ReclaimOutcome, type ReclaimRefusal } from './reclaim.js'
 export { checkoutRoot } from './git.js'
 export { projectRoot, nameBranch, isSessionName, type NameBranchOutcome, type NameBranchRefusal } from './worktree.js'
-export { createCheckout, attachCheckout } from './checkout.js'
+export { createCheckout, attachCheckout, type CheckoutSkills } from './checkout.js'
 export { runCli, USAGE, type CliIo, type CliRefusal } from './cli.js'
 export { CLI_BIN_DIR } from './bin-dir.js'
-export { linkSkill, HARNESS_SKILL_DIRS, SKILL_DIR, SKILL_NAME } from './skill-links.js'
+export { linkSkill, HARNESS_SKILL_DIRS, SKILL_DIR, SKILL_NAME, OWN_SKILL, type SkillLink } from './skill-links.js'
+export {
+  fileBranchPath,
+  fileBranchRepo,
+  ensureFileBranch,
+  withFileBranch,
+  pullFileBranch,
+  readBranchFile,
+  listBranchDir,
+  openBranchReader,
+  writeFileBranchDetached,
+  nodeBranchFileFs,
+  type FileBranchDeps,
+  type FileBranchWrite,
+  type FileBranchSync,
+  type CommitMessage,
+  type DetachedWrite,
+  type BranchFileFs,
+  type BranchReader,
+} from './file-branch.js'

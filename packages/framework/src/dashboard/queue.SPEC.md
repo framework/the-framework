@@ -20,7 +20,7 @@ Within a `TODO*` document, headings, prose and blank lines are ignored; every ma
 
 #### Rationale
 
-This is deliberately the same rule the daemon's own queue-draining sweep applies. If the two disagreed, the dashboard could report "Nothing queued" while the daemon drains the very same file. An earlier rule recognised only checkbox entries, which read a whole queue of ticket-link entries as empty.
+This is deliberately the same rule the `tickets` skill applies, which is what the daemon's own queue-draining sweep reads the queue with. If the two disagreed, the dashboard could report "Nothing queued" while the daemon drains the very same file. An earlier rule recognised only checkbox entries, which read a whole queue of ticket-link entries as empty.
 
 ### Most-open first
 

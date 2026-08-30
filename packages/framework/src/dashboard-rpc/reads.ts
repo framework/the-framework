@@ -204,7 +204,7 @@ export async function onDocs(projectId: string): Promise<WorkspaceDoc[]> {
   return withProject(projectId, readDocs, [])
 }
 
-/** The project's `tickets/*.md`, by filename (#697). `[]` when the repo has no `tickets/` yet. */
+/** The project's tickets, off the `tickets` branch (#697/#1748). `[]` when it has none yet. */
 export async function onTickets(projectId: string): Promise<WorkspaceTicket[]> {
   return withProject(projectId, readTickets, [])
 }

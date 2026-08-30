@@ -1,4 +1,4 @@
-The market-research preset: the agent researches the market the project competes in thoroughly, writes the result to `knowledge-base/MARKET_RESEARCH.md`, and appends one entry to the agent queue (`TODO_AGENTS.md`) naming this session and asking for new tickets to be suggested from it.
+The market-research preset: the agent researches the market the project competes in thoroughly, writes the result to `knowledge-base/MARKET_RESEARCH.md`, and puts one entry on the agent queue (`TODO_AGENTS.md`), with the `tickets` skill's command, naming this session and asking for new tickets to be suggested from it.
 
 ## Business logic — TL;DR
 

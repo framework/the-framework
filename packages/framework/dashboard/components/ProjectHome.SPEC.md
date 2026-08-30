@@ -23,7 +23,7 @@ The project error banner sits between the project's action bar and the start for
 
 #### Rationale
 
-An agent started on a project whose data branch cannot reach origin works from stale tickets and writes into an agent queue nobody else will ever see. Naming that failure after the start form would be too late.
+An agent started on a project whose `tickets` branch cannot reach origin works from stale tickets and writes into an agent queue nobody else will ever see. Naming that failure after the start form would be too late.
 
 ### Every parked agent, answerable here
 

@@ -55,6 +55,7 @@ export function TicketRow({
   onConfigurePlan,
   onTopicClick,
   onClaimedClick,
+  onOpenAgent,
 }: {
   ticket: WorkspaceTicket
   /** Shown on the row in the flat cross-project list, where the section heading no longer says it. */
@@ -80,7 +81,12 @@ export function TicketRow({
   onTopicClick?: ((topic: string) => void) | undefined
   /** Click-to-filter for the claim marker: narrows the page to claimed tickets. */
   onClaimedClick?: (() => void) | undefined
+  /** Open the page of the agent holding the claim (#1748), when the lock names one of this project's. */
+  onOpenAgent?: ((agentId: string) => void) | undefined
 }) {
+  // The holder as a person reads it: the agent's session name once it has one, else the id the
+  // lock names as written (#1748).
+  const holder = ticket.lockedByAgent?.name ?? ticket.lockedBy
   return (
     <li className="flex items-stretch transition-colors hover:bg-accent/60">
       {/* The selection checkbox, the row's left edge — GitHub's list idiom: pick some rows and the
@@ -146,12 +152,20 @@ export function TicketRow({
         {/* An agent holds this ticket's `.lock.md` (#1420) — it is planning the ticket or
             implementing it directly; the hammer says "being worked" either way. The holder is
             named inline, not only in the tooltip — a still 1-2s hover is how nobody discovers
-            anything. Truncated to keep the dense row aligned; the tooltip keeps the full id. */}
+            anything. When the lock names one of this project's agents (#1748) the name is the
+            agent's session name and opens its page; any other holder is shown as written.
+            Truncated to keep the dense row aligned; the tooltip keeps the full name. */}
         {ticket.locked && (
           <Tooltip>
             <TooltipTrigger
               render={
-                onClaimedClick ? (
+                ticket.lockedByAgent && onOpenAgent ? (
+                  <button
+                    type="button"
+                    onClick={() => onOpenAgent(ticket.lockedByAgent!.id)}
+                    className="flex shrink-0 items-center gap-1 text-[10px] text-warning hover:opacity-80"
+                  />
+                ) : onClaimedClick ? (
                   <button
                     type="button"
                     onClick={onClaimedClick}
@@ -163,11 +177,11 @@ export function TicketRow({
               }
             >
               <Hammer className="h-3.5 w-3.5" aria-hidden />
-              {ticket.lockedBy && <span className="inline-block max-w-[8rem] truncate">{ticket.lockedBy}</span>}
+              {holder && <span className="inline-block max-w-[8rem] truncate">{holder}</span>}
             </TooltipTrigger>
             <TooltipContent>
-              {`Claimed${ticket.lockedBy ? ` by ${ticket.lockedBy}` : ''} — an agent is working on this ticket (planning it or implementing it).`}
-              {onClaimedClick ? ' Click to see all claimed tickets.' : ''}
+              {`Claimed${holder ? ` by ${holder}` : ''} — an agent is working on this ticket (planning it or implementing it).`}
+              {ticket.lockedByAgent && onOpenAgent ? " Click to open the agent's page." : onClaimedClick ? ' Click to see all claimed tickets.' : ''}
             </TooltipContent>
           </Tooltip>
         )}
@@ -278,6 +292,7 @@ export function TicketsPanel({
   onSelectProject,
   onTopicClick,
   onClaimedClick,
+  onOpenAgent,
   onClearFilters,
 }: {
   projectId: string | null
@@ -306,6 +321,8 @@ export function TicketsPanel({
   /** Click-to-filter (#1144), threaded to every row; absent on a page with no filters. */
   onTopicClick?: ((topic: string) => void) | undefined
   onClaimedClick?: (() => void) | undefined
+  /** Open the page of the agent holding a ticket's claim (#1748), when the lock names one of this project's. */
+  onOpenAgent?: ((agentId: string) => void) | undefined
   /** Lets the "N hidden by filters" state clear them right there instead of pointing back up
    *  at the toolbar. */
   onClearFilters?: (() => void) | undefined
@@ -411,6 +428,7 @@ export function TicketsPanel({
             onConfigurePlan={configure}
             onTopicClick={onTopicClick}
             onClaimedClick={onClaimedClick}
+            onOpenAgent={onOpenAgent}
           />
         ))}
       </ul>

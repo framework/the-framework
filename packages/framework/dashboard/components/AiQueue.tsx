@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import { StartAgentButton } from './StartAgentButton.js'
 
-// The Overview's AI Queue card (#1139): every project's open `TODO_AGENTS.md` items — the work the
+// The Overview's AI Queue card (#1139): every project's open `TODO_AGENTS.md` entries — the work the
 // framework picks up on its own — grouped by project and shown in full. No "+N more": this is the
 // plan, and a collapsed plan is one you cannot read.
 //
@@ -29,14 +29,14 @@ import { StartAgentButton } from './StartAgentButton.js'
 // DashboardPage has no test file, and opening tickets and starting runs are behaviour worth pinning.
 
 /**
- * The prompt the play button starts an agent with: the drain preset's vocabulary ("work on … then
- * check it off. Do not start any other entry.") narrowed from "the FIRST open entry" to the one
- * entry the row shows. The raw `TODO_AGENTS.md` line, not the pretty label: the agent must find
- * exactly this entry to check it off, and the line's link is how it opens the ticket (#1164).
- * Exported so the test asserts against this and not a copy.
+ * The prompt the play button starts an agent with: the drain preset's vocabulary (work one entry
+ * through the `tickets` skill, then take it off the queue; do not start any other entry) narrowed
+ * from "the FIRST open entry" to the one entry the row shows. The raw `TODO_AGENTS.md` line, not
+ * the pretty label: the agent must name exactly this entry to take it off, and the line's link is
+ * how it opens the ticket (#1164). Exported so the test asserts against this and not a copy.
  */
 export function workOnEntryPrompt(entry: string): string {
-  return `Open TODO_AGENTS.md and work on this one open entry only, then check it off. Do not start any other entry. The entry:\n\n${entry}`
+  return `Use the \`tickets\` skill: work on this one open queue entry only, and when the work is done and published run \`tickets queue done "<the entry>"\`. Do not start any other entry. The entry:\n\n${entry}`
 }
 
 /** How many agents the fan-out button starts until its count says otherwise. */

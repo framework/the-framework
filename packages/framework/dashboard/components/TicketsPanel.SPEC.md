@@ -11,7 +11,7 @@ The user also wants to run any of those three on a different model or somewhere 
 - **A ticket is one row** - title, project (in the cross-project list), topics, claim, effort, uncertainty, priority, age, plan, and the GitHub item behind it, all on one line; the row opens the ticket's detail page. Where the surrounding page selects tickets for its bulk actions, the row also leads with that selection's checkbox.
 - **Start work from the row** - a play control on the row's left edge starts an unattended agent on that one ticket and nothing else, with the ticket named on the agent.
 - **The plan column is either a plan or an offer to write one** - a planned ticket links to its plan; an unplanned one offers to start an agent that writes it.
-- **Claimed rows say who holds them** - a ticket an agent has claimed shows a hammer and the holder's name, meaning an agent is planning or implementing it.
+- **Claimed rows say who holds them** - a ticket an agent has claimed shows a hammer and the holder's name, meaning an agent is planning or implementing it; when the claim names one of this project's own agents the name shown is that agent's session name and the marker opens the agent's page.
 - **Update from GitHub** - one action brings `tickets/` up to date with the repo's issues; on a project with no import on record it brings everything open across. It runs unattended, as the same routine does when the daemon starts it.
 - **Empty is not the same as filtered** - a backlog filtered down to nothing says how many tickets the filters hide and offers to clear them; only a genuinely empty `tickets/` offers the GitHub update.
 - **Configure first, then run** - each of the three actions carries a chevron that hands its prompt to this project's launcher instead of starting anything; the plan column's link to an existing plan carries none, since reading a file starts nothing.
@@ -33,7 +33,7 @@ See `## User story`.
 
 Every ticket occupies a single line. The title takes whatever width the row has to spare and truncates when it runs out; clicking it opens the ticket's detail page. In the flat cross-project list the row also names its project, since there is no section heading saying it. The rest of the line, from left to right: the ticket's topics, its claim, its effort and uncertainty estimates, its priority — coloured by how urgent it is, and spelled out as "Priority: 8" — and its age, with the exact date and time on hover. Priority, age and the plan column keep fixed widths, and a ticket with no GitHub item still reserves that column's width, so the columns line up down the whole list regardless of what any one ticket carries.
 
-Where the surrounding page supports filtering, a row's topics and its claim marker are clickable: a topic filters the page to that topic, the claim marker filters to claimed tickets. Where the page has no filters, they are plain labels.
+Where the surrounding page supports filtering, a row's topics and its claim marker are clickable: a topic filters the page to that topic, the claim marker filters to claimed tickets. A claim held by one of this project's own agents takes precedence over the filtering click: it opens that agent's page instead. Where the page offers neither, they are plain labels.
 
 Where the surrounding page selects tickets for its bulk actions — the Tickets page's queue buttons — the row's left edge leads with a checkbox showing and toggling that selection. The selection itself belongs to the page (it can span projects); the row only reports the toggle, navigates nowhere on it, and never disables the box — selecting is state, not an action. Where the page selects nothing, no checkbox renders.
 
@@ -67,11 +67,15 @@ The user needs to know a ticket is already being worked before starting a second
 
 #### Business logic
 
-A ticket an agent has claimed shows a hammer and the holder's name inline, truncated to keep the row aligned, with the full holder and the explanation on hover: an agent is working on this ticket, planning it or implementing it. Where filtering is available, the hover also says the marker leads to all claimed tickets.
+A ticket an agent has claimed shows a hammer and the holder's name inline, truncated to keep the row aligned, with the full holder and the explanation on hover: an agent is working on this ticket, planning it or implementing it.
+
+Which name that is depends on who the claim names. A claim naming one of this project's own agents is shown as that agent's session name, and clicking the marker opens the agent's page — so the user goes from "this ticket is being worked" to the session working it in one click, and the hover says so. Any other holder — another machine's agent, or an agent that claimed the ticket outside this project's records — is shown exactly as the claim writes it, and the marker keeps its filtering click where the page offers one.
 
 #### Rationale
 
 The holder is named on the row rather than only in the tooltip: a control that only reveals itself after a second of hovering is one nobody discovers.
+
+The session name rather than the claim's raw text, wherever the project knows the agent: a claim names the agent by its id, which is a timestamp and tells the reader nothing about what that agent is doing.
 
 ### Update from GitHub
 

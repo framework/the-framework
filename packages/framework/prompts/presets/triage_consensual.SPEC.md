@@ -1,4 +1,4 @@
-The triage-consensual preset: fills the agent queue with the significant work that needs no human input. The agent reads all tickets, picks only the ones that are significant — explicitly not quick wins — and consensual, meaning zero open questions and zero variability, such as a ticket with a single fairly obvious plan, and appends them to the agent queue (`TODO_AGENTS.md`).
+The triage-consensual preset: fills the agent queue with the significant work that needs no human input. The agent lists all tickets with the `tickets` skill, picks only the ones that are significant — explicitly not quick wins — and consensual, meaning zero open questions and zero variability, such as a ticket with a single fairly obvious plan, and puts them on the agent queue (`TODO_AGENTS.md`), one entry each, linked to its ticket.
 
 ## Business logic — TL;DR
 
@@ -16,7 +16,7 @@ The user wants unattended work to be substantial but never to make a decision th
 
 #### Business logic
 
-Two filters apply together: the ticket must be significant, and it must be consensual — zero open questions and zero variability. Quick wins are excluded here because the sibling triage preset covers them, which is what lets the daemon queue the cheap batch and the significant batch on separate firings rather than in one indiscriminate sweep.
+Two filters apply together: the ticket must be significant, and it must be consensual — zero open questions and zero variability. The effort and uncertainty its plan records are in the skill's listing, so the agent judges both from what it lists. Quick wins are excluded here because the sibling triage preset covers them, which is what lets the daemon queue the cheap batch and the significant batch on separate firings rather than in one indiscriminate sweep.
 
 ### A fixed session name
 

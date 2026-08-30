@@ -1,4 +1,4 @@
-The routine lock: holding one of Auto PM's routines for one machine while it runs, by writing a lock file for that routine on the data branch, so no two machines sharing that branch ever run the same routine at once.
+The routine lock: holding one of Auto PM's routines for one machine while it runs, by writing a lock file for that routine on The Framework's own logs branch, `agents-logs`, so no two machines sharing that branch ever run the same routine at once.
 
 ## User story
 
@@ -8,12 +8,12 @@ The routine lock: holding one of Auto PM's routines for one machine while it run
 
 ## Glossary
 
-- **routine lock** — a routine's `routines/<ROUTINE>.lock.md` file on the data branch. It names the machine that holds the routine and the moment that machine took it, one line each: `CLAIMED: <machine>` and `SINCE: <timestamp>`. Content missing either line names no holder and is not a lock.
-- **write funnel** — the data branch's single write cycle (sync, apply the change, commit, push), which re-runs the change against origin's fresher state when a push loses a race, and restores the checkout when a cycle fails whole.
+- **routine lock** — a routine's `routines/<ROUTINE>.lock.md` file on the logs branch. It names the machine that holds the routine and the moment that machine took it, one line each: `CLAIMED: <machine>` and `SINCE: <timestamp>`. Content missing either line names no holder and is not a lock.
+- **write funnel** — the logs branch's single write cycle (sync, apply the change, commit, push), which re-runs the change against origin's fresher state when a push loses a race, and restores the checkout when a cycle fails whole.
 
 ## Business logic — TL;DR
 
-- **The routine lock is a file on the shared data branch** - written and read through the same write funnel as every other data write, so it reaches every machine that shares the branch instead of living in one daemon's memory.
+- **The routine lock is a file on the shared logs branch** - written and read through the same write funnel as every other write to the branch, so it reaches every machine that shares the branch instead of living in one daemon's memory.
 - **An alive lock stands the caller down, naming its holder** - the refusal says which machine holds the routine and since when, so the reason can be read rather than guessed.
 - **The taking is decided before anything is started** - the answer is a lock file, not something an agent discovers once it is already running.
 - **A commit that could not be pushed still counts as taken** - it guards this machine; the cross-machine gap is logged rather than treated as a failure. A cycle that could not commit at all took nothing and says so.
@@ -23,7 +23,7 @@ The routine lock: holding one of Auto PM's routines for one machine while it run
 
 ## Business logic
 
-### The routine lock is a file on the data branch
+### The routine lock is a file on the logs branch
 
 #### User story
 
@@ -31,7 +31,7 @@ See `## User story`: a routine taken on one machine has to be visible on the oth
 
 #### Business logic
 
-A routine's lock is `routines/<ROUTINE>.lock.md` on the data branch, holding the machine that claimed the routine and the timestamp it claimed it at. It is written, read and removed inside the data branch's write funnel like every other data write, which is what carries the claim to every machine sharing the branch. Each commit says what it did — locking a named routine, releasing a named routine, or releasing the count of locks a previous daemon left behind — so the branch history reads as what happened.
+A routine's lock is `routines/<ROUTINE>.lock.md` on the logs branch, holding the machine that claimed the routine and the timestamp it claimed it at. It is written, read and removed inside the logs branch's write funnel like every other write to the branch, which is what carries the claim to every machine sharing the branch. Each commit says what it did — locking a named routine, releasing a named routine, or releasing the count of locks a previous daemon left behind — so the branch history reads as what happened.
 
 Nothing here ever throws: it runs on a background job with nothing to catch it.
 
@@ -67,7 +67,7 @@ A release removes the routine's lock only while it still names this machine; a l
 
 #### Rationale
 
-Releasing is the daemon's job, not a pull request's: the routines this guards write to the data branch and open no pull request that could carry a deletion of the lock file.
+Releasing is the daemon's job, not a pull request's: the routines this guards land their work by writing to a branch directly and open no pull request that could carry a deletion of the lock file.
 
 ### Locks a dead daemon left behind
 
@@ -91,7 +91,7 @@ A lock is dead four hours after it was taken, and whoever finds a dead lock take
 
 #### Rationale
 
-The expiry is fixed and there is no heartbeat: a triage over hundreds of tickets can legitimately run for hours, so the window has to be generous, and a heartbeat would add code and a stream of commits to the data branch for a case the boot-time cleanup already covers on the machine that matters.
+The expiry is fixed and there is no heartbeat: a triage over hundreds of tickets can legitimately run for hours, so the window has to be generous, and a heartbeat would add code and a stream of commits to the logs branch for a case the boot-time cleanup already covers on the machine that matters.
 
 ## Before modifying/creating SPEC.md files
 

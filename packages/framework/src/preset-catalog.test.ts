@@ -123,7 +123,7 @@ test('Research gates on a multi-select and writes its own review file (#331)', (
 
 test('the Maintenance template queues work rather than doing it (#881)', () => {
   assert.match(presets.maintenance.template, /look for opportunities to refactor code/)
-  assert.match(presets.maintenance.template, /TODO_AGENTS\.md \(usually as low priority/)
+  assert.match(presets.maintenance.template, /put the following entries on the queue with `tickets queue add "<entry>" --priority <N>` \(from the `tickets` skill; usually a low priority/)
   assert.match(presets.maintenance.template, /<CODEBASE_SUBSET>/)
 })
 
@@ -143,24 +143,24 @@ test('Market research researches, then queues the follow-up (#694)', () => {
   const prompt = presets.marketResearch.render()
   assert.match(prompt, /thorough market research/)
   assert.match(prompt, /MARKET_RESEARCH\.md/)
-  assert.match(prompt, /TODO_AGENTS\.md entry/)
+  assert.match(prompt, /Put this entry on the queue with `tickets queue add`/)
   assert.match(prompt, /suggest new tickets/)
   // It defines <SESSION_NAME> itself: the session does not exist yet when a preset renders.
   assert.match(prompt, /<SESSION_NAME>/)
   assert.match(prompt, /^SESSION_NAME: /m)
 })
 
-test('Suggest new tickets is the one line the dashboard prefills (#683)', () => {
-  assert.equal(presets.suggestNewTickets.template, 'Suggest new tickets')
-  assert.equal(presets.suggestNewTickets.render(), 'Suggest new tickets')
+test('Suggest new tickets is the one line the dashboard prefills, written through the skill (#683/#1748)', () => {
+  assert.ok(presets.suggestNewTickets.template.startsWith('Suggest new tickets, and write each with `tickets put <DATE>_<SLUG>.md`'))
+  assert.equal(presets.suggestNewTickets.render(), presets.suggestNewTickets.template)
 })
 
 test('Suggest tickets to work on gates on a human, unlike the triage pair (#698)', () => {
   const prompt = presets.suggestTicketsToWorkOn.render()
-  assert.match(prompt, /Look at all tickets and pick tickets to work on next/)
+  assert.match(prompt, /Look at all tickets \(`tickets list`, from the `tickets` skill\) and pick tickets to work on next/)
   assert.match(prompt, /showMultiSelect\(\)/)
   assert.match(prompt, /<AWAIT>/)
-  assert.match(prompt, /Add approved tickets to `TODO_AGENTS\.md`/)
+  assert.match(prompt, /Put each approved ticket on the queue: `tickets queue add "<title>" --ticket <file>`/)
   assert.match(prompt, /set its default to `true`, otherwise `false`/)
   assert.doesNotMatch(prompt, /showChoices\(\)/)
   assert.match(prompt, /^AWAIT: Stop, await user answer before resuming$/m)
@@ -171,16 +171,16 @@ test('the triage pair splits on cost and both append to the queue (#891/#892)', 
   // Quick triage picks by the plan's own numbers: a low `effort` with `uncertainty: 0` is what
   // "quick-win" means now that every plan carries the two 0-10 keys.
   assert.match(presets.triageQuick.template, /quick-win \(low `effort` value\) with `uncertainty: 0`/)
-  assert.match(presets.triageQuick.template, /Add tickets to TODO_AGENTS\.md/)
+  assert.match(presets.triageQuick.template, /Put each picked ticket on the queue: `tickets queue add "<title>" --ticket <file> --priority <N>`/)
   assert.match(presets.triageConsensual.template, /Only pick tickets that are significant \(no quick-wins\) and consensual/)
-  assert.match(presets.triageConsensual.template, /Add tickets to TODO_AGENTS\.md/)
+  assert.match(presets.triageConsensual.template, /Put each picked ticket on the queue: `tickets queue add "<title>" --ticket <file>`/)
 })
 
 test('both triage presets carry the one queue-only rule, and carry it whole (#1641)', () => {
   // A triage on a throwaway repo queued two tickets and implemented the third itself. The rule
   // against that is one shared file, so both presets are checked against that file's text
   // rather than against a phrase each could drift from.
-  assert.match(TRIAGE_SCOPE, /the only file you change is `TODO_AGENTS\.md`/)
+  assert.match(TRIAGE_SCOPE, /the only thing you change is the queue, through `tickets queue add`/)
   for (const preset of [presets.triageQuick, presets.triageConsensual]) {
     assert.ok(preset.render().endsWith(TRIAGE_SCOPE), `${preset.name} must end with the shared scope rule`)
   }

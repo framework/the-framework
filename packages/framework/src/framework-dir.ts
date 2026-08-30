@@ -9,11 +9,15 @@ import { BRANCHES_DIR } from '@gemstack/skill-branches/branch-names'
  */
 export const THE_FRAMEWORK_DIR = '.the-framework'
 
-/** The branch holding everything The Framework writes (#1582): the tickets, the queue, the session archives. */
-export const DATA_BRANCH = 'agents-data'
+/**
+ * The branch holding what The Framework itself records about its runs (#1582/#1748): the agent
+ * archives and the routine locks. The tickets and the queue are the `tickets` skill's, on its
+ * own branch — nothing of the product's rides there.
+ */
+export const LOGS_BRANCH = 'agents-logs'
 
 /**
- * The data branch's checkout under a project, relative to the project root: `.branches/agents-data`,
+ * The logs branch's checkout under a project, relative to the project root: `.branches/agents-logs`,
  * beside the agent checkouts and named as its branch like each of them (#1736).
  */
-export const DATA_CHECKOUT_DIR = `${BRANCHES_DIR}/${DATA_BRANCH}`
+export const LOGS_CHECKOUT_DIR = `${BRANCHES_DIR}/${LOGS_BRANCH}`

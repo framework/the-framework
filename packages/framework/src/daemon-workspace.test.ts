@@ -16,6 +16,7 @@ const agentReady = (): Promise<PreflightResult> => Promise.resolve({ ok: true, c
 
 import { EVENTS_FILE, META_FILE, startedAtFromAgentId, type AgentMeta } from './store/index.js'
 import { BRANCHES_DIR, worktreePath, agentBranchName, nodeGitRunner, GitTimeoutError, CLI_BIN_DIR } from '@gemstack/skill-branches'
+import { CLI_BIN_DIR as TICKETS_BIN_DIR } from '@gemstack/skill-tickets'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import { addProject, projectId } from './registry.js'
 import type { AgentSpec } from './agent-spec.js'
@@ -663,8 +664,8 @@ test('a spawned agent finds the `branches` command on its PATH (#1725)', async (
       recorded = await readFile(log, 'utf8').catch(() => '')
     }
     const path = recorded.trim()
-    assert.equal(path.split(delimiter)[0], CLI_BIN_DIR, 'the package bin dir comes first')
-    assert.equal(path.split(delimiter).slice(1).join(delimiter), process.env['PATH'], "after the daemon's own")
+    assert.deepEqual(path.split(delimiter).slice(0, 2), [CLI_BIN_DIR, TICKETS_BIN_DIR], 'the packages\' bin dirs come first: branches, then tickets (#1748)')
+    assert.equal(path.split(delimiter).slice(2).join(delimiter), process.env['PATH'], "after the daemon's own")
     // By name, the way the agent's shell resolves it, against the project the daemon started it in.
     const listed = await new Promise<string>((resolvePromise, rejectPromise) =>
       execFile('branches', ['list'], { cwd, env: { ...process.env, PATH: path } }, (err, stdout) => (err ? rejectPromise(err) : resolvePromise(stdout))),

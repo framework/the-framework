@@ -34,7 +34,7 @@ What the tests cover: how an agent's record is written, summarized, archived and
 - Closing copies the agent's log and agent meta into the archive, and the history lists them newest first with what each was asked for and how each ended.
 - Starting a fresh agent first rescues a prior agent that crashed without closing, so its history survives.
 - A worktree agent's record is copied into the repo before its checkout can be removed, and an agent still marked running at that moment is recorded as stopped.
-- A named user files the archive under their own directory on the data branch instead of the throwaway one.
+- A named user files the archive under their own directory on the logs branch instead of the throwaway one.
 - The history lists every user's archive plus the throwaway one, under their one current name only; an agent filed in two places is listed once; an archived log replays wherever it is filed.
 - A history read given a cutoff skips older records by filename without ever opening them, while a record whose id is not one of the framework's timestamps is still read.
 

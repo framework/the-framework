@@ -9,7 +9,7 @@ The Overview's "Routine work" card: the routines Auto PM runs on a schedule, eac
 
 ## Glossary
 
-- **routine lock** — a routine's lock file on the data branch, naming the machine running that routine and since when, so no two machines run it at once. A routine declares whether it holds one.
+- **routine lock** — a routine's lock file on the `agents-logs` branch, where The Framework keeps its own records, naming the machine running that routine and since when, so no two machines run it at once. A routine declares whether it holds one.
 
 ## Business logic — TL;DR
 

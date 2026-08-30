@@ -7,7 +7,8 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { startBackgroundServices, syncProjectData } from './daemon-services.js'
 import { projectErrorStore } from './project-errors.js'
-import { dataWorktreePath, withDataBranch } from './data-branch.js'
+import { fileBranchPath, withFileBranch } from '@gemstack/skill-branches'
+import { TICKETS_BRANCH } from '@gemstack/skill-tickets'
 import { pollerQuotaSource, type QuotaSource } from './dashboard/quota.js'
 import { QuotaPoller } from './quota-poller.js'
 import type { DriverQuotaWindow } from 'agent-driver'
@@ -67,7 +68,7 @@ async function services(preferences: Record<string, unknown>, quota?: QuotaSourc
   await git('git', ['config', 'user.email', 'test@example.com'], { cwd: project })
   await git('git', ['config', 'user.name', 'Test'], { cwd: project })
   await git('git', ['config', 'commit.gpgsign', 'false'], { cwd: project })
-  const seeded = await withDataBranch(project, 'seed', async dir => {
+  const seeded = await withFileBranch(project, TICKETS_BRANCH, 'seed', async dir => {
     await mkdir(join(dir, 'tickets'), { recursive: true })
     for (const entry of QUEUE_ENTRIES) {
       const ticket = /\((tickets\/[^)]+)\)/.exec(entry)![1]!
@@ -132,7 +133,7 @@ test('the concurrency setting on disk is the number of agents the routine spins 
     // four copies of the first entry. The prompt is where the pin lives (E2) — it used to also
     // ride the agent's meta, so a third claim mechanism could be re-derived from it later.
     for (const [index, start] of starts.entries()) {
-      assert.match(start.prompt, /Work on this one open task-queue entry only/)
+      assert.match(start.prompt, /Work on this one open entry of the agent queue only/)
       assert.ok(start.prompt.includes(QUEUE_ENTRIES[index]!), `the prompt pins ${QUEUE_ENTRIES[index]}`)
       // Nobody is at the keyboard, so a gate must auto-answer rather than park (#846/#1279).
       assert.equal(start.options.unattended, true)
@@ -153,11 +154,11 @@ test('the concurrency setting on disk is the number of agents the routine spins 
     const outcome = running.autoPmReport().outcomes[0]
     assert.equal(outcome?.started, true)
     assert.match(outcome?.message ?? '', /started 4 agents/)
-    // The claim the sweep committed ahead of each agent (#1420): the ticket's lock is on the
-    // data branch (#1582) and names the id the agent's own prompt carries as its own.
-    const lock = await readFile(join(dataWorktreePath(projectDir), 'tickets/2026-07-01_one.lock.md'), 'utf8')
-    assert.ok(lock.startsWith('CLAIMED: drain-'), "the first entry's ticket carries a drain claim")
-    assert.ok(starts[0]!.prompt.includes(lock.trim()), 'and the prompt names that exact claim')
+    // The claim the sweep committed ahead of each agent (#1420/#1748): the ticket's lock is on
+    // the tickets branch and names the id the agent is started with, so the lock and the run are one.
+    const lock = await readFile(join(fileBranchPath(projectDir, TICKETS_BRANCH), 'tickets/2026-07-01_one.lock.md'), 'utf8')
+    assert.match(lock, /^CLAIMED: \d{4}-\d{2}-\d{2}T/, "the first entry's ticket carries a claim naming an agent id")
+    assert.equal(starts[0]!.options.agentId, lock.slice('CLAIMED: '.length).trim(), 'and the agent is started with that id')
   } finally {
     await stop()
   }
@@ -189,10 +190,10 @@ async function archiveMeta(projectDir: string, meta: { id: string } & Record<str
   await writeFile(join(dir, `${meta.id}.json`), JSON.stringify({ startedAt: '2026-08-19T00:00:00.000Z', updatedAt: '2026-08-19T00:01:00.000Z', ...meta }))
 }
 
-test('a drained entry is checked off on the data branch once its run reports the work published (#1582)', async () => {
+test('a drained entry is taken off the queue once its run reports the work published (#1582/#1748)', async () => {
   // The whole retire loop, with only the agent stubbed: the sweep pins the entry, the run's
   // archived record reports the hand-off, and the daemon — the queue's one local writer — lands
-  // the check-off as a data-branch commit. The agent never touches the queue.
+  // the removal as a commit on the tickets branch. The agent never touches the queue.
   const { starts, stop, services: running, projectDir } = await services({ autoPm: false, autoPmConcurrency: 1 })
   try {
     running.wakeAutoPm({ onDemand: true, only: 'drain' })
@@ -206,16 +207,15 @@ test('a drained entry is checked off on the data branch once its run reports the
     const deadline = Date.now() + 5000
     let subjects = ''
     while (Date.now() < deadline) {
-      subjects = await git('git', ['log', '--format=%s', 'agents-data'], { cwd: projectDir }).then(r => r.stdout, () => '')
-      if (subjects.includes('check off a drained entry')) break
+      subjects = await git('git', ['log', '--format=%s', `refs/heads/${TICKETS_BRANCH}`], { cwd: projectDir }).then(r => r.stdout, () => '')
+      if (subjects.includes('queue done: ')) break
       await new Promise(resolve => setTimeout(resolve, 25))
     }
-    assert.ok(subjects.includes('check off a drained entry'), 'the check-off is a data-branch commit')
-    const queue = await readFile(join(dataWorktreePath(projectDir), 'TODO_AGENTS.md'), 'utf8')
-    assert.ok(queue.includes(`- [x] ${QUEUE_ENTRIES[0]!}`), 'the drained entry is checked off')
+    assert.ok(subjects.includes(`queue done: ${QUEUE_ENTRIES[0]!}`), 'the removal is a commit on the tickets branch')
+    const queue = await readFile(join(fileBranchPath(projectDir, TICKETS_BRANCH), 'TODO_AGENTS.md'), 'utf8')
+    assert.ok(!queue.includes(QUEUE_ENTRIES[0]!), 'the drained entry is deleted — done means deleted, not checked off')
     // The fixture seeds bare bullets, and untouched ones must stay exactly as written.
     assert.ok(queue.includes(`- ${QUEUE_ENTRIES[1]!}`), 'the untouched entries stay open')
-    assert.ok(!queue.includes(`[x] ${QUEUE_ENTRIES[1]!}`), 'only the drained entry is retired')
   } finally {
     await stop()
   }
@@ -235,8 +235,7 @@ test('a run whose hand-off failed leaves its entry open: unpublished work is not
     // moment and then require the queue untouched — the check-off in the sibling test lands
     // well inside this window when the gate passes.
     await settle(() => false, 1500)
-    const queue = await readFile(join(dataWorktreePath(projectDir), 'TODO_AGENTS.md'), 'utf8')
-    assert.ok(!queue.includes('[x]'), 'nothing is checked off')
+    const queue = await readFile(join(fileBranchPath(projectDir, TICKETS_BRANCH), 'TODO_AGENTS.md'), 'utf8')
     assert.ok(queue.includes(`- ${QUEUE_ENTRIES[0]!}`), "the failed run's entry stays open")
   } finally {
     await stop()
@@ -250,7 +249,7 @@ test('a drain claims an entry whose ticket file is gone, recreating tickets/ on 
   // "another agent already claimed".
   const { starts, stop, services: running, projectDir } = await services({ autoPm: false, autoPmConcurrency: 1 })
   try {
-    const cleared = await withDataBranch(projectDir, 'retire every ticket', async dir => {
+    const cleared = await withFileBranch(projectDir, TICKETS_BRANCH, 'retire every ticket', async dir => {
       await rm(join(dir, 'tickets'), { recursive: true, force: true })
     })
     assert.ok(cleared.ok, 'the fixture must drop tickets/ from the data branch')
@@ -258,8 +257,8 @@ test('a drain claims an entry whose ticket file is gone, recreating tickets/ on 
     await settle(() => starts.length >= 1)
     assert.equal(starts.length, 1, 'the batch starts instead of standing down')
     assert.ok(starts[0]!.prompt.includes(QUEUE_ENTRIES[0]!), 'the first entry is the pinned one')
-    const lock = await readFile(join(dataWorktreePath(projectDir), 'tickets/2026-07-01_one.lock.md'), 'utf8')
-    assert.ok(lock.startsWith('CLAIMED: drain-'), 'the claim landed in a recreated tickets/')
+    const lock = await readFile(join(fileBranchPath(projectDir, TICKETS_BRANCH), 'tickets/2026-07-01_one.lock.md'), 'utf8')
+    assert.match(lock, /^CLAIMED: \d{4}-/, 'the claim landed in a recreated tickets/')
   } finally {
     await stop()
   }
@@ -286,7 +285,7 @@ test('a project whose data branch cannot reach a remote carries a data-sync erro
     const [noRemote] = errors.list(project)
     assert.equal(noRemote?.code, 'data-sync')
     assert.match(noRemote?.message ?? '', /no remote/)
-    assert.ok(logs.some(m => m.includes('data branch sync')), 'still said on the daemon log too')
+    assert.ok(logs.some(m => m.includes('data sync') && m.includes('no remote')), 'still said on the daemon log too')
 
     // The user fixes it: the next turn converges and the error is gone, not merely re-worded.
     await git('git', ['init', '-q', '--bare'], { cwd: remote })

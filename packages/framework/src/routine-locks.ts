@@ -1,29 +1,30 @@
 import { hostname } from 'node:os'
 import { join } from 'node:path'
-import { resolveDataFileDeps, type DataFileDeps } from './data-branch.js'
+import { nodeBranchFileFs, withFileBranch, type BranchFileFs, type CommitMessage, type FileBranchWrite } from '@gemstack/skill-branches'
+import { LOGS_BRANCH } from './framework-dir.js'
 
-// The "one triage at a time" guard (#1659): a `routines/<name>.lock.md` on the data branch.
+// The "one triage at a time" guard (#1659): a `routines/<name>.lock.md` on the logs branch.
 //
 // The pinned branch (#1293) was this guard before, and stopped being one: since #1644 a triage
 // commits nothing on its branch, so the branch never reaches origin and guards nothing across
 // machines, and locally it was a name the *agent* checked from its prompt — every false abort
 // spent a started agent. The lock is the ticket claim (#1420) applied to a routine: minted by the
-// sweep through the data-branch write funnel before the run starts, so the daemon decides and no
-// agent is started to find out, and read by every machine that shares `agents-data`.
+// sweep through the logs branch's write funnel before the run starts, so the daemon decides and no
+// agent is started to find out, and read by every machine that shares `agents-logs`.
 //
 // Release is the daemon's, not a PR's: a triage never opens one. The daemon that minted a lock
 // drops it when the run ends, whatever the ending, and on boot for any it holds whose run is
 // gone — so a crash on this machine frees the routine at once. A lock another machine left
 // behind counts as dead after {@link ROUTINE_LOCK_TTL_MS}, fixed: a triage over hundreds of
-// tickets can take hours, and a heartbeat would cost code and `agents-data` churn.
+// tickets can take hours, and a heartbeat would cost code and `agents-logs` churn.
 
-/** Where routine state lives on the data branch; only the lock files, for now (#1660). */
+/** Where routine state lives on the logs branch; only the lock files, for now (#1660). */
 const ROUTINES_DIR = 'routines'
 
 /** How long a lock stands before whoever finds it may take it over: four hours, no heartbeat. */
 export const ROUTINE_LOCK_TTL_MS = 4 * 60 * 60 * 1000
 
-/** The lock file for a routine, relative to the data branch root: `routines/triage-quick.lock.md`. */
+/** The lock file for a routine, relative to the logs branch root: `routines/triage-quick.lock.md`. */
 export function routineLockPath(name: string): string {
   return `${ROUTINES_DIR}/${name}.lock.md`
 }
@@ -48,15 +49,24 @@ export function routineLockHolder(md: string): RoutineLockHolder | undefined {
 }
 
 /** Injectable seams so every operation is unit-testable off disk and git. */
-export interface RoutineLockDeps extends DataFileDeps {
+export interface RoutineLockDeps extends Partial<BranchFileFs> {
+  /** The logs branch's write funnel (default the persistent checkout's cycle); a test's fake stands in. */
+  funnel?: (root: string, message: CommitMessage, op: (dir: string) => Promise<void>) => Promise<FileBranchWrite>
+  log?: (message: string) => void
   /** The machine claiming the lock (default this host's name). */
   host?: string
   now?: () => number
 }
 
 function resolve(deps: RoutineLockDeps) {
+  const fs = nodeBranchFileFs()
   return {
-    ...resolveDataFileDeps(deps),
+    read: deps.read ?? fs.read,
+    write: deps.write ?? fs.write,
+    remove: deps.remove ?? fs.remove,
+    list: deps.list ?? fs.list,
+    funnel: deps.funnel ?? ((root: string, message: CommitMessage, op: (dir: string) => Promise<void>) => withFileBranch(root, LOGS_BRANCH, message, op)),
+    log: deps.log ?? (() => {}),
     host: deps.host ?? hostname(),
     now: deps.now ?? (() => Date.now()),
   }
@@ -74,7 +84,7 @@ export type AcquireRoutineLockResult =
   | { ok: false; reason: string }
 
 /**
- * Take the lock for `name` on the data branch, in one funneled cycle. An alive lock stands the
+ * Take the lock for `name` on the logs branch, in one funneled cycle. An alive lock stands the
  * caller down naming its holder; an expired one is taken over in the same commit. The funnel
  * re-runs the op when a push loses a race, so a lock another machine minted meanwhile is found,
  * not overwritten — and this machine's own lock seen again on the re-run is still ours.
@@ -101,7 +111,6 @@ export async function acquireRoutineLock(cwd: string, name: string, deps: Routin
       }
       await r.write(path, routineLockContent(mine))
     },
-    { log: r.log },
   )
   if (held) return { ok: false, reason: `${name} is already running on ${held.host} (since ${held.since})` }
   if (!result.ok && !result.committed) return { ok: false, reason: `the ${name} lock could not be committed (${result.error})` }
@@ -123,7 +132,6 @@ export async function releaseRoutineLock(cwd: string, name: string, deps: Routin
       const path = join(dataDir, routineLockPath(name))
       if (routineLockHolder(await r.read(path).catch(() => ''))?.host === r.host) await r.remove(path)
     },
-    { log: r.log },
   )
   return result.ok || result.committed
 }
@@ -154,7 +162,6 @@ export async function releaseDeadRoutineLocks(
         released.push(name)
       }
     },
-    { log: r.log },
   )
   return result.ok || result.committed ? released : []
 }

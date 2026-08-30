@@ -1,0 +1,136 @@
+import { join } from 'node:path'
+import { TICKETS_DIR, ticketLockName, ticketPlanName, ticketStem } from './names.js'
+import { resolveTicketDeps, type TicketDeps, type TicketFiles } from './store.js'
+
+// The `.lock.md` claim on a ticket: a ticket is worked or planned by one holder at a time, and the
+// guard cannot be anyone's memory — the holder may be on another machine, or a cloud session whose
+// local process is gone. So the claim is a file beside the ticket, `tickets/<STEM>.lock.md`,
+// holding one line, `CLAIMED: <holder>`, on the tickets branch where every reader already looks.
+//
+// There is no timed release: a holder can legitimately keep a ticket for days, and a lock lifted
+// under a live holder re-opens the exact double-work window it exists to close. The lock lifts
+// when the ticket is closed with its siblings, when its holder releases it, when a person releases
+// it by hand, or when a caller frees a claim it made for a holder it knows ended with nothing.
+
+/** The first line of a lock file: the claim, naming who holds the ticket. */
+const LOCK_PREFIX = 'CLAIMED:'
+
+/** What a lock file holds: the claim line and nothing else. */
+export function lockContent(holder: string): string {
+  return `${LOCK_PREFIX} ${holder}\n`
+}
+
+/** The holder a lock file names, or `undefined` for content that is not a claim line. */
+export function lockHolder(md: string): string | undefined {
+  const line = md.trimStart()
+  if (!line.startsWith(LOCK_PREFIX)) return undefined
+  const holder = line.slice(LOCK_PREFIX.length).split('\n', 1)[0]!.trim()
+  return holder || undefined
+}
+
+/** One claim: the ticket's filename inside `tickets/`, and who holds it. */
+export interface TicketClaim {
+  ticket: string
+  holder: string
+}
+
+/**
+ * Which side of a ticket's life a batch claims for. A `plan` batch is about to *write* plans, so
+ * an existing `.plan.md` means the work it came for is already done and the ticket is skipped. A
+ * `drain` batch is about to *implement* a plan — the `.plan.md` is its input, not a competing
+ * claim — so only an existing `.lock.md` stands in its way.
+ */
+export type ClaimPhase = 'plan' | 'drain'
+
+/**
+ * The claim applied to a directory of tickets: one lock per claim, an existing file outranking
+ * the batch. Resolves the subset actually locked. Re-runnable — a pure function of the directory
+ * it is handed — so a writer that re-applies the intent after a lost race re-judges the batch
+ * instead of double-claiming: an existing lock naming this very holder is the batch's own claim
+ * seen again, and still counts as locked.
+ */
+export async function applyClaims(dir: string, claims: readonly TicketClaim[], phase: ClaimPhase, files: TicketFiles): Promise<TicketClaim[]> {
+  const locked: TicketClaim[] = []
+  for (const claim of claims) {
+    const lock = join(dir, TICKETS_DIR, ticketLockName(claim.ticket))
+    const existing = await files.read(lock).catch(() => undefined)
+    if (existing !== undefined) {
+      if (lockHolder(existing) === claim.holder) locked.push(claim)
+      continue
+    }
+    if (phase === 'plan' && (await files.read(join(dir, TICKETS_DIR, ticketPlanName(claim.ticket))).then(() => true, () => false))) continue
+    await files.write(lock, lockContent(claim.holder))
+    locked.push(claim)
+  }
+  return locked
+}
+
+/** The commit a batch of claims lands as, naming the count. */
+export function claimMessage(claims: readonly TicketClaim[]): string {
+  return claims.length === 1 ? `claim ${TICKETS_DIR}/${ticketStem(claims[0]!.ticket)}` : `claim ${claims.length} tickets`
+}
+
+/**
+ * Claim `claims`' tickets for their holders through the caller's funnel, as one commit, pushed.
+ * Resolves the subset actually locked. A batch that could not land at all resolves `[]` and logs
+ * why — otherwise "no claims" is indistinguishable from "lost every race". A batch that committed
+ * but could not *push* is kept and resolved as locked: the commit still guards every reader of
+ * this machine's checkout, and the cross-machine gap is logged rather than treated as failure.
+ * Never throws.
+ */
+export async function claimTickets(root: string, claims: readonly TicketClaim[], phase: ClaimPhase, deps: TicketDeps = {}): Promise<TicketClaim[]> {
+  const r = resolveTicketDeps(deps)
+  let locked: TicketClaim[] = []
+  const result = await r.funnel(
+    root,
+    () => claimMessage(locked),
+    async dir => {
+      locked = await applyClaims(dir, claims, phase, r)
+    },
+  )
+  if (!result.ok && !result.committed) {
+    r.log(`[tickets] the claims could not be committed (${result.error})`)
+    return []
+  }
+  if (!result.ok) r.log(`[tickets] the claims could not be pushed, so other machines cannot see these ${locked.length} claim(s)`)
+  return locked
+}
+
+/** What a release did: freed the ticket, found nothing to free, or found someone else's claim. */
+export type ReleaseOutcome = 'released' | 'no-lock' | 'not-holder'
+
+/**
+ * The release applied to a directory of tickets. With `heldBy`, the lock is freed only while it
+ * still names that holder — a lock naming anyone else is someone's live claim and outranks the
+ * release; without it, whoever holds the lock is released.
+ */
+export async function applyRelease(dir: string, ticket: string, heldBy: string | undefined, files: TicketFiles): Promise<ReleaseOutcome> {
+  const lock = join(dir, TICKETS_DIR, ticketLockName(ticket))
+  const md = await files.read(lock).catch(() => undefined)
+  if (md === undefined) return 'no-lock'
+  if (heldBy !== undefined && lockHolder(md) !== heldBy) return 'not-holder'
+  await files.remove(lock)
+  return 'released'
+}
+
+/** The commit a release lands as. */
+export function releaseMessage(ticket: string): string {
+  return `release ${TICKETS_DIR}/${ticketStem(ticket)}`
+}
+
+/**
+ * Free one ticket's lock through the caller's funnel. `heldBy` frees only the exact claim it
+ * names (a caller cleaning up after a holder it knows ended with nothing); absent, whoever holds
+ * the lock is released. A release that cannot land reports `error` and changes nothing — the
+ * funnel restores the checkout, so the committed state keeps telling the truth about the claim.
+ */
+export async function releaseTicket(root: string, ticket: string, opts: { heldBy?: string } = {}, deps: TicketDeps = {}): Promise<ReleaseOutcome | 'error'> {
+  const r = resolveTicketDeps(deps)
+  let outcome: ReleaseOutcome = 'released'
+  const result = await r.funnel(root, releaseMessage(ticket), async dir => {
+    outcome = await applyRelease(dir, ticket, opts.heldBy, r)
+  })
+  if (!result.ok && !result.committed) return 'error'
+  if (!result.ok) r.log(`[tickets] the release of ${ticket} could not be pushed`)
+  return outcome
+}

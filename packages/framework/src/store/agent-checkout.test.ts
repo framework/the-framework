@@ -6,7 +6,7 @@ import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises'
 import { resolveAgentEventsPath } from './agent-checkout.js'
 import { EVENTS_FILE, ARCHIVE_DIR } from './agent-store.js'
 import { worktreePath } from '@gemstack/skill-branches'
-import { DATA_CHECKOUT_DIR, THE_FRAMEWORK_DIR } from '../framework-dir.js'
+import { LOGS_CHECKOUT_DIR, THE_FRAMEWORK_DIR } from '../framework-dir.js'
 // resolveAgentEventsPath probes the real filesystem (same as resolveAgentCheckout), so these
 // tests build a throwaway project directory rather than a memory fs.
 
@@ -62,7 +62,7 @@ test('resolveAgentEventsPath: an ended run (worktree gone) resolves to its archi
 test('resolveAgentEventsPath: finds an archive filed under a user dir on the data branch (#1179/#1582)', async () => {
   const cwd = await makeProject()
   try {
-    const events = await seedArchive(cwd, join(cwd, DATA_CHECKOUT_DIR, ARCHIVE_DIR, 'someone'))
+    const events = await seedArchive(cwd, join(cwd, LOGS_CHECKOUT_DIR, ARCHIVE_DIR, 'someone'))
     assert.equal(await resolveAgentEventsPath(cwd, RUN_ID), events)
   } finally {
     await rm(cwd, { recursive: true, force: true })

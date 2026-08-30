@@ -1,8 +1,8 @@
-Decides which per-user directory a project's archives are filed under on the data branch, so that every finished agent's lasting record survives the repo being cleaned and two people working the same repo never write to the same paths.
+Decides which per-user directory a project's archives are filed under on the logs branch (`agents-logs`), so that every finished agent's lasting record survives the repo being cleaned and two people working the same repo never write to the same paths.
 
 ## Business logic — TL;DR
 
-- **Archives are filed per user** - a finished agent's archive lands under `agents/<user>/` on the data branch, where `<user>` comes from the git identity the repo already commits with.
+- **Archives are filed per user** - a finished agent's archive lands under `agents/<user>/` on the logs branch, where `<user>` comes from the git identity the repo already commits with.
 - **The directory name can never climb out of the archive** - the identity is reduced to a conservative, lowercased name that must start with a letter or digit; anything that cannot be made to fit is filed under `anonymous` instead.
 - **A missing identity still gets a home** - when git has no configured identity, the archive goes to `anonymous` rather than being dropped.
 - **The identity is read once per repo** - resolved on the first archive and reused for the rest of the daemon's life, with an explicit way to forget it.
@@ -17,13 +17,13 @@ Several people work the same project from their own machines. Each of them wants
 
 #### Business logic
 
-An archive is written under a directory named after the user, inside the archive directory `agents/` on the data branch. Because each person's archives sit under their own directory, two people's histories sit side by side instead of overwriting the same paths. The whole team can see everybody's list; that visibility is intended.
+An archive is written under a directory named after the user, inside the archive directory `agents/` on the logs branch. Because each person's archives sit under their own directory, two people's histories sit side by side instead of overwriting the same paths. The whole team can see everybody's list; that visibility is intended.
 
 The identity used is the email that `git config user.email` reports for the project, so there is nothing extra for the user to configure and the directory matches the name that appears on the commits.
 
 #### Rationale
 
-Agent state used to be written to `.the-framework/agents/`, which the install-time `.gitignore` keeps untracked. An ordinary `git clean -fdx` therefore deleted every agent a project had ever run, and nothing was recoverable because nothing had ever been committed. Keeping the lasting copy on the data branch is what makes the history survive.
+Agent state used to be written to `.the-framework/agents/`, which the install-time `.gitignore` keeps untracked. An ordinary `git clean -fdx` therefore deleted every agent a project had ever run, and nothing was recoverable because nothing had ever been committed. Keeping the lasting copy on the logs branch is what makes the history survive.
 
 ### The directory name can never climb out of the archive
 

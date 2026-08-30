@@ -9,7 +9,7 @@ The user wants to see the whole backlog — not one project's slice of it — de
 - **Cross-project by default** - the page reads every registered project's tickets, re-read every ten seconds, and shows a shown/total tally beside its title.
 - **The address is the view** - search, filters, sort and grouping are all carried in the page's address, so a view can be shared and reopened; changing them rewrites the address without adding a Back step.
 - **Grouped or flat** - grouped shows one section per project, each with that project's own ticket panel; flat pools every project's tickets into one order, each row naming its project — the only view that can answer which ticket is the highest-priority one anywhere.
-- **Click-to-filter** - clicking a row's topic adds that topic to the filter, clicking its claim marker narrows to claimed tickets; both add to what is already filtered rather than replacing it.
+- **Click-to-filter, or straight to the holder** - clicking a row's topic adds that topic to the filter, clicking its claim marker narrows to claimed tickets; both add to what is already filtered rather than replacing it. A claim held by one of the row's own project's agents instead opens that agent's page.
 - **Plan it or work it from the row** - a ticket can be handed to a planning agent or to an unattended work agent without leaving the page.
 - **Queue the whole shown set** - a button beside the page's heading adds every unclaimed shown ticket to the AI queue (a ticket already queued stays as it is), counting on its label what one click adds; no agent starts — the queue's own consumers do that.
 - **Queue plans for the whole shown set** - a sibling button queues one plan ask per shown ticket still to plan — the plan-tickets ask, placed by the ticket's priority — skipping tickets already planned, already queued, or claimed.
@@ -65,6 +65,8 @@ The user spots an interesting topic on one ticket and wants everything else carr
 #### Business logic
 
 Clicking a topic on a ticket row adds that topic to the topic filter; clicking a second topic widens the filter to either topic rather than replacing the first. Clicking a ticket's claim marker narrows the page to claimed tickets. Both are no-ops when the filter already holds that clause.
+
+A claim naming one of this project's own agents is the exception: its marker opens that agent's page instead of filtering, in the row's own project — the same rule that decides where a row's start actions run, since the page spans every project.
 
 ### Plan it or work it from the row
 

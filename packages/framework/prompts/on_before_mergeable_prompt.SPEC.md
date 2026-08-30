@@ -7,7 +7,7 @@ The extra turn an agent is given the moment it signals ready for merge, when the
 
 ## Business logic — TL;DR
 
-- **Quality work is queued, not run** - the agent appends entries to the agent queue (`TODO_AGENTS.md`) asking for the quality presets to be applied to its own changes; a later drain does the work.
+- **Quality work is queued, not run** - the agent puts entries on the agent queue (`TODO_AGENTS.md`), with the `tickets` skill's command, asking for the quality presets to be applied to its own changes; a later drain does the work.
 - **Two conditions, two presets** - non-trivial changes with refactor potential queue the maintainability preset, changes that could lead to security issues queue the security-audit preset; each entry scopes the preset to "changes introduced by <session name>".
 - **What was learned goes into the knowledge base** - the agent updates the project's decisions, facts and insights files from the session's changes and discussions, creating them when missing, and writes only what a future agent could not get from the code itself.
 
@@ -21,7 +21,7 @@ See `## User story`: the user wants the follow-up passes to happen, but on their
 
 #### Business logic
 
-The prompt asks the agent to *append* work to the agent queue rather than perform it. Each entry names a preset file and the target to apply it to, so a later drain of the queue turns it into its own agent. The agent judges both conditions itself against the changes it just made:
+The prompt asks the agent to *queue* work rather than perform it, and names how: the `tickets` skill's command, which is what writes an entry onto the agent queue. Each entry names a preset file and the target to apply it to, so a later drain of the queue turns it into its own agent. The agent judges both conditions itself against the changes it just made:
 
 - changes that are not trivial and have refactor potential queue the maintainability preset;
 - changes that can potentially lead to security issues queue the security-audit preset.

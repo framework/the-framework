@@ -49,7 +49,7 @@ export function ProjectHome({
   return (
     <ScrollArea className="min-h-0 flex-1">
       <ProjectActions projectId={projectId} />
-      {/* Above the start form, because an agent started on a project whose data branch cannot
+      {/* Above the start form, because an agent started on a project whose tickets or agents-logs branch cannot
           reach origin (#1599) works from stale tickets and a queue nobody else will see. */}
       <ProjectErrorBanner errors={errors} />
       <StartAgentForm

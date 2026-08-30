@@ -6,7 +6,7 @@ Renders the on-before-mergeable prompt: one extra agent turn sent after an agent
 
 ## Business logic — TL;DR
 
-- **Queues quality work, never runs it** - the prompt tells the agent to append entries to the agent queue (`TODO_AGENTS.md`), one per quality preset; a later routine drains them.
+- **Queues quality work, never runs it** - the prompt tells the agent to put entries on the agent queue (`TODO_AGENTS.md`) with the `tickets` skill's own command, one per quality preset; a later routine drains them.
 - **Folds knowledge back** - the prompt asks the agent to update the repo's business-knowledge docs with what it learned during the task.
 - **Every entry names the session** - each queued entry targets "changes introduced by <session name>"; rendering without a session name fails loudly.
 
@@ -20,7 +20,7 @@ An agent finishes a task. The user wants the changes to also get a maintainabili
 
 #### Business logic
 
-The prompt's `## Maintenance` section instructs the agent to append one agent queue entry per quality preset to `TODO_AGENTS.md`, each of the form "Apply `.the-framework/presets/<preset>.md` with tf.params.what set to 'changes introduced by <session name>'". The entry points at the preset's real on-disk file under `.the-framework/presets/`, so the agent that later picks the entry up opens the actual preset text. A later drain of the agent queue turns each entry into its own agent.
+The prompt's `## Maintenance` section instructs the agent to put one agent queue entry per quality preset on `TODO_AGENTS.md`, through the `tickets` skill's queue command, each of the form "Apply `.the-framework/presets/<preset>.md` with tf.params.what set to 'changes introduced by <session name>'". The entry points at the preset's real on-disk file under `.the-framework/presets/`, so the agent that later picks the entry up opens the actual preset text. A later drain of the agent queue turns each entry into its own agent.
 
 #### Rationale
 

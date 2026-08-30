@@ -1,6 +1,6 @@
-For the <COUNT> most important tickets `tickets/<TICKET>.md` without `<TICKET>.plan.md` and `<TICKET>.lock.md`, add the following to TODO_AGENTS.md
-- "Create tickets/<TICKET>.plan.md"
+Use the `tickets` skill. Run `tickets list` and, for the <COUNT> most important tickets that are neither planned nor locked, put the following on the queue:
+- `tickets queue add "Create tickets/<TICKET>.plan.md" --priority <N>`
 
-Put the entries in the right `## Priority` following a mix of sensible criteria after reading `tickets/<TICKET>.md` (e.g. if ticket seems low effort => higher priority).
+Pick each entry's priority following a mix of sensible criteria after reading the ticket (`tickets show <TICKET>.md`; e.g. if the ticket seems low effort => higher priority).
 
 COUNT: 10

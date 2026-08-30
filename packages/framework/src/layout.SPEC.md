@@ -2,7 +2,7 @@ The layout gate: a build of The Framework refuses to run in a project whose reco
 
 ## Business logic — TL;DR
 
-- **The project records the layout it uses** - the layout marker is a tracked file under `.the-framework/`, so every clone and every worktree of the project carries it. It records every name a committed artifact's path hangs off: the framework directory, the data branch, the archive directory, the worktree directory, the event log and agent meta file names, the tickets directory, and the agent queue file.
+- **The project records the layout it uses** - the layout marker is a tracked file under `.the-framework/`, so every clone and every worktree of the project carries it. It records every name a committed artifact's path hangs off: the framework directory, the tickets branch, the logs branch, the archive directory, the event log and agent meta file names, the tickets directory, and the agent queue file.
 - **A mismatch is refused outright** - a build whose layout differs from the project's records refuses to run there, and says both layouts in full plus the fix for each direction: update The Framework to a build that matches the project, or, when the build is the newer side, rewrite the marker as part of the rename itself.
 - **An unmarked project is ungated** - a project with no marker runs without the check. Activation writes the marker, so every newly activated project is gated from the start.
 - **Refusal is a reported outcome** - the check reports its verdict for the caller to act on rather than crashing.

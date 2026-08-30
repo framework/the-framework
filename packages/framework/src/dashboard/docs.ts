@@ -1,7 +1,6 @@
 import { readFile, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { readDataFile } from '../data-branch.js'
-import { FLAT_TODO_FILE } from '../tickets.js'
+import { QUEUE_FILE, readQueue } from '@gemstack/skill-tickets'
 
 /**
  * The plan/backlog document categories the dashboard surfaces in its sidebar
@@ -55,7 +54,7 @@ export async function readDocs(cwd: string): Promise<WorkspaceDoc[]> {
     docs.push({ name, content: content.length > MAX_DOC_BYTES ? content.slice(0, MAX_DOC_BYTES) + '\n\n… (truncated)' : content })
   }
   for (const cat of DOC_CATEGORIES) {
-    if ('backlog' in cat) push(FLAT_TODO_FILE, await readDataFile(cwd, FLAT_TODO_FILE))
+    if ('backlog' in cat) push(QUEUE_FILE, await readQueue(cwd))
     else if (present.has(cat.flat)) push(cat.flat, await readFile(join(cwd, cat.flat), 'utf8').catch(() => undefined))
     for (const name of entries.filter(e => cat.scoped.test(e)).sort()) {
       push(name, await readFile(join(cwd, name), 'utf8').catch(() => undefined))

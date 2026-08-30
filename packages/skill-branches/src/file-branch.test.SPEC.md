@@ -1,0 +1,14 @@
+What the tests cover: a branch used as a file store, checked against real git — a real repository, a real bare origin, and a second clone standing in for another machine — because "did the file reach origin" and "which copy won" are the whole subject.
+
+- **The branch and its checkout** - the branch is born parentless, sharing no commit with the code history, and is checked out at `.branches/<branch>`; the checkout does not show up in the project's `git status`; making sure it exists a second time changes nothing and still reports success. A branch origin already has is adopted instead, with its files, rather than a second history being born.
+- **A write** - the operation's file is committed on the branch under the caller's message and pushed to origin, and the code branch's tip is untouched. An operation that writes nothing commits nothing and moves no branch.
+- **A repository with no remote** - the write lands locally and reports that it did not push; the file is readable on the branch.
+- **A push owed, and a conflict** - a write syncs in what another machine pushed and carries out a commit an earlier cycle stranded locally, so origin ends up with all three files. When the stranded commit conflicts with origin, it resolves toward origin and the operation re-applies its intent on top: the pushed file holds origin's content plus what the operation appended.
+- **The eager pull** - a machine converges on what another machine pushed, without writing anything of its own; on a repository with no remote the pull reports that as its error.
+- **Serialization** - three writes started at once run one whole cycle at a time rather than interleaving, and all three end up in the file.
+- **Reads** - from the persistent checkout; from an agent's worktree of the same repository, which reads the same file while holding no copy of it, and which names the repository it was made from as where the files live; a file the branch does not have reads as absent. Once another machine has moved origin on, the plain read still answers from the checkout while a fresh read answers from origin. A plain clone that never created the branch locally reads origin's copy and lists a directory off the ref, and a directory the branch does not have lists as none.
+- **A detached write** - it births the branch on origin when there is none, from a clone that gains no local branch of it; another machine's persistent checkout stays where it was until its own pull; when a push loses a race the operation is re-run against origin's fresher tip and both writers' files end up on origin; no throwaway worktree is left registered afterwards; an operation that writes nothing is no commit; and a repository with no remote is refused.
+
+## Before modifying/creating SPEC.md files
+
+You must always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

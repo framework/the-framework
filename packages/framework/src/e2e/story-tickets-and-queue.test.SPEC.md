@@ -1,4 +1,4 @@
-What the tests cover: the roadmap loop — tickets are proposals, the agent queue holds confirmed work, and a drain agent claims the queue's next entry — as the Tickets and Queue pages drive it.
+What the tests cover: the roadmap loop — tickets are proposals, the agent queue holds confirmed work, and a drain agent claims the queue's next entry — as the Tickets and Queue pages drive it. The fixture's tickets and queue sit where the product keeps them, on the project's `tickets` branch, never in a working tree.
 
 **Browsing the backlog**
 

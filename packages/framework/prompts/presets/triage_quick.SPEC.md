@@ -1,4 +1,4 @@
-The triage-quick preset: fills the agent queue with the cheap, decision-free work. The agent reads the tickets and picks only those whose plan shows a quick win — a low effort rating with an uncertainty of zero — then appends them to the agent queue (`TODO_AGENTS.md`).
+The triage-quick preset: fills the agent queue with the cheap, decision-free work. The agent lists the tickets with the `tickets` skill and picks only those whose plan shows a quick win — a low effort rating with an uncertainty of zero — then puts them on the agent queue (`TODO_AGENTS.md`), one entry each, linked to its ticket and given a priority.
 
 ## Business logic — TL;DR
 
@@ -17,7 +17,7 @@ The user wants a steady stream of cheap wins done unattended, and wants the choi
 
 #### Business logic
 
-Eligibility is read entirely off a ticket's plan file: the plan must rate the ticket low effort and must rate its uncertainty zero — the value that says outright that no human intervention is needed. A ticket with no plan is therefore never picked by this preset, which is what makes planning a prerequisite for unattended quick-win work.
+Eligibility is read entirely off a ticket's plan, whose effort and uncertainty ratings the skill's listing reports for every ticket: the plan must rate the ticket low effort and must rate its uncertainty zero — the value that says outright that no human intervention is needed. A ticket with no plan is therefore never picked by this preset, which is what makes planning a prerequisite for unattended quick-win work.
 
 ### The cheapest work goes first
 
@@ -27,7 +27,7 @@ The queue is worked top-down, so the order decides how quickly the backlog of tr
 
 #### Business logic
 
-The agent prioritizes the entries it adds sensibly, and is told to consider bumping the lowest-effort tickets — so that the ones rated as trivial become the next tasks agents work on.
+The agent gives each entry it adds a sensible priority, and is told to consider bumping the lowest-effort tickets — so that the ones rated as trivial become the next tasks agents work on.
 
 ### A fixed session name
 

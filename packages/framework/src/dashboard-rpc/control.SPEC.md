@@ -64,7 +64,7 @@ An agent finishes and the user decides to publish its work: push the branch, or 
 
 #### Business logic
 
-Both actions address the agent's own branch as recorded on its agent meta, and act on the agent's own checkout, because for an agent that never committed, its checkout is the only place its work exists. Nothing is committed on the agent's behalf: what is pushed is the branch as the agent committed it, and work it never committed stays in its checkout, named on its page. Opening a pull request pushes the branch first when the remote does not have it, and takes its title and body from what the agent already recorded — the session name it chose and the intent the user asked for — inventing nothing and asking the user for nothing. The number and URL of the opened pull request are written onto the agent's archive on the data branch, so every surface reads the same fact from the same place instead of re-deriving it from branch names.
+Both actions address the agent's own branch as recorded on its agent meta, and act on the agent's own checkout, because for an agent that never committed, its checkout is the only place its work exists. Nothing is committed on the agent's behalf: what is pushed is the branch as the agent committed it, and work it never committed stays in its checkout, named on its page. Opening a pull request pushes the branch first when the remote does not have it, and takes its title and body from what the agent already recorded — the session name it chose and the intent the user asked for — inventing nothing and asking the user for nothing. The number and URL of the opened pull request are written onto the agent's archive on the logs branch, so every surface reads the same fact from the same place instead of re-deriving it from branch names.
 
 #### Rationale
 
@@ -110,13 +110,13 @@ The user sees a ticket worth doing and queues it, so the next drain agent picks 
 
 #### Business logic
 
-The entry is written straight into the project checkout's agent queue file. Given the ticket it came from, the entry is placed in the agent queue section matching that ticket's own priority rather than appended at the end, and is written as a link back to the ticket, so the drain agent working the queue front to back can open it. An empty entry is refused, and so is a project with no local path here.
+The entry is written straight onto the project's agent queue, through the `tickets` skill that owns it. Given the ticket it came from, the entry is placed in the agent queue section matching that ticket's own priority rather than appended at the end, and is written as a link back to the ticket, so the drain agent working the queue front to back can open it. An empty entry is refused, and so is a project with no local path here.
 
 A ticket's plan is queued the same way: one entry asking for that ticket's plan file — the same wording the plan-tickets preset itself queues — placed by the ticket's priority. Deliberately not a link back to the ticket: a leading ticket link is exactly what every reader takes as "this ticket is queued for implementation", and a plan ask is not that. A name that is not a plain ticket filename is refused.
 
 #### Rationale
 
-A direct file write rather than an agent: the agent queue is a plain file the dashboard already reads, and asking an agent to append one line would cost a turn and could do anything else besides.
+A direct write rather than an agent: the agent queue is a document the dashboard already reads, and asking an agent to add one line would cost a turn and could do anything else besides.
 
 ### Releasing a ticket's claim
 
@@ -126,7 +126,7 @@ An agent died holding a ticket's claim, and nothing frees claims on a timer. The
 
 #### Business logic
 
-Only a real ticket filename is accepted. The claim file is deleted in the project checkout, committed, and pushed as far as it can be — a release only this machine can see would leave the ticket claimed everywhere the claim matters. A ticket that holds no claim, and a release that could not be committed, are each reported as such.
+Only a real ticket filename is accepted. The claim is lifted on the `tickets` branch as one committed and pushed change — a release only this machine can see would leave the ticket claimed everywhere the claim matters. A ticket that holds no claim, and a release that could not be committed, are each reported as such.
 
 ### Opening a project on this machine
 

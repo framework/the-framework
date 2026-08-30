@@ -1,0 +1,50 @@
+{
+  "name": "@gemstack/skill-tickets",
+  "version": "0.0.1",
+  "description": "Tickets and the agent queue for coding agents: markdown tickets with their plans and claims, and the priority-banded queue of what agents work on next, kept on a branch of the project's repository and changed with the tickets command.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/framework/the-framework.git",
+    "directory": "packages/skill-tickets"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "bin/tickets",
+    "SKILL.md"
+  ],
+  "bin": {
+    "tickets": "bin/tickets"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./names": {
+      "types": "./dist/names.d.ts",
+      "default": "./dist/names.js"
+    },
+    "./SKILL.md": "./SKILL.md"
+  },
+  "scripts": {
+    "build": "pnpm -C ../skill-branches build && tsc -p tsconfig.build.json",
+    "typecheck": "pnpm -C ../skill-branches build && tsc --noEmit",
+    "test": "pnpm build && tsc -p tsconfig.test.json && node --test --test-timeout=60000 'dist-test/**/*.test.js'",
+    "clean": "rm -rf dist dist-test"
+  },
+  "dependencies": {
+    "@gemstack/skill-branches": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^7.0.2"
+  }
+}

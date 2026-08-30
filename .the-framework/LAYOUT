@@ -1,5 +1,6 @@
 framework-dir: .the-framework
-data-branch: agents-data
+tickets-branch: tickets
+logs-branch: agents-logs
 archive-dir: agents
 events-file: events.jsonl
 meta-file: agent.json

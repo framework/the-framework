@@ -1,4 +1,4 @@
-The suggest-tickets-to-work-on preset: the agent reads all tickets, picks the ones to work on next, and offers them to the user as a multi-select gate — pre-checking only the ones it is highly confident about — then appends the tickets the user approved to the agent queue (`TODO_AGENTS.md`).
+The suggest-tickets-to-work-on preset: the agent lists all tickets with the `tickets` skill, picks the ones to work on next, and offers them to the user as a multi-select gate — pre-checking only the ones it is highly confident about — then puts the tickets the user approved on the agent queue (`TODO_AGENTS.md`), one entry each, linked to its ticket.
 
 ## Business logic — TL;DR
 
@@ -16,7 +16,7 @@ The user wants help choosing what to work on next but keeps the choice: what lan
 
 #### Business logic
 
-The agent looks at all tickets and picks the ones to work on next, shows exactly those picks as a multi-select gate, and stops. Its confidence is expressed as the default state of each entry — checked when it is highly confident the ticket is a good candidate, unchecked otherwise — so answering can be as cheap as accepting the defaults. Once the user answers, the approved tickets are appended to the agent queue.
+The agent looks at all tickets and picks the ones to work on next, shows exactly those picks as a multi-select gate, and stops. Its confidence is expressed as the default state of each entry — checked when it is highly confident the ticket is a good candidate, unchecked otherwise — so answering can be as cheap as accepting the defaults. Once the user answers, the approved tickets go on the agent queue through the skill's command, each entry naming the ticket it came from.
 
 #### Rationale
 

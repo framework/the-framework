@@ -23,7 +23,7 @@ The dashboard is a projection of what the daemon and its agents write to disk. E
 
 #### User story
 
-The user opens a project that has no `tickets/` directory yet, or one that is not a git repo, or one whose path has moved.
+The user opens a project that has no tickets yet, or one that is not a git repo, or one whose path has moved.
 
 #### Business logic
 
@@ -47,7 +47,7 @@ The user starts an agent and sees it appear in the sidebar as running straight a
 
 #### Business logic
 
-The list is the project's archived agents, plus every agent currently live in its own worktree, plus the agents this daemon is relaying from devices — which exist only in the daemon's memory and would otherwise be lost on a reload. There is exactly one row per agent id: a relayed copy beats a local one, and a live copy beats an archived one, because the live copy is the current truth. Nothing is filtered out by status, so an agent whose record was just corrected does not flicker out of the list for a poll. A `web`-target agent whose cloud session the browser bridge reports as waiting on a human — parked on a question it holds, or shown awaiting input by claude.ai's session list — is marked as waiting on the way out — the record on disk cannot know, only the daemon does — so its row says "waiting" rather than "in cloud". Likewise an agent whose recorded host is not this machine is marked as from another host: the data branch is shared precisely so that other machines' agents appear here, and a row that looked exactly like one of this daemon's own left the user reading the archive by hand to learn whose it was. A record with no host at all is left alone. The same marks are applied to the Overview's pooled recent agents.
+The list is the project's archived agents, plus every agent currently live in its own worktree, plus the agents this daemon is relaying from devices — which exist only in the daemon's memory and would otherwise be lost on a reload. There is exactly one row per agent id: a relayed copy beats a local one, and a live copy beats an archived one, because the live copy is the current truth. Nothing is filtered out by status, so an agent whose record was just corrected does not flicker out of the list for a poll. A `web`-target agent whose cloud session the browser bridge reports as waiting on a human — parked on a question it holds, or shown awaiting input by claude.ai's session list — is marked as waiting on the way out — the record on disk cannot know, only the daemon does — so its row says "waiting" rather than "in cloud". Likewise an agent whose recorded host is not this machine is marked as from another host: the logs branch is shared precisely so that other machines' agents appear here, and a row that looked exactly like one of this daemon's own left the user reading the archive by hand to learn whose it was. A record with no host at all is left alone. The same marks are applied to the Overview's pooled recent agents.
 
 ### Where an agent is working
 

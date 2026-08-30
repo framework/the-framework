@@ -89,10 +89,12 @@ happens while nobody is at the keyboard.
 - Hottest tickets
 - Projects sidebar
 - A project whose directory was renamed or deleted leaves the sidebar on the next refresh, and comes back when the directory does; the registration is kept
-- Project errors: a project whose data branch cannot reach origin (push rejected, or no remote) is flagged with a red dot in the sidebar and a banner on its page, until a sync converges
+- Project errors: a project whose bookkeeping branches cannot reach origin (push rejected, or no remote) — the `tickets` branch or the `agents-logs` branch — is flagged with a red dot in the sidebar and a banner on its page, until a sync converges
 
 ## Tickets
 
+- Tickets and the queue live on the `tickets` branch, never on a code branch; every change is one commit pushed straight to it, so what one agent writes the next one sees without waiting for a pull request (#1748)
+- A `tickets` link at your repository's root shows that branch's tickets from your own checkout, made only where nothing of yours sits at that path and kept out of git
 - Cross-project ticket list
 - Faceted filtering: text, priority/effort/uncertainty as buckets *or* ranges, topics, planning stage, project
 - Sorting and group-by-project toggle
@@ -100,17 +102,21 @@ happens while nobody is at the keyboard.
 - Ticket detail page
 - A plan page when a plan exists; a button to start an agent writing one when it doesn't
 - "Resume agent" on the plan page: opens the session of the agent that wrote the plan, so the conversation continues with the plan already in its context
-- Queue a ticket into the AI queue
+- Queue a ticket into the AI queue — the entry is written onto the `tickets` branch, linked to the ticket and filed under the ticket's priority
 - Queue every ticket the filters show into the AI queue, in one click from the page heading
 - Queue a plan for every unplanned ticket the filters show, from the same heading
+- A ticket whose work is done leaves the branch with its plan and its claim; a queue entry whose work is done is taken off the queue — done means deleted, never ticked off
 - Select tickets row by row (a checkbox per row) — while any are selected, the heading's queue buttons act on just the selected tickets
 - Tickets carry a GitHub issue link, so merging closes the issue
+- A claimed ticket's row names the agent holding it — its session name, opening that agent's page — when the claim names one of the project's own agents; any other holder is shown as the claim writes it
 
 ## Handoff and what lands in git
 
 - Every agent gets its own git worktree under `.branches/` and its own branch (`agent-<id>`), created before it starts; your checkout is never touched
 - The `branches` skill: every checkout The Framework creates carries the `@gemstack/skill-branches` package's `SKILL.md` where the agent's harness looks for skills (`.claude/skills/branches` for Claude Code, `.agents/skills/branches` for Codex), and the system prompt tells the agent to use it — that checkout is your whole workspace, name the session with the command, commit as you go, leave a clean tree, never push or open the PR yourself; an agent anywhere else (a terminal run in your checkout, an Actions runner, a cloud session) is told to branch with git itself
 - `branches` on every agent's PATH — the skill's command line: `name <name>` renames the agent's branch to `agent-<name>` and prints the name it got (suffixed when taken); `status` says whether the tree is clean and the branch on the remote; `create`, `attach`, `list`, `remove`, `prune` are the same operations the dashboard runs
+- The `tickets` skill: every checkout The Framework creates carries the `@gemstack/skill-tickets` package's `SKILL.md` beside the `branches` skill, where the agent's harness looks for skills (`.claude/skills/tickets` for Claude Code, `.agents/skills/tickets` for Codex), and the presets tell the agent to use it — the tickets and the agent queue are on the `tickets` branch, read and changed with the command, claimed before they are planned or worked; an agent anywhere else (a terminal run in your checkout, an Actions runner, a cloud session) is told instead how to do the same with git, temporarily, until the skill is committed into the repository (#1748)
+- `tickets` on every agent's PATH — the skill's command line: `list` and `show <file>` read the tickets with their plans and their holders, `queue` reads the queue in the order it is worked, `queue add <text>` puts an entry on it at a priority and linked to a ticket, `queue done <text>` takes an entry off, `put <file>` writes a ticket, a plan or the import stamp, `close <file>` removes a ticket with its plan and claim, `claim <file>` and `release <file>` are the claim; every one of them is one commit pushed to the `tickets` branch
 - The session name is the branch: an agent is labelled by its `agent-<name>` branch, read from git after every turn — nothing to signal, nothing to record twice
 - Dependency directories shared from the parent checkout instead of reinstalled — as directories of links, so an agent's own install stays in its checkout and never rewrites or purges the parent's
 - A checkout whose work is not on the remote is kept — and a publish-nothing (`handoff: local`) agent's is kept until you publish or delete it
@@ -122,7 +128,7 @@ happens while nobody is at the keyboard.
 - Empty agents publish nothing
 - Handoff panel: push / open PR / merge, as buttons
 - A withheld merge is reported with its reason
-- Agent history archived on the `agents-data` branch under per-user directories — pushed the moment a session settles
+- Agent history archived on the `agents-logs` branch under per-user directories — pushed the moment a session settles
 - Post-merge quality follow-ups queued (maintainability / security)
 - Knowledge folded back into `DECISIONS.md` / `FACTS.md` / `INSIGHTS.md` at merge
 
@@ -134,13 +140,13 @@ happens while nobody is at the keyboard.
 - Every stand-down reported with its reason ("it is a setting, not a bug"); a stand-down at the concurrency cap, or a fan-out that came out short, names the runs holding the slots
 - Concurrency cap: how many unattended agents per project
 - Fan-out planning: several agents, one ticket each
-- Cross-machine ticket claims so two agents never double-work; a claim whose agent ended with nothing to hand off is freed by the daemon
+- Cross-machine ticket claims so two agents never double-work: a claim names the agent that holds it by its id, which the daemon mints before writing the claim and starts the agent with — so the dashboard names the holder's session on the ticket's row and opens that agent's page from it; a claim whose agent ended with nothing to hand off is freed by the daemon
 - CI watch: merge a PR once its checks pass
 - CI watch: one fix agent per red head commit, max two attempts
 - Reclaim the checkout of an agent whose work is on the remote — never by publishing what a `handoff: local` agent refused to
 - An agent that committed nothing leaves no branch behind: its empty branch goes with its checkout, never pushed — and the run-id branch it started on goes too, once the branch it moved to holds everything the run-id branch did
 - A directory under `.branches/` that git does not know as a worktree is never committed, pushed, linked or deleted through — it is reported and left alone, so a leftover can never stand in for your own checkout
-- One triage at a time, across machines: a routine lock (`routines/<name>.lock.md` on the data branch) taken by the daemon before the run starts and released when it ends, whatever the ending; a held lock stands the routine down naming the machine holding it, with no agent spent; a lock left by a dead machine expires after four hours, and a daemon frees its own on boot
+- One triage at a time, across machines: a routine lock (`routines/<name>.lock.md` on the `agents-logs` branch) taken by the daemon before the run starts and released when it ends, whatever the ending; a held lock stands the routine down naming the machine holding it, with no agent spent; a lock left by a dead machine expires after four hours, and a daemon frees its own on boot
 - The agent drains its own TODO backlog, one entry per turn
 
 ## Spending
@@ -182,7 +188,7 @@ happens while nobody is at the keyboard.
 - Answer a cloud agent's question from the dashboard (typed back into claude.ai) — the same gate panel a local agent gets, multi-select and stop options included, listed with every other open question
 - Browser-bridge token setting
 - A cloud run's row follows the session's real branch and PR, with its armed draft PR opened when the session opens none
-- Another machine's runs on the shared data branch are told apart: their rows carry a glyph naming the machine that started them (the Overview's working-now card spells it out), and a run is listed once even when two checkouts share its archive
+- Another machine's runs on the shared `agents-logs` branch are told apart: their rows carry a glyph naming the machine that started them (the Overview's working-now card spells it out), and a run is listed once even when two checkouts share its archive
 
 ## Notifications
 

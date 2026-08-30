@@ -1,11 +1,12 @@
-import { withDataBranch } from './data-branch.js'
+import { withFileBranch } from '@gemstack/skill-branches'
+import { LOGS_BRANCH } from './framework-dir.js'
 import { patchArchivedAgent, type ArchivePatch } from './store/index.js'
 
 /**
- * Patch a settled run's archived record on the data branch (#1601): synced with origin, patched,
- * committed, pushed — the same funnel every other data write goes through (#1582).
+ * Patch a settled run's archived record on the logs branch (#1601): synced with origin, patched,
+ * committed, pushed — the same funnel every other write to the branch goes through (#1582).
  *
- * A patch written straight into the data checkout is not a fact yet: the next sync's rebase
+ * A patch written straight into the branch's checkout is not a fact yet: the next sync's rebase
  * refuses a dirty tree and the funnel hard-resets it, so the patch is gone within a minute and
  * no other machine ever saw it. Seen live on the cloud-work adoption before it went through here.
  *
@@ -19,7 +20,7 @@ export async function patchArchivedAgentOnDataBranch(
   message: string,
 ): Promise<boolean> {
   let patched = false
-  const result = await withDataBranch(cwd, message, async () => {
+  const result = await withFileBranch(cwd, LOGS_BRANCH, message, async () => {
     patched = await patchArchivedAgent(cwd, agentId, patch)
   })
   return patched && (result.ok || result.committed)

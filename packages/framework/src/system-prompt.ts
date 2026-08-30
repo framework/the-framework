@@ -1,5 +1,5 @@
 import { renderTemplate } from './prompt-template.js'
-import { BRANCH_YOURSELF, DATA_BRANCH_PROTOCOL, SYSTEM_PROMPT, TICKETING_FORMAT, TODO_FORMAT } from './prompts.generated.js'
+import { BRANCH_YOURSELF, SYSTEM_PROMPT, TICKETS_SKILL, TICKETS_YOURSELF } from './prompts.generated.js'
 import { AWAIT_PROTOCOL, BROWSER_PROTOCOL, HANDS_OFF_PROTOCOL, SIGNAL_PROTOCOL } from './turn-gate.js'
 
 // No Node imports here, deliberately. This module composes the prompt and the
@@ -71,47 +71,23 @@ const INSIGHTS_DOC: ContextDoc = { path: 'knowledge-base/INSIGHTS.md', comment: 
 export const BUSINESS_KNOWLEDGE_DOCS: readonly ContextDoc[] = [DECISIONS_DOC, FACTS_DOC, INSIGHTS_DOC]
 
 /**
- * The two file-format specs, carried in the agent's own system channel (#1163).
- *
- * Two of the {@link CONTEXT_DOCS} have a shape the agent has to follow: `tickets/**.md` and
- * `TODO_AGENTS.md`. The #674 call is that their spec ships *inside the package* rather than being
- * materialized into the user's repo, so a change to the format rides with the package version
- * instead of going stale in a committed file. What that call left open is how the agent reads it,
- * and the answer was a path — `node_modules/@gemstack/the-framework/prompts/*.md`.
- *
- * That path only resolves when the framework happens to be a root dependency of the repo it is
- * working on. It is not there for a global or npx install, not there in a fresh worktree before an
- * install, and not there in this repo at all, where the framework is a workspace package rather
- * than a dependency of the root. So the spec was unopenable, and the two files it governs drifted
- * from it (#1163/#1162) with nothing to notice.
- *
- * Carrying the content keeps what #674 wanted — the spec still rides with the package version,
- * and nothing is written into the user's repo — and makes it something the agent has already read
- * rather than something it has to go and find. It is framework-authored prompt content, so like
- * the context bullets it goes with the built-in prompt and `--vanilla` drops it.
+ * TEMPORARY (#1748): what an agent outside a checkout the daemon created is told about the
+ * tickets and the queue, since nothing links the `tickets` skill into its checkout and the
+ * `tickets` command is not on its PATH — the counterpart of {@link BRANCH_YOURSELF}: how to read
+ * and write the branch with git, followed by the skill's own formats so they exist in one place.
+ * Dies when use-npm-skills commits the skill into the repository.
  */
-const CONTEXT_FORMATS: readonly string[] = [TICKETING_FORMAT, TODO_FORMAT, DATA_BRANCH_PROTOCOL]
-
-/** The heading each spec opens with, so a bullet can name the section that answers it.
- * Must track the spec's own H1 — #1420 renamed it "Ticketing format", and a bullet naming a
- * section that does not exist sends the agent to follow a format it cannot find. */
-const TICKET_FORMAT_HEADING = 'Ticketing format'
-const TODO_FORMAT_HEADING = 'TODO_AGENTS.md'
-/** Where both of those live and how they are edited (#1582): the data branch, via its protocol. */
-const DATA_BRANCH_HEADING = 'The data branch'
+const TICKETS_BRIDGE = `${TICKETS_YOURSELF}\n\n${TICKETS_SKILL}`
 
 /**
  * Everything the agent keeps in context when it starts (#683), which
  * {@link systemPromptBlock} renders as the `Context:` bullets. A superset of
  * {@link BUSINESS_KNOWLEDGE_DOCS}: it adds `GOAL.md`, `BUSINESS_LOGIC.md`, and the
- * roadmap/queue/history pointers the agent reads but does *not* fold knowledge back into —
- * `tickets/**.md` (the potential work, whose file shape is the `Ticketing format` spec, #684/#674)
- * and the `TODO_AGENTS.md` task queue (whose shape is the `TODO_AGENTS.md` spec, #880). Repo-root
- * paths, because that is the agent's cwd. README is left out: a repo's own `README.md` already
- * covers the overview.
- *
- * The two format-bearing bullets point at {@link CONTEXT_FORMATS}, which travels in the same
- * channel, rather than at a file the agent has to go and open (#1163).
+ * roadmap/queue pointers the agent reads but does *not* fold knowledge back into — the tickets
+ * (the potential work) and the agent queue, both the `tickets` skill's (#1748): they live on the
+ * `tickets` branch, and the skill says how to read and change them and what their formats are.
+ * Repo-root paths, because that is the agent's cwd. README is left out: a repo's own `README.md`
+ * already covers the overview.
  */
 export const CONTEXT_DOCS: readonly ContextDoc[] = [
   DECISIONS_DOC,
@@ -128,14 +104,8 @@ export const CONTEXT_DOCS: readonly ContextDoc[] = [
   { path: 'knowledge-base/MARKET_RESEARCH.md', comment: 'the market the project competes in' },
   // The catch-all (#683): any other file the agent parks under knowledge-base/.
   { path: 'knowledge-base/**.md', comment: 'more files holding knowledge related to the project' },
-  {
-    path: 'tickets/**.md',
-    comment: `things to potentially work on; format: the "${TICKET_FORMAT_HEADING}" section below; lives on the data branch — read/write per the "${DATA_BRANCH_HEADING}" section below`,
-  },
-  {
-    path: 'TODO_AGENTS.md',
-    comment: `the AI task queue; format: the "${TODO_FORMAT_HEADING}" section below; lives on the data branch — read/write per the "${DATA_BRANCH_HEADING}" section below`,
-  },
+  { path: 'tickets/**.md', comment: 'things to potentially work on; on the `tickets` branch — read and change them with the `tickets` skill' },
+  { path: 'TODO_AGENTS.md', comment: 'the AI task queue; on the `tickets` branch — read and change it with the `tickets` skill' },
 ]
 
 /** The two halves of the rendered {@link SYSTEM_PROMPT_TEMPLATE}. */
@@ -232,14 +202,14 @@ export function systemPromptBlock(opts: SystemPromptOptions = {}): string {
     const bullets = docs.map(d => `- \`${d.path}\` (${d.comment})`)
     parts.push([head, ...bullets].join('\n'))
   }
-  // The formats the two format-bearing bullets name, right under the list that names them (#1163).
-  // In a checkout The Framework created, the `branches` skill is the checkout's (#1739): the
-  // package links it where the agent's harness looks for skills, and the built-in prompt's
-  // session-name step tells the agent to use it — nothing rides in this channel. Anywhere else the
-  // command is not on the PATH, so the "Branch management" section that has the agent branch with
-  // git itself follows the prompt. Framework-authored, so `--vanilla` drops it — which is what
-  // keeps the on-before-mergeable follow-up from naming a session of its own (#560).
-  if (includeBuiltin) parts.push(...CONTEXT_FORMATS, renderSystemPrompt(opts.tf).system, ...(opts.ownedCheckout ? [] : [BRANCH_YOURSELF]))
+  // In a checkout The Framework created, the `branches` and `tickets` skills are the checkout's
+  // (#1739/#1748): the packages link them where the agent's harness looks for skills, and the
+  // built-in prompt tells the agent to use them — nothing rides in this channel. Anywhere else
+  // the commands are not on the PATH, so the sections that have the agent branch, and read and
+  // write the tickets, with git itself follow the prompt. Framework-authored, so `--vanilla`
+  // drops them — which is what keeps the on-before-mergeable follow-up from naming a session of
+  // its own (#560).
+  if (includeBuiltin) parts.push(renderSystemPrompt(opts.tf).system, ...(opts.ownedCheckout ? [] : [BRANCH_YOURSELF, TICKETS_BRIDGE]))
   const user = opts.user?.trim()
   if (user) parts.push(user)
   return parts.join('\n\n')

@@ -283,7 +283,7 @@ export function App() {
     // A ticket's own page needs both a project and a slug; anything short of that (including the
     // bare cross-project route) is the list — every registered project, one section each.
     if (view === 'tickets' && projectId && ticketSlug)
-      return <TicketDetailPage projectId={projectId} slug={ticketSlug} onBack={showTickets} />
+      return <TicketDetailPage projectId={projectId} slug={ticketSlug} onBack={showTickets} onOpenAgent={selectAgent} />
     if (view === 'tickets')
       return (
         <TicketsPage
@@ -291,6 +291,7 @@ export function App() {
           onOpenTicketPlan={openTicketPlan}
           onAgentStarted={agentStarted}
           onSelectProject={selectProject}
+          onOpenAgent={selectAgentInProject}
         />
       )
     if (!projectId)

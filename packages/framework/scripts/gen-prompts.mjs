@@ -1,4 +1,5 @@
 import { readdir, readFile, writeFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -41,16 +42,27 @@ function constName(relPath) {
     .toUpperCase()
 }
 
-const sources = (await findMarkdown(promptsDir)).map(path => {
-  const relPath = relative(promptsDir, path).split('\\').join('/')
-  return { label: `prompts/${relPath}`, name: constName(relPath), path }
-})
+// TEMPORARY (#1748): the `tickets` skill's text rides in the system channel of an agent that
+// runs outside a checkout the daemon created (a terminal run, an Actions runner, a cloud
+// session), because nothing links the skill into such a checkout yet. Read from wherever the
+// package is installed, so the formats come from one place. Dies when use-npm-skills commits the
+// skill into the repository. Its front matter is the skill catalogue's metadata, not
+// instructions, and is dropped.
+const ticketsSkillPath = createRequire(import.meta.url).resolve('@gemstack/skill-tickets/SKILL.md')
+const sources = [
+  ...(await findMarkdown(promptsDir)).map(path => {
+    const relPath = relative(promptsDir, path).split('\\').join('/')
+    return { label: `prompts/${relPath}`, name: constName(relPath), path, frontMatter: false }
+  }),
+  { label: '@gemstack/skill-tickets/SKILL.md', name: 'TICKETS_SKILL', path: ticketsSkillPath, frontMatter: true },
+]
 const entries = await Promise.all(
   sources.map(async source => {
     const raw = await readFile(source.path, 'utf8')
+    const text = source.frontMatter ? raw.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n+/, '') : raw
     // Strip exactly one trailing newline: the files end with one so they are well-formed on
     // disk, the prompts they carry do not.
-    return { ...source, text: raw.replace(/\n$/, '') }
+    return { ...source, text: text.replace(/\n$/, '') }
   }),
 )
 

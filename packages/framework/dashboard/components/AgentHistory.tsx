@@ -626,7 +626,7 @@ function AgentHistoryRow({
             being decorative. */}
         {(remote || cloud || picked || startedOn) && (
           <span className="ml-auto flex shrink-0 items-center gap-1.5">
-            {/* Another machine's daemon started this run (#1648): the shared data branch lists every
+            {/* Another machine's daemon started this run (#1648): the shared agents-logs branch lists every
                 machine's runs here, and one that looked exactly like this daemon's own was a mystery
                 solved only by reading the archive. A glyph, not a word in the meta line: the rail's
                 fixed width truncated a hostname to "from…". */}

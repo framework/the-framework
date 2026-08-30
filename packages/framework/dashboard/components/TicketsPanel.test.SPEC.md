@@ -2,7 +2,7 @@ What the tests cover: tickets render as one-line rows carrying what has already 
 
 The plan column links a planned ticket to its plan and starts an agent asked to create the plan file beside the ticket when there is none — attended, unlike the other actions. The start column starts an agent asked to work that one ticket and no other, unattended and with the ticket named on it. Both send exactly the wording the buttons stand for, with no second copy of the prompt hidden behind them.
 
-Row controls do not double as navigation: starting work, filtering by a topic, filtering to claimed tickets, and following the GitHub link all leave the row unopened, while clicking the title opens it. A claimed ticket names its holder inline rather than only on hover.
+Row controls do not double as navigation: starting work, filtering by a topic, filtering to claimed tickets, and following the GitHub link all leave the row unopened, while clicking the title opens it. A claimed ticket names its holder inline rather than only on hover. A claim naming one of the project's own agents shows that agent's session name and opens the agent when clicked; a holder the project has no record of is shown as the claim writes it and opens nothing.
 
 Each of the three actions also offers "Configure first, then run": it opens this project's launcher carrying the prompt that action would have sent — the ticket's work ask, the ticket's plan ask, the update preset from either the filled or the empty backlog — and starts nothing. A plan that already exists is a link, so it has no chevron at all.
 

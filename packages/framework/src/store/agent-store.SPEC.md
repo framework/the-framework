@@ -15,7 +15,7 @@ The durable record of every agent: its event log, the agent meta derived from th
 - **The event log is the record; the agent meta is its summary** - every fact about an agent is an event, and the agent meta is those events folded together.
 - **An agent id is its start time** - ids sort chronologically as plain text, so "newest first" needs no timestamps parsed.
 - **Continuing an agent reopens its record** - a follow-up writes into the same agent rather than creating a second one, and keeps the original label.
-- **A finished agent is archived under its user on the data branch** - the lasting record is per user and off the code history; a second, throwaway copy covers agents with no worktree.
+- **A finished agent is archived under its user on the logs branch** - the lasting record is per user and off the code history; a second, throwaway copy covers agents with no worktree.
 - **A crash never loses history** - an agent that never closed cleanly is archived by whoever notices next.
 - **A dead agent is forced to an end** - an agent whose owning process is gone is credited with the ending it never wrote, so nothing shows as live or awaiting an answer forever.
 - **The agent meta survives being read mid-write** - a reader never sees a half-written record and so never reports a live agent as gone.
@@ -64,7 +64,7 @@ The user's history list is ordered newest first, across hundreds of agents, with
 
 #### Business logic
 
-An agent id is its ISO start time with the separators replaced so it is safe as a filename. Because the format is fixed width, ids compare as text in the same order they happened, and every "newest first" ordering is a plain text sort with no timestamps parsed. The reverse conversion is available for a caller holding an id but no record.
+An agent id is its ISO start time with the separators replaced so it is safe as a filename; the rule that makes one is kept outside the store — a sweep mints an id before the agent it claims a ticket for exists — and the store passes it on unchanged. Because the format is fixed width, ids compare as text in the same order they happened, and every "newest first" ordering is a plain text sort with no timestamps parsed. The reverse conversion is available for a caller holding an id but no record.
 
 An id is required to be path-safe — letters, digits, dashes and underscores only — everywhere it is used to build a path, so no id can escape its directory. An id that is not path-safe is refused rather than followed.
 
@@ -88,7 +88,7 @@ The flow an agent started under is recorded so a continuation can re-enter it: w
 
 Continuing also needs the agent's history back in the checkout it reads from. Teardown moved that history into the repo, so restoring puts the archived event log and agent meta back into the worktree — unless the worktree already holds a live agent, whose own log is newer and must not be overwritten.
 
-### A finished agent is archived under its user on the data branch
+### A finished agent is archived under its user on the logs branch
 
 #### User story
 
@@ -96,7 +96,7 @@ The user, and their teammates, can read months later what agents did to the repo
 
 #### Business logic
 
-When an agent closes, its event log and agent meta are copied out as a pair named after its id. The lasting home is the user's own directory on the data branch's checkout: on the data branch so the record survives cleaning the repo and never touches the code history, and per user so two people's machines write side by side instead of colliding. A second, throwaway home inside the agent's own framework directory covers an agent with no worktree of its own, and the crash rescue.
+When an agent closes, its event log and agent meta are copied out as a pair named after its id. The lasting home is the user's own directory on the logs branch's checkout: on the logs branch so the record survives cleaning the repo and never touches the code history, and per user so two people's machines write side by side instead of colliding. A second, throwaway home inside the agent's own framework directory covers an agent with no worktree of its own, and the crash rescue.
 
 Archiving is what makes teardown safe. An agent writes its record inside its own worktree, so deleting the worktree would delete the record with it; the copy into the repo happens first. The copy inside the worktree is deliberately left untracked, or it would be committed onto the agent's own branch and collide with the lasting copy at merge time.
 
@@ -182,7 +182,7 @@ An agent finishes, and only afterwards does the pull request get opened, or does
 
 #### Business logic
 
-An archived agent's record can be amended with the branch its work landed on and the pull request its work is on. There is no event stream left to carry these facts, and every surface reads the record, so this single amendment is what turns an empty-looking row into its real outcome. Because the archive lives on the data branch's checkout, an amendment is only durable once committed, so callers outside tests go through the data branch's writer rather than writing directly.
+An archived agent's record can be amended with the branch its work landed on and the pull request its work is on. There is no event stream left to carry these facts, and every surface reads the record, so this single amendment is what turns an empty-looking row into its real outcome. Because the archive lives on the logs branch's checkout, an amendment is only durable once committed, so callers outside tests go through the logs branch's writer rather than writing directly.
 
 ## Before modifying/creating SPEC.md files
 

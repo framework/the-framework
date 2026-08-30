@@ -5,11 +5,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { FakeDriver } from 'agent-driver'
 import type { ChoicePick, ChoiceRequest, FrameworkEvent } from './events.js'
-import { appendTodoEntry, appendFlatTodoEntry, checkOffEntry, findTodoBacklog, insertTodoEntry, nextQueuedTicket, parseTodoEntries, runTodoLoop, agentTodoPending, ticketForPrompt } from './todo-loop.js'
+import { nextQueuedTicket, runTodoLoop, agentTodoPending, ticketForPrompt } from './todo-loop.js'
 import { drainsQueue, presets } from './preset-catalog.js'
 import { AUTO_PM_DRAIN_JOB, AUTO_PM_JOBS } from './auto-pm.js'
-import { nodeGitRunner } from '@gemstack/skill-branches'
-import { DATA_BRANCH, dataWorktreePath, withDataBranch } from './data-branch.js'
+import { fileBranchPath, nodeGitRunner, withFileBranch } from '@gemstack/skill-branches'
+import { TICKETS_BRANCH } from '@gemstack/skill-tickets'
 
 const git = nodeGitRunner()
 const RETRIED_RM = { recursive: true, force: true, maxRetries: 10 } as const
@@ -18,7 +18,7 @@ async function tmpWorkspace(): Promise<string> {
   return mkdtemp(join(tmpdir(), 'framework-todo-'))
 }
 
-/** A real repo: the queue lives on its data branch (#1582), so the reads need actual git. */
+/** A real repo: the queue lives on its tickets branch (#1582/#1748), so the reads need actual git. */
 async function repoWorkspace(): Promise<string> {
   const repo = await realpath(await mkdtemp(join(tmpdir(), 'framework-todo-repo-')))
   await git(['init', '-b', 'main'], repo)
@@ -30,133 +30,18 @@ async function repoWorkspace(): Promise<string> {
   return repo
 }
 
-/** Put the queue on the data branch, committed, the way every real writer does. */
+/** Put the queue on the tickets branch, committed, the way every real writer does. */
 async function seedQueue(repo: string, md: string): Promise<void> {
-  const result = await withDataBranch(repo, 'seed', async dir => {
+  const result = await withFileBranch(repo, TICKETS_BRANCH, 'seed', async dir => {
     await writeFile(join(dir, 'TODO_AGENTS.md'), md, 'utf8')
   })
   assert.ok(result.ok, 'seeding the queue must land')
 }
 
-/** The queue as committed on the data branch. */
+/** The queue as committed on the tickets branch. */
 async function queueOnBranch(repo: string): Promise<string> {
-  return git(['show', `${DATA_BRANCH}:TODO_AGENTS.md`], repo)
+  return git(['show', `${TICKETS_BRANCH}:TODO_AGENTS.md`], repo)
 }
-
-test('parseTodoEntries reads open list items and skips checked/blank/prose lines', () => {
-  const md = [
-    '# Backlog',
-    '',
-    'Some prose about the backlog.',
-    '- [ ] fix the login redirect',
-    '- [x] already done',
-    '- [X] also done',
-    '- plain bullet entry',
-    '* star bullet entry',
-    '2. numbered entry',
-    '- [ ]   ', // open checkbox with no text
-    '-    ', // empty bullet
-  ].join('\n')
-  assert.deepEqual(parseTodoEntries(md), [
-    'fix the login redirect',
-    'plain bullet entry',
-    'star bullet entry',
-    'numbered entry',
-  ])
-})
-
-test('the priority (#880) sections need no parser support: headings are skipped, so a sorted file drains in priority order', () => {
-  const md = [
-    '## Priority 10 (critical — act immediately)',
-    '- restore checkout',
-    '',
-    '## Priority 9',
-    '- flaky auth test',
-    '',
-    '## Priority 5',
-    '- tidy the config loader',
-    '',
-    '## Priority 0 (only if capacity)',
-    '- rename the legacy flag',
-  ].join('\n')
-  assert.deepEqual(parseTodoEntries(md), [
-    'restore checkout',
-    'flaky auth test',
-    'tidy the config loader',
-    'rename the legacy flag',
-  ])
-})
-
-test('checkOffEntry retires the named open entry and nothing else (#1582)', () => {
-  const md = '- [ ] first\n- [ ] second\n- [x] done already\n- plain bullet\n'
-  assert.equal(checkOffEntry(md, 'first'), '- [x] first\n- [ ] second\n- [x] done already\n- plain bullet\n')
-  assert.equal(checkOffEntry(md, 'plain bullet'), '- [ ] first\n- [ ] second\n- [x] done already\n- [x] plain bullet\n')
-  // An entry nobody has any more (retired meanwhile) changes nothing.
-  assert.equal(checkOffEntry(md, 'gone'), md)
-  // A checked entry stays checked exactly once.
-  assert.equal(checkOffEntry(md, 'done already'), md)
-})
-
-test('findTodoBacklog reads the queue off the data branch (#682/#1582)', async () => {
-  const repo = await repoWorkspace()
-  try {
-    assert.equal(await findTodoBacklog(repo), undefined) // nothing yet
-
-    await seedQueue(repo, '- [ ] roadmap entry\n')
-    assert.deepEqual(await findTodoBacklog(repo), { name: 'TODO_AGENTS.md', entries: ['roadmap entry'] })
-
-    // The retired session-scoped backlog (#1369) is ignored, even when it has open entries.
-    await writeFile(join(repo, 'TODO_feat-x.agent.md'), '- [ ] scoped entry\n')
-    assert.equal((await findTodoBacklog(repo))?.name, 'TODO_AGENTS.md')
-
-    // A fully checked-off backlog is no backlog.
-    await seedQueue(repo, '- [x] all done\n')
-    assert.equal(await findTodoBacklog(repo), undefined)
-  } finally {
-    await rm(repo, RETRIED_RM)
-  }
-})
-
-test('findTodoBacklog no longer reads any checkout file, the retired locations included (#1582)', async () => {
-  // One convention, one location — and that location is the data branch, not the working tree.
-  const repo = await repoWorkspace()
-  try {
-    await writeFile(join(repo, 'TODO_AGENTS.md'), '- [ ] root copy nobody reads\n')
-    await writeFile(join(repo, 'TODO.md'), '- [ ] old root entry\n')
-    await mkdir(join(repo, 'tickets-plain'))
-    assert.equal(await findTodoBacklog(repo), undefined)
-  } finally {
-    await rm(repo, RETRIED_RM)
-  }
-})
-
-test('appendTodoEntry creates the queue on the data branch when there is none (#682/#1582)', async () => {
-  const repo = await repoWorkspace()
-  try {
-    const file = await appendTodoEntry(repo, 'Resume the paused run')
-    assert.equal(file, 'TODO_AGENTS.md')
-    assert.equal(await queueOnBranch(repo), '- [ ] Resume the paused run\n')
-
-    // A second entry appends to the same file, not a new one.
-    await appendTodoEntry(repo, 'And another')
-    assert.equal(await queueOnBranch(repo), '- [ ] Resume the paused run\n- [ ] And another\n')
-  } finally {
-    await rm(repo, RETRIED_RM)
-  }
-})
-
-test('appendTodoEntry resolves the project root from an agent worktree (#1582)', async () => {
-  // A paused agent calls this from its own checkout; the data checkout lives beside the main repo.
-  const repo = await repoWorkspace()
-  try {
-    const worktree = join(repo, '.branches', 'agent-x')
-    await git(['worktree', 'add', '-b', 'agent-x', worktree], repo)
-    assert.equal(await appendTodoEntry(worktree, 'from the worktree'), 'TODO_AGENTS.md')
-    assert.equal(await queueOnBranch(repo), '- [ ] from the worktree\n')
-  } finally {
-    await rm(repo, RETRIED_RM)
-  }
-})
 
 test('runTodoLoop works the backlog to empty, one entry per turn, checking each off itself (#323/#1582)', async () => {
   const repo = await repoWorkspace()
@@ -164,7 +49,7 @@ test('runTodoLoop works the backlog to empty, one entry per turn, checking each 
   try {
     const events: FrameworkEvent[] = []
     const prompts: string[] = []
-    // The fake driver only answers; the check-off is the framework's own write now.
+    // The fake driver only answers; the removal is the framework's own write.
     const driver = new FakeDriver({
       respond: (prompt, i) => {
         prompts.push(prompt)
@@ -174,17 +59,17 @@ test('runTodoLoop works the backlog to empty, one entry per turn, checking each 
     const session = await driver.start({ cwd: repo })
     const result = await runTodoLoop({ session, cwd: repo, emit: e => events.push(e) })
 
-    assert.deepEqual(result, { completed: 2, reason: 'empty', file: 'TODO_AGENTS.md' })
+    assert.deepEqual(result, { completed: 2, reason: 'empty' })
     assert.equal(prompts.length, 2)
     assert.match(prompts[0]!, /first task/)
-    assert.match(prompts[0]!, /checks this entry off/)
+    assert.match(prompts[0]!, /takes this entry off the queue/)
     assert.match(prompts[1]!, /second task/)
-    assert.equal(await queueOnBranch(repo), '- [x] first task\n- [x] second task\n')
+    assert.equal(await queueOnBranch(repo), '')
     // Narrated: the opening count, each item, and the completion line.
-    assert.ok(events.some(e => e.kind === 'log' && /has 2 open item\(s\)/.test(e.message)))
-    assert.ok(events.some(e => e.kind === 'log' && /Backlog item 1: first task/.test(e.message)))
-    assert.ok(events.some(e => e.kind === 'log' && /Backlog item 2: second task/.test(e.message)))
-    assert.ok(events.some(e => e.kind === 'log' && /Backlog done/.test(e.message)))
+    assert.ok(events.some(e => e.kind === 'log' && /2 open item\(s\)/.test(e.message)))
+    assert.ok(events.some(e => e.kind === 'log' && /Queue item 1: first task/.test(e.message)))
+    assert.ok(events.some(e => e.kind === 'log' && /Queue item 2: second task/.test(e.message)))
+    assert.ok(events.some(e => e.kind === 'log' && /Queue done/.test(e.message)))
     // Headless: no per-item gate events.
     assert.equal(events.some(e => e.kind === 'choice'), false)
   } finally {
@@ -219,33 +104,33 @@ test('an interactive loop gates before each entry; picking stop ends it (#323)',
     const session = await new FakeDriver({ respond: () => 'did task a' }).start({ cwd: repo })
     const result = await runTodoLoop({ session, cwd: repo, emit: e => events.push(e), requestChoice })
 
-    assert.deepEqual(result, { completed: 1, reason: 'stopped', file: 'TODO_AGENTS.md' })
+    assert.deepEqual(result, { completed: 1, reason: 'stopped' })
     assert.equal(gates.length, 2)
     assert.equal(gates[0]!.id, 'todo-next')
     assert.equal(gates[1]!.id, 'todo-next-1')
     assert.match(gates[0]!.options[0]!.label, /Work on: task a/)
     assert.equal(gates[0]!.recommended, 'proceed')
-    assert.equal(await queueOnBranch(repo), '- [x] task a\n- [ ] task b\n')
+    assert.equal(await queueOnBranch(repo), '- [ ] task b\n')
     assert.ok(events.some(e => e.kind === 'log' && /stopped by you/.test(e.message)))
   } finally {
     await rm(repo, RETRIED_RM)
   }
 })
 
-test('a check-off that cannot land stops the loop instead of re-working the entry (#1582)', async () => {
+test('a removal that cannot land stops the loop instead of re-working the entry (#1582)', async () => {
   const repo = await repoWorkspace()
   await seedQueue(repo, '- [ ] stubborn task\n- [ ] never reached\n')
   try {
-    // Break the data checkout: the branch still reads (git show), but the write funnel cannot
-    // have its worktree, so every check-off fails.
-    await git(['worktree', 'remove', '--force', dataWorktreePath(repo)], repo)
-    await writeFile(dataWorktreePath(repo), 'not a directory\n')
+    // Break the branch's checkout: the branch still reads (git show), but the write funnel cannot
+    // have its worktree, so every removal fails.
+    await git(['worktree', 'remove', '--force', fileBranchPath(repo, TICKETS_BRANCH)], repo)
+    await writeFile(fileBranchPath(repo, TICKETS_BRANCH), 'not a directory\n')
     const events: FrameworkEvent[] = []
     const session = await new FakeDriver({ respond: () => 'worked it' }).start({ cwd: repo })
     const result = await runTodoLoop({ session, cwd: repo, emit: e => events.push(e) })
-    assert.deepEqual(result, { completed: 1, reason: 'stalled', file: 'TODO_AGENTS.md' })
-    assert.ok(events.some(e => e.kind === 'log' && /could not be written/.test(e.message)))
-    // The queue is untouched: better an open entry than a lost check-off.
+    assert.deepEqual(result, { completed: 1, reason: 'stalled' })
+    assert.ok(events.some(e => e.kind === 'log' && /could not be taken off the queue/.test(e.message)))
+    // The queue is untouched: better an open entry than a lost removal.
     assert.equal(await queueOnBranch(repo), '- [ ] stubborn task\n- [ ] never reached\n')
   } finally {
     await rm(repo, RETRIED_RM)
@@ -259,9 +144,9 @@ test('runTodoLoop honors the item cap and reports what is left', async () => {
     const events: FrameworkEvent[] = []
     const session = await new FakeDriver({ respond: (_p, i) => `turn ${i + 1}` }).start({ cwd: repo })
     const result = await runTodoLoop({ session, cwd: repo, emit: e => events.push(e), maxItems: 2 })
-    assert.deepEqual(result, { completed: 2, reason: 'max-items', file: 'TODO_AGENTS.md' })
+    assert.deepEqual(result, { completed: 2, reason: 'max-items' })
     assert.ok(events.some(e => e.kind === 'log' && /2-item cap.*1 item\(s\) left/.test(e.message)))
-    assert.equal(await queueOnBranch(repo), '- [x] a\n- [x] b\n- [ ] c\n')
+    assert.equal(await queueOnBranch(repo), '- [ ] c\n')
   } finally {
     await rm(repo, RETRIED_RM)
   }
@@ -290,7 +175,7 @@ test('an item turn that stops to ask is gated and resumed like any await gate (#
       Promise.resolve({ picked: req.id.startsWith('todo-next') ? 'proceed' : 'opt:1', by: 'user' })
     const result = await runTodoLoop({ session, cwd: repo, emit: e => events.push(e), requestChoice })
 
-    assert.deepEqual(result, { completed: 1, reason: 'empty', file: 'TODO_AGENTS.md' })
+    assert.deepEqual(result, { completed: 1, reason: 'empty' })
     assert.equal(prompts.length, 2)
     assert.match(prompts[1]!, /The user chose: Postgres/)
     const ids = events.filter(e => e.kind === 'choice').map(e => (e as { id: string }).id)
@@ -370,92 +255,6 @@ test('ready-for-merge is emitted once across a multi-item backlog', async () => 
 
     assert.equal(result.completed, 2)
     assert.equal(events.filter(e => e.kind === 'ready-for-merge').length, 1)
-  } finally {
-    await rm(repo, RETRIED_RM)
-  }
-})
-
-// #697/#1369/#1582: everything lands on the data branch's flat queue — a leftover session-scoped
-// backlog in the checkout is retired and never written to.
-test('both append helpers write the flat queue even when a session backlog exists (#697/#1369)', async () => {
-  const repo = await repoWorkspace()
-  try {
-    await writeFile(join(repo, 'TODO_a-session.agent.md'), '- [ ] a run\n', 'utf8')
-
-    assert.equal(await appendTodoEntry(repo, 'from the run'), 'TODO_AGENTS.md')
-    assert.equal(await appendFlatTodoEntry(repo, 'Do ticket 42'), 'TODO_AGENTS.md')
-    assert.equal(await queueOnBranch(repo), '- [ ] from the run\n- [ ] Do ticket 42\n')
-    // The leftover session file is untouched.
-    assert.equal(await readFile(join(repo, 'TODO_a-session.agent.md'), 'utf8'), '- [ ] a run\n')
-  } finally {
-    await rm(repo, RETRIED_RM)
-  }
-})
-
-// The queue is worked front to back (the drain preset takes "the FIRST open entry" and
-// parseTodoEntries reads in file order), so where an entry lands *is* its priority. Appending at
-// the end, which is what queueing a ticket used to do, meant "work on this" put it last (#1164).
-
-test('a queued entry lands in its own priority section, not at the end of the file (#1164)', () => {
-  const md = ['# Backlog', '', '## Priority 7', '', '- [ ] an important thing', '', '## Priority 2', '', '- [ ] someday', ''].join('\n')
-  const out = insertTodoEntry(md, 'a medium thing', 5)
-  assert.match(out, /## Priority 5\n\n- \[ \] a medium thing/)
-  // Between the two it ranks against, and ahead of the low one it outranks.
-  assert.ok(out.indexOf('an important thing') < out.indexOf('a medium thing'))
-  assert.ok(out.indexOf('a medium thing') < out.indexOf('someday'))
-})
-
-test('an entry joins the section it belongs to when there already is one (#1164)', () => {
-  const md = ['## Priority 5', '', '- [ ] first', '', '## Priority 2', '', '- [ ] later', ''].join('\n')
-  const out = insertTodoEntry(md, 'second', 5)
-  assert.match(out, /- \[ \] first\n- \[ \] second/)
-  // One section, not a duplicate heading.
-  assert.equal(out.match(/## Priority 5/g)?.length, 1)
-})
-
-test('a file with no priority sections gets one above its own headings (#1164)', () => {
-  // The file's sections are unranked, so burying a deliberate pick beneath them is the bug.
-  const md = ['# Backlog', '', 'Some prose.', '', '## MVP v1', '', '- [ ] dogfooding', ''].join('\n')
-  const out = insertTodoEntry(md, 'queued thing', 5)
-  assert.ok(out.indexOf('queued thing') < out.indexOf('dogfooding'))
-  assert.ok(out.startsWith('# Backlog\n\nSome prose.\n'), 'the intro stays at the top')
-  assert.deepEqual(parseTodoEntries(out), ['queued thing', 'dogfooding'])
-})
-
-test('a backlog with nothing but prose still gets a section (#1164)', () => {
-  const out = insertTodoEntry('# Backlog\n\nSome prose.\n', 'queued thing', 5)
-  assert.match(out, /## Priority 5\n\n- \[ \] queued thing\n$/)
-})
-
-test('an entry that outranks everything in the file goes first (#1164)', () => {
-  const md = ['## Priority 2', '', '- [ ] someday', ''].join('\n')
-  const out = insertTodoEntry(md, 'urgent thing', 9)
-  assert.ok(out.indexOf('urgent thing') < out.indexOf('someday'))
-})
-
-test('an entry outranked by everything in the file goes last, in its own section (#1164)', () => {
-  const md = ['## Priority 9', '', '- [ ] urgent thing', ''].join('\n')
-  const out = insertTodoEntry(md, 'someday', 2)
-  assert.ok(out.indexOf('urgent thing') < out.indexOf('someday'))
-  assert.match(out, /## Priority 2\n\n- \[ \] someday/)
-})
-
-test('a section heading with the format\'s own gloss is still matched (#1164)', () => {
-  // `todo_format.md` writes "## Priority 10 (critical — act immediately)".
-  const md = ['## Priority 10 (critical)', '', '- [ ] the fire', ''].join('\n')
-  const out = insertTodoEntry(md, 'another fire', 10)
-  assert.equal(out.match(/## Priority 10/g)?.length, 1)
-  assert.match(out, /- \[ \] the fire\n- \[ \] another fire/)
-})
-
-test('appendFlatTodoEntry places by priority when given one, and appends when not (#1164)', async () => {
-  const repo = await repoWorkspace()
-  try {
-    await seedQueue(repo, '# Backlog\n\n## MVP v1\n\n- [ ] old\n')
-    await appendFlatTodoEntry(repo, 'ranked', 5)
-    await appendFlatTodoEntry(repo, 'unranked')
-    // The ranked one jumped the unranked backlog; the plain append stayed an append.
-    assert.deepEqual(parseTodoEntries(await queueOnBranch(repo)), ['ranked', 'old', 'unranked'])
   } finally {
     await rm(repo, RETRIED_RM)
   }

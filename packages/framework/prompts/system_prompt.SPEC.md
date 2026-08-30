@@ -8,7 +8,7 @@ The Framework's built-in system prompt: the standing instructions every agent st
 
 ## Glossary
 
-- **macro** - a shorthand the prompt defines for itself at the top (`<SHOW_MD>`, `<SHOW_CHOICES>`, `<AWAIT>`, `<SESSION_NAME>`, `<TODO_FILE>`) and then uses throughout, so one instruction is written once and referenced everywhere. The agent expands them itself; nothing in The Framework substitutes them.
+- **macro** - a shorthand the prompt defines for itself at the top (`<SHOW_MD>`, `<SHOW_CHOICES>`, `<AWAIT>`, `<SESSION_NAME>`, `<TODO_FILE>`) and then uses throughout, so one instruction is written once and referenced everywhere. The agent expands them itself; nothing in The Framework substitutes them. `<TODO_FILE>` is the agent queue, and its definition also says how an entry reaches it: through the `tickets` skill's command.
 
 ## Business logic — TL;DR
 
@@ -41,7 +41,7 @@ The user asks for something that turns out to be days of work. Reviewing the dir
 
 When the scope of the work is *large*, the agent writes a plan file named `PLAN_<session name>.agent.md` describing what it will work on, shows it to the user as a markdown view, and stops until the user approves.
 
-When the scope is *potentially very large* — spanning many hours or days — the agent additionally considers appending follow-up tasks to the agent queue (`TODO_AGENTS.md`) and showing the new entries as a markdown view, so the overflow becomes queued work rather than being lost.
+When the scope is *potentially very large* — spanning many hours or days — the agent additionally considers adding follow-up tasks to the agent queue (`TODO_AGENTS.md`) and showing the new entries as a markdown view, so the overflow becomes queued work rather than being lost. The prompt says how such an entry is added: with the `tickets` skill's command, which puts it on the queue at the priority the agent gives it.
 
 ### Name the session
 

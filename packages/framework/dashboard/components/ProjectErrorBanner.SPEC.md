@@ -2,7 +2,7 @@ The warning banner at the top of a project's page, listing every project error t
 
 ## Glossary
 
-- **project error** - a condition the daemon has found broken about a project and keeps recorded until the condition is gone. Today the only kind is a data branch that cannot sync, headlined "The data branch is not syncing".
+- **project error** - a condition the daemon has found broken about a project and keeps recorded until the condition is gone. Today the only kind is one of the project's two bookkeeping branches failing to converge with origin — the `tickets` branch, holding the tickets and the agent queue, or the `agents-logs` branch, holding the agent archives and the routine locks — headlined "Not syncing with the remote".
 
 ## Business logic — TL;DR
 

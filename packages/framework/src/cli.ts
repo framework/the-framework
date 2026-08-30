@@ -28,8 +28,7 @@ import {
   type AgentKind,
 } from './agent.js'
 import { FAKE_INTENT, fakeDriver } from './fake-script.js'
-import { isTicketPath, ticketIssueRef } from './tickets.js'
-import { readDataFile } from './data-branch.js'
+import { isTicketPath, TICKETS_BRANCH, ticketIssueRef } from '@gemstack/skill-tickets'
 import { isHandsOff, isAgentLocation, type AgentLocation } from './agent-location.js'
 import { handoffStages, isHandoffLevel, type HandoffLevel } from './handoff-level.js'
 import { readAgentSpec, removeAgentSpec, writeAgentSpec, type AgentSpec } from './agent-spec.js'
@@ -45,7 +44,7 @@ import {
 import { loadUserSystemPrompt, SYSTEM_PROMPT_FILE } from './system-prompt-file.js'
 import { checkForUpdate, formatUpdateStatus, nodeVersionFetcher, type VersionFetcher } from './update-check.js'
 import { AgentStore, nodeStoreFs, type StoreFs } from './store/index.js'
-import { currentBranch, agentBranchName, nodeGitRunner, sessionNameOf } from '@gemstack/skill-branches'
+import { currentBranch, agentBranchName, nodeGitRunner, readBranchFile, sessionNameOf } from '@gemstack/skill-branches'
 import { materializePresets } from './presets.js'
 import { isLoopbackHost, registerHomeProject, runDaemon, DEFAULT_DAEMON_HOST, DEFAULT_DAEMON_PORT } from './daemon.js'
 import { appendControl, resetControl, watchControl, type ControlWatcher } from './control.js'
@@ -1064,9 +1063,9 @@ async function driveAgent(opts: AgentOptions, io: CliIO): Promise<number> {
     // subject inherits the title, so the merge closes the issue — without it, an auto-merged
     // quick-win leaves its ticket open. Not on a plan agent (#1327): its PR lands the plan, not
     // the work, so the merge must not close the issue. Best-effort: a ticket that cannot be
-    // read fixes nothing. Read off the data branch (#1582) — the worktree holds no tickets.
+    // read fixes nothing. Read off the `tickets` branch (#1582) — the worktree holds no tickets.
     const fixes = opts.ticket && isTicketPath(opts.ticket) && !opts.planAgent
-      ? ticketIssueRef((await readDataFile(cwd, opts.ticket).catch(() => undefined)) ?? '')
+      ? ticketIssueRef((await readBranchFile(cwd, TICKETS_BRANCH, opts.ticket).catch(() => undefined)) ?? '')
       : undefined
     // The agent's own description of the work (#1567), when it wrote one: this is what an
     // `open-pr` block is for — the agent describes the change and the framework opens the PR,

@@ -1,9 +1,10 @@
 The Framework: autonomous AI programming. Humans make the important decisions; coding agents work the user's registered repos unattended and hand the result off as pull requests. The product never makes model calls of its own — it drives a coding-agent CLI the user already pays for (Claude Code or Codex) as a black box, on the user's own subscription.
 
-Five top-level pieces, one product:
+Six top-level pieces, one product:
 
 - `packages/framework` — the product itself, published as the npm package `framework`: one CLI (`the-framework`) that runs a foreground daemon, the agent lifecycle it orchestrates, and the browser dashboard it serves — the product's only user interface.
-- `packages/skill-branches` — the git conventions and operations behind an agent's own checkout, as an API, as the `branches` command every agent the daemon starts on its machine gets on its PATH, and as the skill (`SKILL.md`) every agent's built-in system prompt carries, published as `@gemstack/skill-branches`: the first of the skills the product is being split into, and the only one so far. The product depends on it; it depends on nothing of the product.
+- `packages/skill-branches` — the git conventions and operations behind an agent's own checkout, as an API, as the `branches` command every agent the daemon starts on its machine gets on its PATH, and as the skill (`SKILL.md`) every agent's built-in system prompt carries, published as `@gemstack/skill-branches`: the first of the skills the product is being split into. The product depends on it; it depends on nothing of the product.
+- `packages/skill-tickets` — the project's tickets and its agent queue, on the `tickets` branch of the project's own repository, published as `@gemstack/skill-tickets`: the same three faces — an API, the `tickets` command every agent the daemon starts gets on its PATH, and the skill (`SKILL.md`) every such agent finds in its checkout — over reading tickets, writing them, claiming one so two agents never work the same, and keeping the queue. The second of the skills. The product depends on it, and it depends on skill-branches for the branch it stores everything on.
 - `packages/agent-driver` — the driver seam as its own package, published as `agent-driver`: one contract for driving a coding-agent CLI as a black box — a session in a directory, one full turn per prompt, a stream of what the agent did — and the implementations for Claude Code and Codex on this device, Claude Code on a GitHub Actions runner, and a scripted fake. The product depends on it and adds the one implementation that needs the product, the hand-off to a Claude Code cloud session; it depends on nothing of the product.
 - `packages/chrome-extension` — the Claude web bridge, a companion Chrome extension: when an agent's task was handed to a Claude Code cloud session on claude.ai, it carries the question that session is parked on into the local dashboard, and types the answer picked there back into the session.
 - `packages/the-framework.ai` — the marketing website at https://the-framework.ai.
@@ -22,7 +23,7 @@ Every user-facing feature is enumerated in `FEATURES-SPEC.md`.
 - **The agent is the unit of work** - one task, in its own git worktree on its own branch, streaming everything it does as events; finished work is pushed and leaves as a pull request.
 - **Black-box driving** - the framework prompts the wrapped coding-agent CLI, lets the CLI's own loop run a full turn, and learns everything from the turn's final message: the session name the agent invented, the questions it stops to ask, and the ready-for-merge signal.
 - **Autonomy bounded by the account's own quota** - unattended work runs only while the account is under its pro-rated quota boundary; work a human asks for is never blocked, and a running agent is never interrupted over quota.
-- **Framework data on its own branch** - everything The Framework itself writes (tickets, the agent queue, agent archives) lives on the `agents-data` branch, so the default branch stays 100% code.
+- **Nothing bookkeeping-shaped on a code branch** - the tickets and the agent queue live on the `tickets` branch, which is the `tickets` skill's; The Framework's own records of its runs — the agent archives, the routine locks — live on the `agents-logs` branch. The default branch stays 100% code.
 
 ## Business logic
 
@@ -44,7 +45,7 @@ See `## User story`: the daemon keeps working while nobody is around, within the
 
 #### Business logic
 
-On a shared clock the daemon runs its background jobs: Auto PM works the agent queue down and refills it by triaging tickets and planning the ones without plans; the CI watch merges the framework's pull requests once their checks pass and starts a fix agent when checks go red; sweeps reclaim finished agents' checkouts (only what is already on the remote) and keep bookkeeping healthy, and a routine that must not run twice is guarded by a routine lock on the data branch. Each unattended start checks the quota boundary first.
+On a shared clock the daemon runs its background jobs: Auto PM works the agent queue down and refills it by triaging tickets and planning the ones without plans; the CI watch merges the framework's pull requests once their checks pass and starts a fix agent when checks go red; sweeps reclaim finished agents' checkouts (only what is already on the remote) and keep bookkeeping healthy, and a routine that must not run twice is guarded by a routine lock on the `agents-logs` branch. Each unattended start checks the quota boundary first.
 
 ## Before modifying/creating SPEC.md files
 

@@ -1,0 +1,109 @@
+import { BRANCHES_DIR } from '@gemstack/skill-branches/branch-names'
+
+/**
+ * The names everything in the package hangs off, and the small pure rules that link a ticket to
+ * the queue and to the issue it tracks. No node imports, so browser-side code can name them too.
+ */
+
+/** The branch the tickets and the queue live on. A convention, not a setting: `SKILL.md` names it to every agent. */
+export const TICKETS_BRANCH = 'tickets'
+
+/** The branch's persistent checkout under a project: `.branches/tickets`, beside the agent checkouts. */
+export const TICKETS_CHECKOUT_DIR = `${BRANCHES_DIR}/${TICKETS_BRANCH}`
+
+/**
+ * The directory on the branch that holds the tickets — `tickets/<DATE>_<SLUG>.md`, their `.plan.md`
+ * and `.lock.md` siblings, and `meta.json` — and the name of the repository-root link into it.
+ * It holds only open tickets: closing one deletes it.
+ */
+export const TICKETS_DIR = 'tickets'
+
+/** The agent queue: `TODO_AGENTS.md` at the branch root, beside `tickets/`. */
+export const QUEUE_FILE = 'TODO_AGENTS.md'
+
+/** The file inside `tickets/` that records when the tickets last caught up with an issue tracker. */
+export const META_FILE = 'meta.json'
+
+/** A ticket's siblings, written about it and never tickets of their own. */
+const SIBLING = /\.(plan|lock)\.md$/
+
+/** A ticket filename without its `.md`. */
+export function ticketStem(file: string): string {
+  return file.replace(/\.md$/, '')
+}
+
+/** A ticket filename's plan sibling: `a.md` → `a.plan.md`. */
+export function ticketPlanName(file: string): string {
+  return `${ticketStem(file)}.plan.md`
+}
+
+/** A ticket filename's lock sibling: `a.md` → `a.lock.md`. */
+export function ticketLockName(file: string): string {
+  return `${ticketStem(file)}.lock.md`
+}
+
+/**
+ * A bare ticket filename: a `.md` name with no path segments (so it cannot address another
+ * directory) and not one of a ticket's own siblings. The gate every filename that arrives from
+ * outside — a command's argument, a browser — goes through.
+ */
+export function isTicketFile(file: string): boolean {
+  return /^[^/\\]+\.md$/.test(file) && !SIBLING.test(file)
+}
+
+/** Whether a filename inside `tickets/` is a sibling (`.plan.md` / `.lock.md`) rather than a ticket. */
+export function isSibling(file: string): boolean {
+  return SIBLING.test(file)
+}
+
+/**
+ * Whether a string names a ticket by path: `tickets/<name>.md`, and nothing else. A relative
+ * segment, an absolute path, a URL, a dotfile, or anything nested deeper all fail it. The one gate
+ * for both ends of a queue link — what an entry is read as, and what a caller may record.
+ */
+export function isTicketPath(path: string): boolean {
+  if (!path.startsWith(`${TICKETS_DIR}/`)) return false
+  const file = path.slice(TICKETS_DIR.length + 1)
+  return file.endsWith('.md') && !file.includes('/') && !file.startsWith('.')
+}
+
+/**
+ * The ticket a queue entry came from, as its `tickets/<file>` path, or `undefined` for an entry
+ * that is just text. Queueing a ticket writes the entry as a markdown link back to it, so the
+ * identity is on the line; only a link into `tickets/` counts, and only one that stays inside it.
+ */
+export function ticketFromQueueEntry(entry: string): string | undefined {
+  const target = /\]\(([^)\s]+)\)/.exec(entry)?.[1]
+  return target && isTicketPath(target) ? target : undefined
+}
+
+/**
+ * Which `## Priority N` section of the queue a ticket's own `Priority:` earns it. The ticket
+ * format's scale is the queue's (0–10), taken at its word; an unmarked ticket, a word, or an
+ * out-of-range or fractional value lands in the middle (5) rather than being guessed at or
+ * clamped — inventing a plausible number would hide the typo. The scale's ends stay reserved:
+ * 10 is for critical production bugs and 0 is an only-if-capacity decision, neither of which a
+ * translation should claim.
+ */
+export function queuePriorityForTicket(priority?: string): number {
+  const written = priority?.trim()
+  if (written !== undefined && /^\d+$/.test(written)) {
+    const value = Number(written)
+    if (value >= 0 && value <= 10) return value
+  }
+  return 5
+}
+
+/**
+ * The issue a ticket tracks, as a `#42` reference, or `undefined` when it tracks none. Read off
+ * the ticket's `GitHub: [#42](…/issues/42)` header line: the number comes from the URL when there
+ * is one — the label is display text, the URL is the identity — with the label's own `#42` as the
+ * fallback for a hand-written line.
+ */
+export function ticketIssueRef(md: string): string | undefined {
+  const line = md.split('\n').find(l => l.trim().toLowerCase().startsWith('github:'))
+  if (!line) return undefined
+  const url = /\((?:[^)]*\/)?(?:issues|pull)\/(\d+)\)/.exec(line)
+  const match = url ?? /#(\d+)/.exec(line)
+  return match ? `#${match[1]}` : undefined
+}

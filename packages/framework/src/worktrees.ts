@@ -11,10 +11,11 @@ import {
   pruneWorktrees,
   worktreePath,
   worktreeSize,
+  fileBranchPath,
+  withFileBranch,
   type ReclaimOutcome,
 } from '@gemstack/skill-branches'
-import { THE_FRAMEWORK_DIR } from './framework-dir.js'
-import { dataWorktreePath, withDataBranch } from './data-branch.js'
+import { LOGS_BRANCH, THE_FRAMEWORK_DIR } from './framework-dir.js'
 
 /** A retained worktree and the agent that left it behind (#752). */
 export interface WorktreeRow {
@@ -260,13 +261,13 @@ export async function deleteProjectAgent(cwd: string, agentId: string, opts: Del
     // Then the records that put the row in the list. Looked up rather than derived from the id: a
     // session is archived under whichever user ran it (#1179), so the id alone no longer names its
     // path. Tolerant of an absent file, so a half-deleted session (its worktree already gone)
-    // still finishes cleanly. A record on the data branch is removed inside its write funnel
+    // still finishes cleanly. A record on the logs branch is removed inside its write funnel
     // (#1582) — the deletion is a committed, pushed change — while a transient copy is an unlink.
     const paths = await archivedAgentPaths(cwd, agentId)
-    const dataRoot = dataWorktreePath(cwd) + sep
+    const dataRoot = fileBranchPath(cwd, LOGS_BRANCH) + sep
     for (const path of paths.filter(p => !p.startsWith(dataRoot))) await removeFile(path)
     if (paths.some(p => p.startsWith(dataRoot))) {
-      const removed = await withDataBranch(cwd, `[The Framework] delete session ${agentId}`, async () => {
+      const removed = await withFileBranch(cwd, LOGS_BRANCH, `[The Framework] delete session ${agentId}`, async () => {
         for (const path of paths.filter(p => p.startsWith(dataRoot))) await removeFile(path)
       })
       if (!removed.ok && !removed.committed) return { ok: false, error: removed.error }

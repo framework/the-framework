@@ -429,7 +429,7 @@ describe('project errors in the Projects list (#1500)', () => {
     expect(dot).toBeTruthy()
     expect(screen.getByText('Error:')).toBeTruthy()
     const tooltip = await hoverTooltip(dot!)
-    expect(tooltip.textContent).toContain('The data branch is not syncing')
+    expect(tooltip.textContent).toContain('Not syncing with the remote')
     expect(tooltip.textContent).toContain('Permission denied (publickey)')
   })
 

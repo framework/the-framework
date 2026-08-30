@@ -46,6 +46,7 @@ export function TicketsPage({
   onOpenTicketPlan,
   onAgentStarted,
   onSelectProject,
+  onOpenAgent,
 }: {
   /** Open one ticket's detail page (#1144), by its project and file. */
   onOpenTicket: (projectId: string, file: string) => void
@@ -58,6 +59,8 @@ export function TicketsPage({
   /** Where every "Configure first, then run" on this page lands (#1507): the row's own project's
    *  launcher — which project that is comes from the row, since the page spans all of them. */
   onSelectProject: (id: string) => void
+  /** Open the page of the agent holding a ticket's claim (#1748), in the ticket's own project. */
+  onOpenAgent?: ((projectId: string, agentId: string) => void) | undefined
 }) {
   const { value: groups, loaded } = usePolled<ProjectTickets[]>(onAllTickets, EMPTY_GROUPS, 10_000, [])
   const [view, setViewState] = useState<TicketsView>(initialView)
@@ -401,6 +404,7 @@ export function TicketsPage({
                         onConfigurePlan={() => onSelectProject(r.projectId)}
                         onTopicClick={addTopic}
                         onClaimedClick={filterClaimed}
+                        onOpenAgent={onOpenAgent ? agentId => onOpenAgent(r.projectId, agentId) : undefined}
                       />
                     ))}
                   </ul>
@@ -428,6 +432,7 @@ export function TicketsPage({
                       onSelectProject={onSelectProject}
                       onTopicClick={addTopic}
                       onClaimedClick={filterClaimed}
+                      onOpenAgent={onOpenAgent ? agentId => onOpenAgent(g.projectId, agentId) : undefined}
                       onClearFilters={filtered ? clearFilters : undefined}
                     />
                   </section>

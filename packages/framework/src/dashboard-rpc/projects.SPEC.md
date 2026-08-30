@@ -14,7 +14,7 @@ The Projects surface: the list of registered projects with whatever the daemon l
 
 #### User story
 
-A project's data branch cannot reach its remote. The user should see that on the project in the sidebar and on the project itself, without hunting for it.
+A project's branches cannot reach its remote. The user should see that on the project in the sidebar and on the project itself, without hunting for it.
 
 #### Business logic
 

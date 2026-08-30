@@ -3,8 +3,9 @@ import { closeSync, mkdirSync, openSync } from 'node:fs'
 import { basename, delimiter, dirname, join, resolve } from 'node:path'
 import { appendFile, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { agentIdFromStartedAt, startedAtFromAgentId, archiveWorktreeAgent, restoreArchivedAgent, listAgents, findAgent, archivedAgentPaths, readLiveMetas, readLiveMeta, resolveAgentEventsPath, EVENTS_FILE, META_FILE, isPidAlive, type AgentMeta } from './store/index.js'
-import { createCheckout, attachCheckout, agentBranchName, worktreePath, worktreeBranch, removeWorktree, pruneWorktrees, agentIdFromWorktreeDir, isGitRepo, nodeGitRunner, isGitTimeout, CLI_BIN_DIR } from '@gemstack/skill-branches'
-import { THE_FRAMEWORK_DIR } from './framework-dir.js'
+import { createCheckout, attachCheckout, agentBranchName, worktreePath, worktreeBranch, removeWorktree, pruneWorktrees, agentIdFromWorktreeDir, isGitRepo, nodeGitRunner, isGitTimeout, withFileBranch, CLI_BIN_DIR as BRANCHES_BIN_DIR } from '@gemstack/skill-branches'
+import { isTicketPath, CLI_BIN_DIR as TICKETS_BIN_DIR, SKILL_DIR as TICKETS_SKILL_DIR, SKILL_NAME as TICKETS_SKILL_NAME } from '@gemstack/skill-tickets'
+import { LOGS_BRANCH, THE_FRAMEWORK_DIR } from './framework-dir.js'
 import type { FrameworkEvent } from './events.js'
 import { removeAgentSpec, writeAgentSpec } from './agent-spec.js'
 import type { StartAgentKind, StartAgentOptions, StartAgentResult, AddProjectResult } from './dashboard/index.js'
@@ -14,12 +15,10 @@ import { agentBranchFor } from './dashboard/agent-handoff.js'
 import { dispatchRelayRpc } from './dashboard-rpc/relay-dispatch.js'
 import { tailEvents, tailAgentEvents } from './dashboard-rpc/events-tail.js'
 import { resolveUserDir } from './agent-archive.js'
-import { withDataBranch } from './data-branch.js'
 import { removeProjectWorktree } from './worktrees.js'
 import { describeDeleted } from './merged-worktrees.js'
 import { scopedKey, parseScopedKey, keyBelongsTo } from './runtime-keys.js'
 import { addProject, listProjects, projectId } from './registry.js'
-import { isTicketPath } from './tickets.js'
 import { resolveProjectAgentOptions } from './daemon-services.js'
 import { installProject } from './install.js'
 import { withAgentLock } from './agent-locks.js'
@@ -106,14 +105,21 @@ function spawnDetached(binPath: string, specPath: string, stderrFile?: string, e
 }
 
 /**
- * A spawned run's environment: ours, with the `branches` command on its PATH (#1725) —
- * the agent names its session and checks its tree through the same package the daemon allocated
- * its checkout with — plus the daemon's URL when it has one (#1328).
+ * A spawned run's environment: ours, with the `branches` and `tickets` commands on its PATH
+ * (#1725/#1748) — the agent names its session, checks its tree, and reads and changes the tickets
+ * through the same packages the daemon does — plus the daemon's URL when it has one (#1328).
  */
 function childEnv(daemonUrl: string | undefined, base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
-  const env = { ...base, PATH: [CLI_BIN_DIR, base['PATH']].filter(Boolean).join(delimiter) }
+  const env = { ...base, PATH: [BRANCHES_BIN_DIR, TICKETS_BIN_DIR, base['PATH']].filter(Boolean).join(delimiter) }
   return daemonUrl ? { ...env, [DAEMON_URL_ENV]: daemonUrl } : env
 }
+
+/**
+ * TEMPORARY (#1748): the `tickets` skill linked into every checkout beside the `branches` skill,
+ * through the branches package's caller-given list. Gone when use-npm-skills commits the skills
+ * into the repository, where a checkout carries them as tracked files.
+ */
+const CHECKOUT_SKILLS = [{ name: TICKETS_SKILL_NAME, dir: TICKETS_SKILL_DIR }]
 
 /** Where a spawned agent's stderr lands (#1261), so a child that dies at boot leaves a trace. */
 export function agentStderrPath(cwd: string): string {
@@ -479,7 +485,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
           // says which name it got; re-attaching by the birth branch would continue the agent on a
           // branch without its previous commits.
           const branch = agentBranchFor(archived ?? { id: agentId })
-          await attachCheckout(projectCwd, { agentId, branch })
+          await attachCheckout(projectCwd, { agentId, branch, skills: CHECKOUT_SKILLS })
         }
         await restoreArchivedAgent(projectCwd, path, agentId).catch(() => false)
         return { cwd: path, agentId }
@@ -541,7 +547,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
     try {
       // The package's one sequence (#1725): the worktree, the parent's dependencies linked in,
       // the branches view (#1580) told now rather than at the next tick.
-      const worktree = await createCheckout(projectCwd, { agentId })
+      const worktree = await createCheckout(projectCwd, { agentId, skills: CHECKOUT_SKILLS })
       return { ok: true, workspace: { cwd: worktree.path, agentId } }
     } catch (err) {
       if (await isGitRepo(projectCwd)) {
@@ -580,12 +586,13 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
         // only from a worktree root (#1654): a directory that is no longer one would answer with
         // the enclosing repo's branch, and the archive would record the user's `main` as the run's.
         const branch = await worktreeBranch(worktree)
-        // Filed under the identity this repo commits as, onto the data branch (#1179/#1582)
+        // Filed under the identity this repo commits as, onto the logs branch (#1179/#1582)
         // through its write funnel: the archive is committed and pushed the moment it lands —
         // durable without a human, and never a commit on main.
         const user = await resolveUserDir(projectCwd)
-        const archived = await withDataBranch(
+        const archived = await withFileBranch(
           projectCwd,
+          LOGS_BRANCH,
           `[The Framework] archive session ${agentId ?? agentIdFromWorktreeDir(basename(worktree))}`,
           async () => {
             await archiveWorktreeAgent(worktree, projectCwd, undefined, branch, user)
@@ -751,9 +758,11 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
     const continued = options.continueAgentId ? await continueWorkspace(projectCwd, options.continueAgentId) : undefined
     // A repo that could not be given a worktree fails the Start rather than borrowing the user's
     // own checkout (#997); the dashboard shows the reason, and starting again is the retry.
+    // The id is the moment of the start — unless the caller minted it first (#1748): a sweep
+    // that claimed a ticket for this agent wrote the lock under the id it now starts it with.
     const allocated = continued
       ? ({ ok: true, workspace: continued } as const)
-      : await allocateWorkspace(projectCwd, agentIdFromStartedAt(new Date().toISOString()))
+      : await allocateWorkspace(projectCwd, options.agentId ?? agentIdFromStartedAt(new Date().toISOString()))
     if (!allocated.ok) return { ok: false, error: allocated.error }
     const workspace = allocated.workspace
     // An agent in its own worktree is keyed by that worktree, so it never collides with a

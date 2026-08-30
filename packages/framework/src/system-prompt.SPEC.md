@@ -1,4 +1,4 @@
-Composes an agent's system channel — the built-in system prompt, the repo-context bullets and the file-format specs they name, the user's own `SYSTEM.md`, and the emit protocols — at one assembly point every agent goes through, so no path can drift from another. Deliberately free of filesystem access: the dashboard renders the very same composition in the browser to show the whole prompt before an agent starts (reading `SYSTEM.md` off disk lives elsewhere and is handed in as plain text).
+Composes an agent's system channel — the built-in system prompt, the repo-context bullets, the sections an agent outside a checkout The Framework created needs, the user's own `SYSTEM.md`, and the emit protocols — at one assembly point every agent goes through, so no path can drift from another. Deliberately free of filesystem access: the dashboard renders the very same composition in the browser to show the whole prompt before an agent starts (reading `SYSTEM.md` off disk lives elsewhere and is handed in as plain text).
 
 ## User story
 
@@ -17,9 +17,9 @@ Composes an agent's system channel — the built-in system prompt, the repo-cont
 ## Business logic — TL;DR
 
 - **The built-in system prompt is a template in two halves** - the system half frames the session; the user-prompt half is the slot the user's prompt lands in. The boundary is fixed by the template itself, so a user prompt that contains the boundary heading can never move it.
-- **The agent's repo context rides in the channel** - a `Context:` block lists the user's picked directories and then the framework's context docs, each with a one-line gloss; the two format-bearing docs point at format specs that travel in the same channel rather than at files to go open.
-- **Composition is additive and ordered** - context first, then the format specs, the built-in prompt, then — for an agent outside a checkout The Framework created — the "Branch management" section that has it branch with git itself, and the user's `SYSTEM.md`; a repo can keep the built-in prompt *and* add its own, replace it, or leave both off.
-- **Vanilla drops everything framework-authored except the emit protocols** - the built-in prompt, the context docs, and the format specs all go together; the user's own dirs and `SYSTEM.md` survive, and the emit protocols stay because they are the contract the dashboard's gates run on, not prompt content.
+- **The agent's repo context rides in the channel** - a `Context:` block lists the user's picked directories and then the framework's context docs, each with a one-line gloss; the two roadmap docs — the tickets and the agent queue — say they live on the `tickets` branch and send the agent to the `tickets` skill for them.
+- **Composition is additive and ordered** - context first, then the built-in prompt, then — for an agent outside a checkout The Framework created — the two sections that have it branch, and read and write the tickets, with git itself, and then the user's `SYSTEM.md`; a repo can keep the built-in prompt *and* add its own, replace it, or leave both off.
+- **Vanilla drops everything framework-authored except the emit protocols** - the built-in prompt, the context docs, and those two sections all go together; the user's own dirs and `SYSTEM.md` survive, and the emit protocols stay because they are the contract the dashboard's gates run on, not prompt content.
 - **Transparent drops the whole channel** - no prompt, no docs, no protocols: the agent runs byte-identical to the raw wrapped CLI. It overrides every other option.
 - **Per-agent capability sections** - an agent with a real browser attached is told so; a hands-off agent is told to land its own work; the signal protocol is always the last thing in the channel.
 
@@ -35,7 +35,7 @@ The user types one prompt; the agent must analyze it before coding — an ambigu
 
 The built-in system prompt is a template whose text lives in the package's `prompts/system_prompt.md`. It carries the analyze-the-prompt flow, the session-name step, the alternatives flow, and the after-changes steps; the workspace rules are the `branches` skill's. For an agent in a checkout The Framework created — a daemon-started agent on this machine, with `branches` on its PATH — the session-name step sends it to the `branches` skill, which the `skill-branches` package links into the checkout where the agent's harness looks for skills; nothing about the workspace rides in the channel. For any other agent (a terminal run in the user's own checkout, a GitHub Actions runner, a cloud session) the "Branch management" section is appended right after the built-in prompt, before the user's own system prompt: the fallback that has the agent create its `agent-<session name>` branch with git itself. It is framework-authored, so vanilla drops it with the built-in prompt — the session-name step is exactly what the vanilla follow-up must not run.
 
-### The repo context and the formats that travel with it
+### The repo context, and reaching the tickets from outside a daemon-made checkout
 
 #### User story
 
@@ -45,11 +45,13 @@ Every agent should start knowing what the repo has learned about itself — its 
 
 The context docs are the files the agent keeps in context, rendered as commented bullets under the `Context:` head: `knowledge-base/DECISIONS.md`, `GOAL.md`, `BUSINESS_LOGIC.md`, `knowledge-base/FACTS.md`, `knowledge-base/INSIGHTS.md`, `knowledge-base/MARKET_RESEARCH.md`, the `knowledge-base/**.md` catch-all, `tickets/**.md`, and `TODO_AGENTS.md`. A subset — the business-knowledge docs (`DECISIONS.md`, `FACTS.md`, `INSIGHTS.md`) — is what the agent also folds new knowledge back into at merge; the rest are read-only pointers. A repo's own `README.md` is deliberately left out: it already covers the overview.
 
-Two of the docs have a shape the agent must follow — `tickets/**.md` (the Ticketing format) and `TODO_AGENTS.md` (the backlog format). Their spec text ships inside the package and travels *in the system channel itself*, right below the bullets, and each bullet names the spec's section heading ("the … section below"). A third spec travels with them: the data branch protocol, which tells the agent that both files live on the data branch and how to read and write them there. The user's picked in-context directories, when any, come first on the `Context:` line, framing whatever follows.
+Two of the docs are not the agent's to edit by hand — `tickets/**.md` and `TODO_AGENTS.md` — because they live on the `tickets` branch rather than in the agent's checkout. Their bullets say so and send the agent to the `tickets` skill, which is where their format, and every way of reading and changing them, is written down. No format text of their own rides in the channel. The user's picked in-context directories, when any, come first on the `Context:` line, framing whatever follows.
+
+In a checkout The Framework created, that skill is the checkout's: the package links it where the agent's harness looks for skills, and the `tickets` command is on the agent's PATH. Anywhere else — a terminal run in the user's own checkout, a GitHub Actions runner, a cloud session — neither is true, so the channel carries a temporary bridge instead, right after the built-in prompt and after the branch section that is its counterpart: how to read and write the branch, and claim a ticket, with git alone, followed by the skill's own text so the formats exist in exactly one place. Temporary is the word the code uses for it: it exists only until skills are committed into the repository itself, and then it goes.
 
 #### Rationale
 
-The format specs used to be pointed at as paths under `node_modules/`, which only resolve when the framework happens to be a root dependency of the repo it works on — not for a global or npx install, not in a fresh worktree before an install. The agent was told to follow a format it could not open, and both governed files drifted from it with nothing to notice. Carrying the content in the channel keeps the spec versioned with the package and nothing materialized into the user's repo, and makes it something the agent has already read rather than something it must find.
+Before it was carried this way, the format was pointed at as a path under `node_modules/`, which only resolves when the framework happens to be a root dependency of the repo it works on — not for a global or npx install, not in a fresh worktree before an install. The agent was told to follow a format it could not open, and both governed files drifted from it with nothing to notice. The format is now the skill's, which the agent either has as a skill or is handed here — nothing to go and find, and nothing materialized into the user's repo.
 
 ### Modes: additive by default, vanilla, transparent
 
@@ -59,7 +61,7 @@ A repo owner decides how much of The Framework's voice their agents get: the bui
 
 #### Business logic
 
-By default the channel is the context block, the format specs, the built-in prompt, and then the user's `SYSTEM.md` (a blank one adds nothing). Vanilla removes every framework-authored piece of prompt content — the built-in prompt, the context docs, and the format specs, driven by the one switch so they cannot fall out of step — while keeping the user's own dirs and `SYSTEM.md`. Transparent short-circuits everything: the system channel is empty, emit protocols included, so the agent receives exactly what the raw wrapped CLI would; it overrides every other option.
+By default the channel is the context block, the built-in prompt, the branch and tickets sections an agent outside a daemon-made checkout gets, and then the user's `SYSTEM.md` (a blank one adds nothing). Vanilla removes every framework-authored piece of prompt content — the built-in prompt, the context docs, and those sections, driven by the one switch so they cannot fall out of step — while keeping the user's own dirs and `SYSTEM.md`. Transparent short-circuits everything: the system channel is empty, emit protocols included, so the agent receives exactly what the raw wrapped CLI would; it overrides every other option.
 
 ### The emit protocols and the per-agent capability sections
 

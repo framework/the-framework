@@ -7,7 +7,7 @@ import { nodeGitRunner, type GitRunner } from '@gemstack/skill-branches'
  * The bug this exists for: agent state was written to `.the-framework/agents/`, which the install-time
  * `.gitignore` keeps untracked, so `git clean -fdx` — an ordinary thing to do to a repo — deleted
  * every session a project had ever run. Nothing was recoverable, because nothing had ever been
- * committed. Since #1582 the lasting copy lives on the data branch, as `agents/<user>/`.
+ * committed. Since #1582 the lasting copy lives on the `agents-logs` branch (#1748), as `agents/<user>/`.
  *
  * Scoped per user rather than one shared directory. Two people working the same repo would
  * otherwise write the same paths from different machines and conflict on every merge; under their

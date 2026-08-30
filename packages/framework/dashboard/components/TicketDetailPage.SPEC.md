@@ -8,8 +8,8 @@ The tickets list shows one line per ticket; a user who wants to actually read a 
 
 - **The whole ticket, by identity** - the page is read directly by the ticket's filename inside `tickets/`, and re-read every ten seconds so a ticket changed by an agent or by Auto PM stays current.
 - **Queue** - puts the ticket on the agent queue and then reads as "Queued", so the same ticket is not queued twice from this page.
-- **Release lock** - offered only while the ticket is claimed, and lifts the claim by hand.
-- **Everything known about the ticket, in one row** - age, priority, the linked GitHub item, topics, whether it is planned, who claims it, effort, uncertainty, and the ticket's filename.
+- **Release lock** - offered only while the ticket is claimed, and lifts the claim by hand; the button names the holder on hover.
+- **Everything known about the ticket, in one row** - age, priority, the linked GitHub item, topics, whether it is planned, who claims it — as a link to that agent's page when the claim names one of this project's agents — effort, uncertainty, and the ticket's filename.
 
 ## Business logic
 
@@ -43,7 +43,9 @@ An agent claimed a ticket and then died. Nothing frees the claim on its own, so 
 
 #### Business logic
 
-A claimed ticket shows a "claimed" mark naming its holder, and offers Release lock. Pressing it removes the claim; the page then immediately reads as unclaimed rather than waiting for the next ten-second read to confirm it. A failure shows "The lock could not be released." Unclaimed tickets offer neither the mark nor the button.
+A claimed ticket shows a "claimed" mark naming its holder, and offers Release lock, which names the same holder on hover. Pressing it removes the claim; the page then immediately reads as unclaimed rather than waiting for the next ten-second read to confirm it. A failure shows "The lock could not be released." Unclaimed tickets offer neither the mark nor the button.
+
+The holder is named the way the tickets list names it: a claim naming one of this project's own agents is shown as that agent's session name and opens the agent's page, so the user can read what the holder is actually doing before deciding it is gone; any other holder is shown exactly as the claim writes it. The page has the room for the full name, so it is written out rather than hidden behind a hover.
 
 #### Rationale
 

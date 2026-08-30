@@ -1,1 +1,1 @@
-Open TODO_AGENTS.md and work on the FIRST open entry only. When the work is done and published, check the entry off. Do not start any other entry.
+Use the `tickets` skill: run `tickets queue` and work on the FIRST open entry only. When the work is done and published, run `tickets queue done "<the entry>"`. Do not start any other entry.

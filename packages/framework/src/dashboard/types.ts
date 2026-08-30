@@ -83,6 +83,12 @@ export interface StartAgentOptions {
    */
   unattended?: boolean
   /**
+   * The id this run is born with, when the caller minted it before the start (#1748): the sweep
+   * claims a ticket for the agent first — the lock names this id — and starts the agent with it,
+   * so the claim and the agent are one. Absent, the run's id is the moment it starts.
+   */
+  agentId?: string
+  /**
    * The `tickets/<file>.md` this agent implements (#1117). Set by the daemon
    * when it starts a drain agent and the queue entry it will work links back to a ticket, so the
    * Overview can show that ticket as being implemented rather than guessing from its plan.

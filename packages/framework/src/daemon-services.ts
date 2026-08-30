@@ -10,21 +10,19 @@ import { readLiveMetas, listAgents, type LiveAgent } from './store/index.js'
 import { startKeyedWatcher, type KeyedWatcher } from './dashboard/keyed-watcher.js'
 import { buildInterventions, interventionKey, postInterventionsDiscord } from './dashboard/interventions.js'
 import { buildActivity, activityKey, postActivityDiscord } from './dashboard/activity.js'
-import { startAutoPm, AUTO_PM_JOBS, DEFAULT_AUTO_PM_INTERVAL_MS, quotaHeadroom, type AutoPmReport, type AutoPmOnly } from './auto-pm.js'
+import { startAutoPm, AUTO_PM_JOBS, DEFAULT_AUTO_PM_INTERVAL_MS, quotaHeadroom, type AutoPmReport, type AutoPmOnly, type PlanAssignment } from './auto-pm.js'
 import type { ActiveAgentSlot } from './daemon-runtime.js'
 import { startDaemonTick, DAEMON_TICK_MS } from './daemon-tick.js'
 import { ciFixPrompt, startCiWatch } from './ci-watch.js'
 import { acquireRoutineLock, releaseDeadRoutineLocks, releaseRoutineLock } from './routine-locks.js'
 import { maintenanceDue, readMaintenanceState, mergeMaintenanceState } from './maintenance.js'
-import { FLAT_TODO_FILE, TICKETS_DIR } from './tickets.js'
-import { acquireTicketLocks, releaseTicketLock } from './ticket-locks.js'
-import { readTickets } from './dashboard/tickets.js'
-import { checkOffEntry, findTodoBacklog, nextQueuedTicket, ticketFromQueueEntry } from './todo-loop.js'
-import { pullDataBranch, withDataBranch } from './data-branch.js'
+import { claimTickets, queueDone, readQueueEntries, readTickets, releaseTicket, syncTickets, TICKETS_DIR, ticketFromQueueEntry, ticketsDir } from '@gemstack/skill-tickets'
+import { nextQueuedTicket } from './todo-loop.js'
+import { LOGS_BRANCH } from './framework-dir.js'
 import type { ProjectErrors } from './project-errors.js'
 import { readFile, writeFile } from 'node:fs/promises'
 import { startMergedWorktreeSweep, type MergedSweepOptions } from './merged-worktrees.js'
-import { reconcileBranchLinks } from '@gemstack/skill-branches'
+import { pullFileBranch, reconcileBranchLinks } from '@gemstack/skill-branches'
 import { startProjectPass } from './project-pass.js'
 import { startCloudScratchSweep } from './cloud-scratch-refs.js'
 import { startCloudWorkAdoption } from './cloud-work.js'
@@ -118,14 +116,20 @@ export interface BackgroundServiceDeps {
 }
 
 /**
- * One project's data-sync turn (#1599): pull the data branch, and set or clear the project's
- * `data-sync` error by the outcome. The clear is unconditional on success, so the error lives
- * exactly as long as the condition — the next tick after the user fixes the remote, it is gone.
+ * One project's data-sync turn (#1599): converge the `tickets` branch (the skill's: the checkout,
+ * the queue seed, the root link, the pull) and the `agents-logs` branch (the archives and routine
+ * locks) with origin, and set or clear the project's `data-sync` error by the outcome. The clear
+ * is unconditional on success, so the error lives exactly as long as the condition — the next
+ * tick after the user fixes the remote, it is gone.
  */
 export async function syncProjectData(path: string, errors: ProjectErrors, log: (message: string) => void): Promise<void> {
-  const result = await pullDataBranch(path, { log })
+  const tickets = await syncTickets(path, { log })
+  const result = tickets.ok ? await pullFileBranch(path, LOGS_BRANCH, { log }) : tickets
   if (result.ok) errors.clear(path, 'data-sync')
-  else errors.set(path, 'data-sync', result.error)
+  else {
+    log(`[framework] data sync: ${result.error}`)
+    errors.set(path, 'data-sync', result.error)
+  }
 }
 
 /** The registered projects as dashboard summaries. */
@@ -195,6 +199,12 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
 
   // Auto PM (#685/#773): while the queue is dry and there is quota to spare, triage and
   // plan tickets rather than let the day's allowance expire unused.
+  // The sweep's assignments name agent ids; the skill's claims name holders — the same string,
+  // read back into the sweep's shape.
+  const claim = async (path: string, assignments: readonly PlanAssignment[], phase: 'plan' | 'drain'): Promise<PlanAssignment[]> => {
+    const locked = await claimTickets(path, assignments.map(a => ({ ticket: a.ticket, holder: a.agentId })), phase, { log })
+    return locked.map(c => ({ ticket: c.ticket, agentId: c.holder }))
+  }
   const autoPm = startAutoPm({
     projects,
     jobs: AUTO_PM_JOBS,
@@ -204,7 +214,7 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
     optedOut: async () => (await prefs()).autoPmOptOut ?? [],
     // The queue's open entries rather than a bare emptiness bit: a batch of concurrent drains is
     // pinned one entry each (#1204), so the sweep needs the entries the decision was made on.
-    queue: async project => (await findTodoBacklog(project.path))?.entries ?? [],
+    queue: project => readQueueEntries(project.path),
     // One label per held slot (#1646): the run's id and its pid, so the sweep's stand-down and
     // fan-out lines name what they were measured against instead of a bare number.
     activeAgents: project => deps.activeAgentSlots(project.id).map(describeSlot),
@@ -244,7 +254,7 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
         const n = Number(priority)
         return Number.isFinite(n) ? n : -1
       }
-      return (await readTickets(project.path))
+      return (await readTickets(ticketsDir(project.path)))
         .filter(ticket => !ticket.planned && !ticket.locked)
         .sort((a, b) => rank(b.priority) - rank(a.priority))
         .map(ticket => ticket.file)
@@ -252,14 +262,14 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
     // The daemon writes and pushes the locks, never the agent (#1327/#1320): an agent only
     // pushes at the end of its session onto its own branch, and a claim that stayed local would
     // not reach the machines it exists for.
-    lockPlans: (project, assignments) => acquireTicketLocks(project.path, assignments, { log }),
+    lockPlans: (project, assignments) => claim(project.path, assignments, 'plan'),
     // The same claim for what a drain is about to *implement* (#1420): drain mode skips only on
     // an existing lock, because the plan it would also find is the drain's input, not a rival.
-    lockDrains: (project, assignments) => acquireTicketLocks(project.path, assignments, { log }, 'drain'),
+    lockDrains: (project, assignments) => claim(project.path, assignments, 'drain'),
     // The one dead claim the daemon can *know* is dead (#1583): the run it minted the lock for
     // settled with nothing to hand off, so the PR that would delete the lock is never coming.
     releaseLock: async (project, claim) => {
-      const result = await releaseTicketLock(project.path, claim.ticket, { log }, { heldBy: claim.agentId })
+      const result = await releaseTicket(project.path, claim.ticket, { heldBy: claim.agentId }, { log })
       if (result === 'released')
         log(`[framework] auto PM: released the lock on ${claim.ticket} — its agent ended with nothing to hand off`)
       if (result === 'error')
@@ -286,6 +296,9 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
       // process. An entry with no ticket has only the sweep's in-memory pin — auto-pm.SPEC.md
       // owns the hand-off window that leaves open.
       const result = await startUnattended(project.id, job.prompt, {
+        // The claim the sweep minted names this id (#1748): the agent is born with it, so the
+        // lock and the run are one and `tickets show` names the agent that holds the ticket.
+        ...(job.claim ? { agentId: job.claim.agentId } : {}),
         ...(ticket ? { ticket } : {}),
         // A fanned-out plan agent plans its ticket rather than implementing it (#1327), so its PR
         // title must not inherit the issue as `(fix #42)` — the plan's merge would close the
@@ -298,9 +311,10 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
       return result.ok ? result.agentId : undefined
     },
     // The daemon retires a drained entry itself (#1582): the queue has one local writer, so the
-    // check-off is a funneled data-branch write at settle, not an agent edit promoted off a
-    // branch. It waits for the run's epilogue — the report is what says the work was published —
-    // and a run that published nothing leaves its entry open (its claim is freed below).
+    // entry is deleted in one write to the `tickets` branch at settle — done means deleted — not
+    // an agent edit promoted off a branch. It waits for the run's epilogue — the report is what
+    // says the work was published — and a run that published nothing leaves its entry open (its
+    // claim is freed below).
     promote: async (project, { agentId, entry }) => {
       const agent = (await listAgents(project.path).catch(() => [])).find(r => r.id === agentId)
       // Unknown or still going: not settled, so it is tried again next tick.
@@ -318,19 +332,13 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
       const published =
         agent.status === 'done' && (agent.handoffReport === 'done' || agent.handoffSkip === 'already-open')
       if (entry === undefined || !published) return { settled: true, promoted: false, ...flags }
-      const result = await withDataBranch(project.path, '[The Framework] check off a drained entry', async dir => {
-        const path = join(dir, FLAT_TODO_FILE)
-        const md = await readFile(path, 'utf8').catch(() => undefined)
-        if (md === undefined) return
-        const next = checkOffEntry(md, entry)
-        if (next !== md) await writeFile(path, next, 'utf8')
-      })
-      if (!result.ok && !result.committed) {
+      const result = await queueDone(project.path, entry, { log })
+      if (!result.ok) {
         // Not settled: the write is retried next tick, and the entry stays held meanwhile.
-        log(`[framework] auto PM: the check-off of a drained entry could not land (${result.error}) (${agentId})`)
+        log(`[framework] auto PM: the drained entry could not be taken off the queue (${agentId})`)
         return { settled: false, promoted: false, ...flags }
       }
-      return { settled: true, promoted: result.ok ? result.changed : true, ...flags }
+      return { settled: true, promoted: result.changed, ...flags }
     },
     log,
   })

@@ -4,10 +4,9 @@ import { openInApp, type OpenTarget, type OpenResult } from '../dashboard/open-i
 import { contextBridgeBrowser, contextPreferences, contextStartAgent, resolveProjectPath, resolveAgentPath } from './context.js'
 import type { BridgeBrowserAction } from '../bridge-browser.js'
 import { relayOr } from './relay-agent.js'
-import { appendFlatTodoEntry, ticketForPrompt } from '../todo-loop.js'
-import { TICKETS_DIR, planTicketPrompt, todoPriorityForTicket } from '../tickets.js'
-import { isTicketFile } from '../dashboard/tickets.js'
-import { releaseTicketLock } from '../ticket-locks.js'
+import { ticketForPrompt } from '../todo-loop.js'
+import { planTicketPrompt } from '../tickets.js'
+import { isTicketFile, QUEUE_FILE, queueAdd, queuePriorityForTicket, releaseTicket, TICKETS_DIR } from '@gemstack/skill-tickets'
 import { findAgent, type AgentMeta } from '../store/index.js'
 import { isSafeAgentId, worktreePath, pushBranch } from '@gemstack/skill-branches'
 import { withAgentLock } from '../agent-locks.js'
@@ -335,15 +334,14 @@ export interface QueuedTicket {
  */
 /**
  * Release a ticket's `.lock.md` claim by hand (#1420): the dashboard's answer to a dead agent,
- * since no timer frees locks anymore. Deletes the lock in the project checkout, commits, and
- * pushes best-effort ({@link releaseTicketLock}) — a release only this machine can see would
- * leave the ticket claimed everywhere the claim matters.
+ * since no timer frees locks anymore. One committed, pushed change on the `tickets` branch — a
+ * release only this machine can see would leave the ticket claimed everywhere the claim matters.
  */
 export async function sendReleaseTicketLock(projectId: string, ticket: string): Promise<{ ok: boolean; error?: string }> {
   if (!isTicketFile(ticket)) return { ok: false, error: 'not a ticket filename' }
   const cwd = await resolveProjectPath(projectId)
   if (!cwd) return { ok: false, error: 'no such project' }
-  const outcome = await releaseTicketLock(cwd, ticket)
+  const outcome = await releaseTicket(cwd, ticket)
   if (outcome === 'released') return { ok: true }
   return { ok: false, error: outcome === 'no-lock' ? 'this ticket holds no lock' : 'the release could not be committed' }
 }
@@ -357,11 +355,11 @@ export async function sendQueueTicket(
   if (!trimmed) return { ok: false, error: 'a ticket is required' }
   const cwd = await resolveProjectPath(projectId)
   if (!cwd) return { ok: false, error: 'no such project' }
-  // A markdown link, so the file reads well and the agent draining it has the ticket to open.
-  // `parseTodoEntries` keeps the line verbatim, so the reference travels with the entry.
+  // A markdown link, so the file reads well and the agent draining it has the ticket to open;
+  // the queue keeps the line verbatim, so the reference travels with the entry.
   const text = ticket ? `[${trimmed}](${TICKETS_DIR}/${ticket.file})` : trimmed
-  const file = await appendFlatTodoEntry(cwd, text, ticket ? todoPriorityForTicket(ticket.priority) : undefined)
-  return file ? { ok: true, file } : { ok: false, error: 'the queue could not be written' }
+  const result = await queueAdd(cwd, text, ticket ? queuePriorityForTicket(ticket.priority) : undefined)
+  return result.ok ? { ok: true, file: QUEUE_FILE } : { ok: false, error: 'the queue could not be written' }
 }
 
 /**
@@ -379,8 +377,8 @@ export async function sendQueueTicketPlan(projectId: string, ticket: QueuedTicke
   if (!isTicketFile(ticket.file)) return { ok: false, error: 'not a ticket filename' }
   const cwd = await resolveProjectPath(projectId)
   if (!cwd) return { ok: false, error: 'no such project' }
-  const file = await appendFlatTodoEntry(cwd, planTicketPrompt(ticket.file), todoPriorityForTicket(ticket.priority))
-  return file ? { ok: true, file } : { ok: false, error: 'the queue could not be written' }
+  const result = await queueAdd(cwd, planTicketPrompt(ticket.file), queuePriorityForTicket(ticket.priority))
+  return result.ok ? { ok: true, file: QUEUE_FILE } : { ok: false, error: 'the queue could not be written' }
 }
 
 /**

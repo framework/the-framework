@@ -27,7 +27,7 @@ The user wants to see what the framework will work on next.
 
 #### Business logic
 
-The card lists, per project, that project's open agent queue entries, with a count of open entries beside the project's name. Projects with nothing open are left out entirely; when no project has anything open the card says nothing is queued, and while the queue is still being fetched it says it is loading. Every open entry is shown — a collapsed plan is one the user cannot read. Checked-off entries are not listed.
+The card lists, per project, that project's open agent queue entries, with a count of open entries beside the project's name. Projects with nothing open are left out entirely; when no project has anything open the card says nothing is queued, and while the queue is still being fetched it says it is loading. Every open entry is shown — a collapsed plan is one the user cannot read. Every entry on the queue is an open one: an entry whose work is done is taken off the queue rather than marked.
 
 Each entry's line is markdown, so the card prints its title rather than its source, with the whole raw line available on hover.
 
@@ -53,7 +53,7 @@ The user starts a queued entry themselves and expects the same outcome the frame
 
 #### Business logic
 
-The play button starts a single agent whose prompt narrows the drain preset's instruction to this one entry: open `TODO_AGENTS.md`, work on this one open entry only, then check it off, and start no other entry. The prompt quotes the entry's raw queue line rather than the tidied title, because the agent has to find exactly that line to check it off, and because the line's own link is how the agent opens the ticket.
+The play button starts a single agent whose prompt narrows the drain preset's instruction to this one entry: work on this one open entry of the agent queue only, take it off the queue when the work is done, and start no other entry. The prompt quotes the entry's raw queue line rather than the tidied title, because the agent has to name exactly that line to take it off the queue, and because the line's own link is how the agent opens the ticket.
 
 The agent is started unattended, with the user's own agent preferences: its gates auto-answer, it ends when it settles, and its armed handoff fires — instead of parking in the stay-open chat loop with its PR never opened.
 

@@ -216,7 +216,7 @@ The pull request the framework opens carries the agent's own title and descripti
 
 The outcome is both recorded and narrated: the pull request's number and URL are recorded so every later surface reads them off the agent instead of re-deriving them from branch names and timestamps, and the terminal gets a line for what happened — opened, pushed, auto-merge armed, merge-on-green watched, merged, withheld with the reason, or failed.
 
-The quality step runs first, the handoff second, and the archive last. Both must precede the archive because archiving copies the event log to the data branch, and an outcome recorded afterwards would be missing from the copy the dashboard's history reads; and the handoff must follow the quality step so whatever that step committed is part of what gets published.
+The quality step runs first, the handoff second, and the archive last. Both must precede the archive because archiving copies the event log to the logs branch, and an outcome recorded afterwards would be missing from the copy the dashboard's history reads; and the handoff must follow the quality step so whatever that step committed is part of what gets published.
 
 #### Rationale
 

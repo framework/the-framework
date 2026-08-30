@@ -21,12 +21,15 @@ export function TicketDetailPage({
   projectId,
   slug,
   onBack,
+  onOpenAgent,
 }: {
   projectId: string
   /** The ticket's filename inside `tickets/`, same as `WorkspaceTicket.file`. */
   slug: string
   /** Back to the tickets list. */
   onBack: () => void
+  /** Open the page of the agent holding the claim (#1748), when the lock names one of this project's. */
+  onOpenAgent?: ((agentId: string) => void) | undefined
 }) {
   const { value: ticket, loaded } = usePolled<WorkspaceTicketDetail | null>(() => onTicket(projectId, slug), null, 10_000, [projectId, slug])
   const [queued, setQueued] = useState(false)
@@ -45,6 +48,7 @@ export function TicketDetailPage({
   // claim stands until a human lifts it here. `released` bridges the gap until the next poll.
   const [released, setReleased] = useState(false)
   const claimed = Boolean(ticket?.locked) && !released
+  const holder = ticket?.lockedByAgent?.name ?? ticket?.lockedBy
   const release = async () => {
     if (!ticket) return
     const result = await run(() => sendReleaseTicketLock(projectId, ticket.file), 'The lock could not be released.')
@@ -69,7 +73,7 @@ export function TicketDetailPage({
                   variant="outline"
                   disabled={busy}
                   onClick={() => void release()}
-                  title={ticket.lockedBy ? `Claimed by ${ticket.lockedBy}` : undefined}
+                  title={holder ? `Claimed by ${holder}` : undefined}
                   className="gap-1.5"
                 >
                   <LockOpen className="h-3.5 w-3.5" /> Release lock
@@ -117,12 +121,23 @@ export function TicketDetailPage({
               </Badge>
             ))}
             {ticket.planned && <Badge className="border-transparent px-0 text-[10px] uppercase">planned</Badge>}
-            {/* The holder inline (#1420): the detail page has the room, so the full id is
-                plainly readable instead of hiding behind a native tooltip. */}
+            {/* The holder inline (#1420): the detail page has the room, so the name is plainly
+                readable instead of hiding behind a native tooltip. One of this project's agents
+                (#1748) is named by its session and opens its page; anyone else is shown as written. */}
             {claimed && (
               <Badge className="border-transparent px-0 text-[10px] text-warning">
                 <span className="uppercase">claimed</span>
-                {ticket.lockedBy && <>&nbsp;· {ticket.lockedBy}</>}
+                {holder &&
+                  (ticket.lockedByAgent && onOpenAgent ? (
+                    <>
+                      &nbsp;·{' '}
+                      <button type="button" className="hover:underline" onClick={() => onOpenAgent(ticket.lockedByAgent!.id)}>
+                        {holder}
+                      </button>
+                    </>
+                  ) : (
+                    <>&nbsp;· {holder}</>
+                  ))}
               </Badge>
             )}
             {ticket.effort !== undefined && (

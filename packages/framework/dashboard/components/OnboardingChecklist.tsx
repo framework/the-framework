@@ -139,7 +139,7 @@ export function OnboardingChecklist({
       key: 'todos',
       label: 'Populate the queue of AI tasks',
       description:
-        'TODO_AGENTS.md is the queue: each unchecked item is work the agent picks up on its own, so a filled queue is what lets it keep going without you.',
+        'TODO_AGENTS.md is the queue: each entry is work the agent picks up on its own, so a filled queue is what lets it keep going without you.',
       done: (data?.totals.openTodos ?? 0) > 0,
     },
     {

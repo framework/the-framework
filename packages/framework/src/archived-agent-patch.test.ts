@@ -5,7 +5,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { dataWorktreePath, withDataBranch } from './data-branch.js'
+import { fileBranchPath, withFileBranch } from '@gemstack/skill-branches'
+import { LOGS_BRANCH } from './framework-dir.js'
 import { patchArchivedAgentOnDataBranch } from './archived-agent-patch.js'
 
 const git = promisify(execFile)
@@ -20,7 +21,7 @@ async function repoWithArchive(): Promise<{ project: string; cleanup: () => Prom
   await git('git', ['config', 'user.name', 'Test'], { cwd: project })
   await git('git', ['config', 'commit.gpgsign', 'false'], { cwd: project })
   await git('git', ['remote', 'add', 'origin', origin], { cwd: project })
-  const seeded = await withDataBranch(project, 'seed', async dir => {
+  const seeded = await withFileBranch(project, LOGS_BRANCH, 'seed', async dir => {
     await mkdir(join(dir, 'agents', 'u'), { recursive: true })
     const meta = { version: 1, status: 'done', id: 'r1', startedAt: '2026-08-20T10:00:00.000Z', updatedAt: '2026-08-20T10:00:00.000Z', branch: 'agent-r1' }
     await writeFile(join(dir, 'agents', 'u', 'r1.json'), JSON.stringify(meta))
@@ -39,7 +40,7 @@ async function repoWithArchive(): Promise<{ project: string; cleanup: () => Prom
 test('an archive patch lands as a commit on the data branch, pushed, leaving the checkout clean (#1601)', async () => {
   const { project, cleanup } = await repoWithArchive()
   try {
-    const dir = dataWorktreePath(project)
+    const dir = fileBranchPath(project, LOGS_BRANCH)
     assert.equal(
       await patchArchivedAgentOnDataBranch(project, 'r1', { branch: 'claude/fix-it', pr: { number: 7, url: 'https://x/pull/7' } }, '[The Framework] adopt r1'),
       true,
@@ -47,12 +48,12 @@ test('an archive patch lands as a commit on the data branch, pushed, leaving the
     const meta = JSON.parse(await readFile(join(dir, 'agents', 'u', 'r1.json'), 'utf8')) as { branch: string; pr: { number: number } }
     assert.equal(meta.branch, 'claude/fix-it')
     assert.equal(meta.pr.number, 7)
-    // Committed, not merely written: a dirty data checkout is what the next sync hard-resets.
+    // Committed, not merely written: a dirty checkout is what the next sync hard-resets.
     assert.equal((await git('git', ['status', '--porcelain'], { cwd: dir })).stdout.trim(), '')
     assert.equal((await git('git', ['log', '-1', '--format=%s'], { cwd: dir })).stdout.trim(), '[The Framework] adopt r1')
-    assert.equal((await git('git', ['rev-list', '--count', 'origin/agents-data..agents-data'], { cwd: dir })).stdout.trim(), '0', 'and pushed')
+    assert.equal((await git('git', ['rev-list', '--count', `origin/${LOGS_BRANCH}..${LOGS_BRANCH}`], { cwd: dir })).stdout.trim(), '0', 'and pushed')
     // The sync the daemon runs a minute later keeps it.
-    await withDataBranch(project, '[The Framework] data sync', async () => {})
+    await withFileBranch(project, LOGS_BRANCH, 'sync', async () => {})
     const after = JSON.parse(await readFile(join(dir, 'agents', 'u', 'r1.json'), 'utf8')) as { branch: string }
     assert.equal(after.branch, 'claude/fix-it')
   } finally {
@@ -63,7 +64,7 @@ test('an archive patch lands as a commit on the data branch, pushed, leaving the
 test('a run with no archive is reported as not patched, and nothing is committed (#1601)', async () => {
   const { project, cleanup } = await repoWithArchive()
   try {
-    const dir = dataWorktreePath(project)
+    const dir = fileBranchPath(project, LOGS_BRANCH)
     const before = (await git('git', ['rev-parse', 'HEAD'], { cwd: dir })).stdout.trim()
     assert.equal(await patchArchivedAgentOnDataBranch(project, 'nope', { branch: 'claude/x' }, '[The Framework] adopt nope'), false)
     assert.equal((await git('git', ['rev-parse', 'HEAD'], { cwd: dir })).stdout.trim(), before)

@@ -362,3 +362,22 @@ describe('TicketsPanel (#697/#1144)', () => {
     expect(container.textContent).toBe('')
   })
 })
+
+test('a claim naming one of the project\'s agents shows its session name and opens the agent (#1748)', () => {
+  const opened: string[] = []
+  render(
+    <TicketsPanel
+      projectId="p1"
+      tickets={[ticket({ locked: true, lockedBy: '2026-08-30T10-00-00-000Z', lockedByAgent: { id: '2026-08-30T10-00-00-000Z', name: 'login-page' } })]}
+      loaded
+      onOpen={() => {}}
+      onSelectProject={() => {}}
+      onOpenAgent={id => opened.push(id)}
+    />,
+  )
+  fireEvent.click(screen.getByText('login-page'))
+  expect(opened).toEqual(['2026-08-30T10-00-00-000Z'])
+  // A holder the project has no record of is shown as written, and opens nothing.
+  render(<TicketsPanel projectId="p2" tickets={[ticket({ file: 'other.md', locked: true, lockedBy: 'claude/some-session' })]} loaded onOpen={() => {}} onSelectProject={() => {}} onOpenAgent={id => opened.push(id)} />)
+  expect(screen.getByText('claude/some-session')).toBeTruthy()
+})

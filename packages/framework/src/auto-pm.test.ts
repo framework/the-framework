@@ -874,9 +874,11 @@ test('a drain batch locks its ticket-linked entries, and each prompt carries its
   assert.equal(lockCalls.length, 1)
   assert.deepEqual(lockCalls[0]!.map(a => a.ticket), ['2026-07-25_a.md', '2026-07-25_b.md'])
   assert.equal(prompts.length, 2)
-  assert.match(prompts[0]!, new RegExp(`CLAIMED: ${lockCalls[0]![0]!.agentId}`))
-  assert.match(prompts[1]!, new RegExp(`CLAIMED: ${lockCalls[0]![1]!.agentId}`))
+  assert.match(prompts[0]!, /tickets\/2026-07-25_a\.md`, is already claimed for you/)
+  assert.match(prompts[1]!, /tickets\/2026-07-25_b\.md`, is already claimed for you/)
+  // The ids are minted a millisecond apart from the sweep's clock (#1748), so a batch stays distinct.
   assert.equal(new Set(lockCalls[0]!.map(a => a.agentId)).size, 2)
+  assert.match(lockCalls[0]![0]!.agentId, /^2026-07-20T12-00-00-000Z$/)
 })
 
 test('a ticketless entry drains without a claim, and is not offered to the lock (#1420)', async () => {
@@ -899,8 +901,8 @@ test('a ticketless entry drains without a claim, and is not offered to the lock 
   loop.stop()
   assert.deepEqual(lockCalls[0]!.map(a => a.ticket), ['2026-07-25_b.md'])
   assert.equal(prompts.length, 2)
-  assert.ok(!/CLAIMED/.test(prompts[0]!), 'the ticketless entry carries no claim')
-  assert.match(prompts[1]!, /CLAIMED/)
+  assert.ok(!/claimed for you/.test(prompts[0]!), 'the ticketless entry carries no claim')
+  assert.match(prompts[1]!, /claimed for you/)
 })
 
 test('an entry whose ticket claim was lost is dropped from the batch, not the batch (#1420)', async () => {
@@ -960,14 +962,14 @@ test('pinnedDrainJob with a claim appends the same contract the pinned plan prom
     ticket: '2026-07-25_x.md',
     agentId: 'drain-7-0',
   })
-  assert.match(pinned.prompt, /tickets\/2026-07-25_x\.lock\.md/)
-  assert.match(pinned.prompt, /CLAIMED: drain-7-0/)
-  // The closing PR retires all three siblings: closed tickets leave the repo, and nothing else
-  // lifts a lock since #1420 dropped the timer.
-  assert.match(pinned.prompt, /remove `tickets\/2026-07-25_x\.md`, `tickets\/2026-07-25_x\.plan\.md`, and `tickets\/2026-07-25_x\.lock\.md`/)
-  assert.match(pinned.prompt, /names a different agent, the ticket is not yours/)
+  assert.match(pinned.prompt, /`tickets\/2026-07-25_x\.md`, is already claimed for you/)
+  assert.match(pinned.prompt, /`tickets show 2026-07-25_x\.md` names you as its holder/)
+  // Closing the ticket through the skill retires it with its siblings, the claim included: nothing
+  // else lifts a lock since #1420 dropped the timer.
+  assert.match(pinned.prompt, /run `tickets close 2026-07-25_x\.md`/)
+  assert.match(pinned.prompt, /claimed by someone else, it is not yours/)
   // And without a claim, the prompt is exactly the pre-#1420 pin.
-  assert.ok(!/CLAIMED/.test(pinnedDrainJob(job, 'entry a').prompt))
+  assert.ok(!/claimed for you/.test(pinnedDrainJob(job, 'entry a').prompt))
 })
 
 // #1583: the one claim the sweep can *know* is dead. A drain that settles with `no-commits` never
@@ -1194,7 +1196,7 @@ test('a fansOut job fans out to the concurrency, one locked ticket per agent (#1
   assert.equal(lockCalls.length, 1)
   assert.equal(lockCalls[0]!.length, 3)
   assert.equal(new Set(lockCalls[0]!.map(a => a.agentId)).size, 3)
-  assert.match(prompts[0]!, new RegExp(`CLAIMED: ${lockCalls[0]![0]!.agentId}`))
+  assert.match(prompts[0]!, /`tickets show a\.md` names you as its holder/)
 })
 
 // #1204: Run now on the planning routine reaches the same fan-out the daemon uses. It used to be
@@ -1417,10 +1419,9 @@ test('pinnedPlanJob appends the pin, so the preset keeps its own rules verbatim 
   // able to silently lose the pin.
   assert.ok(pinned.prompt.startsWith(PLAN_JOB.prompt))
   assert.match(pinned.prompt, /exactly one ticket, `tickets\/2026-07-25_x\.md`/)
-  assert.match(pinned.prompt, /tickets\/2026-07-25_x\.lock\.md/)
-  assert.match(pinned.prompt, /CLAIMED: plan-7-0/)
-  // The lock has no timer since #1420, so the agent is told to lift it with its own work.
-  assert.match(pinned.prompt, /delete `tickets\/2026-07-25_x\.lock\.md` in the same data-branch commit/)
+  assert.match(pinned.prompt, /`tickets show 2026-07-25_x\.md` names you as its holder/)
+  // The lock has no timer since #1420, so the agent is told to lift it once the plan is written.
+  assert.match(pinned.prompt, /`tickets put 2026-07-25_x\.plan\.md`, then lift your claim with `tickets release 2026-07-25_x\.md`/)
   assert.equal(pinned.ticket, '2026-07-25_x.md')
 })
 

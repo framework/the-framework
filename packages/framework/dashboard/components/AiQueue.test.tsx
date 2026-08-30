@@ -115,7 +115,7 @@ describe('AiQueue', () => {
     await waitFor(() => expect(start).toHaveBeenCalled())
     const [projectId, prompt, kind, options] = start.mock.calls[0]!
     expect(projectId).toBe('p1')
-    // The raw line, not the pretty label: the agent must find exactly this entry to check it off.
+    // The raw line, not the pretty label: the agent must find exactly this entry to take it off the queue.
     expect(prompt).toBe(workOnEntryPrompt(entry))
     expect(prompt).toContain(entry)
     expect(kind).toBe('prompt')
@@ -209,7 +209,7 @@ describe('AiQueue', () => {
     fireEvent.click(screen.getByRole('button', { name: fanOutLabel(3) }))
     await waitFor(() => expect(start).toHaveBeenCalledTimes(3))
     // Each agent is pinned to its own entry, in queue order — the raw lines, since each agent must
-    // find exactly its entry to check it off.
+    // find exactly its entry to take it off the queue.
     expect(start.mock.calls.map(call => call[1])).toEqual([
       workOnEntryPrompt('one'),
       workOnEntryPrompt('two'),

@@ -51,3 +51,20 @@ test('an entry already at a link path is left alone (#1739)', async () => {
     await rm(repo, { recursive: true, force: true })
   }
 })
+
+test('a caller-named skill is linked beside the package\'s own, under its own name (#1748, temporary)', async () => {
+  const repo = await repoWithOneCommit()
+  const other = await realpath(await mkdtemp(join(tmpdir(), 'other-skill-')))
+  try {
+    await writeFile(join(other, 'SKILL.md'), '---\nname: other\n---\n# Other\n')
+    const { path } = await createCheckout(repo, { agentId: 'a2', skills: [{ name: 'other', dir: other }] })
+    for (const dir of HARNESS_SKILL_DIRS) {
+      assert.equal(await realpath(join(path, dir, 'other')), other, `${dir} links the other skill`)
+      assert.equal(await realpath(join(path, dir, SKILL_NAME)), await realpath(SKILL_DIR), `${dir} still links this package`)
+    }
+    assert.equal((await git(['status', '--porcelain'], path)).trim(), '')
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+    await rm(other, { recursive: true, force: true })
+  }
+})

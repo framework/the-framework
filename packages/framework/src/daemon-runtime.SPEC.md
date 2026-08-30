@@ -15,7 +15,7 @@ Starting, supervising and retiring agents on behalf of the daemon: every agent t
 - **One agent per checkout** - a second agent aimed at a checkout that is already busy is refused as busy; different checkouts never wait on each other.
 - **An agent that never booted is reported as failed** - when the spawned process dies before writing its own status, the daemon writes the `failed` status for it and puts the process's error output into the agent's event log — unless the checkout is gone, where only the terminal records it.
 - **One more try after a transient driver death** - an agent killed by a dropped connection or an overloaded API is continued automatically, at most twice; any other failure stands.
-- **Retiring a finished agent** - its history is archived onto the data branch, then its checkout is removed once its work has reached the remote, and kept otherwise; any branch that went with it is named.
+- **Retiring a finished agent** - its history is archived onto the logs branch, then its checkout is removed once its work has reached the remote, and kept otherwise; any branch that went with it is named.
 - **Running an agent on another device** - a start aimed at a device is handed to that daemon over the relay, its events are streamed back, and read/steer requests for it are forwarded there.
 - **Adding projects** - the repo at a given path is activated and registered in one go.
 - **Shutdown stops every agent it spawned** - Ctrl-C terminates each agent's process — an agent that will not go is killed together with its whole process group, its browser included — and waits for its teardown to finish before the daemon lets go of the repo; starts landing during shutdown are refused.
@@ -32,13 +32,13 @@ The user clicks Start in the dashboard — on the project they are looking at, o
 
 A start names a project, a prompt and a kind of task. The project id resolves to the repo path through the registry; no id (or the home id) means the daemon's own workspace, resolved without a lookup. An unknown project id is refused by name.
 
-The agent is spawned as a detached process of its own, handed a written-out task description, so it outlives the request that asked for it. It narrates itself: everything the dashboard shows comes from the agent's own event log, and everything the user sends back (Stop, picks, chat) goes through its control channel — the daemon only tracks whether the process is alive. The start hands back the agent id so the dashboard can open exactly that agent rather than guess which one appeared.
+The agent is spawned as a detached process of its own, handed a written-out task description, so it outlives the request that asked for it. It narrates itself: everything the dashboard shows comes from the agent's own event log, and everything the user sends back (Stop, picks, chat) goes through its control channel — the daemon only tracks whether the process is alive. The start hands back the agent id so the dashboard can open exactly that agent rather than guess which one appeared. That id is the moment the agent started, unless the caller minted one beforehand and asked for it: the daemon's own sweep claims a ticket for the agent before starting it, so the agent has to be born under the id its claim already names.
 
 Whatever the framework's own CLI entry is, the agent is spawned from it. The daemon refuses to spawn from a test entry, because that would re-run the test suite instead of an agent — and that suite starts agents, so each spawn would spawn another.
 
 The spawned agent's error output is written to a file inside its checkout instead of being discarded, so an agent that dies at boot leaves a trace to read.
 
-The spawned agent's environment is the daemon's own, with the `branches` command first on its PATH — the agent names its session and checks its tree through the same package the daemon allocated its checkout with — plus the daemon's address, when the daemon has one: a web run uses it to ask this daemon for a cloud session created by the browser extension. A run nobody's daemon spawned has no such address, and a web run among them stops saying web runs start from the dashboard.
+The spawned agent's environment is the daemon's own, with the `branches` and `tickets` commands first on its PATH — the agent names its session, checks its tree, and reads and changes the tickets and the queue through the same packages the daemon does — plus the daemon's address, when the daemon has one: a web run uses it to ask this daemon for a cloud session created by the browser extension. A run nobody's daemon spawned has no such address, and a web run among them stops saying web runs start from the dashboard.
 
 ### Every agent gets its own checkout
 
@@ -50,7 +50,7 @@ The user runs several agents on the same project at once, and keeps working in t
 
 Each agent is given its own git worktree under the project's `.branches/`, on its own `agent-<agent id>` branch. Concurrent agents on one project therefore never fight over a working tree, and the user's own checkout — uncommitted work included — is left untouched.
 
-A fresh worktree has no installed dependencies, since those are not tracked by git, so the project's are mirrored in (the `skill-branches` package's dependency linking).
+A fresh worktree has no installed dependencies, since those are not tracked by git, so the project's are mirrored in (the `skill-branches` package's dependency linking). The `tickets` skill is linked into every checkout the daemon creates or re-attaches, where the agent's harness looks for skills — a temporary arrangement, until skills are committed into the repository itself and every checkout carries them as tracked files.
 
 #### Rationale
 
@@ -150,7 +150,7 @@ An agent finishes. Its work must survive, its history must stay visible in the d
 
 #### Business logic
 
-When an agent's process exits, its history — which lives inside its own checkout — is copied out into the project first, as an archive filed under the identity the repo commits as, on the data branch, through the data branch's single write cycle so it is committed and pushed the moment it lands. The branch the work ended on is recorded with it, because the branch outlives the checkout and is the only handle the dashboard has left on a finished agent. That branch is read only from a directory git knows as a checkout in its own right: a leftover directory would answer with the *enclosing* repository's branch, and the archive would record the user's own branch as the agent's.
+When an agent's process exits, its history — which lives inside its own checkout — is copied out into the project first, as an archive filed under the identity the repo commits as, on the logs branch, through the logs branch's single write cycle so it is committed and pushed the moment it lands. The branch the work ended on is recorded with it, because the branch outlives the checkout and is the only handle the dashboard has left on a finished agent. That branch is read only from a directory git knows as a checkout in its own right: a leftover directory would answer with the *enclosing* repository's branch, and the archive would record the user's own branch as the agent's.
 
 Then the checkout goes, under one rule: it is removed once its work is on the remote, whatever state the agent ended in — pending changes are committed and the branch is pushed, unless everything the checkout holds is already there, and only then does the checkout come off disk. A push that cannot land keeps the checkout, and a later sweep retries it. Teardown, the sweep and the dashboard's Remove button are the same behaviour by construction. When branches went with the checkout — one that provably held nothing the remote lacks, or the `agent-<agent id>` branch the agent had branched away from — the teardown names them, because a branch disappearing unannounced reads as a bug.
 

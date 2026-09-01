@@ -2,9 +2,8 @@ Non-obvious decisions only, grouped by business-logic flow. Anything not listed 
 to the implementer's judgment. Flag conflicts instead of silently deviating.
 
 ## The package
-- A **library, not a skill**: read by code, never by an agent ⇒ no `SKILL.md`, no
-  command, no `use-npm-skills` keyword. A skill must not import another skill's code; a
-  library is what every skill imports.
+- A **library, not a skill**: read by code, never by an agent ⇒ no `SKILL.md`, no command.
+  A skill must not import another skill's code; a library is what every skill imports.
 - Package name = branch name: `@gemstack/agent-data` manages the `agent-data` branch, so it
   is called the same.
 - The code that runs git, and the code that makes git ignore `.branches/`, live in this

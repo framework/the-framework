@@ -14,17 +14,11 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   out of it: every checkout inside is a full copy of the repository.
 
 ## The branch
-- A branch of the project's own repository holding files nobody edits in a working tree —
-  the way `gh-pages` holds a site. Pushed and pulled eagerly: every machine and cloud
-  session sees the same files, and the code branches stay 100% code.
-- **One shared branch, a path per skill** (`tickets/`, `TODO_AGENTS.md`, the caller's
-  `agents/`), checked out once at `.branches/agent-data`. One branch per skill was
-  considered and dropped: N checkouts per project, N sync errors to surface.
-- Named `agent-data`: singular, like the skill names. Not `agents-data` — that branch
-  existed, was deleted, and old builds still push to it; a name a ghost still writes to
-  cannot be reused.
-- The name is exported once, as `DATA_BRANCH`, over hardcoded copies: every skill already
-  depends on this package.
+- A branch of the project's repository holds the data, like `gh-pages`; code branches hold
+  only code. Pushed and pulled on every change, so every machine sees the same files.
+- One branch for all skills, a folder or file each. Not one branch per skill: one more
+  checkout and one more error to report, per skill.
+- The branch name is written once, here, as `DATA_BRANCH`; every other package imports it.
 
 ## Flow: a write
 Sync with origin → apply the change → commit → push; a lost push re-applies the change on

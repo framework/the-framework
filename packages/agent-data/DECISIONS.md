@@ -9,9 +9,9 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 - The code that runs git, and the code that makes git ignore `.branches/`, live in this
   package and not in a skill. A skill that needs them imports them from here; none keeps
   a copy of its own.
-- `.branches`, the checkouts directory, is this package's constant: the data branch's
-  checkout sits beside the agents' checkouts under it. Dotted so that no `*` glob descends
-  into N copies of the repository.
+- `.branches/` holds every extra checkout of the project — each agent's, and the data
+  branch's — so its name is defined here. It starts with a dot to keep tools' `*` patterns
+  out of it: every checkout inside is a full copy of the repository.
 
 ## The branch
 - A branch of the project's own repository holding files nobody edits in a working tree —

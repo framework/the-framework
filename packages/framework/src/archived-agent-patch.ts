@@ -1,4 +1,4 @@
-import { withFileBranch } from '@gemstack/skill-branches'
+import { withFileBranch } from '@gemstack/agent-data'
 import { LOGS_BRANCH } from './framework-dir.js'
 import { patchArchivedAgent, type ArchivePatch } from './store/index.js'
 

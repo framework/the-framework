@@ -8,7 +8,7 @@ import type { ChoicePick, ChoiceRequest, FrameworkEvent } from './events.js'
 import { nextQueuedTicket, runTodoLoop, agentTodoPending, ticketForPrompt } from './todo-loop.js'
 import { drainsQueue, presets } from './preset-catalog.js'
 import { AUTO_PM_DRAIN_JOB, AUTO_PM_JOBS } from './auto-pm.js'
-import { fileBranchPath, nodeGitRunner, withFileBranch } from '@gemstack/skill-branches'
+import { fileBranchPath, nodeGitRunner, withFileBranch } from '@gemstack/agent-data'
 import { TICKETS_BRANCH } from '@gemstack/skill-tickets'
 
 const git = nodeGitRunner()

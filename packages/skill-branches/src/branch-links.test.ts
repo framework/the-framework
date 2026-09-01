@@ -3,9 +3,9 @@ import { test } from 'node:test'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { mkdir, mkdtemp, readdir, realpath, rm, writeFile } from 'node:fs/promises'
-import { nodeGitRunner } from './git.js'
+import { nodeGitRunner, BRANCHES_DIR } from '@gemstack/agent-data'
 import { reconcileBranchLinks, type LinksFs } from './branch-links.js'
-import { BRANCHES_DIR, addWorktree, worktreePath, type WorktreeDirEntry } from './index.js'
+import { addWorktree, worktreePath, type WorktreeDirEntry } from './index.js'
 
 const CWD = '/repo'
 const LINKS = join(CWD, BRANCHES_DIR)

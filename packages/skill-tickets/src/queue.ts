@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { fileBranchRepo, readBranchFile } from '@gemstack/skill-branches'
+import { fileBranchRepo, readBranchFile } from '@gemstack/agent-data'
 import { QUEUE_FILE, TICKETS_BRANCH } from './names.js'
 import { resolveTicketDeps, type TicketDeps } from './store.js'
 

@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { nodeGitRunner, type GitRunner } from '@gemstack/skill-branches'
+import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import { nodeFs } from './node-fs.js'
 /**

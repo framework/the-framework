@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { mkdir, mkdtemp, readFile, readlink, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { nodeGitRunner } from '@gemstack/skill-branches'
+import { nodeGitRunner } from '@gemstack/agent-data'
 import { syncTickets, ticketsCheckoutPath, ticketsDir } from './store.js'
 import { QUEUE_FILE, TICKETS_BRANCH, TICKETS_CHECKOUT_DIR } from './names.js'
 

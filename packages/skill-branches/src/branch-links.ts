@@ -1,6 +1,6 @@
 import { basename, join } from 'node:path'
-import { nodeGitRunner, type GitRunner } from './git.js'
-import { BRANCHES_DIR, isAgentBranch } from './branch-names.js'
+import { nodeGitRunner, type GitRunner, BRANCHES_DIR } from '@gemstack/agent-data'
+import { isAgentBranch } from './branch-names.js'
 import { worktreeDirEntries, worktreeBranch, type WorktreeDirEntry } from './worktree.js'
 
 // The branches view (#1580): every checkout under `.branches/` is a directory named as the branch

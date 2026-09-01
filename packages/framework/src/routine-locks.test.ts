@@ -14,7 +14,7 @@ import {
   type RoutineLockDeps,
 } from './routine-locks.js'
 import { LOGS_BRANCH, LOGS_CHECKOUT_DIR } from './framework-dir.js'
-import { fileBranchPath, nodeGitRunner } from '@gemstack/skill-branches'
+import { fileBranchPath, nodeGitRunner } from '@gemstack/agent-data'
 const CWD = '/repo'
 const DATA = join(CWD, LOGS_CHECKOUT_DIR)
 const T0 = Date.parse('2026-08-23T10:00:00.000Z')

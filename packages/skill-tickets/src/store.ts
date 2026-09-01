@@ -1,17 +1,5 @@
 import { join } from 'node:path'
-import {
-  excludeFromGit,
-  fileBranchPath,
-  nodeBranchFileFs,
-  nodeGitRunner,
-  pullFileBranch,
-  withFileBranch,
-  type BranchFileFs,
-  type CommitMessage,
-  type FileBranchSync,
-  type FileBranchWrite,
-  type GitRunner,
-} from '@gemstack/skill-branches'
+import { excludeFromGit, fileBranchPath, nodeBranchFileFs, nodeGitRunner, pullFileBranch, withFileBranch, type BranchFileFs, type CommitMessage, type FileBranchSync, type FileBranchWrite, type GitRunner } from '@gemstack/agent-data'
 import { QUEUE_FILE, TICKETS_BRANCH, TICKETS_CHECKOUT_DIR, TICKETS_DIR } from './names.js'
 
 // Where the tickets live, bound to the branch: the `tickets` branch of the project's repository,

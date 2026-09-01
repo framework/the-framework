@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { join } from 'node:path'
 import { mkdtemp, readFile, realpath, rm, unlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { nodeGitRunner } from './git.js'
+import { nodeGitRunner } from '@gemstack/agent-data'
 import { createCheckout } from './checkout.js'
 import { HARNESS_SKILL_DIRS, linkSkill, SKILL_DIR, SKILL_NAME } from './skill-links.js'
 

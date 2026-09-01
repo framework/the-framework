@@ -13,9 +13,9 @@ import type { PreflightResult } from './preflight.js'
  * machine running them happens to have `claude` installed and logged in.
  */
 const agentReady = (): Promise<PreflightResult> => Promise.resolve({ ok: true, checks: [] })
-
 import { EVENTS_FILE, META_FILE, startedAtFromAgentId, type AgentMeta } from './store/index.js'
-import { BRANCHES_DIR, worktreePath, agentBranchName, nodeGitRunner, GitTimeoutError, CLI_BIN_DIR } from '@gemstack/skill-branches'
+import { BRANCHES_DIR, nodeGitRunner, GitTimeoutError } from '@gemstack/agent-data'
+import { worktreePath, agentBranchName, CLI_BIN_DIR } from '@gemstack/skill-branches'
 import { CLI_BIN_DIR as TICKETS_BIN_DIR } from '@gemstack/skill-tickets'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import { addProject, projectId } from './registry.js'

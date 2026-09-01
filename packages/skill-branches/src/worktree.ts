@@ -1,7 +1,7 @@
 import { basename, dirname, join } from 'node:path'
 import { realpath } from 'node:fs/promises'
-import { nodeGitRunner, checkoutRoot, type GitRunner } from './git.js'
-import { BRANCHES_DIR, AGENT_BRANCH_PREFIX, isSafeAgentId, isAgentBranch, agentBranchName, agentIdFromWorktreeDir } from './branch-names.js'
+import { nodeGitRunner, checkoutRoot, type GitRunner, BRANCHES_DIR } from '@gemstack/agent-data'
+import { AGENT_BRANCH_PREFIX, isSafeAgentId, isAgentBranch, agentBranchName, agentIdFromWorktreeDir } from './branch-names.js'
 
 /**
  * Git-worktree lifecycle for concurrent agents (#453/#735): give each agent its own

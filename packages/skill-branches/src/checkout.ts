@@ -1,9 +1,8 @@
-import { nodeGitRunner, type GitRunner } from './git.js'
-import { agentBranchName, BRANCHES_DIR } from './branch-names.js'
+import { nodeGitRunner, type GitRunner, BRANCHES_DIR, excludeFromGit } from '@gemstack/agent-data'
+import { agentBranchName } from './branch-names.js'
 import { addWorktree, attachWorktree, type AddedWorktree } from './worktree.js'
 import { linkDependencies } from './worktree-deps.js'
 import { reconcileBranchLinks } from './branch-links.js'
-import { excludeFromGit } from './git-exclude.js'
 import { linkSkill, type SkillLink } from './skill-links.js'
 
 /**

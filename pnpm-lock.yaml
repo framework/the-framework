@@ -12,6 +12,15 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
 
+  packages/agent-data:
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.43
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
   packages/agent-driver:
     devDependencies:
       '@types/node':
@@ -26,6 +35,9 @@ importers:
       '@base-ui-components/react':
         specifier: 1.0.0-rc.0
         version: 1.0.0-rc.0(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      '@gemstack/agent-data':
+        specifier: workspace:*
+        version: link:../agent-data
       '@gemstack/skill-branches':
         specifier: workspace:*
         version: link:../skill-branches
@@ -122,6 +134,10 @@ importers:
         version: 4.1.10(@types/node@20.19.43)(jsdom@29.1.1)(vite@8.1.4(@types/node@20.19.43)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))
 
   packages/skill-branches:
+    dependencies:
+      '@gemstack/agent-data':
+        specifier: workspace:*
+        version: link:../agent-data
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
@@ -132,6 +148,9 @@ importers:
 
   packages/skill-tickets:
     dependencies:
+      '@gemstack/agent-data':
+        specifier: workspace:*
+        version: link:../agent-data
       '@gemstack/skill-branches':
         specifier: workspace:*
         version: link:../skill-branches

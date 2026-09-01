@@ -1,7 +1,7 @@
 import { parseArgs } from 'node:util'
 import { resolve } from 'node:path'
 import { stat } from 'node:fs/promises'
-import { nodeGitRunner, checkoutRoot, gitReason, type GitRunner } from './git.js'
+import { nodeGitRunner, checkoutRoot, gitReason, type GitRunner } from '@gemstack/agent-data'
 import { agentBranchName, isSafeAgentId } from './branch-names.js'
 import {
   branchPushed,

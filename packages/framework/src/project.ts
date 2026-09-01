@@ -1,4 +1,4 @@
-import { nodeGitRunner, type GitRunner } from '@gemstack/skill-branches'
+import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
 import { nodeFs } from './node-fs.js'
 import { gitignorePath } from './framework-gitignore.js'
 

@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { join } from 'node:path'
-import type { FileBranchWrite } from '@gemstack/skill-branches'
+import type { FileBranchWrite } from '@gemstack/agent-data'
 import { claimTickets, releaseTicket, lockContent, lockHolder, claimMessage, releaseMessage } from './locks.js'
 import type { TicketDeps, TicketsFunnel } from './store.js'
 

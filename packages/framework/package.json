@@ -46,6 +46,7 @@
   },
   "dependencies": {
     "@base-ui-components/react": "1.0.0-rc.0",
+    "@gemstack/agent-data": "workspace:*",
     "@gemstack/skill-branches": "workspace:*",
     "@gemstack/skill-tickets": "workspace:*",
     "agent-driver": "workspace:*",

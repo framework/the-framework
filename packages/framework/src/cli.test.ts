@@ -6,7 +6,7 @@ import { join, dirname } from 'node:path'
 import { appendControl } from './control.js'
 import { BROWSER_MCP_SERVERS, withBrowser } from './browser.js'
 import { EVENTS_FILE, ARCHIVE_DIR, type StoreFs } from './store/index.js'
-import { nodeGitRunner } from '@gemstack/skill-branches'
+import { nodeGitRunner } from '@gemstack/agent-data'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import { layoutMarker, layoutMarkerPath } from './layout.js'
 import {

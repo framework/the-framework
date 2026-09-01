@@ -5,7 +5,8 @@ import { tmpdir } from 'node:os'
 import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { deleteProjectAgent, removeProjectWorktree } from './worktrees.js'
 import { listAgents } from './store/index.js'
-import { addWorktree, agentBranchName, nodeGitRunner } from '@gemstack/skill-branches'
+import { nodeGitRunner } from '@gemstack/agent-data'
+import { addWorktree, agentBranchName } from '@gemstack/skill-branches'
 // The agent's side of reclaiming a checkout: what its record allows the git rule to do, and how a
 // refusal is said. The rule itself is tested where it lives, in the `skill-branches` package.
 // Against real git, because "was the diff actually destroyed" is not a question a fake answers.

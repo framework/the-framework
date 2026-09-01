@@ -1,4 +1,4 @@
-The package's main entry point: it gathers the git runner, the naming and layout conventions, the checkout lifecycle, the checkout-as-an-agent-gets-it sequence, the dependency linking, the branch-name links, the skill links, the branch used as a file store, the reclaim rule, the command line and the executable's directory into one place for a caller to import. No business logic of its own. The naming conventions are also reachable on their own (`branch-names`), for code that runs in a browser and must not pull in git.
+The package's main entry point: it gathers the naming conventions, the checkout lifecycle, the checkout-as-an-agent-gets-it sequence, the dependency linking, the branch-name links, the skill links, the reclaim rule, the command line and the executable's directory into one place for a caller to import. What the package builds on — running git, the exclude rule, the `.branches` name — is imported from `@gemstack/agent-data`, never passed through. No business logic of its own. The naming conventions are also reachable on their own (`branch-names`), for code that runs in a browser and must not pull in git.
 
 ## Before modifying/creating SPEC.md files
 

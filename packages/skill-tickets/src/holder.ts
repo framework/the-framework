@@ -1,5 +1,6 @@
 import { basename, dirname } from 'node:path'
-import { agentIdFromWorktreeDir, BRANCHES_DIR, checkoutRoot, currentBranch, isAgentBranch, nodeGitRunner, type GitRunner } from '@gemstack/skill-branches'
+import { BRANCHES_DIR, checkoutRoot, nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
+import { agentIdFromWorktreeDir, currentBranch, isAgentBranch } from '@gemstack/skill-branches'
 
 /**
  * Who the command claims as, read from where it runs — nothing for the agent to type or know.

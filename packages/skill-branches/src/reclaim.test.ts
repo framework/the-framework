@@ -3,7 +3,8 @@ import { test } from 'node:test'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
-import { addWorktree, agentBranchName, nodeGitRunner, reclaimWorktree, type ReclaimOptions } from './index.js'
+import { nodeGitRunner } from '@gemstack/agent-data'
+import { addWorktree, agentBranchName, reclaimWorktree, type ReclaimOptions } from './index.js'
 
 // #982: one rule decides every removal — the checkout goes only once the remote has it. So
 // nothing local is ever the last copy of anything, and the one failure mode is legible: the push

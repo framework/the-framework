@@ -1,4 +1,4 @@
-import { nodeGitRunner, type GitRunner } from '@gemstack/skill-branches'
+import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
 import { cachedPrView, cachedPrsForBranch, pickAgentPr, type LinkedPr, type PrLookup } from './gh.js'
 
 // The project panel's git status (#491, part of #488): the active branch, whether the tree is

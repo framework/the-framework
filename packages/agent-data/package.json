@@ -1,12 +1,12 @@
 {
-  "name": "@gemstack/skill-branches",
+  "name": "@gemstack/agent-data",
   "version": "0.0.1",
-  "description": "Branch management for coding agents: one git checkout per agent under .branches/, named as its branch, reclaimed once its work is on the remote.",
+  "description": "A branch of the project's repository used as a file store for coding-agent skills: the agent-data branch, checked out under .branches/, every write one sync-commit-push cycle that re-applies on a lost race — from a long-lived process through its checkout, or one-shot from any clone.",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/framework/the-framework.git",
-    "directory": "packages/skill-branches"
+    "directory": "packages/agent-data"
   },
   "type": "module",
   "engines": {
@@ -16,31 +16,23 @@
     "access": "public"
   },
   "files": [
-    "dist",
-    "bin/branches",
-    "SKILL.md"
+    "dist"
   ],
-  "bin": {
-    "branches": "bin/branches"
-  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
-    "./branch-names": {
-      "types": "./dist/branch-names.d.ts",
-      "default": "./dist/branch-names.js"
+    "./names": {
+      "types": "./dist/names.d.ts",
+      "default": "./dist/names.js"
     }
   },
   "scripts": {
-    "build": "pnpm -C ../agent-data build && tsc -p tsconfig.build.json",
-    "typecheck": "pnpm -C ../agent-data build && tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
     "test": "pnpm build && tsc -p tsconfig.test.json && node --test --test-timeout=60000 'dist-test/**/*.test.js'",
     "clean": "rm -rf dist dist-test"
-  },
-  "dependencies": {
-    "@gemstack/agent-data": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

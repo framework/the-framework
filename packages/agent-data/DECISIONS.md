@@ -5,7 +5,8 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 - A **library, not a skill**: read by code, never by an agent ⇒ no `SKILL.md`, no
   command, no `use-npm-skills` keyword. A skill must not import another skill's code; a
   library is what every skill imports.
-- Named after the branch it owns: `@gemstack/agent-data`.
+- Package name = branch name: `@gemstack/agent-data` manages the `agent-data` branch, so it
+  is called the same.
 - The git runner and the exclude rule live here, not in a skill: the file store is built on
   them, and a library never reaches up into a skill. `skill-branches` imports them like
   every other consumer.

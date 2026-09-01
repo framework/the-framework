@@ -21,18 +21,13 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 - The branch name is written once, here, as `DATA_BRANCH`; every other package imports it.
 
 ## Flow: a write
-Sync with origin → apply the change → commit → push; a lost push re-applies the change on
-origin's fresher tip.
+Fetch what others pushed → make the change → commit → push. If the push is rejected
+because someone pushed in between, start over on top of their changes.
 
-- The change is handed over as a **function that can run again** — the intent — never as
-  a commit ⇒ a lost push is retried by re-running it on origin's tip, never by forcing.
-  Two attempts; a push that still fails keeps the commit local, and the next cycle carries
-  it out.
-- A conflict resolves toward origin: the checkout is nobody's working tree, so origin wins
-  and the intent is re-applied on top.
-- **Two writers, one rule.** A long-lived process writes through the persistent checkout,
-  serialized per branch. A command an agent runs in any clone writes one-shot through a
-  throwaway worktree on origin's tip and pushes straight to the branch. Joining the
-  process's cycle was rejected (the chain lives in that process's memory); writing inside
-  the persistent checkout was rejected (its `git add -A` and reset would eat a second
-  writer's files).
+- The change is a function, run again on the new files; never a force push. After two
+  failed pushes the commit waits locally for the next write.
+- On a conflict the remote version wins; the change runs again on top.
+- Two writers. A long-running process writes in its own checkout, `.branches/agent-data`,
+  one write at a time. A command an agent runs writes in a temporary copy of the branch,
+  pushes, and deletes the copy; it never touches the process's checkout, whose next write
+  would sweep up or wipe its files.

@@ -2,7 +2,7 @@ Non-obvious decisions only, grouped by business-logic flow. Anything not listed 
 to the implementer's judgment. Flag conflicts instead of silently deviating.
 
 ## The package
-- A **library, not a skill**: read by code, never by the model ⇒ no `SKILL.md`, no
+- A **library, not a skill**: read by code, never by an agent ⇒ no `SKILL.md`, no
   command, no `use-npm-skills` keyword. A skill must not import another skill's code; a
   library is what every skill imports.
 - Named after the branch it owns: `@gemstack/agent-data`. `file-branch` and `data-branch`

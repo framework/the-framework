@@ -7,9 +7,9 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   library is what every skill imports.
 - Package name = branch name: `@gemstack/agent-data` manages the `agent-data` branch, so it
   is called the same.
-- The git runner and the exclude rule live here, not in a skill: the file store is built on
-  them, and a library never reaches up into a skill. `skill-branches` imports them like
-  every other consumer.
+- The code that runs git, and the code that makes git ignore `.branches/`, live in this
+  package and not in a skill: this package needs them, and a library never imports from a
+  skill. A skill that needs them imports them from here; none keeps a copy of its own.
 - `.branches`, the checkouts directory, is this package's constant: the data branch's
   checkout sits beside the agents' checkouts under it. Dotted so that no `*` glob descends
   into N copies of the repository.

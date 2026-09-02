@@ -7,11 +7,11 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   other's code; this library is what every skill imports.
 - Package name = branch name: `@gemstack/agent-data` manages the `agent-data` branch, so it
   is called the same.
-- The code that runs git, and the code that makes git ignore `.branches/`, live in this
-  package and not in a skill.
 - `.branches/` holds every extra checkout of the project — each agent's, and the data
   branch's — so its name is defined here. It starts with a dot to keep tools' `*` patterns
-  out of it: every checkout inside is a full copy of the repository.
+  out of it: every checkout inside is a full working copy of the project. Hidden through
+  git's own exclude file, never a committed `.gitignore`: the project's files are not the
+  library's to change.
 
 ## The branch
 - A branch of the project's repository holds the agents' data — tickets, the queue — like
@@ -20,6 +20,8 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 - One branch for all skills, each with its own folder or file on it. Not one branch per
   skill: every extra branch would need its own checkout on disk and its own sync failure to
   report.
+- A branch that does not exist yet is born empty, with no parent commit, so no code commit
+  is ever in its history.
 - The branch name is written once, here, as `DATA_BRANCH`; every other package imports it.
 
 ## Flow: a write
@@ -28,9 +30,12 @@ because someone pushed in between, start over on top of their changes.
 
 - A write is handed over as a small function ("add this line"), not as a finished
   commit, so starting over is just running it again on the new files. Never a force
-  push. After two failed pushes the commit waits locally for the next write.
-- On a conflict the remote version wins; the change runs again on top.
-- Two writers. A long-running process writes in its own checkout, `.branches/agent-data`,
-  one write at a time. A command an agent runs writes in a temporary copy of the branch,
-  pushes, and deletes the copy; it never touches the process's checkout, whose next write
-  would sweep up or wipe its files.
+  push. After two failed pushes the write reports the failure; the commit stays local and
+  the next write's fetch carries it.
+- A commit that stayed local and no longer applies on top of the remote is dropped: the
+  remote wins, and only the current change runs again.
+- Two writers. A long-running process, the program that starts agents, writes in its own
+  checkout, `.branches/agent-data`, one write at a time. A command an agent runs writes in
+  a temporary copy of the branch, pushes, and deletes the copy; it never touches the
+  process's checkout, whose next write commits everything it finds there and resets it
+  when the write fails. A command's write that cannot be pushed fails; nothing of it waits.

@@ -2,40 +2,38 @@ Non-obvious decisions only, grouped by business-logic flow. Anything not listed 
 to the implementer's judgment. Flag conflicts instead of silently deviating.
 
 ## The package
-- A **library, not a skill**. A skill is a `SKILL.md` an agent reads, plus a command it
-  runs; this package has neither, because only code uses it. Skills never import each
-  other's code; this library is what every skill imports.
-- Package name = branch name: `@gemstack/agent-data` manages the `agent-data` branch, so it
-  is called the same.
-- `.branches/` holds every extra checkout of the project — each agent's, and the data
-  branch's — so its name is defined here. It starts with a dot to keep tools' `*` patterns
-  out of it: every checkout inside is a full working copy of the project. Hidden through
-  git's own exclude file, never a committed `.gitignore`: the project's files are not the
-  library's to change.
+- **A library, not a skill.** There is no `SKILL.md` and no command. Only code imports this
+  package. Skills don't import each other's code; this is the shared library they all use.
+- **Package name = branch name.** `@gemstack/agent-data` manages the `agent-data` branch, so
+  they share the name.
+- **`.branches/` holds every extra checkout.** Agent checkouts and the data-branch checkout
+  alike, so the directory name is defined here. The leading dot keeps tools' `*` patterns
+  from matching it. Every checkout inside is a full working copy of the project. It is
+  hidden through git's exclude file, never a committed `.gitignore`: the library does not
+  modify the project's files.
 
 ## The branch
-- A branch of the project's repository holds the agents' data — tickets, the queue — like
-  `gh-pages` holds a site; code branches hold only code. Pushed and pulled on every
-  change, so every machine sees the same files.
-- One branch for all skills, each with its own folder or file on it. Not one branch per
-  skill: every extra branch would need its own checkout on disk and its own sync failure to
-  report.
-- A branch that does not exist yet is born empty, with no parent commit, so no code commit
-  is ever in its history.
-- The branch name is written once, here, as `DATA_BRANCH`; every other package imports it.
+- The project's repository has one branch for agent data: tickets, the queue. Code
+  branches hold code only. Pushed and pulled on every change, so all machines see the
+  same data.
+- One data branch for all skills, each with its own folder or file on it. Not a branch
+  per skill: each additional branch would need another checkout and another sync failure
+  to report.
+- A branch that does not exist yet is created as an orphan branch: no code commit is ever
+  part of its history.
+- The branch name is defined once, as `DATA_BRANCH`; every other package imports it.
 
 ## Flow: a write
-Fetch what others pushed → make the change → commit → push. If the push is rejected
-because someone pushed in between, start over on top of their changes.
+Fetch → make the change → commit → push. If the push is rejected because another writer
+pushed first, fetch again and retry on top of their changes.
 
-- A write is handed over as a small function ("add this line"), not as a finished
-  commit, so starting over is just running it again on the new files. Never a force
-  push. After two failed pushes the write reports the failure and the commit stays local.
-  The next write's fetch carries it when it still applies on top of the remote, and drops
-  it when it does not: the remote wins, only the current change runs again, and nobody is
-  told.
-- Two writers. A long-running process, the program that starts agents, writes in its own
-  checkout, `.branches/agent-data`, one write at a time. A command an agent runs writes in
-  a temporary copy of the branch, pushes, and deletes the copy; it never touches the
-  process's checkout, whose next write commits everything it finds there and resets it
-  when the write fails. A command's write that cannot be pushed fails; nothing of it waits.
+- A write is a small function such as "add this line", not a pre-built commit. Retrying is
+  running the function again against the new files. Never a force push.
+- After two failed pushes the write reports the failure and the commit stays local. A later
+  write carries it if it still applies cleanly on top of the remote; if not, it is
+  discarded and only the current write runs. The remote wins, and nobody is told.
+- Two writers. The long-running process that starts agents writes in its own checkout,
+  `.branches/agent-data`, one write at a time. An agent command writes in a temporary
+  checkout, pushes, and removes it. It never touches the process's checkout: the next
+  process write commits whatever is there, and resets the checkout when it fails.
+- An agent command whose write cannot be pushed fails. Nothing is queued for later.

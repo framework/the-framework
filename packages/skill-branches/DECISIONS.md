@@ -2,29 +2,31 @@ Non-obvious decisions only, grouped by business-logic flow. Anything not listed 
 to the implementer's judgment. Flag conflicts instead of silently deviating.
 
 ## The checkout
-- One checkout per agent: a full working copy of the project under `.branches/`, in a
-  folder named after the agent's branch. Agents run in parallel, and the user's own
+- One checkout per agent: a git worktree of the user's repository under `.branches/`, in a
+  folder named after the agent's branch. A worktree, not a clone, so every checkout
+  shares the repository's objects and refs. Agents run in parallel, and the user's own
   copy is never an agent's workspace.
 - A checkout starts as branch `agent-<id>` in folder `.branches/agent-<id>/`, `<id>` being
-  what the program that starts the agent calls it. When the agent names itself, the
-  branch is renamed to `agent-<name>`; the folder keeps the id. A rename, not a new
-  branch, so no empty branch is left behind. The folder is not renamed, because the agent
-  is running inside it.
+  what the program that starts the agent calls it. When the agent names itself, through
+  the command (`npx branches name <name>`), the branch is renamed to `agent-<name>`; the
+  folder keeps the id. A rename, not a new branch, so no empty branch is left behind. The
+  folder is not renamed, because the agent is running inside it.
 - After a rename, a link named as the new branch is put beside the folder, so
-  `.branches/<name>` reaches every checkout by its current branch; the link is the
-  package's and is dropped when the checkout goes.
+  `.branches/agent-<name>` reaches every checkout by its current branch; the package makes
+  the link and removes it when the checkout goes.
 - Branch names are `agent-<name>`, with no `/`: the folder is named after the branch,
   and a folder name cannot hold a slash. The package renames and deletes only `agent-*`
   branches; the user's own branches are never touched.
 - A taken name gets `-2`, `-3`, … instead of a refusal: the agent asked for a name and
   reads back the one it got.
-- The user's installed dependencies are linked into the checkout, one link per package,
-  not copied and not reinstalled: instant and free. One link per package, not one link
-  to the whole folder, so a package the agent installs lands in its own checkout.
+- The user's installed dependencies are linked into the checkout, not copied and not
+  reinstalled. One link per package, not one link to the whole folder, so a package the
+  agent installs lands in its own checkout.
 
 ## Flow: reclaim
-Deleting an agent's checkout to free the disk. It goes only once everything in it is
-pushed, so deleting it can lose nothing.
+Deleting an agent's checkout to free the disk. It goes only once everything in it is on
+the remote, so deleting it can lose nothing; the reclaim pushes the branch itself when the
+program allows a push.
 
 - Nothing is committed on the agent's behalf: a checkout with uncommitted work is kept
   until a person commits or deletes it.

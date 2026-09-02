@@ -2,35 +2,38 @@ Non-obvious decisions only, grouped by business-logic flow. Anything not listed 
 to the implementer's judgment. Flag conflicts instead of silently deviating.
 
 ## The tickets
-- Markdown files are the ticketing system: `tickets/<DATE>_<SLUG>.md`, with the plan and
-  the claim as files beside it, `<STEM>.plan.md` and `<STEM>.lock.md`. Nothing records
-  the pairing; the filename does.
+- A ticket is a markdown file; its plan and its claim are files beside it, same name plus
+  `.plan.md` and `.lock.md`. The name is the only link between them.
 - They live on the data branch, never on a code branch: an agent's checkout does not
   contain them. A `tickets` link at the repository root shows them to a person; it is made
   only where nothing exists, and hidden from git.
 - `tickets/` holds only open tickets: closing one deletes it, with its plan and its claim.
-- No issue tracker is required. A ticket may carry a `GitHub:` line; importing issues
-  into tickets is the caller's job, not the skill's.
+- The skill knows no issue tracker. A ticket may carry a `GitHub:` line with its issue,
+  but importing issues into tickets is done by the program using the skill, not by the
+  skill.
 
 ## Flow: a claim
-- A claim is a committed file, `CLAIMED: <holder>`, not something a process remembers:
-  the holder may be on another machine, or in a session whose process is gone.
-- One holder at a time. A claim lifts only when its holder releases it or the ticket is
-  closed; there is no timed release.
-- The holder is read from where the command runs, never typed: inside an agent's checkout,
-  the agent id from the directory name (the branch gets renamed, the directory does not);
-  anywhere else, the current branch.
+- A claim is a committed file, `CLAIMED: <holder>`: agents on other machines must see it
+  too.
+- One claim per ticket; it never expires, only a release or a close removes it.
+- The holder's name is never typed; the command reads it from where it runs. Inside an
+  agent's checkout it is the agent id from the folder name, since the branch gets renamed
+  and the folder does not; anywhere else it is the current branch.
 - Claiming to plan skips a ticket that already has a plan; claiming to implement does not.
 
 ## The queue
-- `TODO_AGENTS.md` at the root of the branch, beside `tickets/`: list items under
-  `## Priority N` headings from 10 down to 0, first within a section first taken.
-- An entry is text — a prompt for a future agent. A link back to a ticket is one kind of
-  text; the queue does not interpret it.
+- The queue is one markdown file on the branch, `TODO_AGENTS.md`: sections `## Priority
+  10` down to `## Priority 0`, an entry a list item under one of them. Work is taken
+  from the top: highest section first, first line first.
+- An entry is plain text: the task a future agent is started with. It may be a link to a
+  ticket, but the queue does not read links; it only stores and removes lines. The
+  tickets side reads the link.
 - Done means deleted, never checked off.
 
 ## Flow: the command
-- A read fetches origin once and reads off it, so a command sees what every writer pushed,
-  its own earlier writes included.
-- A write is one commit pushed straight to the branch, through a temporary copy (see
-  `@gemstack/agent-data`); a repository with no remote is refused.
+- A read fetches the branch from origin once and reads everything from that copy, not
+  from the local branch: only origin is sure to hold what every writer pushed, the
+  command's own earlier writes included.
+- A write is one commit per command, pushed straight to origin through a temporary copy
+  of the branch (the rule is in `@gemstack/agent-data`). A repository with no remote is
+  refused.

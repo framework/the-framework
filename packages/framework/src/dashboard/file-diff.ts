@@ -1,4 +1,4 @@
-import { nodeGitRunner, type GitRunner } from '@gemstack/skill-branches'
+import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
 import type { FileGitStatus } from './file-status.js'
 import { cutToPreview, readConfinedFile, safeRepoPath } from './file-read.js'
 

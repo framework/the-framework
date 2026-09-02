@@ -1,4 +1,5 @@
-import { nodeGitRunner, type GitRunner, agentBranchName } from '@gemstack/skill-branches'
+import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
+import { agentBranchName } from '@gemstack/skill-branches'
 import { ghPrsForBranchOrThrow, pickAgentPr, type LinkedPr } from './dashboard/gh.js'
 import { openRemoteBranchPullRequest, type HandoffResult } from './dashboard/agent-handoff.js'
 import { listAgents, nodeStoreFs, startedAtFromAgentId, type AgentMeta, type ArchivePatch } from './store/index.js'

@@ -1,4 +1,4 @@
-import { nodeGitRunner, pushBranch, type GitRunner } from './git.js'
+import { nodeGitRunner, pushBranch, type GitRunner } from '@gemstack/agent-data'
 import { isAgentBranch } from './branch-names.js'
 import {
   branchPushed,

@@ -8,7 +8,7 @@ import { promisify } from 'node:util'
 import { isAgentBranch } from '@gemstack/skill-branches'
 import { readAgentHandoff, resolveAgentPr, mergeAgentPr, agentBranchFor, openBranchPullRequest, openRemoteBranchPullRequest, openAgentPullRequest, agentAutoHandoff, prBaseName, withheldMerge } from './agent-handoff.js'
 import { pickAgentPr } from './gh.js'
-import { nodeGitRunner, type GitRunner } from '@gemstack/skill-branches'
+import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
 
 const exec = promisify(execFile)
 const SEP = String.fromCharCode(31)

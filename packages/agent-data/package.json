@@ -1,0 +1,41 @@
+{
+  "name": "@gemstack/agent-data",
+  "version": "0.0.1",
+  "description": "A branch of the project's repository used as a file store for coding-agent skills: the agent-data branch, checked out under .branches/, every write one sync-commit-push cycle that re-applies on a lost race — from a long-lived process through its checkout, or one-shot from any clone.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/framework/the-framework.git",
+    "directory": "packages/agent-data"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./names": {
+      "types": "./dist/names.d.ts",
+      "default": "./dist/names.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "pnpm build && tsc -p tsconfig.test.json && node --test --test-timeout=60000 'dist-test/**/*.test.js'",
+    "clean": "rm -rf dist dist-test"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^7.0.2"
+  }
+}

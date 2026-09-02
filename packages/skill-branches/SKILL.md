@@ -1,40 +1,48 @@
 ---
 name: branches
-description: One git checkout per agent, named as its branch. How to name your session, where your work lives, and what must be true before you finish.
+description: Where your work goes (a branch named agent-<name>), how to name it, and what must be true before you finish.
 ---
 
 # Branch management
 
-You were started inside your own checkout of the repository: a git worktree at `.branches/agent-<id>/`, on a branch of the same name. Your working directory is the whole of your workspace.
+Your work goes on a branch named `agent-<name>`. Whoever started you publishes it — push, pull request, merge — so you never push and never open the pull request yourself.
 
-## Workspace
+## The command
 
-- Every file you read or write is under your working directory. Address files relative to it — an absolute path is how you leave it without noticing.
-- The repository around your checkout is the user's own working tree. It is not another view of your files, and it is never yours to edit: the same file exists twice, and only the copy under your working directory is on your branch. Editing the other one puts your work where your commits cannot reach it.
-- If something you genuinely need is outside your working directory, say so and stop — do not reach for it.
+`branches` comes with the npm package `@gemstack/skill-branches`, a dependency of this repository. Install the repository's dependencies once — `npm install`, or the package manager its lockfile belongs to — then run it as `npx branches`.
 
-## Name the session
-
-Before your first change, pick a name for the session — `[a-z0-9-]+`, saying succinctly what the work is — and run:
+## Where you are
 
 ```
-branches name <name>
+npx branches status
 ```
 
-It renames your branch to `agent-<name>` (a rename: your commits stay where they are) and prints the name the branch got, as JSON: `{"ok":true,"branch":"agent-<name>"}`. When `<name>` was already taken, the branch is `agent-<name>-2`, `-3`, … — use the name it printed, not the one you asked for. The session name is read from your branch; there is nothing else to report.
+It prints JSON; `branch` is the branch you are on.
+
+**It starts with `agent-`.** The branch is yours, and your working directory is your whole workspace: every file you read or write is under it, so address files relative to it — an absolute path is how you leave it without noticing. When it sits under a `.branches/` folder, a checkout was made for you and the repository around it is the user's own working tree, never yours to edit. If something you genuinely need is outside your working directory, say so and stop.
+
+Before your first change, name the session — `[a-z0-9-]+`, saying succinctly what the work is:
+
+```
+npx branches name <name>
+```
+
+It renames your branch to `agent-<name>` — a rename, so your commits stay — and prints the name the branch got: `agent-<name>-2`, `-3`, … when `<name>` was taken.
+
+**Any other branch.** You are in a plain clone, on a branch that is not yours. Before your first change, create yours and switch to it:
+
+```
+git switch -c agent-<name>
+```
 
 ## Commit as you go
 
-Work on that branch and commit to it as you go. Only what you committed is ever published — nothing is committed on your behalf, and work left uncommitted stays in your checkout.
+Commit to your branch as you go. Only what you committed is ever published: nothing is committed on your behalf, and uncommitted work stays where it is — neither published nor cleaned up.
 
 ## Before you finish
 
-Run:
-
 ```
-branches status
+npx branches status
 ```
 
-It must report `"clean": true`. Uncommitted work blocks the checkout from being reclaimed, and is not part of what gets published.
-
-Do not push, and do not open the pull request yourself: publishing — push, pull request, merge — is done for you, as the user configured it.
+It must report `"clean": true`.

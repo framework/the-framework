@@ -1,4 +1,4 @@
-import { BRANCHES_DIR } from '@gemstack/skill-branches/branch-names'
+import { BRANCHES_DIR } from '@gemstack/agent-data/names'
 
 /**
  * The names everything in the package hangs off, and the small pure rules that link a ticket to

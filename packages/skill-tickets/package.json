@@ -41,6 +41,7 @@
     "clean": "rm -rf dist dist-test"
   },
   "dependencies": {
+    "@gemstack/agent-data": "workspace:*",
     "@gemstack/skill-branches": "workspace:*"
   },
   "devDependencies": {

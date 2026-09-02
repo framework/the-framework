@@ -7,9 +7,8 @@ import { provideTestContext } from './test-context.js'
 import { sendStart, sendReleaseTicketLock } from './control.js'
 import { presets } from '../preset-catalog.js'
 import { addProject, projectId } from '../registry.js'
-import { withFileBranch } from '@gemstack/skill-branches'
+import { withFileBranch, nodeGitRunner } from '@gemstack/agent-data'
 import { TICKETS_BRANCH } from '@gemstack/skill-tickets'
-import { nodeGitRunner } from '@gemstack/skill-branches'
 import type { StartAgentOptions } from '../dashboard/types.js'
 
 /** A committed real repo whose tickets and queue sit on the tickets branch (#1582/#1748). */

@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import type { GitRunner } from '@gemstack/skill-branches'
+import type { GitRunner } from '@gemstack/agent-data'
 import {
   assessRepo,
   planMaintenanceSweep,

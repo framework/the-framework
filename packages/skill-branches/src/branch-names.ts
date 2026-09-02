@@ -1,15 +1,8 @@
 /**
- * The naming rules for everything the package mints in git, and the layout they imply on disk.
+ * The naming rules for everything the package mints in git, and the layout they imply under
+ * `.branches/` (the directory is `@gemstack/agent-data`'s convention).
  * Pure: no node imports, so browser-safe code can name branches too.
  */
-
-/**
- * Where a project's agent checkouts live: `<repo>/.branches/`, one directory per checkout, each
- * named as the branch it was created on. Dotted on purpose: a `*` glob does not match a leading
- * dot, so type-checkers, test runners and formatters run in the project never descend into N
- * copies of the repository.
- */
-export const BRANCHES_DIR = '.branches'
 
 /** An agent id is path-safe: no separators or traversal, only our own charset. */
 export function isSafeAgentId(id: string): boolean {

@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { nodeGitRunner, withFileBranch } from '@gemstack/skill-branches'
+import { nodeGitRunner, withFileBranch } from '@gemstack/agent-data'
 import { appendQueueEntry, insertQueueEntry, parseQueueEntries, queueAdd, queueDone, readQueue, readQueueEntries, removeQueueEntry } from './queue.js'
 import { QUEUE_FILE, TICKETS_BRANCH } from './names.js'
 

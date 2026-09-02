@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { fileBranchPath, withFileBranch } from '@gemstack/skill-branches'
+import { fileBranchPath, withFileBranch } from '@gemstack/agent-data'
 import { LOGS_BRANCH } from './framework-dir.js'
 import { patchArchivedAgentOnDataBranch } from './archived-agent-patch.js'
 

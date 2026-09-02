@@ -1,6 +1,6 @@
 import { hostname } from 'node:os'
 import { join } from 'node:path'
-import { nodeBranchFileFs, withFileBranch, type BranchFileFs, type CommitMessage, type FileBranchWrite } from '@gemstack/skill-branches'
+import { nodeBranchFileFs, withFileBranch, type BranchFileFs, type CommitMessage, type FileBranchWrite } from '@gemstack/agent-data'
 import { LOGS_BRANCH } from './framework-dir.js'
 
 // The "one triage at a time" guard (#1659): a `routines/<name>.lock.md` on the logs branch.

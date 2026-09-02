@@ -1,15 +1,6 @@
 import { parseArgs } from 'node:util'
 import { join } from 'node:path'
-import {
-  checkoutRoot,
-  gitReason,
-  nodeBranchFileFs,
-  nodeGitRunner,
-  openBranchReader,
-  writeFileBranchDetached,
-  type BranchReader,
-  type GitRunner,
-} from '@gemstack/skill-branches'
+import { checkoutRoot, gitReason, nodeBranchFileFs, nodeGitRunner, openBranchReader, writeFileBranchDetached, type BranchReader, type GitRunner } from '@gemstack/agent-data'
 import { isTicketFile, isTicketPath, META_FILE, QUEUE_FILE, TICKETS_BRANCH, TICKETS_DIR, queuePriorityForTicket, ticketLockName, ticketPlanName, ticketStem } from './names.js'
 import { readTicket, readTickets, type TicketsFs } from './tickets.js'
 import { applyClaims, applyRelease, claimMessage, lockHolder, releaseMessage } from './locks.js'

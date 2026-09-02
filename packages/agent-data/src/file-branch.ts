@@ -1,5 +1,5 @@
 import { dirname, join } from 'node:path'
-import { BRANCHES_DIR } from './branch-names.js'
+import { BRANCHES_DIR } from './names.js'
 import { nodeGitRunner, type GitRunner } from './git.js'
 import { excludeFromGit } from './git-exclude.js'
 

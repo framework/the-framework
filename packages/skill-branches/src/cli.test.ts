@@ -4,7 +4,8 @@ import { execFile } from 'node:child_process'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { lstat, mkdir, mkdtemp, readFile, readlink, realpath, rm, stat, writeFile } from 'node:fs/promises'
-import { CLI_BIN_DIR, agentBranchName, nodeGitRunner, runCli, worktreePath } from './index.js'
+import { nodeGitRunner } from '@gemstack/agent-data'
+import { CLI_BIN_DIR, agentBranchName, runCli, worktreePath } from './index.js'
 
 // #1725: the command line is the package's functions for an agent in a shell, so every command
 // is checked against real git the way the functions are — and the contract on top of them: JSON

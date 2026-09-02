@@ -4,9 +4,9 @@ import { mkdtemp, realpath, writeFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { readDocs, DOC_CATEGORIES } from './docs.js'
-import { withFileBranch } from '@gemstack/skill-branches'
+import { withFileBranch, nodeGitRunner } from '@gemstack/agent-data'
 import { TICKETS_BRANCH } from '@gemstack/skill-tickets'
-import { nodeGitRunner } from '@gemstack/skill-branches'
+
 /** A real repo whose queue lives on the tickets branch (#1582/#1748), the way readDocs reads it. */
 async function repoWithQueue(md: string): Promise<string> {
   const git = nodeGitRunner()

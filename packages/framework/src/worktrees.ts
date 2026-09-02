@@ -2,19 +2,8 @@ import { readFile } from 'node:fs/promises'
 import { join, sep } from 'node:path'
 import { errorMessage } from './error-message.js'
 import { listAgents, readLiveMetas, archivedAgentPaths, META_FILE, type AgentMeta, type AgentStatus } from './store/index.js'
-import {
-  agentBranchName,
-  listWorktreeDirs,
-  isSafeAgentId,
-  reclaimWorktree,
-  removeWorktree,
-  pruneWorktrees,
-  worktreePath,
-  worktreeSize,
-  fileBranchPath,
-  withFileBranch,
-  type ReclaimOutcome,
-} from '@gemstack/skill-branches'
+import { fileBranchPath, withFileBranch } from '@gemstack/agent-data'
+import { agentBranchName, listWorktreeDirs, isSafeAgentId, reclaimWorktree, removeWorktree, pruneWorktrees, worktreePath, worktreeSize, type ReclaimOutcome } from '@gemstack/skill-branches'
 import { LOGS_BRANCH, THE_FRAMEWORK_DIR } from './framework-dir.js'
 
 /** A retained worktree and the agent that left it behind (#752). */

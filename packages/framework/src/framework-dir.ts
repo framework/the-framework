@@ -1,4 +1,4 @@
-import { BRANCHES_DIR } from '@gemstack/skill-branches/branch-names'
+import { BRANCHES_DIR } from '@gemstack/agent-data/names'
 
 /**
  * The directory, under a project root, that holds The Framework's own files.

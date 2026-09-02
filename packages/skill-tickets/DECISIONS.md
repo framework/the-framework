@@ -35,12 +35,14 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   ticket, but the queue does not read links; it only stores and removes lines. The
   program that starts agents reads the link, to claim the ticket for the agent it starts
   on that entry.
+- An entry added with no priority goes to the end of the file; one linked to a ticket
+  takes the ticket's priority, 5 when the ticket has none.
 - Done means deleted, never checked off.
 
 ## Flow: the command
 - The command reads with `list`, `show` and `queue`, and writes with `put` (a ticket, a
-  plan, or the importing program's `meta.json`), `close`, `claim`, `release`, `queue add`
-  and `queue done`.
+  plan, or `meta.json`, the importing program's own bookkeeping, opaque to the skill),
+  `close`, `claim`, `release`, `queue add` and `queue done`.
 - A read fetches the branch from origin, the shared copy on the remote, once, and reads
   everything from that copy rather than from the local branch: only origin is sure to
   hold what every writer pushed, the command's own earlier writes included.

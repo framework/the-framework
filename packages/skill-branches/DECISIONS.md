@@ -5,10 +5,14 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 - One checkout per agent: a full working copy of the project under `.branches/`, in a
   folder named after the agent's branch. Agents run in parallel, and the user's own
   copy is never an agent's workspace.
-- A checkout starts as branch `agent-<id>` in folder `.branches/agent-<id>/`. When the
-  agent names itself, the branch is renamed to `agent-<name>`; the folder keeps the id.
-  A rename, not a new branch, so no empty branch is left behind. The folder is not
-  renamed, because the agent is running inside it.
+- A checkout starts as branch `agent-<id>` in folder `.branches/agent-<id>/`, `<id>` being
+  what the program that starts the agent calls it. When the agent names itself, the
+  branch is renamed to `agent-<name>`; the folder keeps the id. A rename, not a new
+  branch, so no empty branch is left behind. The folder is not renamed, because the agent
+  is running inside it.
+- After a rename, a link named as the new branch is put beside the folder, so
+  `.branches/<name>` reaches every checkout by its current branch; the link is the
+  package's and is dropped when the checkout goes.
 - Branch names are `agent-<name>`, with no `/`: the folder is named after the branch,
   and a folder name cannot hold a slash. The package renames and deletes only `agent-*`
   branches; the user's own branches are never touched.
@@ -24,7 +28,7 @@ pushed, so deleting it can lose nothing.
 
 - Nothing is committed on the agent's behalf: a checkout with uncommitted work is kept
   until a person commits or deletes it.
-- An `agent-*` branch whose commits have already reached GitHub through another branch,
+- An `agent-*` branch whose commits have already reached the remote through another branch,
   as after a merge, holds nothing of its own and is deleted with its checkout.
 - The package only does git. Anything else it needs to know, like whether it may push, the
   program using it passes in; the package never reads that program's files.
@@ -33,14 +37,13 @@ pushed, so deleting it can lose nothing.
 - The agent commits and stops: it never pushes, opens a pull request, or merges. Whoever
   started it does that.
 - The skill says `npm install`, then `npx branches`, never a bare `branches`: on a fresh
-  clone no such command exists yet. Installed, the package is found by `npx` the same
-  way from a fresh clone and from a checkout made for the agent.
+  clone no such command exists yet.
 - An agent reading the skill can be in one of two places: inside a checkout the program
   that started it made for it, already on an `agent-*` branch; or in a plain clone of the
   repository, on `main` or on someone's branch. The skill tells them apart by the branch
   name alone: on `agent-*`, the checkout is the agent's; on anything else, the agent makes
   its own `agent-<name>` branch with git before its first change.
 - Each agent tool (Claude Code, Codex) looks for skills in its own folder at the root of
-  the checkout: `.claude/skills`, `.agents/skills`. The package puts a shortcut to its
-  `SKILL.md` into each of those folders in every checkout it makes, and hides the
-  shortcuts from git. Temporary, until skills are committed into the repository.
+  the checkout: `.claude/skills`, `.agents/skills`. The package links its own folder, where
+  `SKILL.md` sits, into each of those as `branches` in every checkout it makes, and hides
+  the links from git. Temporary, until skills are committed into the repository.

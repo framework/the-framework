@@ -7,36 +7,36 @@ description: The project's tickets and its agent queue: where they live, how to 
 
 The tickets (`tickets/<DATE>_<SLUG>.md`, with their `.plan.md` and `.lock.md` siblings) and the agent queue (`TODO_AGENTS.md`) live on the branch `tickets`, never on a code branch. Your checkout does not contain them. A `tickets` link at the repository root may show them: read there if you like, never write there.
 
-Read and change them with the `tickets` command. Every change it makes is one commit pushed straight to the `tickets` branch (a rejected push is re-applied on the branch's new tip and pushed again, for you); nothing you commit on your own branch reaches them, and these files never belong on your branch.
+Read and change them with the `tickets` command. It comes with the npm package `@gemstack/skill-tickets`, a dependency of this repository: install the repository's dependencies once — `npm install`, or the package manager its lockfile belongs to — then run it as `npx tickets`. Every change it makes is one commit pushed straight to the `tickets` branch (a rejected push is re-applied on the branch's new tip and pushed again, for you); nothing you commit on your own branch reaches them, and these files never belong on your branch.
 
 ## Read
 
 ```
-tickets list                 every open ticket, as JSON: file, title, summary, priority, topics,
+npx tickets list                 every open ticket, as JSON: file, title, summary, priority, topics,
                              github, date, planned, effort, uncertainty, locked, lockedBy
-tickets show <file>          one ticket: its text, its plan, who holds it
-tickets queue                the queue's open entries, in order of work
+npx tickets show <file>          one ticket: its text, its plan, who holds it
+npx tickets queue                the queue's open entries, in order of work
 ```
 
 ## Change
 
 ```
-tickets put <file>           write one file under tickets/ from stdin (a ticket, a plan, meta.json)
-tickets close <file>         remove a ticket with its plan and lock — tickets/ holds only open
+npx tickets put <file>           write one file under tickets/ from stdin (a ticket, a plan, meta.json)
+npx tickets close <file>         remove a ticket with its plan and lock — tickets/ holds only open
                              tickets; refused while someone else holds the ticket
-tickets queue add <text> [--priority N] [--ticket <file>]
+npx tickets queue add <text> [--priority N] [--ticket <file>]
                              put an entry on the queue; --ticket links it to the ticket and places
                              it by the ticket's priority
-tickets queue done <text>    take an entry off the queue: done means deleted
+npx tickets queue done <text>    take an entry off the queue: done means deleted
 ```
 
 ## Claim before you plan or work a ticket
 
 ```
-tickets claim <file>         {"ok":true,"holder":…} — the ticket is yours
+npx tickets claim <file>         {"ok":true,"holder":…} — the ticket is yours
                              {"ok":false,"reason":"claimed","holder":…} — someone else's: back off,
                              pick another; never remove or overwrite their lock
-tickets release <file>       lift your own claim (a finished plan, work that is published)
+npx tickets release <file>       lift your own claim (a finished plan, work that is published)
 ```
 
 `<file>` is the ticket's filename, e.g. `2042-01-01_some-ticket.md`.
@@ -65,11 +65,11 @@ GitHub: [#42](https://github.com/org/repo/issues/42) [optional]
 [optional: more info (any heading and format you want)]
 ```
 
-`tickets/` holds only open tickets: a closed ticket is removed, with its `.plan.md` and `.lock.md` (`tickets close`).
+`tickets/` holds only open tickets: a closed ticket is removed, with its `.plan.md` and `.lock.md` (`npx tickets close`).
 
 ### A claim: `tickets/<DATE>_<SLUG>.lock.md`
 
-Written by `tickets claim`, removed by `tickets release` or `tickets close`. One line: `CLAIMED: <holder>`. A ticket with a lock is being planned or worked by its holder — pick another.
+Written by `npx tickets claim`, removed by `npx tickets release` or `npx tickets close`. One line: `CLAIMED: <holder>`. A ticket with a lock is being planned or worked by its holder — pick another.
 
 ### A plan: `tickets/<DATE>_<SLUG>.plan.md`
 
@@ -136,4 +136,4 @@ Notes:
 ...
 ```
 
-The queue lists *all* tasks AI will work on next, sorted by priority. Priority 10 is rarely used (e.g. critical production bugs) and is treated as the utmost priority. Within a priority, the first tasks have higher priority (they are the "next" tasks within that "priority queue"). A done entry is removed (`tickets queue done`).
+The queue lists *all* tasks AI will work on next, sorted by priority. Priority 10 is rarely used (e.g. critical production bugs) and is treated as the utmost priority. Within a priority, the first tasks have higher priority (they are the "next" tasks within that "priority queue"). A done entry is removed (`npx tickets queue done`).

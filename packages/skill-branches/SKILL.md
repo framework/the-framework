@@ -1,6 +1,6 @@
 ---
 name: branches
-description: Where your work goes — a branch named agent-<name>, in a checkout of your own when one was made for you — how to name it, and what must be true before you finish.
+description: Where your work goes (a branch named agent-<name>), how to name it, and what must be true before you finish.
 ---
 
 # Branch management
@@ -17,9 +17,9 @@ Your work goes on a branch named `agent-<name>`. Whoever started you publishes i
 npx branches status
 ```
 
-It prints the branch you are on.
+It prints JSON; `branch` is the branch you are on.
 
-**It starts with `agent-`.** A checkout was made for you, under the project's `.branches/`, and your working directory is your whole workspace: every file you read or write is under it, so address files relative to it — an absolute path is how you leave it without noticing. The repository around it is the user's own working tree, never yours to edit: the same file exists there twice, and only the copy under your working directory is on your branch. If something you genuinely need is outside your working directory, say so and stop.
+**It starts with `agent-`.** The branch is yours, and your working directory is your whole workspace: every file you read or write is under it, so address files relative to it — an absolute path is how you leave it without noticing. When it sits under a `.branches/` folder, a checkout was made for you and the repository around it is the user's own working tree, never yours to edit. If something you genuinely need is outside your working directory, say so and stop.
 
 Before your first change, name the session — `[a-z0-9-]+`, saying succinctly what the work is:
 

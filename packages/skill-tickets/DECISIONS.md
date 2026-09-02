@@ -17,12 +17,14 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 ## Flow: a claim
 - A claim is a committed file holding one line, `CLAIMED: <who>`, so that agents on other
   machines see it too.
-- One claim per ticket; it never expires, only a release or a close removes it.
+- One claim per ticket; it never expires, only a release, or a close by whoever holds it,
+  removes it.
+- A lock is written only by a claim; `put` refuses `.lock.md`.
 - The holder's name is never typed; the command reads it from where it runs. Inside an
   agent's checkout it is the agent id from the folder name, since the branch gets renamed
   and the folder does not; anywhere else it is the current branch.
-- When tickets are claimed in a batch for planning, those that already have a plan are
-  skipped; when claimed for implementing, they are not.
+- A claim made for planning is skipped when the ticket already has a plan; a claim made
+  for implementing is not.
 
 ## The queue
 - The queue is one markdown file on the branch, `TODO_AGENTS.md`: sections `## Priority
@@ -34,7 +36,7 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 - Done means deleted, never checked off.
 
 ## Flow: the command
-- A read fetches the branch from origin, the shared copy on GitHub, once, and reads
+- A read fetches the branch from origin, the shared copy on the remote, once, and reads
   everything from that copy rather than from the local branch: only origin is sure to
   hold what every writer pushed, the command's own earlier writes included.
 - A write is one commit per command, pushed straight to origin through a temporary copy

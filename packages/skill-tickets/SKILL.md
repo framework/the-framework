@@ -1,6 +1,6 @@
 ---
 name: tickets
-description: The project's tickets and its agent queue: where they live, how to read and change them, how to claim a ticket so no two agents work the same one, and the formats.
+description: Where the project's tickets and its agent queue live, how to read and change them, how to claim a ticket so no two agents work the same one, and the formats.
 ---
 
 # Tickets and the agent queue

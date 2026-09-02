@@ -18,7 +18,8 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   and a folder name cannot hold a slash. The package renames and deletes only `agent-*`
   branches; the user's own branches are never touched.
 - A taken name gets `-2`, `-3`, … instead of a refusal: the agent asked for a name and
-  reads back the one it got.
+  reads back the one it got. Two agents naming the same thing at once race on the rename;
+  the loser takes the next suffix.
 - The user's installed dependencies are linked into the checkout, not copied and not
   reinstalled. One link per package, not one link to the whole folder, so a package the
   agent installs lands in its own checkout.
@@ -48,4 +49,4 @@ program allows a push.
 - Each agent tool (Claude Code, Codex) looks for skills in its own folder at the root of
   the checkout: `.claude/skills`, `.agents/skills`. The package links its own folder, where
   `SKILL.md` sits, into each of those as `branches` in every checkout it makes, and hides
-  the links from git. Temporary, until skills are committed into the repository.
+  the links from git. Temporary, until the project commits the skill files itself.

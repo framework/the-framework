@@ -8,19 +8,18 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 - Package name = branch name: `@gemstack/agent-data` manages the `agent-data` branch, so it
   is called the same.
 - The code that runs git, and the code that makes git ignore `.branches/`, live in this
-  package and not in a skill. A skill that needs them imports them from here; none keeps
-  a copy of its own.
+  package and not in a skill.
 - `.branches/` holds every extra checkout of the project — each agent's, and the data
   branch's — so its name is defined here. It starts with a dot to keep tools' `*` patterns
   out of it: every checkout inside is a full copy of the repository.
 
 ## The branch
-- A branch of the project's repository holds the agents' data — tickets, the queue, the
-  archives — like `gh-pages` holds a site; code branches hold only code. Pushed and
-  pulled on every change, so every machine sees the same files.
+- A branch of the project's repository holds the agents' data — tickets, the queue — like
+  `gh-pages` holds a site; code branches hold only code. Pushed and pulled on every
+  change, so every machine sees the same files.
 - One branch for all skills, each with its own folder or file on it. Not one branch per
-  skill: every extra branch would need its own checkout on disk and its own "could not
-  sync" error in the dashboard.
+  skill: every extra branch would need its own checkout on disk and its own sync failure to
+  report.
 - The branch name is written once, here, as `DATA_BRANCH`; every other package imports it.
 
 ## Flow: a write

@@ -7,7 +7,7 @@ description: The project's tickets and its agent queue: where they live, how to 
 
 The tickets (`tickets/<DATE>_<SLUG>.md`, with their `.plan.md` and `.lock.md` siblings) and the agent queue (`TODO_AGENTS.md`) live on the branch `tickets`, never on a code branch. Your checkout does not contain them. A `tickets` link at the repository root may show them: read there if you like, never write there.
 
-Read and change them with the `tickets` command. It comes with the npm package `@gemstack/skill-tickets`, a dependency of this repository: install the repository's dependencies once — `npm install`, or the package manager its lockfile belongs to — then run it as `npx tickets`. Every change it makes is one commit pushed straight to the `tickets` branch (a rejected push is re-applied on the branch's new tip and pushed again, for you); nothing you commit on your own branch reaches them, and these files never belong on your branch.
+Read and change them with the `tickets` command. It comes with the npm package `@gemstack/skill-tickets`, a dependency of this repository: install the repository's dependencies once — `npm install`, or the package manager its lockfile belongs to — then run it as `npx tickets`. Every change it makes is one commit pushed straight to the `tickets` branch (a rejected push is re-applied on the branch's new tip and pushed again, for you); these files never belong on your branch.
 
 ## Read
 
@@ -21,13 +21,14 @@ npx tickets queue                the queue's open entries, in order of work
 ## Change
 
 ```
-npx tickets put <file>           write one file under tickets/ from stdin (a ticket, a plan, meta.json)
+npx tickets put <file>           write one file under tickets/ from stdin: a ticket, a plan, or meta.json
+                             (whatever the program importing issues keeps there)
 npx tickets close <file>         remove a ticket with its plan and lock — tickets/ holds only open
                              tickets; refused while someone else holds the ticket
 npx tickets queue add <text> [--priority N] [--ticket <file>]
                              put an entry on the queue; --ticket links it to the ticket and places
                              it by the ticket's priority
-npx tickets queue done <text>    take an entry off the queue: done means deleted
+npx tickets queue done <entry>   take an entry off the queue, as `npx tickets queue` printed it: done means deleted
 ```
 
 ## Claim before you plan or work a ticket

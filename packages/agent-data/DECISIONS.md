@@ -30,10 +30,10 @@ because someone pushed in between, start over on top of their changes.
 
 - A write is handed over as a small function ("add this line"), not as a finished
   commit, so starting over is just running it again on the new files. Never a force
-  push. After two failed pushes the write reports the failure; the commit stays local and
-  the next write's fetch carries it.
-- A commit that stayed local and no longer applies on top of the remote is dropped: the
-  remote wins, and only the current change runs again.
+  push. After two failed pushes the write reports the failure and the commit stays local.
+  The next write's fetch carries it when it still applies on top of the remote, and drops
+  it when it does not: the remote wins, only the current change runs again, and nobody is
+  told.
 - Two writers. A long-running process, the program that starts agents, writes in its own
   checkout, `.branches/agent-data`, one write at a time. A command an agent runs writes in
   a temporary copy of the branch, pushes, and deletes the copy; it never touches the

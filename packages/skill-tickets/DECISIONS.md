@@ -17,9 +17,8 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 - `tickets/` holds only open tickets: closing one deletes it, with its plan and its claim.
 - `list` answers newest ticket first, dated by the `<DATE>_` its filename carries; git
   keeps no modification times, so a ticket without one is dated the epoch and sorts last.
-- The skill knows no issue tracker. A ticket may carry a `GitHub:` line with its issue,
-  but importing issues into tickets is done by the program using the skill, not by the
-  skill.
+- The skill knows no issue tracker: a ticket may carry a `GitHub:` line with its issue,
+  but importing issues is the program's job.
 
 ## Flow: a claim
 - A claim is a committed file holding one line, `CLAIMED: <who>`, so that agents on other
@@ -38,9 +37,10 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   agent names its session. A checkout on no branch is refused rather than claiming as
   `HEAD`. Reading the id off the checkout's folder name was dropped: that layout belongs
   to whichever program made the checkout, not to this skill.
-- The program says what a claim is for. A claim for planning is skipped, no lock written,
-  when the ticket already has a plan; a claim for implementing is not. The command always
-  claims to implement: `claim` never skips a planned ticket.
+- The program says which side of a ticket's life a claim is for: a claim for planning is
+  skipped, no lock written, when the ticket already has a plan; a claim for implementing
+  is never skipped, only someone's lock stands in its way. The command always claims to
+  implement.
 - The lock's existence is the claim; the holder it names is only shown. A lock nobody can
   read still holds the ticket, and no command lifts it: it goes by hand on the branch.
 
@@ -56,7 +56,8 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   takes the ticket's priority, 5 when the ticket has none or names one that is not a whole
   0-10: clamping a typo would claim 10 or 0, both reserved ends of the scale. A priority
   the file has no section for gets one, placed before the first lower section so the file
-  stays sorted high to low.
+  stays sorted high to low. An entry joins the end of its section: within a priority, the
+  queue is first in, first taken.
 - Done means deleted, never checked off.
 
 ## Flow: the command
@@ -72,9 +73,11 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 - One JSON document on stdout for every command that runs: the result, or the refusal. A
   refusal, a rule saying no, adds one line for a person on stderr and exits 1; an argument
   that cannot be read never gets that far: the usage on stderr, nothing on stdout, exit 2.
-- A git failure past the decision is reported like a refusal, reason `git-failed`, with
-  git's own line on stderr: a caller parsing stdout never has to handle a command that
-  printed nothing.
+- A git failure anywhere in a command is reported like a refusal, reason `git-failed`,
+  with git's own line on stderr: a caller parsing stdout never has to handle a command
+  that printed nothing.
+- `list` and `queue` answer with the bare JSON array; every other command answers with an
+  object, its `ok` telling a result from a refusal.
 - A write is one commit per command, pushed straight to origin through a throwaway
   worktree at origin's tip; a push that loses a race is re-applied on the new tip by
   `@gemstack/agent-data`. A repository with no remote is refused.

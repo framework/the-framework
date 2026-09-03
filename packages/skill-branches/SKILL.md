@@ -19,7 +19,7 @@ npx branches status
 
 It prints JSON; `branch` is the branch you are on.
 
-**It starts with `agent-`.** The branch is yours, and your working directory is your whole workspace: every file you read or write is under it, so address files relative to it — an absolute path is how you leave it without noticing. When it sits under a `.branches/` folder, a checkout was made for you and the repository around it is the user's own working tree, never yours to edit. If something you genuinely need is outside your working directory, say so and stop.
+**It starts with `agent-`.** The branch is yours, and your working directory is your whole workspace: every file you read or write is under it, so address files relative to it — an absolute path is how you leave it without noticing. When it sits under a `.branches/` folder, a checkout was made for you and the repository around it is the user's own working tree, never yours to edit. If something you need is outside your working directory, say so and stop.
 
 Before your first change, name the session — `[a-z0-9-]+`, saying succinctly what the work is:
 

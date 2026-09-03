@@ -274,7 +274,7 @@ function mintAgentIds(now: number, count: number): string[] {
  * which claim is its own — the same contract {@link pinnedPlanJob} carries, because the same
  * gap exists: without the lock the claim on the *implementation* lived only in this daemon's
  * memory, so another machine's sweep could book the same ticket. Ticket, plan and lock live on
- * the tickets branch (#1582/#1748), so the agent closes the ticket there once its work is published — nothing
+ * the `agent-data` branch (#1582/#1748), so the agent closes the ticket there once its work is published — nothing
  * else releases a lock since #1420 dropped the timer. The queue entry itself is NOT the agent's
  * to touch: the daemon checks it off at settle, once the run's ending reports the work landed.
  */
@@ -335,7 +335,7 @@ export function pinnedPlanJob(job: AutoPmJob, assignment: PlanAssignment): AutoP
       '',
       `You are one agent of a concurrent batch, so the scope above narrows: plan exactly one ticket, \`tickets/${ticket}\`, and no other.`,
       '',
-      `The ticket is already claimed for you (use the \`tickets\` skill): \`tickets show ${ticket}\` names you as its holder. Write the plan with \`tickets put ${stem}.plan.md\`, then lift your claim with \`tickets release ${ticket}\` — the plan is a write to the tickets branch, not a PR. If the ticket is not claimed, is claimed by someone else, or already has a plan, it is not yours — stop and do nothing.`,
+      `The ticket is already claimed for you (use the \`tickets\` skill): \`tickets show ${ticket}\` names you as its holder. Write the plan with \`tickets put ${stem}.plan.md\`, then lift your claim with \`tickets release ${ticket}\` — the plan is a write to the \`agent-data\` branch, not a PR. If the ticket is not claimed, is claimed by someone else, or already has a plan, it is not yours — stop and do nothing.`,
     ].join('\n'),
     describe: `planning "${entryPreview(ticket)}"`,
   }

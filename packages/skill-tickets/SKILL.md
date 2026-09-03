@@ -5,9 +5,9 @@ description: Where the project's tickets and its agent queue live, how to read a
 
 # Tickets and the agent queue
 
-The tickets (`tickets/<DATE>_<SLUG>.md`, with their `.plan.md` and `.lock.md` siblings) and the agent queue (`TODO_AGENTS.md`) live on the branch `tickets`, never on a code branch. Your checkout does not contain them. A `tickets` link at the repository root may show them: read there if you like, never write there.
+The tickets (`tickets/<DATE>_<SLUG>.md`, with their `.plan.md` and `.lock.md` siblings) and the agent queue (`TODO_AGENTS.md`) live on the branch `agent-data`, never on a code branch. Your checkout does not contain them. A `tickets` link at the repository root may show them: read there if you like, never write there.
 
-Read and change them with the `tickets` command. It comes with the npm package `@gemstack/skill-tickets`, a dependency of this repository: install the repository's dependencies once — `npm install`, or the package manager its lockfile belongs to — then run it as `npx tickets`. Every change it makes is one commit pushed straight to the `tickets` branch (a rejected push is re-applied on the branch's new tip and pushed again, for you); these files never belong on your branch.
+Read and change them with the `tickets` command. It comes with the npm package `@gemstack/skill-tickets`, a dependency of this repository: install the repository's dependencies once — `npm install`, or the package manager its lockfile belongs to — then run it as `npx tickets`. Every change it makes is one commit pushed straight to the `agent-data` branch (a rejected push is re-applied on the branch's new tip and pushed again, for you); these files never belong on your branch.
 
 ## Read
 
@@ -40,7 +40,7 @@ npx tickets claim <file>         {"ok":true,"holder":…} — the ticket is your
 npx tickets release <file>       lift your own claim (a finished plan, work that is published)
 ```
 
-`<file>` is the ticket's filename, e.g. `2042-01-01_some-ticket.md`.
+`<file>` is the ticket's filename, e.g. `2042-01-01_some-ticket.md`. You claim as `AGENT_ID` when the process that started you set it in your environment, else as your branch; nothing to type.
 
 ## Formats
 

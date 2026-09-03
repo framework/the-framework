@@ -72,9 +72,11 @@ program allows a push.
 - One JSON document on stdout for every command that runs: the result, or the refusal. A
   refusal, a rule saying no, adds one line for a person on stderr and exits 1; an argument
   that cannot be read never gets that far: the usage on stderr, nothing on stdout, exit 2.
-- A git failure past the decision is reported like a refusal, reason `git-failed`, with
-  git's own line on stderr: a caller parsing stdout never has to handle a command that
-  printed nothing.
+- A git failure anywhere in a command is reported like a refusal, reason `git-failed`,
+  with git's own line on stderr: a caller parsing stdout never has to handle a command
+  that printed nothing.
+- `list` answers with the bare JSON array; every other command answers with an object, its
+  `ok` telling a result from a refusal.
 - An agent reading the skill can be in one of two places: inside a checkout the program
   that started it made for it, already on an `agent-*` branch; or in a plain clone of the
   repository, on `main` or on someone's branch. The skill tells them apart by the branch

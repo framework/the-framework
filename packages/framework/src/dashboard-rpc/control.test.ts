@@ -7,11 +7,10 @@ import { provideTestContext } from './test-context.js'
 import { sendStart, sendReleaseTicketLock } from './control.js'
 import { presets } from '../preset-catalog.js'
 import { addProject, projectId } from '../registry.js'
-import { withFileBranch, nodeGitRunner } from '@gemstack/agent-data'
-import { TICKETS_BRANCH } from '@gemstack/skill-tickets'
+import { withFileBranch, nodeGitRunner, DATA_BRANCH } from '@gemstack/agent-data'
 import type { StartAgentOptions } from '../dashboard/types.js'
 
-/** A committed real repo whose tickets and queue sit on the tickets branch (#1582/#1748). */
+/** A committed real repo whose tickets and queue sit on the `agent-data` branch (#1582/#1748). */
 async function dataRepo(files: Record<string, string>): Promise<string> {
   const git = nodeGitRunner()
   const cwd = await realpath(await mkdtemp(join(tmpdir(), 'framework-control-')))
@@ -21,7 +20,7 @@ async function dataRepo(files: Record<string, string>): Promise<string> {
   await writeFile(join(cwd, 'README.md'), '# t\n')
   await git(['add', '-A'], cwd)
   await git(['commit', '-m', 'init'], cwd)
-  const seeded = await withFileBranch(cwd, TICKETS_BRANCH, 'seed', async dir => {
+  const seeded = await withFileBranch(cwd, DATA_BRANCH, 'seed', async dir => {
     await mkdir(join(dir, 'tickets'), { recursive: true })
     for (const [file, md] of Object.entries(files)) await writeFile(join(dir, file), md)
   })
@@ -116,10 +115,10 @@ test('sendReleaseTicketLock deletes the lock and commits the release (#1420/#158
   try {
     const result = await sendReleaseTicketLock(id, '2026-07-20_thing.md')
     assert.deepEqual(result, { ok: true })
-    // The release is a commit on the tickets branch: the lock is gone from the branch, not just a checkout.
+    // The release is a commit on the `agent-data` branch: the lock is gone from the branch, not just a checkout.
     const git = nodeGitRunner()
-    await assert.rejects(git(['show', `${TICKETS_BRANCH}:tickets/2026-07-20_thing.lock.md`], cwd))
-    assert.equal(await git(['show', `${TICKETS_BRANCH}:tickets/2026-07-20_thing.md`], cwd), '# Thing\n')
+    await assert.rejects(git(['show', `${DATA_BRANCH}:tickets/2026-07-20_thing.lock.md`], cwd))
+    assert.equal(await git(['show', `${DATA_BRANCH}:tickets/2026-07-20_thing.md`], cwd), '# Thing\n')
   } finally {
     await rm(cwd, { recursive: true, force: true })
   }

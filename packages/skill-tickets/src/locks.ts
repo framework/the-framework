@@ -5,7 +5,7 @@ import { resolveTicketDeps, type TicketDeps, type TicketFiles } from './store.js
 // The `.lock.md` claim on a ticket: a ticket is worked or planned by one holder at a time, and the
 // guard cannot be anyone's memory — the holder may be on another machine, or a cloud session whose
 // local process is gone. So the claim is a file beside the ticket, `tickets/<STEM>.lock.md`,
-// holding one line, `CLAIMED: <holder>`, on the tickets branch where every reader already looks.
+// holding one line, `CLAIMED: <holder>`, on the `agent-data` branch where every reader already looks.
 //
 // There is no timed release: a holder can legitimately keep a ticket for days, and a lock lifted
 // under a live holder re-opens the exact double-work window it exists to close. The lock lifts

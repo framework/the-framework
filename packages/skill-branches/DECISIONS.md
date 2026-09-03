@@ -77,6 +77,8 @@ program allows a push.
   that printed nothing.
 - `list` answers with the bare JSON array; every other command answers with an object, its
   `ok` telling a result from a refusal.
+- Run outside a repository, a command refuses with `not-a-repo`: only git's own "not a git
+  repository" reads as that, every other git failure stays `git-failed`.
 - An agent reading the skill can be in one of two places: inside a checkout the program
   that started it made for it, already on an `agent-*` branch; or in a plain clone of the
   repository, on `main` or on someone's branch. The skill tells them apart by the branch

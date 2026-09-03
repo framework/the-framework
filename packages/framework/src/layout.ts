@@ -1,7 +1,8 @@
 import { join } from 'node:path'
 import { LOGS_BRANCH, THE_FRAMEWORK_DIR } from './framework-dir.js'
 import { ARCHIVE_DIR, EVENTS_FILE, META_FILE, nodeStoreFs, type StoreFs } from './store/index.js'
-import { QUEUE_FILE, TICKETS_BRANCH, TICKETS_DIR } from '@gemstack/skill-tickets/names'
+import { QUEUE_FILE, TICKETS_DIR } from '@gemstack/skill-tickets/names'
+import { DATA_BRANCH } from '@gemstack/agent-data/names'
 
 /**
  * The layout gate (#1575): a build refuses to run in a repo whose recorded bookkeeping layout
@@ -36,7 +37,7 @@ export function layoutMarkerPath(cwd: string): string {
 export function layoutMarker(): string {
   return [
     `framework-dir: ${THE_FRAMEWORK_DIR}`,
-    `tickets-branch: ${TICKETS_BRANCH}`,
+    `data-branch: ${DATA_BRANCH}`,
     `logs-branch: ${LOGS_BRANCH}`,
     `archive-dir: ${ARCHIVE_DIR}`,
     `events-file: ${EVENTS_FILE}`,

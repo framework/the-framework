@@ -70,7 +70,7 @@ The user's branch list does not collect one dead `agent-<agent id>` branch per a
 
 #### Business logic
 
-When the caller names the checkout's birth branch and the branch the checkout ended on contains it, the birth branch goes with the checkout: everything it holds is held again by a branch that either stays or has itself been proven to be inside the remote. A birth branch carrying a commit the kept branch lacks stays. This is decided before anything is deleted, because the comparison has to read both branches.
+When the caller names the checkout's birth branch and the branch the checkout ended on contains it, the birth branch goes with the checkout: everything it holds is held again by a branch that either stays or has itself been proven to be inside the remote. A birth branch carrying a commit the kept branch lacks stays, and so does one that is not an `agent-*` branch, whatever the caller names: the package deletes only branches it minted. This is decided before anything is deleted, because the comparison has to read both branches.
 
 ### A directory that is not a git worktree is left alone
 

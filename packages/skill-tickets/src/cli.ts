@@ -154,7 +154,8 @@ const COMMANDS: Record<string, Command> = {
 
   async put(args, io, git) {
     const { positionals } = parse(args, {}, 1)
-    const file = positionals[0]!
+    // The bare filename, or the `tickets/<file>` path a queue entry links to, like every other command.
+    const file = positionals[0]!.startsWith(`${TICKETS_DIR}/`) ? positionals[0]!.slice(TICKETS_DIR.length + 1) : positionals[0]!
     // A ticket, its plan, or the meta file — never a lock: claims go through `claim`.
     if (!(isTicketFile(file) || (isTicketFile(file.replace(/\.plan\.md$/, '.md')) && file.endsWith('.plan.md')) || file === META_FILE))
       throw new Refused({ ok: false, reason: 'invalid-path', file }, `${file} is not a file under ${TICKETS_DIR}/ this command writes: a ticket, its .plan.md, or ${META_FILE}`)

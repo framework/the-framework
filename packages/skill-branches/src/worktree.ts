@@ -185,7 +185,8 @@ export async function removeWorktree(repo: string, path: string, git: GitRunner 
   }
   try {
     await git(['worktree', 'remove', '--force', path], repo)
-    console.log(`[branches] forced removal of worktree ${path} (git called it unclean)`)
+    // stderr: on a CLI run stdout carries the JSON result, and this line would corrupt it.
+    console.error(`[branches] forced removal of worktree ${path} (git called it unclean)`)
   } catch {
     // Already removed, or never registered: nothing to do.
   }

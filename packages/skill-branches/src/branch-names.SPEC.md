@@ -2,7 +2,7 @@ The naming rules for everything the package mints in git, and the layout they im
 
 The same rules answer the filesystem questions around `.branches/`: an agent's checkout directory carries the name of the branch it was created on, so the flat listing reads as branch names, and the agent id is recoverable from a directory name.
 
-They also answer which branches the package may ever rename or delete on its own: those it minted for an agent, `agent-<agent id>` or `agent-<session name>`. A branch of the user's own is out of scope by name alone, so no cleanup can reach it however empty it looks.
+They also answer which branches the package may ever rename or delete on its own: those it minted for an agent, `agent-<agent id>` or `agent-<session name>`. A branch of the user's own is out of scope by name alone, so no cleanup can reach it however empty it looks. So is `agent-data`, the shared data branch of `@gemstack/agent-data`: it carries the prefix without being any agent's, its checkout sits beside the agent checkouts as `.branches/agent-data`, and the package never lists, renames or deletes it — which is also why `data` is not a valid agent id, and an agent naming its session `data` gets the next suffix.
 
 ## Before modifying/creating SPEC.md files
 

@@ -265,7 +265,8 @@ const listing = (entries: Record<string, string[]>) => async (dir: string) => en
 
 test('listWorktreeDirs lists the agent-branch-named dirs under .branches/ and nothing else (#737/#1580)', async () => {
   const root = join('/repo', BRANCHES_DIR)
-  const readdir = listing({ [root]: ['agent-r1', 'agent-r2', '.tmp'] })
+  // `agent-data` is the data branch's checkout, not agent `data`'s.
+  const readdir = listing({ [root]: ['agent-r1', 'agent-r2', '.tmp', 'agent-data'] })
   assert.deepEqual((await listWorktreeDirs('/repo', readdir)).sort(), ['r1', 'r2'])
   assert.deepEqual(await listWorktreeDirs('/never-ran', readdir), [])
 })

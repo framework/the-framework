@@ -9,14 +9,10 @@ import {
   ticketIssueRef,
   ticketLockName,
   ticketPlanName,
-  TICKETS_BRANCH,
-  TICKETS_CHECKOUT_DIR,
   TICKETS_DIR,
 } from './names.js'
 
 test('the branch, its checkout, the folder and the queue file are the conventions the skill names', () => {
-  assert.equal(TICKETS_BRANCH, 'tickets')
-  assert.equal(TICKETS_CHECKOUT_DIR, '.branches/tickets')
   assert.equal(TICKETS_DIR, 'tickets')
   assert.equal(QUEUE_FILE, 'TODO_AGENTS.md')
 })

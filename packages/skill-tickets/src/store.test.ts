@@ -3,9 +3,9 @@ import { test } from 'node:test'
 import { mkdir, mkdtemp, readFile, readlink, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { nodeGitRunner } from '@gemstack/agent-data'
+import { nodeGitRunner, BRANCHES_DIR, DATA_BRANCH } from '@gemstack/agent-data'
 import { syncTickets, ticketsCheckoutPath, ticketsDir } from './store.js'
-import { QUEUE_FILE, TICKETS_BRANCH, TICKETS_CHECKOUT_DIR } from './names.js'
+import { QUEUE_FILE } from './names.js'
 
 const git = nodeGitRunner()
 const RETRIED_RM = { recursive: true, force: true, maxRetries: 10 } as const
@@ -27,15 +27,15 @@ test('sync births the branch, seeds the queue, links tickets/ at the root hidden
     const result = await syncTickets(root)
     assert.ok(!result.ok && /no remote/.test(result.error), 'a repo nothing can reach is an error state, said')
     const wt = ticketsCheckoutPath(root)
-    assert.equal(wt, join(root, TICKETS_CHECKOUT_DIR))
+    assert.equal(wt, join(root, BRANCHES_DIR, DATA_BRANCH))
     assert.equal(ticketsDir(root), join(wt, 'tickets'))
-    assert.equal((await git(['rev-parse', '--abbrev-ref', 'HEAD'], wt)).trim(), TICKETS_BRANCH)
+    assert.equal((await git(['rev-parse', '--abbrev-ref', 'HEAD'], wt)).trim(), DATA_BRANCH)
     // Seeded and committed, so the checkout is clean between cycles.
     assert.equal(await readFile(join(wt, QUEUE_FILE), 'utf8'), '')
-    assert.match(await git(['log', '-1', '--format=%s', `refs/heads/${TICKETS_BRANCH}`], root), /^seed the queue/)
+    assert.match(await git(['log', '-1', '--format=%s', `refs/heads/${DATA_BRANCH}`], root), /^seed the queue/)
     assert.equal((await git(['status', '--porcelain'], wt)).trim(), '')
     // The root link reaches into the checkout, relatively, so a moved repo keeps working.
-    assert.equal(await readlink(join(root, 'tickets')), join(TICKETS_CHECKOUT_DIR, 'tickets'))
+    assert.equal(await readlink(join(root, 'tickets')), join(BRANCHES_DIR, DATA_BRANCH, 'tickets'))
     // Hidden from git, so no sweeping `git add -A` ever commits it onto a code branch…
     const status = await git(['status', '--porcelain'], root)
     assert.ok(!status.split('\n').some(line => line.trim() === '?? tickets'), status)
@@ -45,10 +45,10 @@ test('sync births the branch, seeds the queue, links tickets/ at the root hidden
     await writeFile(join(wt, 'tickets', 't.md'), 'x\n')
     await git(['add', '-A'], wt)
     await git(['commit', '-m', 't'], wt)
-    assert.equal((await git(['show', `${TICKETS_BRANCH}:tickets/t.md`], root)).trim(), 'x')
+    assert.equal((await git(['show', `${DATA_BRANCH}:tickets/t.md`], root)).trim(), 'x')
     // Idempotent: a second sync seeds and links nothing new.
     await syncTickets(root)
-    assert.match(await git(['log', '-1', '--format=%s', `refs/heads/${TICKETS_BRANCH}`], root), /^t$/m)
+    assert.match(await git(['log', '-1', '--format=%s', `refs/heads/${DATA_BRANCH}`], root), /^t$/m)
   } finally {
     await rm(root, RETRIED_RM)
   }
@@ -82,12 +82,12 @@ test('sync converges with origin: the branch origin has is adopted, and a pushed
     await git(['clone', bare, other], otherParent)
     await git(['config', 'user.email', 'o@o'], other)
     await git(['config', 'user.name', 'o'], other)
-    await git(['checkout', '-B', TICKETS_BRANCH, `origin/${TICKETS_BRANCH}`], other)
+    await git(['checkout', '-B', DATA_BRANCH, `origin/${DATA_BRANCH}`], other)
     await mkdir(join(other, 'tickets'))
     await writeFile(join(other, 'tickets', '2026-08-30_a.md'), '# A\n')
     await git(['add', '-A'], other)
     await git(['commit', '-m', 'put tickets/2026-08-30_a.md'], other)
-    await git(['push', 'origin', TICKETS_BRANCH], other)
+    await git(['push', 'origin', DATA_BRANCH], other)
     assert.deepEqual(await syncTickets(root), { ok: true })
     assert.equal(await readFile(join(ticketsDir(root), '2026-08-30_a.md'), 'utf8'), '# A\n')
   } finally {

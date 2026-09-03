@@ -17,6 +17,10 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 - Branch names are `agent-<name>`, with no `/`: the folder is named after the branch,
   and a folder name cannot hold a slash. The package renames and deletes only `agent-*`
   branches; the user's own branches are never touched.
+- `agent-data` is not an agent's: it is the data branch of `@gemstack/agent-data`, checked
+  out beside the agent checkouts as `.branches/agent-data`. The package never lists,
+  renames or deletes it, `data` is refused as an agent id, and an agent naming itself
+  `data` gets `agent-data-2`.
 - A taken name gets `-2`, `-3`, … instead of a refusal: the agent asked for a name and
   reads back the one it got. Two agents naming the same thing at once race on the rename;
   the loser takes the next suffix.

@@ -3,14 +3,13 @@ import { test } from 'node:test'
 import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { nodeGitRunner } from '@gemstack/agent-data'
+import { nodeGitRunner, DATA_BRANCH } from '@gemstack/agent-data'
 import { runCli, USAGE } from './cli.js'
-import { TICKETS_BRANCH } from './names.js'
 
 const git = nodeGitRunner()
 const RETRIED_RM = { recursive: true, force: true, maxRetries: 10 } as const
 
-/** A bare origin with a `tickets` branch holding two tickets, plus N clones acting as agents. */
+/** A bare origin with an `agent-data` branch holding two tickets, plus N clones acting as agents. */
 async function rig(clones: number) {
   const bare = await realpath(await mkdtemp(join(tmpdir(), 'tickets-cli-bare-')))
   await git(['init', '--bare', '-b', 'main', bare], bare)
@@ -22,8 +21,8 @@ async function rig(clones: number) {
   await git(['add', '-A'], seed)
   await git(['commit', '-m', 'init'], seed)
   await git(['push', 'origin', 'main'], seed)
-  const commit = (await git(['commit-tree', '4b825dc642cb6eb9a060e54bf8d69288fbee4904', '-m', 'create the tickets branch'], seed)).trim()
-  await git(['checkout', '-B', TICKETS_BRANCH, commit], seed)
+  const commit = (await git(['commit-tree', '4b825dc642cb6eb9a060e54bf8d69288fbee4904', '-m', 'create the agent-data branch'], seed)).trim()
+  await git(['checkout', '-B', DATA_BRANCH, commit], seed)
   await mkdir(join(seed, 'tickets'))
   await writeFile(join(seed, 'tickets', '2026-08-30_a.md'), 'Priority: 8\n\n# A\n\n## TLDR\n\nThe first.\n')
   await writeFile(join(seed, 'tickets', '2026-08-29_b.md'), '# B\n')
@@ -31,7 +30,7 @@ async function rig(clones: number) {
   await writeFile(join(seed, 'TODO_AGENTS.md'), '## Priority 5\n\n- [Do B](tickets/2026-08-29_b.md)\n')
   await git(['add', '-A'], seed)
   await git(['commit', '-m', 'seed'], seed)
-  await git(['push', 'origin', TICKETS_BRANCH], seed)
+  await git(['push', 'origin', DATA_BRANCH], seed)
   const agents: string[] = []
   for (let i = 0; i < clones; i++) {
     const parent = await realpath(await mkdtemp(join(tmpdir(), `tickets-cli-agent${i}-`)))
@@ -98,10 +97,10 @@ test('claim writes the lock as one pushed commit naming the holder; the second c
     const first = await run(a!, ['claim', '2026-08-30_a.md'])
     assert.equal(first.code, 0)
     assert.deepEqual(first.json, { ok: true, file: 'tickets/2026-08-30_a.md', holder: 'agent-a0' })
-    assert.equal(await git(['show', `${TICKETS_BRANCH}:tickets/2026-08-30_a.lock.md`], bare), 'CLAIMED: agent-a0\n')
-    assert.equal((await git(['log', '-1', '--format=%s %an', TICKETS_BRANCH], bare)).trim(), 'claim tickets/2026-08-30_a a0')
+    assert.equal(await git(['show', `${DATA_BRANCH}:tickets/2026-08-30_a.lock.md`], bare), 'CLAIMED: agent-a0\n')
+    assert.equal((await git(['log', '-1', '--format=%s %an', DATA_BRANCH], bare)).trim(), 'claim tickets/2026-08-30_a a0')
     // The agent's own clone holds no local copy of the branch: the write was a remote writer's.
-    await assert.rejects(git(['rev-parse', '--verify', TICKETS_BRANCH], a!))
+    await assert.rejects(git(['rev-parse', '--verify', DATA_BRANCH], a!))
     assert.equal((await git(['status', '--porcelain'], a!)).trim(), '', 'nothing lands in the agent\'s checkout')
     // A second claimer, from another clone, back to back: refused, told who holds it.
     const second = await run(b!, ['claim', '2026-08-30_a.md'])
@@ -109,7 +108,7 @@ test('claim writes the lock as one pushed commit naming the holder; the second c
     assert.deepEqual(second.json, { ok: false, reason: 'claimed', holder: 'agent-a0', file: '2026-08-30_a.md' })
     assert.match(second.stderr, /claimed by agent-a0/)
     // Exactly one lock commit on the remote.
-    assert.equal((await git(['rev-list', '--count', TICKETS_BRANCH], bare)).trim(), '3')
+    assert.equal((await git(['rev-list', '--count', DATA_BRANCH], bare)).trim(), '3')
     // The holder shows up on the reads.
     const show = await run(b!, ['show', '2026-08-30_a.md'])
     assert.equal(show.json.holder, 'agent-a0')
@@ -122,7 +121,7 @@ test('claim writes the lock as one pushed commit naming the holder; the second c
     assert.deepEqual(notMine.json, { ok: false, reason: 'not-holder', file: '2026-08-30_a.md', holder: 'agent-a0' })
     const mine = await run(a!, ['release', '2026-08-30_a.md'])
     assert.equal(mine.code, 0)
-    await assert.rejects(git(['show', `${TICKETS_BRANCH}:tickets/2026-08-30_a.lock.md`], bare))
+    await assert.rejects(git(['show', `${DATA_BRANCH}:tickets/2026-08-30_a.lock.md`], bare))
     assert.deepEqual((await run(a!, ['release', '2026-08-30_a.md'])).json, { ok: false, reason: 'no-lock', file: '2026-08-30_a.md' })
     // Now b gets it.
     assert.equal((await run(b!, ['claim', '2026-08-30_a.md'])).json.holder, 'agent-a1')
@@ -133,19 +132,27 @@ test('claim writes the lock as one pushed commit naming the holder; the second c
   }
 })
 
-test('the holder is the agent id inside a .branches/agent-<id> checkout, the branch elsewhere, and nobody when detached', async () => {
+test('the holder is AGENT_ID when the process that started the agent set it, the branch elsewhere, and nobody when detached', async () => {
   const { agents, cleanup } = await rig(1)
   const [a] = agents
+  const id = '2026-08-30T10-00-00-000Z'
   try {
-    // The project's checkout with an agent checkout under `.branches/`, as a daemon lays it out.
-    const wt = join(a!, '.branches', 'agent-2026-08-30T10-00-00-000Z')
-    await git(['worktree', 'add', wt, '-b', 'agent-2026-08-30T10-00-00-000Z'], a!)
-    const fromCheckout = await run(wt, ['claim', '2026-08-30_a.md'])
-    assert.equal(fromCheckout.json.holder, '2026-08-30T10-00-00-000Z')
-    // The id survives the session's rename: the directory keeps it, the branch does not.
-    await git(['branch', '-m', 'agent-2026-08-30T10-00-00-000Z', 'agent-named'], wt)
-    assert.equal((await run(wt, ['release', '2026-08-30_a.md'])).json.holder, '2026-08-30T10-00-00-000Z')
-    // Detached: nothing to claim as.
+    // An agent checkout under `.branches/`, as a daemon lays it out; the folder name means nothing
+    // to the command, only the environment and the branch do.
+    const wt = join(a!, '.branches', `agent-${id}`)
+    await git(['worktree', 'add', wt, '-b', `agent-${id}`], a!)
+    assert.equal((await run(wt, ['claim', '2026-08-30_a.md'])).json.holder, `agent-${id}`, 'no AGENT_ID: the branch')
+    assert.equal((await run(wt, ['release', '2026-08-30_a.md'])).code, 0)
+    process.env['AGENT_ID'] = id
+    try {
+      assert.equal((await run(wt, ['claim', '2026-08-30_a.md'])).json.holder, id)
+      // The id survives the session's rename: the environment keeps it, the branch does not.
+      await git(['branch', '-m', `agent-${id}`, 'agent-named'], wt)
+      assert.equal((await run(wt, ['release', '2026-08-30_a.md'])).json.holder, id)
+    } finally {
+      delete process.env['AGENT_ID']
+    }
+    // Detached, and nobody said who: nothing to claim as.
     await git(['checkout', '--detach'], a!)
     const detached = await run(a!, ['claim', '2026-08-30_a.md'])
     assert.equal(detached.code, 1)
@@ -161,11 +168,11 @@ test('put writes a ticket, a plan or meta.json from stdin, never a lock; close r
   try {
     const put = await run(a!, ['put', '2026-08-31_c.md'], '# C\n')
     assert.deepEqual(put.json, { ok: true, file: 'tickets/2026-08-31_c.md' })
-    assert.equal(await git(['show', `${TICKETS_BRANCH}:tickets/2026-08-31_c.md`], bare), '# C\n')
-    assert.equal((await git(['log', '-1', '--format=%s', TICKETS_BRANCH], bare)).trim(), 'put tickets/2026-08-31_c.md')
+    assert.equal(await git(['show', `${DATA_BRANCH}:tickets/2026-08-31_c.md`], bare), '# C\n')
+    assert.equal((await git(['log', '-1', '--format=%s', DATA_BRANCH], bare)).trim(), 'put tickets/2026-08-31_c.md')
     assert.equal((await run(a!, ['put', '2026-08-31_c.plan.md'], 'Effort: 2\n\n# [Plan] C\n')).code, 0)
     assert.equal((await run(a!, ['put', 'meta.json'], '{"lastImportedAt":"2026-08-31T00:00:00.000Z"}')).code, 0)
-    assert.equal(await git(['show', `${TICKETS_BRANCH}:tickets/meta.json`], bare), '{"lastImportedAt":"2026-08-31T00:00:00.000Z"}')
+    assert.equal(await git(['show', `${DATA_BRANCH}:tickets/meta.json`], bare), '{"lastImportedAt":"2026-08-31T00:00:00.000Z"}')
     for (const bad of ['2026-08-31_c.lock.md', '../x.md', 'sub/x.md', 'x.txt']) {
       const refused = await run(a!, ['put', bad], 'x')
       assert.equal(refused.code, 1, bad)
@@ -193,7 +200,7 @@ test('put writes a ticket, a plan or meta.json from stdin, never a lock; close r
     }
     const closed = await run(a!, ['close', '2026-08-31_c.md'])
     assert.deepEqual(closed.json, { ok: true, file: 'tickets/2026-08-31_c.md' })
-    const left = (await git(['ls-tree', '--name-only', `${TICKETS_BRANCH}:tickets`], bare)).split('\n').filter(Boolean)
+    const left = (await git(['ls-tree', '--name-only', `${DATA_BRANCH}:tickets`], bare)).split('\n').filter(Boolean)
     // b's claim on a.md stands: the close touched c's files only.
     assert.deepEqual(left.sort(), ['2026-08-29_b.md', '2026-08-29_b.plan.md', '2026-08-30_a.lock.md', '2026-08-30_a.md', 'meta.json'])
     assert.equal((await run(a!, ['close', '2026-08-31_c.md'])).json.reason, 'no-ticket')
@@ -213,14 +220,14 @@ test('queue add places an entry by priority, links a ticket by --ticket, and que
     assert.deepEqual(linked.json, { ok: true, entry: '[Do A](tickets/2026-08-30_a.md)', priority: 8 })
     const plain = await run(a!, ['queue', 'add', 'Last, unranked'])
     assert.deepEqual(plain.json, { ok: true, entry: 'Last, unranked' })
-    const md = await git(['show', `${TICKETS_BRANCH}:TODO_AGENTS.md`], bare)
+    const md = await git(['show', `${DATA_BRANCH}:TODO_AGENTS.md`], bare)
     assert.equal(md, '## Priority 8\n\n- [Do A](tickets/2026-08-30_a.md)\n\n## Priority 5\n\n- [Do B](tickets/2026-08-29_b.md)\n\n## Priority 3\n\n- Tidy the loader\n- Last, unranked\n')
-    assert.equal((await git(['log', '-1', '--format=%s', TICKETS_BRANCH], bare)).trim(), 'queue add: Last, unranked')
+    assert.equal((await git(['log', '-1', '--format=%s', DATA_BRANCH], bare)).trim(), 'queue add: Last, unranked')
     assert.deepEqual((await run(a!, ['queue'])).json, ['[Do A](tickets/2026-08-30_a.md)', '[Do B](tickets/2026-08-29_b.md)', 'Tidy the loader', 'Last, unranked'])
     const done = await run(a!, ['queue', 'done', '[Do B](tickets/2026-08-29_b.md)'])
     assert.deepEqual(done.json, { ok: true, entry: '[Do B](tickets/2026-08-29_b.md)' })
-    assert.ok(!(await git(['show', `${TICKETS_BRANCH}:TODO_AGENTS.md`], bare)).includes('Do B'))
-    assert.ok(!(await git(['show', `${TICKETS_BRANCH}:TODO_AGENTS.md`], bare)).includes('[x]'), 'deleted, not checked off')
+    assert.ok(!(await git(['show', `${DATA_BRANCH}:TODO_AGENTS.md`], bare)).includes('Do B'))
+    assert.ok(!(await git(['show', `${DATA_BRANCH}:TODO_AGENTS.md`], bare)).includes('[x]'), 'deleted, not checked off')
     const gone = await run(a!, ['queue', 'done', 'never there'])
     assert.equal(gone.code, 1)
     assert.equal(gone.json.reason, 'no-entry')
@@ -240,8 +247,8 @@ test('a repository with no remote reads its local branch and refuses to write; o
     await writeFile(join(solo, 'README.md'), '# t\n')
     await git(['add', '-A'], solo)
     await git(['commit', '-m', 'init'], solo)
-    const commit = (await git(['commit-tree', '4b825dc642cb6eb9a060e54bf8d69288fbee4904', '-m', 'create the tickets branch'], solo)).trim()
-    await git(['branch', TICKETS_BRANCH, commit], solo)
+    const commit = (await git(['commit-tree', '4b825dc642cb6eb9a060e54bf8d69288fbee4904', '-m', 'create the agent-data branch'], solo)).trim()
+    await git(['branch', DATA_BRANCH, commit], solo)
     assert.deepEqual((await run(solo, ['list'])).json, [])
     const refused = await run(solo, ['queue', 'add', 'x'])
     assert.equal(refused.code, 1)

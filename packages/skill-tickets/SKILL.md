@@ -37,7 +37,7 @@ npx tickets queue done <entry>   take an entry off the queue, as `npx tickets qu
 npx tickets claim <file>         {"ok":true,"holder":…} — the ticket is yours
                                  {"ok":false,"reason":"claimed","holder":…} — someone else's: back off,
                                  pick another; never remove or overwrite their lock
-npx tickets release <file>       lift your own claim (a finished plan, work that is published)
+npx tickets release <file>       lift your own claim — the plan is finished, or the work is published
 ```
 
 `<file>` is the ticket's filename, e.g. `2042-01-01_some-ticket.md`. You claim as `AGENT_ID` when the process that started you set it in your environment, else as your branch; nothing to type.

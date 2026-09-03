@@ -18,10 +18,10 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 - After a rename, a link named as the new branch is put beside the folder, so
   `.branches/agent-<name>` reaches every checkout by its current branch; the package makes
   the link and removes it when the checkout goes.
-- Branch names are `agent-<name>`, with no `/`: the folder is named after the branch, a
-  folder name cannot hold a slash, and a slashed ref name does not resolve as a cloud
-  session's revision. The package renames and deletes only `agent-*` branches; the user's
-  own branches are never touched.
+- Branch names are `agent-<name>`, with no `/`: the folder, and the link beside it, are
+  named after a branch, a name on disk cannot hold a slash, and a slashed ref name does
+  not resolve as a cloud session's revision. The package renames and deletes only
+  `agent-*` branches; the user's own branches are never touched.
 - `agent-data` is not an agent's: it is the data branch of `@gemstack/agent-data`, checked
   out beside the agent checkouts as `.branches/agent-data`. The package never lists,
   renames or deletes it, `data` is refused as an agent id, and an agent naming itself
@@ -31,15 +31,18 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   so the later push cannot land on someone else's branch; never the checkout's own branch,
   so asking again for the name it already carries changes nothing. Two agents naming the
   same thing at once race on the rename; the loser takes the next suffix.
+- Continuing an agent puts it back on the branch its work is on; a branch that is gone is
+  recreated from the project's head, since the only branch the package deletes is one that
+  held nothing past what the remote already had.
 - The user's installed dependencies are linked into the checkout, not copied and not
   reinstalled. One link per entry of the folder, not one link to the whole folder, so an
   install in the checkout writes into the checkout; a scope (`@acme`) is one entry, so a
   scoped install still reaches the user's folder. Every dependency folder down to two
   levels under the root is linked, not only the root's, so a workspace package's own
-  dependencies are there too. The package manager's own state (`.pnpm`, `.modules.yaml`)
-  is not linked, only `.bin` is, because the agent runs the project's tools: linked, that
-  state marks the user's tree as the checkout's own install, and an install in the
-  checkout then rewrites, or purges, the user's dependency folder.
+  dependencies are there too. No dot-entry of the folder is linked except `.bin`, which
+  is, because the agent runs the project's tools. The package manager's own state
+  (`.pnpm`, `.modules.yaml`) marks the tree it sits in as that folder's own install:
+  linked, an install in the checkout rewrites, or purges, the user's dependency folder.
 
 ## Flow: reclaim
 Deleting an agent's checkout to free the disk. It goes only once everything in it is on
@@ -50,11 +53,10 @@ program allows a push.
   until a person commits or deletes it.
 - An `agent-*` branch whose commits have already reached the remote through another
   branch, as after a merge, holds nothing of its own and is deleted with its checkout.
-- A checkout whose tip is inside a pushed commit the program names, what a cloud session
-  pushed on the agent's behalf, goes without a push and keeps its branch.
+- A checkout whose tip is inside a pushed commit the program names — the commit a cloud
+  session pushed on the agent's behalf — goes without a push and keeps its branch.
 - An agent that switched to another branch leaves `agent-<id>` behind; it goes with the
-  checkout once the branch the agent ended on contains it; an `agent-*` branch only, like
-  every branch the package deletes.
+  checkout once the branch the agent ended on contains it.
 - A folder under `.branches/` that git no longer knows as a worktree is left alone: git
   run inside it would act on the user's own checkout.
 - The package does git and the filesystem, nothing else. Anything else it needs to know,

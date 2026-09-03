@@ -73,10 +73,11 @@ Fetch what others pushed → make the change → commit → push.
   when the rebase conflicts, the checkout is reset to origin's tip and every unpushed
   commit goes with it: the remote wins, only the current change runs again, and what was
   dropped is never reported.
-- An op is handed a directory and writes into it as it likes; `BranchFileFs` is the seam
-  it can write through instead, injectable so an op is testable off disk, and it creates
-  parent directories: git keeps no empty directory, so a skill's folder is gone with its
-  last file and absent on a branch just born.
+- An op is handed a directory and writes into it as it likes; `BranchFileFs` is the file
+  seam an op can take instead of the disk (the type and its node implementation ship here,
+  the op does the injecting, so it is testable off disk), and it creates parent
+  directories: git keeps no empty directory, so a skill's folder is gone with its last
+  file and absent on a branch just born.
 - The remote is always `origin`, and a repository without one counts as remote-less
   whatever other remotes it has: the process's write commits locally and reports no error;
   a command's write refuses, as an outcome it returns, not as a throw; the pull reports an

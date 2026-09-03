@@ -43,10 +43,14 @@ function resolveDeps(deps: FileBranchDeps): Resolved {
   return { git: deps.git ?? nodeGitRunner(), log: deps.log ?? (() => {}) }
 }
 
-/** Whether the repo has any remote to sync the branch with. */
+/**
+ * Whether the repo has `origin` to sync the branch with. Every fetch and push here names
+ * `origin`, so a repo whose only remote is called something else is remote-less to this module:
+ * the stated no-remote outcomes, not a push that fails twice.
+ */
 async function hasRemote(cwd: string, git: GitRunner): Promise<boolean> {
   try {
-    return (await git(['remote'], cwd)).trim().length > 0
+    return (await git(['remote'], cwd)).split('\n').some(line => line.trim() === 'origin')
   } catch {
     return false
   }

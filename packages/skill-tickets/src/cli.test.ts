@@ -170,7 +170,7 @@ test('put writes a ticket, a plan or meta.json from stdin, never a lock; close r
     assert.deepEqual(put.json, { ok: true, file: 'tickets/2026-08-31_c.md' })
     assert.equal(await git(['show', `${DATA_BRANCH}:tickets/2026-08-31_c.md`], bare), '# C\n')
     assert.equal((await git(['log', '-1', '--format=%s', DATA_BRANCH], bare)).trim(), 'put tickets/2026-08-31_c.md')
-    assert.equal((await run(a!, ['put', '2026-08-31_c.plan.md'], 'Effort: 2\n\n# [Plan] C\n')).code, 0)
+    assert.equal((await run(a!, ['put', 'tickets/2026-08-31_c.plan.md'], 'Effort: 2\n\n# [Plan] C\n')).code, 0, 'the tickets/ path form, as a queue entry links it')
     assert.equal((await run(a!, ['put', 'meta.json'], '{"lastImportedAt":"2026-08-31T00:00:00.000Z"}')).code, 0)
     assert.equal(await git(['show', `${DATA_BRANCH}:tickets/meta.json`], bare), '{"lastImportedAt":"2026-08-31T00:00:00.000Z"}')
     for (const bad of ['2026-08-31_c.lock.md', '../x.md', 'sub/x.md', 'x.txt']) {

@@ -7,13 +7,13 @@ description: Where the project's tickets and its agent queue live, how to read a
 
 The tickets (`tickets/<DATE>_<SLUG>.md`, with their `.plan.md` and `.lock.md` siblings) and the agent queue (`TODO_AGENTS.md`) live on the branch `agent-data`, never on a code branch. Your checkout does not contain them. A `tickets` link at the repository root may show them: read there if you like, never write there.
 
-Read and change them with the `tickets` command. It comes with the npm package `@gemstack/skill-tickets`, a dependency of this repository: install the repository's dependencies once — `npm install`, or the package manager its lockfile belongs to — then run it as `npx tickets`. Every change it makes is one commit pushed straight to the `agent-data` branch (a rejected push is re-applied on the branch's new tip and pushed again); these files never belong on your branch.
+Read and change them with the `tickets` command. It comes with the npm package `@gemstack/skill-tickets`, a dependency of this repository: install the repository's dependencies once — `npm install`, or the package manager its lockfile belongs to — then run it as `npx tickets`. Every change it makes is one commit pushed straight to the `agent-data` branch.
 
 ## Read
 
 ```
 npx tickets list                 every open ticket, as JSON: file, title, summary, priority, topics,
-                             github, date, planned, effort, uncertainty, locked, lockedBy
+                                 github, date, planned, effort, uncertainty, locked, lockedBy
 npx tickets show <file>          one ticket: its text, its plan, who holds it
 npx tickets queue                the queue's open entries, in order of work
 ```
@@ -22,12 +22,12 @@ npx tickets queue                the queue's open entries, in order of work
 
 ```
 npx tickets put <file>           write one file under tickets/ from stdin: a ticket, a plan, or meta.json
-                             (whatever the program importing issues keeps there)
+                                 (whatever the program importing issues keeps there)
 npx tickets close <file>         remove a ticket with its plan and lock — tickets/ holds only open
-                             tickets; refused while someone else holds the ticket
+                                 tickets; refused while someone else holds the ticket
 npx tickets queue add <text> [--priority N] [--ticket <file>]
-                             put an entry on the queue; --ticket links it to the ticket and places
-                             it by the ticket's priority
+                                 put an entry on the queue; --ticket links it to the ticket and places
+                                 it by the ticket's priority
 npx tickets queue done <entry>   take an entry off the queue, as `npx tickets queue` printed it: done means deleted
 ```
 
@@ -35,8 +35,8 @@ npx tickets queue done <entry>   take an entry off the queue, as `npx tickets qu
 
 ```
 npx tickets claim <file>         {"ok":true,"holder":…} — the ticket is yours
-                             {"ok":false,"reason":"claimed","holder":…} — someone else's: back off,
-                             pick another; never remove or overwrite their lock
+                                 {"ok":false,"reason":"claimed","holder":…} — someone else's: back off,
+                                 pick another; never remove or overwrite their lock
 npx tickets release <file>       lift your own claim (a finished plan, work that is published)
 ```
 

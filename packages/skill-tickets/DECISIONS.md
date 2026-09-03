@@ -21,9 +21,11 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 - One claim per ticket; it never expires, only a release, or a close by whoever holds it,
   removes it. Whoever started an agent releases what it left claimed.
 - A lock is written only by a claim; `put` refuses `.lock.md`.
-- The holder's name is never typed; the command reads it from where it runs. Inside an
-  agent's checkout it is the agent id from the folder name, since the branch gets renamed
-  and the folder does not; anywhere else it is the current branch.
+- The holder's name is never typed; the command reads it from where it runs: `AGENT_ID`
+  from the environment when the program that started the agent set it, since the branch
+  gets renamed and the id does not; anywhere else it is the current branch. Reading the
+  id off the checkout's folder name was dropped: that is the branches skill's layout, and
+  a skill does not read another skill's.
 - The program says what a claim is for. A claim for planning is skipped, no lock written,
   when the ticket already has a plan; a claim for implementing is not.
 

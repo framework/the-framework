@@ -1,15 +1,11 @@
-import { BRANCHES_DIR } from '@gemstack/agent-data/names'
-
 /**
  * The names everything in the package hangs off, and the small pure rules that link a ticket to
  * the queue and to the issue it tracks. No node imports, so browser-side code can name them too.
+ *
+ * The branch itself is not named here: the tickets live on the shared data branch, `agent-data`,
+ * whose name `@gemstack/agent-data` exports as `DATA_BRANCH`. A convention, not a setting:
+ * `SKILL.md` names the same branch to every agent.
  */
-
-/** The branch the tickets and the queue live on. A convention, not a setting: `SKILL.md` names it to every agent. */
-export const TICKETS_BRANCH = 'tickets'
-
-/** The branch's persistent checkout under a project: `.branches/tickets`, beside the agent checkouts. */
-export const TICKETS_CHECKOUT_DIR = `${BRANCHES_DIR}/${TICKETS_BRANCH}`
 
 /**
  * The directory on the branch that holds the tickets — `tickets/<DATE>_<SLUG>.md`, their `.plan.md`

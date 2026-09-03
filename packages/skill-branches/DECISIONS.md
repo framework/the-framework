@@ -7,12 +7,14 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   Agents run in parallel, and the user's own copy is never an agent's workspace.
 - `.branches/` is hidden from the project's git through the repository's own exclude file,
   from the first checkout on: an untracked folder at the root would ride a sweeping `git
-  add -A` onto a code branch, and hiding it may not change a tracked file.
+  add -A` onto a code branch, and the hiding must not touch a tracked file, which rules
+  `.gitignore` out.
 - A checkout starts as branch `agent-<id>` in folder `.branches/agent-<id>/`; `<id>` is
-  whatever the program that starts the agent calls it. When the agent names itself,
-  through the command (`npx branches name <name>`), the branch is renamed to
-  `agent-<name>`; the folder keeps the id. A rename, not a new branch, so no empty branch
-  is left behind. The folder is not renamed, because the agent is running inside it.
+  what the program that starts the agent calls it, restricted to `[A-Za-z0-9_-]+` so no id
+  can build a path outside `.branches/`. When the agent names itself, through the command
+  (`npx branches name <name>`), the branch is renamed to `agent-<name>`; the folder keeps
+  the id. A rename, not a new branch, so no empty branch is left behind. The folder is not
+  renamed, because the agent is running inside it.
 - After a rename, a link named as the new branch is put beside the folder, so
   `.branches/agent-<name>` reaches every checkout by its current branch; the package makes
   the link and removes it when the checkout goes.
@@ -30,12 +32,14 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   so asking again for the name it already carries changes nothing. Two agents naming the
   same thing at once race on the rename; the loser takes the next suffix.
 - The user's installed dependencies are linked into the checkout, not copied and not
-  reinstalled. One link per package, not one link to the whole folder, so a package the
-  agent installs lands in its own checkout. Every dependency folder down to two levels
-  under the root is linked, not only the root's, so a workspace package's own dependencies
-  are there too. The package manager's own state (`.pnpm`, `.modules.yaml`) is not linked,
-  only `.bin` is: with it, an install in the checkout resolves through the links and
-  rewrites, or purges, the user's own dependency folder.
+  reinstalled. One link per entry of the folder, not one link to the whole folder, so an
+  install in the checkout writes into the checkout; a scope (`@acme`) is one entry, so a
+  scoped install still reaches the user's folder. Every dependency folder down to two
+  levels under the root is linked, not only the root's, so a workspace package's own
+  dependencies are there too. The package manager's own state (`.pnpm`, `.modules.yaml`)
+  is not linked, only `.bin` is, because the agent runs the project's tools: linked, that
+  state marks the user's tree as the checkout's own install, and an install in the
+  checkout then rewrites, or purges, the user's dependency folder.
 
 ## Flow: reclaim
 Deleting an agent's checkout to free the disk. It goes only once everything in it is on
@@ -46,13 +50,16 @@ program allows a push.
   until a person commits or deletes it.
 - An `agent-*` branch whose commits have already reached the remote through another
   branch, as after a merge, holds nothing of its own and is deleted with its checkout.
+- A checkout whose tip is inside a pushed commit the program names, what a cloud session
+  pushed on the agent's behalf, goes without a push and keeps its branch.
 - An agent that switched to another branch leaves `agent-<id>` behind; it goes with the
   checkout once the branch the agent ended on contains it; an `agent-*` branch only, like
   every branch the package deletes.
 - A folder under `.branches/` that git no longer knows as a worktree is left alone: git
   run inside it would act on the user's own checkout.
-- The package only does git. Anything else it needs to know, like whether it may push, the
-  program using it passes in; the package never reads that program's files.
+- The package does git and the filesystem, nothing else. Anything else it needs to know,
+  like whether it may push, the program using it passes in; the package never reads that
+  program's files.
 
 ## The skill
 - The agent commits and stops: it never pushes, opens a pull request, or merges. Whoever
@@ -67,4 +74,5 @@ program allows a push.
 - Each agent tool (Claude Code, Codex) looks for skills in its own folder at the root of
   the checkout: `.claude/skills`, `.agents/skills`. The package links its own folder,
   where `SKILL.md` sits, into each of those as `branches` in every checkout it makes, and
-  hides the links from git. Temporary, until the project commits the skill files itself.
+  hides the links from git. A caller may name further skills to be linked in beside it,
+  each under its own name; temporary, until the project commits its own skill files.

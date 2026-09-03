@@ -2,10 +2,12 @@ Non-obvious decisions only, grouped by business-logic flow. Anything not listed 
 to the implementer's judgment. Flag conflicts instead of silently deviating.
 
 ## The checkout
-- One checkout per agent: a git worktree of the user's repository under `.branches/`, in a
-  folder named after the agent's branch. A worktree, not a clone, so every checkout shares
-  the repository's objects and refs. Agents run in parallel, and the user's own copy is
-  never an agent's workspace.
+- One checkout per agent: a git worktree of the user's repository under `.branches/`. A
+  worktree, not a clone, so every checkout shares the repository's objects and refs.
+  Agents run in parallel, and the user's own copy is never an agent's workspace.
+- `.branches/` is hidden from the project's git through the repository's own exclude file,
+  from the first checkout on: an untracked folder at the root would ride a sweeping `git
+  add -A` onto a code branch, and hiding it may not change a tracked file.
 - A checkout starts as branch `agent-<id>` in folder `.branches/agent-<id>/`; `<id>` is
   whatever the program that starts the agent calls it. When the agent names itself,
   through the command (`npx branches name <name>`), the branch is renamed to
@@ -24,13 +26,16 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   `data` gets `agent-data-2`.
 - A taken name gets `-2`, `-3`, … instead of a refusal: the agent asked for a name and
   reads back the one it got. Taken means any local or remote-tracking branch of that name,
-  so the later push cannot land on someone else's branch. Two agents naming the same thing
-  at once race on the rename; the loser takes the next suffix.
+  so the later push cannot land on someone else's branch; never the checkout's own branch,
+  so asking again for the name it already carries changes nothing. Two agents naming the
+  same thing at once race on the rename; the loser takes the next suffix.
 - The user's installed dependencies are linked into the checkout, not copied and not
   reinstalled. One link per package, not one link to the whole folder, so a package the
-  agent installs lands in its own checkout. The package manager's own state (`.pnpm`,
-  `.modules.yaml`) is not linked, only `.bin` is: the links say what is installed, not
-  that this checkout installed it.
+  agent installs lands in its own checkout. Every dependency folder down to two levels
+  under the root is linked, not only the root's, so a workspace package's own dependencies
+  are there too. The package manager's own state (`.pnpm`, `.modules.yaml`) is not linked,
+  only `.bin` is: with it, an install in the checkout resolves through the links and
+  rewrites, or purges, the user's own dependency folder.
 
 ## Flow: reclaim
 Deleting an agent's checkout to free the disk. It goes only once everything in it is on
@@ -42,7 +47,8 @@ program allows a push.
 - An `agent-*` branch whose commits have already reached the remote through another
   branch, as after a merge, holds nothing of its own and is deleted with its checkout.
 - An agent that switched to another branch leaves `agent-<id>` behind; it goes with the
-  checkout once the branch the agent ended on contains it.
+  checkout once the branch the agent ended on contains it; an `agent-*` branch only, like
+  every branch the package deletes.
 - A folder under `.branches/` that git no longer knows as a worktree is left alone: git
   run inside it would act on the user's own checkout.
 - The package only does git. Anything else it needs to know, like whether it may push, the

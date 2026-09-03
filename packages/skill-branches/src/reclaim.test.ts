@@ -247,9 +247,11 @@ test('a birth branch that is not an agent branch is never deleted, however conta
     await git(['push', '-q', 'origin', 'HEAD:main'], repo)
     await git(['checkout', '-q', '-b', 'agent-cool-name'], path)
     await commitWork(path)
-    // A caller naming `main` as the birth branch: contained by the kept branch, and still not ours to delete.
-    assert.deepEqual(await reclaimWorktree(repo, path, { birthBranch: 'main', mayPush: true }), { ok: true })
-    assert.ok((await git(['rev-parse', '--verify', 'refs/heads/main'], repo)).trim(), 'main is still there')
+    // A caller naming the user's own branch as the birth branch: contained by the kept branch, and
+    // still not ours to delete. The fixture's default branch, whatever git on this machine calls it.
+    const own = (await git(['rev-parse', '--abbrev-ref', 'HEAD'], repo)).trim()
+    assert.deepEqual(await reclaimWorktree(repo, path, { birthBranch: own, mayPush: true }), { ok: true })
+    assert.ok((await git(['rev-parse', '--verify', `refs/heads/${own}`], repo)).trim(), 'the user\'s branch is still there')
   } finally {
     await rm(repo, { recursive: true, force: true })
   }

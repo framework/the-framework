@@ -8,25 +8,30 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 - Tickets live on `agent-data`, the shared data branch named by `@gemstack/agent-data`,
   never on a code branch: an agent's checkout has no `tickets/` folder, and a pull request
   never carries a ticket. On its sync, the program that keeps the branch checked out links
-  `tickets` at the project root into the branch's persistent checkout,
-  `.branches/agent-data`, and only if nothing of that name is there. Git is told to ignore
-  it with two rules: `/tickets` hides root entries of that name, and `!/tickets/`
-  re-includes directories, which a link never is. Both are needed because
-  `.git/info/exclude` is one file for every worktree of the repository, the data branch's
-  checkout included, whose real `tickets/` folder must keep committing.
+  `tickets` at the project root to `.branches/agent-data/tickets` in the branch's
+  persistent checkout, and only if nothing of that name is there. Git is told to ignore it
+  with two rules: `/tickets` hides root entries of that name, and `!/tickets/` re-includes
+  directories, which a link never is. Both are needed because `.git/info/exclude` is one
+  file for every worktree of the repository, the data branch's checkout included, whose
+  real `tickets/` folder must keep committing.
 - `tickets/` holds only open tickets: closing one deletes it, with its plan and its claim.
-- `list` answers newest ticket first, dated by the `<DATE>_` its filename carries; git
-  keeps no modification times, so a ticket without one is dated the epoch and sorts last.
+- `list` answers newest ticket first, dated by the `<DATE>_` its filename carries; a
+  filename with no date is dated the epoch and sorts last, a read off git having no
+  modification time to fall back on.
 - The skill knows no issue tracker: a ticket may carry a `GitHub:` line with its issue,
   but importing issues is the program's job.
 
 ## Flow: a claim
 - A claim is a committed file holding one line, `CLAIMED: <who>`, so that agents on other
   machines see it too.
-- One claim per ticket; it never expires: only its holder lifts it, by releasing the
-  ticket or by closing it. The program that started an agent releases what it left
-  claimed.
+- One claim per ticket; it never expires: it lifts only on a deliberate release, the
+  ticket released or closed. The command releases and closes as the holder only; the
+  program that started an agent releases what it left claimed, by holder or whoever holds
+  the lock.
 - A lock is written only by a claim; `put` refuses `.lock.md`.
+- A claim the program's write cycle committed but could not push still counts as claimed:
+  the commit already guards this machine's readers, and the gap is logged. A cycle that
+  could not commit at all claims nothing.
 - A claim guards planning and working, not writing: `put` overwrites a ticket or its plan
   no matter who holds it, so an import can refresh a ticket someone is working.
 - A claim on a ticket the same holder already holds succeeds and writes nothing: a re-run
@@ -39,8 +44,8 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   to whichever program made the checkout, not to this skill.
 - The program says whether a claim is for planning or for implementing: a claim for
   planning is skipped, no lock written, when the ticket already has a plan; a claim for
-  implementing is never skipped, only someone's lock stands in its way. The command always
-  claims to implement.
+  implementing is not skipped for having a plan, the plan being what it came to implement;
+  only someone else's lock stands in its way. The command always claims to implement.
 - The lock's existence is the claim; the holder it names is only shown. A lock nobody can
   read still holds the ticket, and no command lifts it: it goes by hand on the branch.
 
@@ -75,9 +80,9 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 - One JSON document on stdout for every command that runs: the result, or the refusal. A
   refusal, a rule saying no, adds one line for a person on stderr and exits 1; an argument
   that cannot be read never gets that far: the usage on stderr, nothing on stdout, exit 2.
-- A git failure anywhere in a command is reported like a refusal, reason `git-failed`,
-  with git's own line on stderr: a caller parsing stdout never has to handle a command
-  that printed nothing.
+- Anything a command throws is reported like a refusal, reason `git-failed`, with the
+  error's own line on stderr: a caller parsing stdout never has to handle a command that
+  printed nothing.
 - `list` and `queue` answer with the bare JSON array; every other command answers with an
   object, its `ok` telling a result from a refusal.
 - Run outside a repository, a command refuses with `not-a-repo`: only git's own "not a git

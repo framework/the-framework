@@ -19,8 +19,8 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   `.branches/agent-<name>` reaches every checkout by its current branch; the package makes
   the link and removes it when the checkout goes.
 - Branch names are `agent-<name>`, with no `/`: the folder, and the link beside it, are
-  named after a branch, a name on disk cannot hold a slash, and a slashed ref name does
-  not resolve as a cloud session's revision. The package renames and deletes only
+  named after a branch, a name on disk cannot hold a slash, and a slashed ref cannot be
+  handed to a hosted run as its starting revision. The package renames and deletes only
   `agent-*` branches; the user's own branches are never touched.
 - `agent-data` is not an agent's: it is the data branch of `@gemstack/agent-data`, checked
   out beside the agent checkouts as `.branches/agent-data`. The package never lists,
@@ -39,10 +39,11 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   install in the checkout writes into the checkout; a scope (`@acme`) is one entry, so a
   scoped install still reaches the user's folder. Every dependency folder down to two
   levels under the root is linked, not only the root's, so a workspace package's own
-  dependencies are there too. No dot-entry of the folder is linked except `.bin`, which
-  is, because the agent runs the project's tools. The package manager's own state
-  (`.pnpm`, `.modules.yaml`) marks the tree it sits in as that folder's own install:
-  linked, an install in the checkout rewrites, or purges, the user's dependency folder.
+  dependencies are there too. No dot-entry of the folder is linked except `.bin`: the
+  agent runs the project's tools. The package manager's own state (`.pnpm`,
+  `.modules.yaml`) is left out: it says the tree it sits in was installed there, which the
+  checkout's was not; the packages resolve without it, a link to a link resolving where
+  the target lives.
 
 ## Flow: reclaim
 Deleting an agent's checkout to free the disk. It goes only once everything in it is on

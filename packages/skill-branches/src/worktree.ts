@@ -2,6 +2,7 @@ import { basename, dirname, join } from 'node:path'
 import { realpath } from 'node:fs/promises'
 import { nodeGitRunner, checkoutRoot, type GitRunner, BRANCHES_DIR } from '@gemstack/agent-data'
 import { AGENT_BRANCH_PREFIX, isSafeAgentId, isAgentBranch, agentBranchName, agentIdFromWorktreeDir } from './branch-names.js'
+import { DATA_BRANCH } from '@gemstack/agent-data/names'
 
 /**
  * Git-worktree lifecycle for concurrent agents (#453/#735): give each agent its own
@@ -307,6 +308,8 @@ export async function nameBranch(path: string, name: string, git: GitRunner = no
   for (let attempt = 1; ; attempt++) {
     const taken = await branchNames(path, git)
     taken.delete(current)
+    // The data branch is nobody's session, whether or not this repo has it yet: `name data` gets `-2`.
+    taken.add(DATA_BRANCH)
     let branch = wanted
     for (let n = 2; taken.has(branch); n++) branch = `${wanted}-${n}`
     if (branch === current) return { ok: true, branch }

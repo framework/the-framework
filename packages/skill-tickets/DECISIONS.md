@@ -7,13 +7,13 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   and `.lock.md`.
 - Tickets live on `agent-data`, the shared data branch named by `@gemstack/agent-data`,
   never on a code branch: an agent's checkout has no `tickets/` folder, and a pull request
-  never carries a ticket. For a person, the program that keeps the branch checked out
-  links `tickets` at the project root into the branch's persistent checkout,
+  never carries a ticket. On its sync, the program that keeps the branch checked out links
+  `tickets` at the project root into the branch's persistent checkout,
   `.branches/agent-data`, and only if nothing of that name is there. Git is told to ignore
   it with two rules: `/tickets` hides root entries of that name, and `!/tickets/`
-  re-includes directories, which a link never is. Both are needed because the exclude file
-  speaks for the data branch's checkout too, whose real `tickets/` folder must keep
-  committing.
+  re-includes directories, which a link never is. Both are needed because
+  `.git/info/exclude` is one file for every worktree of the repository, the data branch's
+  checkout included, whose real `tickets/` folder must keep committing.
 - `tickets/` holds only open tickets: closing one deletes it, with its plan and its claim.
 - `list` answers newest ticket first, dated by the `<DATE>_` its filename carries; git
   keeps no modification times, so a ticket without one is dated the epoch and sorts last.
@@ -37,10 +37,10 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   agent names its session. A checkout on no branch is refused rather than claiming as
   `HEAD`. Reading the id off the checkout's folder name was dropped: that layout belongs
   to whichever program made the checkout, not to this skill.
-- The program says which side of a ticket's life a claim is for: a claim for planning is
-  skipped, no lock written, when the ticket already has a plan; a claim for implementing
-  is never skipped, only someone's lock stands in its way. The command always claims to
-  implement.
+- The program says whether a claim is for planning or for implementing: a claim for
+  planning is skipped, no lock written, when the ticket already has a plan; a claim for
+  implementing is never skipped, only someone's lock stands in its way. The command always
+  claims to implement.
 - The lock's existence is the claim; the holder it names is only shown. A lock nobody can
   read still holds the ticket, and no command lifts it: it goes by hand on the branch.
 
@@ -49,16 +49,18 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   10` down to `## Priority 0`, an entry a list item under one of them. Work is taken from
   the top: highest section first, first line first.
 - An entry is plain text: the task a future agent is started with. `--ticket` writes it as
-  a markdown link to the ticket, resolved once when the entry is added; the queue itself
-  only stores and removes lines. The program that starts agents reads that link back, to
-  claim the ticket for the agent it starts on the entry.
-- An entry added with no priority goes to the end of the file; one linked to a ticket
-  takes the ticket's priority, 5 when the ticket has none or names one that is not a whole
-  0-10: clamping a typo would claim 10 or 0, both reserved ends of the scale. A priority
-  the file has no section for gets one, placed before the first lower section so the file
-  stays sorted high to low. An entry joins the end of its section: within a priority, the
-  queue is first in, first taken.
-- Done means deleted, never checked off.
+  a markdown link to the ticket, read once when the entry is added, for the ticket's
+  priority and to refuse an entry pointing at no ticket; the queue itself only stores and
+  removes lines. The program that starts agents reads that link back, to claim the ticket
+  for the agent it starts on the entry.
+- An entry added with no priority is appended at the end of the file, so it lands in
+  whatever section ends it; one linked to a ticket takes the ticket's priority, 5 when the
+  ticket has none or names one that is not a whole 0-10: clamping a typo would claim 10 or
+  0, both reserved ends of the scale. A priority the file has no section for gets one,
+  placed before the first lower section so the file stays sorted high to low. An entry
+  joins the end of its section.
+- Done means deleted, never checked off: a `- [x]` line is not an open entry, and `queue`
+  never lists it.
 
 ## Flow: the command
 - The command reads with `list`, `show` and `queue`, and writes with `put` (a ticket, a
@@ -78,6 +80,8 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   that printed nothing.
 - `list` and `queue` answer with the bare JSON array; every other command answers with an
   object, its `ok` telling a result from a refusal.
+- Run outside a repository, a command refuses with `not-a-repo`: only git's own "not a git
+  repository" reads as that, every other git failure stays `git-failed`.
 - A write is one commit per command, pushed straight to origin through a throwaway
   worktree at origin's tip; a push that loses a race is re-applied on the new tip by
   `@gemstack/agent-data`. A repository with no remote is refused.

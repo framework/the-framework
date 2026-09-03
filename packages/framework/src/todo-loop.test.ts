@@ -8,8 +8,7 @@ import type { ChoicePick, ChoiceRequest, FrameworkEvent } from './events.js'
 import { nextQueuedTicket, runTodoLoop, agentTodoPending, ticketForPrompt } from './todo-loop.js'
 import { drainsQueue, presets } from './preset-catalog.js'
 import { AUTO_PM_DRAIN_JOB, AUTO_PM_JOBS } from './auto-pm.js'
-import { fileBranchPath, nodeGitRunner, withFileBranch } from '@gemstack/agent-data'
-import { TICKETS_BRANCH } from '@gemstack/skill-tickets'
+import { fileBranchPath, nodeGitRunner, withFileBranch, DATA_BRANCH } from '@gemstack/agent-data'
 
 const git = nodeGitRunner()
 const RETRIED_RM = { recursive: true, force: true, maxRetries: 10 } as const
@@ -18,7 +17,7 @@ async function tmpWorkspace(): Promise<string> {
   return mkdtemp(join(tmpdir(), 'framework-todo-'))
 }
 
-/** A real repo: the queue lives on its tickets branch (#1582/#1748), so the reads need actual git. */
+/** A real repo: the queue lives on the `agent-data` branch (#1582/#1748), so the reads need actual git. */
 async function repoWorkspace(): Promise<string> {
   const repo = await realpath(await mkdtemp(join(tmpdir(), 'framework-todo-repo-')))
   await git(['init', '-b', 'main'], repo)
@@ -30,17 +29,17 @@ async function repoWorkspace(): Promise<string> {
   return repo
 }
 
-/** Put the queue on the tickets branch, committed, the way every real writer does. */
+/** Put the queue on the `agent-data` branch, committed, the way every real writer does. */
 async function seedQueue(repo: string, md: string): Promise<void> {
-  const result = await withFileBranch(repo, TICKETS_BRANCH, 'seed', async dir => {
+  const result = await withFileBranch(repo, DATA_BRANCH, 'seed', async dir => {
     await writeFile(join(dir, 'TODO_AGENTS.md'), md, 'utf8')
   })
   assert.ok(result.ok, 'seeding the queue must land')
 }
 
-/** The queue as committed on the tickets branch. */
+/** The queue as committed on the `agent-data` branch. */
 async function queueOnBranch(repo: string): Promise<string> {
-  return git(['show', `${TICKETS_BRANCH}:TODO_AGENTS.md`], repo)
+  return git(['show', `${DATA_BRANCH}:TODO_AGENTS.md`], repo)
 }
 
 test('runTodoLoop works the backlog to empty, one entry per turn, checking each off itself (#323/#1582)', async () => {
@@ -123,8 +122,8 @@ test('a removal that cannot land stops the loop instead of re-working the entry 
   try {
     // Break the branch's checkout: the branch still reads (git show), but the write funnel cannot
     // have its worktree, so every removal fails.
-    await git(['worktree', 'remove', '--force', fileBranchPath(repo, TICKETS_BRANCH)], repo)
-    await writeFile(fileBranchPath(repo, TICKETS_BRANCH), 'not a directory\n')
+    await git(['worktree', 'remove', '--force', fileBranchPath(repo, DATA_BRANCH)], repo)
+    await writeFile(fileBranchPath(repo, DATA_BRANCH), 'not a directory\n')
     const events: FrameworkEvent[] = []
     const session = await new FakeDriver({ respond: () => 'worked it' }).start({ cwd: repo })
     const result = await runTodoLoop({ session, cwd: repo, emit: e => events.push(e) })

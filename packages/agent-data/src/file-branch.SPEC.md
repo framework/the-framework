@@ -26,7 +26,7 @@ A branch used as a file store: a branch of the project's repository holding file
 - **Conflicts resolve toward origin** - the checkout is nobody's working tree, so origin always wins and the local intent is re-applied on top.
 - **A failed operation leaves nothing half-written** - the checkout is put back to its committed state before the failure is reported.
 - **The eager pull** - the same cycle applying no change: it converges this machine with origin, pushes anything a failed cycle stranded, and creates the checkout if there is none.
-- **A repository with no remote** - fine for a funneled write, an error for the pull, a refusal for a detached write.
+- **A repository with no remote** - no `origin`, whatever other remotes it has: fine for a funneled write, an error for the pull, a refusal for a detached write.
 - **Reading from anywhere in the repository** - the persistent checkout when this location has one, else the branch's ref, else origin's copy of it, so a reader holds no copy of the files; a read can ask for a fresh copy instead.
 - **A reader that fetches once** - a reader opening many files fetches up front, picks one ref, and takes every read off it.
 - **A detached one-shot write** - a command in any clone writes through a throwaway worktree on origin's tip and pushes straight to the branch, never touching the persistent checkout.
@@ -120,7 +120,7 @@ It reports why it could not converge — a push origin rejected, or no origin to
 
 #### Business logic
 
-A repository with no remote is fine for a funneled write: the commit is safe locally, and the write reports that it did not push. It is an error for the pull, whose entire job is to meet the other machines, and it is refused outright for a detached write, which has nothing but the remote to write through. A repository nothing else can reach is a state the caller has to surface, not a mode this supports.
+A repository with no remote — no remote named `origin`; the module names `origin` in every fetch and push, so any other remote does not count — is fine for a funneled write: the commit is safe locally, and the write reports that it did not push. It is an error for the pull, whose entire job is to meet the other machines, and it is refused outright for a detached write, which has nothing but the remote to write through. A repository nothing else can reach is a state the caller has to surface, not a mode this supports.
 
 ### Reading from anywhere in the repository
 

@@ -335,7 +335,7 @@ export interface QueuedTicket {
  */
 /**
  * Release a ticket's `.lock.md` claim by hand (#1420): the dashboard's answer to a dead agent,
- * since no timer frees locks anymore. One committed, pushed change on the `tickets` branch — a
+ * since no timer frees locks anymore. One committed, pushed change on the `agent-data` branch — a
  * release only this machine can see would leave the ticket claimed everywhere the claim matters.
  */
 export async function sendReleaseTicketLock(projectId: string, ticket: string): Promise<{ ok: boolean; error?: string }> {

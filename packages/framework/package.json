@@ -33,14 +33,14 @@
     "the-framework": "dist/bin.js"
   },
   "scripts": {
-    "build": "pnpm -C ../skill-tickets build && pnpm -C ../agent-driver build && node scripts/gen-prompts.mjs && tsc -p tsconfig.build.json && cd dashboard && vite build",
+    "build": "pnpm -C ../skill-branches build && pnpm -C ../skill-tickets build && pnpm -C ../agent-driver build && node scripts/gen-prompts.mjs && tsc -p tsconfig.build.json && cd dashboard && vite build",
     "preview": "pnpm build && node dist/bin.js",
-    "dev": "pnpm -C ../skill-tickets build && pnpm -C ../agent-driver build && node scripts/gen-prompts.mjs && tsc -p tsconfig.build.json --watch",
+    "dev": "pnpm -C ../skill-branches build && pnpm -C ../skill-tickets build && pnpm -C ../agent-driver build && node scripts/gen-prompts.mjs && tsc -p tsconfig.build.json --watch",
     "dev:dashboard": "cd dashboard && vite",
     "dev:daemon": "cd dashboard && FRAMEWORK_DEV_DAEMON=1 vite",
     "design:build": "tsx dashboard/design/build.mts",
-    "typecheck": "pnpm -C ../skill-tickets build && pnpm -C ../agent-driver build && node scripts/gen-prompts.mjs && tsc --noEmit && tsc --noEmit -p dashboard/tsconfig.json",
-    "test": "pnpm -C ../skill-tickets build && pnpm -C ../agent-driver build && node scripts/gen-prompts.mjs && tsc -p tsconfig.test.json && node scripts/run-tests.mjs && cd dashboard && vitest run",
+    "typecheck": "pnpm -C ../skill-branches build && pnpm -C ../skill-tickets build && pnpm -C ../agent-driver build && node scripts/gen-prompts.mjs && tsc --noEmit && tsc --noEmit -p dashboard/tsconfig.json",
+    "test": "pnpm -C ../skill-branches build && pnpm -C ../skill-tickets build && pnpm -C ../agent-driver build && node scripts/gen-prompts.mjs && tsc -p tsconfig.test.json && node scripts/run-tests.mjs && cd dashboard && vitest run",
     "clean": "rm -rf dist dist-test src/prompts.generated.ts",
     "gen:prompts": "node scripts/gen-prompts.mjs"
   },

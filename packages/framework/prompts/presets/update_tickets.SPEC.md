@@ -1,4 +1,4 @@
-The update-tickets preset: brings the project's tickets up to date with the repo's GitHub issues. It reconciles rather than refills — carrying across only what changed since the last import, editing existing tickets in place, and deleting the tickets of closed issues. Every write goes through the `tickets` skill's command, which commits and pushes it to the `tickets` branch on the spot.
+The update-tickets preset: brings the project's tickets up to date with the repo's GitHub issues. It reconciles rather than refills — carrying across only what changed since the last import, editing existing tickets in place, and deleting the tickets of closed issues. Every write goes through the `tickets` skill's command, which commits and pushes it to the `agent-data` branch on the spot.
 
 ## User story
 
@@ -38,7 +38,7 @@ See `## User story`: the project may have no tickets at all, may be up to date, 
 
 #### Business logic
 
-The agent reads the last import stamp from `tickets/meta.json` on the `tickets` branch, and asks the skill whether the project has any ticket at all. It then does exactly one of three things:
+The agent reads the last import stamp from `tickets/meta.json` on the `agent-data` branch, and asks the skill whether the project has any ticket at all. It then does exactly one of three things:
 
 - **Error** — there are existing tickets but no stamp, or the GitHub CLI is missing or logged out: the agent reports which of those it is and aborts.
 - **Empty** — there are no tickets: the agent treats this as a first import and brings every open issue across.

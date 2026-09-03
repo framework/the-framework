@@ -608,8 +608,8 @@ test('runAgent runs the backlog loop after the build when opted in (#323)', asyn
   const { mkdtemp, realpath, rm, writeFile } = await import('node:fs/promises')
   const { tmpdir } = await import('node:os')
   const { join } = await import('node:path')
-  const { nodeGitRunner, withFileBranch } = await import('@gemstack/agent-data')
-  // The queue lives on the tickets branch (#1582/#1748), so the fixture is a real repo.
+  const { nodeGitRunner, withFileBranch, DATA_BRANCH } = await import('@gemstack/agent-data')
+  // The queue lives on the `agent-data` branch (#1582/#1748), so the fixture is a real repo.
   const git = nodeGitRunner()
   const cwd = await realpath(await mkdtemp(join(tmpdir(), 'framework-run-todo-')))
   await git(['init', '-b', 'main'], cwd)
@@ -618,7 +618,7 @@ test('runAgent runs the backlog loop after the build when opted in (#323)', asyn
   await writeFile(join(cwd, 'README.md'), '# t\n')
   await git(['add', '-A'], cwd)
   await git(['commit', '-m', 'init'], cwd)
-  await withFileBranch(cwd, 'tickets', 'seed', async (dir: string) => {
+  await withFileBranch(cwd, DATA_BRANCH, 'seed', async (dir: string) => {
     await writeFile(join(dir, 'TODO_AGENTS.md'), '- [ ] leftover task\n', 'utf8')
   })
   try {

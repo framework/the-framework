@@ -15,8 +15,8 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   speaks for the data branch's checkout too, whose real `tickets/` folder must keep
   committing.
 - `tickets/` holds only open tickets: closing one deletes it, with its plan and its claim.
-- `list` answers newest ticket first, dated by the `<DATE>_` its filename carries; a
-  ticket without one has no date a branch read can give it, and sorts last.
+- `list` answers newest ticket first, dated by the `<DATE>_` its filename carries; git
+  keeps no modification times, so a ticket without one is dated the epoch and sorts last.
 - The skill knows no issue tracker. A ticket may carry a `GitHub:` line with its issue,
   but importing issues into tickets is done by the program using the skill, not by the
   skill.
@@ -41,6 +41,8 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 - The program says what a claim is for. A claim for planning is skipped, no lock written,
   when the ticket already has a plan; a claim for implementing is not. The command always
   claims to implement: `claim` never skips a planned ticket.
+- The lock's existence is the claim; the holder it names is only shown. A lock nobody can
+  read still holds the ticket, and no command lifts it: it goes by hand on the branch.
 
 ## The queue
 - The queue is one markdown file on the branch, `TODO_AGENTS.md`: sections `## Priority
@@ -65,8 +67,8 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   program keeps there.
 - A read fetches the branch from origin once and reads everything from that copy: only
   origin is sure to hold what every writer pushed, the command's own earlier writes
-  included. With no origin, the local branch is read instead; a read has nothing to lose
-  by it.
+  included. With no origin, the local branch is read instead: writes are refused there, so
+  nobody else can have moved it.
 - One JSON document on stdout for every command that runs: the result, or the refusal. A
   refusal, a rule saying no, adds one line for a person on stderr and exits 1; an argument
   that cannot be read never gets that far: the usage on stderr, nothing on stdout, exit 2.

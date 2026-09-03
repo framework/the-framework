@@ -240,6 +240,21 @@ test('the birth branch the agent branched away from goes with the checkout when 
   }
 })
 
+test('a birth branch that is not an agent branch is never deleted, however contained it is', async () => {
+  const { repo, path } = await repoWithDirtyWorktree()
+  const git = nodeGitRunner()
+  try {
+    await git(['push', '-q', 'origin', 'HEAD:main'], repo)
+    await git(['checkout', '-q', '-b', 'agent-cool-name'], path)
+    await commitWork(path)
+    // A caller naming `main` as the birth branch: contained by the kept branch, and still not ours to delete.
+    assert.deepEqual(await reclaimWorktree(repo, path, { birthBranch: 'main', mayPush: true }), { ok: true })
+    assert.ok((await git(['rev-parse', '--verify', 'refs/heads/main'], repo)).trim(), 'main is still there')
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})
+
 test('a commitless run leaves neither the branch it ended on nor its birth branch (#1650, #1657)', async () => {
   const { repo, path, branch: birth } = await repoWithDirtyWorktree()
   const git = nodeGitRunner()

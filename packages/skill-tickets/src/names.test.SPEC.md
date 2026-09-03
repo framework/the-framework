@@ -1,6 +1,6 @@
 What the tests cover: the conventions the skill names, and the pure rules tying a ticket to its siblings, to the queue and to the issue it tracks.
 
-- **The conventions** - the branch is `tickets`, its persistent checkout is `.branches/tickets`, the folder on the branch is `tickets/`, and the queue file is `TODO_AGENTS.md`.
+- **The conventions** - its persistent checkout of the `agent-data` branch is `.branches/agent-data`, the folder on the branch is `tickets/`, and the queue file is `TODO_AGENTS.md`.
 - **The siblings** - a ticket's plan and claim are named from its stem.
 - **A ticket's priority on the queue's scale** - a number 0 to 10 is taken as written, padding included; an unmarked ticket, a word, an out-of-range value and a fractional one all land in the middle rather than being guessed at or clamped.
 - **The ticket behind a queue entry** - a link into `tickets/` gives the ticket; an entry that is just text gives none, and neither does a link to anything else or a traversal dressed as a link.

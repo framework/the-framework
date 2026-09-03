@@ -5,7 +5,7 @@ import { appendFile, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promis
 import { agentIdFromStartedAt, startedAtFromAgentId, archiveWorktreeAgent, restoreArchivedAgent, listAgents, findAgent, archivedAgentPaths, readLiveMetas, readLiveMeta, resolveAgentEventsPath, EVENTS_FILE, META_FILE, isPidAlive, type AgentMeta } from './store/index.js'
 import { isGitRepo, nodeGitRunner, isGitTimeout, withFileBranch } from '@gemstack/agent-data'
 import { createCheckout, attachCheckout, agentBranchName, worktreePath, worktreeBranch, removeWorktree, pruneWorktrees, agentIdFromWorktreeDir, CLI_BIN_DIR as BRANCHES_BIN_DIR } from '@gemstack/skill-branches'
-import { isTicketPath, CLI_BIN_DIR as TICKETS_BIN_DIR, SKILL_DIR as TICKETS_SKILL_DIR, SKILL_NAME as TICKETS_SKILL_NAME } from '@gemstack/skill-tickets'
+import { isTicketPath, CLI_BIN_DIR as TICKETS_BIN_DIR, SKILL_DIR as TICKETS_SKILL_DIR, SKILL_NAME as TICKETS_SKILL_NAME, AGENT_ID_ENV } from '@gemstack/skill-tickets'
 import { LOGS_BRANCH, THE_FRAMEWORK_DIR } from './framework-dir.js'
 import type { FrameworkEvent } from './events.js'
 import { removeAgentSpec, writeAgentSpec } from './agent-spec.js'
@@ -108,10 +108,12 @@ function spawnDetached(binPath: string, specPath: string, stderrFile?: string, e
 /**
  * A spawned run's environment: ours, with the `branches` and `tickets` commands on its PATH
  * (#1725/#1748) — the agent names its session, checks its tree, and reads and changes the tickets
- * through the same packages the daemon does — plus the daemon's URL when it has one (#1328).
+ * through the same packages the daemon does — its id as `AGENT_ID`, so a claim it makes names the
+ * agent and not its branch, plus the daemon's URL when it has one (#1328).
  */
-function childEnv(daemonUrl: string | undefined, base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
-  const env = { ...base, PATH: [BRANCHES_BIN_DIR, TICKETS_BIN_DIR, base['PATH']].filter(Boolean).join(delimiter) }
+function childEnv(daemonUrl: string | undefined, agentId: string | undefined, base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...base, PATH: [BRANCHES_BIN_DIR, TICKETS_BIN_DIR, base['PATH']].filter(Boolean).join(delimiter) }
+  if (agentId) env[AGENT_ID_ENV] = agentId
   return daemonUrl ? { ...env, [DAEMON_URL_ENV]: daemonUrl } : env
 }
 
@@ -804,7 +806,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
         }
         return { ok: false, error: 'the daemon is shutting down' }
       }
-      const child = spawnDetached(realBin, specPath, workspace.agentId ? agentStderrPath(workspace.cwd) : undefined, childEnv(daemonUrl?.()))
+      const child = spawnDetached(realBin, specPath, workspace.agentId ? agentStderrPath(workspace.cwd) : undefined, childEnv(daemonUrl?.(), workspace.agentId))
       // The agent narrates itself through its own `.the-framework/events.jsonl`, which the
       // dashboard streams over `GET /_rpc/events`; the daemon just tracks liveness.
       const settle = (detail: string): void => {

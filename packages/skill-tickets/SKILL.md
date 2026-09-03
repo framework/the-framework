@@ -26,8 +26,9 @@ npx tickets put <file>           write one file under tickets/ from stdin: a tic
 npx tickets close <file>         remove a ticket with its plan and lock — tickets/ holds only open
                                  tickets; refused while someone else holds the ticket
 npx tickets queue add <text> [--priority N] [--ticket <file>]
-                                 put an entry on the queue; --ticket links it to the ticket and places
-                                 it by the ticket's priority
+                                 put an entry on the queue; --priority places it in that section,
+                                 --ticket links it to the ticket and places it by the ticket's
+                                 priority; with neither, it goes to the end of the file
 npx tickets queue done <entry>   take an entry off the queue, as `npx tickets queue` printed it: done means deleted
 ```
 

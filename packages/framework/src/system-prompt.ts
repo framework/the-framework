@@ -85,7 +85,7 @@ const TICKETS_BRIDGE = `${TICKETS_YOURSELF}\n\n${TICKETS_SKILL}`
  * {@link BUSINESS_KNOWLEDGE_DOCS}: it adds `GOAL.md`, `BUSINESS_LOGIC.md`, and the
  * roadmap/queue pointers the agent reads but does *not* fold knowledge back into — the tickets
  * (the potential work) and the agent queue, both the `tickets` skill's (#1748): they live on the
- * `tickets` branch, and the skill says how to read and change them and what their formats are.
+ * `agent-data` branch, and the skill says how to read and change them and what their formats are.
  * Repo-root paths, because that is the agent's cwd. README is left out: a repo's own `README.md`
  * already covers the overview.
  */
@@ -104,8 +104,8 @@ export const CONTEXT_DOCS: readonly ContextDoc[] = [
   { path: 'knowledge-base/MARKET_RESEARCH.md', comment: 'the market the project competes in' },
   // The catch-all (#683): any other file the agent parks under knowledge-base/.
   { path: 'knowledge-base/**.md', comment: 'more files holding knowledge related to the project' },
-  { path: 'tickets/**.md', comment: 'things to potentially work on; on the `tickets` branch — read and change them with the `tickets` skill' },
-  { path: 'TODO_AGENTS.md', comment: 'the AI task queue; on the `tickets` branch — read and change it with the `tickets` skill' },
+  { path: 'tickets/**.md', comment: 'things to potentially work on; on the `agent-data` branch — read and change them with the `tickets` skill' },
+  { path: 'TODO_AGENTS.md', comment: 'the AI task queue; on the `agent-data` branch — read and change it with the `tickets` skill' },
 ]
 
 /** The two halves of the rendered {@link SYSTEM_PROMPT_TEMPLATE}. */

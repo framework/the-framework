@@ -69,9 +69,9 @@ program allows a push.
   started it does that.
 - The skill says `npm install`, then `npx branches`, never a bare `branches`: on a fresh
   clone no such command exists yet.
-- One JSON document on stdout per command. A refusal, a rule saying no, adds one line for
-  a person on stderr and exits 1; an argument that cannot be read gets the usage and exits
-  2.
+- One JSON document on stdout for every command that runs: the result, or the refusal. A
+  refusal, a rule saying no, adds one line for a person on stderr and exits 1; an argument
+  that cannot be read never gets that far: the usage on stderr, nothing on stdout, exit 2.
 - An agent reading the skill can be in one of two places: inside a checkout the program
   that started it made for it, already on an `agent-*` branch; or in a plain clone of the
   repository, on `main` or on someone's branch. The skill tells them apart by the branch

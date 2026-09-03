@@ -3,9 +3,9 @@ import { test } from 'node:test'
 import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { nodeGitRunner, withFileBranch } from '@gemstack/agent-data'
+import { nodeGitRunner, withFileBranch, DATA_BRANCH } from '@gemstack/agent-data'
 import { appendQueueEntry, insertQueueEntry, parseQueueEntries, queueAdd, queueDone, readQueue, readQueueEntries, removeQueueEntry } from './queue.js'
-import { QUEUE_FILE, TICKETS_BRANCH } from './names.js'
+import { QUEUE_FILE } from './names.js'
 
 test('parseQueueEntries reads open list items and skips checked, blank and prose lines', () => {
   const md = ['# Backlog', '', 'Some prose about the backlog.', '- [ ] fix the login redirect', '- [x] already done', '- [X] also done', '- plain bullet entry', '* star bullet entry', '2. numbered entry', '- [ ]   ', '-    '].join('\n')
@@ -98,14 +98,14 @@ test('queueAdd and queueDone edit the queue on the branch, from the project and 
     assert.equal((await queueAdd(wt, 'from the worktree', 9)).ok, true)
     assert.deepEqual(await readQueueEntries(wt), ['from the worktree', 'ranked', 'unranked'])
     assert.deepEqual(await queueDone(wt, 'ranked'), { ok: true, changed: true })
-    assert.deepEqual(parseQueueEntries((await git(['show', `${TICKETS_BRANCH}:${QUEUE_FILE}`], root))), ['from the worktree', 'unranked'])
-    assert.match(await git(['log', '--format=%s', TICKETS_BRANCH], root), /queue done: ranked\n.*queue add: from the worktree/)
+    assert.deepEqual(parseQueueEntries((await git(['show', `${DATA_BRANCH}:${QUEUE_FILE}`], root))), ['from the worktree', 'unranked'])
+    assert.match(await git(['log', '--format=%s', DATA_BRANCH], root), /queue done: ranked\n.*queue add: from the worktree/)
     // Done means deleted, not checked off.
     assert.ok(!(await readQueue(root))!.includes('[x]'))
     // An entry already gone is a no-op that still lands, changing nothing.
     assert.deepEqual(await queueDone(root, 'ranked'), { ok: true, changed: false })
     // The pure parser and the git read agree on the seam every writer uses.
-    await withFileBranch(root, TICKETS_BRANCH, 'by hand', async dir => {
+    await withFileBranch(root, DATA_BRANCH, 'by hand', async dir => {
       await writeFile(join(dir, QUEUE_FILE), '## Priority 3\n\n- [ ] by hand\n')
     })
     assert.deepEqual(await readQueueEntries(root), ['by hand'])

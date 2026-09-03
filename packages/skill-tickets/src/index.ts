@@ -1,6 +1,4 @@
 export {
-  TICKETS_BRANCH,
-  TICKETS_CHECKOUT_DIR,
   TICKETS_DIR,
   QUEUE_FILE,
   META_FILE,
@@ -50,7 +48,7 @@ export {
   queueDone,
   type QueueEdit,
 } from './queue.js'
-export { holderOf, type Holder } from './holder.js'
+export { holderOf, AGENT_ID_ENV, type Holder } from './holder.js'
 export {
   ticketsCheckoutPath,
   ticketsDir,

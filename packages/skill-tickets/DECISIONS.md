@@ -3,15 +3,15 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 
 ## The tickets
 - A ticket is a markdown file in `tickets/`. Its plan, and its claim (who is working on
-  it), are two more files beside it with the same name plus `.plan.md` and `.lock.md`. The
-  shared name is the only link between them.
-- Tickets live on the `agent-data` branch, the shared data branch `@gemstack/agent-data`
-  names, never on a code branch: an agent's checkout has no `tickets/` folder, and a pull
-  request never carries a ticket. For a person, a `tickets` symlink at the project root
-  points into the data branch's checkout; it is created only if nothing of that name is
-  there, and git is told to ignore it with two rules, `/tickets` and `!/tickets/`: the
-  exclude file speaks for the data branch's checkout too, whose real `tickets/` folder
-  must keep committing.
+  it), are two more files beside it: the ticket's name with `.md` swapped for `.plan.md`
+  and `.lock.md`. The shared stem is the only link between them.
+- Tickets live on `agent-data`, the shared data branch named by `@gemstack/agent-data`,
+  never on a code branch: an agent's checkout has no `tickets/` folder, and a pull request
+  never carries a ticket. For a person, a `tickets` symlink at the project root points
+  into the data branch's checkout; it is created only if nothing of that name is there,
+  and git is told to ignore it with two rules, `/tickets` and `!/tickets/`: the exclude
+  file speaks for the data branch's checkout too, whose real `tickets/` folder must keep
+  committing; a trailing slash re-includes directories only, and a link is never one.
 - `tickets/` holds only open tickets: closing one deletes it, with its plan and its claim.
 - The skill knows no issue tracker. A ticket may carry a `GitHub:` line with its issue,
   but importing issues into tickets is done by the program using the skill, not by the
@@ -26,12 +26,14 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 - A claim on a ticket the same holder already holds succeeds and writes nothing: a re-run
   after a lost race must not read its own lock as someone else's.
 - The holder's name is never typed; the command reads it from where it runs: `AGENT_ID`
-  from the environment when the program that started the agent set it, since the branch
-  gets renamed and the id does not; anywhere else it is the current branch. Reading the id
-  off the checkout's folder name was dropped: that is the branches skill's layout, and a
-  skill does not read another skill's.
+  from the environment when the program that started the agent set it, the id outlives the
+  branch, which that program renames once the agent names its session; anywhere else it is
+  the current branch, and a checkout on no branch is refused rather than claiming as
+  `HEAD`. Reading the id off the checkout's folder name was dropped: that layout belongs
+  to whichever program made the checkout, not to this skill.
 - The program says what a claim is for. A claim for planning is skipped, no lock written,
-  when the ticket already has a plan; a claim for implementing is not.
+  when the ticket already has a plan; a claim for implementing is not. The command always
+  claims to implement: `claim` never skips a planned ticket.
 
 ## The queue
 - The queue is one markdown file on the branch, `TODO_AGENTS.md`: sections `## Priority
@@ -42,20 +44,21 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   that starts agents reads the link, to claim the ticket for the agent it starts on that
   entry.
 - An entry added with no priority goes to the end of the file; one linked to a ticket
-  takes the ticket's priority, 5 when the ticket has none. A priority the file has no
-  section for gets one, placed before the first lower section so the file stays sorted
-  high to low.
+  takes the ticket's priority, 5 when the ticket has none or names one that is not a whole
+  0-10: clamping a typo would claim 10 or 0, both reserved ends of the scale. A priority
+  the file has no section for gets one, placed before the first lower section so the file
+  stays sorted high to low.
 - Done means deleted, never checked off.
 
 ## Flow: the command
 - The command reads with `list`, `show` and `queue`, and writes with `put` (a ticket, a
   plan, or `meta.json`, the importing program's own bookkeeping, opaque to the skill),
   `close`, `claim`, `release`, `queue add` and `queue done`.
-- A read fetches the branch from origin, the shared copy on the remote, once, and reads
-  everything from that copy rather than from the local branch: only origin is sure to hold
-  what every writer pushed, the command's own earlier writes included.
+- A read fetches the branch from origin once, and reads everything from that copy rather
+  than from the local branch: only origin is sure to hold what every writer pushed, the
+  command's own earlier writes included.
 - A write is one commit per command, pushed straight to origin through a throwaway
-  worktree at origin's tip (the rule is in `@gemstack/agent-data`). A repository with no
-  remote is refused.
+  worktree at origin's tip; a push that loses a race is re-applied on the new tip by
+  `@gemstack/agent-data`. A repository with no remote is refused.
 - `queue done` takes the entry as `queue` printed it and refuses a line the queue does not
   have.

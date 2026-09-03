@@ -7,28 +7,29 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 - Package name = branch name: `@gemstack/agent-data` is the library for the `agent-data`
   branch, but no function here hardcodes it: every one that touches a branch takes the
   branch as an argument.
-- `.branches/` holds a project's persistent checkouts: the agents' own, made by other
-  packages, and the data branch's, made here; the directory name is exported from here,
-  and the branch a caller names is checked out at `.branches/<branch>`. It starts with a
-  dot so a `*` glob skips it: every checkout inside is a full copy of the project, and a
-  type-checker or test runner that descends into N copies runs N times. Hidden through
-  `info/exclude`, never a committed `.gitignore`: the library must not touch the project's
-  tracked files. Writing the rule is best-effort: a git dir it cannot write to still
-  leaves the checkout standing. The rule goes in the common git dir: a per-worktree
-  `info/exclude` is never read, and one line in the common one covers every checkout. A
-  checkout deleted by hand leaves git's registration behind: prune before adding, or the
-  add fails on the stale registration.
+- `.branches/` holds a project's persistent checkouts, one directory per branch: the
+  agents' own, made by other packages, and the data branch's, made here. The directory
+  name is exported; the branch a caller names is checked out at `.branches/<branch>`. It
+  starts with a dot so a `*` glob skips it: every checkout inside is a full copy of the
+  project, and a type-checker or test runner that descends into N copies runs N times.
+  Hidden through `info/exclude`, never a committed `.gitignore`: the library must not
+  touch the project's tracked files. Writing the rule is best-effort: a git dir it cannot
+  write to still leaves the checkout standing. The rule goes in the common git dir: a
+  per-worktree `info/exclude` is never read, and one line in the common one covers every
+  checkout. A checkout deleted by hand leaves git's registration behind: prune before
+  adding, or the add fails on the stale registration.
 - Every git call has a time budget by subcommand: a read 10s, network and `worktree add`
   120s, everything else 30s. `worktree` goes by its second word (`add` slow, `list` a
-  read, the rest a write) and `branch` by its flags (a listing flag reads; `-D`, `-m` or a
-  new name writes); an unlisted subcommand pays the write budget rather than risk cutting
-  a write short. A killed `push` may have half landed, so a timeout is reported as a
-  timeout, never as a rejected push.
+  read, the rest a write) and `branch` by its own words (bare or with a listing flag it
+  reads; `-D`, `-m` or a new branch name writes); an unlisted subcommand pays the write
+  budget rather than risk cutting a write short. A killed `push` may have half landed, so
+  a timeout is reported as a timeout, never as a rejected push.
 
 ## The branch
 - A branch of the project's repository holds the agents' data — tickets, the queue — like
-  `gh-pages` holds a site; code branches hold only code. Pushed by every write and pulled
-  on its own, so a machine that writes nothing still ends up with what the others pushed.
+  `gh-pages` holds a site; code branches hold only code. Pushed by every write, and pulled
+  independently of any write, so a machine that writes nothing still ends up with what the
+  others pushed.
 - One branch for all skills, each with its own folder or file on it. Not one branch per
   skill: every extra branch would need its own checkout on disk and its own sync failure
   to report.
@@ -72,7 +73,8 @@ Fetch what others pushed → make the change → commit → push.
   when the rebase conflicts, the checkout is reset to origin's tip and every unpushed
   commit goes with it: the remote wins, only the current change runs again, and what was
   dropped is never reported.
-- An op is handed a directory; `BranchFileFs`, the file seam it writes through, creates
+- An op is handed a directory and writes into it as it likes; `BranchFileFs` is the seam
+  it can write through instead, injectable so an op is testable off disk, and it creates
   parent directories: git keeps no empty directory, so a skill's folder is gone with its
   last file and absent on a branch just born.
 - The remote is always `origin`, and a repository without one counts as remote-less

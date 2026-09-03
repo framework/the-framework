@@ -11,8 +11,8 @@ export const THE_FRAMEWORK_DIR = '.the-framework'
 
 /**
  * The branch holding what The Framework itself records about its runs (#1582/#1748): the agent
- * archives and the routine locks. The tickets and the queue are the `tickets` skill's, on its
- * own branch — nothing of the product's rides there.
+ * archives and the routine locks. The tickets and the queue are the `tickets` skill's, on the
+ * shared `agent-data` branch — nothing of the product's rides there.
  */
 export const LOGS_BRANCH = 'agents-logs'
 

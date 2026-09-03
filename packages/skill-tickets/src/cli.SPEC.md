@@ -17,7 +17,7 @@ The package's command line: the same operations a caller calls, for an agent (or
 - **JSON out, a reason for a person, an exit code that says which** - every result is one JSON document on stdout; a refusal or a git failure also puts one line on stderr and exits 1; a command that cannot be read gets the usage on stderr and exits 2.
 - **Reads come off origin, fetched once** - so a command sees what every writer pushed, its own earlier writes included.
 - **Writes are a remote writer's** - one commit each, pushed straight to the branch, never touching a caller's persistent checkout; a repository with no remote is refused.
-- **The holder is read, not typed** - a claim and a release name whoever the working directory says they are.
+- **The holder is read, not typed** - a claim and a release name whoever the environment and the working directory say they are.
 
 ## Business logic
 
@@ -71,7 +71,7 @@ An agent changes a ticket from a clone that holds no checkout of the branch, whi
 
 #### Business logic
 
-Each write is one commit: origin's tip is fetched and checked out in a throwaway checkout, the change applied, committed, and pushed straight to the `tickets` branch, and the throwaway checkout removed. A push that loses a race re-fetches origin's tip and re-applies the same change before pushing again. Nothing lands in the agent's own working tree, and the persistent checkout a long-lived process keeps is never touched — it belongs to that process, and converges on its own next pull.
+Each write is one commit: origin's tip is fetched and checked out in a throwaway checkout, the change applied, committed, and pushed straight to the `agent-data` branch, and the throwaway checkout removed. A push that loses a race re-fetches origin's tip and re-applies the same change before pushing again. Nothing lands in the agent's own working tree, and the persistent checkout a long-lived process keeps is never touched — it belongs to that process, and converges on its own next pull.
 
 A repository with no remote is refused as `no-remote`: a change nothing can carry is the user's error state, not a mode this supports.
 
@@ -83,7 +83,7 @@ An agent claims a ticket without ever having been told an identity.
 
 #### Business logic
 
-`claim` and `release` name the holder the working directory says they are (`holder`): the agent id inside an agent's checkout, else the current branch name. A checkout on no branch is refused as `no-identity` — there is nothing to claim as.
+`claim` and `release` name the holder the environment and the working directory say they are (`holder`): `AGENT_ID` when the process that started the agent set it, else the current branch name. A checkout on no branch is refused as `no-identity` — there is nothing to claim as.
 
 ## Before modifying/creating SPEC.md files
 

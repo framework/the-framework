@@ -72,9 +72,9 @@ program allows a push.
 - One JSON document on stdout for every command that runs: the result, or the refusal. A
   refusal, a rule saying no, adds one line for a person on stderr and exits 1; an argument
   that cannot be read never gets that far: the usage on stderr, nothing on stdout, exit 2.
-- A git failure anywhere in a command is reported like a refusal, reason `git-failed`,
-  with git's own line on stderr: a caller parsing stdout never has to handle a command
-  that printed nothing.
+- Anything a command throws is reported like a refusal, reason `git-failed`, with the
+  error's own line on stderr: a caller parsing stdout never has to handle a command that
+  printed nothing.
 - `list` answers with the bare JSON array; every other command answers with an object, its
   `ok` telling a result from a refusal.
 - Run outside a repository, a command refuses with `not-a-repo`: only git's own "not a git

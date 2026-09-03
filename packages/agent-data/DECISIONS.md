@@ -5,19 +5,19 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 - A **library, not a skill**: no `SKILL.md` and no command, because only code uses it.
   Skills import this library; they never import each other.
 - Package name = branch name: `@gemstack/agent-data` is the library for the `agent-data`
-  branch, but nothing here reads that constant: every function that touches a branch takes
-  it as an argument.
-- `.branches/` holds a project's persistent checkouts, the agents' (made elsewhere) and
-  this branch's; the directory name is exported from here, and the branch a caller names
-  is checked out at `.branches/<branch>`. It starts with a dot so a `*` glob skips it:
-  every checkout inside is a full copy of the project, and a type-checker or test runner
-  that descends into N copies runs N times. Hidden through `info/exclude`, never a
-  committed `.gitignore`: the library must not touch the project's tracked files. Writing
-  the rule is best-effort: a git dir it cannot write to still leaves the checkout
-  standing. The rule goes in the common git dir: a per-worktree `info/exclude` is never
-  read, and one line in the common one covers every checkout. A checkout deleted by hand
-  leaves git's registration behind: prune before adding, or the checkout can never be
-  remade.
+  branch, but no function here hardcodes it: every one that touches a branch takes the
+  branch as an argument.
+- `.branches/` holds a project's persistent checkouts: the agents' own, made by other
+  packages, and the data branch's, made here; the directory name is exported from here,
+  and the branch a caller names is checked out at `.branches/<branch>`. It starts with a
+  dot so a `*` glob skips it: every checkout inside is a full copy of the project, and a
+  type-checker or test runner that descends into N copies runs N times. Hidden through
+  `info/exclude`, never a committed `.gitignore`: the library must not touch the project's
+  tracked files. Writing the rule is best-effort: a git dir it cannot write to still
+  leaves the checkout standing. The rule goes in the common git dir: a per-worktree
+  `info/exclude` is never read, and one line in the common one covers every checkout. A
+  checkout deleted by hand leaves git's registration behind: prune before adding, or the
+  add fails on the stale registration.
 - Every git call has a time budget by subcommand: a read 10s, network and `worktree add`
   120s, everything else 30s. `worktree` goes by its second word (`add` slow, `list` a
   read, the rest a write) and `branch` by its flags (a listing flag reads; `-D`, `-m` or a
@@ -45,7 +45,9 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   may trail what others pushed. A one-shot command opens the branch once: one fetch, then
   every read off that one ref (origin's copy, or the local branch when origin has none);
   it reads origin's copy because its own writes go straight to the remote and never move
-  the local branch.
+  the local branch. A read never fails: a missing file, a missing branch and a git that
+  could not run all read as absent, so a caller cannot tell an unreachable store from an
+  empty one.
 
 ## Flow: a write
 Fetch what others pushed → make the change → commit → push.

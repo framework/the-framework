@@ -2,7 +2,7 @@ The names everything in the package hangs off, and the small rules that tie a ti
 
 ## Business logic — TL;DR
 
-- **Where the tickets live, by name** - the branch `tickets`, its persistent checkout `.branches/tickets`, the `tickets/` folder inside the branch, the queue file `TODO_AGENTS.md` beside it, and the `meta.json` stamp inside the folder. Conventions, not settings: `SKILL.md` names the same ones to every agent.
+- **Where the tickets live, by name** - the shared data branch `agent-data` (named by `@gemstack/agent-data`, not here), its persistent checkout `.branches/agent-data`, the `tickets/` folder inside the branch, the queue file `TODO_AGENTS.md` beside it, and the `meta.json` stamp inside the folder. Conventions, not settings: `SKILL.md` names the same ones to every agent.
 - **A ticket names its own siblings** - a ticket's plan and its claim are `<STEM>.plan.md` and `<STEM>.lock.md` beside it, derived from the ticket's filename, so nothing has to record the pairing.
 - **The gate for a filename from outside** - what counts as a ticket filename, and what counts as a ticket path.
 - **The ticket a queue entry came from** - read back off the entry's own markdown link.
@@ -19,7 +19,7 @@ The names everything in the package hangs off, and the small rules that tie a ti
 
 #### Business logic
 
-The tickets and the queue live on the git branch `tickets` of the project's own repository. A long-lived process keeps that branch checked out at `.branches/tickets`, beside the agent checkouts. On the branch, `tickets/` holds the tickets, their plans, their claims and `meta.json`; `TODO_AGENTS.md` sits beside that folder at the branch root. `tickets` is also the name of the link the repository root gets into the checkout (`store`), so a person browsing the project finds the tickets one listing away.
+The tickets and the queue live on the git branch `agent-data` of the project's own repository — the shared data branch every skill keeps its files on, whose name `@gemstack/agent-data` exports. A long-lived process keeps that branch checked out at `.branches/agent-data`, beside the agent checkouts. On the branch, `tickets/` holds the tickets, their plans, their claims and `meta.json`; `TODO_AGENTS.md` sits beside that folder at the branch root. `tickets` is also the name of the link the repository root gets into the checkout (`store`), so a person browsing the project finds the tickets one listing away.
 
 `tickets/` holds only open tickets: closing one deletes it with its siblings. `meta.json` records when the tickets last caught up with an issue tracker.
 

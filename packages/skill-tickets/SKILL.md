@@ -7,7 +7,7 @@ description: Where the project's tickets and its agent queue live, how to read a
 
 The tickets (`tickets/<DATE>_<SLUG>.md`, with their `.plan.md` and `.lock.md` siblings) and the agent queue (`TODO_AGENTS.md`) live on the branch `agent-data`, never on a code branch. Your checkout does not contain them. A `tickets` link at the repository root may show them: read there if you like, never write there.
 
-Read and change them with the `tickets` command. It comes with the npm package `@gemstack/skill-tickets`, a dependency of this repository: install the repository's dependencies once — `npm install`, or the package manager its lockfile belongs to — then run it as `npx tickets`. Every change it makes is one commit pushed straight to the `agent-data` branch (a rejected push is re-applied on the branch's new tip and pushed again, for you); these files never belong on your branch.
+Read and change them with the `tickets` command. It comes with the npm package `@gemstack/skill-tickets`, a dependency of this repository: install the repository's dependencies once — `npm install`, or the package manager its lockfile belongs to — then run it as `npx tickets`. Every change it makes is one commit pushed straight to the `agent-data` branch (a rejected push is re-applied on the branch's new tip and pushed again); these files never belong on your branch.
 
 ## Read
 

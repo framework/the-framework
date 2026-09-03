@@ -2,7 +2,7 @@ Holds the daemon's per-project error state: when a background job finds a projec
 
 ## Business logic — TL;DR
 
-- **One slot per project and error kind** - each project holds at most one live error per kind; today the only kind is `data-sync`, raised when a project's branches — the `tickets` branch and the `agents-logs` branch — cannot be synced (the push to origin is rejected, or the repo has no origin at all).
+- **One slot per project and error kind** - each project holds at most one live error per kind; today the only kind is `data-sync`, raised when a project's branches — the `agent-data` branch and the `agents-logs` branch — cannot be synced (the push to origin is rejected, or the repo has no origin at all).
 - **The age of a problem is preserved** - re-reporting the same error kind refreshes its detail message but keeps the timestamp it was first seen, so the dashboard can say how long the condition has lasted instead of restarting the clock on every re-check.
 - **Errors live only as long as the daemon does** - nothing is written to disk; a restarted daemon starts clean and re-learns each error on the next check by the job that raised it.
 

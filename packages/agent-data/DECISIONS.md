@@ -15,9 +15,9 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   Hidden through `info/exclude`, never a committed `.gitignore`: the library must not
   touch the project's tracked files. Writing the rule is best-effort: a git dir it cannot
   write to still leaves the checkout standing. The rule goes in the common git dir: a
-  per-worktree `info/exclude` is never read, and one line in the common one covers every
-  checkout. A checkout deleted by hand leaves git's registration behind: prune before
-  adding, or the add fails on the stale registration.
+  per-worktree `info/exclude` is never read, and one line there covers every checkout. A
+  checkout deleted by hand leaves git's registration behind: prune before adding, or the
+  add fails on the stale registration.
 - Every git call has a time budget by subcommand: a read 10s, network and `worktree add`
   120s, everything else 30s. `worktree` goes by its second word (`add` slow, `list` a
   read, the rest a write) and `branch` by its own words (bare or with a listing flag it

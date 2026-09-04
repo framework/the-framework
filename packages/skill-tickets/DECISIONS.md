@@ -13,9 +13,10 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   branch has none, so the queue is a file before its first entry; then links `tickets` at
   the project root to `.branches/agent-data/tickets`, a relative target, where nothing of
   that name sits; then converges the checkout with origin. A seed that cannot commit stops
-  before the link. The link is hidden, when it is made, with a pair of rules, `/tickets`
+  before the link; a link that cannot be made is ignored, and the sync still reports the
+  pull. The link is hidden, when it is made, by two rules, `/tickets`
   then `!/tickets/`: the first hides any root entry of that
-  name, the second un-hides directories, which a symlink is not; a pair because
+  name, the second un-hides directories, which a symlink is not; two because
   `.git/info/exclude` is one file for every worktree, the data branch's checkout included,
   whose own `tickets/` must stay committable.
 - `tickets/` holds only open tickets: closing one deletes it, its plan and its claim, and
@@ -28,8 +29,8 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   skipped), `Topics: [a, b]` split into tags, `GitHub:` into label and url, `Priority:`
   verbatim, whether a plan and a lock sit beside it and whom the lock names, and the
   plan's `Effort:` and `Uncertainty:`, read as absent outside a whole number 0-10. Keys
-  are read only above the `# ` title. `list` reads the first 4 KB of a ticket, `show` all
-  of it.
+  and headings match in any case, and keys are read only above the `# ` title. `list`
+  reads the first 4 KB of a ticket, `show` all of it.
 - The package knows no issue tracker: a ticket may carry a `GitHub:` line, but importing
   issues is the program's job.
 
@@ -37,14 +38,13 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 - A claim is a committed file holding one line, `CLAIMED: <who>`, so agents on other
   machines see it.
 - One claim per ticket; it never expires: it lifts when the ticket is released or closed,
-  otherwise only by hand on the branch. The command releases and closes as the holder it
-  reads: it lifts only a lock naming that holder, and closes only when the ticket has no
-  lock or its own. The program that started an agent releases what the agent left claimed,
-  naming the holder it expects or none; none frees whoever holds the lock.
+  otherwise only by hand on the branch. The command lifts only a lock naming the holder it
+  reads, and closes only when the ticket has no lock or its own. The program that started
+  an agent releases what the agent left claimed, naming the holder it expects or none;
+  none frees whoever holds the lock.
 - Releasing a ticket nobody holds is a refusal, not a no-op.
 - A lock is written only by a claim, and it gates a second `claim`, `close` and `release`,
-  not `put`. `put` overwrites a ticket or its
-  plan no matter who holds it, so an import can refresh a ticket someone is working.
+  not `put`. `put` ignores it, so an import can refresh a ticket someone is working.
 - A claim the program's write cycle committed but could not push still counts: the commit
   already guards this machine's readers, and the gap goes to the program's log. A cycle
   that could not commit claims nothing.
@@ -71,7 +71,7 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   `*` or `N.` list item in the file is an entry, wherever it sits. Entries are placed so
   the file stays sorted high to low; nothing re-sorts on read, so a reader answers in file
   order.
-- An entry is plain text: the task a future agent is started with. `--ticket` writes it as
+- An entry is plain text, trimmed: the task a future agent is started with. `--ticket` writes it as
   a markdown link to the ticket, read as the entry is added, for its priority and to
   refuse an entry pointing at no ticket; the program reads the link back to claim the
   ticket for the agent it starts.
@@ -95,8 +95,8 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   and `close` refuse a ticket that is not there, `no-ticket`; `claim` and `close` check
   inside the write, so without an origin their refusal is `no-remote`; `release` goes
   through the write too but looks only at the lock, so an orphan lock naming you lifts;
-  all three read the holder first, so a checkout on no branch answers `no-identity` before
-  anything else; `put` checks only the name, so a
+  `claim`, `close` and `release` read the holder after the filename check, so a checkout on
+  no branch answers `no-identity` next; `put` checks only the name, so a
   plan can be written for a ticket that does not exist.
 - A ticket is named to any command by its bare filename or by its `tickets/<file>` path,
   so the target of the link a queue entry carries can be pasted straight in.
@@ -106,8 +106,8 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   origin has every writer's pushes, this command's own included.
   With no origin the local branch is read: writes are refused there, so nobody else can
   have moved it.
-- Every command that runs prints one JSON document: the result or the refusal. A
-  refusal adds one line for a person on stderr and exits 1. A malformed
+- Every command that runs prints one JSON document, the result or the refusal; a refusal
+  also prints one line on stderr and exits 1. A malformed
   command line (an unknown flag, the wrong argument count, an empty `queue add` text, a
   `--priority` off the 0-10 scale) never gets that far: the usage on stderr, nothing on
   stdout, exit 2. An argument that parses but names a file no command may touch is an
@@ -123,5 +123,5 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 - A write is one commit per command, pushed straight to origin through a throwaway
   worktree at origin's tip; a push that loses a race is re-applied on the new tip by
   `@gemstack/agent-data`.
-- `queue done` takes the entry as `queue` printed it, removes the first such line, and
-  refuses a line the queue does not have.
+- `queue done` takes the entry as `queue` printed it, trimmed, removes the first such line,
+  and refuses a line the queue does not have, an empty one included.

@@ -10,15 +10,16 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   are two more files beside it: the name with `.md` swapped for `.plan.md` and `.lock.md`.
 - Tickets live on `agent-data`, the shared data branch named by `@gemstack/agent-data`,
   never on a code branch. The program's sync links `tickets` at the project root to
-  `.branches/agent-data/tickets`, only where nothing of that name sits, and creates an
-  empty `TODO_AGENTS.md` when the branch has none, so the queue is a file before its first
-  entry. The link is hidden with a pair of rules, `/tickets` then `!/tickets/`: the first
-  hides any root entry of that name, the second un-hides a directory, which a symlink
-  never is; a pair because `.git/info/exclude` is one file for every worktree, the data
-  branch's checkout included, whose own `tickets/` must stay committable.
+  `.branches/agent-data/tickets`, a relative target, only where nothing of that name sits,
+  and creates an empty `TODO_AGENTS.md` when the branch has none, so the queue is a file
+  before its first entry. The link is hidden with a pair of rules, `/tickets` then
+  `!/tickets/`: the first hides any root entry of that name, the second un-hides a
+  directory, which a symlink never is; a pair because `.git/info/exclude` is one file for
+  every worktree, the data branch's checkout included, whose own `tickets/` must stay
+  committable.
 - `tickets/` holds only open tickets: closing one deletes it, its plan and its claim, and
   nothing else; a queue entry linking it stays until `queue done`.
-- `list` answers newest first by the `<DATE>_` in the filename, ties by filename. A
+- `list` answers newest first by the `<DATE>_` in the filename, ties by filename ascending. A
   filename with no date falls back to the file's modification time; a read off git has
   none, so the ticket is dated the epoch and sorts last.
 - A ticket's row: the title from its `# ` line, the summary from the first prose line
@@ -38,16 +39,16 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   naming the holder it expects or none; none frees whoever holds the lock.
 - Releasing a ticket nobody holds is a refusal, not a no-op: the claim is not where the
   caller thought.
-- A lock is written only by a claim, and a claim guards planning and working, not `put`:
-  `put` overwrites a ticket or its plan no matter who holds it, so an import can refresh a
-  ticket someone is working.
+- A lock is written only by a claim, and a claim tells other agents to keep off: it gates
+  a second `claim`, `close` and `release`, not `put`. `put` overwrites a ticket or its
+  plan no matter who holds it, so an import can refresh a ticket someone is working.
 - A claim the program's write cycle committed but could not push still counts: the commit
   already guards this machine's readers, and the gap is logged. A cycle that could not
   commit claims nothing.
 - Claiming a ticket you already hold succeeds and writes nothing: a re-run
   after a lost race must not read its own lock as someone else's.
 - The holder's name is never typed: the command reads `AGENT_ID` from the environment when
-  the program that started the agent set it, else the current branch. The id wins because
+  it is set and non-blank, else the current branch. The id wins because
   it outlives the branch: a rename mid-session leaves a lock naming a branch nobody
   answers to. A checkout on no branch is refused rather than claiming as `HEAD`. The
   checkout's folder name is not read: the layout is the caller's.
@@ -62,13 +63,14 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 
 ## The queue
 - The queue is one markdown file on the branch, `TODO_AGENTS.md`: sections `## Priority
-  10` down to `## Priority 0`; any markdown list item in the file is an entry, wherever it
-  sits. Entries are placed so the file stays sorted high to low; nothing re-sorts on read,
-  so a reader answers in file order, top first.
+  10` down to `## Priority 0`, any `## Priority N` heading of one or two digits counting;
+  any markdown list item in the file is an entry, wherever it sits. Entries are placed so
+  the file stays sorted high to low; nothing re-sorts on read, so a reader answers in file
+  order.
 - An entry is plain text: the task a future agent is started with. `--ticket` writes it as
   a markdown link to the ticket, read as the entry is added, for its priority and to
-  refuse an entry pointing at no ticket; the program that starts agents reads the link
-  back to claim the ticket for the agent it starts.
+  refuse an entry pointing at no ticket; the program reads the link back to claim the
+  ticket for the agent it starts.
 - An entry added with no priority is appended at the end of the file, in whatever section
   ends it; one linked to a ticket takes the ticket's priority unless one was given, and 5
   when the ticket has none or names one that is not a whole number 0-10: clamping a typo
@@ -86,18 +88,19 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   add` and `queue done`.
 - `show` answers with the ticket, its plan and its holder; a plan's `Effort:` and
   `Uncertainty:` outside a whole number 0-10 read as absent. `show`, `claim` and `close`
-  refuse a ticket that is not there, `no-ticket`, checked inside the write, so without an
-  origin the refusal is `no-remote`; `put` checks only the name, so a plan can be written
-  for a ticket that does not exist.
+  refuse a ticket that is not there, `no-ticket`; `claim` and `close` check inside the
+  write, so without an origin their refusal is `no-remote`; `release` looks only at the
+  lock, so an orphan lock naming you lifts; `put` checks only the name, so a plan can be
+  written for a ticket that does not exist.
 - A ticket is named to any command by its bare filename or by its `tickets/<file>` path,
   so the link a queue entry carries can be pasted straight in.
 - No command reads `meta.json`: the importing program is its only reader, for the
   last-import stamp it keeps there.
 - A read fetches the branch from origin once and reads everything from that copy: only
-  origin holds what every writer pushed, the command's own earlier writes included.
+  origin has every writer's pushes, this command's own included.
   With no origin the local branch is read: writes are refused there, so nobody else can
   have moved it.
-- One JSON document on stdout for every command that runs: the result or the refusal. A
+- Every command that runs prints one JSON document: the result or the refusal. A
   refusal (a rule saying no) adds one line for a person on stderr and exits 1. A malformed
   command line (an unknown flag, the wrong argument count, an empty `queue add` text, a
   `--priority` off the 0-10 scale) never gets that far: the usage on stderr, nothing on

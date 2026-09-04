@@ -3,7 +3,7 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 
 ## The checkout
 - One checkout per agent, a git worktree of the user's repository under `.branches/`,
-  branched from the project checkout's head unless the caller names a base: agents run in
+  branched from the project's head unless the caller names a base: agents run in
   parallel, and the user's own copy is never an agent's workspace. A worktree, not a
   clone, so every checkout shares the repository's objects and refs.
 - `.branches/` is hidden from the project's git from the first checkout on, through the
@@ -16,15 +16,16 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   behind; the folder keeps the id: the agent is running inside it. A checkout on no branch
   is neither renamed nor reclaimed.
 - Whenever a checkout is made, named or removed, each checkout whose branch differs from
-  its folder name gets a sibling link named as its branch, so
-  `.branches/<branch>` reaches every checkout by its current branch; a detached checkout
-  or a slashed branch gets none. The package makes and removes the links, never replacing
-  anything else at that path. `list` and `prune` see directories only, so a link is never
-  a checkout; `remove` follows one to its checkout.
-- Branch names are `agent-<name>` with no `/`: the folder at creation, and the link, are
-  named after a branch, a name on disk cannot hold a slash, and a slashed ref cannot be
-  handed to a cloud session as its starting revision. The package renames and deletes only
-  `agent-*` branches; the user's own are never touched.
+  its folder name gets a sibling link named as its branch, so `.branches/<branch>` reaches
+  it; a detached checkout or a slashed branch gets none. A link pointing at an `agent-*`
+  checkout is the package's to remove, whatever its name; anything else at a link's path
+  is left alone. `list` and `prune` see directories only, so a link is never a checkout;
+  `remove <name>` reaches `.branches/agent-<name>`, the link after a rename, and follows
+  it to the checkout.
+- The names the package mints are `agent-<name>` with no `/`: the folder at creation, and
+  the link, are named after a branch, a name on disk cannot hold a slash, and a slashed
+  ref cannot be handed to a cloud session as its starting revision. The package renames
+  and deletes only `agent-*` branches; the user's own are never touched.
 - `agent-data` is not an agent's branch: it is `@gemstack/agent-data`'s data branch, and
   the program that keeps it checks it out as `.branches/agent-data`, not this package.
   Never listed, renamed or deleted; `data` is refused as an id, and an agent naming itself
@@ -32,8 +33,8 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 - A taken name gets `-2`, `-3`, … instead of a refusal: the agent asked for a name and
   reads back the one it got. Taken means any local or remote-tracking branch, so the later
   push cannot land on someone else's branch; the checkout's own branch is not counted, so
-  asking again for the same name changes nothing while that name is still taken. Two agents
-  naming the same thing at once race on the rename; the loser takes the next suffix. The
+  asking again for a name still taken elsewhere changes nothing. Two agents naming the
+  same thing at once race on the rename; the loser takes the next suffix. The
   rename is tried three times, then it fails.
 - Continuing an agent puts it back on the branch its work is on, whatever its name, even
   one the package did not make; a branch gone locally comes back from origin's copy, and
@@ -50,22 +51,22 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   manager's own state (`.pnpm`, `.modules.yaml`) says the tree was installed there, which
   the checkout's was not; the packages still resolve: a link to a link resolves where the
   target lives.
-- Everything after the worktree itself is best-effort: a checkout without them is a worse
-  run, not a failed one. `create` for an id that already has a checkout fails.
+- Everything after the worktree itself is best-effort: a checkout missing any of it is a
+  worse run, not a failed one. `create` or `attach` for an id that already has a checkout
+  fails.
 
 ## Flow: reclaim
 Deleting an agent's checkout to free disk, only once the remote has everything in it. The
 reclaim pushes the branch the checkout ended on, the user's own included, when the caller
 allows a push, and deletes only `agent-*` branches.
 
-- Nothing is committed on the agent's behalf: a checkout with uncommitted work is kept
-  until a person commits or deletes it.
-- An `agent-*` branch whose commits already reached the remote through another branch
-  (after a merge) holds nothing of its own and goes with its checkout: its tip is on a
-  remote-tracking ref of another name, any remote; its own copy, under its current name or
-  its upstream's, does not count. Pushed means on `origin`, the only remote the package
-  pushes to. Both are read from the local remote-tracking refs without a fetch: the push
-  that put a tip there wrote them.
+- Nothing is committed on the agent's behalf: a checkout with uncommitted work, untracked
+  files included, is kept until a person commits or deletes it.
+- An `agent-*` branch whose tip is on a remote-tracking ref of another name, any remote
+  (after a merge), holds nothing of its own and goes with its checkout; its own copy,
+  under its current name or its upstream's, does not count. Pushed means on `origin`, the
+  only remote the package pushes to. Both are read from the local remote-tracking refs
+  without a fetch: the push that put a tip there wrote them.
 - A checkout whose tip is an ancestor of a pushed commit the program names (the commit a
   cloud session pushed on the agent's behalf) goes without a push and keeps its branch,
   even a branch the merged-branch rule would delete.
@@ -99,12 +100,16 @@ allows a push, and deletes only `agent-*` branches.
   own line on stderr.
 - `create`, `attach`, `list`, `remove` and `prune` act on the project, found from the
   `.branches/` layout even from inside a checkout; `name` and `status` act on the checkout
-  the command runs in, or on the checkout whose path `status` is given; `status` answers
-  the branch, whether the tree is clean, and whether the tip is on the remote.
+  the command runs in, found from anywhere inside it, or on the checkout root whose path
+  `status` is given; `status` answers the branch, whether the tree is clean, and whether
+  the tip is on the remote.
 - `list` answers with a bare JSON array; every other result and every refusal is an object
   whose `ok` tells the two apart.
 - Run outside a repository, a command that needs one refuses with `not-a-repo`: only git's
   own "not a git repository" reads as that, every other git failure stays `git-failed`.
+- The refusals: `invalid-id`, `invalid-name`, `not-a-worktree`, `no-branch`,
+  `not-an-agent-branch`, `no-checkout`, `dirty`, `not-on-remote`, `not-a-repo`,
+  `git-failed`.
 - The skill tells the agent where it is by its branch name: on `agent-*` the checkout is
   the agent's own, made by the program that started it, and the repository around a
   `.branches/` checkout is the user's; on anything else it is a plain clone, and the agent

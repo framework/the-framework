@@ -2,8 +2,10 @@ Non-obvious decisions only, grouped by business-logic flow. Anything not listed 
 to the implementer's judgment. Flag conflicts instead of silently deviating.
 
 ## The tickets
-- Two users: the command an agent runs, and the program (a long-lived process) that keeps
-  the branch checked out, imports issues and starts agents, through the package's library.
+- Two users: the command an agent runs, and a long-lived program that keeps the branch
+  checked out, imports issues and starts agents through the package's library. The package
+  ships `SKILL.md`, the agent's instructions, with the ticket, plan and queue formats the
+  code parses.
 - A ticket is a markdown file in `tickets/`. Its plan and its claim (who is working on it)
   are two more files beside it: the name with `.md` swapped for `.plan.md` and `.lock.md`.
 - Tickets live on `agent-data`, the shared data branch named by `@gemstack/agent-data`,
@@ -14,12 +16,15 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   hides any root entry of that name, the second un-hides a directory, which a symlink
   never is; a pair because `.git/info/exclude` is one file for every worktree, the data
   branch's checkout included, whose own `tickets/` must stay committable.
-- `tickets/` holds only open tickets: closing one deletes it with its plan and its claim,
-  and nothing else; a queue entry linking it stays until `queue done`.
-- `list` answers newest first, dated by the `<DATE>_` its filename carries, ties by
-  filename; a filename
-  with no date falls back to the file's modification time, which a read off git lacks:
-  such a ticket is then dated the epoch and sorts last.
+- `tickets/` holds only open tickets: closing one deletes it, its plan and its claim, and
+  nothing else; a queue entry linking it stays until `queue done`.
+- `list` answers newest first by the `<DATE>_` in the filename, ties by filename. A
+  filename with no date falls back to the file's modification time; a read off git has
+  none, so the ticket is dated the epoch and sorts last.
+- A ticket's row: the title from its `# ` line, the summary from the first prose line
+  after `## TLDR`, else after the title (a `Source:` line skipped), `Topics: [a, b]` split
+  into tags, `GitHub:` into label and url, `Priority:` verbatim. Keys are read only above
+  the `# ` title. `list` reads the first 4 KB of a ticket, `show` all of it.
 - The package knows no issue tracker: a ticket may carry a `GitHub:` line with its issue,
   but importing issues is the program's job.
 
@@ -28,10 +33,9 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   machines see it.
 - One claim per ticket; it never expires: it lifts when the ticket is released or closed,
   otherwise only by hand on the branch. The command releases and closes as the holder it
-  reads: it lifts only a lock naming that holder and closes a ticket only when no lock,
-  or its own, is on it.
-  The program that started an agent releases what the agent left claimed, naming the
-  holder it expects or none; none frees whoever holds the lock.
+  reads: it lifts only a lock naming that holder, and closes only when the ticket has no
+  lock or its own. The program that started an agent releases what the agent left claimed,
+  naming the holder it expects or none; none frees whoever holds the lock.
 - Releasing a ticket nobody holds is a refusal, not a no-op: the claim is not where the
   caller thought.
 - A lock is written only by a claim, and a claim guards planning and working, not `put`:
@@ -42,11 +46,11 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   commit claims nothing.
 - Claiming a ticket you already hold succeeds and writes nothing: a re-run
   after a lost race must not read its own lock as someone else's.
-- The holder's name is never typed; the command reads it from where it runs: `AGENT_ID`
-  from the environment when the program that started the agent set it, else the current
-  branch. The id wins because it outlives the branch: a rename mid-session leaves a lock
-  naming a branch nobody answers to. A checkout on no branch is refused rather than
-  claiming as `HEAD`. The checkout's folder name is not read: the layout is the caller's.
+- The holder's name is never typed: the command reads `AGENT_ID` from the environment when
+  the program that started the agent set it, else the current branch. The id wins because
+  it outlives the branch: a rename mid-session leaves a lock naming a branch nobody
+  answers to. A checkout on no branch is refused rather than claiming as `HEAD`. The
+  checkout's folder name is not read: the layout is the caller's.
 - The program says whether a claim is for planning or implementing: a claim for planning
   is skipped, no lock written, when the ticket already has a plan; a claim for
   implementing is not: the plan is what it came to implement; only someone else's lock
@@ -82,8 +86,9 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   add` and `queue done`.
 - `show` answers with the ticket, its plan and its holder; a plan's `Effort:` and
   `Uncertainty:` outside a whole number 0-10 read as absent. `show`, `claim` and `close`
-  refuse a ticket that is not there, `no-ticket`; `put` checks only the name, so a plan
-  can be written for a ticket that does not exist.
+  refuse a ticket that is not there, `no-ticket`, checked inside the write, so without an
+  origin the refusal is `no-remote`; `put` checks only the name, so a plan can be written
+  for a ticket that does not exist.
 - A ticket is named to any command by its bare filename or by its `tickets/<file>` path,
   so the link a queue entry carries can be pasted straight in.
 - No command reads `meta.json`: the importing program is its only reader, for the
@@ -94,12 +99,11 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   have moved it.
 - One JSON document on stdout for every command that runs: the result or the refusal. A
   refusal (a rule saying no) adds one line for a person on stderr and exits 1. A malformed
-  command line (an unknown flag, the wrong argument count, an empty entry, a `--priority`
-  off the 0-10 scale) never gets that far: the usage on stderr, nothing on stdout, exit 2.
-  An argument that parses but names a file no command may touch is an ordinary refusal,
-  `invalid-path`.
-- Anything a command throws is reported like a refusal, reason `git-failed`: a caller
-  parsing stdout never meets a command that printed nothing.
+  command line (an unknown flag, the wrong argument count, an empty `queue add` text, a
+  `--priority` off the 0-10 scale) never gets that far: the usage on stderr, nothing on
+  stdout, exit 2. An argument that parses but names a file no command may touch is an
+  ordinary refusal, `invalid-path`.
+- Anything a command throws is reported as a refusal with reason `git-failed`.
 - `list`, and `queue` with no sub-command, answer with a bare JSON array; every other
   result, and every refusal, is an object whose `ok` tells the two apart.
 - Run outside a repository, a command refuses with `not-a-repo`: only git's own "not a git
@@ -110,5 +114,5 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 - A write is one commit per command, pushed straight to origin through a throwaway
   worktree at origin's tip; a push that loses a race is re-applied on the new tip by
   `@gemstack/agent-data`.
-- `queue done` takes the entry as `queue` printed it and refuses a line the queue does not
-  have.
+- `queue done` takes the entry as `queue` printed it, removes the first such line, and
+  refuses a line the queue does not have.

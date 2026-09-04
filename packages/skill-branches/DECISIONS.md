@@ -10,31 +10,31 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   repository's own exclude file: an untracked folder at the root would ride a sweeping
   `git add -A` onto a code branch, and `.gitignore` is tracked.
 - A checkout starts as branch `agent-<id>` in folder `.branches/agent-<id>/`; `<id>` is
-  what the program that starts the agent calls it, restricted to `[A-Za-z0-9_-]+` so no id
-  can build a path outside `.branches/`. `npx branches name <name>` (`[a-z0-9-]+`) renames
-  the branch to `agent-<name>`: a rename, not a new branch, so nothing is left behind; the
-  folder keeps the id: the agent is running inside it. A checkout on no branch is
-  neither renamed nor reclaimed.
+  what the program that starts the agent calls it, and must match `[A-Za-z0-9_-]+`, so no
+  id can build a path outside `.branches/`. `npx branches name <name>` (`[a-z0-9-]+`)
+  renames the branch to `agent-<name>`: a rename, not a new branch, so nothing is left
+  behind; the folder keeps the id: the agent is running inside it. A checkout on no branch
+  is neither renamed nor reclaimed.
 - Whenever a checkout is made, named or removed, each checkout whose branch differs from
-  its folder name gets a link beside it, named as the branch, so
+  its folder name gets a sibling link named as its branch, so
   `.branches/<branch>` reaches every checkout by its current branch; a detached checkout
   or a slashed branch gets none. The package makes and removes the links, never replacing
   anything else at that path. `list` and `prune` see directories only, so a link is never
-  a checkout.
+  a checkout; `remove` follows one to its checkout.
 - Branch names are `agent-<name>` with no `/`: the folder at creation, and the link, are
   named after a branch, a name on disk cannot hold a slash, and a slashed ref cannot be
   handed to a cloud session as its starting revision. The package renames and deletes only
   `agent-*` branches; the user's own are never touched.
-- `agent-data` is not an agent's: it is the data branch of `@gemstack/agent-data`, checked
-  out beside the agents' as `.branches/agent-data` by the program that keeps that branch,
-  not by this package. Never listed, renamed or deleted; `data` is refused as an id, and
-  an agent naming itself `data` gets `agent-data-2`.
+- `agent-data` is not an agent's branch: it is `@gemstack/agent-data`'s data branch, and
+  the program that keeps it checks it out as `.branches/agent-data`, not this package.
+  Never listed, renamed or deleted; `data` is refused as an id, and an agent naming itself
+  `data` gets `agent-data-2`.
 - A taken name gets `-2`, `-3`, … instead of a refusal: the agent asked for a name and
   reads back the one it got. Taken means any local or remote-tracking branch, so the later
   push cannot land on someone else's branch; the checkout's own branch is not counted, so
-  asking again for the same name changes nothing. Two agents naming the same thing at once
-  race on the rename; the loser takes the next suffix. The rename is retried three times,
-  then it fails.
+  asking again for the same name changes nothing while that name is still taken. Two agents
+  naming the same thing at once race on the rename; the loser takes the next suffix. The
+  rename is tried three times, then it fails.
 - Continuing an agent puts it back on the branch its work is on, whatever its name, even
   one the package did not make; a branch gone locally comes back from origin's copy, and
   one gone everywhere is recreated from the project's head: the only branch the package
@@ -50,13 +50,13 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   manager's own state (`.pnpm`, `.modules.yaml`) says the tree was installed there, which
   the checkout's was not; the packages still resolve: a link to a link resolves where the
   target lives.
-- Everything after the worktree itself is best-effort: a checkout without it is a worse
-  run, not a failed one.
+- Everything after the worktree itself is best-effort: a checkout without them is a worse
+  run, not a failed one. `create` for an id that already has a checkout fails.
 
 ## Flow: reclaim
-Deleting an agent's checkout to free disk, only once everything in it is on the remote;
-the reclaim pushes the branch the checkout ended on, the
-user's own included, when the program allows a push, and deletes only `agent-*` branches.
+Deleting an agent's checkout to free disk, only once the remote has everything in it. The
+reclaim pushes the branch the checkout ended on, the user's own included, when the caller
+allows a push, and deletes only `agent-*` branches.
 
 - Nothing is committed on the agent's behalf: a checkout with uncommitted work is kept
   until a person commits or deletes it.
@@ -71,8 +71,9 @@ user's own included, when the program allows a push, and deletes only `agent-*` 
   even a branch the merged-branch rule would delete.
 - An agent that switched to another branch leaves `agent-<id>` behind; it goes with the
   checkout once the branch the agent ended on contains it.
-- A folder under `.branches/` that git no longer knows as a worktree is left alone: a git
-  command run inside it would act on the user's own checkout.
+- A folder under `.branches/` that git no longer knows as a worktree is left alone, and
+  `list` still shows it, without a branch: a git command run inside it would act on the
+  user's own checkout.
 - A removal git refuses as unclean after the clean check passed is forced, and says so on
   stderr: an ignored build artifact must not strand a checkout for good.
 - `remove` and `prune` push by default; `--no-push` opts out. `remove` of a missing
@@ -98,19 +99,22 @@ user's own included, when the program allows a push, and deletes only `agent-*` 
   own line on stderr.
 - `create`, `attach`, `list`, `remove` and `prune` act on the project, found from the
   `.branches/` layout even from inside a checkout; `name` and `status` act on the checkout
-  the command runs in, `status` on a checkout whose path it is given.
+  the command runs in, or on the checkout whose path `status` is given; `status` answers
+  the branch, whether the tree is clean, and whether the tip is on the remote.
 - `list` answers with a bare JSON array; every other result and every refusal is an object
   whose `ok` tells the two apart.
 - Run outside a repository, a command that needs one refuses with `not-a-repo`: only git's
   own "not a git repository" reads as that, every other git failure stays `git-failed`.
-- The skill tells the agent where it is by its branch name alone: on `agent-*` the
-  checkout is the agent's own, made by the program that started it, and the repository
-  around a `.branches/` checkout is the user's; on anything else it is a plain clone, and
-  the agent makes its `agent-<name>` branch with git before its first change.
+- The skill tells the agent where it is by its branch name: on `agent-*` the checkout is
+  the agent's own, made by the program that started it, and the repository around a
+  `.branches/` checkout is the user's; on anything else it is a plain clone, and the agent
+  makes its `agent-<name>` branch with git before its first change, unless the checkout
+  sits under `.branches/`: then it was continued on that branch on purpose and stays.
+  `status` and `name` are the agent's commands; the rest are the caller's.
 - Each agent tool (Claude Code, Codex) looks for skills in its own folder at the checkout
-  root: `.claude/skills`, `.agents/skills`. The package links its own folder, where
-  `SKILL.md` sits, into each as `branches` in every checkout it makes, hidden from git
+  root: `.claude/skills`, `.agents/skills`. The package links its own folder, which
+  holds `SKILL.md`, into each as `branches` in every checkout it makes, hidden from git
   through the repository's exclude, which hides a project's own file at that path too; an
   entry already there, a committed skill say, is left alone. A caller may name further
-  skills to link in beside it, each under its own name. Both are temporary, until the
-  project commits its own skill files.
+  skills to link in beside it, each under its own name; the caller's are temporary, until
+  the project commits its own skill files.

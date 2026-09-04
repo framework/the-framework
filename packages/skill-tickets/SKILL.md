@@ -14,6 +14,7 @@ Read and change them with the `tickets` command, a dependency of this repository
 ```
 npx tickets list                 every open ticket, as JSON: file, title, summary, priority, topics,
                                  github, date, planned, effort, uncertainty, locked, lockedBy
+                                 (absent when unset)
 npx tickets show <file>          one ticket: its text, its plan, who holds it
 npx tickets queue                the queue's open entries, in order of work
 ```
@@ -24,14 +25,15 @@ npx tickets queue                the queue's open entries, in order of work
 npx tickets put <file>           write, or create, one file under tickets/ from stdin, the whole file
                                  (npx tickets put <file> < draft.md): a ticket, a plan, or meta.json
                                  (the last-import stamp the program that imports issues keeps there)
-npx tickets close <file>         remove a ticket with its plan and lock; refused while someone else
-                                 holds the ticket; its queue entry stays: `queue done` it
+npx tickets close <file>         once the work is merged: remove the ticket with its plan and lock;
+                                 refused while someone else holds it; its queue entry stays:
+                                 `queue done` it
 npx tickets queue add <text> [--priority N] [--ticket <file>]
                                  put an entry on the queue; --priority places it in that section,
                                  --ticket links it to the ticket and places it by the ticket's
                                  priority (5 when it has none) unless --priority says otherwise;
                                  with neither, it goes at the end of the file, in whatever section ends it
-npx tickets queue done <entry>   take an entry off the queue, as `npx tickets queue` printed it: done means deleted
+npx tickets queue done <entry>   remove an entry, exactly as `npx tickets queue` printed it: done means deleted
 ```
 
 ## Claim before you plan or work a ticket
@@ -39,12 +41,13 @@ npx tickets queue done <entry>   take an entry off the queue, as `npx tickets qu
 ```
 npx tickets claim <file>         {"ok":true,"file":…,"holder":…} — the ticket is yours
                                  {"ok":false,"reason":"claimed","holder":…} — someone else's (no holder
-                                 when the lock is unreadable): back off, pick another; never remove
-                                 or overwrite their lock
+                                 when the lock is unreadable): pick another; never remove or
+                                 overwrite their lock. A claim guards claim, close and release,
+                                 never put, which overwrites whoever holds the ticket
 npx tickets release <file>       lift your own claim once the plan is finished or the work is published
 ```
 
-Every `<file>` above names a ticket by its filename (`2042-01-01_some-ticket.md`) or by the `tickets/…` path a queue entry links to; `put` also takes that ticket's `.plan.md` name, or `meta.json`. You claim as the value of `AGENT_ID` when the process that started you set it in your environment, else as your current branch name (so a rename between claim and release changes who you are); nothing to type.
+Every `<file>` above takes a ticket's filename (`2042-01-01_some-ticket.md`) or the `tickets/…` path a queue entry links to; `put` also takes that ticket's `.plan.md` name. You claim as the value of `AGENT_ID` when the process that started you set it in your environment, else as your current branch name (so a rename between claim and release changes who you are).
 
 ## Formats
 
@@ -69,6 +72,8 @@ GitHub: [#42](https://github.com/org/repo/issues/42) [optional]
 
 [optional: more info (any heading and format you want)]
 ```
+
+A key's value is a bare whole number, above the `# ` title; anything else reads as absent, and a ticket with no readable `Priority:` queues at 5.
 
 ### A claim: `tickets/<DATE>_<SLUG>.lock.md`
 

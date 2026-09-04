@@ -6,10 +6,10 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   it), are two more files beside it: the ticket's name with `.md` swapped for `.plan.md`
   and `.lock.md`.
 - Tickets live on `agent-data`, the shared data branch named by `@gemstack/agent-data`,
-  never on a code branch: no code checkout carries them. On its sync, the program that
-  keeps the branch checked out links `tickets` at the project root to
-  `.branches/agent-data/tickets` in the branch's persistent checkout, and only if nothing
-  of that name is there. The same sync seeds an empty `TODO_AGENTS.md` on a branch born
+  never on a code branch: no code checkout carries them. The program that keeps the branch
+  checked out syncs it; that sync links `tickets` at the project root to
+  `.branches/agent-data/tickets` in the persistent checkout, and only where nothing of
+  that name already sits. The same sync seeds an empty `TODO_AGENTS.md` on a branch born
   without one, so a reader finds a file rather than nothing. Git is told to ignore the
   link with a pair of rules, `/tickets` then `!/tickets/`: the first hides any root entry
   of that name, the second un-hides it again if it is a directory, which a symlink never
@@ -18,8 +18,8 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   committable.
 - `tickets/` holds only open tickets: closing one deletes it, with its plan and its claim.
 - `list` answers newest ticket first, dated by the `<DATE>_` its filename carries. A
-  filename with no date falls back to the file's modification time; `list` reads off git,
-  which has none, so such a ticket is dated the epoch and sorts last.
+  filename with no date falls back to the file's modification time, which a read off git
+  does not have: on `list` such a ticket is dated the epoch and sorts last.
 - The skill knows no issue tracker: a ticket may carry a `GitHub:` line with its issue,
   but importing issues is the program's job.
 
@@ -27,10 +27,10 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 - A claim is a committed file holding one line, `CLAIMED: <who>`, so that agents on other
   machines see it too.
 - One claim per ticket; it never expires: it lifts when the ticket is released or closed,
-  and otherwise only by hand on the branch. The command acts under its own holder: it
-  releases only its own lock, and closes any ticket nobody else has locked; the program
-  that started an agent releases what it left claimed, either naming the holder it expects
-  or naming none, which frees whoever holds the lock.
+  and otherwise only by hand on the branch. The command acts as its own holder: it
+  releases only the lock naming that holder, and closes any ticket nobody else has locked.
+  The program that started an agent releases what the agent left claimed, naming either
+  the holder it expects or none, which frees whoever holds the lock.
 - Releasing a ticket nobody holds is a refusal, not a no-op: a release that lifts nothing
   means the claim is not where the caller thought it was.
 - A lock is written only by a claim.
@@ -62,8 +62,7 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   in file order, top first.
 - An entry is plain text: the task a future agent is started with. `--ticket` writes it as
   a markdown link to the ticket; the ticket is read once as the entry is added, for its
-  priority and to refuse an entry pointing at no ticket. The queue file knows nothing of
-  tickets: it holds lines, places them and removes them. The program that starts agents
+  priority and to refuse an entry pointing at no ticket. The program that starts agents
   reads that link back, to claim the ticket for the agent it starts on the entry.
 - An entry added with no priority is appended at the end of the file, so it lands in
   whatever section ends it; one linked to a ticket takes the ticket's priority, 5 when the
@@ -80,6 +79,8 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 - The command reads with `list`, `show` and `queue`, and writes with `put` (a ticket, a
   plan, or `meta.json`; the bytes as given, unparsed), `close`, `claim`, `release`, `queue
   add` and `queue done`.
+- A ticket is named to any command by its bare filename or by its `tickets/<file>` path,
+  so the link a queue entry carries can be pasted straight in.
 - The only thing read out of `meta.json` is the last-import stamp the importing program
   keeps there.
 - A read fetches the branch from origin once and reads everything from that copy: only
@@ -95,8 +96,8 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 - Anything a command throws is reported like a refusal, reason `git-failed`, with the
   error's own line on stderr: a caller parsing stdout never has to handle a command that
   printed nothing.
-- `list` and `queue` answer with a bare JSON array when they run; every other result, and
-  every refusal, is an object whose `ok` tells the two apart.
+- `list`, and `queue` with no sub-command, answer with a bare JSON array; every other
+  result, and every refusal, is an object whose `ok` tells the two apart.
 - Run outside a repository, a command refuses with `not-a-repo`: only git's own "not a git
   repository" reads as that, every other git failure stays `git-failed`.
 - A write is one commit per command, pushed straight to origin through a throwaway

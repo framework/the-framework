@@ -6,13 +6,14 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   branched from the project's head unless the caller names a base. Agents run in parallel,
   and the user's own copy is never an agent's workspace. A worktree, not a clone, so every
   checkout shares the repository's objects and refs.
-- The repository's own exclude file hides `.branches/` from the project's git, from the
-  first checkout on: an untracked folder at the root would ride a sweeping `git add -A`
-  onto a code branch, and `.gitignore` is tracked.
+- The repository's exclude file hides `.branches/` from the first checkout on: an
+  untracked folder at the root would ride a sweeping `git add -A` onto a code branch, and
+  `.gitignore` is tracked.
 - A checkout starts as branch `agent-<id>` in folder `.branches/agent-<id>/`; `<id>` comes
   from the program that starts the agent, and must match `[A-Za-z0-9_-]+`, so no id can
   build a path outside `.branches/`. `npx branches name <name>` (`[a-z0-9-]+`; the skill
-  asks for a leading letter or digit, which the code does not check) renames the branch to
+  asks for a leading letter or digit: at the command line a leading `-` reads as a flag, a
+  usage error, and the name check itself does not mind it) renames the branch to
   `agent-<name>`: a rename, not a new branch, so nothing is left behind; the folder keeps
   the id, since the agent is running inside it. A checkout on no branch is neither renamed
   nor reclaimed; `status` answers it without a `branch`.
@@ -32,8 +33,8 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   `agent-data-2`; `attach` guards the id only, never the branch it is given.
 - A taken name gets `-2`, `-3`, … instead of a refusal: the agent asked for a name and
   reads back the one it got. Taken means any local or remote-tracking branch, so the later
-  push cannot land on someone else's branch; the branch the checkout carries right now,
-  suffix included, is not counted, so a checkout already on `agent-<name>-2` that asks for
+  push cannot land on someone else's branch. The branch the checkout carries right now,
+  suffix included, is not counted: a checkout already on `agent-<name>-2` that asks for
   `<name>` again keeps `-2` while `agent-<name>` is still taken, and takes `agent-<name>`
   once it is free. Two agents naming the same thing at once race on the rename; the loser
   takes the next free suffix, in at most three tries, then `git-failed`.
@@ -42,16 +43,15 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   is recreated from the project's head: every branch the package deletes held nothing the
   remote lacked.
 - The user's installed dependencies are linked into the checkout, not copied or
-  reinstalled: one link per entry of the folder, absolute, never one link to the whole
-  folder, so an install in the checkout writes into the checkout (a scope like `@acme` is
-  one entry, so a scoped install still writes into the user's folder: a known limit).
-  Every dependency folder down to two levels under the root (not under `node_modules`,
-  `dist`, `build`, `coverage` or a dot-directory) is linked, so a workspace package's own
-  dependencies are there too; a tree already in the checkout is left alone. Of the
-  dot-entries only `.bin` is linked, so the agent runs the project's tools; the others
-  (`.pnpm`, `.modules.yaml`) would tell the package manager the checkout's tree was
-  installed there, which it was not. The packages still resolve: a link to a link resolves
-  where the target lives.
+  reinstalled: one link per entry of the folder, absolute, so an install in the checkout
+  writes into the checkout (a scope like `@acme` is one entry, so a scoped install still
+  writes into the user's folder: a known limit). Every dependency folder down to two
+  levels under the root (not under `node_modules`, `dist`, `build`, `coverage` or a
+  dot-directory) is linked, so a workspace package's own dependencies are there too; a
+  tree already in the checkout is left alone. Of the dot-entries only `.bin` is linked, so
+  the agent runs the project's tools; the others (`.pnpm`, `.modules.yaml`) would tell the
+  package manager the checkout's tree was installed there, which it was not. The packages
+  still resolve: a link to a link resolves where the target lives.
 - Everything after the worktree is best-effort: a checkout missing any of it is a worse
   run, not a failed one.
 - `create` or `attach` for an id that already has a checkout fails as `git-failed` with
@@ -70,9 +70,9 @@ push.
   pushed.
 - An `agent-*` branch whose tip is reachable from another name's remote-tracking ref, on
   any remote, holds nothing of its own (the holds-nothing rule): it goes with its checkout
-  without being pushed, deleted with `-D`, since git's own merged test asks the wrong
-  question. Its own copy, under its current name or its upstream's, does not count. Pushed
-  means on `origin`, the only remote the package pushes to. Both reads take the local
+  unpushed, deleted with `-D`: git's own merged test asks the wrong question. Its own
+  copy, under its current name or its upstream's, does not count. Pushed means on
+  `origin`, the only remote the package pushes to. Both reads take the local
   remote-tracking refs, never a fetch: the push that put a tip there wrote them.
 - The caller may name a pushed commit through the library, not from the command line: the
   commit a cloud session pushed on the agent's behalf. A checkout whose tip is an ancestor
@@ -87,22 +87,22 @@ push.
   stderr: an ignored build artifact must not strand a checkout for good.
 - `remove` and `prune` push by default; `--no-push` opts out. `remove` of a missing
   checkout is a refusal, `no-checkout`; a removal judges the birth branch before anything
-  goes, removes the checkout first and the branches after, since git will not delete a
-  branch a worktree has out, and names the branches that went with it, absent when none;
-  `prune` lists the ids it removed and the checkouts it kept, each with its reason, in its
-  result, nothing on stderr but the forced-removal line, and exits 0.
+  goes, then removes the checkout, then the branches, since git will not delete a branch a
+  worktree has out. `remove` names the branches that went with it, absent when none.
+  `prune` lists only the ids it removed, and the checkouts it kept, each with its reason,
+  in its result, nothing on stderr but the forced-removal line, and exits 0.
 - The package reads no configuration and never asks whether an agent still runs: the
   caller says whether it may push, and may pass a hook that runs just before the checkout
-  goes, to stop whatever serves the tree; the command line passes none.
+  goes, to stop whatever serves the tree; the command line passes no hook.
 
 ## The skill
 - The agent commits and stops: it never pushes, opens a pull request, or merges. Whoever
   started it does that.
-- The skill has the agent name its session, saying what the work is, before its first
-  change, unless its branch already differs from its folder name, as a continued agent's
-  does: it is already named. The agent finishes only when `npx branches status` reports
-  the checkout clean, or after saying what remains is not its own; an agent that needs
-  anything outside its checkout stops and says so.
+- Before its first change the agent names its session, saying what the work is, unless its
+  branch already differs from its folder name, as a continued agent's does: it is already
+  named. The agent finishes only when `npx branches status` reports the checkout clean, or
+  after saying what remains is not its own; an agent that needs anything outside its
+  checkout stops and says so.
 - The skill says: when `node_modules` is missing, install with the lockfile's package
   manager, then `npx branches`, never a bare `branches`: on a fresh clone no such command
   exists yet.
@@ -126,8 +126,8 @@ push.
   whose `ok` tells the two apart.
 - Outside a repository, a command that needs one refuses with `not-a-repo`: only git's own
   "not a git repository" reads as that; every other failure stays `git-failed`. An id is
-  checked before the repository, a name after it, and `status <path>` skips the repository
-  check, so outside one it answers `not-a-worktree`.
+  checked before the repository, a session name after it, and `status <path>` skips the
+  repository check, so outside one it answers `not-a-worktree`.
 - A refusal names its subject: `invalid-id` and `no-checkout` the id, `status`'s
   `not-a-worktree` the path, `dirty` and `not-on-remote` the branch, `not-on-remote` also
   git's reason when a push was tried; `name`'s refusals, `not-a-repo`, and

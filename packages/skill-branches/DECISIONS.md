@@ -6,24 +6,24 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   branched from the project's head unless the caller names a base. Agents run in parallel,
   and the user's own copy is never an agent's workspace. A worktree, not a clone, so every
   checkout shares the repository's objects and refs.
-- `.branches/` is hidden from the project's git from the first checkout on, through the
-  repository's own exclude file: an untracked folder at the root would ride a sweeping
-  `git add -A` onto a code branch, and `.gitignore` is tracked.
+- The repository's own exclude file hides `.branches/` from the project's git, from the
+  first checkout on: an untracked folder at the root would ride a sweeping `git add -A`
+  onto a code branch, and `.gitignore` is tracked.
 - A checkout starts as branch `agent-<id>` in folder `.branches/agent-<id>/`; `<id>` is
   what the program that starts the agent calls it, and must match `[A-Za-z0-9_-]+`, so no
-  id can build a path outside `.branches/`. `npx branches name <name>` (`[a-z0-9-]+`; a
-  leading `-` reaches the parser as a flag, so it never arrives, and the skill asks for a
-  leading letter or digit) renames the branch to `agent-<name>`: a rename, not a new
-  branch, so nothing is left behind; the folder keeps the id: the agent is running inside
-  it. A checkout on no branch is neither renamed nor reclaimed; `status` answers it
-  without a `branch`.
+  id can build a path outside `.branches/`. `npx branches name <name>` (`[a-z0-9-]+`; the
+  skill asks for a leading letter or digit, which the code does not check: a leading `-`
+  reads as a flag unless the arguments follow `--`) renames the branch to `agent-<name>`:
+  a rename, not a new branch, so nothing is left behind; the folder keeps the id, since
+  the agent is running inside it. A checkout on no branch is neither renamed nor
+  reclaimed; `status` answers it without a `branch`.
 - After a checkout is made, named or removed, each checkout whose branch differs from its
-  folder name gets a sibling link `.branches/<branch>` pointing at the folder; a detached
-  checkout or a slashed branch gets none. A link whose target is an `agent-*` name is the
-  package's to remove, whatever the link is called and whether or not the target still
-  exists; anything else at a link's path is left alone. `list` and `prune` see directories
-  only, so a link is never a checkout; a session name passes as an id, so `remove <name>`
-  follows the link `.branches/agent-<name>` to the checkout.
+  folder name gets a sibling link `.branches/<branch>` to its folder; a detached checkout
+  or a slashed branch gets none. A link whose target is an `agent-*` name, `agent-data`
+  aside, is the package's to remove, whatever the link is called and whether or not the
+  target still exists; anything else at a link's path is left alone. `list` and `prune`
+  see directories only, so a link is never a checkout; a session name passes as an id, so
+  `remove <name>` follows the link `.branches/agent-<name>` to the checkout.
 - No name the package mints holds a `/`: a folder and a link are named after a branch, and
   a cloud session (a hosted agent run, started on a branch) cannot start on a slashed ref.
   The package renames and deletes only `agent-*` branches.
@@ -43,22 +43,23 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   is recreated from the project's head: the only branch the package deletes held nothing
   the remote lacked.
 - The user's installed dependencies are linked into the checkout, not copied or
-  reinstalled: one link per entry of the folder, never one link to the whole folder, so an
-  install in the checkout writes into the checkout (a scope like `@acme` is one entry, so
-  a scoped install still writes into the user's folder: a known limit). Every dependency
-  folder down to two levels under the root (not under `node_modules`, `dist`, `build`,
-  `coverage` or a dot-directory) is linked, so a workspace package's own dependencies are
-  there too; a tree already in the checkout is left alone. Of the dot-entries only `.bin`
-  is linked, so the agent runs the project's tools; the others (`.pnpm`, `.modules.yaml`)
-  would tell the package manager the checkout's tree was installed there, which it was
-  not. The packages still resolve: a link to a link resolves where the target lives.
+  reinstalled: one link per entry of the folder, absolute, never one link to the whole
+  folder, so an install in the checkout writes into the checkout (a scope like `@acme` is
+  one entry, so a scoped install still writes into the user's folder: a known limit).
+  Every dependency folder down to two levels under the root (not under `node_modules`,
+  `dist`, `build`, `coverage` or a dot-directory) is linked, so a workspace package's own
+  dependencies are there too; a tree already in the checkout is left alone. Of the
+  dot-entries only `.bin` is linked, so the agent runs the project's tools; the others
+  (`.pnpm`, `.modules.yaml`) would tell the package manager the checkout's tree was
+  installed there, which it was not. The packages still resolve: a link to a link resolves
+  where the target lives.
 - Everything after the worktree is best-effort: a checkout missing any of it is a worse
   run, not a failed one.
 - `create` or `attach` for an id that already has a checkout fails as `git-failed` with
   git's own error, and so does `create` when the branch exists without one: `attach` is
-  the way then. `create` and `attach` each answer the path and the branch; a `list` row is
-  the id, the path, the branch and, asked for, the size, in directory order. Only a
-  directory named `agent-` plus an id counts as a checkout.
+  the way then. `create` and `attach` each answer the path and the branch; `list` answers
+  one row per checkout in directory order: the id, the path, the branch and, asked for,
+  the size. Only a directory named `agent-<id>` counts as a checkout.
 
 ## Flow: reclaim
 Deleting an agent's checkout to free disk, only after the remote has everything in it. It
@@ -91,7 +92,7 @@ push.
   its reason, in its result, nothing on stderr but the forced-removal line, and exits 0.
 - The package reads no configuration and never asks whether an agent still runs: the
   caller says whether it may push, and may pass a hook that runs just before the checkout
-  goes, to stop whatever serves the tree; the command line passes no hook.
+  goes, to stop whatever serves the tree; the command line passes none.
 
 ## The skill
 - The agent commits and stops: it never pushes, opens a pull request, or merges. Whoever
@@ -108,8 +109,8 @@ push.
   refusal (a rule saying no) adds one line for a person on stderr and exits 1. A malformed
   command line (an unknown flag, the wrong argument count) never gets that far: the usage
   on stderr, nothing on stdout, exit 2. An id the charset rejects is a refusal,
-  `invalid-id`, not a usage error; one starting with `-` is a usage error, the parser
-  reading it as a flag.
+  `invalid-id`, not a usage error; one starting with `-` reads as a flag, a usage error,
+  unless the arguments follow `--`.
 - A command that throws is reported like a refusal, reason `git-failed`, the error's own
   line as `detail` on stdout and on stderr.
 - `create`, `attach`, `list`, `remove` and `prune` act on the project, found from the
@@ -118,7 +119,8 @@ push.
   checkout root. `status` answers the path, the branch, whether the tree is clean, and
   whether the tip is on the remote.
 - The keys: `agentId`, `path`, `branch`, `clean`, `onRemote`, `sizeBytes`, `detail`,
-  `removed`, `skipped` (each with `agentId`, `reason`, `detail`), `branchesDeleted`.
+  `removed`, `skipped` (each with `agentId`, `reason`, and the person's line as `detail`),
+  `branchesDeleted`.
 - `list` answers with a bare JSON array; every other result and every refusal is an object
   whose `ok` tells the two apart.
 - Outside a repository, a command that needs one refuses with `not-a-repo`: only git's own
@@ -141,7 +143,7 @@ push.
 - Each agent tool (Claude Code, Codex) looks for skills in its own folder at the checkout
   root: `.claude/skills`, `.agents/skills`. In every checkout it makes, the package links
   its own folder, which holds `SKILL.md`, into both as `branches`, hidden through the
-  repository's exclude; which also hides an untracked project file at that path. An entry
-  already there, a committed skill say, is left alone. A caller may name further skills to
-  link in beside it, each under its own name; these are temporary, until the project
-  commits its own skill files.
+  repository's exclude, whose entry also hides an untracked project file at that path. An
+  entry already there, a committed skill say, is left alone. A caller may name further
+  skills to link in beside it, each under its own name, not from the command line;
+  temporary, until the project commits its own skill files.

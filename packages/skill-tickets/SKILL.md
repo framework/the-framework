@@ -5,9 +5,9 @@ description: Where the project's tickets and its agent queue live, how to read a
 
 # Tickets and the agent queue
 
-The tickets (`tickets/<DATE>_<SLUG>.md`, with their `.plan.md` and `.lock.md` siblings) and the agent queue (`TODO_AGENTS.md`) live on the branch `agent-data`, never on a code branch. A `tickets` link at the repository root may show the tickets, where a long-lived process keeps that branch checked out: read them there if you like, never write there. The queue is not under that link.
+The tickets (`tickets/<DATE>_<SLUG>.md`, with their `.plan.md` and `.lock.md` siblings) and the agent queue (`TODO_AGENTS.md`) live on the branch `agent-data`, never on a code branch. Where a long-lived process keeps that branch checked out, a `tickets` link at the repository root shows them: read there if you like (it may trail what others pushed; the command reads fresh), never write there. The queue is not under that link.
 
-Read and change them with the `tickets` command, a dependency of this repository (`@gemstack/skill-tickets`): install the repository's dependencies once — `npm install`, or the package manager its lockfile belongs to — then run it as `npx tickets`. `npx tickets` alone prints the usage; `--help` is answered by npx itself. Every change it makes is one commit pushed straight to the `agent-data` branch.
+Read and change them with the `tickets` command, a dependency of this repository (`@gemstack/skill-tickets`). If there is no `node_modules` yet, install the repository's dependencies once (`npm install`, or the package manager its lockfile belongs to). Then run it as `npx tickets`; with no arguments it prints the usage on stderr. Every change it makes is one commit pushed straight to the `agent-data` branch. A refusal exits 1 with a line on stderr; a wrong command line exits 2 with the usage.
 
 ## Read
 
@@ -21,29 +21,30 @@ npx tickets queue                the queue's open entries, in order of work
 ## Change
 
 ```
-npx tickets put <file>           write, or create, one file under tickets/ from stdin (npx tickets put <file> < draft.md):
-                                 a ticket, a plan, or meta.json (the last-import stamp the program that
-                                 imports issues keeps there)
+npx tickets put <file>           write, or create, one file under tickets/ from stdin, the whole file
+                                 (npx tickets put <file> < draft.md): a ticket, a plan, or meta.json
+                                 (the last-import stamp the program that imports issues keeps there)
 npx tickets close <file>         remove a ticket with its plan and lock; refused while someone else
-                                 holds the ticket
+                                 holds the ticket; its queue entry stays: `queue done` it
 npx tickets queue add <text> [--priority N] [--ticket <file>]
                                  put an entry on the queue; --priority places it in that section,
                                  --ticket links it to the ticket and places it by the ticket's
-                                 priority unless --priority says otherwise; with neither, it is
-                                 appended at the end of the file, under whatever section ends it
+                                 priority (5 when it has none) unless --priority says otherwise;
+                                 with neither, it goes at the end of the file, in whatever section ends it
 npx tickets queue done <entry>   take an entry off the queue, as `npx tickets queue` printed it: done means deleted
 ```
 
 ## Claim before you plan or work a ticket
 
 ```
-npx tickets claim <file>         {"ok":true,"holder":…} — the ticket is yours
-                                 {"ok":false,"reason":"claimed","holder":…} — someone else's: back off,
-                                 pick another; never remove or overwrite their lock
-npx tickets release <file>       lift your own claim — the plan is finished, or the work is published
+npx tickets claim <file>         {"ok":true,"file":…,"holder":…} — the ticket is yours
+                                 {"ok":false,"reason":"claimed","holder":…} — someone else's (no holder
+                                 when the lock is unreadable): back off, pick another; never remove
+                                 or overwrite their lock
+npx tickets release <file>       lift your own claim once the plan is finished or the work is published
 ```
 
-Every `<file>` above names a ticket: its filename, `2042-01-01_some-ticket.md`, or the `tickets/…` path a queue entry links to; `put` also takes that ticket's `.plan.md` name, or `meta.json`. You claim as the value of `AGENT_ID` when the process that started you set it in your environment, else as your current branch name; nothing to type.
+Every `<file>` above names a ticket by its filename (`2042-01-01_some-ticket.md`) or by the `tickets/…` path a queue entry links to; `put` also takes that ticket's `.plan.md` name, or `meta.json`. You claim as the value of `AGENT_ID` when the process that started you set it in your environment, else as your current branch name (so a rename between claim and release changes who you are); nothing to type.
 
 ## Formats
 
@@ -69,11 +70,9 @@ GitHub: [#42](https://github.com/org/repo/issues/42) [optional]
 [optional: more info (any heading and format you want)]
 ```
 
-`tickets/` holds only open tickets: a closed ticket is removed, with its `.plan.md` and `.lock.md` (`npx tickets close`).
-
 ### A claim: `tickets/<DATE>_<SLUG>.lock.md`
 
-Written by `npx tickets claim`, removed by `npx tickets release` or `npx tickets close`. One line: `CLAIMED: <holder>`. A ticket with a lock is being planned or worked by its holder — pick another.
+Written by `npx tickets claim`, removed by `npx tickets release` or `npx tickets close`. One line: `CLAIMED: <holder>`.
 
 ### A plan: `tickets/<DATE>_<SLUG>.plan.md`
 

@@ -13,7 +13,7 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   what the program that starts the agent calls it, restricted to `[A-Za-z0-9_-]+` so no id
   can build a path outside `.branches/`. `npx branches name <name>` (`[a-z0-9-]+`) renames
   the branch to `agent-<name>`: a rename, not a new branch, so nothing is left behind; the
-  folder keeps the id, since the agent is running inside it. A checkout on no branch is
+  folder keeps the id: the agent is running inside it. A checkout on no branch is
   neither renamed nor reclaimed.
 - Whenever a checkout is made, named or removed, each checkout whose branch differs from
   its folder name gets a link beside it, named as the branch, so
@@ -33,11 +33,12 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   reads back the one it got. Taken means any local or remote-tracking branch, so the later
   push cannot land on someone else's branch; the checkout's own branch is not counted, so
   asking again for the same name changes nothing. Two agents naming the same thing at once
-  race on the rename; the loser takes the next suffix, three times, then it fails.
-- Continuing an agent puts it back on the branch its work is on; a branch gone locally
-  comes back from origin's copy, and one gone everywhere is recreated from the project's
-  head, since the only branch the package deletes held nothing past what the remote
-  already had.
+  race on the rename; the loser takes the next suffix. The rename is retried three times,
+  then it fails.
+- Continuing an agent puts it back on the branch its work is on, whatever its name, even
+  one the package did not make; a branch gone locally comes back from origin's copy, and
+  one gone everywhere is recreated from the project's head: the only branch the package
+  deletes held nothing the remote lacked.
 - The user's installed dependencies are linked into the checkout, not copied or
   reinstalled: one link per entry of the folder, never one link to the whole folder, so an
   install in the checkout writes into the checkout (a scope like `@acme` is one entry, a
@@ -49,22 +50,22 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   manager's own state (`.pnpm`, `.modules.yaml`) says the tree was installed there, which
   the checkout's was not; the packages still resolve: a link to a link resolves where the
   target lives.
-- Everything after the worktree itself (the dependency links, the skill links, the exclude
-  rule, the branch links) is best-effort: a checkout without them is a worse run, not a
-  failed one.
+- Everything after the worktree itself is best-effort: a checkout without it is a worse
+  run, not a failed one.
 
 ## Flow: reclaim
-Deleting an agent's checkout to free the disk, only once everything in it is on the
-remote, so nothing can be lost; the reclaim pushes the branch the checkout ended on, the
+Deleting an agent's checkout to free disk, only once everything in it is on the remote;
+the reclaim pushes the branch the checkout ended on, the
 user's own included, when the program allows a push, and deletes only `agent-*` branches.
 
 - Nothing is committed on the agent's behalf: a checkout with uncommitted work is kept
   until a person commits or deletes it.
 - An `agent-*` branch whose commits already reached the remote through another branch
-  (after a merge) holds nothing of its own and goes with its checkout; its own remote
-  copy, under its current name or the name it was pushed as, does not count. "On the
-  remote" means on `origin`, the only remote the package pushes to, read from the local
-  remote-tracking refs without a fetch: the push that put it there wrote them.
+  (after a merge) holds nothing of its own and goes with its checkout: its tip is on a
+  remote-tracking ref of another name, any remote; its own copy, under its current name or
+  its upstream's, does not count. Pushed means on `origin`, the only remote the package
+  pushes to. Both are read from the local remote-tracking refs without a fetch: the push
+  that put a tip there wrote them.
 - A checkout whose tip is an ancestor of a pushed commit the program names (the commit a
   cloud session pushed on the agent's behalf) goes without a push and keeps its branch,
   even a branch the merged-branch rule would delete.
@@ -77,8 +78,8 @@ user's own included, when the program allows a push, and deletes only `agent-*` 
 - `remove` and `prune` push by default; `--no-push` opts out. `remove` of a missing
   checkout is a refusal, `no-checkout`; `prune` lists the checkouts it kept in its result
   and exits 0.
-- The package does git and the filesystem only: whether it may push comes in from the
-  caller; the package never reads the caller's files.
+- The package does git and the filesystem only, and reads no configuration: whether it
+  may push comes in from the caller.
 
 ## The skill
 - The agent commits and stops: it never pushes, opens a pull request, or merges. Whoever
@@ -88,27 +89,28 @@ user's own included, when the program allows a push, and deletes only `agent-*` 
   its checkout stops and says so.
 - The skill says `npm install`, then `npx branches`, never a bare `branches`: on a fresh
   clone no such command exists yet.
-- One JSON document on stdout for every command that runs: the result or the refusal. A
+- Every command that runs prints one JSON document on stdout: the result or the refusal. A
   refusal (a rule saying no) adds one line for a person on stderr and exits 1. A malformed
   command line (an unknown flag, the wrong argument count) never gets that far: the usage
   on stderr, nothing on stdout, exit 2. An id the charset rejects is a refusal,
   `invalid-id`, not a usage error.
 - A command that throws is reported like a refusal, reason `git-failed`, with the error's
   own line on stderr.
-- `create`, `attach`, `list`, `remove` and `prune` act on the project a checkout belongs
-  to, found by the `.branches/` layout even from inside a checkout; `name` and `status`
-  act on the checkout the command runs in.
+- `create`, `attach`, `list`, `remove` and `prune` act on the project, found from the
+  `.branches/` layout even from inside a checkout; `name` and `status` act on the checkout
+  the command runs in, `status` on a checkout whose path it is given.
 - `list` answers with a bare JSON array; every other result and every refusal is an object
   whose `ok` tells the two apart.
 - Run outside a repository, a command that needs one refuses with `not-a-repo`: only git's
   own "not a git repository" reads as that, every other git failure stays `git-failed`.
 - The skill tells the agent where it is by its branch name alone: on `agent-*` the
-  checkout is the agent's own, made by the program that started it; on anything else it is
-  a plain clone, and the agent makes its `agent-<name>` branch with git before its first
-  change.
+  checkout is the agent's own, made by the program that started it, and the repository
+  around a `.branches/` checkout is the user's; on anything else it is a plain clone, and
+  the agent makes its `agent-<name>` branch with git before its first change.
 - Each agent tool (Claude Code, Codex) looks for skills in its own folder at the checkout
   root: `.claude/skills`, `.agents/skills`. The package links its own folder, where
-  `SKILL.md` sits, into each as `branches` in every checkout it makes, hidden from git;
-  an entry already at that path, a committed skill say, is left alone. A caller may name
-  further skills to link in beside it, each under its own name: temporary, until the
+  `SKILL.md` sits, into each as `branches` in every checkout it makes, hidden from git
+  through the repository's exclude, which hides a project's own file at that path too; an
+  entry already there, a committed skill say, is left alone. A caller may name further
+  skills to link in beside it, each under its own name. Both are temporary, until the
   project commits its own skill files.

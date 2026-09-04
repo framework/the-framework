@@ -61,9 +61,9 @@ Fetch what others pushed → make the change → commit → push.
   message is the caller's: fixed, or a function run after the change, since a batch only
   knows what it did once done. Never a force push. After two failed pushes the process's
   write reports the failure and the commit stays local in its checkout; the next write or
-  pull rebases it onto the remote and pushes it with the new one. When that rebase conflicts the checkout is reset to
-  origin's tip: the remote wins, every unpushed commit is dropped unreported, only the
-  current change runs again.
+  pull rebases it onto the remote and pushes it with the new one. When that rebase conflicts
+  the checkout is reset to origin's tip: the remote wins, every unpushed commit is dropped
+  unreported, only the current change runs again.
 - An op is handed a directory and writes into it. `BranchFileFs` is the file seam an op can
   take instead of the disk, for tests (type and node implementation ship here, the op
   injects it); it creates parent directories: git keeps no empty directory, so a skill's

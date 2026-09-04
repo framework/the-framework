@@ -27,10 +27,10 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 - A claim is a committed file holding one line, `CLAIMED: <who>`, so that agents on other
   machines see it too.
 - One claim per ticket; it never expires: it lifts when the ticket is released or closed,
-  and otherwise only by hand on the branch. The command acts as its own holder: it
-  releases only the lock naming that holder, and closes any ticket nobody else has locked.
-  The program that started an agent releases what the agent left claimed, naming either
-  the holder it expects or none, which frees whoever holds the lock.
+  and otherwise only by hand on the branch. The command releases and closes as the holder
+  it reads: it lifts only a lock naming that holder, and closes any ticket nobody else has
+  locked. The program that started an agent releases what the agent left claimed, naming
+  either the holder it expects or none, which frees whoever holds the lock.
 - Releasing a ticket nobody holds is a refusal, not a no-op: a release that lifts nothing
   means the claim is not where the caller thought it was.
 - A lock is written only by a claim.
@@ -53,7 +53,8 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   implementing is not skipped for having a plan: the plan is what it came to implement;
   only someone else's lock stands in its way. The command always claims to implement.
 - The lock's existence is the claim; the holder it names is only shown. A lock nobody can
-  read still holds the ticket, and no command lifts it: it goes by hand on the branch.
+  read still holds the ticket, and no command lifts it: only a release naming no holder,
+  or a hand edit on the branch.
 
 ## The queue
 - The queue is one markdown file on the branch, `TODO_AGENTS.md`: sections `## Priority

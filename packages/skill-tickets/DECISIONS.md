@@ -6,16 +6,16 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   it), are two more files beside it: the ticket's name with `.md` swapped for `.plan.md`
   and `.lock.md`.
 - Tickets live on `agent-data`, the shared data branch named by `@gemstack/agent-data`,
-  never on a code branch: no code checkout carries the tickets themselves, and a pull
-  request never carries a ticket. On its sync, the program that keeps the branch checked
-  out links `tickets` at the project root to `.branches/agent-data/tickets` in the
-  branch's persistent checkout, and only if nothing of that name is there. The same sync
-  seeds an empty `TODO_AGENTS.md` on a branch born without one, so a reader finds a file
-  rather than nothing. Git is told to ignore it with two rules: `/tickets` hides root
-  entries of that name, and `!/tickets/` re-includes directories, which a link never is.
-  Both are needed because `.git/info/exclude` is one file for every worktree of the
-  repository, the data branch's checkout included, whose real `tickets/` folder must keep
-  committing.
+  never on a code branch: no code checkout carries them. On its sync, the program that
+  keeps the branch checked out links `tickets` at the project root to
+  `.branches/agent-data/tickets` in the branch's persistent checkout, and only if nothing
+  of that name is there. The same sync seeds an empty `TODO_AGENTS.md` on a branch born
+  without one, so a reader finds a file rather than nothing. Git is told to ignore the
+  link with a pair of rules, `/tickets` then `!/tickets/`: the first hides a root entry of
+  that name, the second takes directories back out of it, and a symlink is not a
+  directory. The pair is needed because `.git/info/exclude` is one file for every worktree
+  of the repository, the data branch's checkout included, whose real `tickets/` folder
+  must keep committing.
 - `tickets/` holds only open tickets: closing one deletes it, with its plan and its claim.
 - `list` answers newest ticket first, dated by the `<DATE>_` its filename carries. A
   filename with no date is dated by the file's modification time when the reader has one;
@@ -27,9 +27,12 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 - A claim is a committed file holding one line, `CLAIMED: <who>`, so that agents on other
   machines see it too.
 - One claim per ticket; it never expires: it lifts when the ticket is released or closed,
-  and otherwise only by hand on the branch. The command releases and closes as the holder
-  only; the program that started an agent releases what it left claimed, either naming the
-  holder it expects or naming none, which frees whoever holds the lock.
+  and otherwise only by hand on the branch. The command acts under its own holder: it
+  releases only its own lock, and closes any ticket nobody else has locked; the program
+  that started an agent releases what it left claimed, either naming the holder it expects
+  or naming none, which frees whoever holds the lock.
+- Releasing a ticket nobody holds is a refusal, not a no-op: a release that lifts nothing
+  means the claim is not where the caller thought it was.
 - A lock is written only by a claim; `put` refuses `.lock.md`.
 - A claim the program's write cycle committed but could not push still counts as claimed:
   the commit already guards this machine's readers, and the gap is logged. A cycle that
@@ -40,10 +43,11 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   after a lost race must not read its own lock as someone else's.
 - The holder's name is never typed; the command reads it from where it runs: `AGENT_ID`
   from the environment when the program that started the agent set it, else the current
-  branch. The id wins because it outlives the branch, which that program renames once the
-  agent names its session. A checkout on no branch is refused rather than claiming as
-  `HEAD`. Reading the id off the checkout's folder name was dropped: that layout belongs
-  to whichever program made the checkout, not to this skill.
+  branch. The id wins because it outlives the branch: the branch gets renamed later, and a
+  lock naming the old name would name a holder nobody can be matched to. A checkout on no
+  branch is refused rather than claiming as `HEAD`. Reading the id off the checkout's
+  folder name was dropped: that layout belongs to whichever program made the checkout, not
+  to this skill.
 - The program says whether a claim is for planning or for implementing: a claim for
   planning is skipped, no lock written, when the ticket already has a plan; a claim for
   implementing is not skipped for having a plan, the plan being what it came to implement;
@@ -53,8 +57,9 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 
 ## The queue
 - The queue is one markdown file on the branch, `TODO_AGENTS.md`: sections `## Priority
-  10` down to `## Priority 0`, an entry a list item under one of them. Work is taken from
-  the top: highest section first, first line first.
+  10` down to `## Priority 0`, an entry a list item under one of them. The file is kept
+  sorted high to low as entries are placed; nothing re-sorts on read, so a reader answers
+  in file order, top first.
 - An entry is plain text: the task a future agent is started with. `--ticket` writes it as
   a markdown link to the ticket; the ticket is read once as the entry is added, for its
   priority and to refuse an entry pointing at no ticket. The queue file knows nothing of

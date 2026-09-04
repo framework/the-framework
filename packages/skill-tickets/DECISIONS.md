@@ -6,14 +6,16 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   it), are two more files beside it: the ticket's name with `.md` swapped for `.plan.md`
   and `.lock.md`.
 - Tickets live on `agent-data`, the shared data branch named by `@gemstack/agent-data`,
-  never on a code branch: an agent's checkout has no `tickets/` folder, and a pull request
-  never carries a ticket. On its sync, the program that keeps the branch checked out links
-  `tickets` at the project root to `.branches/agent-data/tickets` in the branch's
-  persistent checkout, and only if nothing of that name is there. Git is told to ignore it
-  with two rules: `/tickets` hides root entries of that name, and `!/tickets/` re-includes
-  directories, which a link never is. Both are needed because `.git/info/exclude` is one
-  file for every worktree of the repository, the data branch's checkout included, whose
-  real `tickets/` folder must keep committing.
+  never on a code branch: no code checkout carries the tickets themselves, and a pull
+  request never carries a ticket. On its sync, the program that keeps the branch checked
+  out links `tickets` at the project root to `.branches/agent-data/tickets` in the
+  branch's persistent checkout, and only if nothing of that name is there. The same sync
+  seeds an empty `TODO_AGENTS.md` on a branch born without one, so a reader finds a file
+  rather than nothing. Git is told to ignore it with two rules: `/tickets` hides root
+  entries of that name, and `!/tickets/` re-includes directories, which a link never is.
+  Both are needed because `.git/info/exclude` is one file for every worktree of the
+  repository, the data branch's checkout included, whose real `tickets/` folder must keep
+  committing.
 - `tickets/` holds only open tickets: closing one deletes it, with its plan and its claim.
 - `list` answers newest ticket first, dated by the `<DATE>_` its filename carries. A
   filename with no date is dated by the file's modification time when the reader has one;
@@ -24,10 +26,10 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 ## Flow: a claim
 - A claim is a committed file holding one line, `CLAIMED: <who>`, so that agents on other
   machines see it too.
-- One claim per ticket; it never expires: it lifts only on a deliberate release, the
-  ticket released or closed. The command releases and closes as the holder only; the
-  program that started an agent releases what it left claimed, either naming the holder it
-  expects or naming none, which frees whoever holds the lock.
+- One claim per ticket; it never expires: it lifts when the ticket is released or closed,
+  and otherwise only by hand on the branch. The command releases and closes as the holder
+  only; the program that started an agent releases what it left claimed, either naming the
+  holder it expects or naming none, which frees whoever holds the lock.
 - A lock is written only by a claim; `put` refuses `.lock.md`.
 - A claim the program's write cycle committed but could not push still counts as claimed:
   the commit already guards this machine's readers, and the gap is logged. A cycle that
@@ -55,15 +57,17 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   the top: highest section first, first line first.
 - An entry is plain text: the task a future agent is started with. `--ticket` writes it as
   a markdown link to the ticket; the ticket is read once as the entry is added, for its
-  priority and to refuse an entry pointing at no ticket. The queue itself only stores and
-  removes lines. The program that starts agents reads that link back, to claim the ticket
-  for the agent it starts on the entry.
+  priority and to refuse an entry pointing at no ticket. The queue file knows nothing of
+  tickets: it holds lines, places them and removes them. The program that starts agents
+  reads that link back, to claim the ticket for the agent it starts on the entry.
 - An entry added with no priority is appended at the end of the file, so it lands in
   whatever section ends it; one linked to a ticket takes the ticket's priority, 5 when the
   ticket has none or names one that is not a whole 0-10: clamping a typo would claim 10 or
   0, both reserved ends of the scale. A priority the file has no section for gets one,
-  placed before the first lower section so the file stays sorted high to low. An entry
-  joins the end of its section.
+  placed before the first lower section so the file stays sorted high to low. A file with
+  no priority section at all gets the new one above its first heading rather than after
+  its last: sections that carry no priority must not bury a deliberate one. An entry joins
+  the end of its section.
 - Done means deleted, never checked off: a `- [x]` line is not an open entry, and `queue`
   never lists it.
 
@@ -80,11 +84,14 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 - One JSON document on stdout for every command that runs: the result, or the refusal. A
   refusal, a rule saying no, adds one line for a person on stderr and exits 1; an argument
   that cannot be read never gets that far: the usage on stderr, nothing on stdout, exit 2.
+  A malformed command line (an unknown flag, the wrong argument count, a `--priority` off
+  the 0-10 scale) is that usage error; an argument that parses but names a file no command
+  may touch is an ordinary refusal, `invalid-path`.
 - Anything a command throws is reported like a refusal, reason `git-failed`, with the
   error's own line on stderr: a caller parsing stdout never has to handle a command that
   printed nothing.
-- `list` and `queue` answer with the bare JSON array; every other command answers with an
-  object, its `ok` telling a result from a refusal.
+- `list` and `queue` answer with a bare JSON array when they run; every other result, and
+  every refusal, is an object whose `ok` tells the two apart.
 - Run outside a repository, a command refuses with `not-a-repo`: only git's own "not a git
   repository" reads as that, every other git failure stays `git-failed`.
 - A write is one commit per command, pushed straight to origin through a throwaway

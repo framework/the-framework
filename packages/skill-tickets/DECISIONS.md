@@ -3,37 +3,46 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 
 ## The tickets
 - Two callers: the command an agent runs, and a long-lived program that keeps the branch
-  checked out, imports issues and starts agents through the package's library. The package
-  ships `SKILL.md`, the agent's instructions, with the ticket, plan and queue formats the
-  code parses.
+  checked out and starts agents through the package's library; it imports issues with its
+  own code. The executable is `tickets`. The package ships `SKILL.md`, the agent's
+  instructions: where the files live and never to write through the root link; install,
+  then `npx tickets`; the commands and what they answer; claim before planning or working,
+  release before stopping unless closed, close once the work is merged; the ticket, plan
+  and queue formats, the code parsing part of them, with the plan's optional sections and
+  its rubric for rating uncertainty.
 - A ticket is a markdown file in `tickets/`. Its plan and its claim (who is working on it)
   sit beside it: `<name>.plan.md` and `<name>.lock.md`, `<name>` the filename without
   `.md`.
 - Tickets live on `agent-data`, the branch `@gemstack/agent-data` names, never on a code
-  branch. The program's sync seeds an empty `TODO_AGENTS.md` when the branch has none, so
-  the queue is a file before its first entry; then links `tickets` at the project root to
-  `.branches/agent-data/tickets`, a relative target, only when nothing of that name sits
-  at the root; then converges the checkout with origin. A seed that cannot commit stops
-  before the link; a link that cannot be made is ignored, and the sync still reports the
-  pull. The link is hidden by two rules in `.git/info/exclude`, `/tickets` then
-  `!/tickets/`, written on the run that creates the link even when the symlink fails. The
-  first hides any root entry of that name; the second un-hides directories, which a
-  symlink is not. Two are needed because the exclude covers every worktree, and the data
-  branch's checkout must keep committing its own `tickets/`.
+  branch. The program's sync runs three steps in order. It seeds an empty `TODO_AGENTS.md`
+  when the branch has none, so the queue is a file before its first entry. It links
+  `tickets` at the project root to the relative target `.branches/agent-data/tickets`,
+  only when nothing of that name sits at the root. Then it converges the checkout with
+  origin. A seed that cannot commit stops before the link; a link that cannot be made is
+  ignored, and the sync still reports the pull. The link is hidden by two rules in
+  `.git/info/exclude`, `/tickets` then `!/tickets/`, written on the run that creates the
+  link even when the symlink fails. The first hides any root entry of that name; the
+  second un-hides directories, which a symlink is not. Two are needed because the exclude
+  covers every worktree, and the data branch's checkout must keep committing its own
+  `tickets/`.
 - `tickets/` holds only open tickets: closing one deletes it, its plan and its claim, and
   nothing else; a queue entry linking it stays until `queue done`.
 - `list` answers newest first by the `<DATE>_` in the filename, ties by filename
-  ascending. A dateless filename dates to the file's modification time on disk, to the
-  epoch off git, where it sorts last.
+  ascending. A filename with no date takes the file's modification time, or the epoch when
+  read from git, where it sorts last.
 - A ticket's row, from `list` and `show` alike: the title from its `# ` line, the summary
-  from the first prose line after `## TLDR`, else after the title (a `Source:` line, exact
-  case, skipped in either: a trailer imported tickets carry, not a field of the format),
+  from the first prose line after `## TLDR`, else after the title, scanning past headings
+  to the end of the file (a `Source:` line, matched case-sensitively unlike every key,
+  skipped in either: a trailer imported tickets carry, not a field of the format),
   `Topics: [a, b]` split into tags, `GitHub:` into label and url, `Priority:` verbatim.
   Plus whether a plan sits beside it, whether a lock does (`locked`, present only when
   true), whom the lock names, and the plan's `Effort:` and `Uncertainty:`, absent unless a
   whole number 0-10. Keys and headings match in any case, `## TLDR` as the whole line; a
   ticket's keys are read only above the `# ` title, a plan's above its title or, when it
-  has none, anywhere. `list` reads the first 4 KB of a ticket, `show` all of it.
+  has none, anywhere. `list` reads the first 4 KB of a ticket, `show` all of it. The row's
+  keys: `file`, `title`, `summary`, `priority`, `topics`, `github` (`label`, `url`),
+  `date`, `planned`, `locked`, `lockedBy`, `effort`, `uncertainty`; `show` nests the row
+  as `ticket` with its text as `content`.
 - The package knows no issue tracker: a ticket may carry a `GitHub:` line, but importing
   issues is the program's job.
 
@@ -41,10 +50,10 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 - A claim is a committed file holding one line, `CLAIMED: <who>`, so agents on other
   machines see it.
 - One claim per ticket; it never expires: it lifts when the ticket is released or closed,
-  otherwise only by hand on the branch. The command lifts only a lock naming the holder it
-  reads, and closes only when the ticket has no lock or its own, `not-holder` otherwise.
-  The program that started an agent releases what the agent left claimed, naming the
-  holder it expects or none; none frees whoever holds the lock.
+  otherwise only by hand on the branch. The command lifts only its own lock, and closes
+  only when the ticket has no lock or its own, `not-holder` otherwise. The program that
+  started an agent releases what the agent left claimed, naming the holder it expects or
+  none; none frees whoever holds the lock.
 - Releasing an unclaimed ticket is a refusal.
 - A lock is written only by a claim; it must name you before `close` or `release` act, and
   someone else's `claim` is refused while it exists. `put` ignores it, so an import can
@@ -72,10 +81,9 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 
 ## The queue
 - The queue is one markdown file on the branch, `TODO_AGENTS.md`: sections `## Priority
-  10` down to `## Priority 0`, any `## Priority N` of one or two digits, ending the number
-  at a word boundary, counts; any `-`, `*` or `N.` list item in the file is an entry,
-  wherever it sits. Entries are placed to keep the file sorted high to low; nothing
-  re-sorts on read.
+  10` down to `## Priority 0`, any `## Priority N` counts, N one or two digits ending at a
+  word boundary; any `-`, `*` or `N.` list item in the file is an entry, wherever it sits.
+  Entries are placed to keep the file sorted high to low; nothing re-sorts on read.
 - An entry is plain text, trimmed: the task a future agent is started with. `--ticket`
   writes the entry as a markdown link to the ticket, the given text as its label. The
   ticket is read off the fetched branch before the write, for its priority and to refuse
@@ -117,8 +125,8 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 - Every command that runs prints one JSON document, the result or the refusal; a refusal
   adds one line on stderr and exits 1. A malformed command line (an unknown flag, the
   wrong argument count, an empty `queue add` text, a `--priority` off the 0-10 scale) is
-  rejected first: the usage on stderr, nothing on stdout, exit 2. An argument naming a
-  file no command may touch is an ordinary refusal, `invalid-path`.
+  rejected first: the usage on stderr, nothing on stdout, exit 2. A file no command may
+  touch is an ordinary refusal, `invalid-path`.
 - Anything a command throws refuses with `git-failed`.
 - `list` and a bare `queue` answer with a JSON array; every other result and every refusal
   is an object with `ok`.
@@ -134,10 +142,10 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   `no-identity`, `no-remote`, `invalid-path`, `not-a-repo`, `git-failed`.
 - A write is one commit per command (`put tickets/<file>`, `close tickets/<stem>`, `claim
   tickets/<stem>`, `release tickets/<stem>`, `queue add: <entry>`, `queue done: <entry>`;
-  the program's seed is `seed the queue`, its batch claim one commit, `claim <n> tickets`
-  for the n it locked, the single form when that is one), pushed straight to origin
-  through a throwaway worktree at origin's tip; a push that loses a race is re-applied on
-  the new tip by `@gemstack/agent-data`.
+  the program's seed is `seed the queue`; its batch claim is one commit, `claim <n>
+  tickets` for the n it locked, or the single form when n is one), pushed straight to
+  origin through a throwaway worktree at origin's tip; a push that loses a race is
+  re-applied on the new tip by `@gemstack/agent-data`.
 - `queue done` takes the entry as `queue` printed it, trimmed, removes the first such
   line, and refuses a line the queue does not have, an empty one included, decided inside
   the write.

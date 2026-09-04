@@ -8,8 +8,8 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   branch takes it as an argument.
 - `.branches/<branch>` holds a project's persistent checkouts, one per branch: the agents' own
   (made by other packages) and the data branch's (made here). The directory name is exported.
-  Dotted so a `*` glob skips it: each checkout is a full copy of the project, and a tool that
-  descends into them does N times the work.
+  Dotted so a `*` glob skips it: each checkout is a full copy, so a tool that descends does
+  N times the work.
 - Hidden through the common git dir's `info/exclude`, never a committed `.gitignore`: the
   library must not touch tracked files; a per-worktree `info/exclude` is never read, and one
   line there, written once, covers every checkout. Best-effort: the checkout stands even when the rule could
@@ -26,12 +26,12 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 ## The branch
 - A branch of the project's repository holds the agents' data (tickets, the queue) the way
   `gh-pages` holds a site; code branches hold only code. Every write that changes something
-  pushes, and a pull runs on its own, so a machine that writes nothing still gets what the
-  others pushed.
+  pushes, and a pull is a cycle of its own, so a machine that writes nothing still gets what
+  the others pushed.
 - One branch for all skills, each with its own folder or file. Not one per skill: every
   extra branch needs its own checkout and its own sync failure to report.
-- Missing locally, it is adopted from origin's copy; existing nowhere, it is born as an
-  orphan branch, so no code commit is ever in its history.
+- Missing locally, it is adopted from origin's copy; missing there too, it is born an orphan
+  branch, so no code commit is ever in its history.
 - The name is written once, in `names`, as `DATA_BRANCH`, and imported everywhere else.
   `names` is its own entry point with no node imports, so browser code can import it.
 - A read works from anywhere in the repository, an agent's worktree included: the checkout
@@ -48,7 +48,7 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 Fetch what others pushed → make the change → commit → push.
 
 - Two writers. A long-lived process (a daemon) writes in its own checkout,
-  `.branches/<branch>`, one write at a time per branch of a repository, a lock in memory: two
+  `.branches/<branch>`, one write at a time per repository and branch, an in-memory lock: two
   processes on one clone are not guarded. The pull is that same cycle with an empty change,
   behind the same lock. A command an agent runs writes in a throwaway worktree outside the
   project, at the remote's tip (parentless when origin has no such branch), pushes, and
@@ -59,7 +59,8 @@ Fetch what others pushed → make the change → commit → push.
 - A write is a re-runnable function, not a finished commit: a lost race winds the attempt's
   commit back and runs the function again on the new files, so the change lands once. The
   message is the caller's: fixed, or a function run after the change, since a batch only
-  knows what it did once done. Never a force push. After two failed pushes the process's
+  knows what it did once done; the library's own are `create the <branch> branch` for the
+  birth and `sync` for the pull. Never a force push. After two failed pushes the process's
   write reports the failure and the commit stays local in its checkout; the next write or
   pull rebases it onto the remote and pushes it with the new one. When that rebase conflicts
   the checkout is reset to origin's tip: the remote wins, every unpushed commit is dropped

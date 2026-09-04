@@ -9,7 +9,7 @@ Your work goes on a branch named `agent-<name>`, unless whoever started you cont
 
 ## The command
 
-The `branches` command is a dependency of this repository (`@gemstack/skill-branches`). If `node_modules` is missing, install once with the lockfile's package manager (`npm install` for `package-lock.json`). Then run it as `npx branches`. `status` and `name` are your commands; the rest belong to whoever started you.
+`branches` is a dependency of this repository (`@gemstack/skill-branches`). If `node_modules` is missing, install with the lockfile's package manager (`npm install` for `package-lock.json`). Then run it as `npx branches`. `status` and `name` are your commands; the rest belong to whoever started you.
 
 ## Where you are
 
@@ -19,17 +19,17 @@ npx branches status
 
 It prints JSON; `branch` is the branch you are on.
 
-**A branch starting with `agent-`.** Its checkout is your whole workspace: read and write only inside it. Dependency files and the skill folders are the user's copies, linked in: never edit them. If something you need is outside your checkout, say so and stop.
+**A branch starting with `agent-`.** Its checkout is your whole workspace: read and write only there. Dependency files and the skill folders are the user's copies, linked in: never edit them. If something you need is outside your checkout, say so and stop.
 
-Before your first change, name the session with `[a-z0-9-]+` saying what the work is, unless your branch is already named (not `agent-<id>` for the `AGENT_ID` in your environment): then keep it.
+Before your first change, name the session with `[a-z0-9-]+` saying what the work is, unless your branch already differs from your checkout's folder name (`path` in `status`): then it is named, keep it.
 
 ```
 npx branches name <name>
 ```
 
-It renames your branch to `agent-<name>` and prints the name it got in `branch`: `agent-<name>-2`, `-3`, … when `<name>` was taken (refused: pick another name).
+It renames your branch to `agent-<name>` and prints the name it got in `branch`: `agent-<name>-2`, `-3`, … when `<name>` was taken (refused as `invalid-name`: pick another).
 
-**Any other branch.** If the checkout sits under `.branches/`, whoever started you put you on this branch on purpose: stay on it, do not name it. Otherwise you are in a plain clone on someone else's branch. Before your first change, create your own and switch to it, `<name>` as above (another if it exists):
+**Any other branch.** If the checkout sits under `.branches/`, whoever started you put you on this branch on purpose: stay on it, do not name it. Otherwise you are in a plain clone on someone else's branch. Before your first change, create your own and switch to it, `<name>` as above (another if it exists, locally or on origin):
 
 ```
 git switch -c agent-<name>

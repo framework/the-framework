@@ -6,15 +6,15 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   each other.
 - Named for the `agent-data` branch, but no function hardcodes it: every one that touches a
   branch takes it as an argument.
-- `.branches/<branch>` holds a project's persistent checkouts, one per branch: the agents' own
-  (made by other packages) and the data branch's (made here). The directory name is exported.
-  Dotted so a `*` glob skips it: each checkout is a full copy, so a tool that descends does
-  N times the work.
+- `.branches/<branch>` holds a project's persistent checkouts, one per branch: the agents'
+  own (made by other packages) and the data branch's (made here). The directory name is
+  exported. Dotted so a `*` glob skips it: each checkout is a full copy, so a tool that
+  descends does N times the work.
 - Hidden through the common git dir's `info/exclude`, never a committed `.gitignore`: the
-  library must not touch tracked files; a per-worktree `info/exclude` is never read, and one
-  line there, written once, covers every checkout. Best-effort: the checkout stands even when the rule could
-  not be written. Prune before adding: a hand-deleted checkout leaves a registration that fails
-  the add.
+  library must not touch tracked files; a per-worktree `info/exclude` is never read, and
+  one line there, written once, covers every checkout. Best-effort: the checkout stands
+  even when the rule could not be written. Prune before adding: a hand-deleted checkout
+  leaves a registration that fails the add.
 - Every git call has a time budget: a listed read 10s, network and `worktree add` 120s,
   other writes 30s. `worktree` goes by its second word (`add` slow, `list` a read, the rest
   a write), `branch` by its flags (bare or a listing flag reads; `-D`, `-m` or a new name
@@ -48,14 +48,15 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 Fetch what others pushed → make the change → commit → push.
 
 - Two writers. A long-lived process (a daemon) writes in its own checkout,
-  `.branches/<branch>`, one write at a time per repository and branch, an in-memory lock: two
-  processes on one clone are not guarded. The pull is that same cycle with an empty change,
-  behind the same lock. A command an agent runs writes in a throwaway worktree outside the
-  project, at the remote's tip (parentless when origin has no such branch), pushes, and
-  deletes it whether or not the push landed. It never touches the process's checkout: that
-  checkout's next write commits everything it finds, and a failed write resets it, new
-  files included. Both try the push twice; the command's write then throws with nothing
-  left to retry, the process's never throws: its callers are background ticks.
+  `.branches/<branch>`, one write at a time per repository and branch, an in-memory lock:
+  two processes on one clone are not guarded. The pull is that same cycle with an empty
+  change, behind the same lock. A command an agent runs writes in a throwaway worktree
+  outside the project, at the remote's tip (parentless when origin has no such branch),
+  pushes, and deletes it whether or not the push landed. It never touches the process's
+  checkout: that checkout's next write commits everything it finds, and a failed write
+  resets it, new files included. Both try the push twice; the command's write then throws
+  with nothing left to retry, the process's never throws: its callers are background
+  ticks.
 - A write is a re-runnable function, not a finished commit: a lost race winds the attempt's
   commit back and runs the function again on the new files, so the change lands once. The
   message is the caller's: fixed, or a function run after the change, since a batch only

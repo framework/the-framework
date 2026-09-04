@@ -13,11 +13,12 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   second un-hides a directory, which a symlink never is; a pair because
   `.git/info/exclude` is one file for every worktree, the data branch's checkout included,
   whose own `tickets/` must stay committable.
-- `tickets/` holds only open tickets: closing one deletes it, with its plan and its claim.
+- `tickets/` holds only open tickets: closing one deletes it, with its plan and its claim,
+  and nothing else: an entry linking it stays on the queue until `queue done`.
 - `list` answers newest first, dated by the `<DATE>_` its filename carries; a filename
   with no date falls back to the file's modification time, which a read off git lacks:
   such a ticket is then dated the epoch and sorts last.
-- The skill knows no issue tracker: a ticket may carry a `GitHub:` line with its issue,
+- The package knows no issue tracker: a ticket may carry a `GitHub:` line with its issue,
   but importing issues is the program's job.
 
 ## Flow: a claim
@@ -30,7 +31,7 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   holder it expects or none; none frees whoever holds the lock.
 - Releasing a ticket nobody holds is a refusal, not a no-op: the claim is not where the
   caller thought.
-- A lock is written only by a claim, and a claim guards planning and working, not writing:
+- A lock is written only by a claim, and a claim guards planning and working, not `put`:
   `put` overwrites a ticket or its plan no matter who holds it, so an import can refresh a
   ticket someone is working.
 - A claim the program's write cycle committed but could not push still counts: the commit
@@ -46,16 +47,16 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   read: that layout belongs to whichever program made the checkout.
 - The program says whether a claim is for planning or implementing: a claim for planning
   is skipped, no lock written, when the ticket already has a plan; a claim for
-  implementing is not, the plan being what it came to implement; only someone else's lock
+  implementing is not: the plan is what it came to implement; only someone else's lock
   stands in its way. The command always claims to implement.
 - The lock's existence is the claim; the holder it names is only shown. A lock nobody can
-  read still holds the ticket, and no command lifts it: only a release naming no holder,
-  or a hand edit on the branch.
+  read still holds the ticket, and no command lifts it: only the program's release naming
+  no holder, or a hand edit on the branch.
 
 ## The queue
 - The queue is one markdown file on the branch, `TODO_AGENTS.md`: sections `## Priority
-  10` down to `## Priority 0`, an entry a list item under one. The file is kept sorted
-  high to low as entries are placed; nothing re-sorts on read, so a reader answers in file
+  10` down to `## Priority 0`, an entry a list item under one. Entries are placed so the
+  file stays sorted high to low; nothing re-sorts on read, so a reader answers in file
   order, top first.
 - An entry is plain text: the task a future agent is started with. `--ticket` writes it as
   a markdown link to the ticket, read once as the entry is added, for its priority and to
@@ -63,25 +64,28 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   back to claim the ticket for the agent it starts.
 - An entry added with no priority is appended at the end of the file, in whatever section
   ends it; one linked to a ticket takes the ticket's priority unless one was given, and 5
-  when the ticket has none or names one that is not a whole 0-10: clamping a typo would
-  claim 10 or 0, the reserved ends. A priority the file has no section for gets one,
-  before the first lower section, so the file stays sorted; a file with no priority
-  section gets it above its first `## ` section, so an unranked section cannot bury a
-  deliberate one; a file with no `## ` section gets it appended. An entry joins the end of
-  its section.
+  when the ticket has none or names one that is not a whole number 0-10: clamping a typo
+  would claim 10 or 0, the reserved ends. A priority the file has no section for gets one,
+  before the first lower section, so the file stays sorted, or after the last priority
+  section when none is lower; a file with no priority section gets it above its first `##
+  ` section, so an unranked section cannot bury a deliberate one; a file with no `## `
+  section gets it appended. An entry joins the end of its section.
 - Done means deleted, never checked off: a `- [x]` line is not an open entry, and `queue`
-  never lists it.
+  never lists it; a `- [ ]` line is one, printed and removed without its box.
 
 ## Flow: the command
 - The command reads with `list`, `show` and `queue`, and writes with `put` (a ticket, a
   plan, or `meta.json`; the bytes as given, unparsed), `close`, `claim`, `release`, `queue
   add` and `queue done`.
+- `show` answers with the ticket, its plan and its holder. `claim` and `close` refuse a
+  ticket that is not there, `no-ticket`; `put` checks only the name, so a plan can be
+  written for a ticket that does not exist.
 - A ticket is named to any command by its bare filename or by its `tickets/<file>` path,
   so the link a queue entry carries can be pasted straight in.
 - No command reads `meta.json`: the importing program is its only reader, for the
   last-import stamp it keeps there.
 - A read fetches the branch from origin once and reads everything from that copy: only
-  origin surely holds what every writer pushed, the command's own earlier writes included.
+  origin surely holds what every writer pushed, including the command's own earlier writes.
   With no origin the local branch is read: writes are refused there, so nobody else can
   have moved it.
 - One JSON document on stdout for every command that runs: the result or the refusal. A
@@ -91,7 +95,7 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   that parses but names a file no command may touch is an ordinary refusal,
   `invalid-path`.
 - Anything a command throws is reported like a refusal, reason `git-failed`, the error's
-  own line on stderr: a caller parsing stdout never meets a command that printed nothing.
+  own line on stderr, so a caller parsing stdout never meets a command that printed nothing.
 - `list`, and `queue` with no sub-command, answer with a bare JSON array; every other
   result, and every refusal, is an object whose `ok` tells the two apart.
 - Run outside a repository, a command refuses with `not-a-repo`: only git's own "not a git

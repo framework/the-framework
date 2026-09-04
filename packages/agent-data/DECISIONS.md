@@ -8,48 +8,49 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   branch takes it as an argument.
 - `.branches/<branch>` holds a project's persistent checkouts, one per branch: the agents' own
   (made by other packages) and the data branch's (made here). The directory name is exported.
-  It starts with a dot so a `*` glob skips it: each checkout is a full copy of the project,
-  and a tool that descends into N copies runs N times.
+  Dotted so a `*` glob skips it: each checkout is a full copy of the project, and a tool that
+  descends into N copies runs N times.
 - Hidden through the common git dir's `info/exclude`, never a committed `.gitignore`: the
   library must not touch tracked files; a per-worktree `info/exclude` is never read, and one
   line there covers every checkout. Best-effort: the checkout stands even when the rule could
   not be written. Prune before adding: a hand-deleted checkout leaves a registration that fails
   the add.
-- Every git call has a time budget: a read 10s, network and `worktree add` 120s, other
-  writes 30s. `worktree` goes by its second word (`add` slow, `list` a read, the rest a
-  write), `branch` by its flags (bare or a listing flag reads; `-D`, `-m` or a new name
+- Every git call has a time budget: a listed read 10s, network and `worktree add` 120s,
+  other writes 30s. `worktree` goes by its second word (`add` slow, `list` a read, the rest
+  a write), `branch` by its flags (bare or a listing flag reads; `-D`, `-m` or a new name
   writes); an unlisted subcommand gets the write budget, so a write is never cut short. A
-  killed `push` may have half landed: reported as a timeout, its own error kind, never as a
-  rejected push. git's output buffer is 16 MB, for a file listing of a large checkout; an
-  overrun is not a timeout.
+  killed `push` may have half landed, so a git call that outruns its budget fails as a
+  timeout, its own error kind, never as a plain failure. git's output buffer is 16 MB (a
+  large checkout's file listing); an overrun is not a timeout.
 
 ## The branch
 - A branch of the project's repository holds the agents' data (tickets, the queue) the way
-  `gh-pages` holds a site; code branches hold only code. Every write pushes, and a pull runs
-  on its own, so a machine that writes nothing still gets what the others pushed.
+  `gh-pages` holds a site; code branches hold only code. Every write that changes something
+  pushes, and a pull runs on its own, so a machine that writes nothing still gets what the
+  others pushed.
 - One branch for all skills, each with its own folder or file. Not one per skill: every
   extra branch needs its own checkout and its own sync failure to report.
 - Missing locally, it is adopted from origin's copy; existing nowhere, it is born as an
   orphan branch, so no code commit is ever in its history.
 - The name is written once, in `names`, as `DATA_BRANCH`, and imported everywhere else.
   `names` is its own entry point with no node imports, so browser code can import it.
-- A read works without a checkout, from anywhere in the repository, an agent's worktree
-  included: the checkout is looked for beside the repository's real `.git`. A file comes from
-  that checkout when there is one, else the local branch, else origin's copy; a directory
-  listing always comes off a ref.
-  A read can ask for a fresh copy: fetch, then origin's ref instead of the checkout, for a
-  reader whose checkout may trail. A one-shot command opens the branch once: one fetch, every read
-  off origin's copy (the local branch when there is no `origin/<branch>`), because its own
-  writes go straight to the remote and never move the local branch. A read never fails: a missing file,
-  a missing branch and a git that could not run all read as absent, so an unreachable store
-  looks empty.
+- A read works from anywhere in the repository, an agent's worktree included: the checkout
+  is looked for beside the real `.git`. A file is looked for in that checkout when there is
+  one, then on the local branch, then on origin's copy; a directory listing always comes off
+  a ref. A read can ask for a fresh copy: fetch, then origin's ref instead of the checkout,
+  for a reader whose checkout may trail. A one-shot command opens the branch once: one fetch
+  when there is an origin, every read off origin's copy (the local branch when there is no
+  `origin/<branch>`), because its own writes go straight to the remote and never move the
+  local branch. A read never fails: a missing file, a missing branch and a git that could
+  not run all read as absent, so an unreachable store looks empty.
 
 ## Flow: a write
 Fetch what others pushed → make the change → commit → push.
 
 - Two writers. A long-lived process (a daemon) writes in its own checkout,
-  `.branches/<branch>`, one write at a time per branch of a repository; the pull is that same
-  cycle with an empty change, in the same queue. A command an agent runs writes in a throwaway worktree outside the
+  `.branches/<branch>`, one write at a time per branch of a repository, a lock in memory: two
+  processes on one clone are not guarded. The pull is that same cycle with an empty change,
+  in the same queue. A command an agent runs writes in a throwaway worktree outside the
   project, at the remote's tip (parentless when origin has no such branch), pushes, and
   deletes it whether or not the push landed. It never touches the process's checkout: that
   checkout's next write commits everything it finds, and a failed write resets it. Both try

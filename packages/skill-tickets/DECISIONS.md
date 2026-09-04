@@ -11,15 +11,15 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   `.branches/agent-data/tickets` in the branch's persistent checkout, and only if nothing
   of that name is there. The same sync seeds an empty `TODO_AGENTS.md` on a branch born
   without one, so a reader finds a file rather than nothing. Git is told to ignore the
-  link with a pair of rules, `/tickets` then `!/tickets/`: the first hides a root entry of
-  that name, the second takes directories back out of it, and a symlink is not a
-  directory. The pair is needed because `.git/info/exclude` is one file for every worktree
-  of the repository, the data branch's checkout included, whose real `tickets/` folder
-  must keep committing.
+  link with a pair of rules, `/tickets` then `!/tickets/`: the first hides any root entry
+  of that name, the second un-hides it again if it is a directory, which a symlink never
+  is. The pair is needed because `.git/info/exclude` is one file for every worktree of the
+  repository, the data branch's checkout included, whose own `tickets/` folder must stay
+  committable.
 - `tickets/` holds only open tickets: closing one deletes it, with its plan and its claim.
 - `list` answers newest ticket first, dated by the `<DATE>_` its filename carries. A
-  filename with no date is dated by the file's modification time when the reader has one;
-  `list` reads off git and has none, so it dates the epoch and sorts last.
+  filename with no date falls back to the file's modification time; `list` reads off git,
+  which has none, so such a ticket is dated the epoch and sorts last.
 - The skill knows no issue tracker: a ticket may carry a `GitHub:` line with its issue,
   but importing issues is the program's job.
 
@@ -33,7 +33,7 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   or naming none, which frees whoever holds the lock.
 - Releasing a ticket nobody holds is a refusal, not a no-op: a release that lifts nothing
   means the claim is not where the caller thought it was.
-- A lock is written only by a claim; `put` refuses `.lock.md`.
+- A lock is written only by a claim.
 - A claim the program's write cycle committed but could not push still counts as claimed:
   the commit already guards this machine's readers, and the gap is logged. A cycle that
   could not commit at all claims nothing.
@@ -43,14 +43,14 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   after a lost race must not read its own lock as someone else's.
 - The holder's name is never typed; the command reads it from where it runs: `AGENT_ID`
   from the environment when the program that started the agent set it, else the current
-  branch. The id wins because it outlives the branch: the branch gets renamed later, and a
-  lock naming the old name would name a holder nobody can be matched to. A checkout on no
-  branch is refused rather than claiming as `HEAD`. Reading the id off the checkout's
+  branch. The id wins because it outlives the branch: a program that renames an agent's
+  branch mid-session leaves a lock naming a branch no live agent answers to. A checkout on
+  no branch is refused rather than claiming as `HEAD`. Reading the id off the checkout's
   folder name was dropped: that layout belongs to whichever program made the checkout, not
   to this skill.
 - The program says whether a claim is for planning or for implementing: a claim for
   planning is skipped, no lock written, when the ticket already has a plan; a claim for
-  implementing is not skipped for having a plan, the plan being what it came to implement;
+  implementing is not skipped for having a plan: the plan is what it came to implement;
   only someone else's lock stands in its way. The command always claims to implement.
 - The lock's existence is the claim; the holder it names is only shown. A lock nobody can
   read still holds the ticket, and no command lifts it: it goes by hand on the branch.
@@ -70,9 +70,9 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   ticket has none or names one that is not a whole 0-10: clamping a typo would claim 10 or
   0, both reserved ends of the scale. A priority the file has no section for gets one,
   placed before the first lower section so the file stays sorted high to low. A file with
-  no priority section at all gets the new one above its first heading rather than after
-  its last: sections that carry no priority must not bury a deliberate one. An entry joins
-  the end of its section.
+  no priority section at all gets the new one above its first `## ` section, so an
+  unranked section cannot bury a deliberate one; a file with no `## ` section at all gets
+  it appended at the end. An entry joins the end of its section.
 - Done means deleted, never checked off: a `- [x]` line is not an open entry, and `queue`
   never lists it.
 
@@ -80,8 +80,8 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 - The command reads with `list`, `show` and `queue`, and writes with `put` (a ticket, a
   plan, or `meta.json`; the bytes as given, unparsed), `close`, `claim`, `release`, `queue
   add` and `queue done`.
-- Nothing is ever read back out of `meta.json` but the last-import stamp the importing
-  program keeps there.
+- The only thing read out of `meta.json` is the last-import stamp the importing program
+  keeps there.
 - A read fetches the branch from origin once and reads everything from that copy: only
   origin is sure to hold what every writer pushed, the command's own earlier writes
   included. With no origin, the local branch is read instead: writes are refused there, so

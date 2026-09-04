@@ -11,7 +11,7 @@ The skill's instructions: what an agent is told about where its work goes, for e
 - **Where the agent is, read off its branch** - `npx branches status` prints the branch. One starting with `agent-` is the agent's own; any other means a plain clone, on a branch that is not the agent's, unless the checkout sits under `.branches/`: then the agent was continued on that branch on purpose and stays on it.
 - **On its own branch, the working directory is the whole workspace** - every file the agent reads or writes is under it; dependency files and the skill folders are the user's copies, linked in, and are never edited; anything it genuinely needs from outside is a reason to say so and stop. Before the first change it names the session with `npx branches name <name>` — a rename of its branch to `agent-<name>`, suffixed when the name was taken, printed as `branch`, another name when refused as invalid — unless the branch already differs from the checkout's folder name, which a continued agent's does: then it is named and kept.
 - **In a plain clone, the agent makes its branch itself** - before the first change, `git switch -c agent-<name>`, another name if that one exists locally or on origin; the same workspace rules apply.
-- **Commit as you go** - only what the agent committed is ever published; nothing is committed on its behalf.
+- **Commit as you go** - nothing is committed on the agent's behalf, and only what it committed is published.
 - **Leave a clean tree** - before finishing, `npx branches status` must report a clean tree: nothing uncommitted and nothing untracked, so the agent commits or deletes what it added; what remains and is not its own it reports and finishes.
 
 ## Before modifying/creating SPEC.md files

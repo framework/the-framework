@@ -3,14 +3,14 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 
 ## The tickets
 - Two callers: the command an agent runs, and a long-lived program that keeps the branch
-  checked out and starts agents through the package's library; it imports issues with its
-  own code. The executable is `tickets`. The package ships `SKILL.md`, the agent's
-  instructions: where the files live, never to write through the root link, install, then
-  `npx tickets`. It gives the commands and what they answer; claim before planning or
-  working, release before stopping unless closed, close once the work is merged; and the
-  ticket, plan and queue formats, which parts of them the code parses, with the filename
-  convention `<DATE>_<SLUG>.md`, the plan's optional sections, its `Outdated:` key and its
-  rubric for rating uncertainty.
+  checked out, starts agents through the library, and imports issues with its own code,
+  stamping `meta.json`. The executable is `tickets`. The package ships `SKILL.md`, the
+  agent's instructions: where the files live, never to write through the root link,
+  install, then `npx tickets`. It gives the commands and what they answer; claim before
+  planning or working, release before stopping unless closed, close once the work is
+  merged; and the ticket, plan and queue formats, which parts of them the code parses,
+  with the filename convention `<DATE>_<SLUG>.md`, the plan's optional sections, its
+  `Outdated:` key and its rubric for rating uncertainty.
 - A ticket is a markdown file in `tickets/`. Its plan and its claim sit beside it:
   `<name>.plan.md` and `<name>.lock.md`, `<name>` the filename without `.md`.
 - Tickets live on `agent-data`, the branch `@gemstack/agent-data` names, never on a code
@@ -20,11 +20,11 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   nothing of that name sits at the root; the target may not exist yet, so the link dangles
   until the first ticket lands. Then it converges the checkout with origin. A seed that
   cannot commit stops before the link; a link that cannot be made is ignored, and the sync
-  still reports the pull. The link is hidden by two rules in `.git/info/exclude`,
+  still returns the pull's result. The link is hidden by two rules in `.git/info/exclude`,
   `/tickets` then `!/tickets/`, written on the run that creates the link even when the
   symlink fails. `/tickets` hides the link, `!/tickets/` re-admits directories, which a
-  symlink is not, so the checkout keeps committing its own `tickets/` under the same
-  repo-wide exclude.
+  symlink is not, so the persistent checkout still commits its own `tickets/` under the
+  same repo-wide exclude.
 - Closing a ticket deletes it, its plan and its claim, and nothing else; a queue entry
   linking it stays until `queue done`.
 - `list` sorts newest first by the filename's leading `yyyy-mm-dd_`, ties by filename
@@ -44,10 +44,10 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   `list` reads the first 4000 characters of a ticket, `show` all of it, so the two can
   differ on a long ticket. The library also reads a ticket's issue reference, scanning the
   whole file for a `GitHub:` line: the number from the link's URL, `/issues/<n>` or
-  `/pull/<n>`, a bare `#42` as the fallback. The row's keys: `file`, `title`, `summary`,
-  `priority`, `topics`, `github` (`label`, `url`), `date`, `planned`, `locked`,
-  `lockedBy`, `effort`, `uncertainty`; `show` nests the row as `ticket` with its text as
-  `content`.
+  `/pull/<n>`, a bare `#42` as the fallback. The row's keys, `summary` always present,
+  empty when there is no prose: `file`, `title`, `summary`, `priority`, `topics`, `github`
+  (`label`, `url`), `date`, `planned`, `locked`, `lockedBy`, `effort`, `uncertainty`;
+  `show` nests the row as `ticket` with its text as `content`.
 
 
 ## Flow: a claim
@@ -65,8 +65,8 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   this machine's readers, and the gap is logged. A cycle that could not commit claims
   nothing. The program's release is judged the same way: committed counts, pushed or not.
   A queue edit is not: it counts only once pushed.
-- Claiming a ticket you already hold succeeds and writes nothing, so a re-run after a lost
-  race does not read its own lock as someone else's.
+- Claiming a ticket you already hold succeeds and writes nothing, so a re-run does not
+  read its own lock as someone else's.
 - The holder is never typed: `AGENT_ID` when non-blank, else the current branch. The id
   outlives the branch: a rename mid-session would leave a lock naming a branch nobody
   answers to. A checkout on no branch is refused, never claimed as `HEAD`. The checkout's
@@ -81,8 +81,8 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   not whether the ticket counts as locked. A lock whose line does not parse still holds
   the ticket, and no command lifts it: only the program's release naming no holder, or a
   hand edit on the branch. A lock file that cannot be read at all counts as no lock to
-  `claim`, `close` and `release`, though `list` still shows it locked, off the directory
-  listing.
+  `claim`, `close` and `release`, though `list` still shows it locked, since `locked`
+  comes from the directory listing, not from reading the lock.
 
 ## The queue
 - The queue is one markdown file on the branch, `TODO_AGENTS.md`: sections `## Priority
@@ -117,17 +117,18 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   order: `invalid-path`, `not-a-repo`, `no-identity` (a checkout on no branch),
   `no-remote`, then `no-ticket`, since the ticket is checked inside the write; `release`
   the same without `no-ticket`, never looking at the ticket; `queue add --ticket` checks
-  the ticket before the write, so there `no-ticket` comes first. `release` looks only at
-  the lock, so an orphan lock naming you lifts. `put` checks only the name, before reading
-  stdin, so a plan can be written for a ticket that does not exist, and writes whatever
-  stdin gives, an empty file included.
+  the ticket before the write but after the repository, so there `no-ticket` comes before
+  `no-remote` and `not-a-repo` before `invalid-path`. `release` looks only at the lock, so
+  an orphan lock naming you lifts. `put` checks only the name, before reading stdin, so a
+  plan can be written for a ticket that does not exist, and writes whatever stdin gives,
+  an empty file included.
 - Every command names a ticket by its bare filename or its `tickets/<file>` path, so a
   queue entry's link target can be pasted in as is; a sibling's name (`.plan.md`,
   `.lock.md`) is `invalid-path` to every command, `put` taking `.plan.md` the one
   exception.
-- No command reads `meta.json`: the importing program is its only reader, for the one key
-  it keeps there, `lastImportedAt`; an unparsable file, or a value that is not a date
-  string, reads as no stamp, and only the first 10000 characters are parsed.
+- No command reads `meta.json`: only the importing program does, for its one key
+  `lastImportedAt`; an unparsable file, or a value that is not a date string, reads as no
+  stamp, and only the first 10000 characters are parsed.
 - A read fetches origin once and reads everything from that copy (the library's queue read
   fetches only when asked): only origin has every writer's pushes, this command's own
   included. With no origin the local branch is read: writes are refused there, so nobody

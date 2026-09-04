@@ -15,9 +15,9 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   file for every worktree of the repository, the data branch's checkout included, whose
   real `tickets/` folder must keep committing.
 - `tickets/` holds only open tickets: closing one deletes it, with its plan and its claim.
-- `list` answers newest ticket first, dated by the `<DATE>_` its filename carries; a
-  filename with no date is dated the epoch and sorts last, a read off git having no
-  modification time to fall back on.
+- `list` answers newest ticket first, dated by the `<DATE>_` its filename carries. A
+  filename with no date is dated by the file's modification time when the reader has one;
+  `list` reads off git and has none, so it dates the epoch and sorts last.
 - The skill knows no issue tracker: a ticket may carry a `GitHub:` line with its issue,
   but importing issues is the program's job.
 
@@ -26,8 +26,8 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   machines see it too.
 - One claim per ticket; it never expires: it lifts only on a deliberate release, the
   ticket released or closed. The command releases and closes as the holder only; the
-  program that started an agent releases what it left claimed, by holder or whoever holds
-  the lock.
+  program that started an agent releases what it left claimed, either naming the holder it
+  expects or naming none, which frees whoever holds the lock.
 - A lock is written only by a claim; `put` refuses `.lock.md`.
 - A claim the program's write cycle committed but could not push still counts as claimed:
   the commit already guards this machine's readers, and the gap is logged. A cycle that
@@ -54,8 +54,8 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   10` down to `## Priority 0`, an entry a list item under one of them. Work is taken from
   the top: highest section first, first line first.
 - An entry is plain text: the task a future agent is started with. `--ticket` writes it as
-  a markdown link to the ticket, read once when the entry is added, for the ticket's
-  priority and to refuse an entry pointing at no ticket; the queue itself only stores and
+  a markdown link to the ticket; the ticket is read once as the entry is added, for its
+  priority and to refuse an entry pointing at no ticket. The queue itself only stores and
   removes lines. The program that starts agents reads that link back, to claim the ticket
   for the agent it starts on the entry.
 - An entry added with no priority is appended at the end of the file, so it lands in

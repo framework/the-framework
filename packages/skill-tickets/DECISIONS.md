@@ -83,8 +83,8 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   add` and `queue done`.
 - A ticket is named to any command by its bare filename or by its `tickets/<file>` path,
   so the link a queue entry carries can be pasted straight in.
-- No command reads `meta.json`; `put` writes it like a ticket. The only thing read out of
-  it at all is the last-import stamp the importing program keeps there.
+- No command reads `meta.json`; `put` writes it like a ticket, bytes as given. The
+  importing program is its only reader, and only for the last-import stamp it keeps there.
 - A read fetches the branch from origin once and reads everything from that copy: only
   origin is sure to hold what every writer pushed, the command's own earlier writes
   included. With no origin, the local branch is read instead: writes are refused there, so

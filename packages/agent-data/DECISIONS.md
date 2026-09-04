@@ -13,13 +13,15 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 - Hidden through the common git dir's `info/exclude`, never a committed `.gitignore`: the
   library must not touch tracked files; a per-worktree `info/exclude` is never read, and one
   line there covers every checkout. Best-effort: the checkout stands even when the rule could
-  not be written. Prune before adding: a checkout deleted by hand leaves a registration that
-  fails the add.
+  not be written. Prune before adding: a hand-deleted checkout leaves a registration that fails
+  the add.
 - Every git call has a time budget: a read 10s, network and `worktree add` 120s, other
   writes 30s. `worktree` goes by its second word (`add` slow, `list` a read, the rest a
   write), `branch` by its flags (bare or a listing flag reads; `-D`, `-m` or a new name
-  writes); an unlisted subcommand pays the write budget rather than cut a write short. A killed `push` may have half landed: reported as a timeout,
-  never as a rejected push.
+  writes); an unlisted subcommand gets the write budget, so a write is never cut short. A
+  killed `push` may have half landed: reported as a timeout, its own error kind, never as a
+  rejected push. git's output buffer is 16 MB, for a file listing of a large checkout; an
+  overrun is not a timeout.
 
 ## The branch
 - A branch of the project's repository holds the agents' data (tickets, the queue) the way
@@ -31,12 +33,14 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   orphan branch, so no code commit is ever in its history.
 - The name is written once, in `names`, as `DATA_BRANCH`, and imported everywhere else.
   `names` is its own entry point with no node imports, so browser code can import it.
-- Reads need no checkout: a file comes from the checkout under `.branches/` when there is
-  one, else the local branch, else origin's copy; a directory listing always comes off a ref.
+- A read works without a checkout, from anywhere in the repository, an agent's worktree
+  included: the checkout is looked for beside the repository's real `.git`. A file comes from
+  that checkout when there is one, else the local branch, else origin's copy; a directory
+  listing always comes off a ref.
   A read can ask for a fresh copy: fetch, then origin's ref instead of the checkout, for a
   reader whose checkout may trail. A one-shot command opens the branch once: one fetch, every read
-  off origin's copy (the local branch when origin has none), because its own writes go
-  straight to the remote and never move the local branch. A read never fails: a missing file,
+  off origin's copy (the local branch when there is no `origin/<branch>`), because its own
+  writes go straight to the remote and never move the local branch. A read never fails: a missing file,
   a missing branch and a git that could not run all read as absent, so an unreachable store
   looks empty.
 
@@ -44,12 +48,12 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 Fetch what others pushed → make the change → commit → push.
 
 - Two writers. A long-lived process (a daemon) writes in its own checkout,
-  `.branches/<branch>`, one write at a time; the pull is that same cycle with an empty change,
-  in the same queue. A command an agent runs writes in a throwaway worktree outside the
+  `.branches/<branch>`, one write at a time per branch of a repository; the pull is that same
+  cycle with an empty change, in the same queue. A command an agent runs writes in a throwaway worktree outside the
   project, at the remote's tip (parentless when origin has no such branch), pushes, and
   deletes it whether or not the push landed. It never touches the process's checkout: that
-  checkout's next write commits everything it finds, and a failed write resets it. Both race
-  twice at the push; the command's write then throws with nothing left to retry, the
+  checkout's next write commits everything it finds, and a failed write resets it. Both try
+  the push twice; the command's write then throws with nothing left to retry, the
   process's never throws: its callers are background ticks.
 - A write is a re-runnable function, not a finished commit: a lost race winds the attempt's
   commit back and runs the function again on the new files, so the change lands once. The
@@ -59,10 +63,10 @@ Fetch what others pushed → make the change → commit → push.
   pull rebases it onto the remote and pushes it with the new one. When that rebase conflicts the checkout is reset to
   origin's tip: the remote wins, every unpushed commit is dropped unreported, only the
   current change runs again.
-- An op is handed a directory and writes into it as it likes. `BranchFileFs` is the file
-  seam an op can take instead of the disk, for tests (type and node implementation ship
-  here, the op injects it); it creates parent directories, since git keeps no empty
-  directory: a skill's folder is gone with its last file and absent on a branch just born.
+- An op is handed a directory and writes into it. `BranchFileFs` is the file seam an op can
+  take instead of the disk, for tests (type and node implementation ship here, the op
+  injects it); it creates parent directories: git keeps no empty directory, so a skill's
+  folder vanishes with its last file and is absent on a new branch.
 - The remote is always `origin`; a repository without one is remote-less whatever other
   remotes it has. Then the process's write commits locally and reports no error, a command's
   write refuses (an outcome, not a throw), and the pull reports an error: nothing to

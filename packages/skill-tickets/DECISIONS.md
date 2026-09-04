@@ -18,8 +18,8 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   pull. The link is hidden by two rules in `.git/info/exclude`, `/tickets` then
   `!/tickets/`, written on the run that creates the link even when the symlink fails. The
   first hides any root entry of that name; the second un-hides directories, which a
-  symlink is not. Two are needed because the exclude covers every worktree, including the
-  data branch's checkout, whose own `tickets/` must stay committable.
+  symlink is not. Two are needed because the exclude covers every worktree, and the data
+  branch's checkout must keep committing its own `tickets/`.
 - `tickets/` holds only open tickets: closing one deletes it, its plan and its claim, and
   nothing else; a queue entry linking it stays until `queue done`.
 - `list` answers newest first by the `<DATE>_` in the filename, ties by filename
@@ -29,11 +29,11 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   from the first prose line after `## TLDR`, else after the title (a `Source:` line, exact
   case, skipped in either: a trailer imported tickets carry, not a field of the format),
   `Topics: [a, b]` split into tags, `GitHub:` into label and url, `Priority:` verbatim.
-  Plus whether a plan and a lock sit beside it, whom the lock names, and the plan's
-  `Effort:` and `Uncertainty:`, absent unless a whole number 0-10. Keys and headings match
-  in any case, `## TLDR` as the whole line; a ticket's keys are read only above the `# `
-  title, a plan's above its title or, when it has none, anywhere. `list` reads the first 4
-  KB of a ticket, `show` all of it.
+  Plus whether a plan sits beside it, whether a lock does (`locked`, present only when
+  true), whom the lock names, and the plan's `Effort:` and `Uncertainty:`, absent unless a
+  whole number 0-10. Keys and headings match in any case, `## TLDR` as the whole line; a
+  ticket's keys are read only above the `# ` title, a plan's above its title or, when it
+  has none, anywhere. `list` reads the first 4 KB of a ticket, `show` all of it.
 - The package knows no issue tracker: a ticket may carry a `GitHub:` line, but importing
   issues is the program's job.
 
@@ -48,7 +48,7 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 - Releasing an unclaimed ticket is a refusal.
 - A lock is written only by a claim; it must name you before `close` or `release` act, and
   someone else's `claim` is refused while it exists. `put` ignores it, so an import can
-  refresh a ticket someone is working.
+  refresh a ticket someone holds.
 - A claim the program's write cycle committed but could not push still counts: the commit
   already guards this machine's readers, and the gap goes to the program's log. A cycle
   that could not commit claims nothing. The program's release is judged the same way:
@@ -61,10 +61,10 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   folder name is not read: the layout is the caller's.
 - The program says whether a claim is for planning or implementing: a claim for planning
   is skipped, no lock written, when the ticket already has a plan, unless the lock is
-  already this holder's, which counts as claimed first; a claim for implementing ignores
-  the plan; only someone else's lock stands in its way. The command always claims to
-  implement. The program's claim writes the lock without reading the ticket, so a ticket
-  closed under it gets an orphan lock.
+  already this holder's: the lock is checked before the plan; a claim for implementing
+  ignores the plan; only someone else's lock stands in its way. The command always claims
+  to implement. The program's claim writes the lock without reading the ticket, so a
+  ticket closed under it gets an orphan lock.
 - The lock's existence is the claim; the holder it names is display only. A lock whose
   line does not parse still holds the ticket, and no command lifts it: only the program's
   release naming no holder, or a hand edit on the branch. A lock file that cannot be read
@@ -89,7 +89,8 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   one, before the first lower section, or after the last priority section when none is
   lower; a file with no priority section gets it above its first `## ` section, so an
   unranked section cannot bury a deliberate one; a file with no `## ` section gets it
-  appended. An entry joins the end of its section, which only a `## ` heading ends.
+  appended. An entry joins its section right after its last item, before the blank lines;
+  only a `## ` heading ends a section.
 - Done means deleted, never checked off: a `- [x]` line is not an open entry; a `- [ ]`
   line is, printed and removed without its box.
 
@@ -98,12 +99,12 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   plan, or `meta.json`, all inside `tickets/`; the bytes as given, unparsed), `close`,
   `claim`, `release`, `queue add` and `queue done`.
 - `show` answers with the ticket's row, its text, its plan and its holder. `show`, `claim`
-  and `close` refuse a missing ticket with `no-ticket`. every write refuses `no-remote`
-  without an origin, and `claim` and `close` check the ticket inside the write, so there
-  that comes first; `release` writes too but looks only at the lock, so an orphan lock
-  naming you lifts. `claim`, `close` and `release` read the holder after the filename
-  check, so a checkout on no branch answers `no-identity` next; `put` checks only the
-  name, so a plan can be written for a ticket that does not exist.
+  and `close` refuse a missing ticket with `no-ticket`. Every write refuses `no-remote`
+  without an origin, and `claim` and `close` check the ticket inside the write, so
+  `no-remote` comes before `no-ticket`; `release` writes too but looks only at the lock,
+  so an orphan lock naming you lifts. `claim`, `close` and `release` read the holder after
+  the filename check, so a checkout on no branch answers `no-identity` next; `put` checks
+  only the name, so a plan can be written for a ticket that does not exist.
 - A ticket is named to any command by its bare filename or by its `tickets/<file>` path,
   so a queue entry's link target can be pasted in as is; a sibling's name (`.plan.md`,
   `.lock.md`) is `invalid-path` to every command, `put` taking `.plan.md` the one
@@ -114,9 +115,9 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   origin has every writer's pushes, this command's own included. With no origin the local
   branch is read: writes are refused there, so nobody else can have moved it.
 - Every command that runs prints one JSON document, the result or the refusal; a refusal
-  also prints one line on stderr and exits 1. A malformed command line (an unknown flag,
-  the wrong argument count, an empty `queue add` text, a `--priority` off the 0-10 scale)
-  is rejected first: the usage on stderr, nothing on stdout, exit 2. An argument naming a
+  adds one line on stderr and exits 1. A malformed command line (an unknown flag, the
+  wrong argument count, an empty `queue add` text, a `--priority` off the 0-10 scale) is
+  rejected first: the usage on stderr, nothing on stdout, exit 2. An argument naming a
   file no command may touch is an ordinary refusal, `invalid-path`.
 - Anything a command throws refuses with `git-failed`.
 - `list` and a bare `queue` answer with a JSON array; every other result and every refusal
@@ -124,18 +125,19 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 - Outside a repository a command refuses `not-a-repo`; only git's own "not a git
   repository" reads as that.
 - A write's result echoes the file as `tickets/<name>`, a row's `file` is bare; `claim`
-  and `release` also answer the holder, `queue add` the entry and its priority when
-  placed, `show` the plan and the holder when there are any; a refusal names the bare file
-  or the entry it was given, `invalid-path` the argument as typed (`put`'s with the
-  `tickets/` prefix stripped), `git-failed` its detail, and `no-remote`, `no-identity` and
-  `not-a-repo` name nothing. The refusals: `no-ticket`, `claimed` and `not-holder` (both
-  with the holder, when readable), `no-lock`, `no-entry`, `no-identity`, `no-remote`,
-  `invalid-path`, `not-a-repo`, `git-failed`.
+  and `release` also answer the holder, `queue add` and `queue done` the entry, `queue
+  add` its priority when placed, `show` the plan and the holder when there are any; a
+  refusal names the bare file or the entry it was given, `invalid-path` the argument as
+  typed (`put`'s with the `tickets/` prefix stripped), `git-failed` its detail, and
+  `no-remote`, `no-identity` and `not-a-repo` name nothing. The refusals: `no-ticket`,
+  `claimed` and `not-holder` (both with the holder, when readable), `no-lock`, `no-entry`,
+  `no-identity`, `no-remote`, `invalid-path`, `not-a-repo`, `git-failed`.
 - A write is one commit per command (`put tickets/<file>`, `close tickets/<stem>`, `claim
   tickets/<stem>`, `release tickets/<stem>`, `queue add: <entry>`, `queue done: <entry>`;
-  the program's seed is `seed the queue`, its batch claim one commit, `claim <n>
-  tickets`), pushed straight to origin through a throwaway worktree at origin's tip; a
-  push that loses a race is re-applied on the new tip by `@gemstack/agent-data`.
+  the program's seed is `seed the queue`, its batch claim one commit, `claim <n> tickets`
+  for the n it locked, the single form when that is one), pushed straight to origin
+  through a throwaway worktree at origin's tip; a push that loses a race is re-applied on
+  the new tip by `@gemstack/agent-data`.
 - `queue done` takes the entry as `queue` printed it, trimmed, removes the first such
   line, and refuses a line the queue does not have, an empty one included, decided inside
   the write.

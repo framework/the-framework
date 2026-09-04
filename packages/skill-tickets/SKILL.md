@@ -5,16 +5,17 @@ description: Where the project's tickets and its agent queue live, how to read a
 
 # Tickets and the agent queue
 
-The tickets (`tickets/<DATE>_<SLUG>.md`, with their `.plan.md` and `.lock.md` siblings) and the agent queue (`TODO_AGENTS.md`) live on the branch `agent-data`, never on a code branch. A `tickets` link at the repository root, if present, shows them: read there if you like (it may trail what others pushed; the command reads fresh), never write there. The queue is not under that link.
+The tickets (`tickets/<DATE>_<SLUG>.md`, with their `.plan.md` and `.lock.md` siblings) and the agent queue (`TODO_AGENTS.md`) live on the branch `agent-data`, never on a code branch. A `tickets` link at the repository root, if present, shows them: read it if you like (it may trail what others pushed; the command reads fresh), but never write there. The queue is not under that link.
 
-Read and change them with the `tickets` command, a dependency of this repository (`@gemstack/skill-tickets`). With no `node_modules`, install the repository's dependencies first, with the lockfile's package manager (`npm install` for a `package-lock.json`). Then run it as `npx tickets`; with no arguments it prints the usage on stderr. Every change it makes is one commit pushed straight to the `agent-data` branch. A refusal exits 1 with a line on stderr; a wrong command line exits 2 with the usage.
+Read and change them with the `tickets` command, a dependency of this repository (`@gemstack/skill-tickets`). With no `node_modules`, install the dependencies first with the lockfile's package manager (`npm install` for `package-lock.json`). Then run it as `npx tickets`. Every change it makes is one commit pushed straight to the `agent-data` branch. A refusal exits 1 with a line on stderr; a wrong command line exits 2 with the usage.
 
 ## Read
 
 ```
 npx tickets list                 every open ticket, as JSON: file, title, summary, priority, topics,
                                  github, date, planned, effort, uncertainty, locked, lockedBy
-                                 (absent when unset)
+                                 (priority, topics, github, effort, uncertainty, locked, lockedBy
+                                 absent when unset)
 npx tickets show <file>          one ticket: its text, its plan, who holds it
 npx tickets queue                the queue's open entries, in order of work
 ```
@@ -22,7 +23,7 @@ npx tickets queue                the queue's open entries, in order of work
 ## Change
 
 ```
-npx tickets put <file>           write, or create, one file under tickets/ from stdin, the whole file
+npx tickets put <file>           write one file under tickets/ from stdin, the whole file, creating it if new
                                  (npx tickets put <file> < draft.md): a ticket or a plan
 npx tickets close <file>         once the work is merged: remove the ticket with its plan and lock;
                                  refused while someone else holds it; its queue entry stays:
@@ -45,10 +46,11 @@ npx tickets claim <file>         {"ok":true,"file":…,"holder":…} — the tic
                                  or overwrite their lock. A claim guards claim, close and release;
                                  put overwrites whoever holds the ticket
 npx tickets release <file>       lift your own claim once the plan is finished or the work is
-                                 published, and before you stop, finished or not: no timeout lifts it
+                                 published, and before you stop, finished or not, unless you closed it:
+                                 no timeout lifts it
 ```
 
-Every `<file>` above takes a ticket's filename (`2042-01-01_some-ticket.md`) or the `tickets/…` path a queue entry links to; `put` also takes that ticket's `.plan.md` name, and writes a plan for a ticket that does not exist, without complaint, invisible to `show`. You claim as `AGENT_ID` when your environment has it, else as your current branch name (so a rename or a branch switch between claim and release changes who you are).
+Every `<file>` above takes a ticket's filename (`2042-01-01_some-ticket.md`) or the `tickets/…` path a queue entry links to; `put` also takes that ticket's `.plan.md` name, and writes a plan for a ticket that does not exist, without complaint, invisible to `show`. You claim as `AGENT_ID` when it is set, else as your current branch name (so a rename or a branch switch between claim and release changes who you are).
 
 ## Formats
 

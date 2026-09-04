@@ -27,10 +27,10 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 - No name the package mints holds a `/`: a folder and a link are named after a branch, and
   a cloud session (a hosted agent run, started on a branch) cannot start on a slashed ref.
   The package renames and deletes only `agent-*` branches.
-- `agent-data` is not an agent's branch: it is `@gemstack/agent-data`'s data branch, and
-  the program that keeps it, not this package, checks it out as `.branches/agent-data`.
-  Never listed, renamed or deleted; `data` is refused as an id, and an agent naming itself
-  `data` gets `agent-data-2`; `attach` guards the id only, never the branch it is given.
+- `agent-data` is `@gemstack/agent-data`'s data branch, checked out as
+  `.branches/agent-data` by the program that keeps it, not by this package. Never listed,
+  renamed or deleted; `data` is refused as an id, and an agent naming itself `data` gets
+  `agent-data-2`; `attach` guards the id only, never the branch it is given.
 - A taken name gets `-2`, `-3`, … instead of a refusal: the agent asked for a name and
   reads back the one it got. Taken means any local or remote-tracking branch, so the later
   push cannot land on someone else's branch; the branch the checkout carries right now,
@@ -61,22 +61,23 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   directory named `agent-` plus an id counts as a checkout.
 
 ## Flow: reclaim
-Deleting an agent's checkout to free disk, only after the remote has everything in it.
-The reclaim pushes the branch the checkout ended on, the user's own included, when the
-caller allows a push.
+Deleting an agent's checkout to free disk, only after the remote has everything in it. It
+pushes the branch the checkout ended on, the user's own included, when the caller allows a
+push.
 
 - Nothing is committed on the agent's behalf: a checkout with uncommitted work, untracked
   files included, is kept until a person commits or deletes it, and nothing of it is
   pushed.
 - An `agent-*` branch whose tip is reachable from another name's remote-tracking ref, on
-  any remote, holds nothing of its own: it goes with its checkout without being pushed.
-  Its own copy, under its current name or its upstream's, does not count. Pushed means on
-  `origin`, the only remote the package pushes to. Both reads take the local
+  any remote, holds nothing of its own (the holds-nothing rule): it goes with its checkout
+  without being pushed, deleted with `-D`, since git's own merged test asks the wrong
+  question. Its own copy, under its current name or its upstream's, does not count. Pushed
+  means on `origin`, the only remote the package pushes to. Both reads take the local
   remote-tracking refs, never a fetch: the push that put a tip there wrote them.
-- A checkout whose tip is an ancestor of a pushed commit the caller names through the
-  library, which the command line cannot (the commit a cloud session pushed on the agent's
-  behalf), goes without a push and keeps its branch, even a branch the merged-branch rule
-  would delete.
+- The caller may name a pushed commit through the library, not from the command line: the
+  commit a cloud session pushed on the agent's behalf. A checkout whose tip is an ancestor
+  of it goes without a push and keeps its branch, even one the holds-nothing rule would
+  delete.
 - An agent that switched to another branch leaves `agent-<id>` behind; it goes with the
   checkout once the branch the agent ended on contains it.
 - A folder under `.branches/` that git no longer knows as a worktree is left alone, and
@@ -85,12 +86,12 @@ caller allows a push.
 - A removal git refuses as unclean after the clean check passed is forced, and says so on
   stderr: an ignored build artifact must not strand a checkout for good.
 - `remove` and `prune` push by default; `--no-push` opts out. `remove` of a missing
-  checkout is a refusal, `no-checkout`; a removal that happened names the branches that
-  went with it, absent when none; `prune` lists the checkouts it removed and those it
-  kept, each with its reason, in its result, nothing on stderr, and exits 0.
+  checkout is a refusal, `no-checkout`; a removal names the branches that went with it,
+  absent when none; `prune` lists the checkouts it removed and those it kept, each with
+  its reason, in its result, nothing on stderr but the forced-removal line, and exits 0.
 - The package reads no configuration and never asks whether an agent still runs: the
   caller says whether it may push, and may pass a hook that runs just before the checkout
-  goes, to stop whatever serves the tree; the command passes none.
+  goes, to stop whatever serves the tree; the command line passes no hook.
 
 ## The skill
 - The agent commits and stops: it never pushes, opens a pull request, or merges. Whoever
@@ -110,24 +111,24 @@ caller allows a push.
   `invalid-id`, not a usage error; one starting with `-` is a usage error, the parser
   reading it as a flag.
 - A command that throws is reported like a refusal, reason `git-failed`, the error's own
-  line on stderr.
+  line as `detail` on stdout and on stderr.
 - `create`, `attach`, `list`, `remove` and `prune` act on the project, found from the
   `.branches/` layout even from inside a checkout; `name` and `status` act on the checkout
   the command runs in, found from anywhere inside it. `status` also takes the path of a
   checkout root. `status` answers the path, the branch, whether the tree is clean, and
   whether the tip is on the remote.
-- The keys: `agentId`, `path`, `branch`, `clean`, `onRemote`, `sizeBytes`, `removed`,
-  `skipped` (each with `agentId`, `reason`, `detail`), `branchesDeleted`.
+- The keys: `agentId`, `path`, `branch`, `clean`, `onRemote`, `sizeBytes`, `detail`,
+  `removed`, `skipped` (each with `agentId`, `reason`, `detail`), `branchesDeleted`.
 - `list` answers with a bare JSON array; every other result and every refusal is an object
   whose `ok` tells the two apart.
 - Outside a repository, a command that needs one refuses with `not-a-repo`: only git's own
-  "not a git repository" reads as that, every other git failure stays `git-failed`. An id
-  is checked before the repository, a name after it, and `status <path>` skips the
-  repository check, so outside one it answers `not-a-worktree`.
+  "not a git repository" reads as that; every other failure stays `git-failed`. An id is
+  checked before the repository, a name after it, and `status <path>` skips the repository
+  check, so outside one it answers `not-a-worktree`.
 - A refusal from `create`, `attach`, `remove` or `status` names its subject: the id, the
   path, the branch, and for `not-on-remote` git's reason when a push was tried; `name`'s
-  refusals, and `not-a-worktree` and `no-branch` from `remove`, carry the reason alone.
-  The refusals: `invalid-id`, `invalid-name`, `not-a-worktree`, `no-branch`,
+  refusals, `not-a-repo`, and `not-a-worktree` and `no-branch` from `remove`, carry the
+  reason alone. The refusals: `invalid-id`, `invalid-name`, `not-a-worktree`, `no-branch`,
   `not-an-agent-branch`, `no-checkout`, `dirty`, `not-on-remote`, `not-a-repo`,
   `git-failed`.
 - The skill tells the agent where it is: on `agent-*` the checkout is its whole workspace,
@@ -140,7 +141,7 @@ caller allows a push.
 - Each agent tool (Claude Code, Codex) looks for skills in its own folder at the checkout
   root: `.claude/skills`, `.agents/skills`. In every checkout it makes, the package links
   its own folder, which holds `SKILL.md`, into both as `branches`, hidden through the
-  repository's exclude; that also hides an untracked file of the project's at that path.
-  An entry already there, a committed skill say, is left alone. A caller may name further
-  skills to link in beside it, each under its own name; these are temporary, until the
-  project commits its own skill files.
+  repository's exclude; which also hides an untracked project file at that path. An entry
+  already there, a committed skill say, is left alone. A caller may name further skills to
+  link in beside it, each under its own name; these are temporary, until the project
+  commits its own skill files.

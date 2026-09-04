@@ -9,13 +9,13 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   never on a code branch: no code checkout carries them. The program that keeps the branch
   checked out syncs it; that sync links `tickets` at the project root to
   `.branches/agent-data/tickets` in the persistent checkout, and only where nothing of
-  that name already sits. The same sync seeds an empty `TODO_AGENTS.md` on a branch born
-  without one, so a reader finds a file rather than nothing. Git is told to ignore the
-  link with a pair of rules, `/tickets` then `!/tickets/`: the first hides any root entry
-  of that name, the second un-hides it again if it is a directory, which a symlink never
-  is. The pair is needed because `.git/info/exclude` is one file for every worktree of the
-  repository, the data branch's checkout included, whose own `tickets/` folder must stay
-  committable.
+  that name already sits. The same sync creates an empty `TODO_AGENTS.md` when the branch
+  has none, so the queue is a file before the first entry is added. Git is told to ignore
+  the link with a pair of rules, `/tickets` then `!/tickets/`: the first hides any root
+  entry of that name, the second un-hides it again if it is a directory, which a symlink
+  never is. The pair is needed because `.git/info/exclude` is one file for every worktree
+  of the repository, the data branch's checkout included, whose own `tickets/` folder must
+  stay committable.
 - `tickets/` holds only open tickets: closing one deletes it, with its plan and its claim.
 - `list` answers newest ticket first, dated by the `<DATE>_` its filename carries. A
   filename with no date falls back to the file's modification time, which a read off git
@@ -30,7 +30,7 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   and otherwise only by hand on the branch. The command releases and closes as the holder
   it reads: it lifts only a lock naming that holder, and closes any ticket nobody else has
   locked. The program that started an agent releases what the agent left claimed, naming
-  either the holder it expects or none, which frees whoever holds the lock.
+  either the holder it expects or none; naming none frees whoever holds the lock.
 - Releasing a ticket nobody holds is a refusal, not a no-op: a release that lifts nothing
   means the claim is not where the caller thought it was.
 - A lock is written only by a claim.
@@ -66,13 +66,14 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   priority and to refuse an entry pointing at no ticket. The program that starts agents
   reads that link back, to claim the ticket for the agent it starts on the entry.
 - An entry added with no priority is appended at the end of the file, so it lands in
-  whatever section ends it; one linked to a ticket takes the ticket's priority, 5 when the
-  ticket has none or names one that is not a whole 0-10: clamping a typo would claim 10 or
-  0, both reserved ends of the scale. A priority the file has no section for gets one,
-  placed before the first lower section so the file stays sorted high to low. A file with
-  no priority section at all gets the new one above its first `## ` section, so an
-  unranked section cannot bury a deliberate one; a file with no `## ` section at all gets
-  it appended at the end. An entry joins the end of its section.
+  whatever section ends it; one linked to a ticket takes the ticket's priority unless one
+  was given with it, and 5 when the ticket has none or names one that is not a whole 0-10:
+  clamping a typo would claim 10 or 0, both reserved ends of the scale. A priority the
+  file has no section for gets one, placed before the first lower section so the file
+  stays sorted high to low. A file with no priority section at all gets the new one above
+  its first `## ` section, so an unranked section cannot bury a deliberate one; a file
+  with no `## ` section at all gets it appended at the end. An entry joins the end of its
+  section.
 - Done means deleted, never checked off: a `- [x]` line is not an open entry, and `queue`
   never lists it.
 
@@ -82,8 +83,8 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   add` and `queue done`.
 - A ticket is named to any command by its bare filename or by its `tickets/<file>` path,
   so the link a queue entry carries can be pasted straight in.
-- The only thing read out of `meta.json` is the last-import stamp the importing program
-  keeps there.
+- No command reads `meta.json`; `put` writes it like a ticket. The only thing read out of
+  it at all is the last-import stamp the importing program keeps there.
 - A read fetches the branch from origin once and reads everything from that copy: only
   origin is sure to hold what every writer pushed, the command's own earlier writes
   included. With no origin, the local branch is read instead: writes are refused there, so
@@ -103,6 +104,6 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   repository" reads as that, every other git failure stays `git-failed`.
 - A write is one commit per command, pushed straight to origin through a throwaway
   worktree at origin's tip; a push that loses a race is re-applied on the new tip by
-  `@gemstack/agent-data`. A repository with no remote is refused.
+  `@gemstack/agent-data`.
 - `queue done` takes the entry as `queue` printed it and refuses a line the queue does not
   have.

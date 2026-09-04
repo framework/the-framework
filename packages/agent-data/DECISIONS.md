@@ -16,9 +16,9 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   not be written. Prune before adding: a checkout deleted by hand leaves a registration that
   fails the add.
 - Every git call has a time budget: a read 10s, network and `worktree add` 120s, other
-  writes 30s. `worktree` goes by its second word, `branch` by its flags (bare or a listing
-  flag reads; `-D`, `-m` or a new name writes); an unlisted subcommand pays the write budget
-  rather than cut a write short. A killed `push` may have half landed: reported as a timeout,
+  writes 30s. `worktree` goes by its second word (`add` slow, `list` a read, the rest a
+  write), `branch` by its flags (bare or a listing flag reads; `-D`, `-m` or a new name
+  writes); an unlisted subcommand pays the write budget rather than cut a write short. A killed `push` may have half landed: reported as a timeout,
   never as a rejected push.
 
 ## The branch
@@ -33,8 +33,8 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   `names` is its own entry point with no node imports, so browser code can import it.
 - Reads need no checkout: a file comes from the checkout under `.branches/` when there is
   one, else the local branch, else origin's copy; a directory listing always comes off a ref.
-  A read can ask for a fresh copy: fetch, then origin's ref before the checkout, for a reader
-  whose checkout may trail. A one-shot command opens the branch once: one fetch, every read
+  A read can ask for a fresh copy: fetch, then origin's ref instead of the checkout, for a
+  reader whose checkout may trail. A one-shot command opens the branch once: one fetch, every read
   off origin's copy (the local branch when origin has none), because its own writes go
   straight to the remote and never move the local branch. A read never fails: a missing file,
   a missing branch and a git that could not run all read as absent, so an unreachable store
@@ -54,9 +54,9 @@ Fetch what others pushed → make the change → commit → push.
 - A write is a re-runnable function, not a finished commit: a lost race winds the attempt's
   commit back and runs the function again on the new files, so the change lands once. The
   message is the caller's: fixed, or a function run after the change, since a batch only
-  knows what it did once done. Never a force push. After two failed pushes the write reports
-  the failure and the commit stays local; the next write or pull rebases it onto the remote
-  and pushes it with the new one. When that rebase conflicts the checkout is reset to
+  knows what it did once done. Never a force push. After two failed pushes the process's
+  write reports the failure and the commit stays local in its checkout; the next write or
+  pull rebases it onto the remote and pushes it with the new one. When that rebase conflicts the checkout is reset to
   origin's tip: the remote wins, every unpushed commit is dropped unreported, only the
   current change runs again.
 - An op is handed a directory and writes into it as it likes. `BranchFileFs` is the file

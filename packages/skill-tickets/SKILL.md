@@ -42,7 +42,7 @@ npx tickets claim <file>         {"ok":true,"holder":…} — the ticket is your
 npx tickets release <file>       lift your own claim — the plan is finished, or the work is published
 ```
 
-Every `<file>` above names a ticket: its filename, `2042-01-01_some-ticket.md`, or the `tickets/…` path a queue entry links to; `put` also takes that ticket's `.plan.md` name, or `meta.json`. You claim as `AGENT_ID` when the process that started you set it in your environment, else as your branch; nothing to type.
+Every `<file>` above names a ticket: its filename, `2042-01-01_some-ticket.md`, or the `tickets/…` path a queue entry links to; `put` also takes that ticket's `.plan.md` name, or `meta.json`. You claim as the value of `AGENT_ID` when the process that started you set it in your environment, else as your current branch name; nothing to type.
 
 ## Formats
 

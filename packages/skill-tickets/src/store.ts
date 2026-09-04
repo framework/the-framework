@@ -1,17 +1,17 @@
 import { join } from 'node:path'
-import { excludeFromGit, fileBranchPath, nodeBranchFileFs, nodeGitRunner, pullFileBranch, withFileBranch, type BranchFileFs, type CommitMessage, type FileBranchSync, type FileBranchWrite, type GitRunner } from '@gemstack/agent-data'
-import { QUEUE_FILE, TICKETS_BRANCH, TICKETS_CHECKOUT_DIR, TICKETS_DIR } from './names.js'
+import { BRANCHES_DIR, DATA_BRANCH, excludeFromGit, fileBranchPath, nodeBranchFileFs, nodeGitRunner, pullFileBranch, withFileBranch, type BranchFileFs, type CommitMessage, type FileBranchSync, type FileBranchWrite, type GitRunner } from '@gemstack/agent-data'
+import { QUEUE_FILE, TICKETS_DIR } from './names.js'
 
-// Where the tickets live, bound to the branch: the `tickets` branch of the project's repository,
-// checked out under `.branches/tickets` for a long-lived process, with a `tickets` link at the
+// Where the tickets live, bound to the branch: the `agent-data` branch of the project's repository,
+// checked out under `.branches/agent-data` for a long-lived process, with a `tickets` link at the
 // repository root so the roadmap is one listing away for a person.
 
-/** The branch's persistent checkout under a project: `<root>/.branches/tickets`. */
+/** The branch's persistent checkout under a project: `<root>/.branches/agent-data`. */
 export function ticketsCheckoutPath(root: string): string {
-  return fileBranchPath(root, TICKETS_BRANCH)
+  return fileBranchPath(root, DATA_BRANCH)
 }
 
-/** The `tickets/` directory inside the persistent checkout: `<root>/.branches/tickets/tickets`. */
+/** The `tickets/` directory inside the persistent checkout: `<root>/.branches/agent-data/tickets`. */
 export function ticketsDir(root: string): string {
   return join(ticketsCheckoutPath(root), TICKETS_DIR)
 }
@@ -31,8 +31,8 @@ export interface TicketDeps extends Partial<TicketFiles> {
   log?: (message: string) => void
 }
 
-/** The default funnel: the persistent checkout's write cycle, on the tickets branch. */
-export const ticketsFunnel: TicketsFunnel = (root, message, op) => withFileBranch(root, TICKETS_BRANCH, message, op)
+/** The default funnel: the persistent checkout's write cycle, on the `agent-data` branch. */
+export const ticketsFunnel: TicketsFunnel = (root, message, op) => withFileBranch(root, DATA_BRANCH, message, op)
 
 /** Fill in whatever a caller left out, so an operation reads the same way in tests and out. */
 export function resolveTicketDeps(deps: TicketDeps): TicketFiles & { funnel: TicketsFunnel; log: (message: string) => void } {
@@ -91,9 +91,9 @@ export async function syncTickets(
   const linkFs = deps.linkFs ?? nodeLinkFs()
   const rootLink = join(root, TICKETS_DIR)
   if (!(await linkFs.lexists(rootLink))) {
-    await linkFs.symlink(join(TICKETS_CHECKOUT_DIR, TICKETS_DIR), rootLink).catch(() => {})
+    await linkFs.symlink(join(BRANCHES_DIR, DATA_BRANCH, TICKETS_DIR), rootLink).catch(() => {})
     await excludeFromGit(root, '/' + TICKETS_DIR, undefined, git).catch(() => {})
     await excludeFromGit(root, '!/' + TICKETS_DIR + '/', undefined, git).catch(() => {})
   }
-  return pullFileBranch(root, TICKETS_BRANCH, { git, log: r.log })
+  return pullFileBranch(root, DATA_BRANCH, { git, log: r.log })
 }

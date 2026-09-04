@@ -20,7 +20,7 @@ export interface WorkspaceTicket extends Ticket {
 /** One ticket with its entire markdown, for its own page. */
 export interface WorkspaceTicketDetail extends WorkspaceTicket, TicketDetail {}
 
-/** The project's tickets, off the skill's checkout under `.branches/tickets`, holders resolved. */
+/** The project's tickets, off the skill's checkout under `.branches/agent-data`, holders resolved. */
 export async function readTickets(cwd: string): Promise<WorkspaceTicket[]> {
   const tickets = await readAll(ticketsDir(cwd))
   return resolveHolders(cwd, tickets)

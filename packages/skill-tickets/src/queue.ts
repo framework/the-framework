@@ -1,6 +1,6 @@
 import { join } from 'node:path'
-import { fileBranchRepo, readBranchFile } from '@gemstack/agent-data'
-import { QUEUE_FILE, TICKETS_BRANCH } from './names.js'
+import { fileBranchRepo, readBranchFile, DATA_BRANCH } from '@gemstack/agent-data'
+import { QUEUE_FILE } from './names.js'
 import { resolveTicketDeps, type TicketDeps } from './store.js'
 
 // The agent queue, `TODO_AGENTS.md`: every task agents will work on next, in markdown list items
@@ -110,7 +110,7 @@ export function removeQueueEntry(md: string, entry: string): string {
  * the queue, whose local view may trail what other writers pushed.
  */
 export async function readQueue(cwd: string, opts: { fresh?: boolean } = {}): Promise<string | undefined> {
-  return readBranchFile(cwd, TICKETS_BRANCH, QUEUE_FILE, opts)
+  return readBranchFile(cwd, DATA_BRANCH, QUEUE_FILE, opts)
 }
 
 /** The queue's open entries, in order of work; `[]` when there is no queue or nothing open. */

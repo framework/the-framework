@@ -151,9 +151,6 @@ importers:
       '@gemstack/agent-data':
         specifier: workspace:*
         version: link:../agent-data
-      '@gemstack/skill-branches':
-        specifier: workspace:*
-        version: link:../skill-branches
     devDependencies:
       '@types/node':
         specifier: ^20.0.0

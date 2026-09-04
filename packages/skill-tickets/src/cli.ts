@@ -1,7 +1,7 @@
 import { parseArgs } from 'node:util'
 import { join } from 'node:path'
-import { checkoutRoot, gitReason, nodeBranchFileFs, nodeGitRunner, openBranchReader, writeFileBranchDetached, type BranchReader, type GitRunner } from '@gemstack/agent-data'
-import { isTicketFile, isTicketPath, META_FILE, QUEUE_FILE, TICKETS_BRANCH, TICKETS_DIR, queuePriorityForTicket, ticketLockName, ticketPlanName, ticketStem } from './names.js'
+import { checkoutRoot, gitReason, nodeBranchFileFs, nodeGitRunner, openBranchReader, writeFileBranchDetached, type BranchReader, type GitRunner, DATA_BRANCH } from '@gemstack/agent-data'
+import { isTicketFile, isTicketPath, META_FILE, QUEUE_FILE, TICKETS_DIR, queuePriorityForTicket, ticketLockName, ticketPlanName, ticketStem } from './names.js'
 import { readTicket, readTickets, type TicketsFs } from './tickets.js'
 import { applyClaims, applyRelease, claimMessage, lockHolder, releaseMessage } from './locks.js'
 import { appendQueueEntry, insertQueueEntry, parseQueueEntries, removeQueueEntry } from './queue.js'
@@ -154,7 +154,8 @@ const COMMANDS: Record<string, Command> = {
 
   async put(args, io, git) {
     const { positionals } = parse(args, {}, 1)
-    const file = positionals[0]!
+    // The bare filename, or the `tickets/<file>` path a queue entry links to, like every other command.
+    const file = positionals[0]!.startsWith(`${TICKETS_DIR}/`) ? positionals[0]!.slice(TICKETS_DIR.length + 1) : positionals[0]!
     // A ticket, its plan, or the meta file — never a lock: claims go through `claim`.
     if (!(isTicketFile(file) || (isTicketFile(file.replace(/\.plan\.md$/, '.md')) && file.endsWith('.plan.md')) || file === META_FILE))
       throw new Refused({ ok: false, reason: 'invalid-path', file }, `${file} is not a file under ${TICKETS_DIR}/ this command writes: a ticket, its .plan.md, or ${META_FILE}`)
@@ -253,7 +254,7 @@ async function writeQueue(dir: string, md: string): Promise<void> {
 /** The branch opened for reading, from wherever the command runs; outside a repo, a refusal. */
 async function open(cwd: string, git: GitRunner): Promise<BranchReader> {
   await inRepo(() => checkoutRoot(cwd, git))
-  return openBranchReader(cwd, TICKETS_BRANCH, { git })
+  return openBranchReader(cwd, DATA_BRANCH, { git })
 }
 
 /** The ticket reader over a branch read: paths are branch-relative (`tickets/<file>`). */
@@ -264,7 +265,7 @@ function ticketsFsOver(reader: BranchReader): TicketsFs {
 /** One detached write, refusing where nothing can carry it. */
 async function write(cwd: string, message: string, op: (dir: string) => Promise<void>, git: GitRunner): Promise<void> {
   await inRepo(() => checkoutRoot(cwd, git))
-  const result = await writeFileBranchDetached(cwd, TICKETS_BRANCH, message, op, { git })
+  const result = await writeFileBranchDetached(cwd, DATA_BRANCH, message, op, { git })
   if (!result.ok) throw new Refused({ ok: false, reason: result.reason }, 'the repository has no remote, so nothing can carry the change')
 }
 

@@ -48,7 +48,7 @@ test('CONTEXT_DOCS is the repo-context fragment (#683): business knowledge plus 
   // The two roadmap bullets send the agent to the `tickets` skill (#1748), which the checkout
   // carries: no format text rides in this channel, and nothing names a file to go and open.
   for (const path of ['tickets/**.md', 'TODO_AGENTS.md']) {
-    assert.match(CONTEXT_DOCS.find(d => d.path === path)?.comment ?? '', /on the `tickets` branch — read and change (them|it) with the `tickets` skill/)
+    assert.match(CONTEXT_DOCS.find(d => d.path === path)?.comment ?? '', /on the `agent-data` branch — read and change (them|it) with the `tickets` skill/)
   }
   // Nothing here may point into node_modules: that path resolves only when the framework is a root
   // dependency of the repo it works on, which is what left both specs unopenable (#1163).
@@ -146,7 +146,7 @@ test('the ticket and queue formats are the `tickets` skill\'s: in the channel on
   // Elsewhere the command is not on the PATH: the git counterpart, then the skill's own formats.
   const elsewhere = systemPromptBlock()
   assert.ok(elsewhere.includes(TICKETS_YOURSELF) && elsewhere.includes(TICKETS_SKILL))
-  assert.ok(TICKETS_YOURSELF.includes('git show origin/tickets:<FILE>') && TICKETS_YOURSELF.includes('git push origin HEAD:refs/heads/tickets'))
+  assert.ok(TICKETS_YOURSELF.includes('git show origin/agent-data:<FILE>') && TICKETS_YOURSELF.includes('git push origin HEAD:refs/heads/agent-data'))
   assert.ok(TICKETS_SKILL.includes('tickets/<DATE>_<SLUG>.md') && TICKETS_SKILL.includes('## Priority 9') && !TICKETS_SKILL.startsWith('---'), 'the skill text, front matter dropped')
   assert.ok(elsewhere.indexOf(TICKETS_YOURSELF) > elsewhere.indexOf(BRANCH_YOURSELF), 'after the branch counterpart')
   // Framework-authored content, so `--vanilla` drops it with the docs and the built-in prompt.

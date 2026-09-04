@@ -322,6 +322,9 @@ test('a detached write lands on origin from any clone without touching the persi
   const solo = await initRepo('file-branch-detached-solo-')
   try {
     assert.deepEqual(await writeFileBranchDetached(solo, BRANCH, 'x', async () => {}), { ok: false, reason: 'no-remote' })
+    // A remote by any other name does not count: every push here names `origin`.
+    await git(['remote', 'add', 'upstream', solo], solo)
+    assert.deepEqual(await writeFileBranchDetached(solo, BRANCH, 'x', async () => {}), { ok: false, reason: 'no-remote' })
   } finally {
     await rm(solo, RETRIED_RM)
   }

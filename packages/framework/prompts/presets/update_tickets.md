@@ -2,7 +2,7 @@ Use the `tickets` skill. Update the tickets from this repo's GitHub issues, brin
 
 Note the current UTC time before you fetch anything, in ISO 8601. That is the timestamp you will record at the end, and taking it first is deliberate: an issue edited while you work is then picked up by the next update instead of being missed.
 
-Read `lastImportedAt` off `tickets/meta.json` (`git show origin/tickets:tickets/meta.json` after `git fetch origin tickets`; `tickets list` says whether there are tickets).
+Read `lastImportedAt` off `tickets/meta.json` (`git show origin/agent-data:tickets/meta.json` after `git fetch origin tickets`; `tickets list` says whether there are tickets).
 
 Do one of the following:
 - [Error] If there are existing tickets but `lastImportedAt` is missing, or `gh` is missing or logged out, report the error — say which of those it is — and abort

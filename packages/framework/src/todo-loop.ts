@@ -16,7 +16,7 @@ import { createTurnSignalEmitter } from './turn-gate.js'
  * issue: stop when the queue is empty. The dashboard's autopilot auto-accepts the per-item gate,
  * so `[x] autopilot` consumes the whole queue unattended; autopilot off pauses before each entry.
  *
- * The queue is the `tickets` skill's (#1748): it lives on the `tickets` branch, read and changed
+ * The queue is the `tickets` skill's (#1748): it lives on the `agent-data` branch, read and changed
  * through the skill's library — the framework holds no copy and edits no file of its own.
  */
 
@@ -84,7 +84,7 @@ export type TodoLoopReason =
   | 'empty'
   /** The user picked "stop" at a per-item gate. */
   | 'stopped'
-  /** Two removals in a row could not be written to the tickets branch. */
+  /** Two removals in a row could not be written to the `agent-data` branch. */
   | 'stalled'
   /** The item cap was reached with entries still open. */
   | 'max-items'
@@ -130,7 +130,7 @@ const DEFAULT_MAX_TODO_ITEMS = 25
 const MAX_STALLS = 2
 
 /**
- * Drive the queue to empty: read the next open entry (fresh off the tickets branch), gate, prompt
+ * Drive the queue to empty: read the next open entry (fresh off the `agent-data` branch), gate, prompt
  * the agent to complete exactly that entry, take it off the queue, and repeat. The removal is the
  * framework's, not the agent's (#1582): the queue lives on a branch the agent's checkout does not
  * hold, and the one writer model keeps every edit going through the same funnel. Caps make it
@@ -194,7 +194,7 @@ export async function runTodoLoop(opts: TodoLoopOptions): Promise<TodoLoopResult
 
     emit({ kind: 'log', message: `Queue item ${completed + 1}: ${preview}` })
     // Complete exactly this entry, honoring await gates. The queue is not the agent's to touch
-    // (#1582): it lives on the tickets branch, and the removal below is the framework's.
+    // (#1582): it lives on the `agent-data` branch, and the removal below is the framework's.
     const prompt = `Work on exactly this task from the project's agent queue, and nothing else:\n\n${next}\n\nComplete it fully and verify your work. Do not start any other task; the framework takes this entry off the queue when the turn ends.`
     const rounds = await runAwaitRounds({ session, prompt, ...gateDeps })
     completed++

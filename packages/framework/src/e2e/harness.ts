@@ -13,9 +13,9 @@ import { createProjectRuntime, type ProjectRuntime } from '../daemon-runtime.js'
 import { registryPreferencesStore, projectId } from '../registry.js'
 import { registryDiscordCredentialsStore } from '../discord-credentials-store.js'
 import { resolveAgentEventsPath, type AgentMeta, type AgentStatus } from '../store/index.js'
-import { withFileBranch } from '@gemstack/agent-data'
+import { withFileBranch, DATA_BRANCH } from '@gemstack/agent-data'
 import { worktreePath } from '@gemstack/skill-branches'
-import { QUEUE_FILE, TICKETS_BRANCH, TICKETS_DIR } from '@gemstack/skill-tickets'
+import { QUEUE_FILE, TICKETS_DIR } from '@gemstack/skill-tickets'
 import { withAgentLock } from '../agent-locks.js'
 import { tailAgentEvents } from '../dashboard-rpc/events-tail.js'
 import { sendAddProject } from '../dashboard-rpc/projects.js'
@@ -202,7 +202,7 @@ export async function makeWorld(): Promise<StoryWorld> {
       await git(cwd, 'config', 'user.email', 'e2e@test')
       await git(cwd, 'config', 'user.name', 'e2e')
       const seeded = Object.keys(files).length ? files : { 'README.md': '# story fixture\n' }
-      // The tickets and the queue live on the `tickets` branch (#1748), never in the working
+      // The tickets and the queue live on the `agent-data` branch (#1748), never in the working
       // tree: a story that seeds them names the same paths, and they land where the product reads.
       const onBranch = Object.entries(seeded).filter(([file]) => file.startsWith(`${TICKETS_DIR}/`) || file === QUEUE_FILE)
       for (const [file, text] of Object.entries(seeded)) {
@@ -213,13 +213,13 @@ export async function makeWorld(): Promise<StoryWorld> {
       await git(cwd, 'add', '-A')
       await git(cwd, 'commit', '-q', '-m', 'seed')
       if (onBranch.length) {
-        const result = await withFileBranch(cwd, TICKETS_BRANCH, 'seed', async dir => {
+        const result = await withFileBranch(cwd, DATA_BRANCH, 'seed', async dir => {
           for (const [file, text] of onBranch) {
             await mkdir(dirname(join(dir, file)), { recursive: true })
             await writeFile(join(dir, file), text)
           }
         })
-        if (!result.ok) throw new Error(`could not seed the tickets branch: ${result.error}`)
+        if (!result.ok) throw new Error(`could not seed the ${DATA_BRANCH} branch: ${result.error}`)
       }
       // A bare repo standing in for `origin`, because a real project has one and the retention
       // rule is about it (E5): a session's checkout is reclaimed once its work reaches the remote,

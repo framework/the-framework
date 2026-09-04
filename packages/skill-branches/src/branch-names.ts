@@ -1,12 +1,18 @@
+import { DATA_BRANCH } from '@gemstack/agent-data/names'
+
 /**
  * The naming rules for everything the package mints in git, and the layout they imply under
  * `.branches/` (the directory is `@gemstack/agent-data`'s convention).
  * Pure: no node imports, so browser-safe code can name branches too.
  */
 
-/** An agent id is path-safe: no separators or traversal, only our own charset. */
+/**
+ * An agent id is path-safe — no separators or traversal, only our own charset — and is not `data`:
+ * `agent-data` is the shared data branch of `@gemstack/agent-data`, checked out beside the agent
+ * checkouts as `.branches/agent-data`, and an agent of that id would be indistinguishable from it.
+ */
 export function isSafeAgentId(id: string): boolean {
-  return /^[A-Za-z0-9_-]+$/.test(id)
+  return /^[A-Za-z0-9_-]+$/.test(id) && agentBranchName(id) !== DATA_BRANCH
 }
 
 /**
@@ -33,10 +39,11 @@ export function agentIdFromWorktreeDir(name: string): string {
 /**
  * Whether a branch is one the package minted for an agent: the branch a checkout was created on,
  * or the session-named `agent-<name>` it was renamed to. The only branches the package ever
- * renames or deletes; a branch of the user's own is out of reach by name alone.
+ * renames or deletes; a branch of the user's own is out of reach by name alone, and so is the
+ * data branch, `agent-data`, which carries the prefix without being anyone's.
  */
 export function isAgentBranch(name: string): boolean {
-  return name.startsWith(AGENT_BRANCH_PREFIX)
+  return name.startsWith(AGENT_BRANCH_PREFIX) && name !== DATA_BRANCH
 }
 
 /**

@@ -1,4 +1,4 @@
-The dashboard's view of a project's tickets: the rows the `tickets` skill reads off the project's `tickets` branch, with the holder of every claim resolved against the project's own agents, so a claimed ticket names the session that is holding it instead of a bare identifier.
+The dashboard's view of a project's tickets: the rows the `tickets` skill reads off the project's `agent-data` branch, with the holder of every claim resolved against the project's own agents, so a claimed ticket names the session that is holding it instead of a bare identifier.
 
 ## User story
 
@@ -6,7 +6,7 @@ The user opens a project's Tickets page and sees its whole backlog: what each ti
 
 ## Business logic — TL;DR
 
-- **The rows are the skill's** - what a ticket is, what its title, summary, priority, topics, GitHub link and date are, what a plan and a claim beside it add, and the whole-file read behind a ticket's own page all belong to the `tickets` skill; this reads them for one project, off the checkout of its `tickets` branch.
+- **The rows are the skill's** - what a ticket is, what its title, summary, priority, topics, GitHub link and date are, what a plan and a claim beside it add, and the whole-file read behind a ticket's own page all belong to the `tickets` skill; this reads them for one project, off the checkout of its `agent-data` branch.
 - **A claim's holder is resolved to an agent** - a claim names a holder, and when that holder is one of this project's own agents the ticket also carries that agent's id and the session name it chose, so the row can name the session and open its page.
 - **An unknown holder is shown as written** - a holder this project has no record of — another machine's agent, a cloud session's branch name — is left exactly as the claim names it rather than being dropped or guessed at.
 - **The lookup is paid only when something is claimed** - a list with no claim in it never reads the project's agents at all.

@@ -7,8 +7,7 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { startBackgroundServices, syncProjectData } from './daemon-services.js'
 import { projectErrorStore } from './project-errors.js'
-import { fileBranchPath, withFileBranch } from '@gemstack/agent-data'
-import { TICKETS_BRANCH } from '@gemstack/skill-tickets'
+import { fileBranchPath, withFileBranch, DATA_BRANCH } from '@gemstack/agent-data'
 import { pollerQuotaSource, type QuotaSource } from './dashboard/quota.js'
 import { QuotaPoller } from './quota-poller.js'
 import type { DriverQuotaWindow } from 'agent-driver'
@@ -68,7 +67,7 @@ async function services(preferences: Record<string, unknown>, quota?: QuotaSourc
   await git('git', ['config', 'user.email', 'test@example.com'], { cwd: project })
   await git('git', ['config', 'user.name', 'Test'], { cwd: project })
   await git('git', ['config', 'commit.gpgsign', 'false'], { cwd: project })
-  const seeded = await withFileBranch(project, TICKETS_BRANCH, 'seed', async dir => {
+  const seeded = await withFileBranch(project, DATA_BRANCH, 'seed', async dir => {
     await mkdir(join(dir, 'tickets'), { recursive: true })
     for (const entry of QUEUE_ENTRIES) {
       const ticket = /\((tickets\/[^)]+)\)/.exec(entry)![1]!
@@ -155,8 +154,8 @@ test('the concurrency setting on disk is the number of agents the routine spins 
     assert.equal(outcome?.started, true)
     assert.match(outcome?.message ?? '', /started 4 agents/)
     // The claim the sweep committed ahead of each agent (#1420/#1748): the ticket's lock is on
-    // the tickets branch and names the id the agent is started with, so the lock and the run are one.
-    const lock = await readFile(join(fileBranchPath(projectDir, TICKETS_BRANCH), 'tickets/2026-07-01_one.lock.md'), 'utf8')
+    // the `agent-data` branch and names the id the agent is started with, so the lock and the run are one.
+    const lock = await readFile(join(fileBranchPath(projectDir, DATA_BRANCH), 'tickets/2026-07-01_one.lock.md'), 'utf8')
     assert.match(lock, /^CLAIMED: \d{4}-\d{2}-\d{2}T/, "the first entry's ticket carries a claim naming an agent id")
     assert.equal(starts[0]!.options.agentId, lock.slice('CLAIMED: '.length).trim(), 'and the agent is started with that id')
   } finally {
@@ -193,7 +192,7 @@ async function archiveMeta(projectDir: string, meta: { id: string } & Record<str
 test('a drained entry is taken off the queue once its run reports the work published (#1582/#1748)', async () => {
   // The whole retire loop, with only the agent stubbed: the sweep pins the entry, the run's
   // archived record reports the hand-off, and the daemon — the queue's one local writer — lands
-  // the removal as a commit on the tickets branch. The agent never touches the queue.
+  // the removal as a commit on the `agent-data` branch. The agent never touches the queue.
   const { starts, stop, services: running, projectDir } = await services({ autoPm: false, autoPmConcurrency: 1 })
   try {
     running.wakeAutoPm({ onDemand: true, only: 'drain' })
@@ -207,12 +206,12 @@ test('a drained entry is taken off the queue once its run reports the work publi
     const deadline = Date.now() + 5000
     let subjects = ''
     while (Date.now() < deadline) {
-      subjects = await git('git', ['log', '--format=%s', `refs/heads/${TICKETS_BRANCH}`], { cwd: projectDir }).then(r => r.stdout, () => '')
+      subjects = await git('git', ['log', '--format=%s', `refs/heads/${DATA_BRANCH}`], { cwd: projectDir }).then(r => r.stdout, () => '')
       if (subjects.includes('queue done: ')) break
       await new Promise(resolve => setTimeout(resolve, 25))
     }
-    assert.ok(subjects.includes(`queue done: ${QUEUE_ENTRIES[0]!}`), 'the removal is a commit on the tickets branch')
-    const queue = await readFile(join(fileBranchPath(projectDir, TICKETS_BRANCH), 'TODO_AGENTS.md'), 'utf8')
+    assert.ok(subjects.includes(`queue done: ${QUEUE_ENTRIES[0]!}`), 'the removal is a commit on the `agent-data` branch')
+    const queue = await readFile(join(fileBranchPath(projectDir, DATA_BRANCH), 'TODO_AGENTS.md'), 'utf8')
     assert.ok(!queue.includes(QUEUE_ENTRIES[0]!), 'the drained entry is deleted — done means deleted, not checked off')
     // The fixture seeds bare bullets, and untouched ones must stay exactly as written.
     assert.ok(queue.includes(`- ${QUEUE_ENTRIES[1]!}`), 'the untouched entries stay open')
@@ -235,7 +234,7 @@ test('a run whose hand-off failed leaves its entry open: unpublished work is not
     // moment and then require the queue untouched — the check-off in the sibling test lands
     // well inside this window when the gate passes.
     await settle(() => false, 1500)
-    const queue = await readFile(join(fileBranchPath(projectDir, TICKETS_BRANCH), 'TODO_AGENTS.md'), 'utf8')
+    const queue = await readFile(join(fileBranchPath(projectDir, DATA_BRANCH), 'TODO_AGENTS.md'), 'utf8')
     assert.ok(queue.includes(`- ${QUEUE_ENTRIES[0]!}`), "the failed run's entry stays open")
   } finally {
     await stop()
@@ -249,7 +248,7 @@ test('a drain claims an entry whose ticket file is gone, recreating tickets/ on 
   // "another agent already claimed".
   const { starts, stop, services: running, projectDir } = await services({ autoPm: false, autoPmConcurrency: 1 })
   try {
-    const cleared = await withFileBranch(projectDir, TICKETS_BRANCH, 'retire every ticket', async dir => {
+    const cleared = await withFileBranch(projectDir, DATA_BRANCH, 'retire every ticket', async dir => {
       await rm(join(dir, 'tickets'), { recursive: true, force: true })
     })
     assert.ok(cleared.ok, 'the fixture must drop tickets/ from the data branch')
@@ -257,7 +256,7 @@ test('a drain claims an entry whose ticket file is gone, recreating tickets/ on 
     await settle(() => starts.length >= 1)
     assert.equal(starts.length, 1, 'the batch starts instead of standing down')
     assert.ok(starts[0]!.prompt.includes(QUEUE_ENTRIES[0]!), 'the first entry is the pinned one')
-    const lock = await readFile(join(fileBranchPath(projectDir, TICKETS_BRANCH), 'tickets/2026-07-01_one.lock.md'), 'utf8')
+    const lock = await readFile(join(fileBranchPath(projectDir, DATA_BRANCH), 'tickets/2026-07-01_one.lock.md'), 'utf8')
     assert.match(lock, /^CLAIMED: \d{4}-/, 'the claim landed in a recreated tickets/')
   } finally {
     await stop()

@@ -4,10 +4,9 @@ import { mkdtemp, realpath, writeFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { readDocs, DOC_CATEGORIES } from './docs.js'
-import { withFileBranch, nodeGitRunner } from '@gemstack/agent-data'
-import { TICKETS_BRANCH } from '@gemstack/skill-tickets'
+import { withFileBranch, nodeGitRunner, DATA_BRANCH } from '@gemstack/agent-data'
 
-/** A real repo whose queue lives on the tickets branch (#1582/#1748), the way readDocs reads it. */
+/** A real repo whose queue lives on the `agent-data` branch (#1582/#1748), the way readDocs reads it. */
 async function repoWithQueue(md: string): Promise<string> {
   const git = nodeGitRunner()
   const repo = await realpath(await mkdtemp(join(tmpdir(), 'framework-docs-repo-')))
@@ -17,7 +16,7 @@ async function repoWithQueue(md: string): Promise<string> {
   await writeFile(join(repo, 'README.md'), '# t\n')
   await git(['add', '-A'], repo)
   await git(['commit', '-m', 'init'], repo)
-  const seeded = await withFileBranch(repo, TICKETS_BRANCH, 'seed', async dir => {
+  const seeded = await withFileBranch(repo, DATA_BRANCH, 'seed', async dir => {
     await writeFile(join(dir, 'TODO_AGENTS.md'), md, 'utf8')
   })
   assert.ok(seeded.ok)

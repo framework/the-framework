@@ -17,7 +17,7 @@ The package's command line: the same operations a caller calls, for an agent (or
 - **JSON out, a reason for a person, an exit code that says which** - every result is one JSON document on stdout; a refusal or a git failure also puts one line on stderr and exits 1; a command that cannot be read gets the usage on stderr and exits 2.
 - **Reads come off origin, fetched once** - so a command sees what every writer pushed, its own earlier writes included.
 - **Writes are a remote writer's** - one commit each, pushed straight to the branch, never touching a caller's persistent checkout; a repository with no remote is refused.
-- **The holder is read, not typed** - a claim and a release name whoever the working directory says they are.
+- **The holder is read, not typed** - a claim and a release name whoever the environment and the working directory say they are.
 
 ## Business logic
 
@@ -34,7 +34,7 @@ See `## User story`.
 - `queue` - the queue's open entries, in order of work.
 - `queue add <text> [--priority N] [--ticket <file>]` - puts an entry on the queue, in its `## Priority N` section when a priority is given, else at the end of the file. With a ticket named, the entry becomes a markdown link back to that ticket and is placed by the ticket's own priority unless a priority was given — the same entry a caller writes when it queues a ticket. An empty entry, or a priority outside 0 to 10, is a usage error; a ticket that does not exist is a refusal.
 - `queue done <text>` - takes an entry off the queue; the text must match an open entry exactly. Done means deleted.
-- `put <file>` - writes one file under `tickets/` from standard input: a ticket, its `.plan.md`, or `meta.json`. Anything else — a `.lock.md`, a path with segments, a non-markdown name — is refused. Claims are never written this way; they go through `claim`.
+- `put <file>` - writes one file under `tickets/` from standard input: a ticket, its `.plan.md`, or `meta.json`, named bare or as its `tickets/…` path like every other command's argument. Anything else — a `.lock.md`, a path with segments, a non-markdown name — is refused. Claims are never written this way; they go through `claim`.
 - `close <file>` - removes a ticket together with its plan and its claim, because `tickets/` holds only open tickets. A ticket that is not there is refused; so is a ticket someone else holds, naming the holder — closing would take their claim with the ticket.
 - `claim <file>` - claims a ticket for the holder the working directory names, before planning or working it. A ticket that does not exist is refused; a ticket someone else holds is refused *and told who holds it* (when the lock names anyone readable), so the agent can back off and pick another. A claim naming this very holder again still counts as claimed, so an agent that re-runs the command after a lost race is not confused by its own lock.
 - `release <file>` - lifts the caller's own claim. A ticket with no claim, and a claim belonging to someone else, are both refused — the second naming the holder it belongs to.
@@ -71,7 +71,7 @@ An agent changes a ticket from a clone that holds no checkout of the branch, whi
 
 #### Business logic
 
-Each write is one commit: origin's tip is fetched and checked out in a throwaway checkout, the change applied, committed, and pushed straight to the `tickets` branch, and the throwaway checkout removed. A push that loses a race re-fetches origin's tip and re-applies the same change before pushing again. Nothing lands in the agent's own working tree, and the persistent checkout a long-lived process keeps is never touched — it belongs to that process, and converges on its own next pull.
+Each write is one commit: origin's tip is fetched and checked out in a throwaway checkout, the change applied, committed, and pushed straight to the `agent-data` branch, and the throwaway checkout removed. A push that loses a race re-fetches origin's tip and re-applies the same change before pushing again. Nothing lands in the agent's own working tree, and the persistent checkout a long-lived process keeps is never touched — it belongs to that process, and converges on its own next pull.
 
 A repository with no remote is refused as `no-remote`: a change nothing can carry is the user's error state, not a mode this supports.
 
@@ -83,7 +83,7 @@ An agent claims a ticket without ever having been told an identity.
 
 #### Business logic
 
-`claim` and `release` name the holder the working directory says they are (`holder`): the agent id inside an agent's checkout, else the current branch name. A checkout on no branch is refused as `no-identity` — there is nothing to claim as.
+`claim` and `release` name the holder the environment and the working directory say they are (`holder`): `AGENT_ID` when the process that started the agent set it, else the current branch name. A checkout on no branch is refused as `no-identity` — there is nothing to claim as.
 
 ## Before modifying/creating SPEC.md files
 

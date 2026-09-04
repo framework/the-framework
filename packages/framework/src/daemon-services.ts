@@ -117,7 +117,7 @@ export interface BackgroundServiceDeps {
 }
 
 /**
- * One project's data-sync turn (#1599): converge the `tickets` branch (the skill's: the checkout,
+ * One project's data-sync turn (#1599): converge the `agent-data` branch (the skill's: the checkout,
  * the queue seed, the root link, the pull) and the `agents-logs` branch (the archives and routine
  * locks) with origin, and set or clear the project's `data-sync` error by the outcome. The clear
  * is unconditional on success, so the error lives exactly as long as the condition — the next
@@ -312,7 +312,7 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
       return result.ok ? result.agentId : undefined
     },
     // The daemon retires a drained entry itself (#1582): the queue has one local writer, so the
-    // entry is deleted in one write to the `tickets` branch at settle — done means deleted — not
+    // entry is deleted in one write to the `agent-data` branch at settle — done means deleted — not
     // an agent edit promoted off a branch. It waits for the run's epilogue — the report is what
     // says the work was published — and a run that published nothing leaves its entry open (its
     // claim is freed below).

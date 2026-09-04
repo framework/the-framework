@@ -9,7 +9,7 @@ What the tests cover: the lifecycle of an agent's own checkout.
 - Whether a checkout is clean is a read that commits nothing: a checkout with uncommitted work reads dirty, a clean one reads clean.
 - The branch currently checked out is reported, and a detached checkout or a non-repo reads as unknown.
 - Naming: a rename that loses the race to a sibling taking the same name re-reads the branches and takes the next suffix; any other rename failure is raised. (The rest of naming — the suffix rule, the refusals — is covered against real git by the command-line tests.)
-- Listing the checkouts on disk names the agent of each `agent-<agent id>` directory, ignores anything else in the branches directory, yields nothing for a project that never ran an agent, and never mistakes a rename link or a file for a checkout — only a directory is one.
+- Listing the checkouts on disk names the agent of each `agent-<agent id>` directory, ignores anything else in the branches directory (the data branch's `agent-data` checkout included), yields nothing for a project that never ran an agent, and never mistakes a rename link or a file for a checkout — only a directory is one.
 - Against a real repo: creating, listing and removing a checkout round-trips; an agent's uncommitted edit reads dirty and is never swept into a commit, and once the agent commits, the edit survives on the agent's branch after the checkout is gone.
 
 ## Before modifying/creating SPEC.md files

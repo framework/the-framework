@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { agentBranchName, isAgentBranch, sessionNameOf } from './branch-names.js'
+import { agentBranchName, isAgentBranch, isSafeAgentId, sessionNameOf } from './branch-names.js'
 
 test('sessionNameOf reads the session name off a renamed agent branch (#1725)', () => {
   assert.equal(sessionNameOf('agent-add-comments', 'r1'), 'add-comments')
@@ -25,4 +25,7 @@ test('an agent branch is the one a checkout was created on or a renamed one; nev
   assert.equal(isAgentBranch('agent-add-comments'), true)
   assert.equal(isAgentBranch('main'), false)
   assert.equal(isAgentBranch('data'), false)
+  assert.equal(isAgentBranch('agent-data'), false, 'the data branch carries the prefix but is nobody\'s')
+  assert.equal(isSafeAgentId('data'), false, 'agent-data is the data branch')
+  assert.equal(isSafeAgentId('data-2'), true)
 })

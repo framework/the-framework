@@ -1,7 +1,7 @@
 {
   "name": "@gemstack/agent-data",
   "version": "0.0.1",
-  "description": "A branch of the project's repository used as a file store for coding-agent skills: the agent-data branch, checked out under .branches/, every write one sync-commit-push cycle that re-applies on a lost race — from a long-lived process through its checkout, or one-shot from any clone.",
+  "description": "A branch of the project's repository used as a file store for coding-agent skills. Checked out under .branches/; every write is one sync-commit-push cycle that re-applies when it loses a race, from a long-lived process or one-shot from any clone.",
   "license": "MIT",
   "repository": {
     "type": "git",

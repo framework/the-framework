@@ -119,8 +119,9 @@ export async function reclaimWorktree(repo: string, path: string, opts: ReclaimO
   }
 
   // The birth branch (#1657) is judged before anything is deleted: the containment reads both refs.
+  // Only a branch the package minted: the rule that guards the checkout's own branch guards this one.
   const birthBranchGoes =
-    opts.birthBranch !== undefined && opts.birthBranch !== branch && (await branchContains(repo, branch, opts.birthBranch, git))
+    opts.birthBranch !== undefined && opts.birthBranch !== branch && isAgentBranch(opts.birthBranch) && (await branchContains(repo, branch, opts.birthBranch, git))
   await opts.beforeRemove?.()
   await removeWorktree(repo, path, git)
   await pruneWorktrees(repo, git)

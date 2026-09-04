@@ -126,7 +126,7 @@ An agent died holding a ticket's claim, and nothing frees claims on a timer. The
 
 #### Business logic
 
-Only a real ticket filename is accepted. The claim is lifted on the `tickets` branch as one committed and pushed change — a release only this machine can see would leave the ticket claimed everywhere the claim matters. A ticket that holds no claim, and a release that could not be committed, are each reported as such.
+Only a real ticket filename is accepted. The claim is lifted on the `agent-data` branch as one committed and pushed change — a release only this machine can see would leave the ticket claimed everywhere the claim matters. A ticket that holds no claim, and a release that could not be committed, are each reported as such.
 
 ### Opening a project on this machine
 

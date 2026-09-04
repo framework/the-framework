@@ -32,7 +32,7 @@ The ticket and queue presets — the two triages, plan tickets, update tickets, 
 
 #### User story
 
-The user's tickets and agent queue are not in the agent's checkout: they live on the `tickets` branch. A preset that told the agent to open a file would send it to a file that is not there.
+The user's tickets and agent queue are not in the agent's checkout: they live on the `agent-data` branch. A preset that told the agent to open a file would send it to a file that is not there.
 
 #### Business logic
 

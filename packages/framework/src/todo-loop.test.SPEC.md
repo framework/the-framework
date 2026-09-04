@@ -1,4 +1,4 @@
-What the tests cover: how the agent queue is worked down by the backlog loop, against a real repository whose queue lives on the `tickets` branch.
+What the tests cover: how the agent queue is worked down by the backlog loop, against a real repository whose queue lives on the `agent-data` branch.
 
 - **The backlog loop** - it works the queue to empty one entry per turn, taking each entry off the queue itself — the entry is deleted from the branch, not marked — and reporting how many it completed and why it ended. It narrates the opening count, each entry it starts, and its finish. With no queue it does nothing and says nothing. An item cap stops it early and reports how many entries are left, with the untouched entries still on the branch. An abort ends it before starting another entry.
 - **Loop interruptions** - when the user is present, each entry is gated first: proceeding works the entry, picking stop ends the loop with the remaining entries still open. When a removal cannot be written the loop stops rather than re-working the entry, and the queue is left untouched — an entry worked twice is worse than an entry left open.

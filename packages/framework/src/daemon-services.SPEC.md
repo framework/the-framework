@@ -13,7 +13,7 @@ The user closes the dashboard and walks away. While nobody is watching, the mach
 - **Auto PM's wiring** - which routines may run, how many agents at once, which routine holds its lock while it runs, which tickets may be claimed, who writes the claims, and when a drained queue entry is taken off the queue.
 - **The CI watch's fix half asks the same consent as Auto PM** - merging a green pull request is ungated, but starting a fix agent needs the Auto PM preference and quota headroom.
 - **Discord notifications, rebuilt on demand** - a token pasted into the dashboard takes effect immediately, and toggling the preference never replays the backlog.
-- **Keeping every project's branches converged** - each project's `tickets` branch and `agents-logs` branch are converged with origin regularly, and a project that cannot converge either of them is recorded as an error for the dashboard to show.
+- **Keeping every project's branches converged** - each project's `agent-data` branch and `agents-logs` branch are converged with origin regularly, and a project that cannot converge either of them is recorded as an error for the dashboard to show.
 - **A project's agent options** - the user's own settings, with the repo's committed config on top; the same options a hand-started agent gets.
 - **Quiescing before shutdown** - everything that could start or steer an agent stops first, and the turn already in flight is waited out.
 
@@ -41,7 +41,7 @@ The job list and its cadences:
 
 - **worktree sweep**, every ten minutes — reclaims the checkout of an agent whose work has reached the remote; the branch and the agent's record are kept, so this frees disk rather than discarding work. It is the retry for a push that could not land at teardown.
 - **branches view**, every ten minutes — keeps one symlink per checkout under `.branches/`, named after its branch.
-- **data sync**, every other tick — converges each project's two branches with origin: first the `tickets` branch, which the `tickets` skill sets up as well as pulls (its checkout, the queue file, the repository-root link to the tickets), then the `agents-logs` branch. This machine ends up seeing what other machines and cloud sessions pushed, and anything a failed write cycle left local is carried out.
+- **data sync**, every other tick — converges each project's two branches with origin: first the `agent-data` branch, which the `tickets` skill sets up as well as pulls (its checkout, the queue file, the repository-root link to the tickets), then the `agents-logs` branch. This machine ends up seeing what other machines and cloud sessions pushed, and anything a failed write cycle left local is carried out.
 - **CI watch**, every other tick — roughly a minute, which is the latency chosen for noticing a check result.
 - **Discord watchers**, every other tick.
 - **Auto PM**, every ten minutes.
@@ -94,7 +94,7 @@ Auto PM is given everything it needs to decide, and everything it decides is app
 - **Who writes the claims.** The daemon claims the tickets through the `tickets` skill and pushes them, never the agent — an agent only pushes at the end onto its own branch, and a claim that stayed local would not reach the other machines it exists for. The holder each claim names is the id of the agent the sweep is about to start with it. A drain claims what it is about to implement under the same rule, except that it skips only on an existing lock: the plan it also finds is the drain's input, not a rival.
 - **Releasing a dead claim.** The one claim the daemon can know is dead is the one whose agent settled with nothing to hand off — the pull request that would have deleted the lock is never coming — so that lock is released, and the outcome is logged either way.
 - **Starting the agent.** An agent started for a claimed ticket is started under the very id that ticket's claim names, so the claim and the run are one thing and the Tickets page can name the session holding a ticket. A drain names on its agent record the ticket it is about to implement, taken from its own pinned queue entry (falling back to the first open entry when the job was wired without one); a fanned-out planning agent names its ticket the same way, and is marked as a planning agent so its pull request title does not inherit the issue reference — a plan merging must not close an issue whose work is still undone. A job whose pull requests may land themselves rides to the agent as the top rung of the handoff ladder. Every other routine puts work on the queue rather than taking it off, so it names no ticket.
-- **Retiring a drained entry.** The daemon takes the queue entry off itself, as one write to the `tickets` branch, never as an agent edit promoted off a branch, because the queue has one local writer. It waits for the agent to settle *and* to have actually published — its handoff reported done, or skipped because the pull request was already open from an earlier leg. An agent that published nothing leaves its entry open. A removal that could not be committed is logged and the entry stays held until the next turn retries it.
+- **Retiring a drained entry.** The daemon takes the queue entry off itself, as one write to the `agent-data` branch, never as an agent edit promoted off a branch, because the queue has one local writer. It waits for the agent to settle *and* to have actually published — its handoff reported done, or skipped because the pull request was already open from an earlier leg. An agent that published nothing leaves its entry open. A removal that could not be committed is logged and the entry stays held until the next turn retries it.
 
 ### The CI watch's fix half asks the same consent as Auto PM
 
@@ -130,7 +130,7 @@ The user works from two machines, and some agents run in the cloud. Tickets, the
 
 #### Business logic
 
-Every registered project's `tickets` branch is converged with origin on a schedule, and then its `agents-logs` branch; a project whose tickets could not be converged is not asked for its logs, since the first failure is already the answer. On success the project's data-sync error is cleared unconditionally, so the error lives exactly as long as the condition does — the turn after the user fixes the remote, it is gone. On failure the reason is recorded against that project for the dashboard to show, and said on the daemon's log as well, so a user watching the daemon rather than the dashboard sees it too.
+Every registered project's `agent-data` branch is converged with origin on a schedule, and then its `agents-logs` branch; a project whose tickets could not be converged is not asked for its logs, since the first failure is already the answer. On success the project's data-sync error is cleared unconditionally, so the error lives exactly as long as the condition does — the turn after the user fixes the remote, it is gone. On failure the reason is recorded against that project for the dashboard to show, and said on the daemon's log as well, so a user watching the daemon rather than the dashboard sees it too.
 
 ### A project's agent options
 

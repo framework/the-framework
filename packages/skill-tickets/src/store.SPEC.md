@@ -1,4 +1,4 @@
-Where the tickets live, bound to the branch: the `tickets` branch of the project's repository, checked out at `.branches/tickets` for a long-lived process, with a `tickets` link at the repository root so the roadmap is one listing away for a person.
+Where the tickets live, bound to the branch: the `agent-data` branch of the project's repository, checked out at `.branches/agent-data` for a long-lived process, with a `tickets` link at the repository root so the roadmap is one listing away for a person.
 
 ## User story
 
@@ -18,13 +18,13 @@ Where the tickets live, bound to the branch: the `tickets` branch of the project
 
 #### Business logic
 
-Under a project, the branch's persistent checkout is `.branches/tickets`, and the tickets themselves are in the `tickets/` folder inside it. Both are derived from the project's root directory, so a caller addresses them without being configured.
+Under a project, the branch's persistent checkout is `.branches/agent-data`, and the tickets themselves are in the `tickets/` folder inside it. Both are derived from the project's root directory, so a caller addresses them without being configured.
 
 ### The seams every operation takes
 
 #### Business logic
 
-Every operation in the package that changes the branch takes two things it does not own: plain file operations — read, write, delete, list — against whatever directory it is handed, and the caller's write cycle, which applies a change to a checkout of the branch, commits it and pushes it. A caller that leaves them out gets the defaults: the real filesystem, and the persistent checkout's serialized cycle on the `tickets` branch. So the same operation reads the same way in a test with neither disk nor git and in production.
+Every operation in the package that changes the branch takes two things it does not own: plain file operations — read, write, delete, list — against whatever directory it is handed, and the caller's write cycle, which applies a change to a checkout of the branch, commits it and pushes it. A caller that leaves them out gets the defaults: the real filesystem, and the persistent checkout's serialized cycle on the `agent-data` branch. So the same operation reads the same way in a test with neither disk nor git and in production.
 
 ### Bringing a caller's view up to date
 

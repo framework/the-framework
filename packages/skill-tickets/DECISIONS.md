@@ -5,12 +5,12 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 - Two callers: the command an agent runs, and a long-lived program that keeps the branch
   checked out and starts agents through the package's library; it imports issues with its
   own code. The executable is `tickets`. The package ships `SKILL.md`, the agent's
-  instructions: where the files live and never to write through the root link; install,
-  then `npx tickets`; the commands and what they answer; claim before planning or working,
-  release before stopping unless closed, close once the work is merged; the ticket, plan
-  and queue formats, the code parsing part of them, with the filename convention
-  `<DATE>_<SLUG>.md`, the plan's optional sections, its `Outdated:` key and its rubric for
-  rating uncertainty.
+  instructions: where the files live, never to write through the root link, install, then
+  `npx tickets`. It gives the commands and what they answer; claim before planning or
+  working, release before stopping unless closed, close once the work is merged; and the
+  ticket, plan and queue formats, the code parsing part of them, with the filename
+  convention `<DATE>_<SLUG>.md`, the plan's optional sections, its `Outdated:` key and its
+  rubric for rating uncertainty.
 - A ticket is a markdown file in `tickets/`. Its plan and its claim sit beside it:
   `<name>.plan.md` and `<name>.lock.md`, `<name>` the filename without `.md`.
 - Tickets live on `agent-data`, the branch `@gemstack/agent-data` names, never on a code
@@ -26,14 +26,15 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   under the same repo-wide exclude.
 - Closing a ticket deletes it, its plan and its claim, and nothing else; a queue entry
   linking it stays until `queue done`.
-- `list` answers newest first by the filename's leading `yyyy-mm-dd_`, ties by filename
+- `list` sorts newest first by the filename's leading `yyyy-mm-dd_`, ties by filename
   ascending; the row's `date` is that day as a full ISO timestamp. A filename with no date
   takes the file's modification time, or the epoch when read from git, which sorts last.
 - A ticket's row, the same fields from `list` and `show`: the title from its `# ` line,
   the summary from the first prose line after `## TLDR`, else after the title, scanning
   past headings to the end of the file (a `Source:` line is skipped in both scans, matched
   case-sensitively unlike every key: a trailer on imported tickets, not a field), `Topics:
-  [a, b]` split into tags, `GitHub:` into label and url, `Priority:` verbatim. Plus
+  [a, b]` split into tags, `GitHub:` into label and url when it is a full markdown link
+  (the library's issue reference also reads a bare `#42`), `Priority:` verbatim. Plus
   whether a plan sits beside it, whether a lock does (`locked`, present only when true),
   whom the lock names, and the plan's `Effort:` and `Uncertainty:`, absent unless a whole
   number 0-10. Keys and headings match in any case, `## TLDR` as the whole line; a
@@ -43,7 +44,7 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   `priority`, `topics`, `github` (`label`, `url`), `date`, `planned`, `locked`,
   `lockedBy`, `effort`, `uncertainty`; `show` nests the row as `ticket` with its text as
   `content`.
-- A ticket may carry a `GitHub:` line, but importing issues is the program's job.
+- A ticket may carry a `GitHub:` line.
 
 ## Flow: a claim
 - A claim is a committed file holding one line, `CLAIMED: <who>`, so agents on other
@@ -60,8 +61,8 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   this machine's readers, and the gap is logged. A cycle that could not commit claims
   nothing. The program's release is judged the same way: committed counts, unpushed or
   not. A queue edit is not: it counts only once pushed.
-- Claiming a ticket you already hold succeeds and writes nothing: a re-run after a lost
-  race must not read its own lock as someone else's.
+- Claiming a ticket you already hold succeeds and writes nothing, so a re-run after a lost
+  race does not read its own lock as someone else's.
 - The holder is never typed: `AGENT_ID` when non-blank, else the current branch. The id
   outlives the branch: a rename mid-session would leave a lock naming a branch nobody
   answers to. A checkout on no branch is refused, never claimed as `HEAD`. The checkout's
@@ -75,14 +76,14 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 - The lock's existence is the claim: the holder it names decides who may close or release,
   not whether the ticket counts as locked. A lock whose line does not parse still holds
   the ticket, and no command lifts it: only the program's release naming no holder, or a
-  hand edit on the branch. A lock file that cannot be read at all is overwritten by the
-  next claim, though `list` still shows the ticket locked, since that comes off the
-  directory listing.
+  hand edit on the branch. A lock file that cannot be read at all counts as no lock to
+  `claim`, `close` and `release`, though `list` still shows the ticket locked, since that
+  comes off the directory listing.
 
 ## The queue
 - The queue is one markdown file on the branch, `TODO_AGENTS.md`: sections `## Priority
   10` down to `## Priority 0`, any `## Priority N` counts, N one or two digits ending at a
-  word boundary; any `-`, `*` or `N.` list item in the file is an entry, wherever it sits.
+  word boundary; any `-`, `*` or `N.` list item with text is an entry, wherever it sits.
   Entries are placed to keep the file sorted high to low; nothing re-sorts on read.
 - An entry is plain text, trimmed: the task a future agent is started with. `--ticket`
   writes the entry as a markdown link to the ticket, the given text as its label,
@@ -99,8 +100,8 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   unranked section cannot bury a deliberate one; a file with no `## ` section gets it
   appended. An entry joins its section right after its last item, before the blank lines;
   only a `## ` heading ends a section.
-- Done means deleted, never checked off: a `- [x]` line is not an open entry; a `- [ ]`
-  line is, printed and removed without its box.
+- Done means deleted, never checked off: a `- [x]` or `- [X]` line is not an open entry; a
+  `- [ ]` line is, printed without its box and deleted whole.
 
 ## Flow: the command
 - The command reads with `list`, `show` and `queue`, and writes with `put` (a ticket, a
@@ -108,17 +109,18 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   `claim`, `release`, `queue add` and `queue done`.
 - `show`, `claim` and `close` refuse a missing ticket with `no-ticket`. Every write
   refuses `no-remote` without an origin, and `claim` and `close` check the ticket inside
-  the write, so `no-remote` comes before `no-ticket`; `release` writes too but looks only
+  the write, so `no-remote` comes before `no-ticket`. `release` writes too but looks only
   at the lock, so an orphan lock naming you lifts. `claim`, `close` and `release` read the
-  holder after the filename check, so a checkout on no branch answers `no-identity` next;
+  holder after the filename check, so a checkout on no branch answers `no-identity` next.
   `put` checks only the name, before reading stdin, so a plan can be written for a ticket
   that does not exist, and writes whatever stdin gives, an empty file included.
-- A ticket is named to any command by its bare filename or by its `tickets/<file>` path,
-  so a queue entry's link target can be pasted in as is; a sibling's name (`.plan.md`,
+- Every command names a ticket by its bare filename or its `tickets/<file>` path, so a
+  queue entry's link target can be pasted in as is; a sibling's name (`.plan.md`,
   `.lock.md`) is `invalid-path` to every command, `put` taking `.plan.md` the one
   exception.
 - No command reads `meta.json`: the importing program is its only reader, for the one key
-  it keeps there, `lastImportedAt`; an unparsable file reads as no stamp.
+  it keeps there, `lastImportedAt`; an unparsable file, or one past 10000 characters,
+  reads as no stamp.
 - A read fetches origin once and reads everything from that copy (the library's queue read
   fetches only when asked): only origin has every writer's pushes, this command's own
   included. With no origin the local branch is read: writes are refused there, so nobody
@@ -127,7 +129,7 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   adds one line on stderr and exits 1. A malformed command line (an unknown flag, the
   wrong argument count, an empty `queue add` text, a `--priority` off the 0-10 scale) is
   rejected first: the usage on stderr, nothing on stdout, exit 2. A file no command may
-  touch is an ordinary refusal, `invalid-path`.
+  touch refuses with `invalid-path`.
 - Anything a command throws refuses with `git-failed`.
 - `list` and a bare `queue` answer with a JSON array; every other result and every refusal
   is an object with `ok`.

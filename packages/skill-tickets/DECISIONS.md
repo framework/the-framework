@@ -17,22 +17,23 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   branch. The program's sync runs three steps in order. It seeds an empty `TODO_AGENTS.md`
   when the branch has none, so the queue exists before its first entry. It links `tickets`
   at the project root to the relative target `.branches/agent-data/tickets`, only when
-  nothing of that name sits at the root. Then it converges the checkout with origin. A
-  seed that cannot commit stops before the link; a link that cannot be made is ignored,
-  and the sync still reports the pull. The link is hidden by two rules in
-  `.git/info/exclude`, `/tickets` then `!/tickets/`, written on the run that creates the
-  link even when the symlink fails. `/tickets` hides the link, `!/tickets/` re-admits
-  directories, which a symlink is not, so the checkout keeps committing its own `tickets/`
-  under the same repo-wide exclude.
+  nothing of that name sits at the root; the target may not exist yet, so the link dangles
+  until the first ticket lands. Then it converges the checkout with origin. A seed that
+  cannot commit stops before the link; a link that cannot be made is ignored, and the sync
+  still reports the pull. The link is hidden by two rules in `.git/info/exclude`,
+  `/tickets` then `!/tickets/`, written on the run that creates the link even when the
+  symlink fails. `/tickets` hides the link, `!/tickets/` re-admits directories, which a
+  symlink is not, so the checkout keeps committing its own `tickets/` under the same
+  repo-wide exclude.
 - Closing a ticket deletes it, its plan and its claim, and nothing else; a queue entry
   linking it stays until `queue done`.
 - `list` sorts newest first by the filename's leading `yyyy-mm-dd_`, ties by filename
-  ascending; the row's `date` is that day at midnight UTC, `T00:00:00.000Z`, unvalidated.
-  A filename with no date takes the file's modification time, or the epoch when read from
-  git, which sorts last.
+  ascending; the row's `date` is that day at `T00:00:00.000Z`, unvalidated. A filename
+  with no date takes the file's modification time, or, when read from git, the epoch,
+  which sorts last.
 - A ticket's row, the same fields in `list` and `show`: the title from its `# ` line, the
   summary from the first prose line after `## TLDR`, else after the title, scanning past
-  headings to the end of the file (a `Source:` line is skipped in both scans, matched
+  headings to the end of the file (a `Source:` line is skipped in either scan, matched
   case-sensitively unlike every key: a trailer on imported tickets, not a field), `Topics:
   [a, b]` split into tags, `GitHub:` into label and url when it is a full markdown link,
   `Priority:` verbatim. Plus whether a plan sits beside it, whether a lock does (`locked`,
@@ -55,15 +56,15 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 - One claim per ticket; it never expires: it lifts when the ticket is released or closed,
   otherwise only by hand on the branch. The command lifts only its own lock, and closes
   only when the ticket has no lock or its own, `not-holder` otherwise. The program that
-  started an agent releases what the agent left claimed, naming the holder it expects or
-  none; none frees whoever holds the lock.
+  started an agent releases what the agent left claimed, naming the holder it expects, or
+  none to free whoever holds the lock.
 - Releasing an unclaimed ticket is a refusal.
 - A lock is written only by a claim; someone else's `claim` is refused while it exists.
   `put` ignores it, so an import can refresh a ticket someone holds.
 - A claim the program committed but could not push still counts: the commit already guards
   this machine's readers, and the gap is logged. A cycle that could not commit claims
-  nothing. The program's release is judged the same way: committed counts, unpushed or
-  not. A queue edit is not: it counts only once pushed.
+  nothing. The program's release is judged the same way: committed counts, pushed or not.
+  A queue edit is not: it counts only once pushed.
 - Claiming a ticket you already hold succeeds and writes nothing, so a re-run after a lost
   race does not read its own lock as someone else's.
 - The holder is never typed: `AGENT_ID` when non-blank, else the current branch. The id
@@ -112,20 +113,21 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   plan, or `meta.json`, all inside `tickets/`; the bytes as given, unparsed), `close`,
   `claim`, `release`, `queue add` and `queue done`.
 - `show`, `claim` and `close` refuse a missing ticket with `no-ticket`. Every write
-  refuses `no-remote` without an origin. For `claim`, `close` and `release` the refusals
-  come in this order: `invalid-path`, `not-a-repo`, `no-identity` (a checkout on no
-  branch), `no-remote`, then `no-ticket`, since the ticket is checked inside the write;
-  `queue add --ticket` checks the ticket before the write, so there `no-ticket` comes
-  first. `release` looks only at the lock, so an orphan lock naming you lifts. `put`
-  checks only the name, before reading stdin, so a plan can be written for a ticket that
-  does not exist, and writes whatever stdin gives, an empty file included.
+  refuses `no-remote` without an origin. For `claim` and `close` the refusals come in this
+  order: `invalid-path`, `not-a-repo`, `no-identity` (a checkout on no branch),
+  `no-remote`, then `no-ticket`, since the ticket is checked inside the write; `release`
+  the same without `no-ticket`, never looking at the ticket; `queue add --ticket` checks
+  the ticket before the write, so there `no-ticket` comes first. `release` looks only at
+  the lock, so an orphan lock naming you lifts. `put` checks only the name, before reading
+  stdin, so a plan can be written for a ticket that does not exist, and writes whatever
+  stdin gives, an empty file included.
 - Every command names a ticket by its bare filename or its `tickets/<file>` path, so a
   queue entry's link target can be pasted in as is; a sibling's name (`.plan.md`,
   `.lock.md`) is `invalid-path` to every command, `put` taking `.plan.md` the one
   exception.
 - No command reads `meta.json`: the importing program is its only reader, for the one key
-  it keeps there, `lastImportedAt`; an unparsable file reads as no stamp, and only its
-  first 10000 characters are parsed.
+  it keeps there, `lastImportedAt`; an unparsable file, or a value that is not a date
+  string, reads as no stamp, and only the first 10000 characters are parsed.
 - A read fetches origin once and reads everything from that copy (the library's queue read
   fetches only when asked): only origin has every writer's pushes, this command's own
   included. With no origin the local branch is read: writes are refused there, so nobody
@@ -154,8 +156,8 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   origin's tip; a push that loses a race is re-applied on the new tip by
   `@gemstack/agent-data`. The program's writes go through its persistent checkout's cycle
   instead, its seed as `seed the queue`, its batch claim as one commit, `claim <n>
-  tickets` for the n it locked, or the single form when n is one; its `queue done` of an
-  entry already gone succeeds, changing nothing.
+  tickets` for the n it locked, or `claim tickets/<stem>` when n is one; its `queue done`
+  of an entry already gone succeeds, changing nothing.
 - `queue done` takes the entry as `queue` printed it, trimmed, removes the first such
   line, and refuses a line the queue does not have, an empty one included, decided inside
   the write.

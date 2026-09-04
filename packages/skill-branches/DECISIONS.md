@@ -72,11 +72,13 @@ program allows a push.
 - One JSON document on stdout for every command that runs: the result, or the refusal. A
   refusal, a rule saying no, adds one line for a person on stderr and exits 1; an argument
   that cannot be read never gets that far: the usage on stderr, nothing on stdout, exit 2.
+  A malformed command line (an unknown flag, the wrong argument count) is that usage
+  error; an id that parses but is not an agent id is an ordinary refusal, `invalid-id`.
 - Anything a command throws is reported like a refusal, reason `git-failed`, with the
   error's own line on stderr: a caller parsing stdout never has to handle a command that
   printed nothing.
-- `list` answers with the bare JSON array; every other command answers with an object, its
-  `ok` telling a result from a refusal.
+- `list` answers with a bare JSON array when it runs; every other result, and every
+  refusal, is an object whose `ok` tells the two apart.
 - Run outside a repository, a command refuses with `not-a-repo`: only git's own "not a git
   repository" reads as that, every other git failure stays `git-failed`.
 - An agent reading the skill can be in one of two places: inside a checkout the program

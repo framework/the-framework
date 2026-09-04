@@ -96,8 +96,8 @@ user's own included, when the program allows a push, and deletes only `agent-*` 
   own line on stderr.
 - `list` answers with a bare JSON array; every other result and every refusal is an object
   whose `ok` tells the two apart.
-- Run outside a repository, a command that needs one refuses with `not-a-repo`: only git's own "not a git
-  repository" reads as that, every other git failure stays `git-failed`.
+- Run outside a repository, a command that needs one refuses with `not-a-repo`: only git's
+  own "not a git repository" reads as that, every other git failure stays `git-failed`.
 - An agent reading the skill is in one of two places: a checkout the program that started
   it made, already on an `agent-*` branch; or a plain clone, on `main` or someone's
   branch. The skill tells them apart by the branch name alone: on `agent-*` the checkout

@@ -60,7 +60,8 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 
 ## Flow: reclaim
 Deleting an agent's checkout to free disk, only once the remote has everything in it. The
-reclaim pushes the branch the checkout ended on, the user's own included, when the caller allows a push.
+reclaim pushes the branch the checkout ended on, the user's own included, when the caller
+allows a push.
 
 - Nothing is committed on the agent's behalf: a checkout with uncommitted work, untracked
   files included, is kept until a person commits or deletes it, and nothing of it is

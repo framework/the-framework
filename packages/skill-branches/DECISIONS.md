@@ -14,18 +14,18 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   id can build a path outside `.branches/`. `npx branches name <name>` (`[a-z0-9-]+`)
   renames the branch to `agent-<name>`: a rename, not a new branch, so nothing is left
   behind; the folder keeps the id: the agent is running inside it. A checkout on no branch
-  is neither renamed nor reclaimed.
-- Whenever a checkout is made, named or removed, each checkout whose branch differs from
+  is neither renamed nor reclaimed; `status` answers it without a `branch`.
+- After every `create`, `name` and `remove`, each checkout whose branch differs from
   its folder name gets a sibling link named as its branch, so `.branches/<branch>` reaches
   it; a detached checkout or a slashed branch gets none. A link pointing at an `agent-*`
   checkout is the package's to remove, whatever its name; anything else at a link's path
   is left alone. `list` and `prune` see directories only, so a link is never a checkout;
   `remove <id>` takes an id (the id charset), so a session name reaches
-  `.branches/agent-<name>`, the link after a rename, and is followed to the checkout.
+  the link `.branches/agent-<name>` and is followed to the checkout.
 - The names the package mints hold no `/`: the folder and the link are named after a
   branch, and a path segment cannot hold a slash; nor can a slashed ref be handed to a
-  cloud session as its starting revision. The package renames
-  and deletes only `agent-*` branches; the user's own are never touched.
+  cloud session (a hosted agent run, started on a branch) as its starting revision. The
+  package renames and deletes only `agent-*` branches; the user's own are never touched.
 - `agent-data` is not an agent's branch: it is `@gemstack/agent-data`'s data branch, and
   the program that keeps it checks it out as `.branches/agent-data`, not this package.
   Never listed, renamed or deleted; `data` is refused as an id, and an agent naming itself
@@ -64,10 +64,10 @@ allows a push, and deletes only `agent-*` branches.
   files included, is kept until a person commits or deletes it, and nothing of it is
   pushed.
 - An `agent-*` branch whose tip sits on some other name's remote-tracking ref, on any
-  remote, holds nothing of its own after a merge and goes with its checkout; its own copy,
-  under its current name or its upstream's, does not count. Pushed means on `origin`, the
-  only remote the package pushes to. Both rules read the local remote-tracking refs,
-  without a fetch: the push that put a tip there wrote them.
+  remote, holds nothing of its own after a merge and goes with its checkout, without a
+  push; its own copy, under its current name or its upstream's, does not count. Pushed
+  means on `origin`, the only remote the package pushes to. Both rules read the local
+  remote-tracking refs, without a fetch: the push that put a tip there wrote them.
 - A checkout whose tip is an ancestor of a pushed commit the program names (the commit a
   cloud session pushed on the agent's behalf) goes without a push and keeps its branch,
   even a branch the merged-branch rule would delete.
@@ -80,16 +80,19 @@ allows a push, and deletes only `agent-*` branches.
   stderr: an ignored build artifact must not strand a checkout for good.
 - `remove` and `prune` push by default; `--no-push` opts out. `remove` of a missing
   checkout is a refusal, `no-checkout`; a `remove` that went names the branches it
-  deleted; `prune` lists the checkouts it kept in its result and exits 0.
-- The package does git and the filesystem only, and reads no configuration: whether it
-  may push comes in from the caller.
+  deleted; `prune` lists the checkouts it removed and those it kept in its result and
+  exits 0.
+- The package touches only git and the filesystem, and reads no configuration: the caller
+  says whether it may push.
 
 ## The skill
 - The agent commits and stops: it never pushes, opens a pull request, or merges. Whoever
   started it does that.
-- The skill has the agent name its session before its first change and finish only when
-  `npx branches status` reports the checkout clean; an agent that needs anything outside
-  its checkout stops and says so.
+- The skill has the agent name its session before its first change, unless its branch
+  already differs from its folder name (a continued agent's does): then it is named and
+  kept. It finishes only when `npx branches status` reports the checkout clean, or after
+  saying what remains is not its own; an agent that needs anything outside its checkout
+  stops and says so.
 - The skill says: when `node_modules` is missing, install with the lockfile's package
   manager, then `npx branches`, never a bare `branches`: on a fresh clone no such command
   exists yet.
@@ -103,8 +106,8 @@ allows a push, and deletes only `agent-*` branches.
 - `create`, `attach`, `list`, `remove` and `prune` act on the project, found from the
   `.branches/` layout even from inside a checkout; `name` and `status` act on the checkout
   the command runs in, found from anywhere inside it, or on the checkout root whose path
-  `status` is given; `status` answers the branch, whether the tree is clean, and whether
-  the tip is on the remote.
+  `status` is given; `status` answers the path, the branch, whether the tree is clean, and
+  whether the tip is on the remote.
 - `list` answers with a bare JSON array; every other result and every refusal is an object
   whose `ok` tells the two apart.
 - Run outside a repository, a command that needs one refuses with `not-a-repo`: only git's
@@ -112,16 +115,16 @@ allows a push, and deletes only `agent-*` branches.
 - The refusals: `invalid-id`, `invalid-name`, `not-a-worktree`, `no-branch`,
   `not-an-agent-branch`, `no-checkout`, `dirty`, `not-on-remote`, `not-a-repo`,
   `git-failed`.
-- The skill tells the agent where it is: on `agent-*` the checkout is the agent's own,
-  made by the program that started it, and the repository around a `.branches/` checkout
-  is the user's; on any other branch under `.branches/` it was continued on that branch on
-  purpose and stays; anywhere else it is a plain clone, and the agent makes its
-  `agent-<name>` branch with git before its first change. `status` and `name` are the
+- The skill tells the agent where it is: on `agent-*` the checkout is its whole workspace,
+  dependency files and skill folders in it the user's copies, linked, never edited; on any
+  other branch under `.branches/` it was continued on that branch on purpose and stays;
+  anywhere else it is a plain clone, and the agent makes its `agent-<name>` branch with
+  git before its first change. `status` and `name` are the
   agent's commands; the rest are the caller's.
 - Each agent tool (Claude Code, Codex) looks for skills in its own folder at the checkout
-  root: `.claude/skills`, `.agents/skills`. The package links its own folder, which
-  holds `SKILL.md`, into each as `branches` in every checkout it makes, hidden from git
-  through the repository's exclude, which hides a project's own file at that path too; an
-  entry already there, a committed skill say, is left alone. A caller may name further
+  root: `.claude/skills`, `.agents/skills`. In every checkout it makes, the package links
+  its own folder, which holds `SKILL.md`, into each as `branches`, hidden through the
+  repository's exclude, which hides a project's own file at that path too. An entry
+  already there, a committed skill say, is left alone. A caller may name further
   skills to link in beside it, each under its own name; the caller's are temporary, until
   the project commits its own skill files.

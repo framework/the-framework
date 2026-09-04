@@ -12,10 +12,10 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
 - A checkout starts as branch `agent-<id>` in folder `.branches/agent-<id>/`; `<id>` is
   what the program that starts the agent calls it, and must match `[A-Za-z0-9_-]+`, so no
   id can build a path outside `.branches/`. `npx branches name <name>` (`[a-z0-9-]+`; a
-  leading `-` never arrives, the argument parser reads it as a flag) renames the branch to
-  `agent-<name>`: a rename, not a new branch, so nothing is left behind; the folder keeps
-  the id: the agent is running inside it. A checkout on no branch is neither renamed nor
-  reclaimed; `status` answers it without a `branch`.
+  leading `-` never arrives, the argument parser reads it as a flag, which the skill says)
+  renames the branch to `agent-<name>`: a rename, not a new branch, so nothing is left
+  behind; the folder keeps the id: the agent is running inside it. A checkout on no branch
+  is neither renamed nor reclaimed; `status` answers it without a `branch`.
 - After a checkout is made, named or removed, each checkout whose branch differs from its
   folder name gets a sibling link named as its branch, so `.branches/<branch>` reaches it;
   a detached checkout or a slashed branch gets none. A link pointing at an `agent-*`
@@ -28,31 +28,31 @@ to the implementer's judgment. Flag conflicts instead of silently deviating.
   ref. The package renames and deletes only `agent-*` branches; the user's own are never
   touched.
 - `agent-data` is not an agent's branch: it is `@gemstack/agent-data`'s data branch, and
-  the program that keeps it checks it out as `.branches/agent-data`, not this package.
+  the program that keeps it, not this package, checks it out as `.branches/agent-data`.
   Never listed, renamed or deleted; `data` is refused as an id, and an agent naming itself
   `data` gets `agent-data-2`.
 - A taken name gets `-2`, `-3`, … instead of a refusal: the agent asked for a name and
   reads back the one it got. Taken means any local or remote-tracking branch, so the later
   push cannot land on someone else's branch; the branch the checkout carries right now,
   suffix included, is not counted, so a checkout already on `agent-<name>-2` that asks for
-  `<name>` again keeps `-2` rather than drifting to `-3`. Two agents naming the same thing
-  at once race on the rename; the loser takes the next free suffix, over at most three
-  tries, then `git-failed`.
+  `<name>` again keeps `-2` while `agent-<name>` is still taken, and takes `agent-<name>`
+  once it is free. Two agents naming the same thing at once race on the rename; the loser
+  takes the next free suffix, in at most three tries, then `git-failed`.
 - Continuing an agent puts it back on the branch its work is on, whatever its name, even
   one the package did not make; a branch gone locally comes back from origin's copy, and
   one gone everywhere is recreated from the project's head: the only branch the package
   deletes held nothing the remote lacked.
 - The user's installed dependencies are linked into the checkout, not copied or
   reinstalled: one link per entry of the folder, never one link to the whole folder, so an
-  install in the checkout writes into the checkout (a scope like `@acme` is one entry, a
-  link into the user's folder, so a scoped install still writes there: a known limit).
-  Every dependency folder down to two levels under the root (not under `node_modules`,
-  `dist`, `build`, `coverage` or a dot-directory) is linked, so a workspace package's own
-  dependencies are there too; a tree already in the checkout is left alone. Of the
-  dot-entries only `.bin` is linked, so the agent runs the project's tools; the other
-  dot-entries (`.pnpm`, `.modules.yaml`) claim the tree was installed there, and the
-  checkout's was not. The packages still resolve: a link to a link resolves where the
-  target lives.
+  install in the checkout writes into the checkout (a scope like `@acme` is one entry, so
+  a scoped install still writes into the user's folder: a known limit). Every dependency
+  folder down to two levels under the root (not under `node_modules`, `dist`, `build`,
+  `coverage` or a dot-directory) is linked, so a workspace package's own dependencies are
+  there too; a tree already in the checkout is left alone. Of the dot-entries only `.bin`
+  is linked, so the agent runs the project's tools; the other dot-entries (`.pnpm`,
+  `.modules.yaml`) would tell the package manager the checkout's tree was installed there,
+  and it was not. The packages still resolve: a link to a link resolves where the target
+  lives.
 - Everything after the worktree itself is best-effort: a checkout missing any of it is a
   worse run, not a failed one.
 - `create` or `attach` for an id that already has a checkout fails, and so does `create`
@@ -87,16 +87,17 @@ caller allows a push.
   checkout is a refusal, `no-checkout`; a `remove` that went names the branches it
   deleted; `prune` lists the checkouts it removed and those it kept in its result and
   exits 0.
-- The package reads no configuration: the caller says whether it may push.
+- The package reads no configuration and asks nothing about whether an agent still runs:
+  the caller says whether it may push, and stops what serves the tree before removal.
 
 ## The skill
 - The agent commits and stops: it never pushes, opens a pull request, or merges. Whoever
   started it does that.
 - The skill has the agent name its session before its first change, unless its branch
-  already differs from its folder name (a continued agent's does): then it is named and
-  kept. It finishes only when `npx branches status` reports the checkout clean, or after
-  saying what remains is not its own; an agent that needs anything outside its checkout
-  stops and says so.
+  already differs from its folder name (a continued agent's does): then it is already
+  named, and kept. It finishes only when `npx branches status` reports the checkout clean,
+  or after saying what remains is not its own; an agent that needs anything outside its
+  checkout stops and says so.
 - The skill says: when `node_modules` is missing, install with the lockfile's package
   manager, then `npx branches`, never a bare `branches`: on a fresh clone no such command
   exists yet.
@@ -122,11 +123,11 @@ caller allows a push.
   `not-an-agent-branch`, `no-checkout`, `dirty`, `not-on-remote`, `not-a-repo`,
   `git-failed`.
 - The skill tells the agent where it is: on `agent-*` the checkout is its whole workspace,
-  dependency files and skill folders in it the user's copies, linked, never edited; on any
-  other branch under `.branches/` it was continued on that branch on purpose and stays;
-  anywhere else it is a plain clone, and the agent makes its `agent-<name>` branch with
-  git before its first change. `status` and `name` are the agent's commands; the rest are
-  the caller's.
+  and the dependency files and skill folders in it are links to the user's copies, never
+  edited; on any other branch under `.branches/` it was continued on that branch on
+  purpose and stays; anywhere else it is a plain clone, and the agent makes its
+  `agent-<name>` branch with git before its first change. `status` and `name` are the
+  agent's commands; the rest are the caller's.
 - Each agent tool (Claude Code, Codex) looks for skills in its own folder at the checkout
   root: `.claude/skills`, `.agents/skills`. In every checkout it makes, the package links
   its own folder, which holds `SKILL.md`, into both as `branches`, hidden through the

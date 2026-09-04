@@ -5,9 +5,9 @@ description: Where the project's tickets and its agent queue live, how to read a
 
 # Tickets and the agent queue
 
-The tickets (`tickets/<DATE>_<SLUG>.md`, with their `.plan.md` and `.lock.md` siblings) and the agent queue (`TODO_AGENTS.md`) live on the branch `agent-data`, never on a code branch. Your checkout does not carry them. A `tickets` link at the repository root may show the tickets, where a long-lived process keeps that branch checked out: read them there if you like, never write there. The queue is not under that link.
+The tickets (`tickets/<DATE>_<SLUG>.md`, with their `.plan.md` and `.lock.md` siblings) and the agent queue (`TODO_AGENTS.md`) live on the branch `agent-data`, never on a code branch. A `tickets` link at the repository root may show the tickets, where a long-lived process keeps that branch checked out: read them there if you like, never write there. The queue is not under that link.
 
-Read and change them with the `tickets` command. It comes with the npm package `@gemstack/skill-tickets`, a dependency of this repository: install the repository's dependencies once — `npm install`, or the package manager its lockfile belongs to — then run it as `npx tickets`. Every change it makes is one commit pushed straight to the `agent-data` branch.
+Read and change them with the `tickets` command, a dependency of this repository (`@gemstack/skill-tickets`): install the repository's dependencies once — `npm install`, or the package manager its lockfile belongs to — then run it as `npx tickets`. `npx tickets` alone prints the usage; `--help` is answered by npx itself. Every change it makes is one commit pushed straight to the `agent-data` branch.
 
 ## Read
 
@@ -21,8 +21,9 @@ npx tickets queue                the queue's open entries, in order of work
 ## Change
 
 ```
-npx tickets put <file>           write one file under tickets/ from stdin: a ticket, a plan, or meta.json
-                                 (the last-import stamp the program that imports issues keeps there)
+npx tickets put <file>           write, or create, one file under tickets/ from stdin (npx tickets put <file> < draft.md):
+                                 a ticket, a plan, or meta.json (the last-import stamp the program that
+                                 imports issues keeps there)
 npx tickets close <file>         remove a ticket with its plan and lock; refused while someone else
                                  holds the ticket
 npx tickets queue add <text> [--priority N] [--ticket <file>]

@@ -40,11 +40,13 @@ export function ticketLockName(file: string): string {
 
 /**
  * A bare ticket filename: a `.md` name with no path segments (so it cannot address another
- * directory) and not one of a ticket's own siblings. The gate every filename that arrives from
- * outside — a command's argument, a browser — goes through.
+ * directory), not starting with a dot, and not one of a ticket's own siblings. The gate every
+ * filename that arrives from outside — a command's argument, a browser — goes through. The two
+ * spellings of a name refuse the same ones: what this refuses bare, `isTicketPath` refuses under
+ * `tickets/`.
  */
 export function isTicketFile(file: string): boolean {
-  return /^[^/\\]+\.md$/.test(file) && !SIBLING.test(file)
+  return /^[^./\\][^/\\]*\.md$/.test(file) && !SIBLING.test(file)
 }
 
 /** Whether a filename inside `tickets/` is a sibling (`.plan.md` / `.lock.md`) rather than a ticket. */

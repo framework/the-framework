@@ -5,15 +5,17 @@ description: Where the project's tickets and its agent queue live, how to read a
 
 # Tickets and the agent queue
 
-The tickets (`tickets/<DATE>_<SLUG>.md`, with their `.plan.md` and `.lock.md` siblings) and the agent queue (`TODO_AGENTS.md`) live on the branch `agent-data`, never on a code branch. Your checkout does not carry them. A `tickets` link at the repository root may show the tickets, where a long-lived process keeps that branch checked out: read them there if you like, never write there. The queue is not under that link.
+The tickets (`tickets/<DATE>_<SLUG>.md`, with their `.plan.md` and `.lock.md` siblings) and the agent queue (`TODO_AGENTS.md`) live on the branch `agent-data`, never on a code branch. A `tickets` link at the repository root, if present, shows a possibly stale copy; never write there. The command reads fresh. The queue is not under that link.
 
-Read and change them with the `tickets` command. It comes with the npm package `@gemstack/skill-tickets`, a dependency of this repository: install the repository's dependencies once — `npm install`, or the package manager its lockfile belongs to — then run it as `npx tickets`. Every change it makes is one commit pushed straight to the `agent-data` branch.
+Read and change them with the `tickets` command, a dependency of this repository (`@gemstack/skill-tickets`). With no `node_modules`, install first with the lockfile's package manager (`npm install` for `package-lock.json`). Then run it as `npx tickets`. Every change it makes is one commit pushed straight to the `agent-data` branch. A refusal exits 1 with a line on stderr; a wrong command line exits 2 with the usage.
 
 ## Read
 
 ```
 npx tickets list                 every open ticket, as JSON: file, title, summary, priority, topics,
                                  github, date, planned, effort, uncertainty, locked, lockedBy
+                                 (priority, topics, github, effort, uncertainty, locked, lockedBy
+                                 absent when unset)
 npx tickets show <file>          one ticket: its text, its plan, who holds it
 npx tickets queue                the queue's open entries, in order of work
 ```
@@ -21,28 +23,34 @@ npx tickets queue                the queue's open entries, in order of work
 ## Change
 
 ```
-npx tickets put <file>           write one file under tickets/ from stdin: a ticket, a plan, or meta.json
-                                 (the last-import stamp the program that imports issues keeps there)
-npx tickets close <file>         remove a ticket with its plan and lock; refused while someone else
-                                 holds the ticket
+npx tickets put <file>           write one file under tickets/ from stdin, the whole file, creating it if new;
+                                 empty stdin writes an empty file
+                                 (npx tickets put <file> < draft.md): a ticket or a plan
+npx tickets close <file>         once the work is merged: remove the ticket with its plan and lock;
+                                 refused while someone else holds it; its queue entry stays,
+                                 `queue done` it
 npx tickets queue add <text> [--priority N] [--ticket <file>]
                                  put an entry on the queue; --priority places it in that section,
                                  --ticket links it to the ticket and places it by the ticket's
-                                 priority unless --priority says otherwise; with neither, it is
-                                 appended at the end of the file, under whatever section ends it
-npx tickets queue done <entry>   take an entry off the queue, as `npx tickets queue` printed it: done means deleted
+                                 priority (5 when it has none) unless --priority says otherwise;
+                                 with neither, it goes at the end of the file
+npx tickets queue done <entry>   remove an entry: one quoted argument, exactly as `npx tickets queue`
+                                 printed it; done means deleted
 ```
 
 ## Claim before you plan or work a ticket
 
 ```
-npx tickets claim <file>         {"ok":true,"holder":…} — the ticket is yours
-                                 {"ok":false,"reason":"claimed","holder":…} — someone else's: back off,
-                                 pick another; never remove or overwrite their lock
-npx tickets release <file>       lift your own claim — the plan is finished, or the work is published
+npx tickets claim <file>         {"ok":true,"file":…,"holder":…} — the ticket is yours
+                                 {"ok":false,"reason":"claimed","holder":…,"file":…} — someone else's
+                                 (no holder when the lock's line does not parse): pick another; never remove
+                                 or overwrite their lock. A claim guards claim, close and release;
+                                 put overwrites whoever holds the ticket
+npx tickets release <file>       lift your own claim when the plan or the work is done, and before you
+                                 stop unless you closed it; nothing lifts it on a timeout
 ```
 
-Every `<file>` above names a ticket: its filename, `2042-01-01_some-ticket.md`, or the `tickets/…` path a queue entry links to; `put` also takes that ticket's `.plan.md` name, or `meta.json`. You claim as the value of `AGENT_ID` when the process that started you set it in your environment, else as your current branch name; nothing to type.
+Every `<file>` above takes a ticket's filename (`2042-01-01_some-ticket.md`) or the `tickets/…` path a queue entry links to; `put` also takes that ticket's `.plan.md` name, and writes a plan for a ticket that does not exist, without complaint, invisible to `show`. You claim as `AGENT_ID` when it is set, else as your current branch (so a rename or a branch switch between claim and release changes who you are: release from the branch you claimed on, or the lock stays until a person edits the branch).
 
 ## Formats
 
@@ -68,11 +76,11 @@ GitHub: [#42](https://github.com/org/repo/issues/42) [optional]
 [optional: more info (any heading and format you want)]
 ```
 
-`tickets/` holds only open tickets: a closed ticket is removed, with its `.plan.md` and `.lock.md` (`npx tickets close`).
+`Priority:`, `Effort:` and `Uncertainty:` are bare whole numbers above the `# ` title; anything else reads as absent for queue placement and the scales, and a ticket with no readable `Priority:` queues at 5.
 
 ### A claim: `tickets/<DATE>_<SLUG>.lock.md`
 
-Written by `npx tickets claim`, removed by `npx tickets release` or `npx tickets close`. One line: `CLAIMED: <holder>`. A ticket with a lock is being planned or worked by its holder — pick another.
+Written by `npx tickets claim`, removed by `npx tickets release` or `npx tickets close`. One line: `CLAIMED: <holder>`.
 
 ### A plan: `tickets/<DATE>_<SLUG>.plan.md`
 

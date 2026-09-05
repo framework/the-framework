@@ -6,13 +6,13 @@ The skill's instructions: what an agent is told about where its work goes, for e
 
 ## Business logic — TL;DR
 
-- **One rule wherever the agent is** - the work goes on a branch named `agent-<name>`, and whoever started the agent publishes it: the agent never pushes and never opens the pull request.
-- **The command is installed, then run through npx** - `branches` ships with the `@gemstack/skill-branches` package the repository depends on; the agent installs the repository's dependencies once and runs `npx branches`, so every command the skill names runs as written on a fresh clone.
-- **Where the agent is, read off its branch** - `npx branches status` prints the branch. One starting with `agent-` is the agent's own; any other means a plain clone, on a branch that is not the agent's.
-- **On its own branch, the working directory is the whole workspace** - every file the agent reads or writes is under it, addressed relative to it; when the directory sits under `.branches/`, a checkout was made for the agent and the repository around it is the user's own working tree, never the agent's to edit; anything it genuinely needs from outside is a reason to say so and stop. Before the first change it names the session with `npx branches name <name>` — a rename of its branch to `agent-<name>`, so the commits stay, suffixed when the name was taken.
-- **In a plain clone, the agent makes its branch itself** - before the first change, `git switch -c agent-<name>`.
-- **Commit as you go** - only what the agent committed is ever published; nothing is committed on its behalf, and uncommitted work is neither published nor cleaned up.
-- **Leave a clean tree** - before finishing, `npx branches status` must report a clean tree.
+- **One rule wherever the agent is** - the work goes on a branch named `agent-<name>`, unless the caller continued the agent on another, and whoever started the agent publishes it: the agent never pushes and never opens the pull request.
+- **The command is installed, then run through npx** - `branches` ships with the `@gemstack/skill-branches` package the repository depends on; the agent installs the repository's dependencies once, when there is no `node_modules` yet, with the package manager the lockfile belongs to, and runs `npx branches` inside its checkout, so every command the skill names runs as written on a fresh clone. `status` and `name` are the agent's commands; the rest are the caller's.
+- **Where the agent is, read off its branch** - `npx branches status` prints the branch. One starting with `agent-` is the agent's own; any other means a plain clone, on a branch that is not the agent's, unless the checkout sits under `.branches/`: then the agent was continued on that branch on purpose and stays on it.
+- **On its own branch, the working directory is the whole workspace** - every file the agent reads or writes is under it; dependency files and the skill folders are the user's copies, linked in, and are never edited; anything it genuinely needs from outside is a reason to say so and stop. Before the first change it names the session with `npx branches name <name>` — a rename of its branch to `agent-<name>`, suffixed when the name was taken, printed as `branch`, another name when refused as invalid — unless the branch already differs from the checkout's folder name, which a continued agent's does: then it is named and kept.
+- **In a plain clone, the agent makes its branch itself** - before the first change, `git switch -c agent-<name>`, another name if that one exists locally or on origin; the same workspace rules apply.
+- **Commit as you go** - nothing is committed on the agent's behalf, and only what it committed is published.
+- **Leave a clean tree** - before finishing, `npx branches status` must report a clean tree: nothing uncommitted and nothing untracked, so the agent commits or deletes what it added; what remains and is not its own it reports and finishes.
 
 ## Before modifying/creating SPEC.md files
 

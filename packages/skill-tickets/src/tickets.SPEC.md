@@ -24,9 +24,9 @@ See `## User story`.
 
 #### Business logic
 
-A ticket lists as: its filename, which is also its identity; its title, from the `# ` heading; its summary, the first line under `## TLDR`, or the first prose line when the ticket has no TLDR, or empty when it has neither; its `Priority:` verbatim, as written; its `Topics:`, as bare tags with the list's cosmetic brackets stripped; and its `GitHub:` link split into the text a reader clicks and the URL it goes to. The three keys are optional, and are read only from the block *above* the title, so a key-looking line in the body is prose. Only the head of each ticket is read — nothing below it is shown in a list.
+A ticket lists as: its filename, which is also its identity; its title, from the `# ` heading; its summary, the first line under `## TLDR`, or the first prose line when the ticket has no TLDR, or empty when it has neither, and never a line starting with `Source:` (imported tickets carry one as a trailer); its `Priority:` lowercased; its `Topics:`, as bare tags with the list's cosmetic brackets stripped; and its `GitHub:` link split into the text a reader clicks and the URL it goes to. The three keys are optional, and are read only from the block *above* the title, so a key-looking line in the body is prose. Only the head of each ticket is read — nothing below it is shown in a list: a list reads the first 4,000 bytes of each ticket, so a title or summary past that point is missing from its row, while one ticket in full is read whole, and its row can differ from the list's on such a ticket.
 
-The tickets come back newest first. A `.plan.md` or `.lock.md` never becomes a row of its own.
+The tickets come back newest first, and tickets of one day in filename order. A `.plan.md` or `.lock.md` never becomes a row of its own.
 
 ### A ticket's date
 
@@ -50,7 +50,7 @@ A `.lock.md` beside a ticket marks it claimed, and the holder it names is report
 
 #### Business logic
 
-Every part of the format is optional to the reader. A ticket with no heading is titled from its filename, made readable by decoding any escapes and turning underscores into spaces — which covers both `<DATE>_<SLUG>.md` and a `<number>-<escaped title>.md` name from an issue tracker. A key nobody recognises is preamble noise, not a field. Asking whether a folder holds any ticket at all is a listing, not a parse, for a caller that asks often.
+Every part of the format is optional to the reader. A ticket with no heading is titled from its filename, made readable by decoding any escapes and turning underscores into spaces — which covers both `<DATE>_<SLUG>.md` and a `<number>-<escaped title>.md` name from an issue tracker. With no heading there is no key block: `Priority:`, `Topics:` and `GitHub:` go unread, and the first non-heading line, a key line included, becomes the summary. A key nobody recognises is preamble noise, not a field. Asking whether a folder holds any ticket at all is a listing, not a parse, for a caller that asks often.
 
 ### One ticket in full
 

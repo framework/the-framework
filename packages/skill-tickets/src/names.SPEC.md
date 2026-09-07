@@ -67,7 +67,7 @@ Guessing a plausible number would hide the typo, and clamping would claim one of
 
 #### Business logic
 
-A ticket may carry a `GitHub: [#42](…/issues/42)` header line. The issue it tracks is read from that line as a `#42` reference: the number comes from the URL when there is one — the label is display text, the URL is the identity — and from the label itself for a line written by hand with no URL. A ticket with no such line, or one whose line names no number, tracks no issue.
+A ticket may carry a `GitHub: [#42](…/issues/42)` header line. The issue it tracks is read from that line as a `#42` reference: the number comes from the URL when there is one — an `…/issues/<n>` or an `…/pull/<n>` URL alike; the label is display text, the URL is the identity — and from the label itself for a line written by hand with no URL. A ticket with no such line, or one whose line names no number, tracks no issue.
 
 ## Before modifying/creating SPEC.md files
 

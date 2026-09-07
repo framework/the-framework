@@ -108,7 +108,7 @@ Teardown never leaves a stranded checkout behind, and never silently deletes som
 
 #### Business logic
 
-Removal tolerates a path that is already gone or was never registered, so teardown can run more than once. Plain removal is attempted first, because git refuses it for a checkout it considers unclean — which, after the caller's clean check, means a state that was not anticipated. Removal is then retried forcefully so that, for example, an ignored build artifact cannot strand a checkout forever, but the forced removal is logged, because forcing past unknown state is exactly how uncommitted work was destroyed before.
+Removal tolerates a path that is already gone or was never registered, so teardown can run more than once. Plain removal is attempted first, because git refuses it for a checkout it considers unclean — which, after the caller's clean check, means a state that was not anticipated. Removal is then retried forcefully so that, for example, an ignored build artifact cannot strand a checkout forever, but the forced removal is logged, because forcing past unknown state is exactly how uncommitted work was destroyed before. A forced removal that fails as well is not reported: the removal answers success with the checkout still on disk.
 
 ## Before modifying/creating SPEC.md files
 

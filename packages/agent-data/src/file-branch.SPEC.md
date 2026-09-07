@@ -20,7 +20,7 @@ A branch used as a file store: a branch of the project's repository holding file
 - **One branch, holding files nobody edits by hand** - the caller names it; nothing on it is anyone's working tree, so it can be pushed and pulled eagerly, which is what gives every machine and every cloud session the same view.
 - **Born parentless, or adopted from origin** - a branch origin already has is adopted; a branch that has to be created here starts from an empty commit with no parent, so no code commit is ever an ancestor of the file history.
 - **The persistent checkout, hidden from the project's git** - the branch is checked out at `.branches/<branch>`, named after its branch like every other checkout there, and that directory is hidden from the project's git.
-- **One funnel, serialized per branch** - every write a long-lived process makes goes through one cycle — sync, run the operation, commit, push — and cycles for the same branch never interleave.
+- **One funnel, serialized per branch** - every write a long-lived process makes goes through one cycle — sync, run the operation, commit, push — and cycles for the same branch never interleave. Reads do not wait for a cycle: a read during one may see the operation's files before they are committed, or none at all while a failed cycle is being put back.
 - **A write is an intent, not a commit** - when a push loses a race, the cycle syncs again and re-runs the operation against the fresher state instead of force-fitting a stale commit.
 - **A push is owed until it lands** - a commit that could not be pushed stays local, and the next cycle carries it out, even when that cycle writes nothing of its own.
 - **Conflicts resolve toward origin** - the checkout is nobody's working tree, so origin always wins and the local intent is re-applied on top.
@@ -29,7 +29,7 @@ A branch used as a file store: a branch of the project's repository holding file
 - **A repository with no remote** - no `origin`, whatever other remotes it has: fine for a funneled write, an error for the pull, a refusal for a detached write.
 - **Reading from anywhere in the repository** - the persistent checkout when this location has one, else the branch's ref, else origin's copy of it, so a reader holds no copy of the files; a read can ask for a fresh copy instead.
 - **A reader that fetches once** - a reader opening many files fetches up front, picks one ref, and takes every read off it.
-- **A detached one-shot write** - a command in any clone writes through a throwaway worktree on origin's tip and pushes straight to the branch, never touching the persistent checkout.
+- **A detached one-shot write** - a command in any clone writes through a throwaway worktree on origin's tip and pushes straight to the branch, never touching the persistent checkout. On its way out it prunes the repository's stale worktree registrations, whatever branch they were for, as does the creation of the persistent checkout.
 - **The files an operation writes** - reading, writing, deleting and listing the files under the directory an operation is handed, with parent directories created on write.
 
 ## Business logic
@@ -60,7 +60,7 @@ A long-lived process reads these files on every tick and writes them many times 
 
 The branch is checked out at `.branches/<branch>` — under the project, named after its branch, exactly like the agent checkouts beside it. The directory is hidden from the project's git through the repository's own exclude file, so no sweeping `git add -A` can commit it onto a code branch and no tracked file changes to achieve that; this may well be the first checkout the project ever gets.
 
-Making sure the branch and its checkout exist is idempotent and cheap once they do — one read of the checkout's branch. A registration left behind by a directory someone deleted by hand is pruned first, so it cannot block the checkout being made again. Nothing here fails outright: a project this cannot be set up in reports why and is otherwise left alone.
+Making sure the branch and its checkout exist is idempotent and cheap once they do — one read of the checkout's branch. A registration left behind by a directory someone deleted by hand is pruned first, so it cannot block the checkout being made again; the prune covers the whole repository, so a stale registration of any other checkout goes with it. Nothing here fails outright: a project this cannot be set up in reports why and is otherwise left alone.
 
 ### One funnel, serialized per branch
 
@@ -70,7 +70,7 @@ Two background jobs write the same files in the same moment. Neither may see, or
 
 #### Business logic
 
-Every write a long-lived process makes goes through one cycle: make sure the branch and its checkout exist, sync with origin, run the operation against the checkout, commit whatever it changed, push. Cycles are serialized per repository and branch, so two of them can never interleave — the eager pull included, since it is the same cycle applying no change.
+Every write a long-lived process makes goes through one cycle: make sure the branch and its checkout exist, sync with origin, run the operation against the checkout, commit whatever it changed, push. Cycles are serialized per repository and branch — the repository as the caller spells its path, so two spellings of one path are two independent chains — so two of them can never interleave — the eager pull included, since it is the same cycle applying no change. Reads are not part of the chain: a read during a cycle may see the operation's files before they are committed, or none at all while a failed cycle is being put back.
 
 A cycle never throws, because its callers run on background ticks with nobody to catch a failure. It reports one of three outcomes: it succeeded, saying whether anything changed and whether the push landed; or it failed with the change committed locally, meaning only the push failed and the next cycle will carry it; or it failed with nothing committed at all.
 
@@ -84,7 +84,7 @@ Another machine pushes to the branch in the instant between this machine's sync 
 
 #### Business logic
 
-The change is expressed as an operation that can be run again, not as a fixed commit. When the push loses the race, the cycle syncs again and runs the operation against the fresher state rather than force-fitting a stale commit — the operation is the intent, the commit is only its serialization. It tries twice; a push that still fails, most likely for want of a network, keeps the commit locally and reports that it did, so the caller knows the change survived even though it is not yet shared.
+The change is expressed as an operation that can be run again, not as a fixed commit. When the push is rejected, for a lost race or any other reason, the cycle syncs again and runs the operation against the fresher state rather than force-fitting a stale commit — the operation is the intent, the commit is only its serialization. It tries twice; a push that still fails, most likely for want of a network, keeps the commit locally and reports that it did, so the caller knows the change survived even though it is not yet shared.
 
 ### A push is owed until it lands
 
@@ -96,7 +96,7 @@ Whenever the local branch holds commits origin does not, the cycle pushes — ev
 
 #### Business logic
 
-Syncing fetches origin's copy of the branch and replays whatever local commits exist on top of it. When that cannot be done cleanly, the checkout is reset to origin's state outright. Nothing is lost by that, because the local intent is re-applied immediately afterwards by the cycle that is running — the whole design rests on the operation being re-runnable.
+Syncing fetches origin's copy of the branch and replays whatever local commits exist on top of it. When that replay fails for any reason — a conflict, or a rebase that cannot start — the checkout is reset to origin's state outright. Nothing is lost by that, because the local intent is re-applied immediately afterwards by the cycle that is running — the whole design rests on the operation being re-runnable.
 
 ### A failed operation leaves nothing half-written
 
@@ -154,9 +154,9 @@ An agent runs a command in its own checkout that has to add to these files. It m
 
 #### Business logic
 
-A detached write fetches origin's tip of the branch, checks it out in a throwaway worktree outside the repository, runs the operation there, commits, pushes straight to the branch, and removes the worktree afterwards — registration and directory both, whether it succeeded or not.
+A detached write fetches origin's tip of the branch, checks it out in a throwaway worktree outside the repository, runs the operation there, commits, pushes straight to the branch, and removes the worktree afterwards — registration and directory both, whether it succeeded or not, pruning the repository's stale worktree registrations with it, whatever branch they were for.
 
-It follows the same intent rule as the funnel: a push that loses a race re-fetches, resets the worktree to origin's tip and runs the operation again, twice in all; a push that still fails is raised with git's own reason. A branch origin does not have yet is born by the write itself, parentless, exactly as it would be locally. An operation that writes nothing commits nothing and reports that it changed nothing. A repository with no remote is refused, and says so as its own outcome rather than as a failure.
+It follows the same intent rule as the funnel: a push that loses a race re-fetches, resets the worktree to origin's tip and runs the operation again, twice in all; a push that still fails is raised with git's own reason, and so is anything else that fails — a worktree that cannot be made, a commit that fails, an operation that throws; only the missing remote is an outcome rather than a failure. A branch origin does not have yet is born by the write itself, parentless, exactly as it would be locally. An operation that writes nothing commits nothing and reports that it changed nothing. A repository with no remote is refused, and says so as its own outcome rather than as a failure.
 
 It never touches the persistent checkout, and it never moves the local branch ref: the machine running a long-lived process converges on its own next pull.
 

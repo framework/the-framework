@@ -37,11 +37,11 @@ A ticket is `tickets/<DATE>_<SLUG>.md`. Its plan is `<DATE>_<SLUG>.plan.md` and 
 
 #### Business logic
 
-A ticket filename is a `.md` name with no path segment at all, and not one of a ticket's own siblings: a relative segment, a nested path, an absolute path and a `.plan.md`/`.lock.md` name are all refused. A ticket path is the same thing spelled out: `tickets/<name>.md`, and nothing else — a segment that climbs out, a deeper nesting, a dotfile, a URL and a non-markdown file all fail it.
+A ticket filename is a `.md` name with no path segment at all, no leading dot, and not one of a ticket's own siblings: a relative segment, a nested path, an absolute path, a dotfile and a `.plan.md`/`.lock.md` name are all refused. A ticket path is the same thing spelled out: `tickets/<name>.md`, and nothing else — a segment that climbs out, a deeper nesting, a dotfile, a URL and a non-markdown file all fail it.
 
 #### Rationale
 
-One gate, used at both ends: what a queue entry is allowed to be read as, and what a caller is allowed to record. A traversal dressed as a markdown link is refused by the same rule that refuses it as a command argument.
+One gate, used at both ends: what a queue entry is allowed to be read as, and what a caller is allowed to record. A traversal dressed as a markdown link is refused by the same rule that refuses it as a command argument. The two spellings refuse the same names, because a command takes either for the same file: a name the bare form accepts and the path form refuses would leave a caller no rule to read off.
 
 ### The ticket a queue entry came from
 

@@ -45,14 +45,15 @@ test('ticketFromQueueEntry reads the ticket a queued entry links back to', () =>
 
 test('only a plain file inside tickets/ counts as a ticket path', () => {
   assert.equal(isTicketPath('tickets/2026-07-25_login.md'), true)
+  // A dot-prefixed name is refused in both spellings: `tickets/.hidden.md` here, `.hidden.md` bare.
   for (const bad of ['tickets/../secrets.md', 'tickets/nested/deep.md', 'tickets/.hidden.md', 'tickets/notes.txt', '/etc/passwd', 'https://example.com/x.md', 'TODO_AGENTS.md', 'tickets/']) {
     assert.equal(isTicketPath(bad), false, `expected ${bad} to be rejected`)
   }
 })
 
-test('a bare ticket filename has no path segments and is not a sibling', () => {
+test('a bare ticket filename has no path segments, no leading dot and is not a sibling', () => {
   assert.equal(isTicketFile('2026-07-25_login.md'), true)
-  for (const bad of ['../login.md', 'sub/login.md', '/etc/passwd.md', '2026-07-25_login.plan.md', '2026-07-25_login.lock.md', 'meta.json']) {
+  for (const bad of ['../login.md', 'sub/login.md', '/etc/passwd.md', '.hidden.md', '2026-07-25_login.plan.md', '2026-07-25_login.lock.md', 'meta.json']) {
     assert.equal(isTicketFile(bad), false, `expected ${bad} to be rejected`)
   }
 })

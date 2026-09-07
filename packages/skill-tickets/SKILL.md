@@ -12,7 +12,7 @@ Read and change them with the `tickets` command, a dependency of this repository
 ## Read
 
 ```
-npx tickets list                 every open ticket, as JSON: file, title, summary, priority, topics,
+npx tickets list                 every open ticket, as one JSON array: file, title, summary, priority, topics,
                                  github, date, planned, effort, uncertainty, locked, lockedBy
                                  (priority, topics, github, effort, uncertainty, locked, lockedBy
                                  absent when unset)
@@ -31,7 +31,8 @@ npx tickets close <file>         once the work is merged: remove the ticket with
                                  `queue done` it
 npx tickets queue add <text> [--priority N] [--ticket <file>]
                                  put an entry on the queue; --priority places it in that section,
-                                 --ticket links it to the ticket and places it by the ticket's
+                                 --ticket makes <text> the label of a link to the ticket (pass the
+                                 label, not a link) and places it by the ticket's
                                  priority (5 when it has none) unless --priority says otherwise;
                                  with neither, it goes at the end of the file
 npx tickets queue done <entry>   remove an entry: one quoted argument, exactly as `npx tickets queue`

@@ -8,6 +8,12 @@ importers:
 
   .:
     devDependencies:
+      '@gemstack/skill-branches':
+        specifier: workspace:*
+        version: link:packages/skill-branches
+      '@gemstack/skill-tickets':
+        specifier: workspace:*
+        version: link:packages/skill-tickets
       typescript:
         specifier: ^7.0.2
         version: 7.0.2

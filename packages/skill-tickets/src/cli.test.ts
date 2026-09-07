@@ -7,6 +7,9 @@ import { nodeGitRunner, DATA_BRANCH } from '@gemstack/agent-data'
 import { runCli, USAGE } from './cli.js'
 
 const git = nodeGitRunner()
+// The command reads AGENT_ID from the real environment, and a daemon sets it for every agent it
+// starts, this test run included: drop it, so only the one test that sets it on purpose sees it.
+delete process.env['AGENT_ID']
 const RETRIED_RM = { recursive: true, force: true, maxRetries: 10 } as const
 
 /** A bare origin with an `agent-data` branch holding two tickets, plus N clones acting as agents. */

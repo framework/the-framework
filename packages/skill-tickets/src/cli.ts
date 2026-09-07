@@ -25,7 +25,7 @@ import { holderOf } from './holder.js'
 
 export const USAGE = `usage: tickets <command>
 
-  list                               every open ticket, as JSON
+  list                               every open ticket, as one JSON array
   show <file>                        one ticket: its text, its plan, who holds it
   queue                              the queue's open entries, in order of work
   queue add <text> [--priority N] [--ticket <file>]

@@ -22,6 +22,8 @@
     "website:test": "cd packages/the-framework.ai/ && echo 'no tests yet'"
   },
   "devDependencies": {
+    "@gemstack/skill-branches": "workspace:*",
+    "@gemstack/skill-tickets": "workspace:*",
     "typescript": "^7.0.2"
   }
 }

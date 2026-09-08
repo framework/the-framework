@@ -52,14 +52,12 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - The lock's existence is the claim: the holder it names decides who may close or release,
   not whether the ticket counts as locked.
 
-## The queue
-- The queue is `@gemstack/skill-queue`'s, not this package's: the package never reads or
-  writes `TODO_AGENTS.md`. A ticket is queued by the caller — the agent through the
-  `queue` skill, the program through that package's functions — as a markdown link to the
-  ticket, the title as its label; the program reads the link back to claim the ticket for
-  the agent it starts. The entry takes the ticket's priority; a ticket whose `Priority:`
-  is missing or unreadable counts as 5, never 10 or 0: those ends (act immediately, only
-  if capacity) are deliberate picks.
+## Flow: queueing a ticket
+- The package never reads or writes the queue. A ticket is queued by the caller as a
+  markdown link to the ticket, the title as its label; the program reads the link back to
+  claim the ticket for the agent it starts. The entry takes the ticket's priority; a
+  ticket whose `Priority:` is missing or unreadable counts as 5, never 10 or 0: those ends
+  (act immediately, only if capacity) are deliberate picks.
 
 ## Flow: the command
 - Every command names a ticket by its bare filename or its `tickets/<file>` path, so a

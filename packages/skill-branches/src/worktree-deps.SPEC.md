@@ -39,7 +39,7 @@ See `## User story`: an agent's install must stay in the agent's checkout.
 
 #### Business logic
 
-The worktree's dependency directory is a directory of its own, not a link to the parent's. When an agent installs in its worktree — which an agent that changes a dependency must — the package manager rewrites the entries of the worktree's directory and leaves the parent checkout's untouched. After the worktree is removed, the parent checkout's dependencies are exactly as they were.
+The worktree's dependency directory is a directory of its own, not a link to the parent's. When an agent installs in its worktree — which an agent that changes a dependency must — the package manager rewrites the entries of the worktree's directory and leaves the parent checkout's untouched — except inside a scope directory or `.bin`, which are single linked entries, so a package added under a scope or a bin shim lands in the parent's copy. After the worktree is removed, the parent checkout's dependencies are exactly as they were.
 
 The package manager's private state — every dot-entry of a dependency directory except the executables directory — is not linked. The executables directory is, because an agent runs the project's tools.
 

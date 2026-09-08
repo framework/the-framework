@@ -1,5 +1,6 @@
 Non-obvious decisions only, grouped by business-logic flow. Anything not listed is left
-to the implementer's judgment. Flag conflicts instead of silently deviating.
+to the implementer's judgment. Flag conflicts instead of silently deviating. Keep
+outdated decisions (no history).
 
 A bullet is a person's pick, and says what it was picked over. What the code does belongs
 in SPEC.md; a choice made while implementing is the implementer's judgment, not a
@@ -15,25 +16,29 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   `.gitignore` is tracked.
 - A checkout starts as branch `agent-<id>` in folder `.branches/agent-<id>/`; `<id>` comes
   from the program that starts the agent, and must match `[A-Za-z0-9_-]+`, so no id can
-  build a path outside `.branches/`. `npx branches name <name>` (`[a-z0-9-]+`) renames the
-  branch to `agent-<name>`: a rename, not a new branch, so nothing is left behind; the
-  folder keeps the id, since the agent is running inside it. A checkout on no branch is
-  neither renamed nor reclaimed; `status` answers it without a `branch`.
+  build a path outside `.branches/`. `npx branches name <name>` (`[a-z0-9-]+`; the skill
+  asks for a leading letter or digit: at the command line a leading `-` reads as a flag, a
+  usage error, and the name check itself does not mind it) renames the branch to
+  `agent-<name>`: a rename, not a new branch, so nothing is left behind; the folder keeps
+  the id, since the agent is running inside it. A checkout on no branch is neither renamed
+  nor reclaimed; `status` answers it without a `branch`.
 - After a checkout is made, named or removed, each checkout whose branch differs from its
   folder name gets a sibling link `.branches/<branch>` to its folder, relative; a detached
   checkout or a slashed branch gets none. A link whose target is an `agent-*` name,
-  `agent-data` aside, is the package's to remove, whatever it is called, and whether or
-  not the target exists; anything else at a link's path is left alone.
+  `agent-data` aside, is the package's to remove, whatever the link's own name, and
+  whether or not the target exists; anything else at a link's path is left alone.
 - No name the package mints holds a `/`: a folder and a link are named after a branch, and
   a cloud session (a hosted agent run, started on a branch) cannot start on a slashed ref.
-  The package renames and deletes only `agent-*` branches.
+  The package renames and deletes only `agent-*` branches. `attach` takes the caller's
+  branch as given, slash or not.
 - `agent-data` is `@gemstack/agent-data`'s data branch, checked out as
-  `.branches/agent-data` by the program that keeps it, not by this package. Never listed,
-  renamed or deleted; `data` is refused as an id, and an agent naming itself `data` gets
-  `agent-data-2`.
+  `.branches/agent-data` by the program that keeps that branch checked out (a daemon), not
+  by this package. Never listed, renamed or deleted; `data` is refused as an id, and an
+  agent naming itself `data` gets `agent-data-2`.
 - A taken name gets `-2`, `-3`, … instead of a refusal: the agent asked for a name and
   reads back the one it got. Taken means any local or remote-tracking branch, so the later
-  push cannot land on someone else's branch.
+  push cannot land on someone else's branch. The branch the checkout carries right now,
+  suffix included, is not counted.
 - Continuing an agent puts it back on the branch its work is on, even one the package did
   not make; a branch gone locally comes back from origin's copy, and one gone everywhere
   is recreated from the project's head: every branch the package deletes held nothing the
@@ -41,9 +46,12 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - The user's installed dependencies are linked into the checkout, not copied or
   reinstalled: one link per entry of the folder, absolute, so an install in the checkout
   writes into the checkout (a scope like `@acme` is one entry, so a scoped install still
-  writes into the user's folder: a known limit). Of the dot-entries only `.bin` is linked,
-  so the agent runs the project's tools; the others (`.pnpm`, `.modules.yaml`) would tell
-  the package manager the checkout's tree was installed there, which it was not.
+  writes into the user's folder: a known limit). Every dependency folder down to two
+  levels under the root is linked, so a workspace package's own dependencies are there
+  too. Of the dot-entries only `.bin` is linked, so the agent runs the project's tools, as
+  one entry, so a bin an install adds lands in the user's folder too; the others (`.pnpm`,
+  `.modules.yaml`) would tell the package manager the checkout's tree was installed there,
+  which it was not.
 - Everything after the worktree is best-effort: a checkout missing any of it is a worse
   run, not a failed one.
 
@@ -97,7 +105,8 @@ push.
   reason `git-failed`, the error's own line as `detail` on stdout and on stderr.
 - `create`, `attach`, `list`, `remove` and `prune` act on the project, found from the
   `.branches/` layout even from inside a checkout; `name` and `status` act on the checkout
-  the command runs in, found from anywhere inside it.
+  the command runs in, found from anywhere inside it; `status` also takes the path of a
+  checkout root.
 - `list` answers with a bare JSON array; every other result and every refusal is an object
   whose `ok` tells the two apart.
 - Outside a repository, a command that needs one refuses with `not-a-repo`: only git's own

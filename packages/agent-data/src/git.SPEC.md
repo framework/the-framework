@@ -3,7 +3,7 @@ Running git on a caller's behalf: every command gets a time budget matched to it
 ## Business logic — TL;DR
 
 - **Every git command gets a time budget matched to its cost** - reads get the shortest budget, ordinary local mutations a longer one, and anything touching the network or writing a whole checkout the longest.
-- **A timeout is not a git failure** - a command killed for outrunning its budget is reported as a timeout, recognisable across package boundaries, so a caller can clean up after an interrupted checkout creation without mistaking git's own refusals for one.
+- **A timeout is not a git failure** - a command killed for outrunning its budget is reported as a timeout, recognisable across package boundaries, so a caller can clean up after an interrupted checkout creation without mistaking git's own refusals for one. A command whose output exceeds 16 MB is killed too, but reported as a plain failure, not a timeout.
 - **"Not a repo" is distinguishable from "git failed"** - a directory can be asked whether it sits inside a git working tree; anything unreadable reads as "not a repo".
 - **The checkout from anywhere inside** - from any directory in a repo, the root of the checkout it is in can be read.
 - **The line worth showing** - a failed invocation is reduced to git's own `fatal:` / `error:` / `remote:` line when there is one, else its first line.
@@ -26,6 +26,8 @@ Each git invocation is classified by its subcommand, ignoring any leading global
 - Everything else is treated as a local mutation and gets an intermediate budget, because writing the index on a large repo outlasts reading it.
 
 Removing or pruning worktrees counts as an ordinary local mutation; listing them counts as a read.
+
+Every invocation's output is capped at 16 MB, enough for a large checkout's file listing; a command that exceeds it is killed and reported as a plain failure, never as a timeout.
 
 #### Rationale
 

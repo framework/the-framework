@@ -1,5 +1,6 @@
 Non-obvious decisions only, grouped by business-logic flow. Anything not listed is left
-to the implementer's judgment. Flag conflicts instead of silently deviating.
+to the implementer's judgment. Flag conflicts instead of silently deviating. Keep
+outdated decisions (no history).
 
 A bullet is a person's pick, and says what it was picked over. What the code does belongs
 in SPEC.md; a choice made while implementing is the implementer's judgment, not a
@@ -7,9 +8,9 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 
 ## The tickets
 - Two callers: the command an agent runs, and a long-lived program that keeps the branch
-  checked out, starts agents through the library, and imports issues with its own code,
-  stamping `meta.json`. The executable is `tickets`. The package ships `SKILL.md`, the
-  agent's instructions.
+  checked out, starts agents through this package's functions, and imports issues with its
+  own code, stamping `meta.json`. The executable is `tickets`. The package ships
+  `SKILL.md`, the agent's instructions.
 - A ticket is a markdown file in `tickets/`. Its plan and its claim sit beside it:
   `<name>.plan.md` and `<name>.lock.md`, `<name>` the filename without `.md`.
 - Tickets live on `agent-data`, the branch `@gemstack/agent-data` names, never on a code
@@ -23,7 +24,7 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   linking it stays until `queue done`.
 - A ticket's row, the same fields in `list` and `show`: the title from its `# ` line, the
   summary from the first prose line after `## TLDR`, else after the title, scanning past
-  headings to the end of the file, `Priority:` verbatim.
+  headings, `Priority:` lowercased.
 
 ## Flow: a claim
 - A claim is a committed file holding one line, `CLAIMED: <who>`, so agents on other
@@ -35,7 +36,7 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - A lock is written only by a claim; someone else's `claim` is refused while it exists.
   `put` ignores it, so an import can refresh a ticket someone holds.
 - A claim the program committed but could not push still counts: the commit already guards
-  this machine's readers, and the gap is logged. A cycle that could not commit claims
+  this machine's readers, and the gap is logged. A write that could not commit claims
   nothing. The program's release is judged the same way: committed counts, pushed or not.
   A queue edit is not: it counts only once pushed.
 - Claiming a ticket you already hold succeeds and writes nothing, so a re-run does not
@@ -70,8 +71,8 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 ## Flow: the command
 - Every command names a ticket by its bare filename or its `tickets/<file>` path, so a
   queue entry's link target can be pasted in as is; a sibling's name (`.plan.md`,
-  `.lock.md`) is `invalid-path` to every command, `put` taking `.plan.md` the one
-  exception.
+  `.lock.md`) is `invalid-path` to every command, `put` taking `.plan.md` and `meta.json`
+  the exceptions.
 - No command reads `meta.json`: only the importing program does, for its one key
   `lastImportedAt`.
 - A read fetches origin once and reads everything from that copy (the library's queue read

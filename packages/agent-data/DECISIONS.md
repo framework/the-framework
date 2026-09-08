@@ -1,5 +1,6 @@
 Non-obvious decisions only, grouped by business-logic flow. Anything not listed is left
-to the implementer's judgment. Flag conflicts instead of silently deviating.
+to the implementer's judgment. Flag conflicts instead of silently deviating. Keep
+outdated decisions (no history).
 
 A bullet is a person's pick, and says what it was picked over. What the code does belongs
 in SPEC.md; a choice made while implementing is the implementer's judgment, not a
@@ -10,22 +11,23 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   import each other.
 - Named for the `agent-data` branch, but no function hardcodes it: every one that touches
   a branch takes it as an argument.
-- `.branches/<branch>` holds a project's persistent checkouts, one per branch: the agents'
-  own (made by other packages) and the data branch's (made here). The directory name is
-  exported. Dotted so a `*` glob skips it: each checkout is a full copy, so a tool that
-  descends does N times the work.
-- Hidden through the common git dir's `info/exclude`, never a committed `.gitignore`: the
-  library must not touch tracked files; a per-worktree `info/exclude` is never read, and
-  one line there, written once, covers every checkout. Best-effort: the checkout stands
-  even when the rule could not be written.
-- Every git call has a time budget; a call that outruns it fails as a timeout, its own
-  error kind, never as a plain failure: a killed `push` may have half landed.
+- `.branches/` holds a project's persistent checkouts, one per branch at
+  `.branches/<branch>`: the agents' own (made by other packages) and the data branch's
+  (made here). The directory name is exported. Dotted so a `*` glob skips it: each
+  checkout is a full copy, so a tool that descends does N times the work.
+- `.branches/` is hidden through the common git dir's `info/exclude`, never a committed
+  `.gitignore`: the library must not touch tracked files; a per-worktree `info/exclude` is
+  never read, and one line there, written once, covers every checkout. Best-effort: the
+  checkout stands even when the rule could not be written.
+- Every git call through the package's own runner has a time budget; a call that outruns
+  it fails as a timeout, its own error kind, never as a plain failure: a killed `push` may
+  have half landed.
 
 ## The branch
 - A branch of the project's repository holds the agents' data (tickets, the queue) the way
   `gh-pages` holds a site; code branches hold only code. Every write that changes
-  something pushes, and a pull is a cycle of its own, so a machine that writes nothing
-  still gets what the others pushed.
+  something pushes when there is a remote, and a pull is a cycle of its own, so a machine
+  that writes nothing still gets what the others pushed.
 - One branch for all skills, each with its own folder or file. Not one per skill: every
   extra branch needs its own checkout and its own sync failure to report.
 - Missing locally, it is adopted from origin's copy; missing there too, it is born an
@@ -52,17 +54,18 @@ Fetch what others pushed → make the change → commit → push.
   resets it, new files included. Both try the push twice; the command's write then throws
   with nothing left to retry, the process's never throws: its callers are background
   ticks.
-- A write is a re-runnable function, not a finished commit: a lost race winds the
-  attempt's commit back and runs the function again on the new files, so the change lands
-  once. The message is the caller's: fixed, or a function run after the change, since a
-  batch only knows what it did once done. Never a force push. After two failed pushes the
-  process's write reports the failure and the commit stays local in its checkout; the next
-  write or pull rebases it onto the remote and pushes it with the new one. When that
-  rebase conflicts the checkout is reset to origin's tip: the remote wins, every unpushed
-  commit is dropped unreported, only the current change runs again.
-- An op is handed a directory and writes into it. Parent directories are created: git
-  keeps no empty directory, so a skill's folder vanishes with its last file and is absent
-  on a new branch.
+- A write is a re-runnable function, not a finished commit: a push that fails, a lost race
+  or anything else, winds the attempt's commit back and runs the function again on the new
+  files, so the change lands once. The message is the caller's: fixed, or a function run
+  after the change, since a batch only knows what it did once done; the library's own are
+  `create the <branch> branch` for the birth and `sync` for the pull. Never a force push.
+  After two failed pushes the process's write reports the failure and the commit stays
+  local in its checkout; the next write or pull rebases it onto the remote and pushes it
+  with the new one. When that rebase fails, a conflict or anything else, the checkout is
+  reset to origin's tip: the remote wins, every unpushed commit is dropped unreported,
+  only the current change runs again.
+- An op is handed a directory and writes into it; git keeps no empty directory, so a
+  skill's folder vanishes with its last file and is absent on a new branch.
 - The remote is always `origin`; a repository without one is remote-less whatever other
   remotes it has. Then the process's write commits locally and reports no error, a
   command's write refuses (an outcome, not a throw), and the pull reports an error:

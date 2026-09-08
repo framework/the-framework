@@ -37,7 +37,7 @@ See `## User story`.
 - `put <file>` - writes one file under `tickets/` from standard input: a ticket, its `.plan.md`, or `meta.json`, named bare or as its `tickets/…` path like every other command's argument. Anything else — a `.lock.md`, a path with segments, a non-markdown name — is refused. Claims are never written this way; they go through `claim`.
 - `close <file>` - removes a ticket together with its plan and its claim, because `tickets/` holds only open tickets. A ticket that is not there is refused; so is a ticket someone else holds, naming the holder — closing would take their claim with the ticket.
 - `claim <file>` - claims a ticket for the holder the working directory names, before planning or working it. A ticket that does not exist is refused; a ticket someone else holds is refused *and told who holds it* (when the lock names anyone readable), so the agent can back off and pick another. A claim naming this very holder again still counts as claimed, so an agent that re-runs the command after a lost race is not confused by its own lock.
-- `release <file>` - lifts the caller's own claim. A ticket with no claim, and a claim belonging to someone else, are both refused — the second naming the holder it belongs to.
+- `release <file>` - lifts the caller's own claim. A ticket with no claim, and a claim belonging to someone else, are both refused — the second naming the holder it belongs to. `release` never reads the ticket itself, so a name no ticket has is refused as unclaimed, not as missing.
 
 A ticket is named either by its bare filename or by its `tickets/<file>` path; anything that is neither is refused before anything is read.
 
@@ -83,7 +83,7 @@ An agent claims a ticket without ever having been told an identity.
 
 #### Business logic
 
-`claim` and `release` name the holder the environment and the working directory say they are (`holder`): `AGENT_ID` when the process that started the agent set it, else the current branch name. A checkout on no branch is refused as `no-identity` — there is nothing to claim as.
+`claim`, `release` and `close` name the holder the environment and the working directory say they are (`holder`): `AGENT_ID` when the process that started the agent set it, else the current branch name. A checkout on no branch is refused as `no-identity` — there is nothing to claim as, and `close` cannot tell its own claim from someone else's.
 
 ## Before modifying/creating SPEC.md files
 

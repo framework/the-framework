@@ -26,13 +26,13 @@ npx tickets put <file>           write one file under tickets/ from stdin, the w
                                  empty stdin writes an empty file
                                  (npx tickets put <file> < draft.md): a ticket or a plan
 npx tickets close <file>         once the work is merged: remove the ticket with its plan and lock;
-                                 refused while someone else holds it; its queue entry stays,
-                                 `npx queue done` it
+                                 refused while someone else holds it; its queue entry, if any,
+                                 stays: `npx queue done` it
 ```
 
 ## Queue a ticket
 
-The agent queue is the `queue` skill's. A ticket goes on it as a link, its title as the label, at the ticket's own `Priority:` (5 when it has none):
+When the repository has the `queue` skill, a ticket goes on the agent queue as a link, its title as the label, at the ticket's own `Priority:` (5 when it has none):
 
 ```
 npx queue add "[<title>](tickets/<file>)" --priority <N>

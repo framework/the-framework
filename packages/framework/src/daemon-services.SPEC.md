@@ -41,7 +41,7 @@ The job list and its cadences:
 
 - **worktree sweep**, every ten minutes — reclaims the checkout of an agent whose work has reached the remote; the branch and the agent's record are kept, so this frees disk rather than discarding work. It is the retry for a push that could not land at teardown.
 - **branches view**, every ten minutes — keeps one symlink per checkout under `.branches/`, named after its branch.
-- **data sync**, every other tick — converges each project's two branches with origin: first the `agent-data` branch, which the `tickets` skill sets up as well as pulls (its checkout, the queue file, the repository-root link to the tickets), then the `agents-logs` branch. This machine ends up seeing what other machines and cloud sessions pushed, and anything a failed write cycle left local is carried out.
+- **data sync**, every other tick — converges each project's two branches with origin: first the `agent-data` branch, which the `tickets` skill sets up as well as pulls (its checkout, the repository-root link to the tickets) and the `queue` skill then seeds and pulls (the queue file), then the `agents-logs` branch. This machine ends up seeing what other machines and cloud sessions pushed, and anything a failed write cycle left local is carried out.
 - **CI watch**, every other tick — roughly a minute, which is the latency chosen for noticing a check result.
 - **Discord watchers**, every other tick.
 - **Auto PM**, every ten minutes.

@@ -6,6 +6,7 @@ import { agentIdFromStartedAt, startedAtFromAgentId, archiveWorktreeAgent, resto
 import { isGitRepo, nodeGitRunner, isGitTimeout, withFileBranch } from '@gemstack/agent-data'
 import { createCheckout, attachCheckout, agentBranchName, worktreePath, worktreeBranch, removeWorktree, pruneWorktrees, agentIdFromWorktreeDir, CLI_BIN_DIR as BRANCHES_BIN_DIR } from '@gemstack/skill-branches'
 import { isTicketPath, CLI_BIN_DIR as TICKETS_BIN_DIR, SKILL_DIR as TICKETS_SKILL_DIR, SKILL_NAME as TICKETS_SKILL_NAME, AGENT_ID_ENV } from '@gemstack/skill-tickets'
+import { CLI_BIN_DIR as QUEUE_BIN_DIR, SKILL_DIR as QUEUE_SKILL_DIR, SKILL_NAME as QUEUE_SKILL_NAME } from '@gemstack/skill-queue'
 import { LOGS_BRANCH, THE_FRAMEWORK_DIR } from './framework-dir.js'
 import type { FrameworkEvent } from './events.js'
 import { removeAgentSpec, writeAgentSpec } from './agent-spec.js'
@@ -106,23 +107,26 @@ function spawnDetached(binPath: string, specPath: string, stderrFile?: string, e
 }
 
 /**
- * A spawned run's environment: ours, with the `branches` and `tickets` commands on its PATH
- * (#1725/#1748) — the agent names its session, checks its tree, and reads and changes the tickets
- * through the same packages the daemon does — its id as `AGENT_ID`, so a claim it makes names the
- * agent and not its branch, plus the daemon's URL when it has one (#1328).
+ * A spawned run's environment: ours, with the `branches`, `tickets` and `queue` commands on its
+ * PATH (#1725/#1748) — the agent names its session, checks its tree, and reads and changes the
+ * tickets and the queue through the same packages the daemon does — its id as `AGENT_ID`, so a
+ * claim it makes names the agent and not its branch, plus the daemon's URL when it has one (#1328).
  */
 function childEnv(daemonUrl: string | undefined, agentId: string | undefined, base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = { ...base, PATH: [BRANCHES_BIN_DIR, TICKETS_BIN_DIR, base['PATH']].filter(Boolean).join(delimiter) }
+  const env: NodeJS.ProcessEnv = { ...base, PATH: [BRANCHES_BIN_DIR, TICKETS_BIN_DIR, QUEUE_BIN_DIR, base['PATH']].filter(Boolean).join(delimiter) }
   if (agentId) env[AGENT_ID_ENV] = agentId
   return daemonUrl ? { ...env, [DAEMON_URL_ENV]: daemonUrl } : env
 }
 
 /**
- * TEMPORARY (#1748): the `tickets` skill linked into every checkout beside the `branches` skill,
- * through the branches package's caller-given list. Gone when use-npm-skills commits the skills
- * into the repository, where a checkout carries them as tracked files.
+ * TEMPORARY (#1748): the `tickets` and `queue` skills linked into every checkout beside the
+ * `branches` skill, through the branches package's caller-given list. Gone when use-npm-skills
+ * commits the skills into the repository, where a checkout carries them as tracked files.
  */
-const CHECKOUT_SKILLS = [{ name: TICKETS_SKILL_NAME, dir: TICKETS_SKILL_DIR }]
+const CHECKOUT_SKILLS = [
+  { name: TICKETS_SKILL_NAME, dir: TICKETS_SKILL_DIR },
+  { name: QUEUE_SKILL_NAME, dir: QUEUE_SKILL_DIR },
+]
 
 /** Where a spawned agent's stderr lands (#1261), so a child that dies at boot leaves a trace. */
 export function agentStderrPath(cwd: string): string {

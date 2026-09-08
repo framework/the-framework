@@ -1,4 +1,4 @@
-The triage-quick preset: fills the agent queue with the cheap, decision-free work. The agent lists the tickets with the `tickets` skill and picks only those whose plan shows a quick win — a low effort rating with an uncertainty of zero — then puts them on the agent queue (`TODO_AGENTS.md`), one entry each, linked to its ticket and given a priority.
+The triage-quick preset: fills the agent queue with the cheap, decision-free work. The agent lists the tickets with the `tickets` skill and picks only those whose plan shows a quick win — a low effort rating with an uncertainty of zero — then puts them on the agent queue (`TODO_AGENTS.md`) with the `queue` skill's command, one entry each, written as a link to its ticket and given a priority.
 
 ## Business logic — TL;DR
 

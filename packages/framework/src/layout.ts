@@ -1,7 +1,8 @@
 import { join } from 'node:path'
 import { LOGS_BRANCH, THE_FRAMEWORK_DIR } from './framework-dir.js'
 import { ARCHIVE_DIR, EVENTS_FILE, META_FILE, nodeStoreFs, type StoreFs } from './store/index.js'
-import { QUEUE_FILE, TICKETS_DIR } from '@gemstack/skill-tickets/names'
+import { TICKETS_DIR } from '@gemstack/skill-tickets/names'
+import { QUEUE_FILE } from '@gemstack/skill-queue/names'
 import { DATA_BRANCH } from '@gemstack/agent-data/names'
 
 /**

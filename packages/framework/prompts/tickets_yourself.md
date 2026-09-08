@@ -1,6 +1,6 @@
-# Tickets and the agent queue, without the command
+# Tickets and the agent queue, without the commands
 
-The `tickets` command is not available here. The tickets and the queue described below live on the branch `agent-data` of this repository; do with git what the command would do:
+The `tickets` and `queue` commands are not available here. The tickets and the queue described below live on the branch `agent-data` of this repository; do with git what the commands would do:
 
 - Read: `git fetch origin agent-data`, then `git show origin/agent-data:<FILE>` (e.g. `origin/agent-data:TODO_AGENTS.md`, `origin/agent-data:tickets/<DATE>_<SLUG>.md`).
 - Write, only when your instructions say to change tickets or the queue: commit the change on a checkout of `origin/agent-data` (`git worktree add --detach <dir> origin/agent-data`) and push it straight to the branch (`git push origin HEAD:refs/heads/agent-data`); on a rejected push, fetch, rebase and push again. Never switch your own checkout to the branch, and never put these files on your own branch.

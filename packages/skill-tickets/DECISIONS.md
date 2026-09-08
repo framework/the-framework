@@ -53,20 +53,13 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   not whether the ticket counts as locked.
 
 ## The queue
-- The queue is one markdown file on the branch, `TODO_AGENTS.md`: sections `## Priority
-  10` down to `## Priority 0`, any `## Priority N` counts, in any case; any `-`, `*` or
-  `N.` list item with text is an entry, wherever it sits. Entries are placed to keep the
-  file sorted high to low; nothing re-sorts on read.
-- An entry is plain trimmed text: the task a future agent is started with. `--ticket`
-  writes the entry as a markdown link to the ticket, the given text as its label; the
-  program reads the link back to claim the ticket for the agent it starts.
-- `queue add` creates the queue file when the branch has none. An entry with no priority
-  goes at the end of the file, in whatever section ends it; one linked to a ticket takes
-  the ticket's priority unless `--priority` was given; a ticket whose `Priority:` is
-  missing or unreadable counts as 5, never 10 or 0: those ends (act immediately, only if
-  capacity) are deliberate picks.
-- Done means deleted, never checked off: a `- [x]` or `- [X]` line is not an open entry; a
-  `- [ ]` line is, printed without its box and deleted whole.
+- The queue is `@gemstack/skill-queue`'s, not this package's: the package never reads or
+  writes `TODO_AGENTS.md`. A ticket is queued by the caller — the agent through the
+  `queue` skill, the program through that package's functions — as a markdown link to the
+  ticket, the title as its label; the program reads the link back to claim the ticket for
+  the agent it starts. The entry takes the ticket's priority; a ticket whose `Priority:`
+  is missing or unreadable counts as 5, never 10 or 0: those ends (act immediately, only
+  if capacity) are deliberate picks.
 
 ## Flow: the command
 - Every command names a ticket by its bare filename or its `tickets/<file>` path, so a
@@ -75,23 +68,18 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   the exceptions.
 - No command reads `meta.json`: only the importing program does, for its one key
   `lastImportedAt`.
-- A read fetches origin once and reads everything from that copy (the library's queue read
-  fetches only when asked): only origin has every writer's pushes, this command's own
-  included. With no origin the local branch is read: writes are refused there, so nobody
-  else can have moved it.
+- A read fetches origin once and reads everything from that copy: only origin has every
+  writer's pushes, this command's own included. With no origin the local branch is read:
+  writes are refused there, so nobody else can have moved it.
 - Every command that runs prints one JSON document, the result or the refusal. A refusal
   also puts one line on stderr and exits 1. A malformed command line (an unknown flag, the
-  wrong argument count, an empty `queue add` text, a `--priority` off the 0-10 scale) is
-  rejected first: the usage on stderr, nothing on stdout, exit 2. A file no command may
-  touch refuses with `invalid-path`. Anything a command throws refuses with `git-failed`.
-  Outside a repository a command refuses `not-a-repo`; only git's own "not a git
-  repository" reads as that.
-- `list` and a bare `queue` answer with a JSON array; every other result and every refusal
-  is an object with `ok`.
+  wrong argument count) is rejected first: the usage on stderr, nothing on stdout, exit 2.
+  A file no command may touch refuses with `invalid-path`. Anything a command throws
+  refuses with `git-failed`. Outside a repository a command refuses `not-a-repo`; only
+  git's own "not a git repository" reads as that.
+- `list` answers with a JSON array; every other result and every refusal is an object with
+  `ok`.
 - The command's write is one commit per command, pushed straight to origin through a
   throwaway worktree at origin's tip; a push that loses a race is re-applied on the new
   tip by `@gemstack/agent-data`. The program's writes go through its persistent checkout's
-  cycle instead; its `queue done` of an entry already gone succeeds, changing nothing.
-- `queue done` takes the entry as `queue` printed it, trimmed, removes the first such
-  line, and refuses a line the queue does not have, an empty one included, decided inside
-  the write.
+  cycle instead.

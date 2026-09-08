@@ -1,4 +1,4 @@
-The backlog loop: once an agent's main work settles, it consumes the agent queue one entry per turn until the queue is empty — the framework drives (read the next entry, gate, prompt, take the entry off the queue, repeat). The queue itself is the `tickets` skill's: it lives on the project's `agent-data` branch, and the framework reads and changes it only through that skill, holding no copy of it and editing no file of its own.
+The backlog loop: once an agent's main work settles, it consumes the agent queue one entry per turn until the queue is empty — the framework drives (read the next entry, gate, prompt, take the entry off the queue, repeat). The queue itself is the `queue` skill's: it lives on the project's `agent-data` branch, and the framework reads and changes it only through that skill, holding no copy of it and editing no file of its own; which ticket an entry links to is the `tickets` skill's rule.
 
 ## User story
 
@@ -8,7 +8,7 @@ The backlog loop: once an agent's main work settles, it consumes the agent queue
 
 ## Glossary
 
-- **open entry** — an entry the queue still lists as work. What counts as one, and in what order entries come back, is the `tickets` skill's rule.
+- **open entry** — an entry the queue still lists as work. What counts as one, and in what order entries come back, is the `queue` skill's rule.
 
 ## Business logic — TL;DR
 

@@ -38,7 +38,7 @@ Whatever the framework's own CLI entry is, the agent is spawned from it. The dae
 
 The spawned agent's error output is written to a file inside its checkout instead of being discarded, so an agent that dies at boot leaves a trace to read.
 
-The spawned agent's environment is the daemon's own, with the `branches` and `tickets` commands first on its PATH — the agent names its session, checks its tree, and reads and changes the tickets and the queue through the same packages the daemon does — plus the daemon's address, when the daemon has one: a web run uses it to ask this daemon for a cloud session created by the browser extension. A run nobody's daemon spawned has no such address, and a web run among them stops saying web runs start from the dashboard.
+The spawned agent's environment is the daemon's own, with the `branches`, `tickets` and `queue` commands first on its PATH — the agent names its session, checks its tree, and reads and changes the tickets and the queue through the same packages the daemon does — plus the daemon's address, when the daemon has one: a web run uses it to ask this daemon for a cloud session created by the browser extension. A run nobody's daemon spawned has no such address, and a web run among them stops saying web runs start from the dashboard.
 
 ### Every agent gets its own checkout
 
@@ -50,7 +50,7 @@ The user runs several agents on the same project at once, and keeps working in t
 
 Each agent is given its own git worktree under the project's `.branches/`, on its own `agent-<agent id>` branch. Concurrent agents on one project therefore never fight over a working tree, and the user's own checkout — uncommitted work included — is left untouched.
 
-A fresh worktree has no installed dependencies, since those are not tracked by git, so the project's are mirrored in (the `skill-branches` package's dependency linking). The `tickets` skill is linked into every checkout the daemon creates or re-attaches, where the agent's harness looks for skills — a temporary arrangement, until skills are committed into the repository itself and every checkout carries them as tracked files.
+A fresh worktree has no installed dependencies, since those are not tracked by git, so the project's are mirrored in (the `skill-branches` package's dependency linking). The `tickets` and `queue` skills are linked into every checkout the daemon creates or re-attaches, where the agent's harness looks for skills — a temporary arrangement, until skills are committed into the repository itself and every checkout carries them as tracked files.
 
 #### Rationale
 

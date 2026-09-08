@@ -1,6 +1,6 @@
 import { readFile, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { QUEUE_FILE, readQueue } from '@gemstack/skill-tickets'
+import { QUEUE_FILE, readQueue } from '@gemstack/skill-queue'
 
 /**
  * The plan/backlog document categories the dashboard surfaces in its sidebar

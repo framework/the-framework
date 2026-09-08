@@ -1,7 +1,8 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { DriverSession } from 'agent-driver'
-import { parseQueueEntries, queueDone, readQueueEntries, ticketFromQueueEntry } from '@gemstack/skill-tickets'
+import { parseQueueEntries, queueDone, readQueueEntries } from '@gemstack/skill-queue'
+import { ticketFromQueueEntry } from '@gemstack/skill-tickets'
 import type { ChoicePick, ChoiceRequest, FrameworkEvent } from './events.js'
 import { requestChoices, runAwaitRounds } from './await-gate.js'
 import { drainsQueue } from './preset-catalog.js'
@@ -16,8 +17,9 @@ import { createTurnSignalEmitter } from './turn-gate.js'
  * issue: stop when the queue is empty. The dashboard's autopilot auto-accepts the per-item gate,
  * so `[x] autopilot` consumes the whole queue unattended; autopilot off pauses before each entry.
  *
- * The queue is the `tickets` skill's (#1748): it lives on the `agent-data` branch, read and changed
- * through the skill's library — the framework holds no copy and edits no file of its own.
+ * The queue is the `queue` skill's (#1748): it lives on the `agent-data` branch, read and changed
+ * through the skill's library — the framework holds no copy and edits no file of its own. Which
+ * ticket an entry links to is the `tickets` skill's rule.
  */
 
 /**

@@ -1,7 +1,7 @@
 {
   "name": "@gemstack/skill-tickets",
   "version": "0.0.1",
-  "description": "Tickets and the agent queue for coding agents: markdown tickets with their plans and claims, and the priority-banded queue of what agents work on next, kept on a branch of the project's repository and changed with the tickets command.",
+  "description": "Tickets for coding agents: markdown tickets with their plans and claims, kept on a branch of the project's repository and changed with the tickets command.",
   "license": "MIT",
   "repository": {
     "type": "git",

@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { BRANCHES_DIR, DATA_BRANCH, excludeFromGit, fileBranchPath, nodeBranchFileFs, nodeGitRunner, pullFileBranch, withFileBranch, type BranchFileFs, type CommitMessage, type FileBranchSync, type FileBranchWrite, type GitRunner } from '@gemstack/agent-data'
-import { QUEUE_FILE, TICKETS_DIR } from './names.js'
+import { TICKETS_DIR } from './names.js'
 
 // Where the tickets live, bound to the branch: the `agent-data` branch of the project's repository,
 // checked out under `.branches/agent-data` for a long-lived process, with a `tickets` link at the
@@ -63,11 +63,10 @@ function nodeLinkFs(): LinkFs {
 }
 
 /**
- * Bring a long-lived process's view of the branch up to date: the branch and its persistent
- * checkout exist, the queue file is seeded on a branch born empty (so readers and people find a
- * file, not a mystery), the repository root links `tickets` into the checkout, and the checkout
- * converges with origin — reading what other machines and cloud sessions pushed, and pushing
- * anything an earlier cycle left stranded. Reports why it could not converge; never throws.
+ * Bring a long-lived process's view of the branch up to date: the repository root links
+ * `tickets` into the checkout, and the branch and its persistent checkout exist and converge with
+ * origin — reading what other machines and cloud sessions pushed, and pushing anything an earlier
+ * cycle left stranded. Reports why it could not converge; never throws.
  *
  * The root link is created only over nothing — a real `tickets/` directory or a file of the
  * user's own is theirs — and hidden from git the moment it is made, as an uncommitted entry at
@@ -83,11 +82,6 @@ export async function syncTickets(
 ): Promise<FileBranchSync> {
   const r = resolveTicketDeps(deps)
   const git = deps.git ?? nodeGitRunner()
-  const seeded = await r.funnel(root, 'seed the queue', async dir => {
-    const queue = join(dir, QUEUE_FILE)
-    if (!(await r.read(queue).then(() => true, () => false))) await r.write(queue, '')
-  })
-  if (!seeded.ok && !seeded.committed) return { ok: false, error: seeded.error }
   const linkFs = deps.linkFs ?? nodeLinkFs()
   const rootLink = join(root, TICKETS_DIR)
   if (!(await linkFs.lexists(rootLink))) {

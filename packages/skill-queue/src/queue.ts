@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 import { fileBranchRepo, readBranchFile, DATA_BRANCH } from '@gemstack/agent-data'
 import { QUEUE_FILE } from './names.js'
-import { resolveTicketDeps, type TicketDeps } from './store.js'
+import { resolveQueueDeps, type QueueDeps } from './store.js'
 
 // The agent queue, `TODO_AGENTS.md`: every task agents will work on next, in markdown list items
 // banded by `## Priority N` sections from 10 down to 0, first within a band first to be taken. An
@@ -127,8 +127,8 @@ export type QueueEdit = { ok: true; changed: boolean } | { ok: false }
  * repository root is resolved, the pure edit applied, the funnel commits and pushes. Never throws —
  * a resume note is queued while a process is already unwinding, and must not mask why it stopped.
  */
-async function editQueue(cwd: string, message: string, edit: (md: string) => string, deps: TicketDeps): Promise<QueueEdit> {
-  const r = resolveTicketDeps(deps)
+async function editQueue(cwd: string, message: string, edit: (md: string) => string, deps: QueueDeps): Promise<QueueEdit> {
+  const r = resolveQueueDeps(deps)
   const root = await fileBranchRepo(cwd).catch(() => undefined)
   if (!root) return { ok: false }
   const result = await r.funnel(root, message, async dir => {
@@ -141,11 +141,11 @@ async function editQueue(cwd: string, message: string, edit: (md: string) => str
 }
 
 /** Put `entry` on the queue: in its priority section when a priority is given, else at the end. */
-export async function queueAdd(cwd: string, entry: string, priority?: number, deps: TicketDeps = {}): Promise<QueueEdit> {
+export async function queueAdd(cwd: string, entry: string, priority?: number, deps: QueueDeps = {}): Promise<QueueEdit> {
   return editQueue(cwd, `queue add: ${entry}`, md => (priority === undefined ? appendQueueEntry(md, entry) : insertQueueEntry(md, entry, priority)), deps)
 }
 
 /** Take `entry` off the queue — it is done, or no longer wanted. Landed too when it was already gone, changing nothing. */
-export async function queueDone(cwd: string, entry: string, deps: TicketDeps = {}): Promise<QueueEdit> {
+export async function queueDone(cwd: string, entry: string, deps: QueueDeps = {}): Promise<QueueEdit> {
   return editQueue(cwd, `queue done: ${entry}`, md => removeQueueEntry(md, entry), deps)
 }

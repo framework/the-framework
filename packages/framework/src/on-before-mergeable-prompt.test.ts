@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { renderOnBeforeMergeablePrompt, ON_BEFORE_MERGEABLE_PROMPT_TEMPLATE } from './on-before-mergeable-prompt.js'
 import { TemplateFragmentError } from './prompt-template.js'
 import { BUSINESS_KNOWLEDGE_DOCS } from './system-prompt.js'
-import { QUEUE_FILE } from '@gemstack/skill-tickets'
+import { QUEUE_FILE } from '@gemstack/skill-queue'
 
 test('ON_BEFORE_MERGEABLE_PROMPT_TEMPLATE carries the built-in on-before-mergeable (#326) block', () => {
   // Derived from the constant, not a literal (#885) — see the same assertion in

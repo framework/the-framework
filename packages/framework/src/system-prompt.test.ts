@@ -11,7 +11,7 @@ import {
   systemPromptBlock,
   SYSTEM_PROMPT_TEMPLATE,
 } from './system-prompt.js'
-import { BRANCH_YOURSELF, TICKETS_SKILL, TICKETS_YOURSELF } from './prompts.generated.js'
+import { BRANCH_YOURSELF, QUEUE_SKILL, TICKETS_SKILL, TICKETS_YOURSELF } from './prompts.generated.js'
 import { loadUserSystemPrompt, SYSTEM_PROMPT_FILE } from './system-prompt-file.js'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 
@@ -21,8 +21,8 @@ const KNOWLEDGE_LINES = CONTEXT_DOCS.map(d => `- \`${d.path}\` (${d.comment})`).
 const KNOWLEDGE_CONTEXT = `Context:\n${KNOWLEDGE_LINES}`
 /** The context block: the bullets alone — the formats are the `tickets` skill's, not the channel's (#1748). */
 const CONTEXT_BLOCK = KNOWLEDGE_CONTEXT
-/** What an agent outside a daemon-made checkout gets after the prompt: branch, then tickets, with git (temporary, #1748). */
-const ELSEWHERE = [BRANCH_YOURSELF, `${TICKETS_YOURSELF}\n\n${TICKETS_SKILL}`]
+/** What an agent outside a daemon-made checkout gets after the prompt: branch, then tickets and queue, with git (temporary, #1748). */
+const ELSEWHERE = [BRANCH_YOURSELF, `${TICKETS_YOURSELF}\n\n${TICKETS_SKILL}\n\n${QUEUE_SKILL}`]
 
 test('CONTEXT_DOCS is the repo-context fragment (#683): business knowledge plus the roadmap/queue pointers', () => {
   const paths = CONTEXT_DOCS.map(d => d.path)
@@ -45,11 +45,10 @@ test('CONTEXT_DOCS is the repo-context fragment (#683): business knowledge plus 
   for (const p of ['GOAL.md', 'BUSINESS_LOGIC.md', 'knowledge-base/MARKET_RESEARCH.md', 'knowledge-base/**.md', 'tickets/**.md', 'TODO_AGENTS.md']) {
     assert.ok(!businessPaths.includes(p))
   }
-  // The two roadmap bullets send the agent to the `tickets` skill (#1748), which the checkout
-  // carries: no format text rides in this channel, and nothing names a file to go and open.
-  for (const path of ['tickets/**.md', 'TODO_AGENTS.md']) {
-    assert.match(CONTEXT_DOCS.find(d => d.path === path)?.comment ?? '', /on the `agent-data` branch — read and change (them|it) with the `tickets` skill/)
-  }
+  // The two roadmap bullets send the agent to the `tickets` and `queue` skills (#1748), which the
+  // checkout carries: no format text rides in this channel, and nothing names a file to go and open.
+  assert.match(CONTEXT_DOCS.find(d => d.path === 'tickets/**.md')?.comment ?? '', /on the `agent-data` branch — read and change them with the `tickets` skill/)
+  assert.match(CONTEXT_DOCS.find(d => d.path === 'TODO_AGENTS.md')?.comment ?? '', /on the `agent-data` branch — read and change it with the `queue` skill/)
   // Nothing here may point into node_modules: that path resolves only when the framework is a root
   // dependency of the repo it works on, which is what left both specs unopenable (#1163).
   for (const doc of CONTEXT_DOCS) assert.ok(!doc.comment.includes('node_modules/'), `${doc.path} points into node_modules`)
@@ -138,20 +137,22 @@ test('renderSystemPrompt is not confused by a user prompt containing the heading
   assert.equal(user, sneaky)
 })
 
-test('the ticket and queue formats are the `tickets` skill\'s: in the channel only for an agent outside a daemon-made checkout, as a temporary bridge (#1748)', () => {
+test('the ticket and queue formats are the `tickets` and `queue` skills\': in the channel only for an agent outside a daemon-made checkout, as a temporary bridge (#1748)', () => {
   // In its own checkout the agent finds the skill where its harness looks; nothing rides here.
   const owned = systemPromptBlock({ ownedCheckout: true })
-  assert.ok(!owned.includes(TICKETS_SKILL) && !owned.includes(TICKETS_YOURSELF))
+  assert.ok(!owned.includes(TICKETS_SKILL) && !owned.includes(QUEUE_SKILL) && !owned.includes(TICKETS_YOURSELF))
   assert.ok(!owned.includes('# Ticketing format') && !owned.includes('# The data branch'), 'the old inline formats are gone')
   // Elsewhere the command is not on the PATH: the git counterpart, then the skill's own formats.
   const elsewhere = systemPromptBlock()
-  assert.ok(elsewhere.includes(TICKETS_YOURSELF) && elsewhere.includes(TICKETS_SKILL))
+  assert.ok(elsewhere.includes(TICKETS_YOURSELF) && elsewhere.includes(TICKETS_SKILL) && elsewhere.includes(QUEUE_SKILL))
   assert.ok(TICKETS_YOURSELF.includes('git show origin/agent-data:<FILE>') && TICKETS_YOURSELF.includes('git push origin HEAD:refs/heads/agent-data'))
-  assert.ok(TICKETS_SKILL.includes('tickets/<DATE>_<SLUG>.md') && TICKETS_SKILL.includes('## Priority 9') && !TICKETS_SKILL.startsWith('---'), 'the skill text, front matter dropped')
+  assert.ok(TICKETS_SKILL.includes('tickets/<DATE>_<SLUG>.md') && !TICKETS_SKILL.startsWith('---'), 'the tickets skill text, front matter dropped')
+  assert.ok(QUEUE_SKILL.includes('## Priority 9') && !QUEUE_SKILL.startsWith('---'), 'the queue skill text, front matter dropped')
+  assert.ok(elsewhere.indexOf(QUEUE_SKILL) > elsewhere.indexOf(TICKETS_SKILL), 'the queue skill after the tickets skill')
   assert.ok(elsewhere.indexOf(TICKETS_YOURSELF) > elsewhere.indexOf(BRANCH_YOURSELF), 'after the branch counterpart')
   // Framework-authored content, so `--vanilla` drops it with the docs and the built-in prompt.
   const vanilla = systemPromptBlock({ vanilla: true, user: 'Only mine.' })
-  assert.ok(!vanilla.includes(TICKETS_SKILL) && !vanilla.includes(TICKETS_YOURSELF))
+  assert.ok(!vanilla.includes(TICKETS_SKILL) && !vanilla.includes(QUEUE_SKILL) && !vanilla.includes(TICKETS_YOURSELF))
 })
 
 test('systemPromptBlock defaults to the knowledge-doc context line + the built-in #326 prompt', () => {

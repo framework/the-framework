@@ -1,5 +1,5 @@
 import { renderTemplate } from './prompt-template.js'
-import { BRANCH_YOURSELF, SYSTEM_PROMPT, TICKETS_SKILL, TICKETS_YOURSELF } from './prompts.generated.js'
+import { BRANCH_YOURSELF, QUEUE_SKILL, SYSTEM_PROMPT, TICKETS_SKILL, TICKETS_YOURSELF } from './prompts.generated.js'
 import { AWAIT_PROTOCOL, BROWSER_PROTOCOL, HANDS_OFF_PROTOCOL, SIGNAL_PROTOCOL } from './turn-gate.js'
 
 // No Node imports here, deliberately. This module composes the prompt and the
@@ -72,20 +72,21 @@ export const BUSINESS_KNOWLEDGE_DOCS: readonly ContextDoc[] = [DECISIONS_DOC, FA
 
 /**
  * TEMPORARY (#1748): what an agent outside a checkout the daemon created is told about the
- * tickets and the queue, since nothing links the `tickets` skill into its checkout and the
- * `tickets` command is not on its PATH — the counterpart of {@link BRANCH_YOURSELF}: how to read
- * and write the branch with git, followed by the skill's own formats so they exist in one place.
- * Dies when use-npm-skills commits the skill into the repository.
+ * tickets and the queue, since nothing links the `tickets` and `queue` skills into its checkout
+ * and their commands are not on its PATH — the counterpart of {@link BRANCH_YOURSELF}: how to read
+ * and write the branch with git, followed by the two skills' own formats so they exist in one
+ * place. Dies when use-npm-skills commits the skills into the repository.
  */
-const TICKETS_BRIDGE = `${TICKETS_YOURSELF}\n\n${TICKETS_SKILL}`
+const TICKETS_BRIDGE = `${TICKETS_YOURSELF}\n\n${TICKETS_SKILL}\n\n${QUEUE_SKILL}`
 
 /**
  * Everything the agent keeps in context when it starts (#683), which
  * {@link systemPromptBlock} renders as the `Context:` bullets. A superset of
  * {@link BUSINESS_KNOWLEDGE_DOCS}: it adds `GOAL.md`, `BUSINESS_LOGIC.md`, and the
  * roadmap/queue pointers the agent reads but does *not* fold knowledge back into — the tickets
- * (the potential work) and the agent queue, both the `tickets` skill's (#1748): they live on the
- * `agent-data` branch, and the skill says how to read and change them and what their formats are.
+ * (the potential work, the `tickets` skill's) and the agent queue (the `queue` skill's) (#1748):
+ * they live on the `agent-data` branch, and each skill says how to read and change its own and
+ * what the format is.
  * Repo-root paths, because that is the agent's cwd. README is left out: a repo's own `README.md`
  * already covers the overview.
  */
@@ -105,7 +106,7 @@ export const CONTEXT_DOCS: readonly ContextDoc[] = [
   // The catch-all (#683): any other file the agent parks under knowledge-base/.
   { path: 'knowledge-base/**.md', comment: 'more files holding knowledge related to the project' },
   { path: 'tickets/**.md', comment: 'things to potentially work on; on the `agent-data` branch — read and change them with the `tickets` skill' },
-  { path: 'TODO_AGENTS.md', comment: 'the AI task queue; on the `agent-data` branch — read and change it with the `tickets` skill' },
+  { path: 'TODO_AGENTS.md', comment: 'the AI task queue; on the `agent-data` branch — read and change it with the `queue` skill' },
 ]
 
 /** The two halves of the rendered {@link SYSTEM_PROMPT_TEMPLATE}. */
@@ -202,7 +203,7 @@ export function systemPromptBlock(opts: SystemPromptOptions = {}): string {
     const bullets = docs.map(d => `- \`${d.path}\` (${d.comment})`)
     parts.push([head, ...bullets].join('\n'))
   }
-  // In a checkout The Framework created, the `branches` and `tickets` skills are the checkout's
+  // In a checkout The Framework created, the `branches`, `tickets` and `queue` skills are the checkout's
   // (#1739/#1748): the packages link them where the agent's harness looks for skills, and the
   // built-in prompt tells the agent to use them — nothing rides in this channel. Anywhere else
   // the commands are not on the PATH, so the sections that have the agent branch, and read and

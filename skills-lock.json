@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "logic-driven-development": {
+      "source": "brillout/skills",
+      "sourceType": "github",
+      "skillPath": "skills/logic-driven-development/SKILL.md",
+      "computedHash": "8d0d0fab5cead15e930e36776fc76d9788e58b8eea91404833347e3b913884b9"
+    }
+  }
+}

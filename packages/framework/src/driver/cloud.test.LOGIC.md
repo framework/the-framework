@@ -1,0 +1,13 @@
+What the tests cover:
+
+- **The hand-off** - a web agent's first turn has the extension create a cloud session and returns that session's id; the request names the repository as `owner/repo`, the pushed ref (the driver's own session id) as the branch to open on, and the whole prompt; the driver keeps asking where the request stands until it is created.
+- **The model** - the model the agent was started with travels with the request; an agent started without one sends nothing about the model.
+- **What reaches the agent's record** - the session link rides an action labeled `cloud <URL>`, the way the Actions driver's run link does; the result carries the cloud session's id and its real URL; a notice says the extension was asked.
+- **The prompt handed to the session** - the task leads; the agent's framing and this turn's extra framing follow, each behind the labeled rule, the framing under the header "Instructions from The Framework, the tool that started this session:"; with nothing injected the prompt is the bare task, with no rule and no header.
+- **The cloud anchor** - an empty commit on HEAD's tree with HEAD as parent and the message `[The Framework] web hand-off <id>` is pushed to `origin` as a branch named by the driver's session id, before the extension is asked; the anchor's commit id is recorded on the turn's result so the session's branch can be recognized later.
+- **Failures before the task leaves** - a push that fails fails the agent naming the need for a pushable GitHub remote, and the extension is never asked; a checkout with no GitHub remote fails naming the need before anything is pushed; an agent no daemon spawned fails saying web agents start from the dashboard; a daemon with no extension around, and one whose bridge is off, each fail naming the cure; an extension that tried and failed fails the turn with the extension's own note.
+- **One agent, one cloud session** - however many times the agent is prompted, one session request is made and every turn reports the same session id; a later turn says the work is already in the cloud rather than repeating the hand-off; the "cloud" link event fires once, so the agent view shows one session.
+- **Session ids** - two driver sessions of the same driver never share an id.
+- **Disposal, aborts and timeouts** - a disposed session refuses further turns; an agent whose stop was already requested fails before anything is asked; waiting past the timeout gives up naming the extension.
+- **No read-back** - the driver offers no way to read a file of the workspace, which lives in a cloud VM.
+- **The hands-off location** - `web` is the location whose first prompt is the whole agent; `local` and `actions` are not.

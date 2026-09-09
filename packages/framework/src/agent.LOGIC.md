@@ -1,4 +1,4 @@
-Runs one agent [1] from its first prompt to its end event: frames the coding agent [2], opens one driver session [3] for the whole agent, sends the opening prompt, honors every gate [4] the coding agent stops at, works the agent queue [5] when the agent is a build agent [6], takes the user's live chat [7], and ends, while streaming every step onto the one event stream [8] the dashboard, the archive and the run are projections of. A hands-off [9] agent is the exception to the middle of that story: its opening turn [10] is the whole agent.
+Runs one agent [1] from its first prompt to its end event: frames the coding agent [2], opens one driver session [3] for the whole agent, sends the opening prompt, honors every gate [4] the coding agent stops at, works the agent queue [5] when the agent is a build agent [6], takes the user's live chat [7], and ends, while streaming every step onto the one event stream [8] every surface is a projection of. A hands-off [9] agent is the exception to the middle of that story: its opening turn [10] is the whole agent.
 
 ## Context
 
@@ -20,9 +20,9 @@ Runs one agent [1] from its first prompt to its end event: frames the coding age
 [8] event stream: everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface (dashboard, terminal, archive, run) is a projection of it.
 [9] hands-off: said of an agent whose work leaves this machine, so its first prompt is the whole agent: an agent whose location is `web`.
 [10] turn: one prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
-[11] launcher: the Start form on a project's own page.
-[12] agent view: one agent's page in the dashboard.
-[13] composer: the prompt editor on a project's own page, also used for live chat.
+[11] launcher: the Start form on the project home, a project's own page.
+[12] agent view: one agent's page.
+[13] composer: the prompt editor on the project home, also used for live chat.
 [14] control file: `.the-framework/control.jsonl`: the file the daemon appends steering to (stops, picks, chat messages) and the agent's process tails.
 [15] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it).
 [16] turn signals: what The Framework reads off a turn's final message: the ready-for-merge signal, the pull request title and body, markdown views, reported errors, and the gate it stops at.
@@ -121,7 +121,7 @@ The first thing the coding agent [2] is sent is the user's text rendered through
 The opening prompt is sent as one turn [10]. When the turn's final message ends on a gate [4], the gate is resolved and the coding agent is re-prompted with the pick [23], and so on until the coding agent stops asking. The rules of one round are `await-gate.ts`'s; what this file relies on:
 
 - Who answers: the pick is the user's when an answer handler is wired, which the agent's process does only for an attended agent. With no handler, or when the agent is stopped while a gate is parked, the recommended option is taken (for a checklist, its pre-checked set), and the agent never pauses. This is what makes an unattended [26] agent run through.
-- The await limit [25] is five consecutive gates in one exchange. An agent still asking past it finishes with its latest turn, and the log says "Finishing the session (await limit reached)." That line is not written when chat followed the exchange, since the chat's own end is then the agent's reason for ending.
+- The await limit [25] is five consecutive gates in one exchange. An agent still asking past it finishes with its latest turn, and the log says "Finishing the session (await limit reached)." When chat followed the exchange, whether the line is written depends on the last chat turn instead of the opening exchange.
 - A pick marked stop [24] ends the exchange at once: the coding agent is never told the answer, the log says "Stopped at your answer: <option>. Awaiting your instructions.", and the agent's stop signal is tripped so the agent ends exactly the way a Stop does. Building on a plan the user just declined is the one thing not to do.
 
 ### A stop is honored before any phase counts as a success

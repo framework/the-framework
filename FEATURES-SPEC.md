@@ -89,7 +89,7 @@ happens while nobody is at the keyboard.
 - Hottest tickets
 - Projects sidebar
 - A project whose directory was renamed or deleted leaves the sidebar on the next refresh, and comes back when the directory does; the registration is kept
-- Project errors: a project whose bookkeeping branches cannot reach origin (push rejected, or no remote) — the `agent-data` branch or the `agents-logs` branch — is flagged with a red dot in the sidebar and a banner on its page, until a sync converges
+- Project errors: a project whose bookkeeping branch cannot reach origin (push rejected, or no remote) — the `agent-data` branch — is flagged with a red dot in the sidebar and a banner on its page, until a sync converges
 
 ## Tickets
 
@@ -119,6 +119,8 @@ happens while nobody is at the keyboard.
 - `tickets` on every agent's PATH — the skill's command line: `list` and `show <file>` read the tickets with their plans and their holders, `put <file>` writes a ticket, a plan or the import stamp, `close <file>` removes a ticket with its plan and claim, `claim <file>` and `release <file>` are the claim; every one of them is one commit pushed to the `agent-data` branch
 - The `queue` skill: every checkout The Framework creates carries the `@gemstack/skill-queue` package's `SKILL.md` beside the other two (`.claude/skills/queue`, `.agents/skills/queue`), and the presets tell the agent to use it — the agent queue is on the `agent-data` branch, read and changed with the command; an agent anywhere else gets the same git bridge as for the tickets (#1750)
 - `queue` on every agent's PATH — the skill's command line: `queue` reads the queue in the order it is worked, `queue add <text> [--priority N]` puts an entry on it in its priority section, `queue done <text>` takes an entry off; every one of them is one commit pushed to the `agent-data` branch
+- The `logs` skill: every checkout The Framework creates carries the `@gemstack/skill-logs` package's `SKILL.md` beside the other three (`.claude/skills/logs`, `.agents/skills/logs`); it tells the agent to read a ticket's past runs before planning or working it — a stopped or failed run says what to avoid, a done run with a PR says the work may be there; an agent anywhere else gets the skill's text through the same bridge as for the tickets (#1769)
+- `logs` on every agent's PATH — the skill's command line, read-only: `logs` lists the runs newest first (the newest 20 unless `--limit N`), `--ticket <file>` the runs that worked one ticket, `--branch <name>` the runs on one branch, `logs show <id>` one run's card with what the agent said, its result, its ending and its cost; the daemon's own bookkeeping on the card is never printed
 - The session name is the branch: an agent is labelled by its `agent-<name>` branch, read from git after every turn — nothing to signal, nothing to record twice
 - Dependency directories shared from the parent checkout instead of reinstalled — as directories of links, so an agent's own install stays in its checkout and never rewrites or purges the parent's
 - A checkout whose work is not on the remote is kept — and a publish-nothing (`handoff: local`) agent's is kept until you publish or delete it
@@ -130,7 +132,7 @@ happens while nobody is at the keyboard.
 - Empty agents publish nothing
 - Handoff panel: push / open PR / merge, as buttons
 - A withheld merge is reported with its reason
-- Agent history archived on the `agents-logs` branch under per-user directories — pushed the moment a session settles
+- Agent history recorded on the `agent-data` branch as the `logs` skill's runs, under per-person directories — pushed the moment a session settles; the framework's own fields ride inside the skill's card under one key, and its other events inside the diary beside the four kinds the skill knows
 - Post-merge quality follow-ups queued (maintainability / security)
 - Knowledge folded back into `DECISIONS.md` / `FACTS.md` / `INSIGHTS.md` at merge
 
@@ -148,7 +150,7 @@ happens while nobody is at the keyboard.
 - Reclaim the checkout of an agent whose work is on the remote — never by publishing what a `handoff: local` agent refused to
 - An agent that committed nothing leaves no branch behind: its empty branch goes with its checkout, never pushed — and the run-id branch it started on goes too, once the branch it moved to holds everything the run-id branch did
 - A directory under `.branches/` that git does not know as a worktree is never committed, pushed, linked or deleted through — it is reported and left alone, so a leftover can never stand in for your own checkout
-- One triage at a time, across machines: a routine lock (`routines/<name>.lock.md` on the `agents-logs` branch) taken by the daemon before the run starts and released when it ends, whatever the ending; a held lock stands the routine down naming the machine holding it, with no agent spent; a lock left by a dead machine expires after four hours, and a daemon frees its own on boot
+- One triage at a time, across machines: a routine lock (`routines/<name>.lock.md` on the `agent-data` branch) taken by the daemon before the run starts and released when it ends, whatever the ending; a held lock stands the routine down naming the machine holding it, with no agent spent; a lock left by a dead machine expires after four hours, and a daemon frees its own on boot
 - The agent drains its own TODO backlog, one entry per turn
 
 ## Spending
@@ -190,7 +192,7 @@ happens while nobody is at the keyboard.
 - Answer a cloud agent's question from the dashboard (typed back into claude.ai) — the same gate panel a local agent gets, multi-select and stop options included, listed with every other open question
 - Browser-bridge token setting
 - A cloud run's row follows the session's real branch and PR, with its armed draft PR opened when the session opens none
-- Another machine's runs on the shared `agents-logs` branch are told apart: their rows carry a glyph naming the machine that started them (the Overview's working-now card spells it out), and a run is listed once even when two checkouts share its archive
+- Another machine's runs on the shared `agent-data` branch are told apart: their rows carry a glyph naming the machine that started them (the Overview's working-now card spells it out), and a run is listed once even when two checkouts share its archive
 
 ## Notifications
 

@@ -9,7 +9,7 @@ import {
   readLiveMeta,
   readLiveMetas,
   archiveWorktreeAgent,
-  patchArchivedAgent,
+  readWorktreeAgent,
   restoreArchivedAgent,
   reconcileOrphanedAgents,
   loadAgentEvents,
@@ -18,7 +18,8 @@ import {
   type StoreFs,
   type AgentMeta,
 } from './agent-store.js'
-import { LOGS_CHECKOUT_DIR } from '../framework-dir.js'
+import { DATA_BRANCH, fileBranchPath } from '@gemstack/agent-data'
+import type { LogsFunnel } from '@gemstack/skill-logs'
 import type { FrameworkEvent } from '../events.js'
 
 /** An in-memory {@link StoreFs} so the store logic is tested without touching disk. */
@@ -483,7 +484,7 @@ test('listAgents reads every user archive and the transient one, under their one
   // archives that, with no users, nobody has.
   const meta = (id: string): string =>
     JSON.stringify({ status: 'done', id, startedAt: AT, updatedAt: AT, intent: id })
-  const user = join(CWD, LOGS_CHECKOUT_DIR, 'agents', 'dev@example.com')
+  const user = join(fileBranchPath(CWD, DATA_BRANCH), 'agents', 'dev@example.com')
   const fs = memFs({
     [join(user, '2026-new.json')]: meta('2026-new'),
     [join(CWD, '.the-framework', 'agents', '2026-transient.json')]: meta('2026-transient'),
@@ -674,47 +675,29 @@ test('archiveWorktreeAgent records a run that died mid-flight as stopped, not ru
   assert.equal((JSON.parse(fs.files.get(join(CWD, '.the-framework', 'agents', 'r1.json'))!) as AgentMeta).status, 'stopped')
 })
 
-test('patchArchivedAgent records a PR opened after the run on its archived meta (E6)', async () => {
-  // The dashboard's Open PR button runs after the session's process is gone, so there is no event
-  // stream left to carry the fact — but it is the same fact, and every surface reads it from the
-  // same place either way.
-  const fs = memFs(worktreeFiles('r1', { version: 1, status: 'done', id: 'r1', startedAt: AT, updatedAt: AT }))
-  await archiveWorktreeAgent(worktreeAt('r1'), CWD, fs)
-  assert.equal(await patchArchivedAgent(CWD, 'r1', { pr: { number: 42, url: 'https://x/pull/42' } }, fs), true)
-  assert.deepEqual((await listAgents(CWD, fs)).find(r => r.id === 'r1')?.pr, { number: 42, url: 'https://x/pull/42' })
-})
-
-test('patchArchivedAgent records the branch the cloud work landed on (#1601)', async () => {
-  // The cloud VM pushes its `claude/*` branch after the wrapper's process is gone, so the fact
-  // arrives the same way a late PR does: patched onto the archive, read by every surface.
-  const fs = memFs(worktreeFiles('r1', { version: 1, status: 'done', id: 'r1', startedAt: AT, updatedAt: AT, branch: 'agent-r1' }))
-  await archiveWorktreeAgent(worktreeAt('r1'), CWD, fs)
-  assert.equal(await patchArchivedAgent(CWD, 'r1', { branch: 'claude/fix-the-thing' }, fs), true)
-  assert.equal((await listAgents(CWD, fs)).find(r => r.id === 'r1')?.branch, 'claude/fix-the-thing')
-})
-
-test('patchArchivedAgent leaves the record as it was when there is nothing to patch (E6/#1601)', async () => {
-  // Best-effort: the cost of missing it is one surface having to ask gh, which is what all of them
-  // used to do anyway.
-  const fs = memFs()
-  assert.equal(await patchArchivedAgent(CWD, 'nope', { pr: { number: 1, url: 'u' } }, fs), false)
-  assert.equal(await patchArchivedAgent(CWD, '../escape', { branch: 'claude/x' }, fs), false, 'and an unsafe id is refused')
-})
-
 test('archiveWorktreeAgent is forgiving of a worktree with no run', async () => {
   assert.equal(await archiveWorktreeAgent(worktreeAt('nope'), CWD, memFs()), undefined)
 })
 
 const USER = 'git@brillout.com'
 const archiveAt = (id: string, ext: string) =>
-  join(CWD, LOGS_CHECKOUT_DIR, 'agents', USER, `${id}.${ext}`)
+  join(fileBranchPath(CWD, DATA_BRANCH), 'agents', USER, `${id}.${ext}`)
 
-test('a named user files the archive under their own sessions, not runs/ (#1179)', async () => {
-  // The whole point: `agents/` is gitignored, so a `git clean -fdx` took every session with it.
-  const fs = memFs(worktreeFiles('r1', { version: 1, status: 'done', id: 'r1', startedAt: AT, updatedAt: AT }, '{"kind":"log","message":"hi"}\n'))
-  await archiveWorktreeAgent(worktreeAt('r1'), CWD, fs, undefined, USER)
-  assert.equal(fs.files.get(archiveAt('r1', 'jsonl')), '{"kind":"log","message":"hi"}\n')
-  assert.equal(fs.files.has(join(CWD, '.the-framework', 'agents', 'r1.json')), false, 'and not in the transient dir')
+/** The `logs` skill's funnel over the in-memory checkout: runs the op against it, reports a landed push. */
+const memFunnel: LogsFunnel = async (_root, _message, op) => {
+  await op(fileBranchPath(CWD, DATA_BRANCH))
+  return { ok: true, changed: true, pushed: true }
+}
+
+test('readWorktreeAgent hands the daemon what it records on the data branch: the meta, ended and stamped, and the events (#1769)', async () => {
+  // The lasting record is the `logs` skill's run on the branch; the daemon writes it from this read.
+  const fs = memFs(worktreeFiles('r1', { version: 1, status: 'running', id: 'r1', startedAt: AT, updatedAt: AT }, '{"kind":"log","message":"hi"}\n'))
+  const run = await readWorktreeAgent(worktreeAt('r1'), fs, 'agent-fixed')
+  assert.equal(run?.meta.status, 'stopped', 'a run whose process is gone did not close')
+  assert.equal(run?.meta.branch, 'agent-fixed', 'the branch is stamped: the checkout is about to go')
+  assert.deepEqual(run?.events.map(e => e.kind), ['log', 'end'], 'the missing end is written before the copy')
+  assert.equal(fs.files.has(join(CWD, '.the-framework', 'agents', 'r1.json')), false, 'nothing lands in the transient archive')
+  assert.equal(await readWorktreeAgent(worktreeAt('nope'), memFs()), undefined)
 })
 
 test('the history lists every user, and the runs archived before this shipped (#1179)', async () => {
@@ -724,36 +707,34 @@ test('the history lists every user, and the runs archived before this shipped (#
   const fs = memFs({
     [join(CWD, '.the-framework', 'agents', 'r1.json')]: done('r1'),
     [archiveAt('r2', 'json')]: done('r2'),
-    [join(CWD, LOGS_CHECKOUT_DIR, 'agents', 'someone@else.com', 'r3.json')]: done('r3'),
+    [join(fileBranchPath(CWD, DATA_BRANCH), 'agents', 'someone@else.com', 'r3.json')]: done('r3'),
   })
   assert.deepEqual((await listAgents(CWD, fs)).map(agent => agent.id), ['r3', 'r2', 'r1'])
 })
 
-test('a `since` skips the older runs by filename, without reading them (#1607)', async () => {
+test('a `since` keeps the runs started at or after it, on the branch by their card and in the transient archive by their name (#1607)', async () => {
   // The cost this exists to remove: the adoption poll wants the last 48h and an archive holds
-  // years, so the read loop spent every pass parsing records its caller was about to discard.
+  // years, so the read loop used to parse records its caller was about to discard.
   const at = (iso: string) => JSON.stringify({ version: 1, status: 'done', id: agentIdFromStartedAt(iso), startedAt: iso, updatedAt: iso })
   const old = agentIdFromStartedAt('2026-07-04T00:00:00.000Z')
   const recent = agentIdFromStartedAt('2026-07-06T00:00:00.000Z')
   const fs = memFs({
     [archiveAt(old, 'json')]: at('2026-07-04T00:00:00.000Z'),
     [archiveAt(recent, 'json')]: at('2026-07-06T00:00:00.000Z'),
-    [archiveAt('hand-picked', 'json')]: JSON.stringify({ version: 1, status: 'done', id: 'hand-picked', startedAt: AT, updatedAt: AT }),
+    // An id that is not a timestamp is dated by its card, like every run on the branch.
+    [archiveAt('hand-picked', 'json')]: JSON.stringify({ version: 1, status: 'done', id: 'hand-picked', startedAt: '2026-07-05T12:00:00.000Z', updatedAt: AT }),
+    [archiveAt('hand-picked-old', 'json')]: JSON.stringify({ version: 1, status: 'done', id: 'hand-picked-old', startedAt: '2026-07-01T12:00:00.000Z', updatedAt: AT }),
+    [join(RUNS, `${old}.json`)]: at('2026-07-04T00:00:00.000Z'),
+    [join(RUNS, 'r-transient.json')]: JSON.stringify({ status: 'done', id: 'r-transient', startedAt: '2026-07-07T00:00:00.000Z', updatedAt: AT }),
   })
   const read: string[] = []
   const spy = { ...fs, read: async (path: string) => (read.push(path), fs.read(path)) }
 
   const listed = await listAgents(CWD, spy, Date.parse('2026-07-05T00:00:00.000Z'))
 
-  assert.deepEqual(listed.map(agent => agent.id).sort(), ['hand-picked', recent].sort())
-  assert.equal(
-    read.some(path => path.includes(old)),
-    false,
-    'the run outside the window is never opened',
-  )
-  // An id that is not one of our timestamps cannot be dated from its name, so it is still read:
-  // rejecting it unread would hide it from every caller that passes a window.
-  assert.equal(read.some(path => path.includes('hand-picked')), true)
+  assert.deepEqual(listed.map(agent => agent.id).sort(), ['hand-picked', 'r-transient', recent].sort())
+  // The transient archive is dated by the file name, so the run outside the window is never opened.
+  assert.equal(read.some(path => path === join(RUNS, `${old}.json`)), false)
 })
 
 test('a run archived under both schemes is listed once (#1179)', async () => {
@@ -773,14 +754,51 @@ test('an archived log replays wherever it is filed (#1179)', async () => {
   assert.deepEqual(await loadAgentEvents(CWD, 'r1', fs), [{ kind: 'log', message: 'replayed' }])
 })
 
-test('a committed session stuck at running is reconciled too (#1179)', async () => {
+test('a run on the branch stuck at running is ended through the skill\'s write, as a commit (#1179/#1769)', async () => {
   // The boot reconcile used to sweep only `agents/`, so a crashed agent archived under a user would
-  // have shown as live forever, with a Stop that does nothing.
+  // have shown as live forever, with a Stop that does nothing. And it used to edit the card in
+  // place on the checkout, where the next sync's reset lost it: now it goes through the funnel.
   const fs = memFs({
-    [archiveAt('r1', 'json')]: JSON.stringify({ version: 1, status: 'running', id: 'r1', startedAt: AT, updatedAt: AT }),
+    [archiveAt('r1', 'json')]: JSON.stringify({ status: 'running', id: 'r1', startedAt: AT, caller: { updatedAt: AT, pid: 7 } }),
+    [archiveAt('r1', 'jsonl')]: '{"kind":"said","text":"hi"}\n',
   })
-  assert.equal(await reconcileOrphanedAgents(CWD, fs, () => false), 1)
-  assert.equal((JSON.parse(fs.files.get(archiveAt('r1', 'json'))!) as AgentMeta).status, 'stopped')
+  assert.equal(await reconcileOrphanedAgents(CWD, fs, () => false, memFunnel), 1)
+  const card = JSON.parse(fs.files.get(archiveAt('r1', 'json'))!) as { status: string; endedAt?: string; caller: { pid: number } }
+  assert.equal(card.status, 'stopped')
+  assert.ok(card.endedAt, 'the ending is dated')
+  assert.equal(card.caller.pid, 7, 'the framework\'s own fields stay under caller')
+  assert.equal(fs.files.get(archiveAt('r1', 'jsonl')), '{"kind":"said","text":"hi"}\n{"kind":"ended","status":"stopped","detail":"its process died without reporting an end"}\n')
+  assert.equal((await listAgents(CWD, fs)).find(a => a.id === 'r1')?.status, 'stopped')
+})
+
+test('a run on the branch replays and restores as the framework\'s events, its card as the meta (#1769)', async () => {
+  const fs = memFs({
+    [archiveAt('r1', 'json')]: JSON.stringify({ status: 'failed', id: 'r1', startedAt: AT, endedAt: AT, cost: 0.5, caller: { updatedAt: AT, kind: 'build', pid: 9 } }),
+    [archiveAt('r1', 'jsonl')]: [
+      '{"kind":"session","driver":"claude-code","workspace":"/w","fake":false}',
+      '{"kind":"said","text":"Reading."}',
+      '{"kind":"result","text":"Done.","sessionId":"s1"}',
+      '{"kind":"cost","usd":0.5,"inputTokens":1,"outputTokens":2,"cacheReadTokens":0,"cacheCreationTokens":0,"turns":1}',
+      '{"kind":"ended","status":"failed","detail":"API 500"}',
+      '',
+    ].join('\n'),
+  })
+  const events = await loadAgentEvents(CWD, 'r1', fs)
+  assert.deepEqual(events, [
+    { kind: 'session', driver: 'claude-code', workspace: '/w', fake: false },
+    { kind: 'driver', event: { type: 'text', text: 'Reading.' } },
+    { kind: 'driver', event: { type: 'result', text: 'Done.', sessionId: 's1' } },
+    { kind: 'usage', costUsd: 0.5, inputTokens: 1, outputTokens: 2, cacheReadTokens: 0, cacheCreationTokens: 0, turns: 1 },
+    { kind: 'end', ok: false, detail: 'API 500' },
+  ])
+  const listed = (await listAgents(CWD, fs)).find(a => a.id === 'r1')!
+  assert.equal(listed.kind, 'build', 'caller unfolds into the meta')
+  assert.equal(listed.cost, 0.5)
+  assert.equal(listed.status, 'failed')
+  const wt = join(CWD, '.branches', 'agent-r1')
+  assert.equal(await restoreArchivedAgent(CWD, wt, 'r1', fs), true)
+  assert.equal(fs.files.get(join(wt, '.the-framework', 'events.jsonl')), events!.map(e => JSON.stringify(e) + '\n').join(''))
+  assert.equal((JSON.parse(fs.files.get(join(wt, '.the-framework', 'agent.json'))!) as AgentMeta).pid, 9)
 })
 
 test('reconcileOrphanedAgents rescues a run a crashed daemon left in a worktree (#737)', async () => {

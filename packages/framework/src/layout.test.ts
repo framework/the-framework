@@ -33,14 +33,14 @@ test('a marker matching this build passes', async () => {
 })
 
 test('a mismatched marker refuses, naming both layouts and the fix (#1575)', async () => {
-  const recorded = layoutMarker().replace('archive-dir: agents', 'archive-dir: sessions')
+  const recorded = layoutMarker().replace('runs-dir: agents', 'runs-dir: sessions')
   const result = await checkLayout('/proj', markerFs(recorded))
   assert.equal(result.ok, false)
   if (result.ok) return
   // The refusal carries what a stranded session's log needs: the file, both sides, the cause.
   assert.match(result.error, /\.the-framework\/LAYOUT/)
-  assert.match(result.error, /archive-dir: agents/)
-  assert.match(result.error, /archive-dir: sessions/)
+  assert.match(result.error, /runs-dir: agents/)
+  assert.match(result.error, /runs-dir: sessions/)
   assert.match(result.error, /#1575/)
   assert.match(result.error, /update/i)
 })

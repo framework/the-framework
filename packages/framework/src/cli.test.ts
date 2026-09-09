@@ -304,7 +304,7 @@ test('runCli refuses a session whose repo records another layout, before writing
   const { io, err } = capture()
   const cwd = await mkdtemp(join(tmpdir(), 'framework-layout-skew-'))
   await mkdir(join(cwd, '.the-framework'), { recursive: true })
-  await writeFile(layoutMarkerPath(cwd), layoutMarker().replace('archive-dir: agents', 'archive-dir: sessions'))
+  await writeFile(layoutMarkerPath(cwd), layoutMarker().replace('runs-dir: agents', 'runs-dir: sessions'))
   const code = await runAgentCli({ prompt: 'say hi', kind: 'prompt', cwd }, io)
   assert.equal(code, 1)
   assert.ok(err.some(l => /#1575/.test(l)))

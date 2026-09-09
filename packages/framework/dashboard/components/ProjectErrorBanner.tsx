@@ -3,7 +3,7 @@ import type { ProjectError, ProjectErrorCode } from '../../src/index.js'
 import { formatAge } from '../lib/format-date.js'
 
 // What the daemon currently finds wrong with the project (#1500), at the top of its page. The
-// daemon records the state and clears it when the condition is gone (#1599: a tickets or agents-logs branch that
+// daemon records the state and clears it when the condition is gone (#1599: an agent-data branch that
 // cannot reach origin), so this renders exactly what the project list carries — no state of its
 // own, and nothing to dismiss: the way to make it go away is to fix the thing it names.
 

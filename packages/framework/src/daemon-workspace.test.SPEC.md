@@ -12,7 +12,7 @@ Refusing a start the driver cannot serve: a start on a logged-out driver is refu
 
 Held slots: a live agent's slot names the agent and its process id, and stopping the agents reports the same name and clears the slot.
 
-The agent's environment: the spawned process's PATH starts with the `skill-branches`, `skill-tickets` and `skill-queue` packages' executable directories, in that order, and continues with the daemon's own; the `branches` command found through it lists the very checkout the daemon allocated; and that checkout links the three skills, each under its name, where every harness looks for skills, each link pointing at the package holding its `SKILL.md`.
+The agent's environment: the spawned process's PATH starts with the `skill-branches`, `skill-tickets`, `skill-queue` and `skill-logs` packages' executable directories, in that order, and continues with the daemon's own; the `branches` command found through it lists the very checkout the daemon allocated; and that checkout links the four skills, each under its name, where every harness looks for skills, each link pointing at the package holding its `SKILL.md`.
 
 ## Before modifying/creating SPEC.md files
 

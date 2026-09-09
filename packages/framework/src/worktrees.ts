@@ -1,10 +1,10 @@
 import { readFile } from 'node:fs/promises'
-import { join, sep } from 'node:path'
+import { join } from 'node:path'
 import { errorMessage } from './error-message.js'
 import { listAgents, readLiveMetas, archivedAgentPaths, META_FILE, type AgentMeta, type AgentStatus } from './store/index.js'
-import { fileBranchPath, withFileBranch } from '@gemstack/agent-data'
+import { deleteRun, runFiles } from '@gemstack/skill-logs'
 import { agentBranchName, listWorktreeDirs, isSafeAgentId, reclaimWorktree, removeWorktree, pruneWorktrees, worktreePath, worktreeSize, type ReclaimOutcome } from '@gemstack/skill-branches'
-import { LOGS_BRANCH, THE_FRAMEWORK_DIR } from './framework-dir.js'
+import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 
 /** A retained worktree and the agent that left it behind (#752). */
 export interface WorktreeRow {
@@ -247,19 +247,15 @@ export async function deleteProjectAgent(cwd: string, agentId: string, opts: Del
       await removeWorktree(cwd, worktreePath(cwd, agentId))
       await pruneWorktrees(cwd)
     }
-    // Then the records that put the row in the list. Looked up rather than derived from the id: a
-    // session is archived under whichever user ran it (#1179), so the id alone no longer names its
-    // path. Tolerant of an absent file, so a half-deleted session (its worktree already gone)
-    // still finishes cleanly. A record on the logs branch is removed inside its write funnel
-    // (#1582) — the deletion is a committed, pushed change — while a transient copy is an unlink.
-    const paths = await archivedAgentPaths(cwd, agentId)
-    const dataRoot = fileBranchPath(cwd, LOGS_BRANCH) + sep
-    for (const path of paths.filter(p => !p.startsWith(dataRoot))) await removeFile(path)
-    if (paths.some(p => p.startsWith(dataRoot))) {
-      const removed = await withFileBranch(cwd, LOGS_BRANCH, `[The Framework] delete session ${agentId}`, async () => {
-        for (const path of paths.filter(p => p.startsWith(dataRoot))) await removeFile(path)
-      })
+    // Then the records that put the row in the list. The run on the data branch is deleted by the
+    // `logs` skill as one committed, pushed change (#1582/#1769); a transient copy is an unlink.
+    // Tolerant of an absent file, so a half-deleted session (its worktree already gone) still
+    // finishes cleanly.
+    if (await runFiles(cwd, agentId)) {
+      const removed = await deleteRun(cwd, agentId)
       if (!removed.ok && !removed.committed) return { ok: false, error: removed.error }
+    } else {
+      for (const path of await archivedAgentPaths(cwd, agentId)) await removeFile(path)
     }
     return { ok: true }
   } catch (err) {

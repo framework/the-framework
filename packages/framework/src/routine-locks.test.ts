@@ -13,10 +13,9 @@ import {
   routineLockPath,
   type RoutineLockDeps,
 } from './routine-locks.js'
-import { LOGS_BRANCH, LOGS_CHECKOUT_DIR } from './framework-dir.js'
-import { fileBranchPath, nodeGitRunner } from '@gemstack/agent-data'
+import { DATA_BRANCH, fileBranchPath, nodeGitRunner } from '@gemstack/agent-data'
 const CWD = '/repo'
-const DATA = join(CWD, LOGS_CHECKOUT_DIR)
+const DATA = fileBranchPath(CWD, DATA_BRANCH)
 const T0 = Date.parse('2026-08-23T10:00:00.000Z')
 
 /** An in-memory data checkout behind a fake funnel, like ticket-locks.test.ts's. */
@@ -120,7 +119,7 @@ test("on boot, this machine's locks whose run is gone are released; a run still 
 
 // Against real git: two clones of one bare origin, each with its own logs checkout — the
 // cross-machine race the lock exists for. No funnel fake: what the other machine sees is what
-// origin's `agents-logs` holds after the push.
+// origin's `agent-data` holds after the push.
 
 const git = nodeGitRunner()
 const RETRIED_RM = { recursive: true, force: true, maxRetries: 10 } as const
@@ -136,7 +135,7 @@ async function initRepo(prefix: string, email: string): Promise<string> {
   return repo
 }
 
-test('two machines sharing agents-logs: the second finds the first machine\'s lock on origin, and its release frees it (#1659, real git)', async () => {
+test('two machines sharing agent-data: the second finds the first machine\'s lock on origin, and its release frees it (#1659, real git)', async () => {
   const laptop = await initRepo('framework-routine-lock-a-', 'a@a')
   const bare = await realpath(await mkdtemp(join(tmpdir(), 'framework-routine-lock-bare-')))
   await git(['init', '--bare', bare], bare)
@@ -149,10 +148,10 @@ test('two machines sharing agents-logs: the second finds the first machine\'s lo
   await git(['config', 'user.name', 'b'], desktop)
   try {
     assert.deepEqual(await acquireRoutineLock(laptop, 'triage-quick', { host: 'laptop' }), { ok: true })
-    const onLaptop = await readFile(join(fileBranchPath(laptop, LOGS_BRANCH), 'routines', 'triage-quick.lock.md'), 'utf8')
+    const onLaptop = await readFile(join(fileBranchPath(laptop, DATA_BRANCH), 'routines', 'triage-quick.lock.md'), 'utf8')
     assert.match(onLaptop, /^CLAIMED: laptop\nSINCE: \d{4}-/)
-    // Pushed: origin's agents-logs carries it.
-    assert.equal((await git(['show', `${LOGS_BRANCH}:routines/triage-quick.lock.md`], bare)).trim(), onLaptop.trim())
+    // Pushed: origin's agent-data carries it.
+    assert.equal((await git(['show', `${DATA_BRANCH}:routines/triage-quick.lock.md`], bare)).trim(), onLaptop.trim())
 
     const onDesktop = await acquireRoutineLock(desktop, 'triage-quick', { host: 'desktop' })
     assert.equal(onDesktop.ok, false)
@@ -160,13 +159,13 @@ test('two machines sharing agents-logs: the second finds the first machine\'s lo
 
     // The desktop cannot release what the laptop holds.
     assert.equal(await releaseRoutineLock(desktop, 'triage-quick', { host: 'desktop' }), true)
-    assert.equal(await git(['show', `${LOGS_BRANCH}:routines/triage-quick.lock.md`], bare).then(() => true, () => false), true)
+    assert.equal(await git(['show', `${DATA_BRANCH}:routines/triage-quick.lock.md`], bare).then(() => true, () => false), true)
 
     // The laptop's run ends: its release reaches origin, and the desktop's next try takes the lock.
     assert.equal(await releaseRoutineLock(laptop, 'triage-quick', { host: 'laptop' }), true)
-    assert.equal(await git(['show', `${LOGS_BRANCH}:routines/triage-quick.lock.md`], bare).then(() => true, () => false), false)
+    assert.equal(await git(['show', `${DATA_BRANCH}:routines/triage-quick.lock.md`], bare).then(() => true, () => false), false)
     assert.deepEqual(await acquireRoutineLock(desktop, 'triage-quick', { host: 'desktop' }), { ok: true })
-    assert.match((await git(['show', `${LOGS_BRANCH}:routines/triage-quick.lock.md`], bare)).trim(), /^CLAIMED: desktop/)
+    assert.match((await git(['show', `${DATA_BRANCH}:routines/triage-quick.lock.md`], bare)).trim(), /^CLAIMED: desktop/)
   } finally {
     for (const dir of [laptop, bare, desktopParent]) await rm(dir, RETRIED_RM)
   }

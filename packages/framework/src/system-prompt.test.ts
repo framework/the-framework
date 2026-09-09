@@ -11,7 +11,7 @@ import {
   systemPromptBlock,
   SYSTEM_PROMPT_TEMPLATE,
 } from './system-prompt.js'
-import { BRANCH_YOURSELF, QUEUE_SKILL, TICKETS_SKILL, TICKETS_YOURSELF } from './prompts.generated.js'
+import { BRANCH_YOURSELF, LOGS_SKILL, QUEUE_SKILL, TICKETS_SKILL, TICKETS_YOURSELF } from './prompts.generated.js'
 import { loadUserSystemPrompt, SYSTEM_PROMPT_FILE } from './system-prompt-file.js'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 
@@ -22,7 +22,7 @@ const KNOWLEDGE_CONTEXT = `Context:\n${KNOWLEDGE_LINES}`
 /** The context block: the bullets alone — the formats are the `tickets` skill's, not the channel's (#1748). */
 const CONTEXT_BLOCK = KNOWLEDGE_CONTEXT
 /** What an agent outside a daemon-made checkout gets after the prompt: branch, then tickets and queue, with git (temporary, #1748). */
-const ELSEWHERE = [BRANCH_YOURSELF, `${TICKETS_YOURSELF}\n\n${TICKETS_SKILL}\n\n${QUEUE_SKILL}`]
+const ELSEWHERE = [BRANCH_YOURSELF, `${TICKETS_YOURSELF}\n\n${TICKETS_SKILL}\n\n${QUEUE_SKILL}\n\n${LOGS_SKILL}`]
 
 test('CONTEXT_DOCS is the repo-context fragment (#683): business knowledge plus the roadmap/queue pointers', () => {
   const paths = CONTEXT_DOCS.map(d => d.path)
@@ -149,10 +149,12 @@ test('the ticket and queue formats are the `tickets` and `queue` skills\': in th
   assert.ok(TICKETS_SKILL.includes('tickets/<DATE>_<SLUG>.md') && !TICKETS_SKILL.startsWith('---'), 'the tickets skill text, front matter dropped')
   assert.ok(QUEUE_SKILL.includes('## Priority 9') && !QUEUE_SKILL.startsWith('---'), 'the queue skill text, front matter dropped')
   assert.ok(elsewhere.indexOf(QUEUE_SKILL) > elsewhere.indexOf(TICKETS_SKILL), 'the queue skill after the tickets skill')
+  assert.ok(LOGS_SKILL.includes('npx logs --ticket <file>') && !LOGS_SKILL.startsWith('---'), 'the logs skill text, front matter dropped')
+  assert.ok(elsewhere.indexOf(LOGS_SKILL) > elsewhere.indexOf(QUEUE_SKILL), 'the logs skill after the queue skill')
   assert.ok(elsewhere.indexOf(TICKETS_YOURSELF) > elsewhere.indexOf(BRANCH_YOURSELF), 'after the branch counterpart')
   // Framework-authored content, so `--vanilla` drops it with the docs and the built-in prompt.
   const vanilla = systemPromptBlock({ vanilla: true, user: 'Only mine.' })
-  assert.ok(!vanilla.includes(TICKETS_SKILL) && !vanilla.includes(QUEUE_SKILL) && !vanilla.includes(TICKETS_YOURSELF))
+  assert.ok(!vanilla.includes(TICKETS_SKILL) && !vanilla.includes(QUEUE_SKILL) && !vanilla.includes(LOGS_SKILL) && !vanilla.includes(TICKETS_YOURSELF))
 })
 
 test('systemPromptBlock defaults to the knowledge-doc context line + the built-in #326 prompt', () => {

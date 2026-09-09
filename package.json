@@ -11,8 +11,8 @@
     "preview": "pnpm -C packages/framework preview",
     "dev": "pnpm -C packages/framework dev",
     "typecheck": "pnpm -C packages/framework typecheck && pnpm -C packages/the-framework.ai typecheck",
-    "clean": "pnpm -C packages/agent-data clean && pnpm -C packages/skill-branches clean && pnpm -C packages/skill-tickets clean && pnpm -C packages/skill-queue clean && pnpm -C packages/agent-driver clean && pnpm -C packages/framework clean",
-    "test": "pnpm -C packages/agent-data test && pnpm -C packages/skill-branches test && pnpm -C packages/skill-tickets test && pnpm -C packages/skill-queue test && pnpm -C packages/agent-driver test && pnpm -C packages/framework test",
+    "clean": "pnpm -C packages/agent-data clean && pnpm -C packages/skill-branches clean && pnpm -C packages/skill-tickets clean && pnpm -C packages/skill-queue clean && pnpm -C packages/skill-logs clean && pnpm -C packages/agent-driver clean && pnpm -C packages/framework clean",
+    "test": "pnpm -C packages/agent-data test && pnpm -C packages/skill-branches test && pnpm -C packages/skill-tickets test && pnpm -C packages/skill-queue test && pnpm -C packages/skill-logs test && pnpm -C packages/agent-driver test && pnpm -C packages/framework test",
     "========= Website": "",
     "// Develop website https://the-framework.ai locally": "",
     "website": "cd packages/the-framework.ai/ && pnpm run dev",
@@ -25,6 +25,7 @@
     "@gemstack/skill-branches": "workspace:*",
     "@gemstack/skill-tickets": "workspace:*",
     "@gemstack/skill-queue": "workspace:*",
+    "@gemstack/skill-logs": "workspace:*",
     "typescript": "^7.0.2"
   }
 }

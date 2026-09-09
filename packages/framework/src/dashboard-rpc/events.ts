@@ -1,4 +1,5 @@
-import { resolveAgentEventsPath } from '../store/index.js'
+import { fromDiaryLine, resolveAgentEventsPath } from '../store/index.js'
+import type { AnyDiaryLine } from '@gemstack/skill-logs'
 import { contextEventsSource, resolveProjectPath } from './context.js'
 import type { FrameworkEvent } from '../events.js'
 import { tailAgentEvents } from './events-tail.js'
@@ -75,7 +76,8 @@ export async function streamAgentEvents(
   // initial attach stays permissive: a fallback agent (non-git project) legitimately lives there.
   const rootJournal = agentId === undefined ? undefined : await resolveEventsPath(projectId, undefined)
   let initial = true
-  return tailAgentEvents(
+  // An ended run's file is the `logs` skill's diary (#1769): its lines come back as the framework's events.
+  return tailAgentEvents<AnyDiaryLine>(
     async () => {
       const next = await resolveEventsPath(projectId, agentId)
       if (initial) {
@@ -84,7 +86,7 @@ export async function streamAgentEvents(
       }
       return rootJournal !== undefined && next === rootJournal ? undefined : next
     },
-    send,
+    line => send(fromDiaryLine(line)),
     () => send({ kind: 'stream-sync' }),
   )
 }

@@ -42,7 +42,7 @@ function constName(relPath) {
     .toUpperCase()
 }
 
-// TEMPORARY (#1748): the `tickets` and `queue` skills' text rides in the system channel of an
+// TEMPORARY (#1748): the `tickets`, `queue` and `logs` skills' text rides in the system channel of an
 // agent that runs outside a checkout the daemon created (a terminal run, an Actions runner, a
 // cloud session), because nothing links the skills into such a checkout yet. Read from wherever
 // the packages are installed, so the formats come from one place. Dies when use-npm-skills
@@ -56,6 +56,7 @@ const sources = [
   }),
   { label: '@gemstack/skill-tickets/SKILL.md', name: 'TICKETS_SKILL', path: resolveSkill('@gemstack/skill-tickets/SKILL.md'), frontMatter: true },
   { label: '@gemstack/skill-queue/SKILL.md', name: 'QUEUE_SKILL', path: resolveSkill('@gemstack/skill-queue/SKILL.md'), frontMatter: true },
+  { label: '@gemstack/skill-logs/SKILL.md', name: 'LOGS_SKILL', path: resolveSkill('@gemstack/skill-logs/SKILL.md'), frontMatter: true },
 ]
 const entries = await Promise.all(
   sources.map(async source => {

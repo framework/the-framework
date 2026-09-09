@@ -4,7 +4,9 @@ import { hostname } from 'node:os'
 import type { AutoHandoffSkip, FrameworkEvent } from '../events.js'
 import { nodeFs } from '../node-fs.js'
 import { isSafeAgentId, worktreeDirEntries } from '@gemstack/skill-branches'
-import { THE_FRAMEWORK_DIR, LOGS_CHECKOUT_DIR } from '../framework-dir.js'
+import { THE_FRAMEWORK_DIR } from '../framework-dir.js'
+import { findRun, listRuns, readDiary, runFiles, writeRun, type LogsDeps, type LogsFunnel } from '@gemstack/skill-logs'
+import { eventsOf, fromRunCard, toDiaryLine, toRunCard } from './run-record.js'
 import { agentIdFromStartedAt, startedAtFromAgentId } from '../agent-id.js'
 
 /**
@@ -24,18 +26,14 @@ export const EVENTS_FILE = 'events.jsonl'
 export const META_FILE = 'agent.json'
 
 /**
- * Where finished agents are archived, under both placements that name has: the lasting
- * `agents/<user>/` on the data branch's checkout (#1179/#1582), and the transient
- * `.the-framework/agents/` that an agent with no worktree of its own — or one archiving inside
- * its own throwaway checkout — writes into. {@link archiveDir}/{@link committedArchiveDir} are
- * where a caller picks; both are read when a project's history is listed.
+ * The transient archive, `.the-framework/agents/`: where an agent with no worktree of its own —
+ * a project that is not a git repository — archives on close, where the crash rescue puts a run
+ * whose process died, and where an agent's own worktree keeps its copy. Untracked by design. The
+ * lasting record of a run is on the data branch, as the `logs` skill's card and diary (#1769):
+ * the daemon writes it there at teardown, and every history read lists both places.
  *
  * The live agent stays at `events.jsonl`/`agent.json` (the daemon tails it); on
- * {@link AgentStore.close} a copy lands here as `<id>.jsonl` + `<id>.json` (#303), giving the
- * history sidebar a per-agent log to replay.
- *
- * The name lives here rather than in `sessions.ts`, which owns the per-user naming: that module
- * reads the store, so the constant travelling the other way would be a cycle.
+ * {@link AgentStore.close} a copy lands here as `<id>.jsonl` + `<id>.json` (#303).
  */
 export const ARCHIVE_DIR = 'agents'
 
@@ -56,6 +54,10 @@ export interface AgentMeta {
   startedAt: string
   /** ISO timestamp of the last event written. */
   updatedAt: string
+  /** ISO timestamp the run ended (the `end` event), absent while it is going. The skill's card field. */
+  endedAt?: string
+  /** What the run cost so far in US dollars, summed over its `usage` events; absent until one says. The skill's card field. */
+  cost?: number
   /**
    * The OS pid of the process that owns this agent (the one tailing `control.jsonl`), on {@link host}.
    * Persisted so a reader can tell a live agent from one whose process died without writing `end`
@@ -353,8 +355,12 @@ export function applyEventToMeta(meta: AgentMeta, event: FrameworkEvent, at: str
       // Any new turn means the agent is working again, so the agent is no longer parked (#785).
       if (event.event.type === 'start') delete next.settledAt
       break
+    case 'usage':
+      if (event.costUsd !== undefined) next.cost = (next.cost ?? 0) + event.costUsd
+      break
     case 'end':
       next.status = event.ok ? 'done' : event.stopped ? 'stopped' : 'failed'
+      next.endedAt = at
       delete next.pendingChoice // a finished run is not awaiting anything
       delete next.settledAt // nor is it waiting on you
       // The bridge dies with the agent, so a kept port would send the pane at whatever else
@@ -631,21 +637,9 @@ export class AgentStore {
   }
 }
 
-/**
- * The transient archive inside a `.the-framework` dir: what an agent's own worktree copy and the
- * crash rescue use. Untracked by design — the lasting copy lives on the data branch (#1582).
- */
+/** The transient archive inside a `.the-framework` dir. See {@link ARCHIVE_DIR}. */
 function archiveDir(dir: string): string {
   return join(dir, ARCHIVE_DIR)
-}
-
-/**
- * A user's lasting archive (#1179/#1582): `agents/<user>/` at the root of the data branch's
- * checkout. On the branch, so the history survives `git clean -fdx` AND never touches the code
- * history; per user, so two people's machines write side by side instead of conflicting.
- */
-function committedArchiveDir(cwd: string, user: string): string {
-  return join(cwd, LOGS_CHECKOUT_DIR, ARCHIVE_DIR, user)
 }
 
 /** Paths of an agent's archived log + meta inside one archive directory. */
@@ -653,39 +647,28 @@ function archivePaths(agentsDir: string, id: string): { events: string; meta: st
   return { events: join(agentsDir, `${id}.jsonl`), meta: join(agentsDir, `${id}.json`) }
 }
 
-/**
- * Where one agent's archive actually sits, searched across {@link archiveDirs}, or `undefined` when
- * it is nowhere. An agent id alone no longer names a path: which user archived it decides that, and a
- * reader (the continue (#762), a removal) only has the id.
- */
-async function findArchive(fs: StoreFs, cwd: string, agentId: string): Promise<{ events: string; meta: string } | undefined> {
-  for (const agentsDir of await archiveDirs(fs, cwd)) {
-    const paths = archivePaths(agentsDir, agentId)
-    if (await fs.exists(paths.meta)) return paths
-  }
-  return undefined
+/** The transient archive of one agent under the project, or `undefined` when it has none. */
+async function findTransientArchive(fs: StoreFs, cwd: string, agentId: string): Promise<{ events: string; meta: string } | undefined> {
+  const paths = archivePaths(archiveDir(join(cwd, THE_FRAMEWORK_DIR)), agentId)
+  return (await fs.exists(paths.meta)) ? paths : undefined
 }
 
 /**
- * Every directory a project's archived agents may sit in, committed first: each user's
- * `agents/<user>/` on the data branch's checkout (#1582), then the transient
- * `.the-framework/agents/` an agent with no worktree archives into.
- *
- * Every user's archive is listed, not just the reader's — the history is a team-visible record of
- * what the agent has done to the repo, which is the point of committing it.
- *
- * A directory is recognized by having a readable archive child, so a stray file is simply not one
- * (readdir yields `[]` for anything that is not a directory).
+ * The `logs` skill's seams over a {@link StoreFs}: the store reaches the runs on the data
+ * branch's checkout through the same injectable filesystem as its own files, so a test with an
+ * in-memory fs reads and writes the committed side as it does the transient one. The funnel is
+ * the skill's own (the persistent checkout's write cycle) unless a caller hands one in.
  */
-async function archiveDirs(fs: StoreFs, cwd: string): Promise<string[]> {
-  const dirs: string[] = []
-  const committed = join(cwd, LOGS_CHECKOUT_DIR, ARCHIVE_DIR)
-  for (const name of await fs.readdir(committed)) {
-    const candidate = join(committed, name)
-    if ((await fs.readdir(candidate)).length > 0) dirs.push(candidate)
+function runDeps(fs: StoreFs, funnel?: LogsFunnel): LogsDeps {
+  return {
+    read: path => fs.read(path),
+    list: path => fs.readdir(path),
+    write: async (path, content) => {
+      await fs.mkdir(join(path, '..'))
+      await fs.write(path, content)
+    },
+    ...(funnel ? { funnel } : {}),
   }
-  dirs.push(join(cwd, THE_FRAMEWORK_DIR, ARCHIVE_DIR))
-  return dirs
 }
 
 /**
@@ -716,8 +699,10 @@ async function archivePriorAgent(fs: StoreFs, dir: string): Promise<void> {
 
 /**
  * Put an archived agent's history back where an agent reads it (#762), so a continued agent picks up its
- * own log rather than starting empty. The inverse of {@link archiveWorktreeAgent}: teardown moved the
- * history to the repo, and continuing needs it in the checkout again.
+ * own log rather than starting empty. The inverse of the teardown's recording: teardown moved the
+ * history onto the data branch, and continuing needs it in the checkout again — the run's diary
+ * as the framework's events, its card as the framework's meta. A run the branch does not have is
+ * looked for in the transient archive.
  *
  * A no-op when the worktree already holds a live agent (nothing to restore, and its log is newer),
  * or when there is no archive. Never throws.
@@ -732,7 +717,15 @@ export async function restoreArchivedAgent(
     if (!isSafeAgentId(agentId)) return false
     const dir = join(worktree, THE_FRAMEWORK_DIR)
     if (await fs.exists(join(dir, META_FILE))) return false
-    const archive = await findArchive(fs, repo, agentId)
+    const card = await findRun(repo, agentId, runDeps(fs))
+    if (card) {
+      const diary = (await readDiary(repo, agentId, runDeps(fs))) ?? []
+      await fs.mkdir(dir)
+      await fs.write(join(dir, EVENTS_FILE), eventsOf(diary).map(event => JSON.stringify(event) + '\n').join(''))
+      await writeMetaFile(fs, join(dir, META_FILE), fromRunCard(card))
+      return true
+    }
+    const archive = await findTransientArchive(fs, repo, agentId)
     if (!archive) return false
     await fs.mkdir(dir)
     await fs.write(join(dir, EVENTS_FILE), (await fs.exists(archive.events)) ? await fs.read(archive.events) : '')
@@ -744,59 +737,63 @@ export async function restoreArchivedAgent(
 }
 
 /**
- * Archive a worktree agent's history into the *main repo* (#737), returning the meta it archived.
+ * A worktree agent's history, read for recording once its process is gone (#737): its meta and
+ * its events, out of its own checkout. The worktree is about to go, so this is the last moment
+ * the run can be read.
  *
- * An agent writes its `agent.json` / `events.jsonl` inside its own worktree (#736), so deleting that
- * worktree would delete the agent's history with it. This copies it into the repo, which is the one
- * place the dashboard's history reads from, so teardown becomes safe.
- *
- * `user` files the copy under that user's lasting `agents/<user>/` on the data branch's checkout
- * (#1179/#1582) instead of the transient `agents/`. It is this copy, not the one the agent left in
- * its own worktree, that is meant to last: every agent in a git repo gets a worktree, so this is
- * the only archive of it that outlives the checkout. The caller owns getting it committed — the
- * daemon funnels this through the data branch's writer. The worktree's own copy deliberately
- * stays untracked — it would otherwise be committed onto the agent's branch as well and collide
- * with this one on merge.
- *
- * A meta still marked `running` is flipped to `stopped` first: this runs when the process is
- * already gone, so `running` means it died without closing (crash, kill -9), exactly the case
- * {@link reconcileOrphanedAgents} handles for the project path. Idempotent per id, and forgiving:
- * a worktree with no run, or an unreadable one, yields `undefined` rather than throwing.
+ * A meta still marked `running` is flipped to `stopped` first, in the worktree's own files too
+ * (#1359): this runs when the process is already gone, so `running` means it died without
+ * closing (crash, kill -9), and the log gains the `end` event the dead process never wrote before
+ * anything copies it. `branch` is stamped on the meta because the caller reads it off the checkout
+ * and this is the last moment it can be observed (#799). Forgiving: a worktree with no run, or
+ * an unreadable one, yields `undefined` rather than throwing.
  */
-export async function archiveWorktreeAgent(
+export async function readWorktreeAgent(
   worktree: string,
-  repo: string,
   fs: StoreFs = nodeStoreFs(),
   branch?: string,
-  user?: string,
-): Promise<AgentMeta | undefined> {
+): Promise<{ meta: AgentMeta; events: FrameworkEvent[] } | undefined> {
   try {
     const worktreeDir = join(worktree, THE_FRAMEWORK_DIR)
     const live = await readMetaFile(fs, join(worktreeDir, META_FILE))
     if (!live?.id || !isSafeAgentId(live.id)) return undefined
-    // The flip writes the worktree's own log + meta too (#1359): the death gains its `end`
-    // event before the archive copies the log, so no reader — live tail or archived replay —
-    // is left holding an open gate for a dead agent.
     const stopped: AgentMeta = live.status === 'running' ? await recordOrphanEnd(fs, worktreeDir, live) : live
-    // The branch is read from the checkout by the caller and stamped here, because this is the
-    // last moment it can be observed: the worktree is about to go (#799).
     const meta: AgentMeta = branch ? { ...stopped, branch } : stopped
-    const dest = user ? committedArchiveDir(repo, user) : archiveDir(join(repo, THE_FRAMEWORK_DIR))
-    await archiveAgent(fs, dest, meta, join(worktreeDir, EVENTS_FILE))
-    return meta
+    const eventsPath = join(worktreeDir, EVENTS_FILE)
+    const events = (await fs.exists(eventsPath)) ? parseEventLog(await fs.read(eventsPath)) : []
+    return { meta, events }
   } catch {
     return undefined
   }
 }
 
 /**
- * The archived log + meta paths of one agent, wherever it is filed, or `[]` when it is nowhere.
- * Exported so a caller that deletes a session (the dashboard's Remove) does not have to know which
- * user archived it — before #1179 the path was derivable from the id alone, and now it is not.
+ * Archive a worktree agent's history into the project's transient archive (#737), returning the
+ * meta it archived: the boot reconcile's rescue of a run a dead daemon left in a worktree, where
+ * nothing reads it. The daemon's own teardown records the run on the data branch instead, through
+ * the `logs` skill, from what {@link readWorktreeAgent} reads.
+ */
+export async function archiveWorktreeAgent(worktree: string, repo: string, fs: StoreFs = nodeStoreFs(), branch?: string): Promise<AgentMeta | undefined> {
+  const run = await readWorktreeAgent(worktree, fs, branch)
+  if (!run) return undefined
+  try {
+    await archiveAgent(fs, archiveDir(join(repo, THE_FRAMEWORK_DIR)), run.meta, join(worktree, THE_FRAMEWORK_DIR, EVENTS_FILE))
+    return run.meta
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * The archived log + meta paths of one agent, wherever it is filed — its card and diary on the
+ * data branch's checkout, else its transient copy — or `[]` when it is nowhere. For a caller that
+ * needs the file itself: the tail of an ended run, the retry's read of its failure detail.
  */
 export async function archivedAgentPaths(cwd: string, agentId: string, fs: StoreFs = nodeStoreFs()): Promise<string[]> {
   if (!isSafeAgentId(agentId)) return []
-  const archive = await findArchive(fs, cwd, agentId).catch(() => undefined)
+  const files = await runFiles(cwd, agentId, runDeps(fs)).catch(() => undefined)
+  if (files) return [files.card, files.diary]
+  const archive = await findTransientArchive(fs, cwd, agentId).catch(() => undefined)
   return archive ? [archive.meta, archive.events] : []
 }
 
@@ -850,36 +847,27 @@ function isDeadRunningAgent(meta: AgentMeta | undefined, isAlive: (pid: number) 
   return meta?.status === 'running' && ownerLiveness(meta, isAlive) !== 'live'
 }
 
-/**
- * Every archived meta a project has, across all of {@link archiveDirs}, with the path it came from.
- * De-duplicated by agent id, first directory winning: the crash rescue archives into the transient
- * `agents/` and the close into the user's committed one, so an agent can sit in both places and the
- * history must show it once. The user directories are searched first, so the committed copy wins.
- */
-async function readAllArchivedMetaEntries(fs: StoreFs, cwd: string, since?: number): Promise<Array<{ path: string; meta: AgentMeta }>> {
-  const seen = new Set<string>()
-  const entries: Array<{ path: string; meta: AgentMeta }> = []
-  for (const agentsDir of await archiveDirs(fs, cwd)) {
-    for (const entry of await readArchivedMetaEntries(fs, agentsDir, since).catch(() => [])) {
-      if (seen.has(entry.meta.id)) continue
-      seen.add(entry.meta.id)
-      entries.push(entry)
-    }
-  }
-  return entries
+/** The transient archive's metas with their paths, `[]` when there is none; `since` as in {@link listAgents}. */
+async function transientArchivedMetaEntries(fs: StoreFs, cwd: string, since?: number): Promise<Array<{ path: string; meta: AgentMeta }>> {
+  return readArchivedMetaEntries(fs, archiveDir(join(cwd, THE_FRAMEWORK_DIR)), since).catch(() => [])
 }
 
 /**
- * List a project's archived agents, most-recent first: every user's committed archive plus the
- * transient `agents/`. The id sorts chronologically so no timestamp parse is needed. Missing or
- * unreadable dir/entries are skipped, never thrown.
+ * List a project's archived agents, most-recent first: the runs on the data branch (every
+ * person's, read through the `logs` skill and unfolded into the framework's meta) plus the
+ * transient archive, de-duplicated by id with the branch's copy winning — the crash rescue
+ * archives transiently and the teardown records on the branch, so a run can sit in both and the
+ * history must show it once. The id sorts chronologically so no timestamp parse is needed.
+ * Missing or unreadable dir/entries are skipped, never thrown.
  *
  * `since` (epoch ms) is for a caller that only wants recent runs — a poll on a cadence, not the
- * history list. It is answered from the filenames, so the records it excludes cost no read at all.
+ * history list.
  */
 export async function listAgents(cwd: string, fs: StoreFs = nodeStoreFs(), since?: number): Promise<AgentMeta[]> {
-  const entries = await readAllArchivedMetaEntries(fs, cwd, since)
-  return entries.map(entry => entry.meta).sort(byIdDesc)
+  const committed = (await listRuns(cwd, since === undefined ? {} : { since }, runDeps(fs)).catch((): never[] => [])).map(fromRunCard)
+  const seen = new Set(committed.map(meta => meta.id))
+  const transient = (await transientArchivedMetaEntries(fs, cwd, since)).map(entry => entry.meta).filter(meta => !seen.has(meta.id))
+  return [...committed, ...transient].sort(byIdDesc)
 }
 
 /**
@@ -897,11 +885,16 @@ function ownerLiveness(meta: AgentMeta, isAlive: (pid: number) => boolean): 'liv
 }
 
 /**
- * Reconcile runs a dead process left marked `running` — the live `agent.json`, an archived
- * `agents/*.json`, or an agent inside a worktree. Such an agent shows as active while nothing is left
- * to read its `control.jsonl`, so its Stop is a no-op. Each is flipped to `stopped`; the live
- * run is archived first (idempotent) so its history is kept. Returns how many were reconciled.
- * Best-effort: a read/write error skips that agent, never throws.
+ * Reconcile runs a dead process left marked `running` — a run on the data branch, the live
+ * `agent.json`, a transient `agents/*.json`, or an agent inside a worktree. Such an agent shows as
+ * active while nothing is left to read its `control.jsonl`, so its Stop is a no-op. Each is
+ * flipped to `stopped`; the live run is archived first (idempotent) so its history is kept.
+ * Returns how many were reconciled. Best-effort: a read/write error skips that agent, never throws.
+ *
+ * A run on the data branch is ended through the `logs` skill's write, so the ending is a commit:
+ * a card edited in place on the branch's checkout is not a fact yet — the next sync's rebase
+ * refuses the dirty tree and the funnel resets it. `funnel` is the skill's own unless a test
+ * hands one in.
  *
  * An agent whose pid is alive on this host is left alone (#926). This used to flip every `running`
  * meta on the assumption that a fresh dashboard drives no in-flight run, which holds only while
@@ -913,17 +906,26 @@ export async function reconcileOrphanedAgents(
   cwd: string,
   fs: StoreFs = nodeStoreFs(),
   isAlive: (pid: number) => boolean = isPidAlive,
+  funnel?: LogsFunnel,
 ): Promise<number> {
   const dir = join(cwd, THE_FRAMEWORK_DIR)
   let fixed = 0
-  // Archived agents stuck at `running` (e.g. a prior live agent the next agent never rescued), wherever
-  // they are archived. Done before the live agent so its fresh archive isn't re-counted here.
-  for (const { path, meta } of await readAllArchivedMetaEntries(fs, cwd)) {
+  const deps = runDeps(fs, funnel)
+  for (const card of await listRuns(cwd, {}, deps).catch((): never[] => [])) {
+    const meta = fromRunCard(card)
+    if (!isDeadRunningAgent(meta, isAlive)) continue
+    // The surrogate end (#1359) lands in both files: the replayed diary sees the run finish, and
+    // the meta fold drops the pendingChoice the agent died holding.
+    const event = orphanEndEvent()
+    const diary = (await readDiary(cwd, card.id, deps).catch(() => undefined)) ?? []
+    const ended = await writeRun(cwd, toRunCard(applyEventToMeta(meta, event, new Date().toISOString())), [...diary, toDiaryLine(event)], deps)
+    if (ended.ok || ended.committed) fixed++
+  }
+  // The transient archive's runs stuck at `running`. Done before the live agent so its fresh
+  // archive isn't re-counted here.
+  for (const { path, meta } of await transientArchivedMetaEntries(fs, cwd)) {
     if (!isDeadRunningAgent(meta, isAlive)) continue
     try {
-      // The archived pair sits side by side (`<id>.json` + `<id>.jsonl`), so the surrogate end
-      // (#1359) lands in both: the replayed log sees the agent finish, and the meta fold drops
-      // the pendingChoice the agent died holding.
       const event = orphanEndEvent()
       await fs.append(path.replace(/\.json$/, '.jsonl'), JSON.stringify(event) + '\n').catch(() => {})
       await writeMetaFile(fs, path, applyEventToMeta(meta, event, new Date().toISOString()))
@@ -943,7 +945,7 @@ export async function reconcileOrphanedAgents(
   // Runs living in worktrees (#736/#737). A daemon that died mid-run never ran its teardown, so
   // each of those agents is orphaned the same way — except its history sits inside the worktree,
   // where nothing reads it. Flip it in place (so the dashboard stops showing it as live) and copy
-  // it into the repo's history. The worktree itself is left on disk: an agent that ended this way did
+  // it into the transient archive. The worktree itself is left on disk: an agent that ended this way did
   // not end cleanly, and those are kept for inspection. Removing one is an explicit action.
   for (const entry of await worktreeDirEntries(cwd, path => fs.subdirs(path))) {
     const worktreeDir = join(entry.path, THE_FRAMEWORK_DIR)
@@ -1039,9 +1041,10 @@ export async function readLiveMetas(
 }
 
 /**
- * Read one archived agent's event log for replay. Returns `undefined` for an
- * unknown or unsafe id; a torn trailing line is dropped (same rule as the live
- * {@link AgentStore.loadEvents}).
+ * Read one archived agent's event log for replay: the run's diary on the data branch, read
+ * through the `logs` skill and turned back into the framework's events, else the transient
+ * archive's log. Returns `undefined` for an unknown or unsafe id; a torn trailing line is dropped
+ * (same rule as the live {@link AgentStore.loadEvents}).
  */
 export async function loadAgentEvents(
   cwd: string,
@@ -1049,7 +1052,9 @@ export async function loadAgentEvents(
   fs: StoreFs = nodeStoreFs(),
 ): Promise<FrameworkEvent[] | undefined> {
   if (!isSafeAgentId(id)) return undefined
-  const archive = await findArchive(fs, cwd, id)
+  const diary = await readDiary(cwd, id, runDeps(fs)).catch(() => undefined)
+  if (diary) return eventsOf(diary)
+  const archive = await findTransientArchive(fs, cwd, id)
   if (!archive || !(await fs.exists(archive.events))) return undefined
   return parseEventLog(await fs.read(archive.events))
 }
@@ -1104,37 +1109,5 @@ export async function readEventLog(cwd: string, fs: StoreFs = nodeStoreFs()): Pr
     return parseEventLog(await fs.read(path))
   } catch {
     return []
-  }
-}
-
-/** The facts a settled run learns after its process is gone: the PR its work is on, the branch it landed on. */
-export type ArchivePatch = Partial<Pick<AgentMeta, 'branch' | 'pr'>>
-
-/**
- * Patch an archived run's record with a fact discovered once the agent's process is gone (E6,
- * #1601): the pull request opened for its work, or the branch a cloud session's work landed
- * on. There is no event stream left to carry it, and every surface reads the record, so this
- * one write is what turns a "nothing committed" row into its real branch and PR.
- *
- * The archive lives on the data branch's checkout, and a fact written there is only durable once
- * committed — {@link patchArchivedAgentOnDataBranch} is the funneled form every caller outside a
- * test uses.
- */
-export async function patchArchivedAgent(
-  cwd: string,
-  agentId: string,
-  patch: ArchivePatch,
-  fs: StoreFs = nodeStoreFs(),
-): Promise<boolean> {
-  if (!isSafeAgentId(agentId)) return false
-  try {
-    const archive = await findArchive(fs, cwd, agentId)
-    if (!archive) return false
-    const meta = await readMetaFile(fs, archive.meta)
-    if (!meta) return false
-    await writeMetaFile(fs, archive.meta, { ...meta, ...patch })
-    return true
-  } catch {
-    return false
   }
 }

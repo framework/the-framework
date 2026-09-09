@@ -19,11 +19,9 @@ import { maintenanceDue, readMaintenanceState, mergeMaintenanceState } from './m
 import { claimTickets, readTickets, releaseTicket, syncTickets, TICKETS_DIR, ticketFromQueueEntry, ticketsDir } from '@gemstack/skill-tickets'
 import { queueDone, readQueueEntries, syncQueue } from '@gemstack/skill-queue'
 import { nextQueuedTicket } from './todo-loop.js'
-import { LOGS_BRANCH } from './framework-dir.js'
 import type { ProjectErrors } from './project-errors.js'
 import { readFile, writeFile } from 'node:fs/promises'
 import { startMergedWorktreeSweep, type MergedSweepOptions } from './merged-worktrees.js'
-import { pullFileBranch } from '@gemstack/agent-data'
 import { reconcileBranchLinks } from '@gemstack/skill-branches'
 import { startProjectPass } from './project-pass.js'
 import { startCloudScratchSweep } from './cloud-scratch-refs.js'
@@ -118,17 +116,16 @@ export interface BackgroundServiceDeps {
 }
 
 /**
- * One project's data-sync turn (#1599): converge the `agent-data` branch (the skills': the
- * `tickets` skill's checkout, root link and pull, then the `queue` skill's seed and pull) and the
- * `agents-logs` branch (the archives and routine locks) with origin, and set or clear the
- * project's `data-sync` error by the outcome. The clear is unconditional on success, so the error
- * lives exactly as long as the condition — the next tick after the user fixes the remote, it is
- * gone.
+ * One project's data-sync turn (#1599): converge the `agent-data` branch — the skills' branch,
+ * which also carries the `logs` skill's runs and the routine locks — with origin (the `tickets`
+ * skill's checkout, root link and pull, then the `queue` skill's seed and pull), and set or clear
+ * the project's `data-sync` error by the outcome. The clear is unconditional on success, so the
+ * error lives exactly as long as the condition — the next tick after the user fixes the remote,
+ * it is gone.
  */
 export async function syncProjectData(path: string, errors: ProjectErrors, log: (message: string) => void): Promise<void> {
   const tickets = await syncTickets(path, { log })
-  const queue = tickets.ok ? await syncQueue(path, { log }) : tickets
-  const result = queue.ok ? await pullFileBranch(path, LOGS_BRANCH, { log }) : queue
+  const result = tickets.ok ? await syncQueue(path, { log }) : tickets
   if (result.ok) errors.clear(path, 'data-sync')
   else {
     log(`[framework] data sync: ${result.error}`)

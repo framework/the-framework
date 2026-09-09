@@ -126,15 +126,11 @@ export async function reclaimWorktree(repo: string, path: string, opts: ReclaimO
   await removeWorktree(repo, path, git)
   await pruneWorktrees(repo, git)
   // After the checkout: git refuses to delete a branch a worktree still has checked out.
+  // Only a branch that actually went is named: git refuses to delete a branch another worktree
+  // has checked out, and the caller must not report that one as gone.
   const deleted: string[] = []
-  if (emptyBranch) {
-    await deleteBranch(repo, branch, git)
-    deleted.push(branch)
-  }
-  if (birthBranchGoes && opts.birthBranch) {
-    await deleteBranch(repo, opts.birthBranch, git)
-    deleted.push(opts.birthBranch)
-  }
+  if (emptyBranch && (await deleteBranch(repo, branch, git))) deleted.push(branch)
+  if (birthBranchGoes && opts.birthBranch && (await deleteBranch(repo, opts.birthBranch, git))) deleted.push(opts.birthBranch)
   return deleted.length ? { ok: true, branchesDeleted: deleted } : { ok: true }
 }
 

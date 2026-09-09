@@ -54,6 +54,11 @@ const GIT_GLOBAL_VALUE_OPTIONS = new Set(['-C', '-c', '--git-dir', '--work-tree'
  * would read `git -C /repo push` as the subcommand `/repo`, costing `push` its slow budget.
  */
 function gitWords(args: string[]): string[] {
+  return gitCommand(args).filter(arg => !arg.startsWith('-'))
+}
+
+/** The subcommand and everything after it: the invocation with the leading global options dropped. */
+function gitCommand(args: string[]): string[] {
   let i = 0
   while (i < args.length) {
     const arg = args[i] ?? ''
@@ -61,7 +66,7 @@ function gitWords(args: string[]): string[] {
     // The `--opt=value` form carries its value inline; the separate form eats the next word.
     i += GIT_GLOBAL_VALUE_OPTIONS.has(arg) ? 2 : 1
   }
-  return args.slice(i).filter(arg => !arg.startsWith('-'))
+  return args.slice(i)
 }
 
 /**
@@ -81,7 +86,8 @@ export function gitTimeoutMs(args: string[]): number {
   }
   if (op === 'branch') {
     // A bare `branch` or one carrying a listing flag reads; `-D`, `-m`, or `branch <new> [start]` writes a ref.
-    const flags = args.filter(arg => arg.startsWith('-'))
+    // The subcommand's own flags: a global option ahead of it (`-C <repo>`) is not one of them.
+    const flags = gitCommand(args).filter(arg => arg.startsWith('-'))
     const reads = words.length === 1 || flags.some(flag => GIT_BRANCH_READ_FLAGS.has(flag))
     return reads && !flags.some(flag => !GIT_BRANCH_READ_FLAGS.has(flag) && !flag.startsWith('--format')) ? GIT_READ_TIMEOUT_MS : GIT_WRITE_TIMEOUT_MS
   }

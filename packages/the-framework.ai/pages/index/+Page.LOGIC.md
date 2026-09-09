@@ -1,0 +1,1 @@
+Assembles the landing page (`/`) from its sections, top to bottom: the top navigation, the hero, the section navigation, then the five chapters "Stop babysitting", "Autonomous AI", "How it works", "Features" and "Your framework", the closing call to action, and the footer. Each section's content and behavior is described in that section's own `LOGIC.md` beside it.

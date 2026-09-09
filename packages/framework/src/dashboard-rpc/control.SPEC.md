@@ -110,7 +110,7 @@ The user sees a ticket worth doing and queues it, so the next drain agent picks 
 
 #### Business logic
 
-The entry is written straight onto the project's agent queue, through the `tickets` skill that owns it. Given the ticket it came from, the entry is placed in the agent queue section matching that ticket's own priority rather than appended at the end, and is written as a link back to the ticket, so the drain agent working the queue front to back can open it. An empty entry is refused, and so is a project with no local path here.
+The entry is written straight onto the project's agent queue, through the `queue` skill that owns it; the ticket's priority is read through the `tickets` skill. Given the ticket it came from, the entry is placed in the agent queue section matching that ticket's own priority rather than appended at the end, and is written as a link back to the ticket, so the drain agent working the queue front to back can open it. An empty entry is refused, and so is a project with no local path here.
 
 A ticket's plan is queued the same way: one entry asking for that ticket's plan file — the same wording the plan-tickets preset itself queues — placed by the ticket's priority. Deliberately not a link back to the ticket: a leading ticket link is exactly what every reader takes as "this ticket is queued for implementation", and a plan ask is not that. A name that is not a plain ticket filename is refused.
 

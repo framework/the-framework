@@ -4,7 +4,7 @@ SHOW_MD: Show it via `showMarkdown()`
 SHOW_CHOICES: Show it via `showChoices()`
 AWAIT: Stop, await user answer before resuming
 SESSION_NAME: the name of the session
-TODO_FILE: the agent queue, `TODO_AGENTS.md` — add an entry with `tickets queue add "<entry>" --priority <N>` from the `tickets` skill
+TODO_FILE: the agent queue, `TODO_AGENTS.md` — add an entry with `queue add "<entry>" --priority <N>` from the `queue` skill
 
 ## Analyze the user prompt
 

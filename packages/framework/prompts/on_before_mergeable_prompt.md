@@ -1,4 +1,4 @@
-TODO_FILE: the agent queue, `TODO_AGENTS.md` — add an entry with `tickets queue add "<entry>"` from the `tickets` skill
+TODO_FILE: the agent queue, `TODO_AGENTS.md` — add an entry with `queue add "<entry>"` from the `queue` skill
 
 ## Maintenance
 

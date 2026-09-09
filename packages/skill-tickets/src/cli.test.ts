@@ -30,7 +30,6 @@ async function rig(clones: number) {
   await writeFile(join(seed, 'tickets', '2026-08-30_a.md'), 'Priority: 8\n\n# A\n\n## TLDR\n\nThe first.\n')
   await writeFile(join(seed, 'tickets', '2026-08-29_b.md'), '# B\n')
   await writeFile(join(seed, 'tickets', '2026-08-29_b.plan.md'), 'Effort: 1\n\n# [Plan] B\n')
-  await writeFile(join(seed, 'TODO_AGENTS.md'), '## Priority 5\n\n- [Do B](tickets/2026-08-29_b.md)\n')
   await git(['add', '-A'], seed)
   await git(['commit', '-m', 'seed'], seed)
   await git(['push', 'origin', DATA_BRANCH], seed)
@@ -58,7 +57,7 @@ async function run(cwd: string, argv: string[], stdin = '') {
   return { code, json: out.length ? JSON.parse(out.join('\n')) : undefined, stderr: err.join('\n') }
 }
 
-test('reads: list, show and queue come off origin, and a missing ticket is a refusal', async () => {
+test('reads: list and show come off origin, and a missing ticket is a refusal', async () => {
   const { agents, cleanup } = await rig(1)
   const [a] = agents
   try {
@@ -75,8 +74,6 @@ test('reads: list, show and queue come off origin, and a missing ticket is a ref
     assert.equal(show.json.holder, undefined)
     // The ticket may be named by its path too.
     assert.equal((await run(a!, ['show', 'tickets/2026-08-29_b.md'])).code, 0)
-    const queue = await run(a!, ['queue'])
-    assert.deepEqual(queue.json, ['[Do B](tickets/2026-08-29_b.md)'])
     const missing = await run(a!, ['show', '2026-08-28_nope.md'])
     assert.equal(missing.code, 1)
     assert.deepEqual(missing.json, { ok: false, reason: 'no-ticket', file: '2026-08-28_nope.md' })
@@ -212,35 +209,6 @@ test('put writes a ticket, a plan or meta.json from stdin, never a lock; close r
   }
 })
 
-test('queue add places an entry by priority, links a ticket by --ticket, and queue done deletes the line', async () => {
-  const { bare, agents, cleanup } = await rig(1)
-  const [a] = agents
-  try {
-    const added = await run(a!, ['queue', 'add', 'Tidy the loader', '--priority', '3'])
-    assert.deepEqual(added.json, { ok: true, entry: 'Tidy the loader', priority: 3 })
-    // By ticket: a link back to it, placed by the ticket's own priority (a is 8).
-    const linked = await run(a!, ['queue', 'add', 'Do A', '--ticket', '2026-08-30_a.md'])
-    assert.deepEqual(linked.json, { ok: true, entry: '[Do A](tickets/2026-08-30_a.md)', priority: 8 })
-    const plain = await run(a!, ['queue', 'add', 'Last, unranked'])
-    assert.deepEqual(plain.json, { ok: true, entry: 'Last, unranked' })
-    const md = await git(['show', `${DATA_BRANCH}:TODO_AGENTS.md`], bare)
-    assert.equal(md, '## Priority 8\n\n- [Do A](tickets/2026-08-30_a.md)\n\n## Priority 5\n\n- [Do B](tickets/2026-08-29_b.md)\n\n## Priority 3\n\n- Tidy the loader\n- Last, unranked\n')
-    assert.equal((await git(['log', '-1', '--format=%s', DATA_BRANCH], bare)).trim(), 'queue add: Last, unranked')
-    assert.deepEqual((await run(a!, ['queue'])).json, ['[Do A](tickets/2026-08-30_a.md)', '[Do B](tickets/2026-08-29_b.md)', 'Tidy the loader', 'Last, unranked'])
-    const done = await run(a!, ['queue', 'done', '[Do B](tickets/2026-08-29_b.md)'])
-    assert.deepEqual(done.json, { ok: true, entry: '[Do B](tickets/2026-08-29_b.md)' })
-    assert.ok(!(await git(['show', `${DATA_BRANCH}:TODO_AGENTS.md`], bare)).includes('Do B'))
-    assert.ok(!(await git(['show', `${DATA_BRANCH}:TODO_AGENTS.md`], bare)).includes('[x]'), 'deleted, not checked off')
-    const gone = await run(a!, ['queue', 'done', 'never there'])
-    assert.equal(gone.code, 1)
-    assert.equal(gone.json.reason, 'no-entry')
-    assert.equal((await run(a!, ['queue', 'add', 'x', '--priority', '11'])).code, 2)
-    assert.equal((await run(a!, ['queue', 'add', 'x', '--ticket', 'nope.md'])).json.reason, 'no-ticket')
-  } finally {
-    await cleanup()
-  }
-})
-
 test('a repository with no remote reads its local branch and refuses to write; outside a repository is a refusal', async () => {
   const solo = await realpath(await mkdtemp(join(tmpdir(), 'tickets-cli-solo-')))
   try {
@@ -253,7 +221,7 @@ test('a repository with no remote reads its local branch and refuses to write; o
     const commit = (await git(['commit-tree', '4b825dc642cb6eb9a060e54bf8d69288fbee4904', '-m', 'create the agent-data branch'], solo)).trim()
     await git(['branch', DATA_BRANCH, commit], solo)
     assert.deepEqual((await run(solo, ['list'])).json, [])
-    const refused = await run(solo, ['queue', 'add', 'x'])
+    const refused = await run(solo, ['put', '2026-08-31_c.md'], '# C\n')
     assert.equal(refused.code, 1)
     assert.deepEqual(refused.json, { ok: false, reason: 'no-remote' })
     const outside = await run(tmpdir(), ['list'])

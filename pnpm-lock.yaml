@@ -11,6 +11,9 @@ importers:
       '@gemstack/skill-branches':
         specifier: workspace:*
         version: link:packages/skill-branches
+      '@gemstack/skill-queue':
+        specifier: workspace:*
+        version: link:packages/skill-queue
       '@gemstack/skill-tickets':
         specifier: workspace:*
         version: link:packages/skill-tickets
@@ -47,6 +50,9 @@ importers:
       '@gemstack/skill-branches':
         specifier: workspace:*
         version: link:../skill-branches
+      '@gemstack/skill-queue':
+        specifier: workspace:*
+        version: link:../skill-queue
       '@gemstack/skill-tickets':
         specifier: workspace:*
         version: link:../skill-tickets
@@ -140,6 +146,19 @@ importers:
         version: 4.1.10(@types/node@20.19.43)(jsdom@29.1.1)(vite@8.1.4(@types/node@20.19.43)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))
 
   packages/skill-branches:
+    dependencies:
+      '@gemstack/agent-data':
+        specifier: workspace:*
+        version: link:../agent-data
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.43
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
+  packages/skill-queue:
     dependencies:
       '@gemstack/agent-data':
         specifier: workspace:*

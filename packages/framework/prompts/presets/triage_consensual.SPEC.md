@@ -1,4 +1,4 @@
-The triage-consensual preset: fills the agent queue with the significant work that needs no human input. The agent lists all tickets with the `tickets` skill, picks only the ones that are significant — explicitly not quick wins — and consensual, meaning zero open questions and zero variability, such as a ticket with a single fairly obvious plan, and puts them on the agent queue (`TODO_AGENTS.md`), one entry each, linked to its ticket.
+The triage-consensual preset: fills the agent queue with the significant work that needs no human input. The agent lists all tickets with the `tickets` skill, picks only the ones that are significant — explicitly not quick wins — and consensual, meaning zero open questions and zero variability, such as a ticket with a single fairly obvious plan, and puts them on the agent queue (`TODO_AGENTS.md`) with the `queue` skill's command, one entry each, written as a link to its ticket at the ticket's own priority (5 when it has none).
 
 ## Business logic — TL;DR
 

@@ -89,11 +89,11 @@ happens while nobody is at the keyboard.
 - Hottest tickets
 - Projects sidebar
 - A project whose directory was renamed or deleted leaves the sidebar on the next refresh, and comes back when the directory does; the registration is kept
-- Project errors: a project whose bookkeeping branches cannot reach origin (push rejected, or no remote) — the `tickets` branch or the `agents-logs` branch — is flagged with a red dot in the sidebar and a banner on its page, until a sync converges
+- Project errors: a project whose bookkeeping branches cannot reach origin (push rejected, or no remote) — the `agent-data` branch or the `agents-logs` branch — is flagged with a red dot in the sidebar and a banner on its page, until a sync converges
 
 ## Tickets
 
-- Tickets and the queue live on the `tickets` branch, never on a code branch; every change is one commit pushed straight to it, so what one agent writes the next one sees without waiting for a pull request (#1748)
+- Tickets and the queue live on the `agent-data` branch, never on a code branch; every change is one commit pushed straight to it, so what one agent writes the next one sees without waiting for a pull request (#1748)
 - A `tickets` link at your repository's root shows that branch's tickets from your own checkout, made only where nothing of yours sits at that path and kept out of git
 - Cross-project ticket list
 - Faceted filtering: text, priority/effort/uncertainty as buckets *or* ranges, topics, planning stage, project
@@ -102,7 +102,7 @@ happens while nobody is at the keyboard.
 - Ticket detail page
 - A plan page when a plan exists; a button to start an agent writing one when it doesn't
 - "Resume agent" on the plan page: opens the session of the agent that wrote the plan, so the conversation continues with the plan already in its context
-- Queue a ticket into the AI queue — the entry is written onto the `tickets` branch, linked to the ticket and filed under the ticket's priority
+- Queue a ticket into the AI queue — the entry is written onto the `agent-data` branch, linked to the ticket and filed under the ticket's priority
 - Queue every ticket the filters show into the AI queue, in one click from the page heading
 - Queue a plan for every unplanned ticket the filters show, from the same heading
 - A ticket whose work is done leaves the branch with its plan and its claim; a queue entry whose work is done is taken off the queue — done means deleted, never ticked off
@@ -115,8 +115,10 @@ happens while nobody is at the keyboard.
 - Every agent gets its own git worktree under `.branches/` and its own branch (`agent-<id>`), created before it starts; your checkout is never touched
 - The `branches` skill: every checkout The Framework creates carries the `@gemstack/skill-branches` package's `SKILL.md` where the agent's harness looks for skills (`.claude/skills/branches` for Claude Code, `.agents/skills/branches` for Codex), and the system prompt tells the agent to use it — that checkout is your whole workspace, name the session with the command, commit as you go, leave a clean tree, never push or open the PR yourself; an agent anywhere else (a terminal run in your checkout, an Actions runner, a cloud session) is told to branch with git itself
 - `branches` on every agent's PATH — the skill's command line: `name <name>` renames the agent's branch to `agent-<name>` and prints the name it got (suffixed when taken); `status` says whether the tree is clean and the branch on the remote; `create`, `attach`, `list`, `remove`, `prune` are the same operations the dashboard runs
-- The `tickets` skill: every checkout The Framework creates carries the `@gemstack/skill-tickets` package's `SKILL.md` beside the `branches` skill, where the agent's harness looks for skills (`.claude/skills/tickets` for Claude Code, `.agents/skills/tickets` for Codex), and the presets tell the agent to use it — the tickets and the agent queue are on the `tickets` branch, read and changed with the command, claimed before they are planned or worked; an agent anywhere else (a terminal run in your checkout, an Actions runner, a cloud session) is told instead how to do the same with git, temporarily, until the skill is committed into the repository (#1748)
-- `tickets` on every agent's PATH — the skill's command line: `list` and `show <file>` read the tickets with their plans and their holders, `queue` reads the queue in the order it is worked, `queue add <text>` puts an entry on it at a priority and linked to a ticket, `queue done <text>` takes an entry off, `put <file>` writes a ticket, a plan or the import stamp, `close <file>` removes a ticket with its plan and claim, `claim <file>` and `release <file>` are the claim; every one of them is one commit pushed to the `tickets` branch
+- The `tickets` skill: every checkout The Framework creates carries the `@gemstack/skill-tickets` package's `SKILL.md` beside the `branches` skill, where the agent's harness looks for skills (`.claude/skills/tickets` for Claude Code, `.agents/skills/tickets` for Codex), and the presets tell the agent to use it — the tickets are on the `agent-data` branch, read and changed with the command, claimed before they are planned or worked, queued as a link through the `queue` skill; an agent anywhere else (a terminal run in your checkout, an Actions runner, a cloud session) is told instead how to do the same with git, temporarily, until the skill is committed into the repository (#1748)
+- `tickets` on every agent's PATH — the skill's command line: `list` and `show <file>` read the tickets with their plans and their holders, `put <file>` writes a ticket, a plan or the import stamp, `close <file>` removes a ticket with its plan and claim, `claim <file>` and `release <file>` are the claim; every one of them is one commit pushed to the `agent-data` branch
+- The `queue` skill: every checkout The Framework creates carries the `@gemstack/skill-queue` package's `SKILL.md` beside the other two (`.claude/skills/queue`, `.agents/skills/queue`), and the presets tell the agent to use it — the agent queue is on the `agent-data` branch, read and changed with the command; an agent anywhere else gets the same git bridge as for the tickets (#1750)
+- `queue` on every agent's PATH — the skill's command line: `queue` reads the queue in the order it is worked, `queue add <text> [--priority N]` puts an entry on it in its priority section, `queue done <text>` takes an entry off; every one of them is one commit pushed to the `agent-data` branch
 - The session name is the branch: an agent is labelled by its `agent-<name>` branch, read from git after every turn — nothing to signal, nothing to record twice
 - Dependency directories shared from the parent checkout instead of reinstalled — as directories of links, so an agent's own install stays in its checkout and never rewrites or purges the parent's
 - A checkout whose work is not on the remote is kept — and a publish-nothing (`handoff: local`) agent's is kept until you publish or delete it

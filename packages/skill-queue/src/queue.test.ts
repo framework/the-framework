@@ -75,7 +75,7 @@ const git = nodeGitRunner()
 const RETRIED_RM = { recursive: true, force: true, maxRetries: 10 } as const
 
 async function repo(): Promise<string> {
-  const path = await realpath(await mkdtemp(join(tmpdir(), 'tickets-queue-')))
+  const path = await realpath(await mkdtemp(join(tmpdir(), 'queue-')))
   await git(['init', '-b', 'main'], path)
   await git(['config', 'user.email', 't@t'], path)
   await git(['config', 'user.name', 't'], path)

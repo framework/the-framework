@@ -5,7 +5,6 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { nodeGitRunner, BRANCHES_DIR, DATA_BRANCH } from '@gemstack/agent-data'
 import { syncTickets, ticketsCheckoutPath, ticketsDir } from './store.js'
-import { QUEUE_FILE } from './names.js'
 
 const git = nodeGitRunner()
 const RETRIED_RM = { recursive: true, force: true, maxRetries: 10 } as const
@@ -21,7 +20,7 @@ async function repo(): Promise<string> {
   return path
 }
 
-test('sync births the branch, seeds the queue, links tickets/ at the root hidden from git, and names a repo with no remote', async () => {
+test('sync births the branch, links tickets/ at the root hidden from git, and names a repo with no remote', async () => {
   const root = await repo()
   try {
     const result = await syncTickets(root)
@@ -30,9 +29,8 @@ test('sync births the branch, seeds the queue, links tickets/ at the root hidden
     assert.equal(wt, join(root, BRANCHES_DIR, DATA_BRANCH))
     assert.equal(ticketsDir(root), join(wt, 'tickets'))
     assert.equal((await git(['rev-parse', '--abbrev-ref', 'HEAD'], wt)).trim(), DATA_BRANCH)
-    // Seeded and committed, so the checkout is clean between cycles.
-    assert.equal(await readFile(join(wt, QUEUE_FILE), 'utf8'), '')
-    assert.match(await git(['log', '-1', '--format=%s', `refs/heads/${DATA_BRANCH}`], root), /^seed the queue/)
+    // Born an orphan and left clean between cycles: nothing of the package's is written on it.
+    assert.match(await git(['log', '--format=%s', `refs/heads/${DATA_BRANCH}`], root), /^create the agent-data branch\n?$/)
     assert.equal((await git(['status', '--porcelain'], wt)).trim(), '')
     // The root link reaches into the checkout, relatively, so a moved repo keeps working.
     assert.equal(await readlink(join(root, 'tickets')), join(BRANCHES_DIR, DATA_BRANCH, 'tickets'))
@@ -46,7 +44,7 @@ test('sync births the branch, seeds the queue, links tickets/ at the root hidden
     await git(['add', '-A'], wt)
     await git(['commit', '-m', 't'], wt)
     assert.equal((await git(['show', `${DATA_BRANCH}:tickets/t.md`], root)).trim(), 'x')
-    // Idempotent: a second sync seeds and links nothing new.
+    // Idempotent: a second sync links nothing new and writes nothing.
     await syncTickets(root)
     assert.match(await git(['log', '-1', '--format=%s', `refs/heads/${DATA_BRANCH}`], root), /^t$/m)
   } finally {

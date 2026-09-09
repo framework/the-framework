@@ -3,7 +3,6 @@ import { test } from 'node:test'
 import {
   isTicketFile,
   isTicketPath,
-  QUEUE_FILE,
   queuePriorityForTicket,
   ticketFromQueueEntry,
   ticketIssueRef,
@@ -12,9 +11,8 @@ import {
   TICKETS_DIR,
 } from './names.js'
 
-test('the branch, its checkout, the folder and the queue file are the conventions the skill names', () => {
+test('the folder is the convention the skill names', () => {
   assert.equal(TICKETS_DIR, 'tickets')
-  assert.equal(QUEUE_FILE, 'TODO_AGENTS.md')
 })
 
 test('a ticket names its plan and lock siblings by stem', () => {

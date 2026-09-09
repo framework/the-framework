@@ -1,11 +1,11 @@
 ---
 name: tickets
-description: Where the project's tickets and its agent queue live, how to read and change them, how to claim a ticket so no two agents work the same one, and the formats.
+description: Where the project's tickets live, how to read and change them, how to claim a ticket so no two agents work the same one, how to queue one, and the formats.
 ---
 
-# Tickets and the agent queue
+# Tickets
 
-The tickets (`tickets/<DATE>_<SLUG>.md`, with their `.plan.md` and `.lock.md` siblings) and the agent queue (`TODO_AGENTS.md`) live on the branch `agent-data`, never on a code branch. A `tickets` link at the repository root, if present, shows a possibly stale copy; never write there. The command reads fresh. The queue is not under that link.
+The tickets (`tickets/<DATE>_<SLUG>.md`, with their `.plan.md` and `.lock.md` siblings) live on the branch `agent-data`, never on a code branch. A `tickets` link at the repository root, if present, shows a possibly stale copy; never write there. The command reads fresh.
 
 Read and change them with the `tickets` command, a dependency of this repository (`@gemstack/skill-tickets`). With no `node_modules`, install first with the lockfile's package manager (`npm install` for `package-lock.json`). Then run it as `npx tickets`. Every change it makes is one commit pushed straight to the `agent-data` branch. A refusal exits 1 with a line on stderr; a wrong command line exits 2 with the usage.
 
@@ -17,7 +17,6 @@ npx tickets list                 every open ticket, as one JSON array: file, tit
                                  (priority, topics, github, effort, uncertainty, locked, lockedBy
                                  absent when unset)
 npx tickets show <file>          one ticket: its text, its plan, who holds it
-npx tickets queue                the queue's open entries, in order of work
 ```
 
 ## Change
@@ -27,17 +26,19 @@ npx tickets put <file>           write one file under tickets/ from stdin, the w
                                  empty stdin writes an empty file
                                  (npx tickets put <file> < draft.md): a ticket or a plan
 npx tickets close <file>         once the work is merged: remove the ticket with its plan and lock;
-                                 refused while someone else holds it; its queue entry stays,
-                                 `queue done` it
-npx tickets queue add <text> [--priority N] [--ticket <file>]
-                                 put an entry on the queue; --priority places it in that section,
-                                 --ticket makes <text> the label of a link to the ticket (pass the
-                                 label, not a link) and places it by the ticket's
-                                 priority (5 when it has none) unless --priority says otherwise;
-                                 with neither, it goes at the end of the file
-npx tickets queue done <entry>   remove an entry: one quoted argument, exactly as `npx tickets queue`
-                                 printed it; done means deleted
+                                 refused while someone else holds it; its queue entry, if any,
+                                 stays: `npx queue done` it
 ```
+
+## Queue a ticket
+
+When the repository has the `queue` skill, a ticket goes on the agent queue as a link, its title as the label, at the ticket's own `Priority:` (5 when it has none):
+
+```
+npx queue add "[<title>](tickets/<file>)" --priority <N>
+```
+
+Once the work is merged, `npx tickets close <file>` and `npx queue done` the entry.
 
 ## Claim before you plan or work a ticket
 
@@ -128,24 +129,3 @@ Notes:
   - List all aspects that need to be considered
   - Give an uncertainty rating (0-10) to each aspect following this criteria: is there an obviously optimal way to implement it (0), or is it highly unclear whether it can be implemented in a better way (10)?
   - Explore and suggest alternatives for each aspect with a low rating
-
-### The queue: `TODO_AGENTS.md`
-
-```md
-## Priority 10 (critical — act immediately)
-
-...
-
-## Priority 9
-
-- [Succinct description](/link-for-more-details)
-- Or self-contained TODO item with complete description of what should be done
-
-...
-
-## Priority 0 (only if capacity)
-
-...
-```
-
-The queue lists *all* tasks AI will work on next, sorted by priority. Priority 10 is rarely used (e.g. critical production bugs) and is treated as the utmost priority. Within a priority, the first tasks have higher priority (they are the "next" tasks within that "priority queue"). A done entry is removed (`npx tickets queue done`).

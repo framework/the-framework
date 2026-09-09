@@ -9,7 +9,7 @@ Where the tickets live, bound to the branch: the `agent-data` branch of the proj
 
 - **The paths the branch has under a project** - the persistent checkout, and the `tickets/` folder inside it.
 - **The seams every operation takes** - the file operations and the caller's write cycle, injected so every operation is testable off disk and git, with the persistent checkout's cycle as the default.
-- **Bringing a caller's view up to date** - the branch and its checkout exist, the queue file is seeded, the root link is made, and the checkout converges with origin.
+- **Bringing a caller's view up to date** - the root link is made, and the branch and its checkout exist and converge with origin.
 - **The root link is made only over nothing, and hidden from git at once** - a pair of exclude rules keeps the link out of every code branch while the branch's own `tickets/` folder keeps committing.
 
 ## Business logic
@@ -36,9 +36,8 @@ See `## User story`.
 
 A long-lived process brings its view of the branch up to date in one step, which never throws and reports why it could not converge:
 
-- The branch and its persistent checkout exist.
-- The queue file is seeded on a branch born empty, so readers and people find a file rather than a mystery.
 - The repository root links `tickets` into the checkout.
+- The branch and its persistent checkout exist, born empty when nothing has them yet.
 - The checkout converges with origin: reading what other machines and cloud sessions pushed, and pushing anything an earlier cycle left stranded.
 
 A repository with no remote is reported as an error state rather than treated as a mode: the tickets exist to be shared, and one nothing can reach is something the caller has to surface.

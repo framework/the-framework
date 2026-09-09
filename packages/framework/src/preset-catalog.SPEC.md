@@ -6,7 +6,7 @@ The catalog of every built-in preset: one table holding, per preset, its name (t
 
 ## Business logic — TL;DR
 
-- **Two families** - the quality presets take one target ("what to run against", defaulting to the launching session or the whole codebase); the ticket/queue presets scope themselves to the project's own tickets, plans and queue — which they reach through the `tickets` skill — so there is no blank to fill.
+- **Two families** - the quality presets take one target ("what to run against", defaulting to the launching session or the whole codebase); the ticket/queue presets scope themselves to the project's own tickets, plans and queue — which they reach through the `tickets` and `queue` skills — so there is no blank to fill.
 - **Each preset's contract** - what each canned prompt asks for, including which ones gate on a human and which run unattended.
 - **The triage pair** - two unattended triage presets split on cost and share one verbatim queue-only rule, making them safe to fire on a schedule.
 - **Recognizing the drain** - a bare prompt is recognized as the queue-draining one by exact match against the rendered preset, so the recognition can never drift from a reworded prompt.
@@ -22,7 +22,7 @@ From the dashboard's launcher the user picks a preset to start an agent: quality
 
 #### Business logic
 
-The quality presets — maintainability, readability, security_audit, ux, research, maintenance — take a single target the user may type; left blank, the target defaults to the session the preset was launched from, or to the entire codebase when no session exists yet. The ticket/queue presets — triage_quick, triage_consensual, plan_tickets, update_tickets, suggest_new_tickets, suggest_new_features, suggest_tickets_to_work_on, drain_queue, market_research — work the project's own tickets, plans and agent queue through the `tickets` skill, so their prompt renders verbatim with nothing to fill.
+The quality presets — maintainability, readability, security_audit, ux, research, maintenance — take a single target the user may type; left blank, the target defaults to the session the preset was launched from, or to the entire codebase when no session exists yet. The ticket/queue presets — triage_quick, triage_consensual, plan_tickets, update_tickets, suggest_new_tickets, suggest_new_features, suggest_tickets_to_work_on, drain_queue, market_research — work the project's own tickets, plans and agent queue through the `tickets` and `queue` skills, so their prompt renders verbatim with nothing to fill.
 
 ### Each preset's contract
 
@@ -52,7 +52,7 @@ Auto PM refills the agent queue from the ticket backlog on a schedule, with nobo
 
 #### Business logic
 
-Both triage presets list the tickets through the `tickets` skill, pick tickets that are consensual (zero open questions, zero uncertainty), and put them on the agent queue with the skill's own command. They split on cost only: triage_quick picks quick wins (low effort, zero uncertainty per the plan's own numbers), triage_consensual picks significant work — kept apart so the cheap batch and the significant batch queue on separate turns. Both run unattended and never gate, and each pins its own fixed session name; keeping one triage at a time is the daemon's routine lock, not a rule the agent checks. Both end with the same queue-only rule, appended verbatim from one shared prompt file so the pair cannot drift apart on it: a triage changes the queue and nothing else, never a ticket's code.
+Both triage presets list the tickets through the `tickets` skill, pick tickets that are consensual (zero open questions, zero uncertainty), and put them on the agent queue with the `queue` skill's command, each entry a link to its ticket. They split on cost only: triage_quick picks quick wins (low effort, zero uncertainty per the plan's own numbers), triage_consensual picks significant work — kept apart so the cheap batch and the significant batch queue on separate turns. Both run unattended and never gate, and each pins its own fixed session name; keeping one triage at a time is the daemon's routine lock, not a rule the agent checks. Both end with the same queue-only rule, appended verbatim from one shared prompt file so the pair cannot drift apart on it: a triage changes the queue and nothing else, never a ticket's code.
 
 #### Rationale
 

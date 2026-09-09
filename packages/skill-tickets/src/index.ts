@@ -1,6 +1,5 @@
 export {
   TICKETS_DIR,
-  QUEUE_FILE,
   META_FILE,
   ticketStem,
   ticketPlanName,
@@ -37,17 +36,6 @@ export {
   type ClaimPhase,
   type ReleaseOutcome,
 } from './locks.js'
-export {
-  parseQueueEntries,
-  appendQueueEntry,
-  insertQueueEntry,
-  removeQueueEntry,
-  readQueue,
-  readQueueEntries,
-  queueAdd,
-  queueDone,
-  type QueueEdit,
-} from './queue.js'
 export { holderOf, AGENT_ID_ENV, type Holder } from './holder.js'
 export {
   ticketsCheckoutPath,

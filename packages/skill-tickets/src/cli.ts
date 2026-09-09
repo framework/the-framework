@@ -1,10 +1,9 @@
 import { parseArgs } from 'node:util'
 import { join } from 'node:path'
 import { checkoutRoot, gitReason, nodeBranchFileFs, nodeGitRunner, openBranchReader, writeFileBranchDetached, type BranchReader, type GitRunner, DATA_BRANCH } from '@gemstack/agent-data'
-import { isTicketFile, isTicketPath, META_FILE, QUEUE_FILE, TICKETS_DIR, queuePriorityForTicket, ticketLockName, ticketPlanName, ticketStem } from './names.js'
+import { isTicketFile, isTicketPath, META_FILE, TICKETS_DIR, ticketLockName, ticketPlanName, ticketStem } from './names.js'
 import { readTicket, readTickets, type TicketsFs } from './tickets.js'
 import { applyClaims, applyRelease, claimMessage, lockHolder, releaseMessage } from './locks.js'
-import { appendQueueEntry, insertQueueEntry, parseQueueEntries, removeQueueEntry } from './queue.js'
 import { holderOf } from './holder.js'
 
 /**
@@ -27,10 +26,6 @@ export const USAGE = `usage: tickets <command>
 
   list                               every open ticket, as one JSON array
   show <file>                        one ticket: its text, its plan, who holds it
-  queue                              the queue's open entries, in order of work
-  queue add <text> [--priority N] [--ticket <file>]
-                                     put an entry on the queue, in its priority section
-  queue done <text>                  take an entry off the queue
   put <file>                         write one file under tickets/ from stdin (a ticket, a plan, meta.json)
   close <file>                       remove a ticket with its plan and lock (not while someone else holds it)
   claim <file>                       claim a ticket before planning or working it
@@ -108,48 +103,6 @@ const COMMANDS: Record<string, Command> = {
     if (!ticket) throw noTicket(file)
     const plan = await reader.read(`${TICKETS_DIR}/${ticketPlanName(file)}`)
     return { ok: true, ticket, ...(plan === undefined ? {} : { plan }), ...(ticket.lockedBy === undefined ? {} : { holder: ticket.lockedBy }) }
-  },
-
-  async queue(args, io, git) {
-    const [sub, ...rest] = args
-    if (sub === 'add') {
-      const { positionals, values } = parse(rest, { priority: { type: 'string' }, ticket: { type: 'string' } }, 1)
-      const text = positionals[0]!.trim()
-      if (!text) throw new Usage('the entry is empty')
-      const priority = values.priority === undefined ? undefined : priorityArg(values.priority)
-      const reader = await open(io.cwd, git)
-      // A ticket named turns the entry into a link back to it, placed by the ticket's own
-      // priority unless one was given — the same entry a dashboard writes when it queues a ticket.
-      let entry = text
-      let at = priority
-      if (values.ticket !== undefined) {
-        const file = ticketArg(values.ticket)
-        const ticket = await readTicket(TICKETS_DIR, file, ticketsFsOver(reader))
-        if (!ticket) throw noTicket(file)
-        entry = `[${text}](${TICKETS_DIR}/${file})`
-        at ??= queuePriorityForTicket(ticket.priority)
-      }
-      await write(io.cwd, `queue add: ${entry}`, async dir => {
-        const md = await readOr(dir, '')
-        await writeQueue(dir, at === undefined ? appendQueueEntry(md, entry) : insertQueueEntry(md, entry, at))
-      }, git)
-      return { ok: true, entry, ...(at === undefined ? {} : { priority: at }) }
-    }
-    if (sub === 'done') {
-      const { positionals } = parse(rest, {}, 1)
-      const entry = positionals[0]!.trim()
-      let found = false
-      await write(io.cwd, `queue done: ${entry}`, async dir => {
-        const md = await readOr(dir, '')
-        found = parseQueueEntries(md).includes(entry)
-        if (found) await writeQueue(dir, removeQueueEntry(md, entry))
-      }, git)
-      if (!found) throw new Refused({ ok: false, reason: 'no-entry', entry }, `no open queue entry reads "${entry}"`)
-      return { ok: true, entry }
-    }
-    if (sub !== undefined) throw new Usage(`unknown queue command: ${sub}`)
-    const reader = await open(io.cwd, git)
-    return parseQueueEntries((await reader.read(QUEUE_FILE)) ?? '')
   },
 
   async put(args, io, git) {
@@ -242,15 +195,6 @@ const COMMANDS: Record<string, Command> = {
   },
 }
 
-/** The queue file inside a checkout, read as `fallback` when absent. */
-async function readOr(dir: string, fallback: string): Promise<string> {
-  return nodeBranchFileFs().read(join(dir, QUEUE_FILE)).catch(() => fallback)
-}
-
-async function writeQueue(dir: string, md: string): Promise<void> {
-  await nodeBranchFileFs().write(join(dir, QUEUE_FILE), md)
-}
-
 /** The branch opened for reading, from wherever the command runs; outside a repo, a refusal. */
 async function open(cwd: string, git: GitRunner): Promise<BranchReader> {
   await inRepo(() => checkoutRoot(cwd, git))
@@ -285,11 +229,6 @@ function ticketArg(arg: string): string {
   const file = isTicketPath(arg) ? arg.slice(TICKETS_DIR.length + 1) : arg
   if (!isTicketFile(file)) throw new Refused({ ok: false, reason: 'invalid-path', file: arg }, `${arg} is not a ticket filename`)
   return file
-}
-
-function priorityArg(value: string): number {
-  if (!/^\d+$/.test(value) || Number(value) > 10) throw new Usage(`--priority takes 0 to 10, got ${value}`)
-  return Number(value)
 }
 
 /**

@@ -16,7 +16,8 @@ import { startDaemonTick, DAEMON_TICK_MS } from './daemon-tick.js'
 import { ciFixPrompt, startCiWatch } from './ci-watch.js'
 import { acquireRoutineLock, releaseDeadRoutineLocks, releaseRoutineLock } from './routine-locks.js'
 import { maintenanceDue, readMaintenanceState, mergeMaintenanceState } from './maintenance.js'
-import { claimTickets, queueDone, readQueueEntries, readTickets, releaseTicket, syncTickets, TICKETS_DIR, ticketFromQueueEntry, ticketsDir } from '@gemstack/skill-tickets'
+import { claimTickets, readTickets, releaseTicket, syncTickets, TICKETS_DIR, ticketFromQueueEntry, ticketsDir } from '@gemstack/skill-tickets'
+import { queueDone, readQueueEntries, syncQueue } from '@gemstack/skill-queue'
 import { nextQueuedTicket } from './todo-loop.js'
 import { LOGS_BRANCH } from './framework-dir.js'
 import type { ProjectErrors } from './project-errors.js'
@@ -117,15 +118,17 @@ export interface BackgroundServiceDeps {
 }
 
 /**
- * One project's data-sync turn (#1599): converge the `agent-data` branch (the skill's: the checkout,
- * the queue seed, the root link, the pull) and the `agents-logs` branch (the archives and routine
- * locks) with origin, and set or clear the project's `data-sync` error by the outcome. The clear
- * is unconditional on success, so the error lives exactly as long as the condition — the next
- * tick after the user fixes the remote, it is gone.
+ * One project's data-sync turn (#1599): converge the `agent-data` branch (the skills': the
+ * `tickets` skill's checkout, root link and pull, then the `queue` skill's seed and pull) and the
+ * `agents-logs` branch (the archives and routine locks) with origin, and set or clear the
+ * project's `data-sync` error by the outcome. The clear is unconditional on success, so the error
+ * lives exactly as long as the condition — the next tick after the user fixes the remote, it is
+ * gone.
  */
 export async function syncProjectData(path: string, errors: ProjectErrors, log: (message: string) => void): Promise<void> {
   const tickets = await syncTickets(path, { log })
-  const result = tickets.ok ? await pullFileBranch(path, LOGS_BRANCH, { log }) : tickets
+  const queue = tickets.ok ? await syncQueue(path, { log }) : tickets
+  const result = queue.ok ? await pullFileBranch(path, LOGS_BRANCH, { log }) : queue
   if (result.ok) errors.clear(path, 'data-sync')
   else {
     log(`[framework] data sync: ${result.error}`)

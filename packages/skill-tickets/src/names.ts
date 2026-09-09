@@ -1,6 +1,7 @@
 /**
  * The names everything in the package hangs off, and the small pure rules that link a ticket to
- * the queue and to the issue it tracks. No node imports, so browser-side code can name them too.
+ * the agent queue (the `queue` skill's file, which this package never reads or writes) and to the
+ * issue it tracks. No node imports, so browser-side code can name them too.
  *
  * The branch itself is not named here: the tickets live on the shared data branch, `agent-data`,
  * whose name `@gemstack/agent-data` exports as `DATA_BRANCH`. A convention, not a setting:
@@ -13,9 +14,6 @@
  * It holds only open tickets: closing one deletes it.
  */
 export const TICKETS_DIR = 'tickets'
-
-/** The agent queue: `TODO_AGENTS.md` at the branch root, beside `tickets/`. */
-export const QUEUE_FILE = 'TODO_AGENTS.md'
 
 /** The file inside `tickets/` that records when the tickets last caught up with an issue tracker. */
 export const META_FILE = 'meta.json'

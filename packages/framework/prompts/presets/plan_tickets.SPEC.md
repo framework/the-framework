@@ -1,4 +1,4 @@
-The plan-tickets preset: queues planning work for the tickets that still have none. Working through the `tickets` skill, the agent picks the 10 most important tickets that have neither a plan nor a claim on them, and puts one entry per ticket on the agent queue (`TODO_AGENTS.md`) asking for that ticket's plan to be written.
+The plan-tickets preset: queues planning work for the tickets that still have none. Reading through the `tickets` skill, the agent picks the 10 most important tickets that have neither a plan nor a claim on them, and puts one entry per ticket on the agent queue (`TODO_AGENTS.md`), with the `queue` skill's command, asking for that ticket's plan to be written.
 
 ## Business logic — TL;DR
 

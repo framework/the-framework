@@ -30,13 +30,13 @@ import { StartAgentButton } from './StartAgentButton.js'
 
 /**
  * The prompt the play button starts an agent with: the drain preset's vocabulary (work one entry
- * through the `tickets` skill, then take it off the queue; do not start any other entry) narrowed
+ * through the `queue` skill, then take it off the queue; do not start any other entry) narrowed
  * from "the FIRST open entry" to the one entry the row shows. The raw `TODO_AGENTS.md` line, not
  * the pretty label: the agent must name exactly this entry to take it off, and the line's link is
  * how it opens the ticket (#1164). Exported so the test asserts against this and not a copy.
  */
 export function workOnEntryPrompt(entry: string): string {
-  return `Use the \`tickets\` skill: work on this one open queue entry only, and when the work is done and published run \`tickets queue done "<the entry>"\`. Do not start any other entry. The entry:\n\n${entry}`
+  return `Use the \`queue\` skill: work on this one open queue entry only, and when the work is done and published run \`queue done "<the entry>"\`. Do not start any other entry. The entry:\n\n${entry}`
 }
 
 /** How many agents the fan-out button starts until its count says otherwise. */

@@ -329,3 +329,19 @@ test('a detached write lands on origin from any clone without touching the persi
     await rm(solo, RETRIED_RM)
   }
 })
+
+test('a detached write works for a branch named with a slash: the throwaway checkout takes a flat name (#1762)', async () => {
+  const { bare, other, cleanup } = await initSyncedRepos()
+  try {
+    assert.deepEqual(
+      await writeFileBranchDetached(other, 'feature/store', 'slashed', async dir => {
+        await writeFile(join(dir, 'a.md'), 'a\n')
+      }),
+      { ok: true, changed: true },
+    )
+    assert.equal(await git(['show', 'feature/store:a.md'], bare), 'a\n')
+    assert.ok(!(await git(['worktree', 'list'], other)).includes('write-'))
+  } finally {
+    await cleanup()
+  }
+})

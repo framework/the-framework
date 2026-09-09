@@ -401,7 +401,8 @@ export async function writeFileBranchDetached(
   if (!(await hasRemote(cwd, r.git))) return { ok: false, reason: 'no-remote' }
   const { mkdtemp, rm } = await import('node:fs/promises')
   const { tmpdir } = await import('node:os')
-  const dir = await mkdtemp(join(tmpdir(), `${branch}-write-`))
+  // A slash in the branch name would name a directory under tmpdir that does not exist (#1762).
+  const dir = await mkdtemp(join(tmpdir(), `${branch.replace(/[\\/]/g, '-')}-write-`))
   // The remote's tip, or a parentless start for a branch origin does not have yet.
   const tip = async (): Promise<string> => {
     await r.git(['fetch', 'origin', branch], cwd).catch(() => {})

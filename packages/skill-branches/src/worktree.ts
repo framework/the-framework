@@ -1,5 +1,5 @@
 import { basename, dirname, join } from 'node:path'
-import { realpath } from 'node:fs/promises'
+import { realpath, stat } from 'node:fs/promises'
 import { nodeGitRunner, checkoutRoot, type GitRunner, BRANCHES_DIR } from '@gemstack/agent-data'
 import { AGENT_BRANCH_PREFIX, isSafeAgentId, isAgentBranch, agentBranchName, agentIdFromWorktreeDir } from './branch-names.js'
 import { DATA_BRANCH } from '@gemstack/agent-data/names'
@@ -187,8 +187,10 @@ export async function removeWorktree(repo: string, path: string, git: GitRunner 
     await git(['worktree', 'remove', '--force', path], repo)
     // stderr: on a CLI run stdout carries the JSON result, and this line would corrupt it.
     console.error(`[branches] forced removal of worktree ${path} (git called it unclean)`)
-  } catch {
-    // Already removed, or never registered: nothing to do.
+  } catch (err) {
+    // Already removed, or never registered: nothing to do. A checkout still on disk is another
+    // matter (#1757): a caller told "removed" while it stands would drop its branch next.
+    if (await stat(path).then(() => true, () => false)) throw err
   }
 }
 
@@ -196,10 +198,14 @@ export async function removeWorktree(repo: string, path: string, git: GitRunner 
  * Delete a branch that holds nothing (#1650). `-D`, because "merged" in git's eyes is the wrong
  * test: the caller proved the tip is a commit the remote already has, which is the stronger fact.
  * Forgiving: the checkout is already gone by the time this runs, and a branch that would not
- * delete is a leftover name, not lost work.
+ * delete is a leftover name, not lost work. Says whether it went, so a caller names only the
+ * branches that are actually gone (#1757).
  */
-export async function deleteBranch(repo: string, branch: string, git: GitRunner = nodeGitRunner()): Promise<void> {
-  await git(['branch', '-D', branch], repo).catch(() => undefined)
+export async function deleteBranch(repo: string, branch: string, git: GitRunner = nodeGitRunner()): Promise<boolean> {
+  return git(['branch', '-D', branch], repo).then(
+    () => true,
+    () => false,
+  )
 }
 
 /**

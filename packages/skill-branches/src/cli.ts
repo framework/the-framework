@@ -1,8 +1,8 @@
 import { parseArgs } from 'node:util'
-import { resolve } from 'node:path'
-import { stat } from 'node:fs/promises'
+import { basename, resolve } from 'node:path'
+import { realpath, stat } from 'node:fs/promises'
 import { nodeGitRunner, checkoutRoot, gitReason, type GitRunner } from '@gemstack/agent-data'
-import { agentBranchName, isSafeAgentId } from './branch-names.js'
+import { agentBranchName, agentIdFromWorktreeDir, isSafeAgentId } from './branch-names.js'
 import {
   branchPushed,
   currentBranch,
@@ -177,11 +177,17 @@ const COMMANDS: Record<string, Command> = {
 /** A refusal `remove` and `prune` can add to the reclaim rule's own: there is no such checkout. */
 type RemoveRefusal = { ok: false; reason: 'no-checkout'; agentId: string }
 
-/** One agent's checkout under the reclaim rule; a missing checkout is its own refusal. */
+/**
+ * One agent's checkout under the reclaim rule; a missing checkout is its own refusal. The
+ * argument may be the session name a rename link carries rather than the id, so the birth
+ * branch is read off the checkout's own directory, never off the argument (#1757): a link's
+ * name is the branch the agent chose, and that one is not the birth branch.
+ */
 async function reclaim(repo: string, agentId: string, mayPush: boolean, git: GitRunner): Promise<ReclaimOutcome | RemoveRefusal> {
   const path = worktreePath(repo, agentId)
   if (!(await stat(path).then(s => s.isDirectory(), () => false))) return { ok: false, reason: 'no-checkout', agentId }
-  return reclaimWorktree(repo, path, { birthBranch: agentBranchName(agentId), mayPush, git })
+  const checkout = await realpath(path)
+  return reclaimWorktree(repo, checkout, { birthBranch: agentBranchName(agentIdFromWorktreeDir(basename(checkout))), mayPush, git })
 }
 
 /** Why a checkout stayed, as one line for a person. */

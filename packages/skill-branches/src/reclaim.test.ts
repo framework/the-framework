@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { nodeGitRunner } from '@gemstack/agent-data'
 import { addWorktree, agentBranchName, reclaimWorktree, type ReclaimOptions } from './index.js'
 
@@ -305,6 +305,39 @@ test('a branch renamed after its birth name was pushed is pushed under its new n
     assert.match(await git(['show', 'refs/remotes/origin/agent-renamed:index.html'], repo), /Welcome!/, 'pushed under the new name')
     assert.equal((await git(['rev-parse', '--verify', 'refs/heads/agent-renamed'], repo)).trim().length, 40, 'and the local branch stays')
   } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})
+
+test('a birth branch another worktree has checked out is not named as deleted (#1757)', async () => {
+  const { repo, path, branch: birth } = await repoWithDirtyWorktree()
+  const git = nodeGitRunner()
+  try {
+    await git(['push', '-q', 'origin', 'HEAD:main'], repo)
+    await git(['checkout', '-q', '-b', 'agent-cool-name'], path)
+    await commitWork(path)
+    // Someone else holds the birth branch out: git will refuse to delete it.
+    await git(['worktree', 'add', '-q', join(repo, 'elsewhere'), birth], repo)
+    assert.deepEqual(await reclaimWorktree(repo, path, ORDINARY), { ok: true }, 'the checkout goes, no branch is claimed deleted')
+    await assert.rejects(() => stat(path), 'the checkout is gone')
+    assert.match(await git(['rev-parse', '--verify', `refs/heads/${birth}`], repo), /^[0-9a-f]{40}/, 'the birth branch still exists')
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})
+
+test('a checkout git cannot remove even by force is not reported as reclaimed (#1757)', async () => {
+  const { repo, path } = await repoWithDirtyWorktree()
+  const git = nodeGitRunner()
+  try {
+    await git(['push', '-q', 'origin', 'HEAD:main'], repo)
+    await commitWork(path)
+    // No write permission on the directory: nothing inside it can be unlinked.
+    await chmod(path, 0o555)
+    await assert.rejects(() => reclaimWorktree(repo, path, ORDINARY), 'the removal that failed is said, not swallowed')
+    assert.equal((await stat(path)).isDirectory(), true, 'the checkout is still there')
+  } finally {
+    await chmod(path, 0o755).catch(() => {})
     await rm(repo, { recursive: true, force: true })
   }
 })

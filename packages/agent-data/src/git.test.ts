@@ -34,6 +34,10 @@ const BUDGETS: { args: string[]; ms: number }[] = [
   { args: ['branch', '--list', '--merged', 'main', 'topic'], ms: GIT_READ_TIMEOUT_MS },
   { args: ['branch', '--remotes', '--contains', 'refs/heads/agent-x', '--format=%(refname:short)'], ms: GIT_READ_TIMEOUT_MS },
   { args: ['branch'], ms: GIT_READ_TIMEOUT_MS },
+  // A global option ahead of the subcommand is not one of its flags (#1757): the listing still reads.
+  { args: ['-C', '/repo', 'branch', '--list'], ms: GIT_READ_TIMEOUT_MS },
+  { args: ['-c', 'core.quotepath=off', 'branch'], ms: GIT_READ_TIMEOUT_MS },
+  { args: ['-C', '/repo', 'branch', '-D', 'agent-1'], ms: GIT_WRITE_TIMEOUT_MS },
   { args: ['branch', '-D', 'agent-1'], ms: GIT_WRITE_TIMEOUT_MS },
   { args: ['branch', '-m', 'agent-1', 'agent-cool'], ms: GIT_WRITE_TIMEOUT_MS },
   { args: ['branch', 'topic', 'abc123'], ms: GIT_WRITE_TIMEOUT_MS },

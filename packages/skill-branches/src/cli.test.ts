@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { lstat, mkdir, mkdtemp, readFile, readlink, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { nodeGitRunner } from '@gemstack/agent-data'
-import { CLI_BIN_DIR, agentBranchName, runCli, worktreePath } from './index.js'
+import { CLI_BIN_DIR, agentBranchName, reconcileBranchLinks, runCli, worktreePath } from './index.js'
 
 // #1725: the command line is the package's functions for an agent in a shell, so every command
 // is checked against real git the way the functions are — and the contract on top of them: JSON
@@ -432,6 +432,27 @@ test('a command named like an Object property is not a command (review)', async 
       assert.equal(ran.code, 2, argv.join(' '))
       assert.equal(ran.out, undefined)
     }
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})
+
+test("remove <name>: a link's name reaches the checkout, and the birth branch is the checkout's own, not the name (#1757)", async () => {
+  const repo = await repoWithOrigin()
+  try {
+    await run(repo, 'create', 'a1')
+    const path = worktreePath(repo, 'a1')
+    // The agent branches away itself, so the birth branch stays behind; the reconcile links the new name.
+    await git(['checkout', '-q', '-b', 'agent-cool-name'], path)
+    await commitWork(path)
+    await reconcileBranchLinks(repo)
+    assert.equal(await readlink(join(repo, '.branches', 'agent-cool-name')), 'agent-a1')
+    const removed = await run(repo, 'remove', 'cool-name')
+    assert.equal(removed.code, 0)
+    assert.deepEqual(removed.out, { ok: true, branchesDeleted: ['agent-a1'] }, 'the birth branch is the directory\'s, not the argument\'s')
+    await assert.rejects(() => stat(path), 'the checkout is gone')
+    assert.equal(await isSymlink(join(repo, '.branches', 'agent-cool-name')), false, 'and its link')
+    assert.match(await git(['rev-parse', '--verify', 'refs/heads/agent-cool-name'], repo), /^[0-9a-f]{40}/, 'the work branch stays')
   } finally {
     await rm(repo, { recursive: true, force: true })
   }

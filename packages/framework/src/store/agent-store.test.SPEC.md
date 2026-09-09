@@ -33,16 +33,17 @@ What the tests cover: how an agent's record is written, summarized, archived and
 
 - Closing copies the agent's log and agent meta into the archive, and the history lists them newest first with what each was asked for and how each ended.
 - Starting a fresh agent first rescues a prior agent that crashed without closing, so its history survives.
-- A worktree agent's record is copied into the repo before its checkout can be removed, and an agent still marked running at that moment is recorded as stopped.
-- A named user files the archive under their own directory on the logs branch instead of the throwaway one.
-- The history lists every user's archive plus the throwaway one, under their one current name only; an agent filed in two places is listed once; an archived log replays wherever it is filed.
-- A history read given a cutoff skips older records by filename without ever opening them, while a record whose id is not one of the framework's timestamps is still read.
+- A worktree agent's record is read out for the daemon to record on the data branch before its checkout can be removed — its missing ending written, the branch stamped, nothing landing in the throwaway archive — and the boot rescue copies such a record into the throwaway archive, an agent still marked running recorded as stopped.
+- The history lists the branch's runs, every person's, plus the throwaway archive, under their one current name only; an agent filed in two places is listed once; an archived log replays wherever it is filed.
+- A history read given a cutoff keeps a run on the branch by the start time on its card, whatever its id, and skips an older record in the throwaway archive by its filename without opening it.
+- A run on the branch replays as the framework's events — the skill's four kinds of line mapped back, every other line as it is — is listed with its card's caller fields unfolded into the meta, and restores into a worktree as that event log and that meta.
+- A run on the branch stuck at running is ended through the skill's write funnel: the card ends and dates it, keeps the framework's fields under caller, and the diary gains the ending.
 
 **Liveness and self-healing**
 
 - A fresh start records the process and host that own the agent.
 - Reading a live agent whose owning process is gone flips it to stopped and archives it; one whose process is alive is left alone; one with no owner recorded, or an owner on another machine, is left alone for the boot reconciliation to handle.
-- The boot reconciliation flips archived agents stuck at running, flips and archives the live one counting it once, rescues an agent a crashed daemon left inside a worktree, and covers an agent archived under a user directory. It leaves alone any agent whose process is provably alive on this host, and does nothing on a clean or empty workspace.
+- The boot reconciliation flips throwaway-archived agents stuck at running, flips and archives the live one counting it once, and rescues an agent a crashed daemon left inside a worktree. It leaves alone any agent whose process is provably alive on this host, and does nothing on a clean or empty workspace.
 - Healing a dead agent writes the ending it never wrote: the ending lands in the live log, in the worktree's own log and in the archived copy, and the gate the agent died holding is cleared everywhere. An agent that wrote its own ending gets no second one.
 
 **Surviving concurrent reads and writes**
@@ -65,11 +66,6 @@ What the tests cover: how an agent's record is written, summarized, archived and
 - The flow the first leg started under is preserved across the continuation.
 - Continuing with nothing to reopen starts a fresh agent.
 - An archived agent's history is restored into its worktree so the continuation reads its own past; a checkout that already holds a live agent is left untouched, and a missing archive is a no-op.
-
-**Patching an archive afterwards**
-
-- A pull request opened after the agent's process is gone, and the branch a cloud session's work landed on, are patched onto the archived record and read back by the history.
-- Patching an unknown or unsafe agent id changes nothing and reports that it did nothing.
 
 ## Before modifying/creating SPEC.md files
 

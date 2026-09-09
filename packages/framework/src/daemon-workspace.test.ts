@@ -18,6 +18,7 @@ import { BRANCHES_DIR, nodeGitRunner, GitTimeoutError } from '@gemstack/agent-da
 import { worktreePath, agentBranchName, CLI_BIN_DIR, HARNESS_SKILL_DIRS, SKILL_DIR as BRANCHES_SKILL_DIR } from '@gemstack/skill-branches'
 import { CLI_BIN_DIR as TICKETS_BIN_DIR, SKILL_DIR as TICKETS_SKILL_DIR } from '@gemstack/skill-tickets'
 import { CLI_BIN_DIR as QUEUE_BIN_DIR, SKILL_DIR as QUEUE_SKILL_DIR } from '@gemstack/skill-queue'
+import { CLI_BIN_DIR as LOGS_BIN_DIR, SKILL_DIR as LOGS_SKILL_DIR } from '@gemstack/skill-logs'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import { addProject, projectId } from './registry.js'
 import type { AgentSpec } from './agent-spec.js'
@@ -665,8 +666,8 @@ test('a spawned agent finds the `branches` command on its PATH (#1725)', async (
       recorded = await readFile(log, 'utf8').catch(() => '')
     }
     const path = recorded.trim()
-    assert.deepEqual(path.split(delimiter).slice(0, 3), [CLI_BIN_DIR, TICKETS_BIN_DIR, QUEUE_BIN_DIR], 'the packages\' bin dirs come first: branches, tickets, queue (#1748)')
-    assert.equal(path.split(delimiter).slice(3).join(delimiter), process.env['PATH'], "after the daemon's own")
+    assert.deepEqual(path.split(delimiter).slice(0, 4), [CLI_BIN_DIR, TICKETS_BIN_DIR, QUEUE_BIN_DIR, LOGS_BIN_DIR], 'the packages\' bin dirs come first: branches, tickets, queue, logs (#1748/#1769)')
+    assert.equal(path.split(delimiter).slice(4).join(delimiter), process.env['PATH'], "after the daemon's own")
     // By name, the way the agent's shell resolves it, against the project the daemon started it in.
     const listed = await new Promise<string>((resolvePromise, rejectPromise) =>
       execFile('branches', ['list'], { cwd, env: { ...process.env, PATH: path } }, (err, stdout) => (err ? rejectPromise(err) : resolvePromise(stdout))),
@@ -676,9 +677,9 @@ test('a spawned agent finds the `branches` command on its PATH (#1725)', async (
       [result.agentId],
       'and it reports the checkout the daemon allocated',
     )
-    // The three skills are in the checkout too, where each harness looks for them (#1739/#1748).
+    // The four skills are in the checkout too, where each harness looks for them (#1739/#1748/#1769).
     for (const harnessDir of HARNESS_SKILL_DIRS) {
-      for (const [name, dir] of [['branches', BRANCHES_SKILL_DIR], ['tickets', TICKETS_SKILL_DIR], ['queue', QUEUE_SKILL_DIR]] as const) {
+      for (const [name, dir] of [['branches', BRANCHES_SKILL_DIR], ['tickets', TICKETS_SKILL_DIR], ['queue', QUEUE_SKILL_DIR], ['logs', LOGS_SKILL_DIR]] as const) {
         const target = await readlink(join(worktreePath(cwd, result.agentId!), harnessDir, name))
         assert.equal(await realpath(resolve(join(worktreePath(cwd, result.agentId!), harnessDir), target)), await realpath(dir), `${harnessDir}/${name} links the package holding its SKILL.md`)
       }

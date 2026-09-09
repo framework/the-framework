@@ -9,7 +9,7 @@ Auto PM: the policy that decides whether the daemon may spend leftover quota on 
 ## Glossary
 
 - **ended dry** - work Auto PM already gave an agent that finished without producing anything to hand off. It is not handed out again for the rest of the daemon's lifetime.
-- **routine lock** - a routine's lock file on The Framework's `agents-logs` branch, naming the machine that is running that routine and since when, so no two machines run it at once. A routine declares whether it holds one.
+- **routine lock** - a routine's lock file on the `agent-data` branch, naming the machine that is running that routine and since when, so no two machines run it at once. A routine declares whether it holds one.
 
 ## Business logic — TL;DR
 

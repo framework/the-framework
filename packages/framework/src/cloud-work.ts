@@ -2,8 +2,8 @@ import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
 import { agentBranchName } from '@gemstack/skill-branches'
 import { ghPrsForBranchOrThrow, pickAgentPr, type LinkedPr } from './dashboard/gh.js'
 import { openRemoteBranchPullRequest, type HandoffResult } from './dashboard/agent-handoff.js'
-import { listAgents, nodeStoreFs, startedAtFromAgentId, type AgentMeta, type ArchivePatch } from './store/index.js'
-import { patchArchivedAgentOnDataBranch } from './archived-agent-patch.js'
+import { listAgents, nodeStoreFs, startedAtFromAgentId, type AgentMeta } from './store/index.js'
+import { patchRun, type RunPatch } from '@gemstack/skill-logs'
 import { errorMessage } from './error-message.js'
 import { startProjectPass, type ProjectPass, type ProjectsSource } from './project-pass.js'
 
@@ -55,8 +55,8 @@ export interface CloudWorkDeps {
   prs?: (cwd: string, branch: string) => Promise<LinkedPr[]>
   /** The project's run records, none older than `since` in epoch ms (default {@link listAgents}). */
   agents?: (cwd: string, since: number) => Promise<AgentMeta[]>
-  /** Record the adopted branch and PR on the run's archive (default {@link patchArchivedAgentOnDataBranch}). */
-  patch?: (cwd: string, agentId: string, patch: ArchivePatch, message: string) => Promise<boolean>
+  /** Record the adopted branch and PR on the run's card, as one commit on the data branch (default the `logs` skill's {@link patchRun}). */
+  patch?: (cwd: string, agentId: string, patch: RunPatch) => Promise<boolean>
   /** Open the armed draft PR for a remote-only branch (default {@link openRemoteBranchPullRequest}). */
   openPr?: (cwd: string, agent: AgentMeta, branch: string) => Promise<HandoffResult>
   /** The current time in ms (injected so tests can age runs deterministically). */
@@ -149,7 +149,7 @@ export async function adoptCloudWork(cwd: string, deps: CloudWorkDeps = {}): Pro
   const git = deps.git ?? nodeGitRunner()
   const prs = deps.prs ?? ghPrsForBranchOrThrow
   const agents = deps.agents ?? ((project: string, since: number) => listAgents(project, nodeStoreFs(), since))
-  const patchArchive = deps.patch ?? patchArchivedAgentOnDataBranch
+  const patchArchive = deps.patch ?? patchRun
   const openPr = deps.openPr ?? openRemoteBranchPullRequest
   const now = deps.now ? deps.now() : Date.now()
   const result: CloudWorkResult = { adopted: [], failed: [] }
@@ -207,12 +207,12 @@ export async function adoptCloudWork(cwd: string, deps: CloudWorkDeps = {}): Pro
 
     // One commit on the data branch carries whatever this pass learned: the branch (first time
     // only), the PR (once known). Nothing learned, nothing written — and nothing announced.
-    const patch: ArchivePatch = {
+    const patch: RunPatch = {
       ...(onBirthBranch(run) ? { branch } : {}),
       ...(pr && run.pr === undefined ? { pr: { number: pr.number, url: pr.url } } : {}),
     }
     if (Object.keys(patch).length === 0) continue
-    if (!(await patchArchive(cwd, run.id, patch, `[The Framework] adopt session ${run.id}'s cloud work`))) {
+    if (!(await patchArchive(cwd, run.id, patch))) {
       result.failed.push({ agentId: run.id, error: `could not record ${branch} on the run's archive` })
       continue
     }

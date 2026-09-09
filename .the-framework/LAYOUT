@@ -1,8 +1,7 @@
 framework-dir: .the-framework
 data-branch: agent-data
-logs-branch: agents-logs
-archive-dir: agents
 events-file: events.jsonl
 meta-file: agent.json
 tickets-dir: tickets
 queue-file: TODO_AGENTS.md
+runs-dir: agents

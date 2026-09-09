@@ -1,8 +1,9 @@
 import { join } from 'node:path'
-import { LOGS_BRANCH, THE_FRAMEWORK_DIR } from './framework-dir.js'
-import { ARCHIVE_DIR, EVENTS_FILE, META_FILE, nodeStoreFs, type StoreFs } from './store/index.js'
+import { THE_FRAMEWORK_DIR } from './framework-dir.js'
+import { EVENTS_FILE, META_FILE, nodeStoreFs, type StoreFs } from './store/index.js'
 import { TICKETS_DIR } from '@gemstack/skill-tickets/names'
 import { QUEUE_FILE } from '@gemstack/skill-queue/names'
+import { RUNS_DIR } from '@gemstack/skill-logs/names'
 import { DATA_BRANCH } from '@gemstack/agent-data/names'
 
 /**
@@ -39,12 +40,11 @@ export function layoutMarker(): string {
   return [
     `framework-dir: ${THE_FRAMEWORK_DIR}`,
     `data-branch: ${DATA_BRANCH}`,
-    `logs-branch: ${LOGS_BRANCH}`,
-    `archive-dir: ${ARCHIVE_DIR}`,
     `events-file: ${EVENTS_FILE}`,
     `meta-file: ${META_FILE}`,
     `tickets-dir: ${TICKETS_DIR}`,
     `queue-file: ${QUEUE_FILE}`,
+    `runs-dir: ${RUNS_DIR}`,
     '',
   ].join('\n')
 }

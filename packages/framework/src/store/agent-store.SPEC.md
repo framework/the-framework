@@ -15,12 +15,12 @@ The durable record of every agent: its event log, the agent meta derived from th
 - **The event log is the record; the agent meta is its summary** - every fact about an agent is an event, and the agent meta is those events folded together.
 - **An agent id is its start time** - ids sort chronologically as plain text, so "newest first" needs no timestamps parsed.
 - **Continuing an agent reopens its record** - a follow-up writes into the same agent rather than creating a second one, and keeps the original label.
-- **A finished agent is archived under its user on the logs branch** - the lasting record is per user and off the code history; a second, throwaway copy covers agents with no worktree.
+- **A finished agent's lasting record is the `logs` skill's run** - the agent meta and event log are mapped onto the skill's card and diary on the data branch, and read back the same way; a second, throwaway copy covers agents with no worktree.
 - **A crash never loses history** - an agent that never closed cleanly is archived by whoever notices next.
 - **A dead agent is forced to an end** - an agent whose owning process is gone is credited with the ending it never wrote, so nothing shows as live or awaiting an answer forever.
 - **The agent meta survives being read mid-write** - a reader never sees a half-written record and so never reports a live agent as gone.
 - **A project's agents are the live ones plus the archived ones** - composed once, with the live copy always winning.
-- **Facts learned after the agent is gone are patched onto its archive** - the branch and pull request that only became knowable later.
+- **Facts learned after the agent is gone are patched onto its card** - the branch and pull request that only became knowable later, through the `logs` skill.
 
 ## Business logic
 
@@ -70,7 +70,7 @@ An id is required to be path-safe — letters, digits, dashes and underscores on
 
 The daemon allocates the id before it spawns the agent, because the worktree directory is named with it; the agent adopts that id rather than deriving a second, slightly later one.
 
-A history read that only wants recent agents states a cutoff, and archived records older than that are rejected by their filename alone — most of a long history is skipped without being read at all. Only a name that parses as one of these ids can be rejected this way; any other name is read normally.
+A history read that only wants recent agents states a cutoff: a run on the data branch is kept by the start time on its card, and a record in the throwaway archive older than the cutoff is rejected by its filename alone. Only a name that parses as one of these ids can be rejected that way; any other name is read normally.
 
 ### Continuing an agent reopens its record
 
@@ -86,23 +86,28 @@ A reopened agent keeps its original label. The continuation's own request would 
 
 The flow an agent started under is recorded so a continuation can re-enter it: without that record, continuing a build agent would drop it into the plain prompt path, losing the framing and the backlog loop that belong to a build.
 
-Continuing also needs the agent's history back in the checkout it reads from. Teardown moved that history into the repo, so restoring puts the archived event log and agent meta back into the worktree — unless the worktree already holds a live agent, whose own log is newer and must not be overwritten.
+Continuing also needs the agent's history back in the checkout it reads from. Teardown recorded that history on the data branch, so restoring reads the run back through the `logs` skill — its diary as the framework's events, its card as the agent meta — and puts them into the worktree; a run the branch does not have is looked for in the throwaway archive. A worktree that already holds a live agent is left alone: its own log is newer and must not be overwritten.
 
-### A finished agent is archived under its user on the logs branch
+### A finished agent's lasting record is the `logs` skill's run
 
 #### User story
 
-The user, and their teammates, can read months later what agents did to the repo — including agents whose throwaway checkouts are long gone.
+The user, and their teammates, can read months later what agents did to the repo — including agents whose throwaway checkouts are long gone — and an agent starting on a ticket can read how the last run on it went.
 
 #### Business logic
 
-When an agent closes, its event log and agent meta are copied out as a pair named after its id. The lasting home is the user's own directory on the logs branch's checkout: on the logs branch so the record survives cleaning the repo and never touches the code history, and per user so two people's machines write side by side instead of colliding. A second, throwaway home inside the agent's own framework directory covers an agent with no worktree of its own, and the crash rescue.
+When an agent's process is gone, the daemon reads its record out of its worktree — the agent meta, ended if the process died running, with the branch actually holding its commits stamped on, since this is the last moment it can be observed — and records it on the data branch as the `logs` skill's run, under the identity the repo commits as, through the branch's write cycle. The mapping is the store's and works both ways:
 
-Archiving is what makes teardown safe. An agent writes its record inside its own worktree, so deleting the worktree would delete the record with it; the copy into the repo happens first. The copy inside the worktree is deliberately left untracked, or it would be committed onto the agent's own branch and collide with the lasting copy at merge time.
+- The card is the agent meta with the skill's eleven fields on top — id, start and end time, status, intent, driver, model, branch, pull request, ticket, cost — and every other field of the meta under the one key the skill stores for its caller and never reads. A meta unfolds back out of a card the same way.
+- The diary is the event log with four events written as the four kinds of line the skill knows — what the agent said, its result, the run's cost and its ending — and every other event written as it is, under its own kind. A diary reads back as the same events, so a run page replays it, a continuation restores it and a tail of an ended run follows it exactly as they did the live log.
 
-At the moment of teardown, the branch actually holding the agent's commits is read from the checkout and stamped onto the archived record — the last moment it can be observed at all.
+The end time and the cost are two facts of the agent meta that exist for the card: the time the ending was folded, and the cost summed over the run's usage events.
 
-Reading a project's history means reading every user's archive directory plus the throwaway one, because the history is a team-visible record of what has been done to the repo. The same agent can appear in more than one place — rescued into the throwaway copy and archived into the committed one — so records are de-duplicated by id, with the committed copy winning. Unreadable or half-written records are skipped rather than failing the whole read. Archiving the same agent twice is harmless.
+A second, throwaway home inside the agent's own framework directory covers an agent with no worktree of its own, and the crash rescue: there the event log and agent meta are copied as a pair named after the id, unmapped.
+
+Recording is what makes teardown safe. An agent writes its record inside its own worktree, so deleting the worktree would delete the record with it; the record on the branch comes first. The copy inside the worktree is deliberately left untracked, or it would be committed onto the agent's own branch and collide with the lasting copy at merge time.
+
+Reading a project's history means reading the branch's runs — every person's — plus the throwaway archive, because the history is a team-visible record of what has been done to the repo. The same agent can appear in both places — rescued into the throwaway copy and recorded on the branch — so records are de-duplicated by id, with the branch's copy winning. Unreadable or half-written records are skipped rather than failing the whole read. Recording the same agent twice is harmless.
 
 An archived agent's event log can be replayed in full, applying the same tolerance for a torn last line as the live log.
 
@@ -132,7 +137,7 @@ The two places that check treat that third state differently on purpose. The che
 
 Healing an orphan does not merely change its outcome: an ending is appended to its event log on its behalf, recording that the process died without reporting one, and that ending is then folded in like any other. Every surface keys "this agent is over" off that one ending, so a death that skipped it would leave the agent's last question rendering as answerable forever. Folding it also closes the gate the agent died holding. The healed agent is then archived, so its history is kept.
 
-The boot-time reconciliation covers all three places an orphan can hide: archived records still marked running, the live record at the project root, and an agent inside a worktree. A worktree agent is healed in place and copied into the repo's history, but its worktree is left on disk — an agent that ended this way did not end cleanly, and those are kept for inspection; removing one is an explicit action. The count of agents reconciled is reported back. Every step is best-effort: a failure skips that agent rather than failing the sweep.
+The boot-time reconciliation covers all four places an orphan can hide: a run on the data branch still marked running, which is ended through the `logs` skill's write so the ending is a commit rather than an edit the next sync would reset; a record in the throwaway archive; the live record at the project root; and an agent inside a worktree. A worktree agent is healed in place and copied into the throwaway archive, but its worktree is left on disk — an agent that ended this way did not end cleanly, and those are kept for inspection; removing one is an explicit action. The count of agents reconciled is reported back. Every step is best-effort: a failure skips that agent rather than failing the sweep.
 
 #### Rationale
 
@@ -174,7 +179,7 @@ The full list is the live agents followed by the archived ones that are not alre
 
 This composition — not either half on its own — is what callers actually want, which is why it is defined once here; three separate parts of the product had each grown their own copy of it.
 
-### Facts learned after the agent is gone are patched onto its archive
+### Facts learned after the agent is gone are patched onto its card
 
 #### User story
 
@@ -182,7 +187,7 @@ An agent finishes, and only afterwards does the pull request get opened, or does
 
 #### Business logic
 
-An archived agent's record can be amended with the branch its work landed on and the pull request its work is on. There is no event stream left to carry these facts, and every surface reads the record, so this single amendment is what turns an empty-looking row into its real outcome. Because the archive lives on the logs branch's checkout, an amendment is only durable once committed, so callers outside tests go through the logs branch's writer rather than writing directly.
+A run's card can be amended with the branch its work landed on and the pull request its work is on — the `logs` skill's patch, one commit on the data branch. There is no event stream left to carry these facts, and every surface reads the card, so this single amendment is what turns an empty-looking row into its real outcome. The callers are the cloud-work adoption and the dashboard's Open PR action; the store itself no longer patches anything.
 
 ## Before modifying/creating SPEC.md files
 

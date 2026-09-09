@@ -201,7 +201,7 @@ export interface AutoPmJob {
   entry?: string
   /**
    * The routine lock this job holds while it runs (#1659), as `routines/<lock>.lock.md` on the
-   * agents-logs branch: the triage routines rewrite the shared queue and may take hours, so no two may
+   * agent-data branch: the triage routines rewrite the shared queue and may take hours, so no two may
    * run at once, on any machine. The sweep mints it before the start and releases it when the
    * run ends. Declared as data on the job, like {@link AutoPmJob.drains}, so the sweep never
    * matches on {@link AutoPmJob.name} at the call site.
@@ -544,7 +544,7 @@ export interface AutoPmDeps {
   start(project: AutoPmProject, job: AutoPmJob): Promise<string | undefined>
   /**
    * Take a job's {@link AutoPmJob.lock} before its run starts (#1659): `routines/<lock>.lock.md`
-   * on the agents-logs branch, pushed, so every machine sharing it sees the routine as taken. `ok: false`
+   * on the agent-data branch, pushed, so every machine sharing it sees the routine as taken. `ok: false`
    * stands the job down with the reason — the lock's holder, or a write that could not land.
    * Omitted, the job starts unguarded.
    */

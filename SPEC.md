@@ -25,7 +25,7 @@ Every user-facing feature is enumerated in `FEATURES-SPEC.md`.
 - **The agent is the unit of work** - one task, in its own git worktree on its own branch, streaming everything it does as events; finished work is pushed and leaves as a pull request.
 - **Black-box driving** - the framework prompts the wrapped coding-agent CLI, lets the CLI's own loop run a full turn, and learns everything from the turn's final message: the session name the agent invented, the questions it stops to ask, and the ready-for-merge signal.
 - **Autonomy bounded by the account's own quota** - unattended work runs only while the account is under its pro-rated quota boundary; work a human asks for is never blocked, and a running agent is never interrupted over quota.
-- **Nothing bookkeeping-shaped on a code branch** - the tickets and the agent queue live on the `agent-data` branch, the `tickets` skill's and the `queue` skill's; The Framework's own records of its runs — the agent archives, the routine locks — live on the `agents-logs` branch. The default branch stays 100% code.
+- **Nothing bookkeeping-shaped on a code branch** - the tickets, the agent queue and the record of every run live on the `agent-data` branch, the `tickets`, `queue` and `logs` skills'; The Framework's routine locks sit beside them. The default branch stays 100% code.
 
 ## Business logic
 
@@ -47,7 +47,7 @@ See `## User story`: the daemon keeps working while nobody is around, within the
 
 #### Business logic
 
-On a shared clock the daemon runs its background jobs: Auto PM works the agent queue down and refills it by triaging tickets and planning the ones without plans; the CI watch merges the framework's pull requests once their checks pass and starts a fix agent when checks go red; sweeps reclaim finished agents' checkouts (only what is already on the remote) and keep bookkeeping healthy, and a routine that must not run twice is guarded by a routine lock on the `agents-logs` branch. Each unattended start checks the quota boundary first.
+On a shared clock the daemon runs its background jobs: Auto PM works the agent queue down and refills it by triaging tickets and planning the ones without plans; the CI watch merges the framework's pull requests once their checks pass and starts a fix agent when checks go red; sweeps reclaim finished agents' checkouts (only what is already on the remote) and keep bookkeeping healthy, and a routine that must not run twice is guarded by a routine lock on the `agent-data` branch. Each unattended start checks the quota boundary first.
 
 ## Before modifying/creating SPEC.md files
 

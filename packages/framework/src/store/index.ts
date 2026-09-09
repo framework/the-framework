@@ -12,9 +12,8 @@ export {
   loadAgentEvents,
   readLiveMetas as readLiveMetas,
   archiveWorktreeAgent,
+  readWorktreeAgent,
   archivedAgentPaths,
-  patchArchivedAgent,
-  type ArchivePatch,
   restoreArchivedAgent,
   agentIdFromStartedAt,
   startedAtFromAgentId as startedAtFromAgentId,
@@ -28,3 +27,4 @@ export {
   type OpenStoreOptions,
 } from './agent-store.js'
 export { resolveAgentCheckout, resolveAgentEventsPath } from './agent-checkout.js'
+export { toRunCard, fromRunCard, toDiaryLine, fromDiaryLine, diaryOf, eventsOf } from './run-record.js'

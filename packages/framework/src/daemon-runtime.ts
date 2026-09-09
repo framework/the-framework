@@ -2,12 +2,13 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import { closeSync, mkdirSync, openSync } from 'node:fs'
 import { basename, delimiter, dirname, join, resolve } from 'node:path'
 import { appendFile, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
-import { agentIdFromStartedAt, startedAtFromAgentId, archiveWorktreeAgent, restoreArchivedAgent, listAgents, findAgent, archivedAgentPaths, readLiveMetas, readLiveMeta, resolveAgentEventsPath, EVENTS_FILE, META_FILE, isPidAlive, type AgentMeta } from './store/index.js'
-import { isGitRepo, nodeGitRunner, isGitTimeout, withFileBranch } from '@gemstack/agent-data'
+import { agentIdFromStartedAt, startedAtFromAgentId, readWorktreeAgent, restoreArchivedAgent, listAgents, findAgent, archivedAgentPaths, readLiveMetas, readLiveMeta, resolveAgentEventsPath, EVENTS_FILE, META_FILE, isPidAlive, toRunCard, diaryOf, fromDiaryLine, type AgentMeta } from './store/index.js'
+import { isGitRepo, nodeGitRunner, isGitTimeout } from '@gemstack/agent-data'
 import { createCheckout, attachCheckout, agentBranchName, worktreePath, worktreeBranch, removeWorktree, pruneWorktrees, agentIdFromWorktreeDir, CLI_BIN_DIR as BRANCHES_BIN_DIR } from '@gemstack/skill-branches'
 import { isTicketPath, CLI_BIN_DIR as TICKETS_BIN_DIR, SKILL_DIR as TICKETS_SKILL_DIR, SKILL_NAME as TICKETS_SKILL_NAME, AGENT_ID_ENV } from '@gemstack/skill-tickets'
 import { CLI_BIN_DIR as QUEUE_BIN_DIR, SKILL_DIR as QUEUE_SKILL_DIR, SKILL_NAME as QUEUE_SKILL_NAME } from '@gemstack/skill-queue'
-import { LOGS_BRANCH, THE_FRAMEWORK_DIR } from './framework-dir.js'
+import { CLI_BIN_DIR as LOGS_BIN_DIR, SKILL_DIR as LOGS_SKILL_DIR, SKILL_NAME as LOGS_SKILL_NAME, writeRun, type AnyDiaryLine } from '@gemstack/skill-logs'
+import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import type { FrameworkEvent } from './events.js'
 import { removeAgentSpec, writeAgentSpec } from './agent-spec.js'
 import type { StartAgentKind, StartAgentOptions, StartAgentResult, AddProjectResult } from './dashboard/index.js'
@@ -16,7 +17,6 @@ import { RelayedAgents, startRemoteAgent } from './dashboard/remote-run.js'
 import { agentBranchFor } from './dashboard/agent-handoff.js'
 import { dispatchRelayRpc } from './dashboard-rpc/relay-dispatch.js'
 import { tailEvents, tailAgentEvents } from './dashboard-rpc/events-tail.js'
-import { resolveUserDir } from './agent-archive.js'
 import { removeProjectWorktree } from './worktrees.js'
 import { describeDeleted } from './merged-worktrees.js'
 import { scopedKey, parseScopedKey, keyBelongsTo } from './runtime-keys.js'
@@ -107,25 +107,27 @@ function spawnDetached(binPath: string, specPath: string, stderrFile?: string, e
 }
 
 /**
- * A spawned run's environment: ours, with the `branches`, `tickets` and `queue` commands on its
- * PATH (#1725/#1748) — the agent names its session, checks its tree, and reads and changes the
- * tickets and the queue through the same packages the daemon does — its id as `AGENT_ID`, so a
- * claim it makes names the agent and not its branch, plus the daemon's URL when it has one (#1328).
+ * A spawned run's environment: ours, with the `branches`, `tickets`, `queue` and `logs` commands on
+ * its PATH (#1725/#1748/#1769) — the agent names its session, checks its tree, reads and changes
+ * the tickets and the queue, and reads past runs through the same packages the daemon does — its
+ * id as `AGENT_ID`, so a claim it makes names the agent and not its branch, plus the daemon's URL
+ * when it has one (#1328).
  */
 function childEnv(daemonUrl: string | undefined, agentId: string | undefined, base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = { ...base, PATH: [BRANCHES_BIN_DIR, TICKETS_BIN_DIR, QUEUE_BIN_DIR, base['PATH']].filter(Boolean).join(delimiter) }
+  const env: NodeJS.ProcessEnv = { ...base, PATH: [BRANCHES_BIN_DIR, TICKETS_BIN_DIR, QUEUE_BIN_DIR, LOGS_BIN_DIR, base['PATH']].filter(Boolean).join(delimiter) }
   if (agentId) env[AGENT_ID_ENV] = agentId
   return daemonUrl ? { ...env, [DAEMON_URL_ENV]: daemonUrl } : env
 }
 
 /**
- * TEMPORARY (#1748): the `tickets` and `queue` skills linked into every checkout beside the
+ * TEMPORARY (#1748): the `tickets`, `queue` and `logs` skills linked into every checkout beside the
  * `branches` skill, through the branches package's caller-given list. Gone when use-npm-skills
  * commits the skills into the repository, where a checkout carries them as tracked files.
  */
 const CHECKOUT_SKILLS = [
   { name: TICKETS_SKILL_NAME, dir: TICKETS_SKILL_DIR },
   { name: QUEUE_SKILL_NAME, dir: QUEUE_SKILL_DIR },
+  { name: LOGS_SKILL_NAME, dir: LOGS_SKILL_DIR },
 ]
 
 /** Where a spawned agent's stderr lands (#1261), so a child that dies at boot leaves a trace. */
@@ -200,7 +202,8 @@ export function lastAgentFailureDetail(eventsJsonl: string): string | undefined 
   for (const line of eventsJsonl.split('\n')) {
     if (!line.trim()) continue
     try {
-      const event = JSON.parse(line) as { kind?: string; ok?: boolean; detail?: string }
+      // A live log or a recorded diary: the run's ending reads the same through the skill's mapping.
+      const event = fromDiaryLine(JSON.parse(line) as AnyDiaryLine)
       if (event.kind === 'end') detail = event.ok === false ? event.detail : undefined
     } catch {
       // A malformed line is not this reader's problem; the events around it still count.
@@ -593,20 +596,17 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
         // only from a worktree root (#1654): a directory that is no longer one would answer with
         // the enclosing repo's branch, and the archive would record the user's `main` as the run's.
         const branch = await worktreeBranch(worktree)
-        // Filed under the identity this repo commits as, onto the logs branch (#1179/#1582)
-        // through its write funnel: the archive is committed and pushed the moment it lands —
-        // durable without a human, and never a commit on main.
-        const user = await resolveUserDir(projectCwd)
-        const archived = await withFileBranch(
-          projectCwd,
-          LOGS_BRANCH,
-          `[The Framework] archive session ${agentId ?? agentIdFromWorktreeDir(basename(worktree))}`,
-          async () => {
-            await archiveWorktreeAgent(worktree, projectCwd, undefined, branch, user)
-          },
-        )
-        if (!archived.ok && !archived.committed)
-          console.log(`[framework] could not archive session ${basename(worktree)}: ${archived.error}`)
+        // Recorded as the `logs` skill's run on the data branch (#1179/#1582/#1769), under the
+        // identity this repo commits as, through the branch's write funnel: the record is committed
+        // and pushed the moment it lands — durable without a human, and never a commit on main.
+        // The card is the skill's shape with the rest of the meta under `caller`; the diary is the
+        // event log with the four kinds the skill knows mapped onto its lines.
+        const run = await readWorktreeAgent(worktree, undefined, branch)
+        if (run) {
+          const archived = await writeRun(projectCwd, toRunCard(run.meta), diaryOf(run.events))
+          if (!archived.ok && !archived.committed)
+            console.log(`[framework] could not archive session ${basename(worktree)}: ${archived.error}`)
+        }
         // One rule (E5): the checkout goes once its work is on the remote, whatever state the agent
         // ended in. `removeProjectWorktree` owns the whole sequence — keep a dirty checkout, push
         // the branch, remove only if the remote has it — so teardown, the sweep and the dashboard's

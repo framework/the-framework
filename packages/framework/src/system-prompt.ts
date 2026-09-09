@@ -1,5 +1,5 @@
 import { renderTemplate } from './prompt-template.js'
-import { BRANCH_YOURSELF, QUEUE_SKILL, SYSTEM_PROMPT, TICKETS_SKILL, TICKETS_YOURSELF } from './prompts.generated.js'
+import { BRANCH_YOURSELF, LOGS_SKILL, QUEUE_SKILL, SYSTEM_PROMPT, TICKETS_SKILL, TICKETS_YOURSELF } from './prompts.generated.js'
 import { AWAIT_PROTOCOL, BROWSER_PROTOCOL, HANDS_OFF_PROTOCOL, SIGNAL_PROTOCOL } from './turn-gate.js'
 
 // No Node imports here, deliberately. This module composes the prompt and the
@@ -72,12 +72,13 @@ export const BUSINESS_KNOWLEDGE_DOCS: readonly ContextDoc[] = [DECISIONS_DOC, FA
 
 /**
  * TEMPORARY (#1748): what an agent outside a checkout the daemon created is told about the
- * tickets and the queue, since nothing links the `tickets` and `queue` skills into its checkout
- * and their commands are not on its PATH — the counterpart of {@link BRANCH_YOURSELF}: how to read
- * and write the branch with git, followed by the two skills' own formats so they exist in one
- * place. Dies when use-npm-skills commits the skills into the repository.
+ * tickets, the queue and the logs, since nothing links the `tickets`, `queue` and `logs` skills
+ * into its checkout and their commands are not on its PATH — the counterpart of
+ * {@link BRANCH_YOURSELF}: how to read and write the branch with git, followed by the three
+ * skills' own texts so they exist in one place. Dies when use-npm-skills commits the skills into
+ * the repository.
  */
-const TICKETS_BRIDGE = `${TICKETS_YOURSELF}\n\n${TICKETS_SKILL}\n\n${QUEUE_SKILL}`
+const TICKETS_BRIDGE = `${TICKETS_YOURSELF}\n\n${TICKETS_SKILL}\n\n${QUEUE_SKILL}\n\n${LOGS_SKILL}`
 
 /**
  * Everything the agent keeps in context when it starts (#683), which

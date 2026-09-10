@@ -14,7 +14,10 @@ Builds the cross-project "needs you" list, the interventions [1] feed: every reg
 [4] sweep: A background job the daemon runs on its clock: Auto PM, the CI watch, the notification watchers, the sweep that reclaims checkouts, the branch-links sweep, the cloud scratch sweep, cloud work adoption.
 [5] the Overview: The dashboard's cross-project page at `/`.
 [6] handoff: What happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it).
-[7] agent id: An agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
+[7] the `agent-data` branch: The branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
+[8] unattended: Said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
+[9] agent id: An agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
+[10] preferences: The user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 
 ## Business logic — TL;DR
 
@@ -35,7 +38,7 @@ See `## Context`.
 
 #### Business logic
 
-For each registered project, the open pull requests of its repository (read through `gh.ts`, at most 50) each become one item with the pull request's number, title, URL and opening time; the URL is where to act, on GitHub. A draft pull request is left out, because a draft is not asking for review, with one exception: a draft whose head branch is an agent's [2] branch (a branch named `agent-…`, other than the `agent-data` branch itself) is kept. An unattended handoff [6] opens its pull request as a draft precisely so it does not ping reviewers, and if the feed dropped it too, nothing would tell anyone the work exists. A draft with no head branch recorded counts as opened by hand, so an answer that lacks the branch never turns every draft in the repository into a "needs you". A project whose pull requests cannot be read (no remote, `gh` missing or logged out, GitHub unreachable) contributes no pull request items.
+For each registered project, the open pull requests of its repository (read through `gh.ts`, at most 50) each become one item with the pull request's number, title, URL and opening time; the URL is where to act, on GitHub. A draft pull request is left out, because a draft is not asking for review, with one exception: a draft whose head branch is an agent's [2] branch (a branch named `agent-…`, other than the `agent-data` branch [7] itself) is kept. An unattended [8] handoff [6] opens its pull request as a draft precisely so it does not ping reviewers, and if the feed dropped it too, nothing would tell anyone the work exists. A draft with no head branch recorded counts as opened by hand, so an answer that lacks the branch never turns every draft in the repository into a "needs you". A project whose pull requests cannot be read (no remote, `gh` missing or logged out, GitHub unreachable) contributes no pull request items.
 
 ### Agents parked on a gate
 
@@ -55,7 +58,7 @@ For each project, every live agent [2] whose status is still running and which h
 
 #### Business logic
 
-For each project, only the 5 most recent finished agents [2] (every agent whose status is not running, newest by start time first) are inspected, since each inspection costs several git reads and the feed is re-read on a poll: work that has sat unpushed for dozens of agents is not news, and the agent list remains the record of it. For each of those agents the branch is the one recorded for it, or, when no record exists, the branch its agent id [7] names. The branch's state is read as for the handoff summary (`agent-handoff.ts`), except that the pull request lookup is skipped: an open pull request means the branch was pushed, which already excludes it, and the pull request kind above is what surfaces it, so an 8-second network call per agent on every poll would buy nothing.
+For each project, only the 5 most recent finished agents [2] (every agent whose status is not running, newest by start time first) are inspected, since each inspection costs several git reads and the feed is re-read on a poll: work that has sat unpushed for dozens of agents is not news, and the agent list remains the record of it. For each of those agents the branch is the one recorded for it, or, when no record exists, the branch its agent id [9] names. The branch's state is read as for the handoff summary (`agent-handoff.ts`), except that the pull request lookup is skipped: an open pull request means the branch was pushed, which already excludes it, and the pull request kind above is what surfaces it, so an 8-second network call per agent on every poll would buy nothing.
 
 The agent is an item only when none of these holds, each being a reason nobody is waited on: the branch is gone, the agent wrote nothing (no commit beyond what the base branch already has), the branch is already merged, the branch is already on the remote at the same commit, or the repository has no remote to push to. The item's title is what the agent was asked to do, or the branch name when no request was recorded; it names the branch and how many commits are waiting, links to the dashboard's URL when known, is identified by the project and the agent, and carries the agent's last update time. A branch that cannot be read is skipped rather than failing the feed.
 
@@ -83,7 +86,7 @@ A project is read whole only when every one of its sources answered: its open pu
 
 #### Context
 
-**User story**: with a Discord webhook configured in the preferences, the user is told in Discord what needs them, in a form they can act on from the message.
+**User story**: with a Discord webhook configured in the preferences [10], the user is told in Discord what needs them, in a form they can act on from the message.
 
 #### Business logic
 

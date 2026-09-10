@@ -45,7 +45,7 @@ Fixes the vocabulary of the event stream [1]: every kind of event an agent [2] c
 - **The opening events** - the session opening, the session id once known, the full system channel and the intent say what the agent is, what it was told and what it was asked; a continuation opens with its own session opening, so readers keep the latest.
 - **The coding agent's progress, forwarded** - every progress event the coding agent reports is forwarded verbatim onto the stream and never decided on.
 - **What the agent shows the user** - a view updates in place by title, a reported error stays in the log as history, a log line narrates, and the agent's browser travels as a page URL and a stream port only, never as frames.
-- **A gate and its pick** - a gate is a question, at least one option and, for a single choice, a recommended option; a checklist pre-checks options instead; the pick is one option id or the chosen subset, and says whether the user, the autopilot countdown or nobody picked.
+- **A gate and its pick** - a gate is a question, at least one option and, for a single-select gate, a recommended option; a checklist pre-checks options instead; the pick is one option id or the chosen subset, and says whether the user, the autopilot countdown or nobody picked.
 - **Ready for merge and the pull request text** - the ready-for-merge signal flips the agent from building to ready without blocking it; the pull request title and description the agent wrote travel as an event the handoff uses, the latest one winning.
 - **Facts that must survive a reload** - what the handoff is armed to do, the ticket being implemented, the branch and session name, the pull request once opened, and the cloud anchor each travel as events because only an event reaches a tab opened later.
 - **The on-before-mergeable outcome** - the follow-up queued its prompts, queued them without finishing cleanly, or declined for one of five reasons; it is silent when the option was off.
@@ -84,14 +84,14 @@ Every progress event the driver [13] reports is wrapped and forwarded verbatim o
 
 #### Context
 
-**User story**: while the agent [2] works, the user sees a plan or a summary appear in the dashboard's right rail, an error the agent hit stays visible in the timeline, and the agent's browser, when it has one, is watched live in the agent view [6].
+**User story**: while the agent [2] works, the user sees a plan or a summary appear in the dashboard's right rail, an error the agent hit stays visible on the page, and the agent's browser, when it has one, is watched live in the agent view [6].
 
 #### Business logic
 
 - A view [8]: a markdown document the agent [2] pushed, with a title and an id that is stable per title, so pushing a view with the same title again updates it in place rather than adding a duplicate. Non-blocking: the agent goes on.
 - An error: something went wrong that only the user can fix, reported by the agent itself through its error signal, with a headline (the first line) and an optional detail (the rest). It is an event, not a status: it says what happened at that point and stays in the log as history, and nothing clears it, because nothing can undo it. Conditions that are true now and clear themselves once gone (the project-level errors a sweep [16] finds between agents) are a different thing, in `project-errors.ts`.
 - A log line: one line of The Framework's own narration ("Finishing the session (await limit reached).", "Handed off: …").
-- The browser's page: the URL the agent's browser is showing, emitted for the first real `http` or `https` page and again on every change of page, so the timeline can host the live preview at the point it was used. Only the URL travels. It is emitted again after each session opening, because the dashboard shows only the events since the latest session opening; readers fold repeats of the same URL in place, like a re-shown view.
+- The browser's page: the URL the agent's browser is showing, emitted for the first real `http` or `https` page and again on every change of page, so the agent view can host the live preview at the point in the stream where it was used. Only the URL travels. It is emitted again after each session opening, because the dashboard shows only the events since the latest session opening; readers fold repeats of the same URL in place, like a re-shown view.
 - The browser stream: the agent's browser preview is up and listening on a loopback port. Only the port travels: the dashboard reaches the stream through the daemon, which proxies to that port, so the agent's own browser endpoint is never reachable from the web. Frames never enter the log, because someone will type a password into that pane.
 - A preview: a generated app booted and serving at a URL, with the command that serves it, so the user can open it. The vocabulary defines it and the terminal renders it; no part of the agent's lifecycle emits it today.
 
@@ -108,8 +108,8 @@ A gate [3], emitted when the agent [2] pauses on a question and waits for a pick
 - an id unique to this pending question; the pick is posted back against it;
 - the title: the question shown above the options;
 - the options, at least one, each with a stable id posted back when picked, a label, and optionally a one-line detail under the label (for instance why an alternative lost);
-- for a single choice, the recommended option's id: pre-selected in the dashboard, accepted by the autopilot [17] countdown, and taken when nobody can answer;
-- for a checklist, a flag marking it as a multiple choice. A checklist has no single recommended option: each option instead says whether it starts checked, and the pick is the chosen subset of option ids, which may be empty. An option's starting state is ignored for a single choice;
+- for a single-select gate, the recommended option's id: pre-selected in the dashboard, accepted by the autopilot [17] countdown, and taken when nobody can answer;
+- for a checklist, a flag marking it as one. A checklist has no single recommended option: each option instead says whether it starts checked, and the pick is the chosen subset of option ids, which may be empty. An option's starting state is ignored for a single-select gate;
 - optionally the delay after which the autopilot countdown accepts the recommended option, 10 seconds by default;
 - optionally the markdown file under approval (a plan such as `PLAN_<slug>.agent.md`), which the right rail renders beside the question.
 
@@ -126,7 +126,7 @@ A pick is normalized to a list of option ids wherever a list is needed: a subset
 #### Business logic
 
 - Ready for merge [19]: the agent [2] signaled that it believes the work is complete and ready for human review. Non-blocking: it flips the agent's badge from building to ready, and the on-before-mergeable follow-up hangs off it.
-- The pull request text: the title and description the agent asked for through its open-pr signal. This is how an agent opens a pull request through The Framework instead of running `gh pr create` itself, so the ticket's issue reference and the recording of the pull request number still apply. The title is the agent's name for the work and the description is what changed; either may be absent when the agent wrote only the other. Non-blocking; the handoff [5] uses the latest one.
+- The pull request text: the title and description the agent asked for through its `open-pr` signal. This is how an agent opens a pull request through The Framework instead of running `gh pr create` itself, so the ticket's issue reference and the recording of the pull request number still apply. The title is the agent's name for the work and the description is what changed; either may be absent when the agent wrote only the other. Non-blocking; the handoff [5] uses the latest one.
 
 Both are read off a turn's [14] final message as turn signals [12]; the parsing rules are `turn-gate.ts`'s.
 
@@ -164,7 +164,7 @@ The step itself is `on-before-mergeable-prompt.ts`'s.
 
 #### Context
 
-**User story**: when an agent [2] ends, the user finds its branch pushed and a pull request opened, or reads in the timeline why nothing was published: a normal end, never a fault. A dashboard-started agent has no terminal anyone reads, so the outcome must be an event.
+**User story**: when an agent [2] ends, the user finds its branch pushed and a pull request opened, or reads on the agent's page why nothing was published: a normal end, never a fault. A dashboard-started agent has no terminal anyone reads, so the outcome must be an event.
 
 #### Business logic
 

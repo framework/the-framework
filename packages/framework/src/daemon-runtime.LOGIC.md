@@ -118,13 +118,13 @@ After the preflight, the agent's checkout is reused when it still exists; otherw
 
 **User story**: several agents [1] work one project at the same time, and the user's own checkout [3], uncommitted work included, is never touched.
 
-**Problem**: creating a checkout on a large repository can outrun its time budget and be killed part way, leaving a partial directory git no longer knows about.
+**Problem**: creating a checkout on a large repository can outrun its time budget and be cut short part way, leaving a partial directory git no longer knows about.
 
 #### Business logic
 
 A new agent's id is derived from the moment of the start, unless the caller minted the id first: a sweep [15] that claimed a ticket for the agent wrote the claim [24] under the id it now starts the agent with. The checkout is created by the `branches` skill [11] in one sequence: a git worktree under the project's `.branches/` directory on a fresh branch `agent-<agent id>`, `.branches/` hidden from git, the project's dependency trees linked in, and the `tickets`, `queue` and `logs` skills linked in beside `branches` where the coding agent's [18] harness looks for skills.
 
-A project that is not a git repository cannot be given a checkout: its agents run in the project's own checkout, one at a time since they would collide, and the daemon logs "[framework] <project> is not a git repository, so it gets no worktree; running in the main checkout". A project that is a repository but whose checkout could not be created does not fall back to the user's checkout: the start is refused with "could not create a worktree for this run: <reason>", the dashboard shows it, and starting again is the retry, because a failed agent is recoverable and a user's checkout with an agent's edits mixed in is not. When the creation was killed by its time budget, the partial directory it left is removed; a failure of any other kind leaves the directory alone, since it may be a path that was on disk before this agent asked for it.
+A project that is not a git repository cannot be given a checkout: its agents run in the project's own checkout, one at a time since they would collide, and the daemon logs "[framework] <project> is not a git repository, so it gets no worktree; running in the main checkout". A project that is a repository but whose checkout could not be created does not fall back to the user's checkout: the start is refused with "could not create a worktree for this run: <reason>", the dashboard shows it, and starting again is the retry, because a failed agent is recoverable and a user's checkout with an agent's edits mixed in is not. When the creation was cut short by its time budget, the partial directory it left is removed; a failure of any other kind leaves the directory alone, since it may be a path that was on disk before this agent asked for it.
 
 ### One agent per checkout
 
@@ -158,7 +158,7 @@ Right before the spawn, and again because everything before it waited, the daemo
 
 #### Business logic
 
-When the process exits, or could not be spawned at all, the spec [4] is removed if it is still on disk, since a process that died before reading it would leave the prompt and any device [8] token there, and the agent's slot is freed. A process that could not be spawned is recorded as "its process could not be spawned (<error>)"; one that exited as "its process exited with code <code> before reporting anything"; one that was killed as "its process was killed by <signal> before reporting anything".
+When the process exits, or could not be spawned at all, the spec [4] is removed if it is still on disk, since a process that died before reading it would leave the prompt and any device [8] token there, and the agent's slot is freed. A process that could not be spawned is recorded as "its process could not be spawned (<error>)"; one that exited as "its process exited with code <code> before reporting anything"; one ended by a signal as "its process was killed by <signal> before reporting anything".
 
 For an agent with its own checkout [3], a retirement chain then runs and is parked on the slot so a continuation can wait for it: first the failed-start marker, then the teardown, then the transient-death retry. The failed-start marker is written only when the process never wrote its own status file: the agent is marked failed with the prompt as its intent, the last 2,000 characters of its error output are appended to its event stream [9] as "The session failed to start: <detail>." followed by that tail, and the daemon logs "[framework] run <agent id> failed to start: <detail>". A process that did write its status file is left alone: its ending is its own to report. When the checkout is already gone, no marker is written, because a marker would make a directory under `.branches/` that is not a checkout and every later git command run there would act on the whole repository; the log line "[framework] run <agent id> failed to start: <detail>; its checkout is gone, so no marker is written" is the record instead.
 
@@ -198,7 +198,7 @@ The path is resolved against the daemon's home directory and must be an existing
 
 #### Context
 
-**Problem**: a sweep [15] must tell an idle project from a busy one and say what holds it, and the reclaim [6] sweep must not race a teardown for the same checkout [3]: an agent's [1] status turns done a beat before its teardown archives and removes its checkout.
+**Problem**: a sweep [15] must tell a project with no agent from a busy one and say what holds it, and the reclaim [6] sweep must not race a teardown for the same checkout [3]: an agent's [1] status turns done a beat before its teardown archives and removes its checkout.
 
 #### Business logic
 
@@ -210,8 +210,8 @@ A project's slots are the agents [1] whose process is alive, re-checked against 
 
 **User story**: Ctrl-C closes the dashboard and every agent [1] it is running. What is stopped is not lost: the agent keeps its branch, and its checkout [3] until its work reaches the remote, so the next start continues the same conversation when the user asks for it.
 
-**Problem**: an agent's process is detached so it survives the CLI that asked for it, not the daemon that owns it; left alone it becomes an orphan holding a checkout and a headless browser with no daemon that knows about it. And killing a process is not letting go of the repository: its teardown runs well past its exit, and the archive commit that follows shutdown would miss that agent's ending.
+**Problem**: an agent's process is detached so it survives the CLI that asked for it, not the daemon that owns it; left alone it becomes an orphan holding a checkout and the browser it launched with no daemon that knows about it. And ending a process is not letting go of the repository: its teardown runs well past its exit, and the archive commit that follows shutdown would miss that agent's ending.
 
 #### Business logic
 
-Only the agents this daemon spawned are stopped, never an agent it merely steers. Once stopping has begun, every later start is refused, for good. Each agent's process receives a graceful stop and is given 5 seconds by default to go; one that does not go is killed forcibly, together with its whole process group so that the browser it launched dies with it, and then the process itself for one that led no group. The daemon then waits, bounded by the same grace, until each stopped agent's slot has been let go of, its process gone and its teardown finished; a teardown that wedges costs the shutdown its grace period, not the exit. The agents stopped are reported by agent id [25], or as "pid <process id>" for one without an id, because a process still alive at shutdown that the dashboard showed as finished is the one fact that explains a slot the sweeps [15] could not account for.
+Only the agents this daemon spawned are stopped, never an agent it merely steers. Once stopping has begun, every later start is refused, for good. Each agent's process receives a graceful stop and is given 5 seconds by default to go; one that does not go is ended forcibly, together with its whole process group so that the browser it launched dies with it, and then the process itself for one that led no group. The daemon then waits, bounded by the same grace, until each stopped agent's slot has been let go of, its process gone and its teardown finished; a teardown that wedges costs the shutdown its grace period, not the exit. The agents stopped are reported by agent id [25], or as "pid <process id>" for one without an id, because a process still alive at shutdown that the dashboard showed as finished is the one fact that explains a slot the sweeps [15] could not account for.

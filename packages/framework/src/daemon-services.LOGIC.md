@@ -65,7 +65,7 @@ The jobs are declared on the daemon's one clock (`daemon-tick.ts`), one tick [9]
 - "data sync", every 2 ticks (one minute): converges every project's `agent-data` branch [4] with the remote (see the data sync rule below). Before Auto PM [6], so a sweep of the same tick reads the queue the sync just brought in; its start-up turn is also what creates the branch's checkout on a fresh clone.
 - "CI watch", every 2 ticks: the CI watch [5] (`ci-watch.ts`).
 - "Discord watchers", every 2 ticks: one poll of each notification watcher; their first turn seeds the baseline, which must happen at start-up or the whole open backlog would read as new.
-- "auto PM", every 20 ticks: Auto PM (`auto-pm.ts`). Its start-up turn matters: a daemon started with the switch already on would otherwise sit idle for ten minutes with quota [17] going spare.
+- "auto PM", every 20 ticks: Auto PM (`auto-pm.ts`). Its start-up turn matters: a daemon started with the switch already on would otherwise sit for ten minutes doing nothing with quota [17] going spare.
 - "cloud scratch sweep", every 120 ticks (hourly): deletes the scratch refs a `web` agent's handoff leaves on the remote, once they have sat for about a day and their work is provably on the default branch (`cloud-scratch-refs.ts`). Hourly because the refs must age a day first; its start-up turn starts that clock.
 - "cloud work adoption", every 20 ticks: matches each settled `web` agent to the branch its cloud session [8] pushed, records the branch and pull request on the agent, and opens the pull request the session never did (`cloud-work.ts`).
 

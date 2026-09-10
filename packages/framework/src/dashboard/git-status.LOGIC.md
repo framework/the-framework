@@ -6,6 +6,9 @@ Reads the git status bar of a project or of an agent's [1] checkout [2]: the cur
 [2] checkout: An agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch. The user's own working copy is the project's checkout.
 [3] device: Another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 [4] relay: Running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
+[5] project home: a project's own page with the launcher (the Start form) and its composer (the prompt editor, also used for live chat).
+[6] agent view: one agent's page.
+[7] routine: A preset the daemon fires on its own on a schedule — update tickets, triage quick, triage consensual, plan tickets, maintenance — each switchable off and runnable on demand.
 
 ## Business logic — TL;DR
 
@@ -19,7 +22,7 @@ Reads the git status bar of a project or of an agent's [1] checkout [2]: the cur
 
 #### Context
 
-**User story**: the user sees, on project home and on the agent view, which branch the checkout [2] is on and whether it holds uncommitted changes.
+**User story**: the user sees, on project home [5] and on the agent view [6], which branch the checkout [2] is on and whether it holds uncommitted changes.
 
 #### Business logic
 
@@ -39,7 +42,7 @@ For a project's own checkout [2], the pull request is the one linked to the curr
 
 #### Context
 
-**Problem**: the plain lookup answers the newest pull request for the branch in any state, so an agent [1] on a reused pinned branch (a routine's branch such as `the-framework/triage-quick`) would wear a predecessor's merged pull request as its own badge.
+**Problem**: the plain lookup answers the newest pull request for the branch in any state, so an agent [1] on a reused pinned branch (a routine's [7] branch such as `the-framework/triage-quick`) would wear a predecessor's merged pull request as its own badge.
 
 #### Business logic
 

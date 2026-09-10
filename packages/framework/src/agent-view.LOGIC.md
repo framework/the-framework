@@ -27,7 +27,7 @@ Derives what the dashboard shows about an agent [1] from its event stream [2]: i
 - **The session name of a view built from the record** - a name is present only when the agent's branch carries one, so an unnamed agent has no name rather than an empty one.
 - **The errors the agent reported** - every error the agent reported, oldest first, each with its headline and its detail when the agent wrote one.
 - **The armed handoff and its outcome** - push and pull request read as armed until an announcement says otherwise, merge reads as off until one says so, a record snapshot may seed all three, the latest announcement wins, and the handoff's outcome is carried once it has run.
-- **The session behind the agent** - nothing before the session opening; then the driver, the checkout, the link and the model of the latest leg, plus the id and link of the latest session update.
+- **The driver session behind the agent** - nothing before the session opening; then the driver, the checkout, the link and the model of the latest leg, plus the id and link of the latest session update.
 
 ## Business logic
 
@@ -76,7 +76,7 @@ Every error report in the stream, in order, becomes one entry with its headline 
 - Every armed announcement in the stream overrides push and pull request. It overrides merge only when it carries a merge flag, so an announcement without one keeps the seed rather than flipping an armed merge off. The latest announcement wins, which is what makes unticking a box stick.
 - Once a handoff outcome is in the stream it is carried as: done, with the pull request URL when one was opened; failed, with the error; or skipped, with the reason. It is absent while the agent is still going. The merge half's own outcome is not part of this projection.
 
-### The session behind the agent
+### The driver session behind the agent
 
 #### Context
 
@@ -84,4 +84,4 @@ Every error report in the stream, in order, becomes one entry with its headline 
 
 #### Business logic
 
-Nothing is known before the session opening event; a stream without one yields no session. The opening gives the driver [12], whether it is the fake demo driver, the checkout [7] the agent ran in, the session link when the opening had a literal one, and the model when one was recorded. Each session update then sets the session id and, when it carries one, the link, and keeps the rest. A continuation emits a new session opening, so the driver, the checkout and the model are the latest leg's: a leg that recorded no model clears the model rather than keeping the previous leg's. The checkout is taken from the event on purpose: a finished agent's checkout is removed, and the event is the only surviving record of where it lived.
+Nothing is known before the session opening event; a stream without one yields no driver session. The opening gives the driver [12], whether it is the fake demo driver, the checkout [7] the agent ran in, the session link when the opening had a literal one, and the model when one was recorded. Each session update then sets the session id and, when it carries one, the link, and keeps the rest. A continuation emits a new session opening, so the driver, the checkout and the model are the latest leg's: a leg that recorded no model clears the model rather than keeping the previous leg's. The checkout is taken from the event on purpose: a finished agent's checkout is removed, and the event is the only surviving record of where it lived.

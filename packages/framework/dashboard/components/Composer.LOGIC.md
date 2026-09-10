@@ -161,7 +161,7 @@ Inside an agent, both in live chat [3] and for the resume after the agent has en
 
 #### Business logic
 
-At the launcher [1], below the box, a strip labeled "Settings:" lists every option currently on as a chip, built from the same rows and rules as the gear so the two never disagree. A chip whose value comes from the repo file is drawn dashed and tagged "repo", with the tooltip "From this repo's the-framework.yml, committed for everyone who clones it"; the user's own chips say "Your setting, from the options gear". The strip disappears when nothing is on. The chip rules are in `ResolvedOptions.tsx`.
+At the launcher [1], below the box, a strip labeled "Settings:" lists every option currently on as a chip, built from the same rows and rules as the gear so the two never disagree. A chip whose value comes from the repo file is drawn dashed and tagged "repo", with the tooltip "From this repo’s the-framework.yml, committed for everyone who clones it"; the user's own chips say "Your setting, from the options gear". The strip disappears when nothing is on. The chip rules are in `ResolvedOptions.tsx`.
 
 ### The compact single row
 

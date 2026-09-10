@@ -15,6 +15,8 @@ Implements the rich editing inside the composer [1]: the trigger characters that
 - **Chipping a loaded prompt** (`tokenize.ts`) - every tag or call in freshly loaded text becomes a chip at once, except inside an inline code span.
 - **Opening a menu from a trigger character** (`suggestion.ts`) - each of `/`, `<`, `@` and `#` opens its own menu at the caret when typed at the start of a word; the menu follows the caret, hides on a query that matches nothing while the trigger stays armed, shows a note over an empty source, hands a pick back to the trigger to replace the typed text, and announces itself so that Enter picks from it instead of sending.
 - **Steering and picking in the menu** (`SuggestionList.tsx`) - entries grouped under headers, each with a label and a hint, the first highlighted, the arrow keys moving the highlight with wrap-around, Enter or Tab picking, and the mouse doing the same without taking the focus from the editor.
+- **A token's life from keystroke to prompt** - by a menu pick, by typing a tag or call out in full, or by loading a preset, a token becomes a chip that is written to the prompt as its exact text.
+- **Enter picks or sends** - while a trigger's menu is visible Enter picks the highlighted entry, and otherwise Enter sends the prompt.
 
 ## Business logic
 

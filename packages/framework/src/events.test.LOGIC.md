@@ -2,7 +2,7 @@ What the tests cover, across the pick normalization in `events.ts`, the session 
 
 - **Session link templates** - a link with the session id placeholder is told apart from a literal URL; resolving fills every occurrence of the placeholder with the session id; a literal URL comes back unchanged.
 - **Normalizing a pick** - a single option id becomes a one-item list; a chosen subset stays the same list; an empty subset and an empty id both become an empty list.
-- **The gate as a terminal line** - a checklist renders "? <question>" and one indented line per option marked "[x]" or "[ ]" by whether it starts checked; a single choice marks the recommended option "●" and the others "○".
+- **The gate as a terminal line** - a checklist renders "? <question>" and one indented line per option marked "[x]" or "[ ]" by whether it starts checked; a single-select gate marks the recommended option "●" and the others "○".
 - **The pick as a terminal line** - "✓ chose p0, p2 (user)": a subset lists its ids, an empty subset says "(none)", a single id is shown as is, and who picked follows in parentheses.
 - **The armed line says what will happen** - a push, a pull request and a merge together read "when this ends: push the branch, open a PR, and merge it"; a pull request without a merge, or with the merge flag absent, reads "when this ends: push the branch and open a draft PR"; a merge flag without a pull request is never promised, the line reading only "when this ends: push the branch".
 - **The session id line** - "session abc123", with " — <link>" appended once a session link is known.

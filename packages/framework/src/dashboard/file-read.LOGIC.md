@@ -14,7 +14,7 @@ Reads one file out of a checkout [1] for the file tree's hover card, and holds t
 ## Business logic — TL;DR
 
 - **Which paths may be read** - only a plain repository-relative path: no traversal, no absolute path, no leading dash, never into `.git`, no empty segment, at most 1024 characters.
-- **The read stays inside the checkout** - the file's real location, symlinks resolved, must sit under the checkout's real location, so a link pointing outside is refused and a missing or unreadable file yields nothing.
+- **The read stays inside the checkout** - the file's real path, symlinks resolved, must sit under the checkout's real path, so a link pointing outside is refused and a missing or unreadable file yields nothing.
 - **A file's contents for the hover card** - text is returned without its trailing newline and cut at 500 lines with a flag; a file with a NUL byte is reported as binary with no text; an empty file is an empty text, not "nothing".
 
 ## Business logic
@@ -37,7 +37,7 @@ A path may be read only when it is a plain repository-relative path: non-empty, 
 
 #### Business logic
 
-The checkout's real location and the file's real location, both with symlinks resolved, are compared: the file must lie strictly under the checkout, or nothing is read. A file that does not exist has no real location, so "not there" is answered before any read; a checkout whose location cannot be resolved, or a file that cannot be read, yields nothing too. Resolving the checkout's own location as well is what makes the comparison hold on platforms whose temporary directories are themselves links.
+The checkout's real path and the file's real path, both with symlinks resolved, are compared: the file must lie strictly under the checkout, or nothing is read. A file that does not exist has no real path, so "not there" is answered before any read; a checkout whose real path cannot be resolved, or a file that cannot be read, yields nothing too. Resolving the checkout's own path as well is what makes the comparison hold on platforms whose temporary directories are themselves links.
 
 ### A file's contents for the hover card
 

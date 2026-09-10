@@ -1,10 +1,11 @@
-Derives a project's place on GitHub from its `origin` remote: the `https://github.com/<owner>/<repo>` URL the project panel's "Open on GitHub" links to, and the owner and repository name other GitHub reads address. Only a remote on `github.com` counts, in any of its spellings (`git@github.com:owner/repo.git`, `ssh://git@github.com/owner/repo.git`, `https://github.com/owner/repo.git`, with or without `.git`, an embedded credential, or a trailing slash); anything else resolves to nothing rather than to a wrong link. The read is safe anywhere: where there is no `origin`, git fails, or there is no local checkout at all (an agent [1] run on a device [2] through the relay [3]), the answer is simply "not on GitHub".
+Derives a project's place on GitHub from its `origin` remote: the `https://github.com/<owner>/<repo>` URL the project panel's "Open on GitHub" links to, and the owner and repository name other GitHub reads address. Only a remote on `github.com` counts, in any of its spellings (`git@github.com:owner/repo.git`, `ssh://git@github.com/owner/repo.git`, `https://github.com/owner/repo.git`, with or without `.git`, an embedded credential, or a trailing slash); anything else resolves to nothing rather than to a wrong link. The read is safe anywhere: where there is no `origin`, git fails, or there is no local checkout [1] at all (an agent [2] run on a device [3] through the relay [4]), the answer is simply "not on GitHub".
 
 ## Glossary
 
-[1] agent: The unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
-[2] device: Another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
-[3] relay: Running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
+[1] checkout: An agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch. The user's own working copy is the project's checkout.
+[2] agent: The unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[3] device: Another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
+[4] relay: Running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
 
 ## Business logic — TL;DR
 

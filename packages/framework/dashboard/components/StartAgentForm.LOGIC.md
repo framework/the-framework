@@ -1,4 +1,4 @@
-The launcher on a project home [1]: the box where the user says what an agent [2] should do and starts it. It gathers the prompt, the agent Context [3] the agent should look beyond its own project at, and the agent options the user's preferences [4] resolve to, then hands all of it to the daemon as one start. Before that start is spent it says everything it already knows will go wrong or disappoint: a coding agent [5] that cannot run, a model that will not finish cleanly, a merge this repository will not perform by itself.
+The launcher on a project home [1]: the box where the user says what an agent [2] should do and starts it. It gathers the prompt, the agent Context [3] — the other projects and files the agent should look at — and the agent options the user's preferences [4] resolve to, then hands all of it to the daemon as one start. Before that start is spent it says everything it already knows will go wrong or disappoint: a coding agent [5] that cannot run, a model that will not finish cleanly, a merge this repository will not perform by itself.
 
 ## Context
 

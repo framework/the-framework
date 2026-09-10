@@ -13,7 +13,6 @@ Provides the dashboard's sidebar shell: a side column that can be expanded or co
 - **Expanded or collapsed, toggled three ways** - the sidebar starts expanded unless its host says otherwise; the "Toggle Sidebar" button, the grab strip on its edge and Cmd/Ctrl+B anywhere on the page flip it.
 - **Three collapsing modes** - off-canvas slides the sidebar fully out of view, icon mode shrinks it to a narrow strip of icons and hides everything that needs width, and the non-collapsible mode keeps it as a fixed column.
 - **A drawer on a narrow screen** - narrower than 768 pixels, the sidebar becomes a drawer that slides in from its side, closed by default and opened by the same toggles.
-- **The state is written to a cookie that nothing reads** - every toggle records the state in a `sidebar_state` cookie kept for seven days, but the dashboard never reads it back, so a reload starts from the default again.
 - **Rows follow the collapsed state** - a row can be marked active, comes in three sizes, shows its tooltip only while the sidebar is collapsed to icons, may carry a badge, a hover-only action and a nested sub-list, and has a placeholder row for loading.
 
 ## Business logic
@@ -47,16 +46,6 @@ The sidebar is 16rem wide when expanded, sits on the left unless the host puts i
 #### Business logic
 
 When the window is narrower than 768 pixels, a collapsible sidebar is not shown as a column at all: it becomes a drawer, 18rem wide, sliding in from the sidebar's side. The drawer is closed by default and its open state is separate from the desktop state, so folding the sidebar on a desktop does not change what a narrow window shows. The drawer's own close button is hidden; it closes through the same toggles or by dismissing it as any sheet (`sheet.tsx`). A non-collapsible sidebar stays a column even on a narrow screen. A row's tooltip is never shown in the drawer.
-
-### The state is written to a cookie that nothing reads
-
-#### Context
-
-**Problem**: a sidebar the user folded should stay folded after a reload; the state is recorded for that purpose, but nothing restores it.
-
-#### Business logic
-
-Every change of the desktop state writes a cookie named `sidebar_state` holding `true` or `false`, for the whole site and for seven days. No part of the dashboard reads that cookie, so after a reload the sidebar starts from its default (or from whatever its host decides) regardless of what was recorded. The drawer state on a narrow screen is never recorded.
 
 ### Rows follow the collapsed state
 

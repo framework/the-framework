@@ -20,8 +20,6 @@ import { useIsMobile } from '../../lib/use-mobile.js'
 // forward the wrapper's div props onto the Sheet's Dialog root. `--sidebar-*` tokens live in
 // tailwind.css.
 
-const SIDEBAR_COOKIE_NAME = 'sidebar_state'
-const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
 const SIDEBAR_WIDTH = '16rem'
 const SIDEBAR_WIDTH_MOBILE = '18rem'
 const SIDEBAR_WIDTH_ICON = '3rem'
@@ -74,8 +72,6 @@ function SidebarProvider({
       } else {
         _setOpen(openState)
       }
-      // Persist the state so it survives a reload.
-      document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
     },
     [setOpenProp, open],
   )

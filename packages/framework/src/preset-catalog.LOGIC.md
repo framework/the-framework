@@ -22,6 +22,7 @@ Holds every built-in preset in one table: fifteen rows, each naming the preset, 
 [12] driver session: The coding agent's own conversation for one agent, which the driver can resume by its session id.
 [13] the Overview: The dashboard's cross-project page at `/`.
 [14] unattended: Said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
+[15] the `agent-data` branch: The branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
 
 ## Business logic — TL;DR
 
@@ -81,7 +82,7 @@ The other nine presets have no blank: each scopes itself to the repository's own
 
 #### Business logic
 
-Each triage prompt is its own markdown followed by a blank line and the one rule in `prompts/triage_scope.md`: a triage only changes the queue, through the `queue add` command; it never implements a ticket, however small its plan, with no code changes and no pull request, so every ticket it picks goes on the queue where a human can still veto it. The rule is appended from one file rather than pasted into each preset, so the pair cannot drift apart on it. Each triage prompt also pins its own session name [7] and stops when the branch `agent-<session name>` already exists; that collision guard is what makes the pair safe to fire on a schedule, since a triage still in flight owns the branch and the next firing does nothing instead of triaging twice.
+Each triage prompt is its own markdown followed by a blank line and the one rule in `prompts/triage_scope.md`: a triage only changes the queue, through the `queue add` command; it never implements a ticket, however small its plan, with no code changes and no pull request, so every ticket it picks goes on the queue where a human can still veto it. The rule is appended from one file rather than pasted into each preset, so the pair cannot drift apart on it. Each triage prompt also pins its own session name [7], `triage-quick` or `triage-consensual`, and carries no check of its own against running twice: the guard that makes the pair safe to fire on a schedule is the routine lock [11] the daemon takes on the `agent-data` branch [15] before starting the routine (`routine-locks.ts`), and the two names are distinct so their locks are distinct too.
 
 ### "Update from GitHub" always opens its own agent
 

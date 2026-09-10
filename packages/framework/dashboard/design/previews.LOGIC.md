@@ -1,0 +1,14 @@
+The design gallery's card registry: the cards the gallery renders, each with its group ("Foundations", "Components" or "Patterns"), its name and subtitle, the path of the page it becomes, its width, and the content to render. Every card renders the dashboard's real, shipped component wherever the component can stand alone, so a card cannot quietly drift from what the app ships; the few that cannot be rendered outside the running app (popups that render into a portal, anything that needs a read from the daemon) are hand-copied markup marked as a replica, so the card itself says so, because a silent hand-copy is exactly the drift the gallery exists to catch. How a card becomes a page is `build.mts`'s.
+
+## Glossary
+
+[1] event: Everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface (dashboard, terminal, archive, run) is a projection of it.
+[2] the Overview: The dashboard's cross-project page at `/`.
+
+## Business logic — TL;DR
+
+- **Real components, or a flagged replica** - a card is the shipped component itself whenever the component can stand alone; the one replica is the tooltip and menu popup card, built from the popup's own class names and announced as "(replica)" in its subtitle, so the flag travels with the card.
+- **Foundations** - four cards: the 15 semantic color tokens, each with what it is for (page canvas, body text, raised surface, hairlines, brand and action, hover fill, and the four status colors); the status palette, one token per meaning ("Done / passing", "Failed / destructive", "Stopped / warning", "Unpushed / informational", "Running / live") tuned per theme; the type scale's six roles from KPI value to caption; and the five radius steps from chart bars to pills.
+- **Components** - six cards: the button's three variants, five sizes and disabled states; the badge as event [1] kind labels and as status pills ("DONE", "FAILED", "STOPPED", "RUNNING"); the card in its header-plus-content and bare tile forms; the Overview's [2] row of stat tiles with the accent on the active count; the disclosure toggle with the option label; and the tooltip and menu popup replica.
+- **Patterns** - one card: the empty states the rails show when they have no data.
+- **Captions that name a gap** - three cards carry a caption stating a gap in the design system as it stands, so the gallery documents the debt rather than hiding it: the button has no destructive variant, so every irreversible action is styled ad hoc where it appears; the badge has no status variant, so status coloring is applied by hand at each use and the same status can read differently in different places; and empty states are bare sentences with no icon, no explanation of what would fill the space, and only sometimes a next action.

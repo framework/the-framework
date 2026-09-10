@@ -1,4 +1,4 @@
-The follow-up an agent's [1] work gets after the agent signals ready for merge [2], when the user switched the quality follow-ups preference on: a second agent, started vanilla [3] in the finished agent's checkout [4] on its branch, is told to put a maintainability pass and a security audit of the session's changes on the agent queue [5] when the changes warrant one, and to fold what the session learned into the project's knowledge base. It queues the quality presets rather than running them: one short turn that writes a few queue entries, which a later drain [6] works.
+The follow-up an agent's [1] work gets after the agent signals ready for merge [2], when the user switched the launcher's "Post-merge cleanup" option on: a second agent, started vanilla [3] in the finished agent's checkout [4] on its branch, is told to put a maintainability pass and a security audit of the session's changes on the agent queue [5] when the changes warrant one, and to fold what the session learned into the project's knowledge base. It queues the quality presets rather than running them: one short turn that writes a few queue entries, which a later drain [6] works.
 
 ## Context
 

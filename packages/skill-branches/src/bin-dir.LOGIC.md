@@ -1,0 +1,1 @@
+Fixes where the `branches` executable lives, for the daemon to put on the PATH of every agent it starts: the package's own `bin/` directory, beside its built code, so the path is the same whether the package is a workspace checkout of this repository or an installed dependency. It carries no other rule.

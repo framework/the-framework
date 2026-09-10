@@ -45,7 +45,7 @@ Pressing `/` anywhere on the page moves the cursor into the box, unless the user
 
 Every option in every facet carries a number to its right: how many tickets it would show with all the other facets applied but its own facet's current selection ignored. So "Critical" and "Medium" both keep meaningful counts while "Critical" is picked, and the counts still shrink when the search box or another facet narrows the pool.
 
-A facet's button carries the facet's name and, when the facet is filtering, a small badge with the number of its own clauses that are active — a picked span, a set range and "names no value" each count as one clause.
+A facet's button carries the facet's name and, when the facet is filtering, a small badge counting its own active clauses: one per picked option on a list facet, and on a numeric facet one for each of a picked span, a set range and "names no value".
 
 ### The numeric facets
 
@@ -79,7 +79,7 @@ The priority facet is always offered. The effort and uncertainty facets are offe
 #### Business logic
 
 Three facets that are plain lists of options with counts:
-- "Topics": one option per topic in the backlog, lowercased, most common first and alphabetically within an equal count, so the busy tags lead. A picked topic stays listed even when the other filters leave it at zero, or the user could not unpick it. A "No topics" option, last, covers the tickets that name none. The whole facet is offered only when the backlog has at least one topic, or the "No topics" clause is already on.
+- "Topics": one option per topic in the backlog, lowercased, most common first and alphabetically within an equal count, so the busy tags lead. A picked topic stays listed even when the other filters leave it at zero, or the user could not unpick it. Last, a "No topics" option for the tickets that name none, offered only when some ticket does name none or the clause is already on. The facet as a whole is offered only when it has something to list: at least one topic, or at least one ticket with none.
 - "Stage": exactly three options, "Unplanned", "Planned" and "Claimed". Claimed means an agent [1] holds the ticket's claim [2], whether to plan it or to implement it, which is why it composes with the other two rather than excluding them.
 - "Project": one option per registered project, by name. It is offered only when two or more projects are registered, since with one project every ticket is that project's.
 

@@ -139,7 +139,7 @@ A POST to `/_bridge/events` names the cloud session [2] and carries 1 to 50 entr
 
 #### Context
 
-**Problem**: diagnosing the bridge [1] used to need a screenshot of a panel, a round trip through a person for every wrong guess; when the page script says for itself which version is injected and what its last read found, the daemon can be asked instead. And a hands-off [5] agent's own record cannot say what its cloud session [2] is doing, because the agent ends at its hand-off; what claude.ai's session list shows is the only read-back.
+**Problem**: diagnosing the bridge [1] without this needs a screenshot of a panel, a round trip through a person for every wrong guess; when the page script says for itself which version is injected and what its last read found, the daemon can be asked instead. And a hands-off [5] agent's own record cannot say what its cloud session [2] is doing, because the agent ends as soon as its task leaves this machine; what claude.ai's session list shows is the only read-back.
 
 #### Business logic
 

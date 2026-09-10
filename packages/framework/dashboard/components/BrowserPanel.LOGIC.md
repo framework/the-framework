@@ -55,7 +55,7 @@ When the image fails to load, the panel replaces it with "The preview is not rea
 
 #### Context
 
-**User story**: a finished agent's page keeps showing the last page its browser was on, as a picture, where the live stream used to be.
+**User story**: a finished agent's page keeps showing the last page its browser was on, as a still picture in place of the live stream.
 
 #### Business logic
 

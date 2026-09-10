@@ -112,7 +112,7 @@ The model the agent [5] was started with is sent with the session request, and t
 
 #### Business logic
 
-The hand-off happens at most once per driver session [15]. Once a cloud session exists, every later turn [3] emits its start event and returns at once with a report that the work is already there: "This run was already handed off to Claude Code on the web, so there is nothing further to do here." and "The work continues in that cloud session, which opens its own pull request.", followed by the same "View the session" and "Continue it here" lines as the first report. No request is queued, nothing is pushed, and the "cloud" link event is not repeated, so the agent view [9] shows one session.
+The task is handed over at most once per driver session [15]. Once a cloud session exists, every later turn [3] emits its start event and returns at once with a report that the work is already there: "This run was already handed off to Claude Code on the web, so there is nothing further to do here." and "The work continues in that cloud session, which opens its own pull request.", followed by the same "View the session" and "Continue it here" lines as the first report. No request is queued, nothing is pushed, and the "cloud" link event is not repeated, so the agent view [9] shows one session.
 
 ### What the turn reports
 
@@ -122,7 +122,7 @@ The hand-off happens at most once per driver session [15]. Once a cloud session 
 
 #### Business logic
 
-The first hand-off emits into the agent's [5] event stream [17] an action labeled `cloud <session URL>` (the counterpart of the Actions driver's `run <url>`), which the agent view links through. The turn's [3] final text is "Handed off to Claude Code on the web.", a blank line, "View the session: <URL>" and "Continue it here: claude --teleport <session id>". The turn's result event carries that text, the cloud session's [4] id as the driver session [15] id (the handle `claude --teleport` and `claude --resume` take), the session's real URL as the session link, and the anchor's commit id; the agent process records the link on the agent and the anchor as the agent's cloud anchor [6] (the fold in `agent-telemetry.ts`, the record in `store/agent-store.ts`), and the cloud work adoption sweep [16] in `cloud-work.ts` later matches `origin`'s `claude/*` branches against the anchor.
+Handing the task over emits into the agent's [5] event stream [17] an action labeled `cloud <session URL>` (the counterpart of the Actions driver's `run <url>`), which the agent view links through. The turn's [3] final text is "Handed off to Claude Code on the web.", a blank line, "View the session: <URL>" and "Continue it here: claude --teleport <session id>". The turn's result event carries that text, the cloud session's [4] id as the driver session [15] id (the handle `claude --teleport` and `claude --resume` take), the session's real URL as the session link, and the anchor's commit id; the agent process records the link on the agent and the anchor as the agent's cloud anchor [6] (the fold in `agent-telemetry.ts`, the record in `store/agent-store.ts`), and the cloud work adoption sweep [16] in `cloud-work.ts` later matches `origin`'s `claude/*` branches against the anchor.
 
 ### Nothing is read back
 

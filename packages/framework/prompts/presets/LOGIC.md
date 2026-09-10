@@ -33,4 +33,4 @@ The fifteen presets: the canned prompts behind the launcher's buttons and the da
 - **Add quick-win work to AI Queue** (`triage_quick.md`) - queue the tickets whose plan shows a quick win with no uncertainty, cheapest first, and nothing else; the second routine.
 - **Add consensual work to AI Queue** (`triage_consensual.md`) - queue the significant tickets with no open question and no variability at their own priority, and nothing else; the third routine.
 - **Plan tickets (aka spike)** (`plan_tickets.md`) - queue a plan for the 10 most important unplanned, unclaimed tickets; as the last routine it fans out [8] into one agent per claimed ticket that writes the plan itself.
-- **Spin up agents working on the AI queue** (`drain_queue.md`) - work the first open entry of the agent queue [4] and only it, marking it done once published; fired by the daemon, never a launcher button, and recognized as a drain [5] by its exact text.
+- **Draining the agent queue** (`drain_queue.md`) - work the first open entry of the agent queue [4] and only it, marking it done once published; fired by the daemon, never a launcher button, and recognized as a drain [5] by its exact text.

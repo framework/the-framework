@@ -1,0 +1,1 @@
+A user-interface building block with no business logic: it pairs a value shared across a part of the dashboard with the way that part reads it, and turns a read from outside that part into an outright error naming what is missing, rather than letting a screen render with a silently absent value.

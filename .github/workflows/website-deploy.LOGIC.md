@@ -37,7 +37,7 @@ One job on the latest Ubuntu runner, with pnpm, runs four commands at the reposi
 3. `pnpm run website:test`: the website's tests. There are none yet: the command prints "no tests yet" and succeeds, so this step cannot fail today.
 4. `pnpm run website:build`: the website's production build, which lands in `packages/the-framework.ai/dist/client`.
 
-A failing command fails the job and nothing is deployed; the previously deployed site stays up.
+A failing command fails the job and nothing is deployed; the site already deployed stays up.
 
 ### How it publishes
 

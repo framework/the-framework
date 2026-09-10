@@ -20,7 +20,7 @@ What the agent view [1] says about a hands-off [2] agent [3] whose location [4] 
 
 ## Business logic — TL;DR
 
-- **The notice row** - "Starting a Claude Code cloud session…" until the hand-off names the session, then "Running as a Claude Code cloud session…" with the `claude --teleport <session id>` command, a copy button and "Open the session".
+- **The notice row** - "Starting a Claude Code cloud session…" until the task has left this machine and the session is named, then "Running as a Claude Code cloud session…" with the `claude --teleport <session id>` command, a copy button and "Open the session".
 - **The parked question as a gate card** - the question the bridge reports is shown as the "Your call" card, with "Answer it in the session" as the manual path; the pick is queued for the extension to type.
 - **Where the answer stands** - a queued answer shows "Sending “…” through your Claude web tab…" with "Cancel"; a typed one "Answered “…”"; a failed one puts the card back with "Sending “…” failed…".
 - **The cloud session mirror** - a labeled best-effort box of the session's turns, the user's side reduced to one line, claude.ai's own interface text scrubbed out, "Connecting to the cloud session…" while empty.
@@ -36,7 +36,7 @@ See `## Context`.
 
 #### Business logic
 
-For an agent [3] whose location [4] is `web`, a row with a cloud icon sits above the feed. Until the hand-off has named the cloud session [5] it reads "Starting a Claude Code cloud session…". Once the session is known it reads "Running as a Claude Code cloud session. It opens its own pull request over there; a question it parks on shows here once the bridge sees it." followed by the command `claude --teleport <session id>`, a copy button named "Copy the command that continues this session here", and the link "Open the session", which opens claude.ai in a new tab. The session's id and URL are read off the agent's event stream [9], from the driver's action that announces the hand-off; when the agent handed off more than once, the most recent session counts (the rule is in `lib/live-state.ts`).
+For an agent [3] whose location [4] is `web`, a row with a cloud icon sits above the feed. Until the task has left this machine and named the cloud session [5] it reads "Starting a Claude Code cloud session…". Once the session is known it reads "Running as a Claude Code cloud session. It opens its own pull request over there; a question it parks on shows here once the bridge sees it." followed by the command `claude --teleport <session id>`, a copy button named "Copy the command that continues this session here", and the link "Open the session", which opens claude.ai in a new tab. The session's id and URL are read off the agent's event stream [9], from the driver's action that announces the cloud session; when the agent handed off more than once, the most recent session counts (the rule is in `lib/live-state.ts`).
 
 ### The parked question as a gate card
 
@@ -65,7 +65,7 @@ When the daemon reports a question the session is parked on, and no answer for i
 
 #### Context
 
-**Problem**: a web agent's own log dead-ends at the hand-off; without a mirror the page shows dead air. The mirror is a scrape of the claude.ai tab through the extension, not the agent's own record, so it must be visibly one box rather than ordinary log rows.
+**Problem**: a web agent's own log dead-ends the moment its task leaves this machine; without a mirror the page shows dead air. The mirror is a scrape of the claude.ai tab through the extension, not the agent's own record, so it must be visibly one box rather than ordinary log rows.
 
 #### Business logic
 

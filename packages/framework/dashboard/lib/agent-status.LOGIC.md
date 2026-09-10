@@ -17,7 +17,7 @@ Picks the one word an agent's [1] status pill shows, out of its event stream [2]
 
 ## Business logic — TL;DR
 
-- **No pill until there is something to say** - an agent that has not named its work, not signalled ready for merge and not ended badly shows no pill.
+- **No pill until there is something to say** - an agent that has not named its work, not signaled ready for merge and not ended badly shows no pill.
 - **One agent, one word, ranked** - the six words sit on a fixed ladder and the first one that applies wins.
 - **"failed" says what failed** - a failure shows the reason the agent's ending carried, appended to the word.
 - **"publishing…" outranks "ready for merge"** - between a clean ending and the handoff's report, the pill says the work is being published, not that it is merely ready.
@@ -33,7 +33,7 @@ Picks the one word an agent's [1] status pill shows, out of its event stream [2]
 
 #### Business logic
 
-There is no pill while all of the following hold: the agent [1] has not given its work a session name [5], has not signalled ready for merge [3], has not failed, and was not stopped [4]. Any one of the four is enough for a pill to appear.
+There is no pill while all of the following hold: the agent [1] has not given its work a session name [5], has not signaled ready for merge [3], has not failed, and was not stopped [4]. Any one of the four is enough for a pill to appear.
 
 ### One agent, one word, ranked
 
@@ -48,7 +48,7 @@ The first word that applies, top down, is the one shown:
 1. **"failed"** — the agent [1] ended without success and the user did not stop [4] it. Red dot, red text.
 2. **"stopped"** — the agent's ending says the user stopped it. Amber dot, amber text.
 3. **"publishing…"** — the handoff [6] is still running (the rule is in `live-state.ts`). Pulsing green dot, muted text.
-4. **"ready for merge"** — the agent signalled ready for merge [3]. Green dot, muted text.
+4. **"ready for merge"** — the agent signaled ready for merge [3]. Green dot, muted text.
 5. **"building…"** — the agent is still live (the rule is in `live-state.ts`). Pulsing amber dot, muted text.
 6. **"finished"** — everything else: the agent is over and said nothing more about itself. Gray dot, muted text.
 
@@ -68,7 +68,7 @@ When the agent's [1] ending carries a detail text, the word becomes "failed — 
 
 #### Context
 
-**Problem**: an agent that finished clean has usually already signalled ready for merge [3]. During the seconds in which its handoff [6] pushes the branch, opens the pull request and possibly merges it, showing "ready for merge" would describe what the agent claimed rather than what is happening.
+**Problem**: an agent that finished clean has usually already signaled ready for merge [3]. During the seconds in which its handoff [6] pushes the branch, opens the pull request and possibly merges it, showing "ready for merge" would describe what the agent claimed rather than what is happening.
 
 #### Business logic
 

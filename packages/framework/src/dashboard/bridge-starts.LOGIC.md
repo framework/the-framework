@@ -4,7 +4,7 @@ Keeps the daemon's queue of session requests [1]: the cloud sessions [2] the dae
 
 **User story**: the user starts an agent [4] whose location is `web`. Within about a minute a cloud session [2] exists on claude.ai, opened on the agent's own branch, and the dashboard shows the session link; if no extension is around, the agent fails at once with the cure rather than after a timeout.
 
-**Problem**: a session created through claude.ai's own repository picker is bound to the repository and can push and open pull requests, which is what a hand-off is for; nothing but a browser on claude.ai can create one. The agent's process is a separate process the daemon spawned, so the agent's request and the extension's claim must meet in one queue inside the daemon.
+**Problem**: a session created through claude.ai's own repository picker is bound to the repository and can push and open pull requests, which is what handing a task to the cloud is for; nothing but a browser on claude.ai can create one. The agent's process is a separate process the daemon spawned, so the agent's request and the extension's claim must meet in one queue inside the daemon.
 
 **Business logic story**: the `claude-web` driver [5] pushes the agent's cloud anchor [6] to the remote as a branch named by the agent id [7], then queues the request through the daemon's agent-facing routes and polls it (`web-start-endpoints.ts`, `../driver/cloud.ts`); the extension's worker claims requests and reports on them through the bridge [8] routes (`bridge-endpoints.ts`); the daemon wires both sides to this one queue (`server.ts`).
 
@@ -42,7 +42,7 @@ A session request [1] is accepted only when:
 
 - its repository is `owner/name` as claude.ai's repository picker lists it — two segments of letters, digits, dots, underscores and hyphens, neither made of dots only — else "repo must look like owner/name";
 - its branch is a git branch name of 1 to 255 characters made of letters, digits, dots, underscores, hyphens and slashes — else "branch must be a git branch name";
-- its prompt is not blank and at most 200,000 characters, long because the hand-off prompt carries the agent's [4] whole framing (the system prompt, the formats, the protocols) — else "prompt must not be empty" or "prompt must be at most 200000 characters";
+- its prompt is not blank and at most 200,000 characters, long because the opening prompt of a cloud session carries the agent's [4] whole framing (the system prompt, the formats, the protocols) — else "prompt must not be empty" or "prompt must be at most 200000 characters";
 - its model, when given, is at most 100 characters — a short name or id the extension matches against claude.ai's model menu — else "model must be at most 100 characters"; a blank model is dropped and leaves claude.ai's own default.
 
 Surrounding whitespace is trimmed from every field. An accepted request gets its own id, the time it was queued, and the state "queued".

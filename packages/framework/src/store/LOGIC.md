@@ -21,6 +21,7 @@ The persisted state of one agent [1] and every read of it. An agent's event stre
 
 ## Business logic — TL;DR
 
+- **An agent's record, from its checkout to the branch and back** - while an agent runs its process writes the event stream and the status snapshot in its own checkout; when it ends the run is written to the `agent-data` branch, and every history read joins both places.
 - **The agent's files and their lifecycle** (`agent-store.ts`) - one append-only event stream [2] and one status snapshot [3] per agent [1] in its checkout [4], written torn-proof and best-effort; a fresh open, a continuation that reopens the same agent, the fold of every event kind into the snapshot, the archive [5] on close, the surrogate end [10] for a process that died, the crash rescue [11] on read and at boot, and the history that lists live agents, the runs [6] on the `agent-data` branch [7] and the archive together.
 - **The run's two shapes** (`run-record.ts`) - which facts of the status snapshot are the `logs` skill's [8] card fields and which ride under its `caller` key, and which events become the skill's four diary kinds, both ways.
 - **Addressing an agent's checkout and event stream** (`agent-checkout.ts`) - an agent id [9] resolves to the live agent's checkout, else the checkout directory named for it, else the project root; a tail of an ended agent follows its recorded event stream instead of the root's.

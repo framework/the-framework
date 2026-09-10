@@ -1,18 +1,18 @@
-Takes the issue-closing authority out of a pull request's prose without changing what the prose says: `close #1164` becomes `close the ticket #1164`. GitHub closes an issue on merge only when a closing keyword sits directly in front of the reference, so slipping two words in between ends the command while the sentence still reads as the agent [1] wrote it and the issue reference stays live.
+Takes the issue-closing authority out of a pull request's prose without changing what the prose says: `close #42` becomes `close the ticket #42`. GitHub closes an issue on merge only when a closing keyword sits directly in front of the reference, so slipping two words in between ends the command while the sentence still reads as the agent [1] wrote it and the issue reference stays live.
 
 ## Context
 
-**User story**: an agent [1] is started to write a ticket's plan. Its plan says "…then close #1164", which is a true description of what implementing the ticket will do. Its pull request lands the plan, not the implementation, and the user expects the ticket to still be open — with its fresh plan — after that pull request merges.
+**User story**: a plan agent [2] is started for a ticket. Its plan says "…then close #42", which is a true description of what implementing the ticket will do. Its pull request lands the plan, not the implementation, and the user expects the ticket to still be open — with its fresh plan — after that pull request merges.
 
-**Problem**: a closing phrase anywhere in a merged pull request's title or body closes the issue it names. On a pull request that delivers the work, that is exactly right, and the handoff [2] puts "(fix #N)" on such a title on purpose. On a pull request that delivers something short of the work, it silently closes a ticket whose work has not started, and the next tickets sync then removes the closed ticket and the plan just written for it. Forbidding the phrase is the wrong cure: the agent is describing its plan and the sentence is true.
+**Problem**: a closing phrase anywhere in a merged pull request's title or body closes the issue it names. On a pull request that delivers the work, that is exactly right, and the handoff [3] puts "(fix #N)" on such a title on purpose. On a pull request that delivers something short of the work, it silently closes a ticket whose work has not started, and the next tickets sync then removes the closed ticket and the plan just written for it. Forbidding the phrase is the wrong cure: the agent is describing its plan and the sentence is true.
 
-**Business logic story**: which text is defused is decided where an agent's pull request is prepared (`cli.ts`): both the title and the body of an agent that plans a ticket, and nothing else.
+**Business logic story**: which text is defused is decided where an agent [1]'s pull request is prepared (`cli.ts`): both the title and the body of a plan agent [2], and nothing else.
 
 ## Glossary
 
 [1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
-
-[2] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it).
+[2] plan agent: an agent started to write a ticket's plan rather than to implement the ticket; its pull request lands the plan, not the work.
+[3] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it).
 
 ## Business logic — TL;DR
 

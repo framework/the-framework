@@ -1,0 +1,1 @@
+Says whether the browser window is narrow enough to count as a phone: narrower than 768 pixels. The sidebar reads it to switch between sitting beside the page and sliding in over it. The answer follows the window being resized, and a window whose width cannot be measured counts as not narrow, so the desktop layout is the fallback.

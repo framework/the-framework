@@ -22,6 +22,8 @@ Every prompt The Framework sends an agent [1], authored as markdown and nowhere 
 
 ## Business logic — TL;DR
 
+- **One system channel, in one order** - the files of this directory are assembled into one system channel in a fixed order, and that order is what a build agent is started with.
+- **Templates** - a prompt file is a template: a `${{ ... }}` fragment is evaluated at render time against the context the prompt reads, and everything outside a fragment passes through byte for byte.
 - **The built-in system prompt** (`system_prompt.md`) - analyze the prompt and stop at a gate [8] when it is ambiguous or large, name the work and branch before the first change, weigh alternatives at a gate before every change, and signal ready for merge [5] only when nothing is left; its last section is where the user's prompt is rendered.
 - **Branching without the skill** (`branch_yourself.md`) - an agent outside a checkout [3] The Framework created creates `agent-<session name>` with git itself and commits as it goes.
 - **Tickets and the queue without the commands** (`tickets_yourself.md`) - the same agent reads and writes the `agent-data` branch with git, exactly as the `tickets` and `queue` commands would, and claims a ticket with a lock file it never overwrites.

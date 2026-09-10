@@ -4,7 +4,7 @@ The counterpart of `branch_yourself.md` for the tickets and the agent queue [3]:
 
 **User story**: an agent [1] on a GitHub Actions runner or in a cloud session works a ticket like any other agent: it reads the queue and the ticket, claims the ticket so no other agent takes it, and updates the queue when its instructions say so, and none of that bookkeeping ever lands on the agent's code branch or in the pull request.
 
-**Problem**: the shared bookkeeping lives on the `agent-data` branch [4], and the commands that keep two agents from stepping on each other are not installed on a runner or in a cloud session; without these instructions such an agent would edit the files on its own branch, switch its checkout to the data branch, or overwrite another agent's claim [6].
+**Problem**: the shared bookkeeping lives on the `agent-data` branch [4], and the commands that keep two agents from stepping on each other are not installed on a runner or in a cloud session; without these instructions such an agent would edit the files on its own branch, switch its checkout to the `agent-data` branch, or overwrite another agent's claim [6].
 
 ## Glossary
 

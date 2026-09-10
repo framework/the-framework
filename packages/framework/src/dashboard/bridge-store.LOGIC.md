@@ -7,7 +7,7 @@ Keeps, in the daemon's memory, everything the Claude web bridge [1] reports and 
 - The dashboard lists a cloud session as waiting on the user — in the open questions [8] and on the Overview [9] — while it is parked on a question, or while claude.ai's own session list shows it "Awaiting input".
 - In Settings, the bridge's panel shows when the extension last reached the daemon and how it went, which version it claimed and whether it was refused, and what the page script last reported about itself.
 
-**Problem**: a cloud session has no live local agent to hang a gate on: a hands-off agent ends at its hand-off, so by the time its session asks anything the agent is already done, and the only join back to the agent is the cloud session id the agent recorded. The store is in memory on purpose: a question is only answerable while the session that asked it is still parked, and the extension re-reports it on reconnect, so surviving a daemon restart would preserve a question that may already have been answered elsewhere.
+**Problem**: a cloud session has no live local agent to hang a gate on: a hands-off agent ends as soon as its task leaves this machine, so by the time its session asks anything the agent is already done, and the only join back to the agent is the cloud session id the agent recorded. The store is in memory on purpose: a question is only answerable while the session that asked it is still parked, and the extension re-reports it on reconnect, so surviving a daemon restart would preserve a question that may already have been answered elsewhere.
 
 **Business logic story**: the bridge routes write into the store (`bridge-endpoints.ts`, wired in `server.ts`); the dashboard reads it for the open questions (`open-questions.ts`), the Overview (`overview.ts`), an agent's page and its gate controls (`../dashboard-rpc/`); the sessions holding a queued answer feed the list of sessions the Driver tab [10] serves (`bridge-sessions.ts`, `../daemon.ts`); and the web-start endpoints ask it whether an extension is around before queuing a session request [11] (`web-start-endpoints.ts`).
 
@@ -114,7 +114,7 @@ Every session holding a queued answer [3] is listed for the Driver tab [10] to s
 
 #### Context
 
-**Problem**: a hands-off [4] agent's [5] own record reads done from its hand-off on, whether its cloud session [2] is parked on its user or finished hours ago; and a question the session asks in prose carries no question block for the bridge [1] to hold, so claude.ai's session list is the only thing that says the session stopped for its user.
+**Problem**: a hands-off [4] agent's [5] own record reads done from the moment its task leaves this machine, whether its cloud session [2] is parked on its user or finished hours ago; and a question the session asks in prose carries no question block for the bridge [1] to hold, so claude.ai's session list is the only thing that says the session stopped for its user.
 
 #### Business logic
 

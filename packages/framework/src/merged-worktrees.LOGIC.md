@@ -69,7 +69,7 @@ See `## Context`.
 
 #### Business logic
 
-A removal waits for every earlier actor on the same checkout [3] to settle before it runs: the teardown at the agent's end, a Push or Open PR, a Remove or Delete, a Resume (the lock in `agent-locks.ts`). Without it a sweep landing during a teardown's archiving would remove the directory the archive is reading from, the archive would recreate it, and the removal would silently un-happen.
+A removal waits for every earlier actor on the same checkout [3] to settle before it runs: the teardown at the agent's end, a "Push" or "Open PR", a "Remove" or "Delete", a "Resume" (the lock in `agent-locks.ts`). Without it a sweep landing during a teardown's archiving would remove the directory the archive is reading from, the archive would recreate it, and the removal would silently un-happen.
 
 ### One turn per beat of the daemon's clock
 

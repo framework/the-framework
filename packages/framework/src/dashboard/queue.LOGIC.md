@@ -27,7 +27,7 @@ See `## Context`.
 
 #### Business logic
 
-Each line of a document is read on its own. A line that is a markdown list item, with `-`, `*` or a number followed by a period as its marker and any indentation before it, is one queue entry [1]; every other line, whether a heading, prose or blank, is ignored. When the item's text starts with a GitHub-style checkbox, `[ ]` makes the entry open and `[x]` or `[X]` makes it done, and the text after the checkbox is the entry's text; an item whose text after the checkbox is empty is dropped. An item with no checkbox is an open entry whose text is the whole item. This is deliberately the rule the daemon's own drain [3] parses by (`../todo-loop.ts`).
+Each line of a document is read on its own. A line that is a markdown list item, with `-`, `*` or a number followed by a period as its marker and any indentation before it, is one queue entry [1]; every other line, whether a heading, prose or blank, is ignored. When the item's text starts with a GitHub-style checkbox, `[ ]` makes the entry open and `[x]` or `[X]` makes it done, and the text after the checkbox is the entry's text; an item whose text after the checkbox is empty is dropped. An item with no checkbox is an open entry whose text is the whole item. This is deliberately the rule of the `queue` skill's own parser, which the daemon's drain [3] reads the queue by (`../todo-loop.ts`).
 
 ### One block per project, most open first
 

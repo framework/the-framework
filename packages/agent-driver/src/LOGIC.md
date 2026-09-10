@@ -38,6 +38,8 @@ The driver [1] seam of The Framework: one contract under which a coding agent [2
 - **Reading a run's artifact** (`actions-zip.ts`, `actions-zip.test.ts`) - the zip archive GitHub hands back is read entry by entry and refused outright when it is not an archive, never read short.
 - **The scripted fake** (`fake.ts`, `fake.test.ts`) - scripted or responder-driven turns with the same progress events as a real driver, no process and no model, for tests and offline demos.
 - **The entry point** (`index.ts`) - everything the product may import: the contract, the four drivers with their parsers, the quota reader and the pieces an outside driver builds on; the zip reader stays internal.
+- **A turn on this machine, end to end** - how a local driver's command line and parser, the shared process core, the isolated reporter and the process registry together carry one turn from prompt to exit code, and what a stop does to the process tree.
+- **Where the implementations differ** - how each implementation starts its coding agent, delivers framing, resumes a conversation, reports spend and quota, reads code back, and whose login it spends.
 
 ## Business logic
 

@@ -14,7 +14,8 @@ Wires a trigger character to a floating suggestion menu in the composer [1]'s pr
 - **The query is matched ignoring letter case** - what the user typed after the trigger character is lower-cased before the trigger's own item source filters on it.
 - **The menu floats at the caret** - it opens just below the caret, flips above it when the caret is near the bottom of the window, and follows the caret through scrolling and window resizing.
 - **An empty source shows a note, a mistyped query hides the menu** - a fresh trigger over an empty source shows the trigger's note, while a query that matches nothing hides the menu but keeps the trigger armed, so the menu is back the moment a later key matches.
-- **Keys reach the menu while a trigger is open** - key presses go to the menu list first, which steers and picks as described in `SuggestionList.tsx`; Escape is passed through untouched.
+- **Keys reach the menu while a trigger is open** - key presses go to the menu list first, which steers and picks as described in `SuggestionList.tsx`.
+- **Escape dismisses the menu** - the first Escape closes an open menu and goes no further; the trigger stays armed but silent until a fresh one opens, and a second Escape reaches the surface around the editor.
 - **A pick replaces the trigger text** - the picked item and the span from the trigger character to the caret go to the trigger's own insertion, which replaces that span.
 - **The open menu is announced** - while the menu is visible the editor reads as an expanded combobox pointing at the highlighted entry, and the same signal is what makes Enter pick from the menu instead of sending the prompt.
 
@@ -69,6 +70,16 @@ See `## Context`.
 #### Business logic
 
 While a trigger is open, every key press is offered to the menu list before the editor sees it; the list decides which keys it consumes (arrows, Enter and Tab, per `SuggestionList.tsx`) and the rest reach the editor as normal typing. Escape is the one key never offered to the list: it passes through to the editor and the page, and does not close the trigger by itself.
+
+### Escape dismisses the menu
+
+#### Context
+
+**Problem**: Escape over an open menu means "close this". Letting it through untouched left the menu on screen after the keystroke that dismisses it, and because an open menu is what makes Enter pick instead of send, the next Enter picked a suggestion the user thought they had dismissed.
+
+#### Business logic
+
+The first Escape while a menu is showing closes it and stops there: the menu is hidden, the editor stops reading as expanded, and nothing else on the page acts on that keystroke. The trigger itself stays armed but silent — typing on does not bring the menu back, and only a fresh trigger opens one again. With no menu showing, Escape is not taken: it reaches the surface around the editor as it always did.
 
 ### A pick replaces the trigger text
 

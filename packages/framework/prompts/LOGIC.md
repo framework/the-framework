@@ -26,7 +26,7 @@ Every prompt The Framework sends an agent [1], authored as markdown and nowhere 
 - **Branching without the skill** (`branch_yourself.md`) - an agent outside a checkout [3] The Framework created creates `agent-<session name>` with git itself and commits as it goes.
 - **Tickets and the queue without the commands** (`tickets_yourself.md`) - the same agent reads and writes the `agent-data` branch with git, exactly as the `tickets` and `queue` commands would, and claims a ticket with a lock file it never overwrites.
 - **The protocols** (`protocols/`) - the syntax for a gate, a browser handover, a right-rail document, the ready signal, the pull request and an error, plus the two sections an agent gets only with a browser or only when hands-off [9]; see `protocols/LOGIC.md`.
-- **The follow-up after ready for merge** (`on_before_mergeable_prompt.md`) - a vanilla [6] follow-up agent queues a maintainability pass and a security audit of the finished session's changes when warranted, and folds what the session learned into `knowledge-base/`.
+- **The follow-up after ready for merge** (`on_before_mergeable_prompt.md`) - a vanilla [6] follow-up agent queues a maintainability pass and a security audit of the finished agent's changes when warranted, and folds what that agent learned into `knowledge-base/`.
 - **The presets** (`presets/`) - the fifteen canned prompts behind the launcher's buttons and the daemon's routines; see `presets/LOGIC.md`.
 - **Triage queues only** (`triage_scope.md`) - the rule ending both triage presets: the agent changes nothing but the agent queue [11], implements no ticket and opens no pull request.
 

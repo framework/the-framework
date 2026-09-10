@@ -108,7 +108,7 @@ The launcher [1] shows fourteen buttons, in this order: "Research", "Readability
 
 #### Context
 
-**Problem**: the daemon knows a drain [3] by the mark on its routine [8], but an agent [2] the user started arrives as bare prompt text with no such mark, so the text is all there is to recognize it by. The dashboard needs that recognition to show which agents are working the agent queue [4]: a lane on the Overview [13], and which ticket an agent is implementing.
+**Problem**: the daemon knows a drain [3] by the mark on its routine [8], but an agent [2] the user started arrives as plain prompt text with no such mark, so the text is all there is to recognize it by. The dashboard needs that recognition to show which agents are working the agent queue [4]: a lane on the Overview [13], and which ticket an agent is implementing.
 
 #### Business logic
 
@@ -122,4 +122,4 @@ A prompt drains the queue exactly when its text, ignoring surrounding whitespace
 
 #### Business logic
 
-"Research" stops at a gate: it shows its ratings as a multiple-choice question the dashboard resolves live. "Suggest tickets to work on" also ends at a gate, so it is deliberately kept out of the routines [8]. "UX (auto)" ends in work rather than at a gate, so an agent started from it finishes on its own. "Suggest new features" proposes features as tickets rather than asking for approval mid-agent, so a human triages its proposals later and it stays usable unattended [14]. The routines are built only from rows that need no human: "Update from GitHub", the two triage presets, "Plan tickets (aka spike)", "Spin up agents working on the AI queue" and "Maintenance".
+"Research" stops at a gate offering its ratings as options, which the dashboard resolves live. "Suggest tickets to work on" also ends at a gate, so it is deliberately kept out of the routines [8]. "UX (auto)" ends in work rather than at a gate, so an agent started from it finishes on its own. "Suggest new features" proposes features as tickets rather than asking for approval mid-agent, so a human triages its proposals later and it stays usable unattended [14]. The routines are built only from rows that need no human: "Update from GitHub", the two triage presets, "Plan tickets (aka spike)", "Spin up agents working on the AI queue" and "Maintenance".

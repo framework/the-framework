@@ -13,6 +13,7 @@ Reads and edits the agent queue [1], `TODO_AGENTS.md` on the `agent-data` branch
 [3] queue entry: an item on the agent queue.
 [4] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
 [5] drain: starting an agent on the agent queue's first open entry — the half of Auto PM that spends existing work.
+[6] run: only the `logs` skill's record of one agent on the `agent-data` branch: a card (what was asked, the ticket, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said).
 
 ## Business logic — TL;DR
 
@@ -70,7 +71,7 @@ An entry added without a priority is appended as `- <entry>` on its own line at 
 
 #### Context
 
-**User story**: the queue is the remaining work; the history of what ran is kept elsewhere, in the runs, so a finished task leaves the file rather than being checked off.
+**User story**: the queue is the remaining work; the record of what ran is kept elsewhere, in the runs [6], so a finished task leaves the file rather than being checked off.
 
 #### Business logic
 

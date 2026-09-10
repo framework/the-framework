@@ -17,7 +17,7 @@ Checks, before a checkout [1] is spent on an agent [2], that the chosen driver's
 
 ## Business logic — TL;DR
 
-- **The driver that was picked** - preflight probes the coding agent of the chosen driver, `claude` by default, so a Codex agent fails on `codex` being missing rather than on `claude`; the Node version is always the first, passing check.
+- **The driver that was picked** - preflight checks the coding agent of the chosen driver, `claude` by default, so a Codex agent fails on `codex` being missing rather than on `claude`; the Node version is always the first, passing check.
 - **Installed** - the command must be found and answer `--version` within ten seconds; otherwise the check fails with "`<command>` not found — <install hint>".
 - **Logged in** - an installed coding agent is asked whether it is logged in; only an explicit no fails, an explicit yes passes as "logged in", a coding agent that will not say adds nothing, and the question is skipped when the command is missing.
 - **The GitHub CLI, when a pull request is armed** - `gh` missing or logged out is a warning naming the fix, never a failure, and `gh` is not probed otherwise.
@@ -34,7 +34,7 @@ Checks, before a checkout [1] is spent on an agent [2], that the chosen driver's
 
 #### Business logic
 
-Preflight [6] probes the coding agent [4] of the chosen driver [3]: `claude` for Claude Code, `codex` for Codex, `claude` when no driver is given. What preflight knows about each, the command on PATH, the install hint, the login question and the fix, is the table in `driver-cli.ts`. Every probe runs the command with a ten-second limit and reads its standard output and standard error together, because the two coding agents disagree about where a status line belongs. The first check is always Node, passing, with the running version as its detail.
+Preflight [6] checks the coding agent [4] of the chosen driver [3]: `claude` for Claude Code, `codex` for Codex, `claude` when no driver is given. What preflight knows about each, the command on PATH, the install hint, the login question and the fix, is the table in `driver-cli.ts`. Every check runs its command with a ten-second limit and reads its standard output and standard error together, because the two coding agents disagree about where a status line belongs. The first check is always Node, passing, with the running version as its detail.
 
 ### Installed
 
@@ -64,7 +64,7 @@ Only when the command was found, preflight [6] asks it the driver's [3] login qu
 
 #### Business logic
 
-Only when the caller says a pull request is armed, `gh` is asked for `--version` and then for `gh auth status`. A `gh` that is not found adds a passing check marked as a warning, "gh", with the detail "`gh` not found — the armed PR cannot be opened, so publishing stops at the pushed branch. Install the GitHub CLI (`brew install gh`, or https://cli.github.com) and run `gh auth login`.". A `gh` whose `auth status` fails, which it does when no host is logged in, adds a warning check "gh auth" with the detail "`gh` is not logged in — the armed PR cannot be opened, so publishing stops at the pushed branch. Run `gh auth login`, then start the session.". The exit code alone decides the login answer. An installed, logged-in `gh` adds nothing. These are warnings because the agent's [2] own work needs no `gh` and the push level of the handoff is plain git, so the agent is worth starting either way. Without an armed pull request, `gh` is not probed at all.
+Only when the caller says a pull request is armed, `gh` is asked for `--version` and then for `gh auth status`. A `gh` that is not found adds a passing check marked as a warning, "gh", with the detail "`gh` not found — the armed PR cannot be opened, so publishing stops at the pushed branch. Install the GitHub CLI (`brew install gh`, or https://cli.github.com) and run `gh auth login`.". A `gh` whose `auth status` fails, which it does when no host is logged in, adds a warning check "gh auth" with the detail "`gh` is not logged in — the armed PR cannot be opened, so publishing stops at the pushed branch. Run `gh auth login`, then start the session.". The exit code alone decides the login answer. An installed, logged-in `gh` adds nothing. These are warnings because the agent's [2] own work needs no `gh` and the push level of the handoff is plain git, so the agent is worth starting either way. Without an armed pull request, `gh` is not checked at all.
 
 ### Running as root
 

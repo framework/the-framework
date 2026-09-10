@@ -2,7 +2,7 @@ The instructions every agent [1] reads before touching the agent queue [2]: wher
 
 ## Context
 
-**User story**: an agent starting its backlog work reads what agents will work next, takes the first entry, queues a task it discovered at the right priority, and removes the entry it finished, so the user's queue in the dashboard is always the work that remains, in the order it will be done.
+**User story**: an agent about to work the agent queue [2] reads what agents will work next, takes the first entry, queues a task it discovered at the right priority, and removes the entry it finished, so the user's queue in the dashboard is always the work that remains, in the order it will be done.
 
 **Business logic story**: everything the skill says the command does is enforced by the rules in `src/cli.ts` and `src/queue.ts`; the daemon drains the queue by the same order with code of its own.
 

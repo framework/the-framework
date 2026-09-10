@@ -2,7 +2,7 @@ Opens the operating system's own choose-a-folder dialog on the daemon's machine,
 
 ## Context
 
-**User story**: the user clicks "Add project" and the operating system's folder dialog opens, titled "Choose a git repository to add as a project"; the chosen folder's path lands in the form, and cancelling leaves the form as it was. On a daemon reached over SSH or in a container, the user is told that no dialog can open there rather than left waiting. What follows the pick, the confirmation "Do you trust this repository?" before the folder is added as a project, is the dashboard's own step in `dashboard/components/AddProjectPanel.tsx`.
+**User story**: the user clicks "Add project" and the operating system's folder dialog opens, titled "Choose a git repository to add as a project"; the chosen folder's path lands in the form, and canceling leaves the form as it was. On a daemon reached over SSH or in a container, the user is told that no dialog can open there rather than left waiting. What follows the pick, the confirmation "Do you trust this repository?" before the folder is added as a project, is the dashboard's own step in `dashboard/components/AddProjectPanel.tsx`.
 
 ## Business logic — TL;DR
 

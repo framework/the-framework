@@ -39,11 +39,11 @@ The daemon holds four things: the most recent attempt exactly as the driver [2] 
 
 #### Context
 
-**Problem**: a poller whose first reading lands five minutes in is no use to an agent that just started, and the session window's own measurement needs a baseline from the start.
+**Problem**: a first reading that lands five minutes in is no use to an agent that just started, and the session window's own measurement needs a baseline from the start.
 
 #### Business logic
 
-Starting the poller reads the quota [1] at once, then schedules the next read one gap later, five minutes by default. Starting twice does nothing the second time, and a poller that has given up or been stopped does not start again. No read is waited on: it takes about five seconds and nothing in the daemon should block on it. The timer between reads never keeps the daemon's process alive on its own; the daemon's own work decides its lifetime. Stopping the poller cancels the pending read and is safe to repeat.
+Starting the polling reads the quota [1] at once, then schedules the next read one gap later, five minutes by default. Starting twice does nothing the second time, and polling that has given up or been stopped does not start again. No read is waited on: it takes about five seconds and nothing in the daemon should block on it. The wait between reads never keeps the daemon's process alive on its own; the daemon's own work decides its lifetime. Stopping cancels the pending read and is safe to repeat.
 
 ### A transient failure keeps the reading and backs off
 

@@ -4,7 +4,7 @@ Binds the tickets to the `agent-data` branch [1] for a long-lived process, the d
 
 **User story**: the user opens the project's own checkout and finds a `tickets` directory at its root listing the roadmap, one listing away, without switching branches; the dashboard shows the tickets other machines and cloud sessions [3] pushed, and a change the daemon made reaches every other machine.
 
-**Business logic story**: the branch's birth, its sync with origin and the commit-and-push cycle are the `agent-data` package's rules; this file only binds them to the tickets. The `tickets` command in `cli.ts` does not use the persistent checkout: it writes through a throwaway worktree at origin's tip.
+**Business logic story**: the branch's birth, its sync with origin and the commit-and-push cycle are the `agent-data` package's rules; this file only binds them to the tickets. The `tickets` command in `cli.ts` does not use the persistent checkout: it writes through a throwaway checkout at origin's tip.
 
 ## Glossary
 

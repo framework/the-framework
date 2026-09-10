@@ -4,7 +4,7 @@ Fixes what an unset preference [1] means and the bounds that the controls writin
 
 **User story**: the user opens Settings and finds the browser bell and the "needs you" notifications on, Discord and plain activity off; the quota panel's line sits a little ahead of the boundary; Auto PM keeps two agents going. Whatever the user changes is stored; whatever is left alone means exactly this.
 
-**Problem**: a default that lives in one place cannot be spelled three ways. Each notification default was once a predicate in the dashboard and open-coded at each daemon call site, and one call site got a category's polarity wrong by copying its sibling; the slider that writes the spend offset is in the browser while the check that clamps it is in the daemon, so its bound has to be one number both import.
+**Problem**: a default that lives in one place cannot be spelled three ways. Each notification default was once a predicate in the dashboard and open-coded at each daemon call site, and one call site got a category's polarity wrong by copying its sibling; the control that writes the spend offset is in the browser while the check that clamps it is in the daemon, so its bound has to be one number both import.
 
 ## Glossary
 
@@ -53,7 +53,7 @@ Unset, the browser method is on and the Discord method is off; the intervention 
 
 #### Business logic
 
-The spend offset [2] reaches at most 50 percentage points either side of the boundary; the slider in the dashboard and the clamp in the daemon share that bound. Before the user touches it, the offset is one fourteenth of the week's allowance, 100/14 or about 7.1 percentage points ahead of the boundary: a half-day cushion that gives unattended work room to breathe without meaningfully loosening the policy that the boundary is the line.
+The spend offset [2] reaches at most 50 percentage points either side of the boundary; the control in the dashboard and the clamp in the daemon share that bound. Before the user touches it, the offset is one fourteenth of the week's allowance, 100/14 or about 7.1 percentage points ahead of the boundary: a half-day cushion that gives unattended work room to breathe without meaningfully loosening the policy that the boundary is the line.
 
 ### Auto PM concurrency
 

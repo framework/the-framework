@@ -14,7 +14,7 @@ Renders a prompt's placeholders: every `${{ <expression> }}` in a prompt is a Ja
 
 - **Placeholders are expressions** - each `${{ … }}` is evaluated as a JavaScript expression with the context's entries in scope, and its result, as text, takes its place; text outside placeholders is untouched.
 - **Only trusted prompts** - evaluation is arbitrary code execution, so only the prompts The Framework ships are rendered, never text the user or a repository supplied.
-- **A broken placeholder fails the render** - an expression that throws, or evaluates to nothing, aborts the render with an error quoting the placeholder, instead of a prompt with a hole in it.
+- **A broken placeholder fails the render** - an expression that throws, or evaluates to nothing, fails the render with an error quoting the placeholder, instead of a prompt with a hole in it.
 - **A placeholder ends at the first `}}`** - two closing braces next to each other end the placeholder even inside a nested object, and a space between them is the fix; this is a permanent rule of the notation.
 
 ## Business logic

@@ -13,11 +13,12 @@ Reads tickets off the `tickets/` directory of the `agent-data` branch [1] into r
 [3] holder: who a claim names: the agent's id when the daemon started the agent, else the branch the `tickets` command ran on.
 [4] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
 [5] sibling: a ticket's plan file (`<name>.plan.md`) or claim file (`<name>.lock.md`), written about the ticket and never a ticket of its own.
+[6] key block: the `key: value` lines above a ticket's or a plan's `# ` heading, where `Priority:`, `Topics:`, `GitHub:`, `Effort:` and `Uncertainty:` are read from.
 
 ## Business logic — TL;DR
 
 - **What a ticket's row holds** - one row per ticket, the same fields for `list` and `show`: file, title, summary, date and whether planned always; priority, topics, GitHub link, locked, holder, effort and uncertainty only when they have a value.
-- **The key block above the title** - `Priority:`, `Topics:` and `GitHub:` are read only from the lines above the `# ` heading, keys matched in any case; any other line there is noise.
+- **The key block above the title** - `Priority:`, `Topics:` and `GitHub:` are read only from the key block [6], the lines above the `# ` heading, keys matched in any case; any other line there is noise.
 - **The title, else the filename made readable** - the first `# ` heading is the title; without one, the filename without `.md`, percent escapes decoded and underscores turned into spaces.
 - **The summary is the first prose line** - the first line after `## TLDR` that is not blank, not a heading and not a `Source:` line; without a `## TLDR`, the first such line after the title; empty when there is none.
 - **A ticket's date, and newest first** - the `yyyy-mm-dd` the filename starts with, at midnight UTC; else the file's modification time; else the Unix epoch; a listing is ordered newest first.
@@ -47,7 +48,7 @@ A row names the ticket by its filename inside `tickets/`, which is also its iden
 
 #### Business logic
 
-The lines above the first `# ` heading are the ticket's key block; a ticket with no heading has no key block, so none of the keys are read. In the key block, a line whose lowercased text starts with `priority:`, `topics:` or `github:` gives that key its value: the text after the colon with surrounding whitespace removed, the first such line winning. A `Priority:` value is lowercased and kept as written (`High` becomes `high`, `7` stays `7`); an empty value counts as absent. A `Topics:` value drops one leading `[` and one trailing `]`, then splits on commas into trimmed tags with empty tags dropped, so `[dx, ui, docs]` and `dx, ui, docs` both give three topics; a value with no tag left counts as absent. A `GitHub:` value gives a link only when it holds a markdown link, `[label](url)`: the first such link's label and URL are kept as written, the label never re-derived from the URL; a `GitHub:` line without a link gives no link. Any other line in the key block, such as a leftover `Status:` line, is noise and never a field.
+The lines above the first `# ` heading are the ticket's key block [6]; a ticket with no heading has no key block, so none of the keys are read. In the key block, a line whose lowercased text starts with `priority:`, `topics:` or `github:` gives that key its value: the text after the colon with surrounding whitespace removed, the first such line winning. A `Priority:` value is lowercased and kept as written (`High` becomes `high`, `7` stays `7`); an empty value counts as absent. A `Topics:` value drops one leading `[` and one trailing `]`, then splits on commas into trimmed tags with empty tags dropped, so `[dx, ui, docs]` and `dx, ui, docs` both give three topics; a value with no tag left counts as absent. A `GitHub:` value gives a link only when it holds a markdown link, `[label](url)`: the first such link's label and URL are kept as written, the label never re-derived from the URL; a `GitHub:` line without a link gives no link. Any other line in the key block, such as a leftover `Status:` line, is noise and never a field.
 
 ### The title, else the filename made readable
 
@@ -97,7 +98,7 @@ A `.plan.md` or `.lock.md` sibling [5] never becomes a row of its own; a lone pl
 
 #### Business logic
 
-`Effort:` and `Uncertainty:` are read from the plan's own key block, the lines above the plan's first `# ` heading (a plan with no heading is all key block), keys matched in any case, the first line per key winning, within the plan's first 4,000 characters. A value counts only when it is a whole number from 0 to 10. A fraction (`2.5`), an out-of-range number (`15`), a word, or a key written below the heading yields no rating, never a clamped one: a rating that is not on the scale is a typo, and inventing one would hide it. An unplanned ticket has no ratings.
+`Effort:` and `Uncertainty:` are read from the plan's own key block [6], the lines above the plan's first `# ` heading (a plan with no heading is all key block), keys matched in any case, the first line per key winning, within the plan's first 4,000 characters. A value counts only when it is a whole number from 0 to 10. A fraction (`2.5`), an out-of-range number (`15`), a word, or a key written below the heading yields no rating, never a clamped one: a rating that is not on the scale is a typo, and inventing one would hide it. An unplanned ticket has no ratings.
 
 ### Listing a directory
 

@@ -4,7 +4,7 @@ Binds the agent queue [1] to the `agent-data` branch [2] for a long-lived proces
 
 **User story**: the dashboard shows the queue as every machine and cloud session [4] left it, a task the user queues reaches every other machine, and a person browsing the branch finds a `TODO_AGENTS.md` even before the first task is queued, not a mystery.
 
-**Business logic story**: the branch's birth, its sync with origin and the commit-and-push cycle are the `agent-data` package's rules; this file only binds them to the queue. The `queue` command in `cli.ts` does not use the persistent checkout: it writes through a throwaway worktree at origin's tip.
+**Business logic story**: the branch's birth, its sync with origin and the commit-and-push cycle are the `agent-data` package's rules; this file only binds them to the queue. The `queue` command in `cli.ts` does not use the persistent checkout: it writes through a throwaway checkout at origin's tip.
 
 ## Glossary
 

@@ -18,4 +18,4 @@ What the tests cover, over a tickets directory on disk and over the same files r
 - **Any ticket at all** - the "has tickets" answer agrees with the listing: no directory, a lone plan and claim, or a stray file is no ticket; one ticket is.
 - **One ticket by name** - the whole file comes back with its metadata; a missing file, a plan's name, `meta.json`, a relative segment, an absolute path and a nested path all yield no ticket; the ticket's planned state is read too.
 - **The last-import stamp** - a valid stamp is read back; no directory, no file, text that is not JSON, a JSON string, `null`, an object without the key, a non-string stamp and an unparseable date all read as "not known".
-- **Reading straight off the branch** - over relative paths with no modification times, the listing still reads each ticket's priority, lock and holder and orders newest first, and a single ticket's whole content comes back.
+- **Reading straight off the branch** - over relative paths with no modification times, the listing still reads each ticket's priority, claim and holder and orders newest first, and a single ticket's whole content comes back.

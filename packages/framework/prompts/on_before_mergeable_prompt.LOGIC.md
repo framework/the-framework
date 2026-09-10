@@ -1,10 +1,10 @@
-The follow-up an agent's [1] work gets after the agent signals ready for merge [2], when the user switched the launcher's "Post-merge cleanup" option on: a second agent, started vanilla [3] in the finished agent's checkout [4] on its branch, is told to put a maintainability pass and a security audit of the session's changes on the agent queue [5] when the changes warrant one, and to fold what the session learned into the project's knowledge base. It queues the quality presets rather than running them: one short turn that writes a few queue entries, which a later drain [6] works.
+The follow-up an agent's [1] work gets after the agent signals ready for merge [2], when the user switched the launcher's "Post-merge cleanup" option on: a second agent, started vanilla [3] in the finished agent's checkout [4] on its branch, is told to put a maintainability pass and a security audit of the finished agent's changes on the agent queue [5] when the changes warrant one, and to fold what that agent learned into the project's knowledge base. It queues the quality presets rather than running them: one short turn that writes a few queue entries, which a later drain [6] works.
 
 ## Context
 
 **User story**: with the follow-up switched on, the user finds, after an agent finishes non-trivial work, one or two new entries on the agent queue [5] asking for a maintainability pass or a security audit of exactly that agent's changes, and the project's `knowledge-base/` files gained what the agent decided, found out or understood; the user can still remove a queued entry before any agent works it.
 
-**Business logic story**: the rule in `src/cli.ts` fires the follow-up at most once per agent [1], only for an agent started with the follow-up option (the preference is off by default), and only after the agent signaled ready for merge [2]; it is skipped, and the skip shown in the dashboard as the follow-up's outcome, when the agent never signaled, was stopped, is a fake run, or never named its work. Before the follow-up starts, the quality presets are written to the project's `.the-framework/presets/` so the file paths the queued entries name exist. The follow-up runs vanilla [3] so it never runs the built-in system prompt's session-name step and never renames the branch: its output stays on the finished agent's branch and rides to review with the work. A follow-up never triggers a follow-up of its own. It is best-effort: when it does not complete cleanly the outcome is "incomplete", a line says "on-before-mergeable queueing did not complete cleanly.", and the handoff [7] proceeds regardless.
+**Business logic story**: the rule in `src/cli.ts` fires the follow-up at most once per agent [1], only for an agent started with the follow-up option (the preference is off by default), and only after the agent signaled ready for merge [2]; it is skipped, and the skip shown in the dashboard as the follow-up's outcome, when the agent never signaled, was stopped, is a fake run, or never named its work. Before the follow-up starts, the quality presets are written to the project's `.the-framework/presets/` so the file paths the queued entries name exist. The follow-up runs vanilla [3] so it never runs the built-in system prompt's step that names the work and never renames the branch: its output stays on the finished agent's branch and rides to review with the work. A follow-up never triggers a follow-up of its own. It is best-effort: when it does not complete cleanly the outcome is "incomplete", a line says "on-before-mergeable queueing did not complete cleanly.", and the handoff [7] proceeds regardless.
 
 The text is a template: `${{ tf.session_name }}` is the finished agent's session name [8], read off its branch, and `${{ tf.presets.<stem>.filePath }}` is the path of a preset written to the project, `.the-framework/presets/maintainability.md` and `.the-framework/presets/security_audit.md` here.
 
@@ -24,7 +24,7 @@ The text is a template: `${{ tf.session_name }}` is the finished agent's session
 
 - **Queue through the skill, never edit the file** - a queue entry is added with `queue add "<entry>"` from the `queue` skill; the prompt never has the agent run a quality preset itself.
 - **Queue a maintainability pass and a security audit when warranted** - non-trivial changes with refactor potential queue a maintainability pass over "changes introduced by <session name>"; changes that could lead to security issues queue a security audit over the same scope.
-- **Fold what was learned into the knowledge base** - the decisions, non-obvious facts and insights of the session go into three files under `knowledge-base/`, created when missing, and only what a future agent needs and cannot get from the code.
+- **Fold what was learned into the knowledge base** - the decisions, non-obvious facts and insights of the finished agent's work go into three files under `knowledge-base/`, created when missing, and only what a future agent needs and cannot get from the code.
 
 ## Business logic
 
@@ -61,7 +61,7 @@ Both, one or neither may be queued. The entry names the preset's file on disk an
 
 #### Business logic
 
-Unless it already did, the agent [1] considers updating, based on the changes and the discussions of the session:
+Unless it already did, the agent [1] considers updating, based on the changes and the discussions of the finished agent's work, which the prompt names by its session name [8]:
 
 - `knowledge-base/DECISIONS.md`: decisions taken, and why.
 - `knowledge-base/FACTS.md`: non-obvious facts relevant to the project.

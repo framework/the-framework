@@ -11,8 +11,8 @@ One ticket's own page: its whole markdown rather than the one line the list show
 [1] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down. The dashboard labels it "AI queue".
 [2] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
 [3] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
-[4] holder: who a claim names: the agent's id when the daemon started the agent, else the branch the `tickets` command ran on.
-[5] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
+[4] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
+[5] holder: who a claim names: the agent's id when the daemon started the agent, else the branch the `tickets` command ran on.
 [6] session name: the name an agent gives its own work; the dashboard labels the agent by it.
 
 ## Business logic — TL;DR
@@ -48,7 +48,7 @@ Under the summary, in this order: the ticket's age ("2d ago", with the exact dat
 
 Each of these appears only when the ticket has it, so a bare ticket shows only its age and its file name.
 
-The claim badge reads "claimed" in the warning color, followed by the holder [4] when the claim names one. The holder reads as the agent's session name [6] when the claim names one of this project's agents, and clicking it opens that agent's page; any other holder is shown exactly as the claim wrote it and opens nothing.
+The claim badge reads "claimed" in the warning color, followed by the holder [5] when the claim names one. The holder reads as the agent's session name [6] when the claim names one of this project's agents, and clicking it opens that agent's page; any other holder is shown exactly as the claim wrote it and opens nothing.
 
 ### Queueing the ticket
 
@@ -72,6 +72,6 @@ The button is disabled while either action on the page is in flight.
 
 #### Business logic
 
-While the ticket is claimed, a "Release lock" button sits beside "Queue", with "Claimed by <holder>" on hover when the claim names a holder [4]. Clicking it removes the ticket's claim.
+While the ticket is claimed, a "Release lock" button sits beside "Queue", with "Claimed by <holder>" on hover when the claim names a holder [5]. Clicking it removes the ticket's claim.
 
 The page treats the claim as lifted as soon as the release succeeds — the claim badge and the button both go — rather than waiting for the next read to catch up. A refusal shows the daemon's reason, or "The lock could not be released." when it gives none, and the ticket stays claimed.

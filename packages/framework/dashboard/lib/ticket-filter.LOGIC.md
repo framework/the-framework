@@ -12,11 +12,11 @@ Decides which tickets [1] the tickets page shows, in what order and under which 
 
 [1] ticket: a markdown file under `tickets/` on the `agent-data` branch (`<date>_<slug>.md`), with an optional plan (`.plan.md`) and claim (`.lock.md`).
 [2] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
-[3] plan: a ticket's `.plan.md`: effort and uncertainty ratings and how to implement it.
-[4] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
-[5] agent: the unit of work: one task worked by a coding agent under The Framework's control, in its own checkout, on its own branch, streaming events, handed off when it ends.
-[6] project: a repository the user registered in the dashboard, identified by an id derived from its path.
-[7] facet: one of the filter toolbar's dimensions — the text search, priority, effort, uncertainty, topics, stage, project, and the "Not linked" switch.
+[3] project: a repository the user registered in the dashboard, identified by an id derived from its path.
+[4] facet: one of the filter toolbar's dimensions — the text search, priority, effort, uncertainty, topics, stage, project, and the "Not linked" switch.
+[5] plan: a ticket's `.plan.md`: effort and uncertainty ratings and how to implement it.
+[6] agent: the unit of work: one task worked by a coding agent under The Framework's control, in its own checkout, on its own branch, streaming events, handed off when it ends.
+[7] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
 
 ## Business logic — TL;DR
 
@@ -43,7 +43,7 @@ See `## Context`.
 
 #### Business logic
 
-Every project's [6] tickets [1] are flattened into one pool of rows. A row is one ticket plus the id and the display name of the project it belongs to. Everything below — filtering, counting, sorting, grouping — works on this pool, so the cross-project page and a single project's page differ only in which rows are in it.
+Every project's [3] tickets [1] are flattened into one pool of rows. A row is one ticket plus the id and the display name of the project it belongs to. Everything below — filtering, counting, sorting, grouping — works on this pool, so the cross-project page and a single project's page differ only in which rows are in it.
 
 ### How the facets combine
 
@@ -53,7 +53,7 @@ Every project's [6] tickets [1] are flattened into one pool of rows. A row is on
 
 #### Business logic
 
-A ticket passes when it satisfies every active facet [7]. A facet with nothing selected is inactive and passes everything. Within one facet the selected options are alternatives: a ticket satisfies the facet by matching any one of them. So "Critical" plus "Medium" under "Priority" widens, while adding "Unplanned" under "Stage" narrows.
+A ticket passes when it satisfies every active facet [4]. A facet with nothing selected is inactive and passes everything. Within one facet the selected options are alternatives: a ticket satisfies the facet by matching any one of them. So "Critical" plus "Medium" under "Priority" widens, while adding "Unplanned" under "Stage" narrows.
 
 The "Clear" button appears exactly when at least one facet is active. The sort and the grouping never count as filters: they reorder and regroup, they never hide a ticket.
 
@@ -73,11 +73,11 @@ The search text is split on whitespace into words, and every word must appear so
 
 **User story**: "Priority", "Effort" and "Uncertainty" each open as a short list of named spans with a count each, plus a slider for a precise range, plus an option for the tickets that name nothing — "No priority", "No effort", "No uncertainty".
 
-**Business logic story**: a ticket's priority is the `Priority:` key it names, and its effort and uncertainty are the ratings its plan [3] records. All three run from 0 to 10.
+**Business logic story**: a ticket's priority is the `Priority:` key it names, and its effort and uncertainty are the ratings its plan [5] records. All three run from 0 to 10.
 
 #### Business logic
 
-Each of the three facets [7] holds three things at once: a set of named buckets, an optional hand-set range, and whether tickets [1] naming no value are included.
+Each of the three facets [4] holds three things at once: a set of named buckets, an optional hand-set range, and whether tickets [1] naming no value are included.
 
 The buckets are fixed spans of the 0 to 10 scale:
 
@@ -115,15 +115,15 @@ Toggling a bucket clears any hand-set range. Setting a range clears every select
 
 A ticket's topics are matched without regard to case, so `UX` and `ux` are one topic and appear as one option. With topics selected, a ticket passes when it carries at least one of them. "No topics" passes the tickets carrying no topic at all, and composes with selected topics as an alternative.
 
-The options are ordered by count, most used first, and alphabetically among equal counts. A topic the user has selected stays in the list even when the other facets [7] leave it at zero, because an option that disappeared could never be unticked.
+The options are ordered by count, most used first, and alphabetically among equal counts. A topic the user has selected stays in the list even when the other facets [4] leave it at zero, because an option that disappeared could never be unticked.
 
 ### Planning stage
 
 #### Context
 
-**User story**: the "Stage" facet answers "what still needs a plan [3]", "what is planned and ready to work", and "what does an agent [5] already hold".
+**User story**: the "Stage" facet answers "what still needs a plan [5]", "what is planned and ready to work", and "what does an agent [6] already hold".
 
-**Business logic story**: a ticket [1] is planned when a plan file sits beside it, and claimed when a claim [4] file names a holder. A claim covers the ticket's whole life, planning it as well as implementing it, so a claimed ticket may also be planned.
+**Business logic story**: a ticket [1] is planned when a plan file sits beside it, and claimed when a claim [7] file names a holder. A claim covers the ticket's whole life, planning it as well as implementing it, so a claimed ticket may also be planned.
 
 #### Business logic
 
@@ -139,7 +139,7 @@ Claimed is not exclusive with the other two: a claimed ticket is also either pla
 
 #### Context
 
-**User story**: on the cross-project page the user narrows to one or two projects [6]; and "Not linked" answers "which tickets exist only here", the ones nobody has mirrored to GitHub.
+**User story**: on the cross-project page the user narrows to one or two projects [3]; and "Not linked" answers "which tickets exist only here", the ones nobody has mirrored to GitHub.
 
 #### Business logic
 
@@ -160,7 +160,7 @@ The list is ordered by the chosen key:
 - "Date" is the ticket's date, which comes from its filename.
 - "Priority" is the priority as a number.
 - "Title" is the title, compared as text and ignoring case.
-- "Effort" is the effort its plan [3] records.
+- "Effort" is the effort its plan [5] records.
 
 A ticket that names no value for the chosen key sorts after every ticket that names one, in both directions. Tickets that compare equal fall back to newest first, which is the one tiebreak that means the same thing for every key.
 
@@ -170,7 +170,7 @@ Picking a key from the menu starts it at its own natural direction: newest first
 
 #### Context
 
-**User story**: by default the cross-project page shows one section per project [6], which is how the user reads their projects. Turning "Group by project" off produces one flat list across every project, which is the only view that can answer "what is the single highest-priority ticket [1] anywhere".
+**User story**: by default the cross-project page shows one section per project [3], which is how the user reads their projects. Turning "Group by project" off produces one flat list across every project, which is the only view that can answer "what is the single highest-priority ticket [1] anywhere".
 
 #### Business logic
 
@@ -180,7 +180,7 @@ Grouping is either one section per project, the default, or no grouping at all. 
 
 #### Context
 
-**Problem**: a count computed with the whole filter applied would show zero beside every unticked option the moment one option in that facet [7] is picked, since those tickets [1] are exactly the ones the current selection hides. The count would then never say what ticking the option would give.
+**Problem**: a count computed with the whole filter applied would show zero beside every unticked option the moment one option in that facet [4] is picked, since those tickets [1] are exactly the ones the current selection hides. The count would then never say what ticking the option would give.
 
 #### Business logic
 
@@ -196,7 +196,7 @@ Every option's count is computed over the tickets that pass all the other facets
 
 #### Business logic
 
-The whole viewing state — every facet [7], the sort and the grouping — is written into the query string, and only what differs from the default is written, so the unfiltered, date-sorted, project-grouped page carries no query string at all.
+The whole viewing state — every facet [4], the sort and the grouping — is written into the query string, and only what differs from the default is written, so the unfiltered, date-sorted, project-grouped page carries no query string at all.
 
 What is written:
 
@@ -204,7 +204,7 @@ What is written:
 - `priority`, `effort`, `uncertainty`: a comma-separated list of the selected bucket names, then the hand-set range as `<min>-<max>`, then `none` when tickets naming no value are included.
 - `topics`: the selected topics, with `none` appended when "No topics" is on. `none` is reserved and is never read back as a topic name.
 - `stage`: the selected stages, comma-separated.
-- `project`: the selected project [6] ids, comma-separated.
+- `project`: the selected project [3] ids, comma-separated.
 - `github`: the single value `unlinked` when the "Not linked" switch is on.
 - `sort`: the sort key, omitted when it is the default date.
 - `dir`: the direction, omitted when it is the chosen key's natural direction.

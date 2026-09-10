@@ -3,9 +3,9 @@
 **The Framework** — autonomous AI programming: humans make the important decisions
 while coding agents run unattended.
 
-You register your repos. From then on, agents work on them in sessions: each session
-gets a throwaway copy of the repo, does its work, and hands the result off as a pull
-request. Your own checkout is never touched.
+You register your repos. From then on, agents work on them: each agent gets a throwaway
+checkout of the repo, does its work, and hands the result off as a pull request. Your own
+checkout is never touched.
 
 ```bash
 npm i -g framework
@@ -18,7 +18,7 @@ the-framework      # serves the dashboard at http://127.0.0.1:4200
 
 ```
 the-framework          Serve the dashboard in the foreground. Ctrl+C closes it and
-                       every session it is running.
+                       every agent it is running.
 
   --port <n>           Dashboard port (default: 4200).
   --host <addr>        Bind address (default: 127.0.0.1). A non-loopback address
@@ -31,9 +31,9 @@ the-framework          Serve the dashboard in the foreground. Ctrl+C closes it a
 ```
 
 Everything else is the dashboard. It is the product's user interface, and where a
-session's prompt, its options, its agent and its checkout are chosen. The dashboard
-spawns each session as its own process, handing it one JSON spec rather than a
-command line — so a session's configuration is never also a human-facing flag
+agent's prompt, its options, its coding agent and its checkout are chosen. The dashboard
+spawns each agent as its own process, handing it one JSON spec rather than a
+command line — so an agent's configuration is never also a human-facing flag
 surface.
 
 ## How it works
@@ -46,17 +46,17 @@ its own subscription auth and stays swappable behind the driver seam
 ([`Driver`](../agent-driver/src/types.ts) in the `agent-driver` package; Claude Code and Codex today).
 
 Everything the framework learns from a turn, it learns by parsing that turn's final
-message: the session name the agent invented (the branch is renamed to match), the
+message: the session name the agent gave its work (the branch is renamed to match), the
 views it wants shown, the ready-for-merge signal, and the questions it stops to ask.
 
 - **One daemon per machine.** Running the CLI in any registered repo finds it. It
-  serves the dashboard, spawns sessions, and runs the background work — the idle
+  serves the dashboard, spawns agents, and runs the background work — the idle
   sweeps, notifications, chat, the CI watch.
-- **A session is one agent working one task**, in its own git worktree on its own
+- **An agent is one task being worked**, in its own checkout on its own
   branch. It streams what it does as events; you can watch, answer its questions,
   and chat with it live — or not be there at all.
-- **Work leaves as a pull request.** When a session ends with real work, the work is
-  pushed and a PR opened. Empty sessions publish nothing.
+- **Work leaves as a pull request.** When an agent ends with real work, the work is
+  pushed and a pull request opened. An agent that committed nothing publishes nothing.
 - **When nobody is around**, the daemon plays product manager: it drains the
   confirmed-task queue, refills it by triaging and planning tickets, keeps CI green
   on the PRs it opened, and merges them once checks pass — all bounded by the
@@ -64,7 +64,7 @@ views it wants shown, the ready-for-merge signal, and the questions it stops to 
 
 ## Layout
 
-- `src/` — the CLI, the daemon, the session lifecycle, git handoff, autonomy, and
+- `src/` — the CLI, the daemon, the agent lifecycle, git handoff, autonomy, and
   the chat surfaces. Node only.
 - `dashboard/` — the browser app: a Vite SPA the daemon serves as static files,
   talking back over plain HTTP. See [its README](./dashboard/README.md).

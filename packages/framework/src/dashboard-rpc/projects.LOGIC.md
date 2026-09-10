@@ -9,7 +9,7 @@ Everything the dashboard asks the daemon about projects [1]: the list of registe
 ## Glossary
 
 [1] project: a repository the user registered in the dashboard, identified by an id derived from its path.
-[2] launcher: the Start form on a project home, a project's own page with the prompt editor beside it.
+[2] launcher: the Start form on a project home — a project's own page with the launcher and its composer (the prompt editor, also used for live chat).
 [3] coding agent: the CLI doing the actual work: Claude Code or Codex.
 [4] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
 [5] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.

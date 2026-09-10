@@ -11,5 +11,5 @@ What the tests cover, for the dashboard's shared start button:
 ## Glossary
 
 [1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
-[2] launcher: the Start form on a project home, a project's own page with the prompt editor beside it.
+[2] launcher: the Start form on a project home — a project's own page with the launcher and its composer (the prompt editor, also used for live chat).
 [3] fan-out: starting several agents at once, one per queue entry or one per ticket to plan.

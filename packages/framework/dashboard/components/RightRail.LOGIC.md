@@ -10,7 +10,7 @@ The dashboard's right rail: a narrow column beside the main pane holding up to f
 
 [1] view: a markdown document an agent pushes to the dashboard's right rail while it works.
 [2] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
-[3] the agent Context: the set of other registered projects and individual files an agent is pointed at on top of its own project, carried into its system prompt.
+[3] the agent Context: the set of other registered projects and individual files an agent is pointed at on top of its own project, carried into its system prompt as one `Context:` line.
 [4] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [5] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
 [6] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.

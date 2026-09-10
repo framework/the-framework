@@ -8,7 +8,7 @@
 
 ## Glossary
 
-[1] launcher: the Start form on a project home, a project's own page with the prompt editor beside it.
+[1] launcher: the Start form on a project home — a project's own page with the launcher and its composer (the prompt editor, also used for live chat).
 [2] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
 [3] the built-in system prompt: the standing instructions every agent starts with; `SYSTEM.md` is the project's own instructions added on top.
 [4] vanilla: an agent started without the built-in system prompt but with the signal protocols kept.

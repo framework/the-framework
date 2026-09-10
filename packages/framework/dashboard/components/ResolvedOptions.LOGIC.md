@@ -8,7 +8,7 @@ The strip under the launcher [1] that names, without opening anything, the agent
 
 ## Glossary
 
-[1] launcher: the Start form on a project home, a project's own page with the prompt editor beside it.
+[1] launcher: the Start form on a project home — a project's own page with the launcher and its composer (the prompt editor, also used for live chat).
 [2] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
 [3] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 

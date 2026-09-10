@@ -1,0 +1,1 @@
+The note that closes "How it works": "Everything is powered by open source state-of-the-art prompts (you can also bring your own):", followed by four chips naming the prompt packs, "Security audit", "Code quality", "Research" and "Product Management", and a dashed "＋ Add yours" chip. The chips are labels, not links: nothing on this band can be clicked.

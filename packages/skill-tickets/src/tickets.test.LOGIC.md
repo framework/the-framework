@@ -1,0 +1,21 @@
+What the tests cover, over a tickets directory on disk and over the same files read without a checkout:
+
+- **A missing directory** - a directory that does not exist lists nothing, holds no ticket and has no import stamp.
+- **The format read off a ticket** - the keys above the title give the priority (lowercased) and the topics, the `# ` line gives the title, the first prose line after `## TLDR` gives the summary, the filename gives the date, and an unplanned ticket says so; `show` returns the same row plus the whole text.
+- **The GitHub link** - a `GitHub:` line's markdown link is split into its label and its URL; a ticket without one carries no link.
+- **A ticket's date** - the filename's date wins over the modification time when the filename carries one; without a date prefix the modification time stands in; read off git with no modification time at all, the Unix epoch does.
+- **Preamble noise** - a leftover `Status:` line above the title is not a field.
+- **Topics** - a bracketed multi-topic list reads as bare tags; a ticket without a `Topics:` line carries none.
+- **Newest first** - a listing is ordered by date, newest first.
+- **Tickets predating the format** - a ticket with no key block still lists, its title from the heading, its summary from the first prose line with a trailing `Source:` line skipped, and no priority.
+- **The filename as title** - a ticket with no heading is titled by its filename, `.md` dropped, percent escapes decoded, underscores turned into spaces, and an undecodable name kept as is.
+- **A plan folds into its ticket** - a `.plan.md` never lists as a row; it marks its ticket as planned and every other ticket as unplanned.
+- **A claim folds into its ticket** - a `.lock.md` never lists as a row; its ticket is locked and names the holder, in `list` and `show` alike.
+- **Planned and locked at once** - a ticket with both a plan and a claim is planned, locked, and carries the plan's effort.
+- **A malformed claim still locks** - a claim whose line does not parse locks the ticket without naming a holder.
+- **The plan's ratings** - `Effort:` and `Uncertainty:` are read above the plan's heading only and only as whole numbers from 0 to 10: an out-of-range value is not clamped, a fraction is no value, a key in the body is ignored, an unplanned ticket has none, and `show` carries the same ratings.
+- **Ignored files** - a non-markdown file and `meta.json` are neither rows nor tickets, while the directory still counts as holding tickets.
+- **Any ticket at all** - the "has tickets" answer agrees with the listing: no directory, a lone plan and claim, or a stray file is no ticket; one ticket is.
+- **One ticket by name** - the whole file comes back with its metadata; a missing file, a plan's name, `meta.json`, a relative segment, an absolute path and a nested path all yield no ticket; the ticket's planned state is read too.
+- **The last-import stamp** - a valid stamp is read back; no directory, no file, text that is not JSON, a JSON string, `null`, an object without the key, a non-string stamp and an unparseable date all read as "not known".
+- **Reading straight off the branch** - over relative paths with no modification times, the listing still reads each ticket's priority, claim and holder and orders newest first, and a single ticket's whole content comes back.

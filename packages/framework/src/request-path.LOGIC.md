@@ -1,0 +1,1 @@
+Reads the path of an incoming HTTP request defensively: a request target the daemon cannot parse (an absolute-form target a proxy client may send, for example) yields "no path", which the daemon answers with a 400 or its fallback page, instead of an exception in the request handler that would take the whole daemon down.

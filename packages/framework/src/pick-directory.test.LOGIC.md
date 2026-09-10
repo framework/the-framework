@@ -1,0 +1,6 @@
+What the tests cover, for the system folder picker behind the dashboard's "Add project":
+
+- **macOS** - the OS's own folder sheet is rendered through `osascript`'s "choose folder"; the picked folder comes back as its POSIX path with the trailing slash dropped; a dismissed dialog is a normal outcome with no path, not an error; any other failure of the dialog surfaces the dialog's own reason ("osascript: no display").
+- **Linux** - the GTK helper `zenity` renders the dialog, asked for a folder rather than a file; without it the KDE helper `kdialog` is asked instead, in that order, also for a folder; a Wayland session counts as a desktop session, not only an X11 display; a dismissed dialog is a normal outcome; with neither helper installed the answer names both ("zenity or kdialog"); a daemon with no desktop session at all says so ("no desktop session") without trying to open anything.
+- **Windows** - PowerShell renders the OS's own folder browser, not a text prompt; the picked path comes back trimmed; a dismissed dialog is a normal outcome; a PowerShell failure stays a failure carrying its own message, unlike a dismissal.
+- **Any other platform** - the answer says the picker is "not available on <platform>" without trying to open anything.

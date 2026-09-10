@@ -1,0 +1,12 @@
+What the tests cover, partly against a real git repository:
+
+- **Where a checkout lives** - an agent's checkout sits at `.branches/agent-<agent id>` under the project, and its birth branch is `agent-<agent id>`.
+- **Creating a checkout** - a new worktree on the branch named, from the base named when there is one; an id outside the agent id charset is rejected before any git runs, so nothing can escape `.branches/`.
+- **The worktrees git knows** - each registered worktree is read with its path, its commit and its branch, a detached one with no branch; empty output and a git failure both yield an empty list.
+- **Removing** - removing a path git never registered does not fail, so a removal can run twice; a plain removal is tried first and force is used only when git calls the checkout unclean; create, list, remove and prune round-trip on a real repository, the directory gone and unlisted afterwards.
+- **Continuing an agent** - attaching to a branch that no longer exists creates it from the project's head; attaching to a branch the project's checkout has out is git's refusal and surfaces; a deleted branch is really gone.
+- **Telling a checkout from a directory git does not know** - the project's checkout and an agent's checkout are worktree roots; a subdirectory, a directory left under `.branches/` that git does not know, and a directory outside any repository are not; in that leftover directory a plain branch read answers with the user's own branch while the guarded read answers nothing, and the guarded read answers the agent's branch in a real checkout.
+- **Dirty until the agent commits** - an uncommitted edit reads dirty and is never swept into a commit; once the agent commits, the checkout reads clean, and after the checkout is removed its branch still carries the edit.
+- **The current branch** - the checked-out branch is read; a detached head and a directory outside any repository read as no branch.
+- **Which directories are checkouts** - only directories under `.branches/` named as an agent branch count: `agent-data` and dot-entries are excluded, a project without `.branches/` has none, and a symbolic link or a plain file named as an agent branch is not a checkout.
+- **Naming under a race** - a rename that loses to a sibling naming the same thing at the same moment reads the branches again and takes the next suffix (`agent-x-2`); any other rename failure surfaces.

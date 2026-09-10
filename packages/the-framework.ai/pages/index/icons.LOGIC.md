@@ -1,0 +1,1 @@
+The Discord, GitHub and npm logos as inline vector icons, drawn in the surrounding text color, for the buttons and links of the top navigation, the footer and the closing call to action. They carry no business logic.

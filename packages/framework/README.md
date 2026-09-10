@@ -69,8 +69,9 @@ views it wants shown, the ready-for-merge signal, and the questions it stops to 
 - `dashboard/` — the browser app: a Vite SPA the daemon serves as static files,
   talking back over plain HTTP. See [its README](./dashboard/README.md).
 
-A `SPEC.md` sits beside nearly every source file, describing what that file is for
-in prose. [`SPEC.md`](./SPEC.md) at the package root is the place to start.
+A `LOGIC.md` sits beside every source file and directory, describing the business
+logic it implements, in prose written to be read instead of the code.
+[`LOGIC.md`](./LOGIC.md) at the package root is the place to start.
 
 ## Status
 

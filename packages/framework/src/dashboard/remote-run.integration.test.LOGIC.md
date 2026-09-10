@@ -1,0 +1,7 @@
+What the tests cover, with two real daemons on loopback: the local daemon as a real project runtime, and the device as a daemon whose start answers with a short event stream instead of starting a coding agent.
+
+- **A start with a device chosen is created on the device** - the local daemon's start answers with the device's own agent id; the device received the prompt exactly once, without the device it was submitted for, so a relayed agent never relays onward, and without a project, so it runs in the device's own home checkout.
+- **The local daemon spends nothing of its own** - it allocates no checkout and starts no agent: its own busy guard never fires.
+- **A local row for the relayed agent** - the local project's agent list carries the relayed agent as a row of its own with the device's agent id, the device's label, the prompt and a running status while the stream is live, and the row reads done once the device's end event has come through, which is what a dashboard reload reads.
+- **The events stream back in order** - through the local daemon's relayed-agent source, up to and including the device's end event.
+- **Agent-scoped calls run on the device** - a git status read relayed to the device is answered against the device's own home project, the caller's own project id being dropped, and a push relayed to the device runs on the device's side and returns the device's own result.

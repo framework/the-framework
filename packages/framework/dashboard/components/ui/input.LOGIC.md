@@ -1,0 +1,1 @@
+Provides the dashboard's single-line text field: a bordered, transparent box with muted placeholder text and the dashboard's keyboard focus ring, which, when disabled, is faded and shows a not-allowed cursor. The sidebar's search field in `sidebar.tsx` builds on it.

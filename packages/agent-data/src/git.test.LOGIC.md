@@ -1,0 +1,7 @@
+What the tests cover:
+
+- **Budgets by subcommand** - `push`, `worktree add`, `clone` and `fetch` get the 120-second budget; `add`, `commit`, `init`, `checkout`, `worktree remove` and `worktree prune` the 30-second one; `ls-files`, `status`, `rev-parse`, `rev-list`, `log`, `diff`, `show`, `remote`, `symbolic-ref`, `show-ref`, `for-each-ref`, `worktree list` and the listing forms of `branch` the 10-second one, while `branch -D`, `branch -m` and `branch <new> <start>` are mutations.
+- **The three budgets stay distinct** - pinned at 10, 30 and 120 seconds, and a slow operation gets more than twice a read's budget, so no read is ever widened to fit a slow operation.
+- **Unknown and disguised subcommands** - an unknown subcommand and an empty command line are mutations; leading global options, the value of a global option (`-C /repo`, `-c key=value`, `--git-dir`, `--work-tree`, `--namespace`, `--exec-path`) and the inline `--option=value` form never hide the subcommand, and `worktree add` behind `-C` still gets the slow budget.
+- **A failed push is reported, not thrown** - the result carries the failure; a timed-out push names the command and says "timed out after 120000ms" instead of reading like a rejected push; a timeout is distinguishable from git's own rejection.
+- **The reason line** - a failure shows git's own `fatal:` line rather than the echoed command line, and the plain message when there is no such line.

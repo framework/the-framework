@@ -1,0 +1,5 @@
+What the tests cover: tickets are proposals, the agent queue holds confirmed work, and a drain claims the queue's next entry.
+
+- **Browsing the ticket backlog** - the project's Tickets page lists every ticket with its parsed title, priority and summary; a ticket's own page carries its full text; a name that escapes the tickets directory is refused; the cross-project ticket pages see the same backlog under the project.
+- **Queueing a ticket and draining it** - the ticket page's Queue action lands an entry in `TODO_AGENTS.md` that links back to the ticket, and the Queue page counts it as open; the queued ticket shows on the hot-tickets rail; a drain started by hand (the "drain queue" preset) resolves the queue's next entry to its ticket before the agent starts, so the spawned agent carries the ticket, the agent's record names it while the agent is live, and the hot-tickets rail links the ticket to the agent implementing it.
+- **Only a drain claims** - any other prompt wears no ticket, and the queue entry stays open.

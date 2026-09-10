@@ -1,0 +1,1 @@
+The "How it works" chapter, subtitled "The Framework introduces two major building blocks:", which places the two building blocks side by side in that order — "1. Enhanced System Prompt" (`EnhancedSystemPrompt.tsx`) and "2. Queues" (`Queues.tsx`) — and, below them, the note about the prompts everything runs on (`Prompts.tsx`).

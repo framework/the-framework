@@ -1,0 +1,13 @@
+What the tests cover, mostly against a scripted git and once against real repositories (a bare origin, the daemon's checkout, and a separate clone standing in for the cloud machine):
+
+- **Adopting the matched branch** - the `claude/*` head descending from the agent's cloud anchor is recorded as the agent's branch, together with the pull request the session opened for it, and no second pull request is opened.
+- **The armed draft pull request** - an agent armed for a pull request the session never opened gets a draft opened and recorded, and the adoption says it was opened; an agent not armed for one gets its branch recorded and nothing opened; a head that is only the anchor gets its branch recorded but no pull request, since the session pushed nothing beyond the handoff.
+- **Unprovable matches wait** - no head descending from the anchor, or two, adopts nothing and records nothing; this is the normal waiting state, not a failure.
+- **Agents outside the pass** - a local agent, a running one, one with no anchor recorded, one already adopted with its pull request recorded, one adopted and not armed for a pull request, and one started more than 48 hours ago are not asked about, and with nothing waiting no fetch happens at all.
+- **Only the window is read** - the agent records are requested only from 48 hours before now, so an old history costs no reads.
+- **Still owed a pull request** - an agent whose branch is already adopted but whose armed pull request is unaccounted for keeps being asked about, and a later pass opens the draft without re-recording the branch.
+- **No remote** - a fetch that fails adopts nothing, fails nothing, and never throws.
+- **The pass over ticks** - adoptions and failures are said out loud, with the branch, the agent id and the opened draft named; overlapping ticks join the pass in flight; a stopped pass runs nothing.
+- **A listing that fails** - when the branch's pull requests cannot be listed, the branch is still recorded, no pull request is opened, and the failure is reported as "could not list the PRs", so "none" and "could not tell" never look alike.
+- **A record naming another branch** - an agent whose record names a branch that is neither its birth branch nor the matched head is left alone, with nothing recorded or opened.
+- **Against real git** - the pass fetches `claude/*` heads the checkout has never seen into remote-tracking refs (so they survive garbage collection), the anchor picks out exactly the branch that descends from it and not one forked before it, and an anchor no branch descends from matches nothing and is left for the next pass.

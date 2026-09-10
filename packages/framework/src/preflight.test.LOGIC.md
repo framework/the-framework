@@ -1,0 +1,7 @@
+What the tests cover:
+
+- **The picked driver** - with Claude Code present, preflight passes and reports its version; with Codex picked, `codex` is checked rather than `claude` and its version is reported; a missing `codex` fails pointing at the Codex install, and a missing `claude` at the Claude Code one, each saying "not found"; the Node version is always reported as a passing check.
+- **Logged in** - a logged-out Claude Code fails, saying "not logged in" and naming `claude auth login`; a logged-in Claude Code passes and says so; a logged-out Codex fails naming `codex login`; "Not logged in" is never read as logged in; a logged-in Codex passes; a coding agent that will not say, such as an older one that does not know the question, does not fail and adds no check; the login question is not asked when the command is missing, so one "not found" is the only problem; the answer is read off standard error too.
+- **Running as root** - warns about credentials and `sudo` without blocking, so a container running as root can still start; the warning names the user `sudo` came from; there is no root check when the process is not root.
+- **The problems** - only the failing checks are listed, each prefixed by its name; a warning is never listed as a problem.
+- **The GitHub CLI** - with a pull request armed, a missing `gh` warns naming the install and the login without blocking; a logged-out `gh` warns naming the fix without blocking; an installed, logged-in `gh` adds nothing; `gh` is not checked at all when nothing arms a pull request.

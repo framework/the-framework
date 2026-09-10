@@ -1,0 +1,12 @@
+What the tests cover, against a canned origin:
+
+- **Which refs are candidates** - the cloud driver's naming is matched exactly (`cloud-1-3955352b`, `cloud-12-0a1b2c3d`) and nothing looser: a user's own `cloud-experiments` branch, a tag outside the driver's character set, and a name merely containing the driver's shape are not candidates. In a sweep, the default branch, a `claude/*` branch, an `agent-<session name>` branch, an `agent-…` name whose start time cannot be read, and any name sitting under a path prefix (`the-framework/…`, `feature/cloud-1-3955352b`) are all left untouched and are not even reported as kept.
+- **Age of an agent's own branch** - an `agent-<agent id>` branch whose start time is more than 24 hours old is deleted from origin; one started an hour ago is kept as too young, because its agent may still be provisioning.
+- **An agent the daemon still holds** - an `agent-<agent id>` branch whose agent the daemon is still responsible for is kept, however old the branch is.
+- **Age of a scratch ref, remembered** - a `cloud-*` ref carries no age, so its first sighting is recorded and the ref kept; once it has been watched for the full 24 hours it is deleted and its record removed; watched for only half a day, it is kept. A record for a ref that is no longer on origin is dropped, since someone else already deleted it.
+- **Holds no work** - a tip that is not provably reachable from the default branch is kept as possibly holding work, and no pull request lookup is spent on it. A tip with the cloud anchor's shape — an empty commit whose tree equals its parent's, on a parent that landed — still counts as holding no work and is deleted. A tip that changes something against its parent is not an anchor and is kept.
+- **Open pull request** - a ref with an open pull request is kept, so a deletion never closes one; a ref whose only pull request is closed is deleted.
+- **A refused deletion** - a deletion the remote rejects is reported with its error and the ref's first-seen record is left in place, so the retry does not restart its day.
+- **The default branch** - the default branch is taken from what origin's HEAD points at, so a repository defaulting to neither `main` nor `master` is swept correctly.
+- **No reachable remote** - a project whose remote cannot be reached sweeps nothing, writes no first-seen record, and never fails.
+- **The pass over projects** - one turn visits every registered project in order; only deletions and failures are said out loud, kept refs stay quiet; a stopped sweep's next turn does nothing.

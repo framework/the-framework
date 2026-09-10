@@ -1,0 +1,5 @@
+The dashboard header's appearance control: one icon button that opens a menu of the three theme choices — "System", "Light" and "Dark" — and stores the pick in the preferences [1]. "System" is the default, used whenever the user has never chosen: the dashboard then follows the operating system's own light or dark setting, and follows it as it changes. The button itself wears the icon of the current choice — a monitor, a sun or a moon — and reads "Theme: System", "Theme: Light" or "Theme: Dark" on hover, so the header says which theme is on without the menu being opened; inside the menu, a check mark marks the current choice. Picking leaves the menu open, so the whole dashboard visibly changes color underneath the pick. The theme is one setting for the whole dashboard, not a per-agent one, and this control writes the same preference the shell reads to paint the page (`AppFrame.tsx`).
+
+## Glossary
+
+[1] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).

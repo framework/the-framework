@@ -49,7 +49,7 @@ The agent [1] is told that its work goes on a branch named `agent-<name>`, unles
 
 #### Business logic
 
-The agent [1] is told that `branches` is a dependency of the repository, the package `@gemstack/skill-branches`; that when `node_modules` is missing it installs with the package manager the lockfile belongs to (`npm install` for a `package-lock.json`); and that it then runs `npx branches` inside its checkout [3], never a bare `branches`. Of the commands, `status` and `name` are the agent's; the rest belong to whoever started it.
+The agent [1] is told that `branches` is a dependency of the repository, the package `@gemstack/skill-branches`; that when `node_modules` is missing it installs with the package manager the lockfile belongs to (`npm install` for a `package-lock.json`); and that it then runs `npx branches` inside its checkout [3]: through `npx`, since on a fresh clone no bare `branches` command exists. Of the commands, `status` and `name` are the agent's; the rest belong to whoever started it.
 
 ### Where the agent is
 

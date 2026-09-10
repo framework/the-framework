@@ -23,6 +23,7 @@ Renders an agent's [1] event stream [2] in a terminal, one human-readable line p
 [13] CI watch: The sweep that merges the pull requests The Framework opened once their checks pass, and starts a fix agent when a check goes red.
 [14] quota: The account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
 [15] stop: Ending an agent before it finishes: the Stop button, Ctrl-C, or a pick marked to stop.
+[16] autopilot: the dashboard's switch that accepts a gate's recommended option for the user after a countdown.
 
 ## Business logic — TL;DR
 
@@ -66,7 +67,7 @@ A log line is printed as is. A reported error is "✗ <headline>", with its deta
 
 #### Business logic
 
-A gate [11] prints "? <title>" and then one option per line, indented. On a gate that takes several picks each option carries "[x]" when it starts checked and "[ ]" otherwise; on a single-pick gate the recommended option carries "●" and every other "○". The pick [12] prints "✓ chose <the picked ids, comma-separated>" or "✓ chose (none)", followed by who picked in parentheses: the user, the autopilot countdown, or the automatic fallback.
+A gate [11] prints "? <title>" and then one option per line, indented. On a gate that takes several picks each option carries "[x]" when it starts checked and "[ ]" otherwise; on a single-pick gate the recommended option carries "●" and every other "○". The pick [12] prints "✓ chose <the picked ids, comma-separated>" or "✓ chose (none)", followed by who picked in parentheses: the user, the autopilot [16] countdown, or the automatic fallback.
 
 ### The handoff, announced then reported
 

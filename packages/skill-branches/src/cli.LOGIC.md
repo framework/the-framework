@@ -42,7 +42,7 @@ See `## Context`.
 
 #### Business logic
 
-Every command that runs prints exactly one JSON document on stdout: the result, or the refusal. `list` answers with a bare JSON array; every other result and every refusal is an object whose `ok` tells the two apart. A refusal is a rule saying no (a dirty tree, a name that is not a session name [4]): stdout carries `{"ok": false, "reason": "<reason>"}` plus whatever the rule adds (the branch, the path, the id), stderr carries one line for a person, and the exit code is 1. A command that fails in git is reported like a refusal, with the reason `git-failed` and git's own line as `detail`, on stdout and on stderr, exit code 1. A result exits 0 with nothing on stderr.
+Every command that runs prints exactly one JSON document on stdout: the result, or the refusal. `list` answers with a bare JSON array; every other result and every refusal is an object whose `ok` tells the two apart. A refusal is a rule saying no (a dirty tree, a name that is not a session name [4]): stdout carries `{"ok": false, "reason": "<reason>"}` plus whatever the rule adds (the branch, the path, the id), stderr carries one line for a person, and the exit code is 1. A command that fails in git is reported like a refusal, with the reason `git-failed` and git's own line as `detail`, on stdout and on stderr, exit code 1. A result exits 0; stderr then carries nothing, except the warning a forced removal writes (`worktree.ts`).
 
 ### A command line that cannot be read
 

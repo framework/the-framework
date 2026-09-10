@@ -44,9 +44,9 @@ test('renderOnBeforeMergeablePrompt names the session on every entry', () => {
   assert.match(prompt, /Apply \.the-framework\/presets\/security_audit\.md with tf\.params\.what set to "changes introduced by add-oauth"/)
 })
 
-test('renderOnBeforeMergeablePrompt defaults absent settings to off rather than throwing (#556)', () => {
-  // The template reads `tf.settings.technical_control`, so an absent `settings` would throw
-  // on the property access rather than read as off.
+test('renderOnBeforeMergeablePrompt renders the same prompt every time (#556)', () => {
+  // Nothing but the session name and the preset paths reaches the template, so two renders of
+  // the same session are the same prompt — and the presets it queues are the two it names.
   const prompt = renderOnBeforeMergeablePrompt({ session_name: 'add-oauth' })
   assert.doesNotMatch(prompt, /readability/)
   assert.equal(prompt, renderOnBeforeMergeablePrompt({ session_name: 'add-oauth' }))

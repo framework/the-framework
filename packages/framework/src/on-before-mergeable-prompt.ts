@@ -11,11 +11,8 @@ import { presetContext } from './presets.js'
  * #556 — the previous suite executed maintainability, readability and security-audit as
  * three child runs on the spot, which does not compose with the queue.
  *
- * Flattened rather than verbatim, which is the one place this departs from the doc: the
- * doc nests `${{ tf.session_name }}` inside the outer `${{ ... }}` and puts backticks
- * inside a backtick template literal. {@link renderTemplate}'s fragment regex is
- * non-greedy, so the outer fragment closes on the inner `}}` and the remainder is not
- * valid JS. Same branch, same output, one fragment.
+ * The markdown is the prompt, verbatim: it is compiled into the package at build time and
+ * used as it is written, so what a reviewer reads in `prompts/` is what an agent is sent.
  *
  * Two sections: `## Maintenance` queues the quality presets, and `## Business knowledge`
  * (#537) asks the agent to fold what it learned back into {@link BUSINESS_KNOWLEDGE_DOCS}.

@@ -1009,9 +1009,6 @@ async function driveAgent(opts: AgentOptions, io: CliIO): Promise<number> {
     if (!journal.sawReadyForMerge()) return skip('not-ready-for-merge')
     if (journal.stoppedCleanly()) return skip('run-stopped')
     if (fake) return skip('fake-run')
-    // --eco-auto-maintenance (#314) no longer skips the whole agent: since #537 this prompt
-    // also carries `## Business knowledge`, which the flag does not name. It drops just
-    // `## Maintenance` inside renderOnBeforeMergeablePrompt() instead.
     // Every line of the prompt names the session, so there is nothing to queue without one.
     // An agent that made changes has one; this is the agent that ignored the instruction.
     const sessionName = journal.sessionName()

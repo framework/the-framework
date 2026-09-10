@@ -171,12 +171,6 @@ export type FrameworkEvent =
   /** The wrapped agent's own progress, forwarded verbatim (never gated on). */
   | { kind: 'driver'; event: DriverEvent }
   /**
-   * The generated app is booted and serving. Emitted after a successful agent when
-   * a serve config is set: the app is kept running so the user can open it, and
-   * the dashboard shows a live preview link (torn down on Ctrl+C).
-   */
-  | { kind: 'preview'; url: string; command: string }
-  /**
    * The agent's browser preview is up and listening on this loopback port (#813).
    *
    * Only the port travels. The dashboard reaches the stream through the daemon, which proxies

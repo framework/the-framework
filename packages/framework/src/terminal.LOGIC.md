@@ -27,7 +27,7 @@ Renders an agent's [1] event stream [2] in a terminal, one human-readable line p
 
 ## Business logic — TL;DR
 
-- **The agent's setup** - the driver and model in the checkout with the session link, the prompt, the branch, the ticket, the cloud anchor, the preview and browser addresses, the pull request number.
+- **The agent's setup** - the driver and model in the checkout with the session link, the prompt, the branch, the ticket, the cloud anchor, the browser addresses, the pull request number.
 - **What the agent signals** - its log lines, errors with their detail indented, views by title, "✓ ready for merge", the pull request it wrote, and "done for now" when it is settled.
 - **Gates and picks** - the question with one option per line, the recommended one marked, and the pick with who made it.
 - **The handoff, announced then reported** - one line saying what will happen when the agent ends, then what happened to the push and the pull request, and always a line for the merge.

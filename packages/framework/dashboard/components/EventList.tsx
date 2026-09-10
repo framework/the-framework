@@ -110,14 +110,14 @@ function rowTone(e: FrameworkEvent): string {
  *   - milestones (a CLEAN `end`, `ready-for-merge`) — green, how far the agent got; a stopped or
  *     failed end is not a milestone (failure is already red, stopped stays neutral), and
  *     `handoff` stays muted because its body reports per-rung outcomes that may be mixed
- *   - pushed surfaces (`view`, `browser-stream`, `preview`) — primary, the agent showing you something
+ *   - pushed surfaces (`view`, `browser-stream`, `browser`) — primary, the agent showing you something
  */
 function badgeTone(e: FrameworkEvent): string {
   const semantic = rowTone(e)
   if (semantic) return semantic
   if (e.kind === 'choice' || e.kind === 'choice-resolved') return 'text-warning'
   if ((e.kind === 'end' && e.ok) || e.kind === 'ready-for-merge') return 'text-success'
-  if (e.kind === 'view' || e.kind === 'browser-stream' || e.kind === 'browser' || e.kind === 'preview') return 'text-primary'
+  if (e.kind === 'view' || e.kind === 'browser-stream' || e.kind === 'browser') return 'text-primary'
   return ''
 }
 

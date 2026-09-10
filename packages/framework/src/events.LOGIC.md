@@ -93,7 +93,6 @@ Every progress event the driver [13] reports is wrapped and forwarded verbatim o
 - A log line: one line of The Framework's own narration ("Finishing the session (await limit reached).", "Handed off: …").
 - The browser's page: the URL the agent's browser is showing, emitted for the first real `http` or `https` page and again on every change of page, so the agent view can host the live preview at the point in the stream where it was used. Only the URL travels. It is emitted again after each session opening, because the dashboard shows only the events since the latest session opening; readers fold repeats of the same URL in place, like a re-shown view.
 - The browser stream: the agent's browser preview is up and listening on a loopback port. Only the port travels: the dashboard reaches the stream through the daemon, which proxies to that port, so the agent's own browser endpoint is never reachable from the web. Frames never enter the log, because someone will type a password into that pane.
-- A preview: a generated app booted and serving at a URL, with the command that serves it, so the user can open it. The vocabulary defines it and the terminal renders it; no part of the agent's lifecycle emits it today.
 
 ### A gate and its pick
 

@@ -1,0 +1,4 @@
+What the tests cover, across the whole path from a web agent's handoff to the record its dashboard row reads (`driver/cloud.ts`, `agent-telemetry.ts`, `store/agent-store.ts`):
+
+- **The link a web agent ends with** - once the handoff has a cloud session, the agent's record carries the deep link to that session on claude.ai (`https://claude.ai/code/<session id>`). A link the handoff actually knows always beats the generic entry point a Claude Code agent is given when no per-session link exists, so the agent view opens the session itself rather than the "Claude Code" landing page.
+- **What was known at the start stays honest** - the record written when the agent opens, before any cloud session exists, still carries the generic entry point `https://claude.ai/code`. It is never back-dated to the deep link.

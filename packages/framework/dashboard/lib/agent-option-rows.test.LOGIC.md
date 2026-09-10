@@ -1,0 +1,8 @@
+What the tests cover:
+
+- **The publish ladder's three rungs** - "Push branch", "Open PR" and "Auto-merge" are offered in that order; with nothing stored, the ladder reaches the pull request, so the first two are ticked and "Auto-merge" is not; a ladder stored at the push rung leaves "Open PR" unticked.
+- **What each rung writes** - unticking "Open PR" lowers the ladder to push, unticking "Push branch" lowers it to publishing nothing, ticking "Auto-merge" raises it to merge and unticking it lowers it back to the pull request. Every other row simply writes its own setting.
+- **A rung is inert while the rung below it is off** - with the ladder publishing nothing, "Open PR" is unticked, greyed and says its reason names "Push branch", and "Auto-merge" is unticked and greyed with it rather than staying live over a disarmed pull request. With the push on, "Open PR" is an ordinary live row again. With the ladder at push, "Auto-merge" is unticked and greyed.
+- **"Transparent" overrides the options it does not apply to** - with "Transparent" on and "Browser", "Disable system prompt" and "Post-merge cleanup" all stored as on, each of the three reads as off and greyed, because the agent will ignore them; "Transparent" itself stays on and changeable.
+- **"Browser" only on Claude Code** - under Codex the row reads as off and greyed, with a reason naming Claude Code; under Claude Code it reads as on and is changeable. A stored driver choice naming no coding agent The Framework can drive also leaves it off and greyed, even though the name written in the rows' text falls back to Claude Code.
+- **The rows name the selected coding agent** - the summary under "Transparent" names Codex when Codex is selected and Claude when Claude Code is.

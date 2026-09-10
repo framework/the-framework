@@ -19,7 +19,7 @@ Defines the tokens of the composer [1]'s prompt editor: inline chips that stand 
 - **Five kinds of token** - macro, action, reference, project and file; the kind decides the chip's color and which trigger menu inserts it.
 - **The macro catalog** - the six angle-bracket tags the preset prompts repeat, each with a one-line hint for the menu.
 - **The action catalog** - the three call-shaped tokens that make the agent stop at a gate [3] or push a view [4], each with a hint.
-- **Recognizing a token in text** - an upper-case angle-bracket tag or a `show…()` call anywhere in free text is a token; this is how a loaded preset is turned into chips.
+- **Recognizing a token in text** - an angle-bracket tag or a `show…()` call anywhere in free text is a token, whatever its letter case; this is how a loaded preset is turned into chips, and it recognizes exactly what typing the same text recognizes.
 - **Normalizing a known token** - a token matching a catalogued one in any letter case becomes that catalogued token; an unknown one keeps its exact spelling.
 - **A chip is one unit and serializes verbatim** - a chip is edited as a whole, shows its label, and is written to the prompt as its exact text with no markdown escaping.
 - **Chips form while typing** - a tag becomes a chip the moment its closing `>` is typed, a call the moment its closing `)` is typed.
@@ -64,7 +64,7 @@ Three actions are catalogued: `showChoices()` "Single-select gate", `showMultiSe
 
 #### Business logic
 
-Anywhere in free text, a token is either a tag written as `<`, an upper-case letter, any run of upper-case letters, digits and underscores, and `>`, or a call written as `show`, one or more letters, and `()`. A lower-case tag in loaded text is not a token. Turning loaded text into chips is done by `tokenize.ts` with this rule.
+Anywhere in free text, a token is either a tag written as `<`, a letter, any run of letters, digits and underscores, and `>`, or a call written as `show`, one or more letters, and `()`. Letter case does not decide what counts: the rule recognizes exactly what typing the same text recognizes, so a loaded `<await>` becomes the canonical `<AWAIT>` chip just as a typed one does. Turning loaded text into chips is done by `tokenize.ts` with this rule.
 
 ### Normalizing a known token
 

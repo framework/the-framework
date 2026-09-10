@@ -37,8 +37,14 @@ export const ACTION_TOKENS: TokenSpec[] = [
   { kind: 'action', label: 'showMarkdown()', text: 'showMarkdown()', hint: 'Push a markdown view' },
 ]
 
-/** Match any insertable token in free text, so a loaded preset can be chip-ified (tokenize.ts). */
-export const TOKEN_PATTERN = /<[A-Z][A-Z0-9_]*>|show[A-Za-z]+\(\)/g
+/**
+ * Match any insertable token in free text, so a loaded preset can be chip-ified (tokenize.ts).
+ * Letter case does not decide what counts as a tag — `specForText` normalizes a catalogued one —
+ * so this matches exactly what typing the same text matches (the input rules below). Taking
+ * uppercase alone made the two disagree: a preset carrying `<await>` stayed plain text and
+ * reached the agent as typed, while typing it into the same box produced `<AWAIT>`.
+ */
+export const TOKEN_PATTERN = /<[A-Za-z][A-Za-z0-9_]*>|show[A-Za-z]+\(\)/g
 
 /**
  * The token spec for a matched string. A catalogued macro/action matches case-insensitively

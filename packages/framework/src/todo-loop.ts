@@ -119,13 +119,13 @@ export interface TodoLoopOptions {
    * autopilot off means a human gate per item (#323). Headless runs don't pause.
    */
   requestChoice?: ((req: ChoiceRequest) => Promise<ChoicePick>) | undefined
-  /** The agent signal; aborting (Stop button / budget cap #322) ends the loop. */
+  /** The agent signal; aborting (the Stop button, an answer marked stop) ends the loop. */
   signal?: AbortSignal | undefined
   /** Hard cap on entries worked in one agent. Default {@link DEFAULT_MAX_TODO_ITEMS}. */
   maxItems?: number | undefined
 }
 
-/** The default per-agent cap on queue entries — a backstop beside the budget cap (#322). */
+/** The default per-agent cap on queue entries, so one agent cannot work the queue forever. */
 const DEFAULT_MAX_TODO_ITEMS = 25
 
 /** How many consecutive failed removals before the loop stops rather than spins. */
@@ -222,7 +222,7 @@ export async function runTodoLoop(opts: TodoLoopOptions): Promise<TodoLoopResult
     }
   }
 
-  // Aborted mid-loop (Stop button / budget cap #322): the agent is ending anyway,
+  // Aborted mid-loop (the Stop button, an answer marked stop): the agent is ending anyway,
   // so report a clean stop without extra narration.
   if (opts.signal?.aborted) return { completed, reason: 'stopped' }
 

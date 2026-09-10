@@ -104,7 +104,7 @@ An exchange answers at most 5 consecutive gates [3]. When the turn after the fif
 
 - On a single-select gate the recommended option is the one the agent named, else the first option. It is shown pre-selected.
 - A headless agent, one with no surface at all to ask on, takes the recommended option without pausing. A multi-select takes its pre-checked set.
-- A gate parked for a pick resolves to the recommended option the moment the agent is stopped or hits its budget cap, and also when the ask itself fails; the wait never rejects.
+- A gate parked for a pick resolves to the recommended option the moment the agent is stopped, and also when the ask itself fails; the wait never rejects.
 - An answer that names no option of the gate resolves to the recommended option rather than to an unknown id.
 - The resolution recorded on the event stream [10] says who picked: the user, the dashboard on the user's behalf, or the automatic fallback.
 

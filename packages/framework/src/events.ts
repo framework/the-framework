@@ -47,7 +47,7 @@ export interface ChoiceRequest {
 export type OnBeforeMergeableSkip =
   /** The agent never signalled `setReadyForMerge()`, so there is nothing to clean up after. */
   | 'not-ready-for-merge'
-  /** The agent was stopped (Stop button, Ctrl+C, budget cap) rather than finished. */
+  /** The agent was stopped (the Stop button, Ctrl+C, an answer marked stop) rather than finished. */
   | 'run-stopped'
   /** A fake/offline run: no agent to hand the follow-up prompt to. */
   | 'fake-run'
@@ -82,7 +82,7 @@ export type AutoHandoffSkip =
   | 'already-landed'
   /** The branch is already on the remote at this commit, and only the push was asked for. */
   | 'already-pushed'
-  /** The agent was stopped (Stop button, Ctrl+C, budget cap) rather than finished. */
+  /** The agent was stopped (the Stop button, Ctrl+C, an answer marked stop) rather than finished. */
   | 'run-stopped'
   /** A fake/offline run: nothing real to publish. */
   | 'fake-run'
@@ -311,11 +311,11 @@ export type FrameworkEvent =
   | { kind: 'settled' }
   /**
    * Cumulative token + cost usage for the agent so far (#322). Emitted after each
-   * agent turn that reports usage; the dashboard renders a live spend readout and
-   * the agent stops itself once `costUsd` reaches the budget cap, if one is set.
+   * agent turn that reports usage, for the dashboard's live spend readout. Nothing
+   * gates on it: an agent already running is never cut short over spending, and the
+   * account's quota decides what may *start* instead.
    *
-   * `costUsd` is absent when the agent reports tokens but no price (#540), which
-   * is also when no budget cap can fire.
+   * `costUsd` is absent when the agent reports tokens but no price (#540).
    */
   | {
       kind: 'usage'

@@ -225,7 +225,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<RunAgentResult> {
     }
 
     // The backlog loop (#323): with the opening work settled, consume the agent's own TODO
-    // backlog one gated entry per turn until it is empty. The session signal (Stop / budget cap
+    // backlog one gated entry per turn until it is empty. The session signal (a Stop, an answer marked stop)
     // #322) and the item cap bound it for unattended sessions.
     let todo: TodoLoopResult | undefined
     if (kind === 'build' && !handsOff && (opts.todoLoop ?? opts.driver.id !== 'fake')) {

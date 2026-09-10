@@ -30,8 +30,8 @@ interface Answered {
  * vanish under the cursor when the poll drops the resolved gate, and clicking the line
  * re-expands what was picked. The memory is per-mount on purpose — a reload starts clean.
  *
- * The countdown is off on purpose (see ChoicePanel.countdown): a hub that renders every gate at
- * once must not auto-accept them all ten seconds after the launcher opens.
+ * Nothing here is ever answered for the user: a hub that renders every parked gate at once must
+ * not accept any of them on its own.
  */
 export function OpenQuestions({
   onOpenAgent,
@@ -112,7 +112,6 @@ export function OpenQuestions({
                       projectId={question.projectId}
                       agentId={question.agentId}
                       choice={question.choice}
-                      countdown={false}
                       onAnswered={pick =>
                         setAnswered(prev => new Map(prev).set(key, { question, pick }))
                       }

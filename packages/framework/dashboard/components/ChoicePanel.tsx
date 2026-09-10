@@ -22,7 +22,6 @@ export function ChoicePanel({
   agentId: agentId,
   choice,
   active = false,
-  countdown = true,
   inline = false,
   onAnswered,
   send,
@@ -36,13 +35,6 @@ export function ChoicePanel({
    *  full-bleed rail section. Behaviour is identical — only the container changes. */
   inline?: boolean
   /**
-   * Whether autopilot's auto-accept countdown may run here (#1455). The launcher's questions hub
-   * turns it off: it renders every parked session's gate at once, and a page that answers all of
-   * them ten seconds after being opened is not a hub, it is a mass auto-accept. The session's own
-   * rail keeps the countdown — there the user chose to look at that one agent.
-   */
-  countdown?: boolean
-  /**
    * Told once the pick is posted and accepted, with what was picked. The launcher's hub uses it
    * to collapse the answered card to a single line (#1455 bonus 2); the rail passes nothing —
    * there the `choice-resolved` event unmounts the panel and that is the whole story.
@@ -54,7 +46,7 @@ export function ChoicePanel({
    * panel is the same either way, which is the point: a cloud session's question is answered
    * exactly like a local one.
    */
-  send?: ((pick: string | string[], by: 'user' | 'autopilot') => Promise<unknown>) | undefined
+  send?: ((pick: string | string[]) => Promise<unknown>) | undefined
 }) {
   const { busy, error, run } = useAction()
   // Posted and accepted by the daemon; the panel stays parked (buttons off, status shown)
@@ -64,18 +56,15 @@ export function ChoicePanel({
   const [checked, setChecked] = useState<Set<string>>(
     () => new Set(choice.multi ? choice.options.filter(o => o.default).map(o => o.id) : []),
   )
-  // The countdown's auto-accept fires from a closure captured when the countdown started;
-  // the ref keeps it reading the boxes as they are at fire time (#948).
+  // Accept reads the boxes as they are when it fires, not as they were when it was wired up.
   const checkedRef = useRef(checked)
   checkedRef.current = checked
-  const [secondsLeft, setSecondsLeft] = useState<number | null>(null)
-  const [cancelled, setCancelled] = useState(false)
 
   const parked = busy || sent
 
-  const post = (pick: string | string[], by: 'user' | 'autopilot' = 'user') => {
-    const deliver = send ?? ((p: string | string[], b: 'user' | 'autopilot') => sendChoice(projectId, choice.id, p, b, agentId ?? undefined))
-    void run(() => deliver(pick, by), 'Could not send your choice — try again.').then(outcome => {
+  const post = (pick: string | string[]) => {
+    const deliver = send ?? ((p: string | string[]) => sendChoice(projectId, choice.id, p, 'user', agentId ?? undefined))
+    void run(() => deliver(pick), 'Could not send your choice — try again.').then(outcome => {
       if (outcome.ok) {
         setSent(true)
         onAnswered?.(pick)
@@ -91,17 +80,10 @@ export function ChoicePanel({
     })
 
   // What Accept picks: the checked subset for a multi-select, else the recommended option (the
-  // first when the agent named none). Shared by the button, the countdown, and Ctrl+Enter.
+  // first when the agent named none). Shared by the button and Ctrl+Enter.
   const recommendedId = choice.recommended ?? choice.options[0]?.id
   const autoPick = (): string | string[] => (choice.multi ? [...checkedRef.current] : (recommendedId ?? ''))
-  const accept = (by: 'user' | 'autopilot' = 'user') => post(autoPick(), by)
-
-  // Any mouse movement cancels the auto-accept — the human is here, so let them pick.
-  useEffect(() => {
-    const cancel = () => setCancelled(true)
-    window.addEventListener('mousemove', cancel, { once: true })
-    return () => window.removeEventListener('mousemove', cancel)
-  }, [])
+  const accept = () => post(autoPick())
 
   // Ctrl+Enter accepts the recommended pick (page.ts parity, #440). Only the active gate
   // (the first in the rail) binds it, so the shortcut is unambiguous with several gates open.

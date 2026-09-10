@@ -15,7 +15,7 @@ export interface ChoiceOption {
 /**
  * An interactive choice the agent pauses on until a pick arrives (#304). Emitted as
  * a `choice` {@link FrameworkEvent}; the dashboard renders it in a panel and posts
- * the pick back. The recommended option is the default the autopilot auto-accepts.
+ * the pick back. The recommended option is what an agent nobody is watching takes.
  */
 export interface ChoiceRequest {
   /** Unique id for this pending choice; the pick is posted back against it. */
@@ -25,7 +25,7 @@ export interface ChoiceRequest {
   /** The options to choose between (at least one). */
   options: readonly ChoiceOption[]
   /**
-   * The option id pre-selected as the default (autopilot auto-accepts it). Required
+   * The option id pre-selected as the default (taken when nobody is watching). Required
    * for a single-select; omitted for a {@link multi} select, where each option's own
    * {@link ChoiceOption.default} drives the pre-checked set instead.
    */
@@ -36,8 +36,6 @@ export interface ChoiceRequest {
    * *subset* of ids rather than one. Absent = the single-select gate (#304).
    */
   multi?: boolean
-  /** Auto-accept the recommended option after this many ms when autopilot is on. Default 10000. */
-  autoAcceptMs?: number
   /** The markdown file under approval (e.g. `PLAN_<slug>.agent.md`); the doc sidebar renders it. */
   file?: string
 }
@@ -119,8 +117,8 @@ export type AutoMergeOutcome =
   | { outcome: 'withheld'; reason: MergeWithheldReason }
   | { outcome: 'failed'; error: string }
 
-/** Who resolved a {@link ChoiceRequest}: a human, the autopilot countdown, or a headless auto-accept. */
-export type ChoiceBy = 'user' | 'autopilot' | 'auto'
+/** Who resolved a {@link ChoiceRequest}: a human, or a headless auto-accept. */
+export type ChoiceBy = 'user' | 'auto'
 
 /** What a {@link import('./agent.js').RunFrameworkOptions.requestChoice} handler resolves with. */
 export interface ChoicePick {

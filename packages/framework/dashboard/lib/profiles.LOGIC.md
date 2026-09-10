@@ -1,4 +1,4 @@
-Keeps the list of devices [1] this browser can hop to, and performs the hop. A saved device is a connection, not a driver: each machine's daemon serves its own dashboard, so switching to a device means navigating this browser to that daemon's address, carrying the device's token for the one hop that authenticates it. The list, and each device's token, are kept in this browser's own storage and never in the user's preferences [2].
+Keeps the list of devices [1] this browser can hop to, and performs the device hop [2]. A saved device is a connection, not a driver: each machine's daemon serves its own dashboard, so switching to a device means navigating this browser to that daemon's address, carrying the device's token for the one hop that authenticates it. The list, and each device's token, are kept in this browser's own storage and never in the user's preferences [3].
 
 ## Context
 
@@ -9,8 +9,9 @@ Keeps the list of devices [1] this browser can hop to, and performs the hop. A s
 ## Glossary
 
 [1] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
-[2] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
-[3] composer: the prompt editor on a project's page, also used for live chat.
+[2] device hop: navigating this browser from one machine's dashboard to another's, carrying that device's token for the one request that authenticates it.
+[3] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
+[4] composer: the prompt editor on a project's page, also used for live chat.
 
 ## Business logic — TL;DR
 
@@ -33,7 +34,7 @@ See `## Context`.
 
 #### Business logic
 
-The devices [1] are stored by this browser, on this machine, under the origin the dashboard was opened on. Each entry is a machine's address, its token, and its label. Nothing is written into the user's preferences [2], because those live in one file on the daemon's machine and are read by every browser that opens that dashboard, which is the wrong home for a secret told to one browser.
+The devices [1] are stored by this browser, on this machine, under the origin the dashboard was opened on. Each entry is a machine's address, its token, and its label. Nothing is written into the user's preferences [3], because those live in one file on the daemon's machine and are read by every browser that opens that dashboard, which is the wrong home for a secret told to one browser.
 
 Every screen showing devices reads the same list, and any change to it updates them all at once. On a page rendered before the browser is running there is no storage, so the list is empty and fills in once the page is live.
 
@@ -75,13 +76,13 @@ The label is the text the user gave, trimmed. A label that is empty or only whit
 
 #### Context
 
-**User story**: the user is halfway through typing a prompt, realizes it should run on another machine, and picks that device [1]. The other machine's dashboard opens with the prompt still in the composer [3], ready to start there.
+**User story**: the user is halfway through typing a prompt, realizes it should run on another machine, and picks that device [1]. The other machine's dashboard opens with the prompt still in the composer [4], ready to start there.
 
 **Problem**: the token has to reach the other machine once to establish the session. It rides the address for that one hop and is then held by that machine's dashboard as a cookie, so it does not stay in the address bar.
 
 #### Business logic
 
-Hopping navigates the browser to the device's [1] origin with its token attached, plus the text currently in the composer [3]. The receiving daemon accepts the token, removes it from the address, and leaves the carried draft, so the other machine's dashboard opens with the same prompt in its composer.
+A device hop [2] navigates the browser to the device's [1] origin with its token attached, plus the text currently in the composer [4]. The receiving daemon accepts the token, removes it from the address, and leaves the carried draft, so the other machine's dashboard opens with the same prompt in its composer.
 
 A draft is only carried when it fits: measured in its encoded form, anything longer than 7000 characters is dropped and the hop connects with an empty composer, so a very large paste cannot make the address unusable. A device with no token connects to its bare origin.
 
@@ -91,7 +92,7 @@ This is a connection, not the start of an agent: nothing is submitted by hopping
 
 #### Context
 
-**User story**: after hopping to a device [1], the user clicks "Local" to come back to their own machine — and lands on the port their own daemon actually uses, not a guess.
+**User story**: after a device hop [2], the user clicks "Local" to come back to their own machine — and lands on the port their own daemon actually uses, not a guess.
 
 #### Business logic
 

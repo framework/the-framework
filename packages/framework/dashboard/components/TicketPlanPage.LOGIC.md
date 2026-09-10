@@ -7,9 +7,9 @@ One ticket's plan, rendered as markdown: the `.plan.md` file sitting beside the 
 ## Glossary
 
 [1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
-[2] driver session: the coding agent's own conversation for one agent, which can be resumed by its session id.
-[3] agent view: one agent's page in the dashboard.
-[4] settled: said of an agent whose work has stopped and which is waiting for the user: it is alive, takes messages, and does nothing until told.
+[2] agent view: one agent's page in the dashboard.
+[3] settled: said of an agent whose work has stopped and which is waiting for the user: it is alive, takes messages, and does nothing until told.
+[4] driver session: the coding agent's own conversation for one agent, which can be resumed by its session id.
 
 ## Business logic — TL;DR
 
@@ -66,4 +66,4 @@ When an agent is attributed, a line above the plan says which case this is and o
 - While that agent is still running: "An agent is writing this plan right now." with an "Open agent" button, whose tooltip reads "Opens the session writing this plan, so you can watch it or step in."
 - Otherwise: "Written by an agent whose session can be picked up where it left off." with a "Resume agent" button, whose tooltip reads "Opens the session of the agent that wrote this plan. Anything you send there continues that same conversation — the plan, the ticket and the reasoning behind it are already in its context."
 
-Both open that agent's agent view [3]. Nothing is resumed by this page itself: a settled [4] agent's driver session [2] is continued by sending a message from that page, which is where the resuming already happens.
+Both open that agent's agent view [2]. Nothing is resumed by this page itself: a settled [3] agent's driver session [4] is continued by sending a message from that page, which is where the resuming already happens.

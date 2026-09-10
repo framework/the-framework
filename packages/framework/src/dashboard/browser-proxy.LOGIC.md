@@ -15,16 +15,16 @@ The daemon's route from the dashboard to the browser an agent [1] is driving: th
 
 ## Business logic — TL;DR
 
-- **Two legs, addressed by project and agent** - the dashboard asks for the picture or posts input under `/browser/<project>/<agent>/stream` or `/browser/<project>/<agent>/input`; anything else is not a browser request at all.
+- **Two addresses, one for the picture and one for input** - the dashboard asks for the picture, or posts a click, at an address naming the project and the agent; anything else is not a browser request at all.
 - **The destination is looked up, never supplied** - the daemon finds the agent's [1] browser bridge [2] from that agent's own record, so no caller can aim the relay anywhere else.
 - **Only a running agent has a browser to show** - a finished agent, an agent started without a browser, and an unknown id are all answered "no browser preview for this run".
-- **Both legs stream** - the picture is an endless response and is passed through as it arrives, never collected first, and it is never cached.
+- **Both directions stream** - the picture is an endless response and is passed through as it arrives, never collected first, and it is never cached.
 - **When the far end dies, the pane is told** - a bridge that fails or disappears mid-stream ends the response with a gateway error instead of hanging.
 - **A pane that goes away stops costing frames** - closing the panel tears the relay down, so the agent stops serving a viewer that is no longer there.
 
 ## Business logic
 
-### Two legs, addressed by project and agent
+### Two addresses, one for the picture and one for input
 
 #### Context
 
@@ -32,7 +32,7 @@ See `## Context`.
 
 #### Business logic
 
-The dashboard addresses the relay at `/browser/<project id>/<agent id>/stream` for the live picture and `/browser/<project id>/<agent id>/input` for a click or a key sent back. The picture leg is a plain fetch of an image that keeps updating; the input leg carries the click or key as JSON.
+The dashboard addresses the relay at `/browser/<project id>/<agent id>/stream` for the live picture and `/browser/<project id>/<agent id>/input` for a click or a key sent back. The first is fetched as an image that keeps updating; the second carries the click or the key as JSON.
 
 Any other shape under that prefix — a missing project [3] or agent id [4], a fourth path segment, any word other than `stream` or `input`, or a target the daemon cannot make sense of at all, such as a broken escape sequence — is not treated as a browser request and is served as an ordinary dashboard address instead. Nothing is guessed at, and a malformed address never brings the daemon down.
 
@@ -60,7 +60,7 @@ The relay serves only an agent [1] that is currently running and recorded a brow
 
 That answer is ordinary rather than a fault: the panel asks repeatedly while an agent is starting up, and many agents never have a browser at all, so a miss is not reported anywhere.
 
-### Both legs stream
+### Both directions stream
 
 #### Context
 
@@ -68,7 +68,7 @@ That answer is ordinary rather than a fault: the panel asks repeatedly while an 
 
 #### Business logic
 
-Both legs are passed through as the bytes arrive, in both directions, and neither is collected first. The status and headers the browser bridge [2] answers with are passed back as they are, with one addition: the response is marked as never to be cached, because every frame is a live picture of what is happening right now.
+Both are passed through as the bytes arrive, in both directions, and neither is collected first. The status and headers the browser bridge [2] answers with are passed back as they are, with one addition: the response is marked as never to be cached, because every frame is a live picture of what is happening right now.
 
 ### When the far end dies, the pane is told
 

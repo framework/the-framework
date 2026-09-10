@@ -85,6 +85,6 @@ The request can narrow what the sweep does, which is what a "Run now" that fans 
 
 - draining [9]: agents [7] are started on the agent queue's [8] entries. When the queue is empty this is reported as having nothing to work, rather than the click being borrowed for some other routine's [10] work nobody asked for.
 - planning: agents are started on the open tickets [12] to plan, through the same claim-then-start path the scheduled routine takes, so the fan-out [11] respects the same limits and claims.
-- one named routine [10], identified by the routine lock [13] it takes: a single agent, started by the sweep so the lock that guards it is taken the same way the scheduled run takes it, and started from a fresh copy of its branch.
+- one named routine [10], identified by the routine lock [13] it takes: a single agent, started by the sweep so the lock that guards it is taken the same way a scheduled firing takes it, and started from a fresh copy of its branch.
 
 The request can also be scoped to a single project [15], which is what the panel's own project selection means.

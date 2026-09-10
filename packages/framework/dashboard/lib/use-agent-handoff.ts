@@ -41,9 +41,9 @@ export function useAgentHandoff(projectId: string, agentId: string | null | unde
 
   const act = (which: 'push' | 'pr' | 'merge', fn: () => Promise<unknown>, fallback: string): void => {
     setPending(which)
-    void run(fn, fallback).then(result => {
+    void run(fn, fallback).then(outcome => {
       setPending(null)
-      if (result !== undefined) reload()
+      if (outcome.ok) reload()
     })
   }
 

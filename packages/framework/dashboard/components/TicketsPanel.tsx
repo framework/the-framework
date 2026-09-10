@@ -341,10 +341,10 @@ export function TicketsPanel({
   const configure = () => onSelectProject(projectId)
 
   const startSession = async (prompt: string, failure: string, options: { unattended?: boolean; ticket?: string } = {}) => {
-    const result = await run(() => sendStart(projectId, prompt, 'prompt', options), failure)
+    const outcome = await run(() => sendStart(projectId, prompt, 'prompt', options), failure)
     // Jump to the session doing the work, so its progress is watchable instead of the panel
     // sitting on stale rows until files land.
-    if (result?.ok) onAgentStarted?.(prompt, result.agentId)
+    if (outcome.ok) onAgentStarted?.(prompt, outcome.value.agentId)
   }
 
   // Unattended (#1279): an update fired by a button is routine work, not a conversation — it

@@ -118,13 +118,11 @@ export function AgentComposer({
       return
     }
     if (live) {
-      // sendMessage resolves void; map success to `true` so it is tellable from useAction's
-      // failure `undefined`.
-      const result = await run(
-        () => sendMessage(projectId, text, agentId ?? undefined).then(() => true),
+      const outcome = await run(
+        () => sendMessage(projectId, text, agentId ?? undefined),
         'Could not send — the agent may have just ended. Your text is kept, try again.',
       )
-      if (result) {
+      if (outcome.ok) {
         setQueued(text)
         composerRef.current?.clear()
       }

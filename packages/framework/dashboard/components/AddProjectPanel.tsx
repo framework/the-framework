@@ -58,9 +58,9 @@ export function AddProjectPanel({ onAdded, onClose }: { onAdded: () => void; onC
   // Trust confirmed (#439) -> install + register.
   const confirmAdd = async () => {
     if (busy || !path) return
-    const result = await run(() => sendAddProject(path), 'Failed to add the project.')
-    if (result?.ok) {
-      setAdded({ alreadyActivated: result.alreadyActivated })
+    const outcome = await run(() => sendAddProject(path), 'Failed to add the project.')
+    if (outcome.ok) {
+      setAdded({ alreadyActivated: outcome.value.alreadyActivated })
       onAdded()
     }
   }

@@ -97,17 +97,17 @@ export function TicketsPage({
   const { busy, error, run } = useAction()
   const startPlan = async (projectId: string, file: string) => {
     const prompt = planTicketPrompt(file)
-    const result = await run(() => sendStart(projectId, prompt, 'prompt'), 'The planning agent could not be started.')
-    if (result?.ok) onAgentStarted?.(projectId, prompt, result.agentId)
+    const outcome = await run(() => sendStart(projectId, prompt, 'prompt'), 'The planning agent could not be started.')
+    if (outcome.ok) onAgentStarted?.(projectId, prompt, outcome.value.agentId)
   }
   // Unattended with the ticket named on the options, exactly as the panel's own start column does.
   const startWork = async (projectId: string, file: string) => {
     const prompt = workOnTicketPrompt(file)
-    const result = await run(
+    const outcome = await run(
       () => sendStart(projectId, prompt, 'prompt', { unattended: true, ticket: `tickets/${file}` }),
       'The work agent could not be started.',
     )
-    if (result?.ok) onAgentStarted?.(projectId, prompt, result.agentId)
+    if (outcome.ok) onAgentStarted?.(projectId, prompt, outcome.value.agentId)
   }
   // The page-wide queue-adds: every unclaimed shown ticket joins the AI queue — the work the
   // framework picks up on its own — as an implementation entry, or as the [Plan tickets]
@@ -138,7 +138,7 @@ export function TicketsPage({
   // title as the entry, linked back to the ticket, its priority picking the section.
   const [queuedKey, setQueuedKey] = useState<string | null>(null)
   const queueShownTickets = async (targets: { projectId: string; ticket: WorkspaceTicket }[], key: string) => {
-    const done = await run(async () => {
+    const outcome = await run(async () => {
       const open = await readOpenQueue()
       for (const { projectId, ticket } of targets) {
         if (open.tickets.has(`${projectId}\n${ticket.file}`)) continue
@@ -150,7 +150,7 @@ export function TicketsPage({
       }
       return { ok: true as const }
     }, 'The tickets could not be queued.')
-    if (done?.ok) setQueuedKey(key)
+    if (outcome.ok) setQueuedKey(key)
   }
 
   // Queue the tickets' PLANS: one `Create tickets/<stem>.plan.md` entry each — the [Plan
@@ -160,7 +160,7 @@ export function TicketsPage({
   // plan could matter.
   const [plansQueuedKey, setPlansQueuedKey] = useState<string | null>(null)
   const queueShownPlans = async (targets: { projectId: string; ticket: WorkspaceTicket }[], key: string) => {
-    const done = await run(async () => {
+    const outcome = await run(async () => {
       const open = await readOpenQueue()
       for (const { projectId, ticket } of targets) {
         if (open.texts.has(`${projectId}\n${planTicketPrompt(ticket.file)}`)) continue
@@ -173,7 +173,7 @@ export function TicketsPage({
       }
       return { ok: true as const }
     }, 'The plans could not be queued.')
-    if (done?.ok) setPlansQueuedKey(key)
+    if (outcome.ok) setPlansQueuedKey(key)
   }
 
   // A project deselected in the Project facet disappears entirely — its section would otherwise

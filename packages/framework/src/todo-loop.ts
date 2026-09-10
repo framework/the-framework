@@ -146,7 +146,7 @@ export async function runTodoLoop(opts: TodoLoopOptions): Promise<TodoLoopResult
   const { session, cwd, emit } = opts
   const maxItems = opts.maxItems ?? DEFAULT_MAX_TODO_ITEMS
   // One emitter for the whole queue, so ready-for-merge fires once across every item
-  // and a session name only re-emits on an actual rename.
+  // and a pull-request description only re-emits when it changes.
   const gateDeps = {
     requestChoice: opts.requestChoice,
     emit,

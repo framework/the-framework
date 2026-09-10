@@ -332,7 +332,8 @@ function parseGateBody(body: string): ParsedAwaitGate | undefined {
 
 /**
  * Emit the {@link PROTOCOLS_SIGNAL} signals an agent turn carries: markdown views, the errors it
- * reported, the session name, `setReadyForMerge()`, and a pull-request description. Every turn the framework prompts goes through
+ * reported, `setReadyForMerge()`, and a pull-request description. The session name is not among
+ * them: the agent names its branch through the `branches` skill, and the name is read off it. Every turn the framework prompts goes through
  * one of these, because the protocols are unconditional (see `composeAgentSystem`) — the
  * agent is told it can signal on any turn, so any turn we don't parse drops the signal.
  *

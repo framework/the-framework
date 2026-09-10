@@ -1,0 +1,1 @@
+Turns whatever was thrown into the one sentence shown to the user: an error's own message, or the thrown value spelled out as text when it is not an error. One home for the idiom, so every surface, daemon and dashboard alike, reports a failure the same way and a thrown string never shows up as an unreadable object.

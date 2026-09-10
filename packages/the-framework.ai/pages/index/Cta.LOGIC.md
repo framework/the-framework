@@ -1,0 +1,1 @@
+The closing call to action of the landing page: the logo, the heading "Join our community of agentic developers" 💪🦾, and two buttons, "Join us on Discord" (the primary one) linking to the Discord server and "Star on GitHub" linking to the repository (the addresses live in `ui.tsx`). It is the bottom screen at which the section navigation (`SectionNav.tsx`) highlights no chapter.

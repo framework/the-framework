@@ -236,7 +236,6 @@ body {
   color: var(--foreground);
   border-color: var(--border);
 }
-.pe-token[data-token='reference'],
 .pe-token[data-token='project'] {
   background: var(--accent);
   color: var(--accent-foreground);

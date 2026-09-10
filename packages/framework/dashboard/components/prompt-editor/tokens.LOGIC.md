@@ -16,7 +16,7 @@ Defines the tokens of the composer [1]'s prompt editor: inline chips that stand 
 
 ## Business logic — TL;DR
 
-- **Five kinds of token** - macro, action, reference, project and file; the kind decides the chip's color and which trigger menu inserts it.
+- **Four kinds of token** - macro, action, project and file; the kind decides the chip's color and which trigger menu inserts it.
 - **The macro catalog** - the six angle-bracket tags the preset prompts repeat, each with a one-line hint for the menu.
 - **The action catalog** - the three call-shaped tokens that make the agent stop at a gate [3] or push a view [4], each with a hint.
 - **Recognizing a token in text** - an angle-bracket tag or a `show…()` call anywhere in free text is a token, whatever its letter case; this is how a loaded preset is turned into chips, and it recognizes exactly what typing the same text recognizes.
@@ -26,7 +26,7 @@ Defines the tokens of the composer [1]'s prompt editor: inline chips that stand 
 
 ## Business logic
 
-### Five kinds of token
+### Four kinds of token
 
 #### Context
 
@@ -34,7 +34,7 @@ See `## Context`.
 
 #### Business logic
 
-A token is of one of five kinds: `macro` (an angle-bracket tag), `action` (a call such as `showChoices()`), `reference` (a general mention), `project` (an `@` mention of a registered project) and `file` (a `#` mention of a file of the open project). Every token carries a label, which is what its chip shows, and a text, which is the exact string written to the prompt; a catalogued token also carries a hint, the one-line description its menu entry shows. The kind is stamped on the chip and picks its color. Which trigger menu inserts which kind is decided by the trigger definitions in `PromptEditor.tsx`.
+A token is of one of four kinds: `macro` (an angle-bracket tag), `action` (a call such as `showChoices()`), `project` (an `@` mention of a registered project) and `file` (a `#` mention of a file of the open project). Every token carries a label, which is what its chip shows, and a text, which is the exact string written to the prompt; a catalogued token also carries a hint, the one-line description its menu entry shows. The kind is stamped on the chip and picks its color. Which trigger menu inserts which kind is decided by the trigger definitions in `PromptEditor.tsx`.
 
 ### The macro catalog
 

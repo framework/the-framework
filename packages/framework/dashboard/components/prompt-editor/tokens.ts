@@ -2,12 +2,12 @@ import { Node, mergeAttributes, nodeInputRule } from '@tiptap/core'
 
 // The prompt editor's tokens (#470). A token is an inline chip that reads as a pill in the
 // editor but serializes back to the EXACT plain text the agent already parses today — an
-// angle-bracket macro (`<AWAIT>`, `<REVIEW_FILE>`), an action call (`showMultiSelect()`), or
-// a reference (`@my-app`). Because a chip flattens to its `text` verbatim, the prompt over
+// angle-bracket macro (`<AWAIT>`, `<REVIEW_FILE>`), an action call (`showMultiSelect()`), a
+// project (`@my-app`) or a file. Because a chip flattens to its `text` verbatim, the prompt over
 // the wire is unchanged: presets, the agent contract, everything downstream stays the same.
 
 /** What a token is, which drives its chip colour and which menu inserts it. */
-export type TokenKind = 'macro' | 'action' | 'reference' | 'project' | 'file'
+export type TokenKind = 'macro' | 'action' | 'project' | 'file'
 
 /** One insertable token: how it reads (label) and how it serializes (text). */
 export interface TokenSpec {

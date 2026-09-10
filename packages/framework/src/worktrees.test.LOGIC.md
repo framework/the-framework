@@ -1,0 +1,10 @@
+What the tests cover, against real git with a bare repository standing in for the remote:
+
+- **Only what is on the remote may go** - with no remote at all, a checkout holding committed work is kept, the refusal says the branch is not on the remote, and the work is still on disk.
+- **A publish-nothing agent** - with a remote that would take the push, an agent whose handoff publishes nothing keeps its checkout and is told so ("publish nothing"); nothing reaches the remote and nothing is committed on the way, the uncommitted edit staying as it was; committed but unpushed work is kept the same way, the push never being made for it; when the branch is already on the remote by someone else's push, the checkout goes.
+- **An unreadable record** - a record that exists but does not parse keeps the checkout, says the record could not be read, and pushes nothing.
+- **A web agent's checkout** - a clean tree inside the cloud anchor goes without pushing its empty birth branch to the remote; a tree holding uncommitted work beyond the anchor falls back to the ordinary rule, is kept as having uncommitted work, and nothing is pushed.
+- **A directory git does not know as a worktree** - is refused before any git command runs in it: nothing is committed on the user's own checkout, the user's uncommitted edit survives, nothing is pushed, and the directory is left where it is.
+- **The birth branch** - when the agent branched away to a named branch and committed there, removal pushes the named branch, deletes the birth branch, and reports that deletion.
+- **An unknown agent** - an id with no checkout is refused with "no worktree for session <id>" and the real checkout is untouched.
+- **Deleting an agent** - removes its checkout, its archived record and its event stream so the row leaves the list, while the branch and its commits survive; uncommitted work in the checkout is discarded rather than committed; an agent whose checkout is already gone still has its record cleared; an unsafe id is refused before anything is touched.

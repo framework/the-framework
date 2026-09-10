@@ -1,8 +1,10 @@
-The browser's typed stubs for the preferences [1] the Settings page and the launcher read and save, for a project's shared custom presets, for the editors installed on the daemon's machine, and for the Discord credentials the daemon holds: one stub per call, addressed by the call's name over the dashboard's transport (`lib/rpc.ts`) and declared with the daemon's own signature for it, taken from `src/dashboard-rpc/preferences.ts`. A call the daemon renames, or whose arguments or answer change shape, therefore fails the dashboard's type check instead of breaking the page at runtime. The stubs add no rule of their own: what each call answers and refuses is the daemon's logic in `src/dashboard-rpc/preferences.ts`; only the calls' names and types cross into the dashboard, and none of the daemon's code reaches the browser bundle.
+The browser's typed stubs for the preferences [1] that Settings [2] and the launcher [3] read and save, for a project's shared custom presets, for the editors installed on the daemon's machine, and for the Discord credentials the daemon holds: one stub per call, addressed by the call's name over the dashboard's transport (`lib/rpc.ts`) and declared with the daemon's own signature for it, taken from `src/dashboard-rpc/preferences.ts`. A call the daemon renames, or whose arguments or answer change shape, therefore fails the dashboard's type check instead of breaking the page at runtime. The stubs add no rule of their own: what each call answers and refuses is the daemon's logic in `src/dashboard-rpc/preferences.ts`; only the calls' names and types cross into the dashboard, and none of the daemon's code reaches the browser bundle.
 
 ## Glossary
 
 [1] preferences: The user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
+[2] Settings: the settings page.
+[3] launcher: the Start form on a project's own page (the project home).
 
 ## Business logic — TL;DR
 

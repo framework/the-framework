@@ -8,10 +8,10 @@ Builds the one-line shell command that reopens an agent's [1] driver session [2]
 
 ## Glossary
 
-[1] agent: The unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
-[2] driver session: The coding agent's own conversation for one agent, which the driver can resume by its session id.
-[3] coding agent: The CLI doing the actual work: Claude Code or Codex.
-[4] checkout: An agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
+[1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[2] driver session: the coding agent's own conversation for one agent, which the driver can resume by its session id.
+[3] coding agent: the CLI doing the actual work: Claude Code or Codex.
+[4] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 
 ## Business logic — TL;DR
 

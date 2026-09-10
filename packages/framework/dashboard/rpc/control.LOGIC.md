@@ -2,21 +2,21 @@ The browser's typed stubs for every action the dashboard takes on an agent [1], 
 
 ## Glossary
 
-[1] agent: The unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
-[2] the Claude web bridge: The daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge browser is the Chrome for Testing the daemon runs for it.
-[3] gate: A question with options at which an agent stops and waits for an answer: it emits the question in its turn's final message, the dashboard shows it as a card, and the answer re-prompts the agent.
-[4] pick: The answer to a gate: the option or options chosen, by the user or automatically.
-[5] live chat: The user's own messages to a running agent, each continuing the same driver session. One of them is a message.
-[6] handoff: What happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it). "Handoff level" is a rung of that ladder.
+[1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
+[2] the Claude web bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge browser is the Chrome for Testing the daemon runs for it.
+[3] gate: a question with options at which an agent stops and waits for an answer: it emits the question in its turn's final message, the dashboard shows it as a card, and the answer re-prompts the agent.
+[4] pick: the answer to a gate: the option or options chosen, by the user or automatically.
+[5] live chat: the user's own messages to a running agent, each continuing the same driver session. One of them is a message.
+[6] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it). "Handoff level" is a rung of that ladder.
 [7] control file: `.the-framework/control.jsonl`: the file the daemon appends steering to (stops, picks, chat messages) and the agent's process tails.
-[8] cloud session: A Claude Code cloud session on claude.ai, the far end of a `web` agent.
-[9] build agent / prompt agent: The two kinds of agent: a build works the agent queue after its opening exchange; a prompt agent runs one prompt and stops there.
+[8] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
+[9] build agent / prompt agent: the two kinds of agent: a build works the agent queue after its opening exchange; a prompt agent runs one prompt and stops there.
 [10] research agent: the third kind a start accepts: an agent that runs the research preset around a subject the caller posts, which may be empty and then defaults to the current pull request.
 [11] launcher: the Start form on a project's own page (the project home).
-[12] agent id: An agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
-[13] checkout: An agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
+[12] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
+[13] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [14] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down.
-[15] claim: A ticket's lock file naming the holder working it, so two agents never work the same ticket.
+[15] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
 
 ## Business logic — TL;DR
 

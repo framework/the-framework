@@ -4,7 +4,7 @@ Picks the one word an agent's [1] status pill shows, out of its event stream [2]
 
 **User story**: the user scans a list of agents and each one shows a single word for where it stands, and opens an agent's own page to find the same word in its toolbar. A red "failed" tells a crash from an amber "stopped" the user asked for, and neither is dressed up as the green "ready for merge" the agent claimed a minute earlier.
 
-**Problem**: an agent can hold several of these facts at the same time. It can signal ready for merge [3] and then fail, or be stopped [4] after signalling it. Without a ranking, the pill would show whichever fact was checked first, and a green "ready for merge" would be a lie about an agent that then crashed.
+**Problem**: an agent can hold several of these facts at the same time. It can signal ready for merge [3] and then fail, or be stopped [4] after signaling it. Without a ranking, the pill would show whichever fact was checked first, and a green "ready for merge" would be a lie about an agent that then crashed.
 
 ## Glossary
 

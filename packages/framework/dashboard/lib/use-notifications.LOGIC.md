@@ -14,12 +14,12 @@ Fires a browser notification when something new appears in one of the dashboard'
 [2] activity: the other notification feed: an agent started or finished.
 [3] agent: the unit of work: one task worked by a coding agent under The Framework's control, in its own checkout, on its own branch, streaming events, handed off when it ends.
 [4] project: a repository the user registered in the dashboard, identified by an id derived from its path.
-[5] gate: a question with options at which an agent stops and waits for an answer: it emits the question in its turn's final message, the dashboard shows it as a card, and the answer re-prompts the agent.
-[6] open question: a gate nobody has answered yet, as the dashboard lists them across projects.
+[5] open question: a gate nobody has answered yet, as the dashboard lists them across projects.
+[6] gate: a question with options at which an agent stops and waits for an answer: it emits the question in its turn's final message, the dashboard shows it as a card, and the answer re-prompts the agent.
 
 ## Business logic — TL;DR
 
-- **Two gates before anything is shown** - the user's own preference for the feed and for browser delivery, and the browser's own permission.
+- **Two conditions before anything is shown** - the user's own preference for the feed and for browser delivery, and the browser's own permission.
 - **What counts as the same item** - each item has a stable identity, so one thing is announced exactly once no matter how often the feed is re-read.
 - **What counts as already there** - a project's existing items are absorbed silently the first time that project is read completely, and only then does that project start announcing.
 - **Turning the notifications off does not bank a backlog** - the feeds keep being absorbed while notifications are off, so turning them back on announces nothing retroactively.
@@ -29,7 +29,7 @@ Fires a browser notification when something new appears in one of the dashboard'
 
 ## Business logic
 
-### Two gates before anything is shown
+### Two conditions before anything is shown
 
 #### Context
 
@@ -52,7 +52,7 @@ The intervention [1] feed is polled regardless, since the same read also drives 
 Every item carries a stable identity, and an item is announced at most once:
 
 - A pull request is identified by its URL, which survives the title being edited and the list being re-ordered.
-- An open question [6] is identified by the project [4], the agent [3] parked on it and the gate [5] it is parked on. The agent is part of the identity because a gate's own id is only unique within one agent, so two agents in one project parked on their first gate would otherwise count as one item and only one of them would be announced.
+- An open question [5] is identified by the project [4], the agent [3] parked on it and the gate [6] it is parked on. The agent is part of the identity because a gate's own id is only unique within one agent, so two agents in one project parked on their first gate would otherwise count as one item and only one of them would be announced.
 - Unpushed work is identified by the project and the agent whose branch holds it.
 - An activity [2] item is identified by whether the agent started or finished, plus the project and the agent, so one agent produces two announcements over its life, one when it starts and one when it lands, each fired once.
 

@@ -6,10 +6,10 @@ Tails an agent's [1] events [2] file for the live stream: everything already wri
 
 ## Glossary
 
-[1] agent: The unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
-[2] event / event stream: Everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface (dashboard, terminal, archive, run) is a projection of it.
-[3] archive: The transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
-[4] checkout: An agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
+[1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[2] event / event stream: everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface (dashboard, terminal, archive, run) is a projection of it.
+[3] archive: the transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
+[4] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 
 ## Business logic — TL;DR
 

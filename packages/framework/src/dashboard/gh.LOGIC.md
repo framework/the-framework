@@ -8,16 +8,16 @@ Every fact the daemon reads from GitHub, and the one thing it writes there, goes
 
 ## Glossary
 
-[1] agent: The unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
-[2] checkout: An agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
-[3] handoff: What happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it).
+[1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[2] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
+[3] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it).
 [4] agent view: one agent's page.
 [5] launcher: the Start form on project home, a project's own page.
-[6] location: Where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
-[7] CI watch: The sweep that merges the pull requests The Framework opened once their checks pass, and starts a fix agent when a check goes red.
-[8] routine: A preset the daemon fires on its own on a schedule — update tickets, triage quick, triage consensual, plan tickets, maintenance — each switchable off and runnable on demand.
-[9] unattended: Said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
-[10] intervention: Something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds.
+[6] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
+[7] CI watch: the sweep that merges the pull requests The Framework opened once their checks pass, and starts a fix agent when a check goes red.
+[8] routine: a preset the daemon fires on its own on a schedule — update tickets, triage quick, triage consensual, plan tickets, maintenance — each switchable off and runnable on demand.
+[9] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
+[10] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds.
 
 ## Business logic — TL;DR
 

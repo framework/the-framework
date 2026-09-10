@@ -8,13 +8,13 @@ Keeps a routine [1] from running twice at once across the machines that share a 
 
 ## Glossary
 
-[1] routine: A preset the daemon fires on its own on a schedule — update tickets, triage quick, triage consensual, plan tickets, maintenance — each switchable off and runnable on demand.
-[2] the `agent-data` branch: The branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks. Born as an orphan, written through one sync → commit → push cycle.
-[3] routine lock: A file on the `agent-data` branch (`routines/<name>.lock.md`) a daemon takes before running a routine so the routine runs once across machines.
-[4] agent: The unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
-[5] Auto PM: The daemon's unattended product management: drain the agent queue, and refill it by running the routines.
-[6] quota: The account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
-[7] tick: One beat of the daemon's single background clock; each sweep says how many ticks it waits between turns.
+[1] routine: a preset the daemon fires on its own on a schedule — update tickets, triage quick, triage consensual, plan tickets, maintenance — each switchable off and runnable on demand.
+[2] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks. Born as an orphan, written through one sync → commit → push cycle.
+[3] routine lock: a file on the `agent-data` branch (`routines/<name>.lock.md`) a daemon takes before running a routine so the routine runs once across machines.
+[4] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
+[5] Auto PM: the daemon's unattended product management: drain the agent queue, and refill it by running the routines.
+[6] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
+[7] tick: one beat of the daemon's single background clock; each sweep says how many ticks it waits between turns.
 
 ## Business logic — TL;DR
 

@@ -2,8 +2,8 @@ Pumps an in-memory event stream, the one the daemon holds for an agent relayed [
 
 ## Glossary
 
-[1] relay: Running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
-[2] device: Another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
+[1] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
+[2] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 
 ## Business logic — TL;DR
 

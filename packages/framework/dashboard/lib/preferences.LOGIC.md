@@ -8,16 +8,16 @@ Holds the browser's view of the user's preferences [1]: loads them from the daem
 
 ## Glossary
 
-[1] preferences: The user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
+[1] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 [2] the repo file: `the-framework.yml` at a project's root: per-repo defaults that travel with the code.
 [3] Settings: the settings page.
 [4] launcher: the Start form on a project's own page.
-[5] handoff: What happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it).
-[6] Auto PM: The daemon's unattended product management: drain the agent queue, and refill it by running the routines.
-[7] agent: The unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
+[5] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it).
+[6] Auto PM: the daemon's unattended product management: drain the agent queue, and refill it by running the routines.
+[7] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
 [8] transparent: an agent started with nothing of The Framework's — the raw coding agent.
 [9] vanilla: an agent started without the built-in system prompt but with the signal protocols kept.
-[10] intervention: Something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds. The other is activity: an agent started or finished.
+[10] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds. The other is activity: an agent started or finished.
 
 ## Business logic — TL;DR
 

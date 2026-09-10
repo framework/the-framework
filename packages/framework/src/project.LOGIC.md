@@ -6,9 +6,9 @@ Two read-only facts about a repository on disk: whether it is activated as a pro
 
 ## Glossary
 
-[1] project: A repository the user registered in the dashboard, identified by an id derived from its path.
-[2] agent: The unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
-[3] checkout: An agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
+[1] project: a repository the user registered in the dashboard, identified by an id derived from its path.
+[2] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[3] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 
 ## Business logic — TL;DR
 

@@ -8,25 +8,25 @@ Runs The Framework's one daemon per machine, in the foreground: it binds the das
 
 ## Glossary
 
-[1] agent: The unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
-[2] sweep: A background job the daemon runs on its clock: Auto PM, the CI watch, the notification watchers, the sweep that reclaims checkouts (the daemon's log calls it the "worktree sweep"), the branch-links sweep, the cloud scratch sweep, cloud work adoption.
-[3] the bridge: The daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge token is the secret the extension presents; the bridge browser is the Chrome for Testing the daemon runs for it; the Driver tab is the extension's one pinned tab that reads claude.ai's session list, visits sessions and types answers.
-[4] event stream: Everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface (dashboard, terminal, archive, run) is a projection of it.
-[5] checkout: An agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
+[1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
+[2] sweep: a background job the daemon runs on its clock: Auto PM, the CI watch, the notification watchers, the sweep that reclaims checkouts (the daemon's log calls it the "worktree sweep"), the branch-links sweep, the cloud scratch sweep, cloud work adoption.
+[3] the bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge token is the secret the extension presents; the bridge browser is the Chrome for Testing the daemon runs for it; the Driver tab is the extension's one pinned tab that reads claude.ai's session list, visits sessions and types answers.
+[4] event stream: everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface (dashboard, terminal, archive, run) is a projection of it.
+[5] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [6] control file: `.the-framework/control.jsonl`: the file the daemon appends steering to (stops, picks, chat messages) and the agent's process tails.
-[7] quota: The account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
-[8] Auto PM: The daemon's unattended product management: drain the agent queue, and refill it by running the routines.
-[9] relay: Running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
-[10] device: Another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
-[11] gate: A question with options at which an agent stops and waits for an answer: it emits the question in its turn's final message, the dashboard shows it as a card, and the answer re-prompts the agent.
-[12] pick: The answer to a gate: the option or options chosen, by the user or automatically.
-[13] run: Only the `logs` skill's record of one agent on the `agent-data` branch: a card (what was asked, the ticket, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said).
-[14] archive: The transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
-[15] the `agent-data` branch: The branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
-[16] spend offset: The user's adjustment of the quota boundary, in percentage points of the week.
-[17] preferences: The user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
-[18] prompt agent: One of the two kinds of agent: a prompt agent runs one prompt and stops there, while a build agent works the agent queue after its opening exchange.
-[19] cloud session: A Claude Code cloud session on claude.ai, the far end of a `web` agent.
+[7] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
+[8] Auto PM: the daemon's unattended product management: drain the agent queue, and refill it by running the routines.
+[9] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
+[10] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
+[11] gate: a question with options at which an agent stops and waits for an answer: it emits the question in its turn's final message, the dashboard shows it as a card, and the answer re-prompts the agent.
+[12] pick: the answer to a gate: the option or options chosen, by the user or automatically.
+[13] run: only the `logs` skill's record of one agent on the `agent-data` branch: a card (what was asked, the ticket, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said).
+[14] archive: the transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
+[15] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
+[16] spend offset: the user's adjustment of the quota boundary, in percentage points of the week.
+[17] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
+[18] prompt agent: one of the two kinds of agent: a prompt agent runs one prompt and stops there, while a build agent works the agent queue after its opening exchange.
+[19] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
 
 ## Business logic — TL;DR
 

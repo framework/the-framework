@@ -8,12 +8,12 @@ Checks, before a checkout [1] is spent on an agent [2], that the chosen driver's
 
 ## Glossary
 
-[1] checkout: An agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
-[2] agent: The unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
-[3] driver: A coding agent wrapped as a black box. The user's driver choice is `claude` or `codex`.
-[4] coding agent: The CLI doing the actual work: Claude Code or Codex.
-[5] handoff: What happens to an agent's work when the agent ends, as one ladder of four levels: `local`, `push`, `pr` (also open a pull request — the default), `merge` (also merge it).
-[6] preflight: The check that the chosen driver's coding agent can start an agent, run before a checkout is spent.
+[1] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
+[2] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[3] driver: a coding agent wrapped as a black box. The user's driver choice is `claude` or `codex`.
+[4] coding agent: the CLI doing the actual work: Claude Code or Codex.
+[5] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local`, `push`, `pr` (also open a pull request — the default), `merge` (also merge it).
+[6] preflight: the check that the chosen driver's coding agent can start an agent, run before a checkout is spent.
 
 ## Business logic — TL;DR
 

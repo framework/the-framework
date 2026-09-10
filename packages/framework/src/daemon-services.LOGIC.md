@@ -8,30 +8,30 @@ Everything the daemon runs in the background beside serving the dashboard, wired
 
 ## Glossary
 
-[1] sweep: A background job the daemon runs on its clock: Auto PM, the CI watch, the notification watchers, the sweep that reclaims checkouts (the daemon's log calls it the "worktree sweep"), the branch-links sweep, the cloud scratch sweep, cloud work adoption.
-[2] reclaim: Removing a finished agent's checkout once its work is on the remote.
-[3] checkout: An agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
-[4] the `agent-data` branch: The branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
-[5] CI watch: The sweep that merges the pull requests The Framework opened once their checks pass, and starts a fix agent when a check goes red.
-[6] Auto PM: The daemon's unattended product management: drain the agent queue, and refill it by running the routines.
-[7] agent: The unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
-[8] cloud session: A Claude Code cloud session on claude.ai, the far end of a `web` agent.
-[9] tick: One beat of the daemon's single background clock; each sweep says how many ticks it waits between turns.
-[10] preferences: The user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
-[11] unattended: Said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
-[12] quota boundary: The share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
-[13] claim: A ticket's lock file naming the holder working it, so two agents never work the same ticket.
-[14] routine lock: A file on the `agent-data` branch (`routines/<name>.lock.md`) a daemon takes before running a routine so the routine runs once across machines.
+[1] sweep: a background job the daemon runs on its clock: Auto PM, the CI watch, the notification watchers, the sweep that reclaims checkouts (the daemon's log calls it the "worktree sweep"), the branch-links sweep, the cloud scratch sweep, cloud work adoption.
+[2] reclaim: removing a finished agent's checkout once its work is on the remote.
+[3] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
+[4] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
+[5] CI watch: the sweep that merges the pull requests The Framework opened once their checks pass, and starts a fix agent when a check goes red.
+[6] Auto PM: the daemon's unattended product management: drain the agent queue, and refill it by running the routines.
+[7] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
+[8] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
+[9] tick: one beat of the daemon's single background clock; each sweep says how many ticks it waits between turns.
+[10] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
+[11] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
+[12] quota boundary: the share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
+[13] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
+[14] routine lock: a file on the `agent-data` branch (`routines/<name>.lock.md`) a daemon takes before running a routine so the routine runs once across machines.
 [15] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down. An item on it is a queue entry.
 [16] the repo file: `the-framework.yml` at a project's root: per-repo defaults that travel with the code.
-[17] quota: The account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
-[18] routine: A preset the daemon fires on its own on a schedule — update tickets, triage quick, triage consensual, plan tickets, maintenance — each switchable off and runnable on demand.
-[19] fan-out: Starting several agents at once, one per queue entry or one per ticket to plan.
-[20] drain: Starting an agent on the agent queue's first open entry — the half of Auto PM that spends existing work.
-[21] agent id: An agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
-[22] handoff: What happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it).
-[23] intervention: Something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds. The other is activity: an agent started or finished.
-[24] holder: Who a claim names: the agent's id when the daemon started the agent, else the branch the `tickets` command ran on.
+[17] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
+[18] routine: a preset the daemon fires on its own on a schedule — update tickets, triage quick, triage consensual, plan tickets, maintenance — each switchable off and runnable on demand.
+[19] fan-out: starting several agents at once, one per queue entry or one per ticket to plan.
+[20] drain: starting an agent on the agent queue's first open entry — the half of Auto PM that spends existing work.
+[21] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
+[22] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it).
+[23] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds. The other is activity: an agent started or finished.
+[24] holder: who a claim names: the agent's id when the daemon started the agent, else the branch the `tickets` command ran on.
 
 ## Business logic — TL;DR
 

@@ -6,13 +6,13 @@ Keeps an agent's [1] process alive while the agent is parked on a gate [2], or o
 
 ## Glossary
 
-[1] agent: The unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
-[2] gate: A question with options at which an agent stops and waits for an answer: it emits the question in its turn's final message, the dashboard shows it as a card, and the answer re-prompts the agent. When nobody can answer, the recommended option is taken.
-[3] turn: One prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
-[4] live chat: The user's own messages to a running agent, each continuing the same driver session. One of them is a message.
-[5] coding agent: The CLI doing the actual work: Claude Code or Codex.
+[1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
+[2] gate: a question with options at which an agent stops and waits for an answer: it emits the question in its turn's final message, the dashboard shows it as a card, and the answer re-prompts the agent. When nobody can answer, the recommended option is taken.
+[3] turn: one prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
+[4] live chat: the user's own messages to a running agent, each continuing the same driver session. One of them is a message.
+[5] coding agent: the CLI doing the actual work: Claude Code or Codex.
 [6] control file: `.the-framework/control.jsonl`: the file the daemon appends steering to (stops, picks, chat messages) and the agent's process tails.
-[7] pick: The answer to a gate: the option or options chosen, by the user or automatically.
+[7] pick: the answer to a gate: the option or options chosen, by the user or automatically.
 
 ## Business logic — TL;DR
 

@@ -2,11 +2,11 @@ Picks the driver [1] implementation for an agent [2] from its location [3], on t
 
 ## Glossary
 
-[1] driver: A coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later. The user's driver choice is `claude` or `codex`; the driver implementations are `claude-code`, `codex`, `github-actions`, `claude-web` and `fake`.
-[2] agent: The unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
-[3] location: Where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
-[4] cloud session: A Claude Code cloud session on claude.ai, the far end of a `web` agent.
-[5] coding agent: The CLI doing the actual work: Claude Code or Codex.
+[1] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later. The user's driver choice is `claude` or `codex`; the driver implementations are `claude-code`, `codex`, `github-actions`, `claude-web` and `fake`.
+[2] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[3] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
+[4] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
+[5] coding agent: the CLI doing the actual work: Claude Code or Codex.
 
 ## Business logic — TL;DR
 

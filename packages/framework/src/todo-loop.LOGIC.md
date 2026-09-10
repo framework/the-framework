@@ -10,30 +10,30 @@ Works the agent queue [1] once a build agent's [2] opening work settles, as the 
 
 [1] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down. An item on it is a queue entry.
 [2] build agent: one of the two kinds of agent: a build works the agent queue after its opening exchange; a prompt agent runs one prompt and stops there.
-[3] backlog loop: After a build agent's opening work settles, the loop that works the agent queue one entry per turn until it is empty.
+[3] backlog loop: after a build agent's opening work settles, the loop that works the agent queue one entry per turn until it is empty.
 [4] queue entry: an item on the agent queue.
-[5] the `agent-data` branch: The branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks. Born as an orphan, written through one sync → commit → push cycle.
-[6] agent: The unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
-[7] drain: Starting an agent on the agent queue's first open entry — the half of Auto PM that spends existing work.
-[8] the Overview: The dashboard's cross-project page at `/`.
+[5] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks. Born as an orphan, written through one sync → commit → push cycle.
+[6] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
+[7] drain: starting an agent on the agent queue's first open entry — the half of Auto PM that spends existing work.
+[8] the Overview: the dashboard's cross-project page at `/`.
 [9] autopilot: the dashboard's switch that accepts a gate's recommended option for the user after a countdown.
-[10] unattended: Said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles. The opposite is attended.
-[11] checkout: An agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
-[12] skill: One of the four capabilities an agent is taught — `branches`, `tickets`, `queue`, `logs` — each a package with the instructions the agent reads, a command on the agent's PATH, and an API the product calls.
-[13] stop: Ending an agent before it finishes: the Stop button, Ctrl-C, or a pick marked to stop.
-[14] turn: One prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
-[15] hands-off: Said of an agent whose work leaves this machine, so its first prompt is the whole agent: an agent whose location is `web`.
-[16] driver session: The coding agent's own conversation for one agent, which the driver can resume by its session id.
-[17] event stream: Everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface (dashboard, terminal, archive, run) is a projection of it.
-[18] turn signals: What The Framework reads off a turn's final message: the ready-for-merge signal, the pull request title and body, markdown views, reported errors, and the gate it stops at.
-[19] ready for merge: The signal an agent emits when it believes its work is complete: it flips the agent's badge from building to ready and authorizes the handoff.
-[20] gate: A question with options at which an agent stops and waits for an answer: it emits the question in its turn's final message, the dashboard shows it as a card, and the answer re-prompts the agent. When nobody can answer, the recommended option is taken.
-[21] pick: The answer to a gate: the option or options chosen, by the user or automatically.
-[22] await limit: The cap on consecutive gates within one exchange; an agent still asking past it finishes with its latest turn.
-[23] handoff: What happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it).
-[24] sweep: A background job the daemon runs on its clock: Auto PM, the CI watch, the notification watchers, the sweep that reclaims checkouts, the branch-links sweep, the cloud scratch sweep, cloud work adoption.
-[25] routine: A preset the daemon fires on its own on a schedule — update tickets, triage quick, triage consensual, plan tickets, maintenance — each switchable off and runnable on demand.
-[26] session name: The name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
+[10] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles. The opposite is attended.
+[11] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
+[12] skill: one of the four capabilities an agent is taught — `branches`, `tickets`, `queue`, `logs` — each a package with the instructions the agent reads, a command on the agent's PATH, and an API the product calls.
+[13] stop: ending an agent before it finishes: the Stop button, Ctrl-C, or a pick marked to stop.
+[14] turn: one prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
+[15] hands-off: said of an agent whose work leaves this machine, so its first prompt is the whole agent: an agent whose location is `web`.
+[16] driver session: the coding agent's own conversation for one agent, which the driver can resume by its session id.
+[17] event stream: everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface (dashboard, terminal, archive, run) is a projection of it.
+[18] turn signals: what The Framework reads off a turn's final message: the ready-for-merge signal, the pull request title and body, markdown views, reported errors, and the gate it stops at.
+[19] ready for merge: the signal an agent emits when it believes its work is complete: it flips the agent's badge from building to ready and authorizes the handoff.
+[20] gate: a question with options at which an agent stops and waits for an answer: it emits the question in its turn's final message, the dashboard shows it as a card, and the answer re-prompts the agent. When nobody can answer, the recommended option is taken.
+[21] pick: the answer to a gate: the option or options chosen, by the user or automatically.
+[22] await limit: the cap on consecutive gates within one exchange; an agent still asking past it finishes with its latest turn.
+[23] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it).
+[24] sweep: a background job the daemon runs on its clock: Auto PM, the CI watch, the notification watchers, the sweep that reclaims checkouts, the branch-links sweep, the cloud scratch sweep, cloud work adoption.
+[25] routine: a preset the daemon fires on its own on a schedule — update tickets, triage quick, triage consensual, plan tickets, maintenance — each switchable off and runnable on demand.
+[26] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
 
 ## Business logic — TL;DR
 

@@ -8,9 +8,9 @@ Holds what the daemon can actually deliver a notification on, as one shared answ
 
 ## Glossary
 
-[1] preferences: The user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
+[1] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 [2] Settings: the settings page.
-[3] the Overview: The dashboard's cross-project page at `/`.
+[3] the Overview: the dashboard's cross-project page at `/`.
 
 ## Business logic — TL;DR
 

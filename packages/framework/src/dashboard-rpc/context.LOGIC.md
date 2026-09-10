@@ -6,17 +6,17 @@ Gives every call the dashboard makes the daemon's own capabilities, wired once w
 
 ## Glossary
 
-[1] checkout: An agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
-[2] agent: The unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
-[3] preferences: The user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
-[4] quota: The account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
-[5] Auto PM: The daemon's unattended product management: drain the agent queue, and refill it by running the routines.
-[6] sweep: A background job the daemon runs on its clock: Auto PM, the CI watch, the notification watchers, the sweep that reclaims checkouts, the branch-links sweep, the cloud scratch sweep, cloud work adoption.
-[7] the Claude web bridge: The daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge browser is the Chrome for Testing the daemon runs for it.
-[8] relay: Running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
-[9] device: Another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
-[10] event stream: Everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface (dashboard, terminal, archive, run) is a projection of it.
-[11] agent id: An agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
+[1] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
+[2] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
+[3] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
+[4] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
+[5] Auto PM: the daemon's unattended product management: drain the agent queue, and refill it by running the routines.
+[6] sweep: a background job the daemon runs on its clock: Auto PM, the CI watch, the notification watchers, the sweep that reclaims checkouts, the branch-links sweep, the cloud scratch sweep, cloud work adoption.
+[7] the Claude web bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge browser is the Chrome for Testing the daemon runs for it.
+[8] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
+[9] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
+[10] event stream: everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface (dashboard, terminal, archive, run) is a projection of it.
+[11] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
 
 ## Business logic — TL;DR
 

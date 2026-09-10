@@ -2,7 +2,7 @@ Posts one message to a Discord webhook, the transport both notification feeds sh
 
 ## Glossary
 
-[1] intervention: Something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds. The other is activity: an agent started or finished.
+[1] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds. The other is activity: an agent started or finished.
 
 ## Business logic — TL;DR
 

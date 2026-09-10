@@ -34,7 +34,7 @@ See `## Context`.
 
 The page shows the ticket's title as its heading, its summary beneath, and then the ticket's entire content rendered as markdown. A back control returns to the list the ticket was opened from.
 
-The ticket is re-read every 10 seconds, so a ticket an agent [2] edits, claims [3] or plans updates while the user is reading it. Before the first read the page reads "Loading…". A ticket that does not exist — deleted between the list and this read, or a hand-typed address — reads "This ticket does not exist." rather than an empty page.
+The ticket is re-read every 10 seconds, so a ticket an agent [2] edits, claims [3] or plans is updated on screen while the user is reading it. Before the first read the page reads "Loading…". A ticket that does not exist — deleted between the list and this read, or a hand-typed address — reads "This ticket does not exist." rather than an empty page.
 
 ### What is known about the ticket
 

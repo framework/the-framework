@@ -2,5 +2,5 @@ Fixes the one color vocabulary for an agent's [1] status word, so the same statu
 
 ## Glossary
 
-[1] agent: The unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
-[2] stop: Ending an agent before it finishes: the Stop button, Ctrl-C, or a pick marked to stop.
+[1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[2] stop: ending an agent before it finishes: the Stop button, Ctrl-C, or a pick marked to stop.

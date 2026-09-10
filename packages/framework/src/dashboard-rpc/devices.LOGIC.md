@@ -2,8 +2,8 @@ The health check behind the status dots of the saved devices [1]: the browser ke
 
 ## Glossary
 
-[1] device: Another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
-[2] relay: Running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
+[1] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
+[2] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
 
 ## Business logic — TL;DR
 

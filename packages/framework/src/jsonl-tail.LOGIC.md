@@ -6,11 +6,11 @@ Follows an append-only JSONL file, one JSON value per line, delivering each comp
 
 ## Glossary
 
-[1] agent: The unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
-[2] event stream: Everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface (dashboard, terminal, archive, run) is a projection of it.
+[1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[2] event stream: everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface (dashboard, terminal, archive, run) is a projection of it.
 [3] control file: `.the-framework/control.jsonl`: the file the daemon appends steering to (stops, picks, chat messages) and the agent's process tails.
-[4] checkout: An agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
-[5] archive: The transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
+[4] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
+[5] archive: the transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
 
 ## Business logic — TL;DR
 

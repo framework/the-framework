@@ -8,13 +8,13 @@ Computes the quota boundary [1]: the share of the account's quota [2] week that 
 
 ## Glossary
 
-[1] quota boundary: The share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
-[2] quota: The account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
-[3] coding agent: The CLI doing the actual work: Claude Code or Codex.
-[4] spend offset: The user's adjustment of the quota boundary, in percentage points of the week.
-[5] unattended: Said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
-[6] Auto PM: The daemon's unattended product management: drain the agent queue, and refill it by running the routines.
-[7] agent: The unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
+[1] quota boundary: the share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
+[2] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
+[3] coding agent: the CLI doing the actual work: Claude Code or Codex.
+[4] spend offset: the user's adjustment of the quota boundary, in percentage points of the week.
+[5] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
+[6] Auto PM: the daemon's unattended product management: drain the agent queue, and refill it by running the routines.
+[7] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
 
 ## Business logic — TL;DR
 

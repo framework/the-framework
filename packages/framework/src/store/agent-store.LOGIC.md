@@ -11,44 +11,44 @@ Keeps on disk everything The Framework itself knows about one agent [1]: the age
 
 ## Glossary
 
-[1] agent: The unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
-[2] event stream: Everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface (dashboard, terminal, archive, run) is a projection of it.
-[3] checkout: An agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch. Also "the `agent-data` branch's checkout". The user's own working copy is "the project's checkout" or "the user's checkout".
+[1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
+[2] event stream: everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface (dashboard, terminal, archive, run) is a projection of it.
+[3] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch. Also "the `agent-data` branch's checkout". The user's own working copy is "the project's checkout" or "the user's checkout".
 [4] status snapshot: `.the-framework/agent.json` in an agent's checkout: the agent's current state as one small JSON document, folded from its event stream, so that reading an agent's status never means replaying the stream.
-[5] archive: The transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
-[6] run: Only the `logs` skill's record of one agent on the `agent-data` branch: a card (what was asked, the ticket, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said). Never the unit of work.
-[7] skill: One of the four capabilities an agent is taught — `branches`, `tickets`, `queue`, `logs` — each a package with the instructions the agent reads (its `SKILL.md`, linked into the checkout where the coding agent's harness looks for skills), a command on the agent's PATH, and an API the product calls.
-[8] the `agent-data` branch: The branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks. Born as an orphan, written through one sync → commit → push cycle.
-[9] coding agent: The CLI doing the actual work: Claude Code or Codex.
-[10] the Overview: The dashboard's cross-project page at `/`.
-[11] stop: Ending an agent before it finishes: the Stop button, Ctrl-C, or a pick marked to stop.
-[12] reclaim: Removing a finished agent's checkout once its work is on the remote.
-[13] agent id: An agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
-[14] location: Where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session). On the status snapshot a fourth value, `remote`, marks an agent relayed to a device.
-[15] relay: Running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
+[5] archive: the transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
+[6] run: only the `logs` skill's record of one agent on the `agent-data` branch: a card (what was asked, the ticket, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said). Never the unit of work.
+[7] skill: one of the four capabilities an agent is taught — `branches`, `tickets`, `queue`, `logs` — each a package with the instructions the agent reads (its `SKILL.md`, linked into the checkout where the coding agent's harness looks for skills), a command on the agent's PATH, and an API the product calls.
+[8] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks. Born as an orphan, written through one sync → commit → push cycle.
+[9] coding agent: the CLI doing the actual work: Claude Code or Codex.
+[10] the Overview: the dashboard's cross-project page at `/`.
+[11] stop: ending an agent before it finishes: the Stop button, Ctrl-C, or a pick marked to stop.
+[12] reclaim: removing a finished agent's checkout once its work is on the remote.
+[13] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
+[14] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session). On the status snapshot a fourth value, `remote`, marks an agent relayed to a device.
+[15] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
 [16] surrogate end: the end event The Framework writes on behalf of an agent whose process died without reporting one, so the agent ends as `stopped` like any other.
-[17] gate: A question with options at which an agent stops and waits for an answer: it emits the question in its turn's final message, the dashboard shows it as a card, and the answer re-prompts the agent. When nobody can answer, the recommended option is taken.
+[17] gate: a question with options at which an agent stops and waits for an answer: it emits the question in its turn's final message, the dashboard shows it as a card, and the answer re-prompts the agent. When nobody can answer, the recommended option is taken.
 [18] crash rescue: ending an agent whose status snapshot says `running` while the process that owned it is gone, so it stops showing as live and keeps its history; done on read for a provably dead process, and at daemon boot for every process the daemon cannot find.
-[19] driver session: The coding agent's own conversation for one agent, which the driver can resume by its session id.
-[20] turn: One prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
-[21] pick: The answer to a gate: the option or options chosen, by the user or automatically.
-[22] handoff: What happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it). "Handoff level" is a rung of that ladder.
-[23] settled: Said of an agent whose work has stopped and which is waiting for the user: it is alive, takes messages, and does nothing until told.
-[24] sweep: A background job the daemon runs on its clock: Auto PM, the CI watch, the notification watchers, the sweep that reclaims checkouts (the daemon's log calls it the "worktree sweep"), the branch-links sweep, the cloud scratch sweep, cloud work adoption.
-[25] driver: A coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later. The user's driver choice is `claude` or `codex`; the driver implementations are `claude-code`, `codex`, `github-actions`, `claude-web` and `fake`.
+[19] driver session: the coding agent's own conversation for one agent, which the driver can resume by its session id.
+[20] turn: one prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
+[21] pick: the answer to a gate: the option or options chosen, by the user or automatically.
+[22] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it). "Handoff level" is a rung of that ladder.
+[23] settled: said of an agent whose work has stopped and which is waiting for the user: it is alive, takes messages, and does nothing until told.
+[24] sweep: a background job the daemon runs on its clock: Auto PM, the CI watch, the notification watchers, the sweep that reclaims checkouts (the daemon's log calls it the "worktree sweep"), the branch-links sweep, the cloud scratch sweep, cloud work adoption.
+[25] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later. The user's driver choice is `claude` or `codex`; the driver implementations are `claude-code`, `codex`, `github-actions`, `claude-web` and `fake`.
 [26] leg: one process's stretch of an agent's life: a fresh agent has one leg, and a continued agent one more per continuation, each leg writing into the same agent.
-[27] ready for merge: The signal an agent emits when it believes its work is complete: it flips the agent's badge from building to ready and authorizes the handoff.
-[28] drain: Starting an agent on the agent queue's first open entry — the half of Auto PM that spends existing work.
-[29] claim: A ticket's lock file naming the holder working it, so two agents never work the same ticket.
-[30] CI watch: The sweep that merges the pull requests The Framework opened once their checks pass, and starts a fix agent when a check goes red.
-[31] session name: The name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
-[32] cloud anchor: An empty commit a web agent pushes before its task leaves this machine, unique to the agent: the branch the cloud session later pushes descends from it, which is how the daemon recognises that branch as the agent's (cloud work adoption).
-[33] hands-off: Said of an agent whose work leaves this machine, so its first prompt is the whole agent: an agent whose location is `web`.
-[34] agent view: One agent's page.
-[35] build agent / prompt agent: The two kinds of agent: a build works the agent queue after its opening exchange; a prompt agent runs one prompt and stops there.
-[36] the Claude web bridge: The daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge token is the secret the extension presents; the bridge browser is the Chrome for Testing the daemon runs for it; the Driver tab is the extension's one pinned tab that reads claude.ai's session list, visits sessions and types answers.
-[37] cloud session: A Claude Code cloud session on claude.ai, the far end of a `web` agent.
-[38] device: Another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
+[27] ready for merge: the signal an agent emits when it believes its work is complete: it flips the agent's badge from building to ready and authorizes the handoff.
+[28] drain: starting an agent on the agent queue's first open entry — the half of Auto PM that spends existing work.
+[29] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
+[30] CI watch: the sweep that merges the pull requests The Framework opened once their checks pass, and starts a fix agent when a check goes red.
+[31] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
+[32] cloud anchor: an empty commit a web agent pushes before its task leaves this machine, unique to the agent: the branch the cloud session later pushes descends from it, which is how the daemon recognises that branch as the agent's (cloud work adoption).
+[33] hands-off: said of an agent whose work leaves this machine, so its first prompt is the whole agent: an agent whose location is `web`.
+[34] agent view: one agent's page.
+[35] build agent / prompt agent: the two kinds of agent: a build works the agent queue after its opening exchange; a prompt agent runs one prompt and stops there.
+[36] the Claude web bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge token is the secret the extension presents; the bridge browser is the Chrome for Testing the daemon runs for it; the Driver tab is the extension's one pinned tab that reads claude.ai's session list, visits sessions and types answers.
+[37] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
+[38] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 [39] control file: `.the-framework/control.jsonl`: the file the daemon appends steering to (stops, picks, chat messages) and the agent's process tails.
 
 ## Business logic — TL;DR

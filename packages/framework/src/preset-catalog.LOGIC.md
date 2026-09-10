@@ -8,21 +8,21 @@ Holds every built-in preset in one table: fifteen rows, each naming the preset, 
 
 ## Glossary
 
-[1] launcher: The Start form on project home, a project's own page.
-[2] agent: The unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
-[3] drain: Starting an agent on the agent queue's first open entry — the half of Auto PM that spends existing work.
+[1] launcher: the Start form on project home, a project's own page.
+[2] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
+[3] drain: starting an agent on the agent queue's first open entry — the half of Auto PM that spends existing work.
 [4] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down. An item on it is a queue entry.
-[5] composer: The prompt editor on project home, also used for live chat.
-[6] agent view: One agent's page in the dashboard.
-[7] session name: The name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
-[8] routine: A preset the daemon fires on its own on a schedule — update tickets, triage quick, triage consensual, plan tickets, maintenance — each switchable off and runnable on demand.
-[9] prompt agent: An agent that runs one prompt and stops there; a build agent works the agent queue after its opening exchange.
-[10] gate: A question with options at which an agent stops and waits for an answer: it emits the question in its turn's final message, the dashboard shows it as a card, and the answer re-prompts the agent. When nobody can answer, the recommended option is taken.
-[11] routine lock: A file on the `agent-data` branch (`routines/<name>.lock.md`) a daemon takes before running a routine so the routine runs once across machines.
-[12] driver session: The coding agent's own conversation for one agent, which the driver can resume by its session id.
-[13] the Overview: The dashboard's cross-project page at `/`.
-[14] unattended: Said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
-[15] the `agent-data` branch: The branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
+[5] composer: the prompt editor on project home, also used for live chat.
+[6] agent view: one agent's page in the dashboard.
+[7] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
+[8] routine: a preset the daemon fires on its own on a schedule — update tickets, triage quick, triage consensual, plan tickets, maintenance — each switchable off and runnable on demand.
+[9] prompt agent: an agent that runs one prompt and stops there; a build agent works the agent queue after its opening exchange.
+[10] gate: a question with options at which an agent stops and waits for an answer: it emits the question in its turn's final message, the dashboard shows it as a card, and the answer re-prompts the agent. When nobody can answer, the recommended option is taken.
+[11] routine lock: a file on the `agent-data` branch (`routines/<name>.lock.md`) a daemon takes before running a routine so the routine runs once across machines.
+[12] driver session: the coding agent's own conversation for one agent, which the driver can resume by its session id.
+[13] the Overview: the dashboard's cross-project page at `/`.
+[14] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
+[15] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
 
 ## Business logic — TL;DR
 

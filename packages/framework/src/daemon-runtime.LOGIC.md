@@ -8,32 +8,32 @@ What the daemon does for a project: starting an agent [1] (the project it is for
 
 ## Glossary
 
-[1] agent: The unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
-[2] preflight: The check that the chosen driver's coding agent can start an agent, run before a checkout is spent.
-[3] checkout: An agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch. The user's own working copy is "the project's checkout" or "the user's checkout".
-[4] agent spec: The one JSON file the daemon hands a spawned agent process with its whole configuration.
-[5] run: Only the `logs` skill's record of one agent on the `agent-data` branch: a card (what was asked, the ticket, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said).
-[6] reclaim: Removing a finished agent's checkout once its work is on the remote.
-[7] relay: Running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
-[8] device: Another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
-[9] event stream: Everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface (dashboard, terminal, archive, run) is a projection of it.
+[1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
+[2] preflight: the check that the chosen driver's coding agent can start an agent, run before a checkout is spent.
+[3] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch. The user's own working copy is "the project's checkout" or "the user's checkout".
+[4] agent spec: the one JSON file the daemon hands a spawned agent process with its whole configuration.
+[5] run: only the `logs` skill's record of one agent on the `agent-data` branch: a card (what was asked, the ticket, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said).
+[6] reclaim: removing a finished agent's checkout once its work is on the remote.
+[7] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
+[8] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
+[9] event stream: everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface (dashboard, terminal, archive, run) is a projection of it.
 [10] control file: `.the-framework/control.jsonl`: the file the daemon appends steering to (stops, picks, chat messages) and the agent's process tails.
-[11] skill: One of the four capabilities an agent is taught — `branches`, `tickets`, `queue`, `logs` — each a package with the instructions the agent reads (its `SKILL.md`, linked into the checkout where the coding agent's harness looks for skills), a command on the agent's PATH, and an API the product calls.
-[12] driver: A coding agent wrapped as a black box. The user's driver choice is `claude` or `codex`.
-[13] the `agent-data` branch: The branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
-[14] unattended: Said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
-[15] sweep: A background job the daemon runs on its clock: Auto PM, the CI watch, the notification watchers, the sweep that reclaims checkouts (the daemon's log calls it the "worktree sweep"), the branch-links sweep, the cloud scratch sweep, cloud work adoption.
-[16] handoff: What happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it).
-[17] archive: The transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
-[18] coding agent: The CLI doing the actual work: Claude Code or Codex.
-[19] location: Where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
-[20] driver session: The coding agent's own conversation for one agent, which the driver can resume by its session id.
-[21] preferences: The user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
+[11] skill: one of the four capabilities an agent is taught — `branches`, `tickets`, `queue`, `logs` — each a package with the instructions the agent reads (its `SKILL.md`, linked into the checkout where the coding agent's harness looks for skills), a command on the agent's PATH, and an API the product calls.
+[12] driver: a coding agent wrapped as a black box. The user's driver choice is `claude` or `codex`.
+[13] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
+[14] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
+[15] sweep: a background job the daemon runs on its clock: Auto PM, the CI watch, the notification watchers, the sweep that reclaims checkouts (the daemon's log calls it the "worktree sweep"), the branch-links sweep, the cloud scratch sweep, cloud work adoption.
+[16] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it).
+[17] archive: the transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
+[18] coding agent: the CLI doing the actual work: Claude Code or Codex.
+[19] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
+[20] driver session: the coding agent's own conversation for one agent, which the driver can resume by its session id.
+[21] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 [22] the repo file: `the-framework.yml` at a project's root: per-repo defaults that travel with the code.
-[23] session name: The name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
-[24] claim: A ticket's lock file naming the holder working it, so two agents never work the same ticket.
-[25] agent id: An agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
-[26] cloud session: A Claude Code cloud session on claude.ai, the far end of a `web` agent.
+[23] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
+[24] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
+[25] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
+[26] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
 
 ## Business logic — TL;DR
 

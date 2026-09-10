@@ -2,7 +2,7 @@ The browser's typed stubs for the preferences [1] that Settings [2] and the laun
 
 ## Glossary
 
-[1] preferences: The user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
+[1] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 [2] Settings: the settings page.
 [3] launcher: the Start form on a project's own page (the project home).
 

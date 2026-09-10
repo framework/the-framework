@@ -3,9 +3,9 @@ Fixes the one wording of the ask for a ticket's plan, "Create tickets/<stem>.pla
 ## Glossary
 
 [1] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down. An item on it is a queue entry.
-[2] agent: The unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[2] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
 [3] queue entry: an item on the agent queue.
-[4] drain: Starting an agent on the agent queue's first open entry — the half of Auto PM that spends existing work.
+[4] drain: starting an agent on the agent queue's first open entry — the half of Auto PM that spends existing work.
 
 ## Business logic — TL;DR
 

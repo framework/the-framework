@@ -2,9 +2,9 @@ Fixes the handoff [1] as one ladder of four rungs, `local` < `push` < `pr` < `me
 
 ## Glossary
 
-[1] handoff: What happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it). "Handoff level" is a rung of that ladder.
-[2] agent: The unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
-[3] preferences: The user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
+[1] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it). "Handoff level" is a rung of that ladder.
+[2] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[3] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 [4] the repo file: `the-framework.yml` at a project's root: per-repo defaults that travel with the code.
 
 ## Business logic — TL;DR

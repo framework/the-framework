@@ -2,14 +2,14 @@ The browser's typed stubs for what the dashboard asks the daemon about projects:
 
 ## Glossary
 
-[1] preflight: The check that the chosen driver's coding agent can start an agent, run before a checkout is spent.
-[2] driver: A coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later. The user's driver choice is `claude` or `codex`.
+[1] preflight: the check that the chosen driver's coding agent can start an agent, run before a checkout is spent.
+[2] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later. The user's driver choice is `claude` or `codex`.
 [3] launcher: the Start form on a project's own page (the project home).
 [4] the repo file: `the-framework.yml` at a project's root: per-repo defaults that travel with the code.
-[5] sweep: A background job the daemon runs on its clock: Auto PM, the CI watch, the notification watchers, the sweep that reclaims checkouts, the branch-links sweep, the cloud scratch sweep, cloud work adoption.
-[6] handoff: What happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it). "Handoff level" is a rung of that ladder.
-[7] CI watch: The sweep that merges the pull requests The Framework opened once their checks pass, and starts a fix agent when a check goes red.
-[8] coding agent: The CLI doing the actual work: Claude Code or Codex.
+[5] sweep: a background job the daemon runs on its clock: Auto PM, the CI watch, the notification watchers, the sweep that reclaims checkouts, the branch-links sweep, the cloud scratch sweep, cloud work adoption.
+[6] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it). "Handoff level" is a rung of that ladder.
+[7] CI watch: the sweep that merges the pull requests The Framework opened once their checks pass, and starts a fix agent when a check goes red.
+[8] coding agent: the CLI doing the actual work: Claude Code or Codex.
 
 ## Business logic — TL;DR
 

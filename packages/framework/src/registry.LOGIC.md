@@ -9,29 +9,29 @@ Keeps the one file The Framework owns for the user, the registry [1] at `~/.the-
 ## Glossary
 
 [1] registry: `~/.the-framework.json`, the file that keeps the preferences [2] and also lists the projects.
-[2] preferences: The user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
+[2] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 [3] Settings: the settings page.
 [4] launcher: the Start form on a project's own page.
-[5] agent: The unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
-[6] vanilla: An agent started without the built-in system prompt but with the signal protocols kept.
-[7] ready for merge: The signal an agent emits when it believes its work is complete: it flips the agent's badge from building to ready and authorizes the handoff.
-[8] transparent: An agent started with nothing of The Framework's — the raw coding agent.
-[9] intervention: Something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds. The other is activity: an agent started or finished.
-[10] Auto PM: The daemon's unattended product management: drain the agent queue, and refill it by running the routines.
-[11] the bridge: The daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge token is the secret the extension presents; the bridge browser is the Chrome for Testing the daemon runs for it.
-[12] the Overview: The dashboard's cross-project page at `/`.
-[13] coding agent: The CLI doing the actual work: Claude Code or Codex.
-[14] driver: A coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later. The user's driver choice is `claude` or `codex`.
-[15] location: Where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
-[16] handoff: What happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it).
-[17] spend offset: The user's adjustment of the quota boundary, in percentage points of the week.
-[18] quota: The account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
-[19] unattended: Said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
-[20] quota boundary: The share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
-[21] routine: A preset the daemon fires on its own on a schedule — update tickets, triage quick, triage consensual, plan tickets, maintenance — each switchable off and runnable on demand.
-[22] drain: Starting an agent on the agent queue's first open entry — the half of Auto PM that spends existing work.
-[23] fan-out: Starting several agents at once, one per queue entry or one per ticket to plan.
-[24] tick: One beat of the daemon's single background clock; each sweep says how many ticks it waits between turns.
+[5] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
+[6] vanilla: an agent started without the built-in system prompt but with the signal protocols kept.
+[7] ready for merge: the signal an agent emits when it believes its work is complete: it flips the agent's badge from building to ready and authorizes the handoff.
+[8] transparent: an agent started with nothing of The Framework's — the raw coding agent.
+[9] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds. The other is activity: an agent started or finished.
+[10] Auto PM: the daemon's unattended product management: drain the agent queue, and refill it by running the routines.
+[11] the bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge token is the secret the extension presents; the bridge browser is the Chrome for Testing the daemon runs for it.
+[12] the Overview: the dashboard's cross-project page at `/`.
+[13] coding agent: the CLI doing the actual work: Claude Code or Codex.
+[14] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later. The user's driver choice is `claude` or `codex`.
+[15] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
+[16] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it).
+[17] spend offset: the user's adjustment of the quota boundary, in percentage points of the week.
+[18] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
+[19] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
+[20] quota boundary: the share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
+[21] routine: a preset the daemon fires on its own on a schedule — update tickets, triage quick, triage consensual, plan tickets, maintenance — each switchable off and runnable on demand.
+[22] drain: starting an agent on the agent queue's first open entry — the half of Auto PM that spends existing work.
+[23] fan-out: starting several agents at once, one per queue entry or one per ticket to plan.
+[24] tick: one beat of the daemon's single background clock; each sweep says how many ticks it waits between turns.
 
 ## Business logic — TL;DR
 

@@ -2,10 +2,10 @@ Derives a project's place on GitHub from its `origin` remote: the `https://githu
 
 ## Glossary
 
-[1] checkout: An agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch. The user's own working copy is the project's checkout.
-[2] agent: The unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
-[3] device: Another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
-[4] relay: Running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
+[1] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch. The user's own working copy is the project's checkout.
+[2] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[3] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
+[4] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
 
 ## Business logic — TL;DR
 

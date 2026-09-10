@@ -8,8 +8,8 @@ The daemon's one background clock: a single interval that fires every 30 seconds
 
 ## Glossary
 
-[1] sweep: A background job the daemon runs on its clock: Auto PM, the CI watch, the notification watchers, the sweep that reclaims checkouts (the daemon's log calls it the "worktree sweep"), the branch-links sweep, the cloud scratch sweep, cloud work adoption.
-[2] tick: One beat of the daemon's single background clock; each sweep says how many ticks it waits between turns.
+[1] sweep: a background job the daemon runs on its clock: Auto PM, the CI watch, the notification watchers, the sweep that reclaims checkouts (the daemon's log calls it the "worktree sweep"), the branch-links sweep, the cloud scratch sweep, cloud work adoption.
+[2] tick: one beat of the daemon's single background clock; each sweep says how many ticks it waits between turns.
 
 ## Business logic — TL;DR
 

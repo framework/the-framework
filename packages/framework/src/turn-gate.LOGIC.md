@@ -8,31 +8,31 @@ Reads the turn signals [1] off a turn's [2] final message, the one place The Fra
 
 ## Glossary
 
-[1] turn signals: What The Framework reads off a turn's final message: the ready-for-merge signal, the pull request title and body, markdown views, reported errors, and the gate it stops at.
-[2] turn: One prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
-[3] agent: The unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
-[4] view: A markdown document an agent pushes to the dashboard's right rail while it works.
-[5] ready for merge: The signal an agent emits when it believes its work is complete: it flips the agent's badge from building to ready and authorizes the handoff.
-[6] gate: A question with options at which an agent stops and waits for an answer: it emits the question in its turn's final message, the dashboard shows it as a card, and the answer re-prompts the agent. When nobody can answer, the recommended option is taken.
-[7] await limit: The cap on consecutive gates within one exchange; an agent still asking past it finishes with its latest turn.
-[8] driver: A coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later.
-[9] coding agent: The CLI doing the actual work: Claude Code or Codex.
-[10] the built-in system prompt: The standing instructions every agent starts with (`prompts/system_prompt.md`); `SYSTEM.md` is the project's own instructions added on top.
-[11] hands-off: Said of an agent whose work leaves this machine, so its first prompt is the whole agent: an agent whose location is `web`.
-[12] session name: The name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
-[13] pick: The answer to a gate: the option or options chosen, by the user or automatically.
-[14] cloud session: A Claude Code cloud session on claude.ai, the far end of a `web` agent.
-[15] vanilla: An agent started without the built-in system prompt but with the signal protocols kept.
-[16] stop: Ending an agent before it finishes: the Stop button, Ctrl-C, or a pick marked to stop.
-[17] skill: One of the four capabilities an agent is taught — `branches`, `tickets`, `queue`, `logs` — each a package with the instructions the agent reads, a command on the agent's PATH, and an API the product calls.
-[18] handoff: What happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it).
-[19] unattended: Said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
-[20] build agent / prompt agent: The two kinds of agent: a build works the agent queue after its opening exchange; a prompt agent runs one prompt and stops there.
-[21] backlog loop: After a build agent's opening work settles, the loop that works the agent queue one entry per turn until it is empty.
-[22] driver session: The coding agent's own conversation for one agent, which the driver can resume by its session id.
-[23] the bridge: The daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session.
-[24] live chat: The user's own messages to a running agent, each continuing the same driver session.
-[25] event: Everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface (dashboard, terminal, archive, run) is a projection of it.
+[1] turn signals: what The Framework reads off a turn's final message: the ready-for-merge signal, the pull request title and body, markdown views, reported errors, and the gate it stops at.
+[2] turn: one prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
+[3] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
+[4] view: a markdown document an agent pushes to the dashboard's right rail while it works.
+[5] ready for merge: the signal an agent emits when it believes its work is complete: it flips the agent's badge from building to ready and authorizes the handoff.
+[6] gate: a question with options at which an agent stops and waits for an answer: it emits the question in its turn's final message, the dashboard shows it as a card, and the answer re-prompts the agent. When nobody can answer, the recommended option is taken.
+[7] await limit: the cap on consecutive gates within one exchange; an agent still asking past it finishes with its latest turn.
+[8] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later.
+[9] coding agent: the CLI doing the actual work: Claude Code or Codex.
+[10] the built-in system prompt: the standing instructions every agent starts with (`prompts/system_prompt.md`); `SYSTEM.md` is the project's own instructions added on top.
+[11] hands-off: said of an agent whose work leaves this machine, so its first prompt is the whole agent: an agent whose location is `web`.
+[12] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
+[13] pick: the answer to a gate: the option or options chosen, by the user or automatically.
+[14] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
+[15] vanilla: an agent started without the built-in system prompt but with the signal protocols kept.
+[16] stop: ending an agent before it finishes: the Stop button, Ctrl-C, or a pick marked to stop.
+[17] skill: one of the four capabilities an agent is taught — `branches`, `tickets`, `queue`, `logs` — each a package with the instructions the agent reads, a command on the agent's PATH, and an API the product calls.
+[18] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it).
+[19] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
+[20] build agent / prompt agent: the two kinds of agent: a build works the agent queue after its opening exchange; a prompt agent runs one prompt and stops there.
+[21] backlog loop: after a build agent's opening work settles, the loop that works the agent queue one entry per turn until it is empty.
+[22] driver session: the coding agent's own conversation for one agent, which the driver can resume by its session id.
+[23] the bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session.
+[24] live chat: the user's own messages to a running agent, each continuing the same driver session.
+[25] event: everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface (dashboard, terminal, archive, run) is a projection of it.
 
 ## Business logic — TL;DR
 

@@ -8,12 +8,12 @@ Keeps a recent reading of the account's quota [1] on hand for the daemon: reads 
 
 ## Glossary
 
-[1] quota: The account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
-[2] driver: A coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later.
-[3] turn: One prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
-[4] unattended: Said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
-[5] quota boundary: The share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
-[6] coding agent: The CLI doing the actual work: Claude Code or Codex.
+[1] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
+[2] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later.
+[3] turn: one prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
+[4] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
+[5] quota boundary: the share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
+[6] coding agent: the CLI doing the actual work: Claude Code or Codex.
 
 ## Business logic — TL;DR
 

@@ -6,9 +6,9 @@ Renders a prompt's placeholders: every `${{ <expression> }}` in a prompt is a Ja
 
 ## Glossary
 
-[1] coding agent: The CLI doing the actual work: Claude Code or Codex.
-[2] the built-in system prompt: The standing instructions every agent starts with (`prompts/system_prompt.md`).
-[3] agent: The unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[1] coding agent: the CLI doing the actual work: Claude Code or Codex.
+[2] the built-in system prompt: the standing instructions every agent starts with (`prompts/system_prompt.md`).
+[3] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
 
 ## Business logic — TL;DR
 

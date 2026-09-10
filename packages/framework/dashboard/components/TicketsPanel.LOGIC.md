@@ -65,7 +65,7 @@ The topics, claim, effort and uncertainty are hidden on a narrow screen; every o
 
 A claimed [3] ticket carries a hammer icon in the warning color followed by the holder [4], truncated to keep the row aligned. The holder reads as the agent's session name [5] when the claim names one of this project's agents, and otherwise exactly as the claim wrote it. The hammer alone is shown when the claim names nobody readable.
 
-Hovering reads "Claimed by <holder> — an agent is working on this ticket (planning it or implementing it)." — a claim covers both planning the ticket and implementing it — or "Claimed — an agent is working on this ticket (planning it or implementing it)." when there is no holder to name.
+Hovering reads "Claimed by <holder> — an agent is working on this ticket (planning it or implementing it).", or "Claimed — an agent is working on this ticket (planning it or implementing it)." when there is no holder to name. A claim covers both cases: the agent may be planning the ticket or writing its implementation, and the marker does not distinguish the two.
 
 The marker acts on click when the surrounding page offers it. When the claim names one of this project's agents, clicking opens that agent's page and the tooltip adds "Click to open the agent's page."; otherwise, where the page filters, clicking narrows the list to claimed tickets and the tooltip adds "Click to see all claimed tickets.". Where the page offers neither, the marker is plain text.
 

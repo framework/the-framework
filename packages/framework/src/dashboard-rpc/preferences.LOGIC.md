@@ -8,16 +8,16 @@ The Settings surface of the dashboard's calls: reading and saving the user's pre
 
 ## Glossary
 
-[1] preferences: The user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
+[1] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 [2] custom preset: a preset the user saved: a prompt with an id and a label, shown beside the built-in presets.
-[3] Settings: The settings page.
-[4] driver: A coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later. The user's driver choice is `claude` or `codex`; the driver implementations are `claude-code`, `codex`, `github-actions`, `claude-web` and `fake`.
-[5] handoff: What happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it). "Handoff level" is a rung of that ladder.
-[6] Auto PM: The daemon's unattended product management: drain the agent queue, and refill it by running the routines.
-[7] spend offset: The user's adjustment of the quota boundary, in percentage points of the week.
+[3] Settings: the settings page.
+[4] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later. The user's driver choice is `claude` or `codex`; the driver implementations are `claude-code`, `codex`, `github-actions`, `claude-web` and `fake`.
+[5] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it). "Handoff level" is a rung of that ladder.
+[6] Auto PM: the daemon's unattended product management: drain the agent queue, and refill it by running the routines.
+[7] spend offset: the user's adjustment of the quota boundary, in percentage points of the week.
 [8] registry: `~/.the-framework.json`: where the user's preferences are kept, and which also lists the projects.
-[9] location: Where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
-[10] agent: The unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
+[9] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
+[10] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
 
 ## Business logic — TL;DR
 

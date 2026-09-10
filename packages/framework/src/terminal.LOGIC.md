@@ -8,21 +8,21 @@ Renders an agent's [1] event stream [2] in a terminal, one human-readable line p
 
 ## Glossary
 
-[1] agent: The unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
-[2] event stream: Everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface (dashboard, terminal, archive, run) is a projection of it.
-[3] handoff: What happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it).
-[4] turn: One prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
-[5] driver: A coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later.
-[6] driver session: The coding agent's own conversation for one agent, which the driver can resume by its session id. Say "session id" and "session link" for its id and URL.
-[7] cloud anchor: An empty commit a web agent pushes before its task leaves this machine, unique to the agent.
-[8] view: A markdown document an agent pushes to the dashboard's right rail while it works.
-[9] ready for merge: The signal an agent emits when it believes its work is complete: it flips the agent's badge from building to ready and authorizes the handoff.
-[10] settled: Said of an agent whose work has stopped and which is waiting for the user: it is alive, takes messages, and does nothing until told.
-[11] gate: A question with options at which an agent stops and waits for an answer: it emits the question in its turn's final message, the dashboard shows it as a card, and the answer re-prompts the agent.
-[12] pick: The answer to a gate: the option or options chosen, by the user or automatically.
-[13] CI watch: The sweep that merges the pull requests The Framework opened once their checks pass, and starts a fix agent when a check goes red.
-[14] quota: The account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
-[15] stop: Ending an agent before it finishes: the Stop button, Ctrl-C, or a pick marked to stop.
+[1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[2] event stream: everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface (dashboard, terminal, archive, run) is a projection of it.
+[3] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it).
+[4] turn: one prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
+[5] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later.
+[6] driver session: the coding agent's own conversation for one agent, which the driver can resume by its session id. Say "session id" and "session link" for its id and URL.
+[7] cloud anchor: an empty commit a web agent pushes before its task leaves this machine, unique to the agent.
+[8] view: a markdown document an agent pushes to the dashboard's right rail while it works.
+[9] ready for merge: the signal an agent emits when it believes its work is complete: it flips the agent's badge from building to ready and authorizes the handoff.
+[10] settled: said of an agent whose work has stopped and which is waiting for the user: it is alive, takes messages, and does nothing until told.
+[11] gate: a question with options at which an agent stops and waits for an answer: it emits the question in its turn's final message, the dashboard shows it as a card, and the answer re-prompts the agent.
+[12] pick: the answer to a gate: the option or options chosen, by the user or automatically.
+[13] CI watch: the sweep that merges the pull requests The Framework opened once their checks pass, and starts a fix agent when a check goes red.
+[14] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
+[15] stop: ending an agent before it finishes: the Stop button, Ctrl-C, or a pick marked to stop.
 [16] autopilot: the dashboard's switch that accepts a gate's recommended option for the user after a countdown.
 
 ## Business logic — TL;DR

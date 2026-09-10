@@ -8,7 +8,7 @@ Keeps a project's shared custom presets [1], the ones saved into the repository 
 
 ## Glossary
 
-[1] custom preset: A preset the user saved, as opposed to the built-in ones.
+[1] custom preset: a preset the user saved, as opposed to the built-in ones.
 [2] registry: `~/.the-framework.json`, which keeps the user's preferences and lists the projects.
 
 ## Business logic — TL;DR

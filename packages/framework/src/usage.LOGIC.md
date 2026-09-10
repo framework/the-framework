@@ -2,7 +2,7 @@ Keeps the running totals of what one agent [1] has spent across its turns [2]: t
 
 ## Glossary
 
-[1] agent: The unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
-[2] turn: One prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
-[3] coding agent: The CLI doing the actual work: Claude Code or Codex.
-[4] quota: The account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
+[1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[2] turn: one prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
+[3] coding agent: the CLI doing the actual work: Claude Code or Codex.
+[4] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.

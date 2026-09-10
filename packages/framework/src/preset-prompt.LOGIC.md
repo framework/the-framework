@@ -8,10 +8,10 @@ Defines how a preset is declared and rendered: from a name, a prompt, a label, a
 
 ## Glossary
 
-[1] agent: The unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
-[2] session name: The name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
-[3] launcher: The Start form on project home, a project's own page.
-[4] agent view: One agent's page in the dashboard.
+[1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
+[2] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
+[3] launcher: the Start form on project home, a project's own page.
+[4] agent view: one agent's page in the dashboard.
 
 ## Business logic — TL;DR
 

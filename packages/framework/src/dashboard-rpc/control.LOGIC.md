@@ -8,37 +8,37 @@ Carries out every action the user takes on an agent [1] or a project from the da
 
 ## Glossary
 
-[1] agent: The unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
-[2] gate: A question with options at which an agent stops and waits for an answer: it emits the question in its turn's final message, the dashboard shows it as a card, and the answer re-prompts the agent. When nobody can answer, the recommended option is taken.
-[3] live chat: The user's own messages to a running agent, each continuing the same driver session. One of them is a message.
-[4] handoff: What happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it). "Handoff level" is a rung of that ladder.
+[1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
+[2] gate: a question with options at which an agent stops and waits for an answer: it emits the question in its turn's final message, the dashboard shows it as a card, and the answer re-prompts the agent. When nobody can answer, the recommended option is taken.
+[3] live chat: the user's own messages to a running agent, each continuing the same driver session. One of them is a message.
+[4] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it). "Handoff level" is a rung of that ladder.
 [5] retained checkout: the checkout of an agent that has ended and is still on disk, kept so the user can inspect what the agent left; nothing removes it on a timer.
-[6] checkout: An agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
+[6] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [7] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down. An item on it is a queue entry.
-[8] claim: A ticket's lock file naming the holder working it, so two agents never work the same ticket.
-[9] cloud session: A Claude Code cloud session on claude.ai, the far end of a `web` agent.
-[10] the Claude web bridge: The daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge browser is the Chrome for Testing the daemon runs for it; the Driver tab is the extension's one pinned tab that reads claude.ai's session list, visits sessions and types answers.
-[11] relay: Running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
-[12] device: Another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
-[13] event stream: Everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface (dashboard, terminal, archive, run) is a projection of it.
+[8] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
+[9] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
+[10] the Claude web bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge browser is the Chrome for Testing the daemon runs for it; the Driver tab is the extension's one pinned tab that reads claude.ai's session list, visits sessions and types answers.
+[11] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
+[12] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
+[13] event stream: everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface (dashboard, terminal, archive, run) is a projection of it.
 [14] control file: `.the-framework/control.jsonl`: the file the daemon appends steering to (stops, picks, chat messages) and the agent's process tails.
-[15] turn: One prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
-[16] agent id: An agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
-[17] pick: The answer to a gate: the option or options chosen, by the user or automatically.
-[18] driver session: The coding agent's own conversation for one agent, which the driver can resume by its session id.
-[19] unattended: Said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
-[20] build agent / prompt agent: The two kinds of agent: a build works the agent queue after its opening exchange; a prompt agent runs one prompt and stops there.
+[15] turn: one prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
+[16] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
+[17] pick: the answer to a gate: the option or options chosen, by the user or automatically.
+[18] driver session: the coding agent's own conversation for one agent, which the driver can resume by its session id.
+[19] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
+[20] build agent / prompt agent: the two kinds of agent: a build works the agent queue after its opening exchange; a prompt agent runs one prompt and stops there.
 [21] preset: a canned prompt the user launches from the dashboard; the drain preset is the one that works the agent queue's first open entry.
-[22] drain: Starting an agent on the agent queue's first open entry — the half of Auto PM that spends existing work.
-[23] the Overview: The dashboard's cross-project page at `/`.
-[24] location: Where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
-[25] vanilla: An agent started without the built-in system prompt but with the signal protocols kept. transparent: an agent started with nothing of The Framework's — the raw coding agent.
-[26] run: Only the `logs` skill's record of one agent on the `agent-data` branch: a card (what was asked, the ticket, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said).
-[27] the `agent-data` branch: The branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
-[28] archive: The transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
-[29] session name: The name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
-[30] ready for merge: The signal an agent emits when it believes its work is complete: it flips the agent's badge from building to ready and authorizes the handoff.
-[31] holder: Who a claim names: the agent's id when the daemon started the agent, else the branch the `tickets` command ran on.
+[22] drain: starting an agent on the agent queue's first open entry — the half of Auto PM that spends existing work.
+[23] the Overview: the dashboard's cross-project page at `/`.
+[24] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
+[25] vanilla: an agent started without the built-in system prompt but with the signal protocols kept. transparent: an agent started with nothing of The Framework's — the raw coding agent.
+[26] run: only the `logs` skill's record of one agent on the `agent-data` branch: a card (what was asked, the ticket, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said).
+[27] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
+[28] archive: the transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
+[29] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
+[30] ready for merge: the signal an agent emits when it believes its work is complete: it flips the agent's badge from building to ready and authorizes the handoff.
+[31] holder: who a claim names: the agent's id when the daemon started the agent, else the branch the `tickets` command ran on.
 
 ## Business logic — TL;DR
 

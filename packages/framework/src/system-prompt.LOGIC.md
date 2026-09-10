@@ -8,24 +8,24 @@ Composes the system channel every agent [1] starts with, and renders the user's 
 
 ## Glossary
 
-[1] agent: The unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
-[2] the built-in system prompt: The standing instructions every agent starts with (`prompts/system_prompt.md`); `SYSTEM.md` is the project's own instructions added on top.
-[3] checkout: An agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
+[1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
+[2] the built-in system prompt: the standing instructions every agent starts with (`prompts/system_prompt.md`); `SYSTEM.md` is the project's own instructions added on top.
+[3] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [4] launcher: the Start form on a project's own page.
-[5] gate: A question with options at which an agent stops and waits for an answer: it emits the question in its turn's final message, the dashboard shows it as a card, and the answer re-prompts the agent. When nobody can answer, the recommended option is taken.
-[6] view: A markdown document an agent pushes to the dashboard's right rail while it works.
-[7] ready for merge: The signal an agent emits when it believes its work is complete: it flips the agent's badge from building to ready and authorizes the handoff.
-[8] vanilla: An agent started without the built-in system prompt but with the signal protocols kept.
-[9] transparent: An agent started with nothing of The Framework's — the raw coding agent.
-[10] coding agent: The CLI doing the actual work: Claude Code or Codex.
-[11] the `agent-data` branch: The branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
+[5] gate: a question with options at which an agent stops and waits for an answer: it emits the question in its turn's final message, the dashboard shows it as a card, and the answer re-prompts the agent. When nobody can answer, the recommended option is taken.
+[6] view: a markdown document an agent pushes to the dashboard's right rail while it works.
+[7] ready for merge: the signal an agent emits when it believes its work is complete: it flips the agent's badge from building to ready and authorizes the handoff.
+[8] vanilla: an agent started without the built-in system prompt but with the signal protocols kept.
+[9] transparent: an agent started with nothing of The Framework's — the raw coding agent.
+[10] coding agent: the CLI doing the actual work: Claude Code or Codex.
+[11] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
 [12] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down.
-[13] cloud session: A Claude Code cloud session on claude.ai, the far end of a `web` agent.
-[14] session name: The name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
-[15] turn: One prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
-[16] turn signals: What The Framework reads off a turn's final message: the ready-for-merge signal, the pull request title and body, markdown views, reported errors, and the gate it stops at.
-[17] hands-off: Said of an agent whose work leaves this machine, so its first prompt is the whole agent: an agent whose location is `web`.
-[18] the bridge: The daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session.
+[13] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
+[14] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
+[15] turn: one prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
+[16] turn signals: what The Framework reads off a turn's final message: the ready-for-merge signal, the pull request title and body, markdown views, reported errors, and the gate it stops at.
+[17] hands-off: said of an agent whose work leaves this machine, so its first prompt is the whole agent: an agent whose location is `web`.
+[18] the bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session.
 
 ## Business logic — TL;DR
 

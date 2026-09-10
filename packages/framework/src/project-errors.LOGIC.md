@@ -8,10 +8,10 @@ Keeps, per project [1], the states a sweep [2] of the daemon finds that the user
 
 ## Glossary
 
-[1] project: A repository the user registered in the dashboard, identified by an id derived from its path.
-[2] sweep: A background job the daemon runs on its clock: Auto PM, the CI watch, the notification watchers, the sweep that reclaims checkouts, the branch-links sweep, the cloud scratch sweep, cloud work adoption.
-[3] the `agent-data` branch: The branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks. Born as an orphan, written through one sync → commit → push cycle.
-[4] tick: One beat of the daemon's single background clock; each sweep says how many ticks it waits between turns.
+[1] project: a repository the user registered in the dashboard, identified by an id derived from its path.
+[2] sweep: a background job the daemon runs on its clock: Auto PM, the CI watch, the notification watchers, the sweep that reclaims checkouts, the branch-links sweep, the cloud scratch sweep, cloud work adoption.
+[3] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks. Born as an orphan, written through one sync → commit → push cycle.
+[4] tick: one beat of the daemon's single background clock; each sweep says how many ticks it waits between turns.
 
 ## Business logic — TL;DR
 

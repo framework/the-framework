@@ -8,8 +8,8 @@ Keeps the list of devices [1] this browser can hop to, and performs the hop. A s
 
 ## Glossary
 
-[1] device: Another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
-[2] preferences: The user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
+[1] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
+[2] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 [3] composer: the prompt editor on a project's page, also used for live chat.
 
 ## Business logic — TL;DR

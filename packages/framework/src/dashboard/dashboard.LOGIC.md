@@ -6,12 +6,12 @@ Builds the data behind the Overview [1], the dashboard's cross-project page: how
 
 ## Glossary
 
-[1] the Overview: The dashboard's cross-project page at `/`.
+[1] the Overview: the dashboard's cross-project page at `/`.
 [2] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down. An item on it is a queue entry.
-[3] agent: The unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
-[4] archive: The transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
-[5] the `agent-data` branch: The branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
-[6] tick: One beat of the daemon's single background clock; each sweep says how many ticks it waits between turns.
+[3] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[4] archive: the transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
+[5] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
+[6] tick: one beat of the daemon's single background clock; each sweep says how many ticks it waits between turns.
 
 ## Business logic — TL;DR
 

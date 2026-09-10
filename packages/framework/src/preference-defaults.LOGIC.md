@@ -8,13 +8,13 @@ Fixes what an unset preference [1] means and the bounds that the controls writin
 
 ## Glossary
 
-[1] preferences: The user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
-[2] spend offset: The user's adjustment of the quota boundary, in percentage points of the week.
-[3] quota boundary: The share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
-[4] Auto PM: The daemon's unattended product management: drain the agent queue, and refill it by running the routines.
-[5] agent: The unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
-[6] intervention: Something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds. The other is activity: an agent started or finished.
-[7] unattended: Said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
+[1] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
+[2] spend offset: the user's adjustment of the quota boundary, in percentage points of the week.
+[3] quota boundary: the share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
+[4] Auto PM: the daemon's unattended product management: drain the agent queue, and refill it by running the routines.
+[5] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[6] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds. The other is activity: an agent started or finished.
+[7] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
 
 ## Business logic — TL;DR
 

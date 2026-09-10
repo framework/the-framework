@@ -2,15 +2,15 @@ The browser's typed stubs behind the usage panel: where the account's quota [1] 
 
 ## Glossary
 
-[1] quota: The account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
-[2] quota boundary: The share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
-[3] Auto PM: The daemon's unattended product management: drain the agent queue, and refill it by running the routines.
-[4] sweep: A background job the daemon runs on its clock: Auto PM, the CI watch, the notification watchers, the sweep that reclaims checkouts, the branch-links sweep, the cloud scratch sweep, cloud work adoption.
-[5] coding agent: The CLI doing the actual work: Claude Code or Codex.
-[6] preferences: The user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
-[7] routine: A preset the daemon fires on its own on a schedule — update tickets, triage quick, triage consensual, plan tickets, maintenance — each switchable off and runnable on demand.
-[8] drain: Starting an agent on the agent queue's first open entry — the half of Auto PM that spends existing work.
-[9] fan-out: Starting several agents at once, one per queue entry or one per ticket to plan.
+[1] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
+[2] quota boundary: the share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
+[3] Auto PM: the daemon's unattended product management: drain the agent queue, and refill it by running the routines.
+[4] sweep: a background job the daemon runs on its clock: Auto PM, the CI watch, the notification watchers, the sweep that reclaims checkouts, the branch-links sweep, the cloud scratch sweep, cloud work adoption.
+[5] coding agent: the CLI doing the actual work: Claude Code or Codex.
+[6] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
+[7] routine: a preset the daemon fires on its own on a schedule — update tickets, triage quick, triage consensual, plan tickets, maintenance — each switchable off and runnable on demand.
+[8] drain: starting an agent on the agent queue's first open entry — the half of Auto PM that spends existing work.
+[9] fan-out: starting several agents at once, one per queue entry or one per ticket to plan.
 [10] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down. An item on it is a queue entry.
 
 ## Business logic — TL;DR

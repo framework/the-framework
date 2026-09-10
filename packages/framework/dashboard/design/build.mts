@@ -6,8 +6,9 @@ import { build } from 'vite'
 import { PREVIEWS, type Preview } from './previews.js'
 
 // Builds the design gallery: one self-contained HTML file per card, each carrying the shipped
-// stylesheet inline and rendering its component in both themes. `pnpm design:build`, then
-// DesignSync uploads design/out/**. Cards are static — no client JS — so hover/open states are
+// stylesheet inline and rendering its component in both themes, into design/out/. `pnpm
+// design:build` writes it; publishing it is somebody's own business, and nothing in this
+// repository does it. Cards are static — no client JS — so hover/open states are
 // shown as separate rendered instances rather than something to click.
 
 const here = dirname(fileURLToPath(import.meta.url))

@@ -97,8 +97,9 @@ export function pollerQuotaSource(
  * not just during an agent, because the panel has to show where the account stands
  * even when nothing is running.
  *
- * Separate from the per-agent guard on purpose — that one exists to pause an agent
- * and dies with it, this one exists to draw a bar.
+ * Separate from the reading an agent takes for itself: that one dies with the agent, and
+ * nothing stops a running agent over quota anyway. This one exists to draw a bar, and to
+ * answer whether unattended work may start.
  */
 export function defaultQuotaSource(env: NodeJS.ProcessEnv = process.env): QuotaSource {
   const driver = new ClaudeCodeDriver()

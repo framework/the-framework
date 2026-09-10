@@ -77,5 +77,5 @@ The browser tools are one tool server, `chrome-devtools-mcp`, fetched on demand 
 #### Business logic
 
 - At daemon start-up the process table is read. An agent browser is a browser process whose profile directory name starts with `framework-chrome-`, which is the ownership mark, and which is the browser itself rather than one of its helper processes (renderers repeat the profile flag but carry a process type). It is orphaned when its parent is gone: reparented to the init process, to a process no longer in the table, or to a process that is not Node, since only a Node agent [1] ever launches these browsers and any other parent is the init, subreaper or shell that inherited it.
-- Every orphan is killed outright and its profile directory removed; a browser gone between the listing and the kill is skipped. What was closed is returned to the daemon's log.
+- Every orphan is killed outright and its profile directory removed; a browser gone between the listing and the kill is skipped. What was closed is reported back, for the daemon's start-up log line.
 - Windows has no process listing of this kind, so the sweep does nothing there.

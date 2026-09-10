@@ -4,7 +4,7 @@ Streams the agent [1]'s browser to the user and carries the user's clicks, typin
 
 **User story**: an agent parks on a gate [2] asking someone to deal with a login wall or a captcha. The user opens the browser pane in the dashboard, sees the very page the agent is on as it changes, clicks and types into it, and answers the gate once the wall is behind. A still page, such as a login form waiting for input, must paint in the pane and not sit blank.
 
-**Problem**: Chrome refuses debugger connections that come from a web page unless it is launched with that opened up, and opening it up would let any page the user happens to visit drive the agent's browser. So the browser's debugging port stays unreachable from the web, and this stream, hosted by the agent and reached through the daemon, is the only way in. The stream's port is published on the agent's log so the daemon can proxy the pane to the dashboard.
+**Problem**: Chrome refuses debugger connections that come from a web page unless it is launched with that opened up, and opening it up would let any page the user happens to visit drive the agent's browser. So the browser's debugging port stays unreachable from the web, and this stream, hosted by the agent and reached through the daemon, is the only way in. The stream's port is put on the agent's event stream [3] so the daemon can proxy the pane to the dashboard.
 
 ## Glossary
 

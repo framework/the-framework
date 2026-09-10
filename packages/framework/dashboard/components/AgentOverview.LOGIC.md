@@ -1,4 +1,4 @@
-A summary block for one agent [1], projected from its events [2]: its status line, the errors it reported, and a link to its driver session [3]. It renders nothing at all until at least one of the three is known, so an agent that has just started shows nothing extra.
+A summary block for one agent [1], projected from its events [2], shown on the project home below the launcher while the page holds an agent's events: its status line, the errors it reported, and a link to its driver session [3]. It renders nothing at all until at least one of the three is known, so an agent that has just started shows nothing extra.
 
 ## Glossary
 

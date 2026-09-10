@@ -1,4 +1,4 @@
-Decides, once per sweep [1] and per project, whether the daemon may spend the account's quota [2] on work nobody asked for, and on what. Auto PM [3] either drains [4] the agent queue [5] by starting one agent [6] per open queue entry, or, when the queue is empty, refills it by firing the next routine [7] of a fixed rotation. Every reason not to start is a sentence the daemon logs and the dashboard shows, and every job the sweep fires is built from a preset, so the routines the dashboard lists and the work the daemon actually starts cannot drift apart.
+Decides, once per sweep [1] and per project, whether the daemon may spend the account's quota [2] on work nobody asked for, and on what. Auto PM [3] either drains [4] the agent queue [5] by starting one agent [6] per open queue entry, or, when the queue is empty, refills it by firing the next routine [7] of a fixed rotation. Every reason not to start is a sentence the daemon logs and the dashboard shows, and every routine the sweep fires is built from a preset, so the routines the dashboard lists and the work the daemon actually starts cannot drift apart.
 
 ## Context
 
@@ -39,14 +39,14 @@ Decides, once per sweep [1] and per project, whether the daemon may spend the ac
 - **Drain or product management: the queue decides** - a queue with open entries is worked before anything new is made; only an empty queue reaches the rotation.
 - **The routine rotation and its order** - update tickets, triage the quick wins, triage the consensual work, plan tickets, in that order, per project, minus what is switched off, advancing only on a start that took.
 - **The maintenance sweep is paced by the calendar** - when due it outranks the rotation, but only on a genuinely empty queue, and it stamps its own schedule instead of moving the rotation.
-- **Settling what an earlier sweep started** - before judging a queue, finished agents have their entry retired, a claim they abandoned freed, and their routine lock released, each with bounded retries.
+- **Closing out what an earlier sweep started** - before judging a queue, finished agents have their entry retired, a claim they abandoned freed, and their routine lock released, each with bounded retries.
 - **Draining fans out, one agent per entry** - as many agents as the cap has room for, each pinned to its own open entry, with the entry's ticket claimed first when the entry links one.
 - **Planning fans out, one agent per ticket** - the one rotation routine that fans out: each agent is pinned to one claimed ticket, and a batch that could claim nothing falls back to a single unpinned agent.
 - **Triage takes a routine lock** - the two triage routines are taken as `routines/<name>.lock.md` before they start, so they run once across machines, and stand down when the lock is alive.
 - **Starting the batch, and stopping** - the first refused start ends the batch, claims of agents that never started are released, and a stopped daemon spawns nothing more.
 - **"Run now": a sweep a person asked for** - runs with the preference off and without the cooldown, scoped to one project or one routine, and never borrows the click for other work.
 - **What the last sweep reports** - the dashboard shows whether the preference was on, when the sweep ran, when the next is due, and one sentence per project, the same sentence the daemon logged.
-- **The jobs are built from the presets** - name, prompt, label and tooltip come off the preset; what a job does (drains, fans out, takes a lock, auto-merges) is declared on the job, never matched by name.
+- **The routines are built from the presets** - name, prompt, label and tooltip come off the preset; what a routine does (drains, fans out, takes a lock, auto-merges) is declared on the routine, never matched by name.
 
 ## Business logic
 
@@ -117,7 +117,7 @@ Otherwise the project may start, in the mode the queue picks (see "Drain or prod
 
 #### Business logic
 
-- A queue with open entries puts the sweep [1] in drain [4] mode: agents are started on its entries, through the drain job.
+- A queue with open entries puts the sweep [1] in drain [4] mode: agents are started on its entries, through the drain routine.
 - An empty queue puts it in product management mode: the routine [7] whose turn it is fires, or the maintenance sweep when due.
 - When the drain routine is switched off while the queue has work, the sweep does not stand down: the rotation gets the turn instead. Switching the drain off means "do not work the queue", and the rotation does not work it; triage and planning put entries on it. Standing down here would make every routine that invents work unreachable for as long as the queue had anything on it, which, with a queue that fills itself, is most of the time. A drain-only "Run now" is the exception: it has already stood down by then, because the click asked for the queue specifically.
 - The maintenance sweep never fires while the queue has entries, including when the turn fell through to the rotation because the drain routine is off.
@@ -150,7 +150,7 @@ Otherwise the project may start, in the mode the queue picks (see "Drain or prod
 - Its firing does not advance the rotation. Instead the project is stamped as swept once the start took, so the next maintenance sweep is an interval away; a start the daemon refused is retried on the next sweep rather than postponed a whole interval.
 - Its prompt covers the entire codebase, and its start is reported as "sweeping the codebase for maintenance work".
 
-### Settling what an earlier sweep started
+### Closing out what an earlier sweep started
 
 #### Context
 
@@ -158,13 +158,13 @@ Otherwise the project may start, in the mode the queue picks (see "Drain or prod
 
 #### Business logic
 
-Before judging a project's queue, every agent this sweep started on it and has not yet finished settling is looked at. The daemon reads the agent's status and recorded ending and retires the entry the agent was pinned to once the ending says the work was published (`daemon-services.ts`); the sweep decides what to do with the answer:
+Before judging a project's queue, every agent this sweep started on it and has not yet been closed out is looked at. The daemon reads the agent's status and recorded ending and retires the entry the agent was pinned to once the ending says the work was published (`daemon-services.ts`); the sweep decides what to do with the answer:
 
 - Still running: kept for the next sweep.
-- Ended cleanly, but its handoff [18] has not reported yet: an agent carrying a claim or pinned to an entry is held for at most two more sweeps rather than settled blind, since the ending is the one fact the release and the entry's retirement key off. Past that bound it settles unread, so a process that died mid-handoff cannot pin its entry forever.
+- Ended cleanly, but its handoff [18] has not reported yet: an agent carrying a claim or pinned to an entry is held for at most two more sweeps rather than closed out blind, since the ending is the one fact the release and the entry's retirement key off. Past that bound it is closed out unread, so a process that died mid-handoff cannot pin its entry forever.
 - Ended with nothing to hand off, carrying a claim minted here: the claim is freed by the sweep itself, and only the exact minted claim; a lock naming anyone else is left alone. The entry, or the planned ticket, is remembered as having ended dry before the release is attempted, and is not offered again for the rest of the daemon's life: a task that deterministically ends without commits would otherwise burn a quota [2] run every cooldown, forever. A daemon restart forgets the set and allows one more try, on the assumption that a human retired or reshaped the entry in between. A release that could not land, a transient git lock for instance, is retried on the next sweep, at most twice.
 - Held a routine lock [10]: the lock is released whatever the ending, since no pull request of the agent's ever will; a release that could not land is retried, at most twice.
-- When settling retired one or more entries, the queue this sweep would read is stale, so the project is left to the next sweep with "landed the queue from <n> finished run(s)", logged as "auto PM: landed the queue from <n> run(s) in <project path>".
+- When closing out retired one or more entries, the queue this sweep would read is stale, so the project is left to the next sweep with "landed the queue from <n> finished run(s)", logged as "auto PM: landed the queue from <n> run(s) in <project path>".
 - On a project's first sweep after the daemon started, the routine locks a previous daemon on this machine left behind whose agents are gone are released once, since nothing else would ever release them.
 
 ### Draining fans out, one agent per entry
@@ -208,7 +208,7 @@ Before judging a project's queue, every agent this sweep started on it and has n
 
 - "Add quick-win work to AI Queue" holds `routines/triage-quick.lock.md` and "Add consensual work to AI Queue" holds `routines/triage-consensual.lock.md`, each a routine lock [10] on the `agent-data` branch, written and pushed before the agent [6] starts so every machine sharing the branch sees the routine as taken.
 - A lock that is alive, held by another machine's triage or by this one's still going, or that could not be written, stands the routine down with the lock's own reason and no agent started; when the taking itself fails, the reason is "the routine lock could not be taken". The rotation stays on that routine, so the next sweep [1] tries it again.
-- The lock is released when the agent ends, whatever the ending, with the bounded retries described under "Settling what an earlier sweep started", and released at once when the daemon refused the start, since no agent will ever release it.
+- The lock is released when the agent ends, whatever the ending, with the bounded retries described under "Closing out what an earlier sweep started", and released at once when the daemon refused the start, since no agent will ever release it.
 - Locks a previous daemon on this machine left behind are released on a project's first sweep.
 - A daemon wired without the locking seam starts the routine unguarded.
 
@@ -216,14 +216,14 @@ Before judging a project's queue, every agent this sweep started on it and has n
 
 #### Context
 
-**Problem**: an agent [6] spawned after the daemon has begun closing is missing from the live-agent map the daemon has by then cleared, so nothing would ever stop it. Claims [9] are pushed before the first spawn, so an agent that never starts would strand a claim no agent could ever settle free.
+**Problem**: an agent [6] spawned after the daemon has begun closing is missing from the live-agent map the daemon has by then cleared, so nothing would ever stop it. Claims [9] are pushed before the first spawn, so an agent that never starts would strand a claim no agent could ever free.
 
 #### Business logic
 
 - Stopping the sweep [1] is a verdict on the whole sweep: it is re-checked after every wait and before every spawn, and a stop mid-batch spawns none of the rest.
 - Each start is logged as "auto PM: <what it does> in <project path>", where "what it does" is the routine's description line when it has one, else its label, else its name.
 - The first start the daemon refuses ends the batch: whatever refused it is not going to take the next one a moment later, and a refused routine must be retried rather than skipped. It is logged as "auto PM: could not start a run in <project path>", and a routine lock [10] taken for it goes back at once.
-- After the batch, the claim of every item that never started is released: those never enter the settling loop, so nothing else would free them.
+- After the batch, the claim of every item that never started is released: those never enter the closing-out step, so nothing else would free them.
 - When nothing started, the cooldown is given back and the project is recorded as "the daemon could not start a run", or as the lock's reason when a lock stood the routine down.
 - When something started, the project is recorded with what: a single start keeps its own sentence; several read "started <n> agents: <sentence>; <sentence>; …". Either is followed by " alongside <m> already going (<labels>)" when agents were already live, so a batch that came out short of the cap says what it was short by.
 
@@ -255,15 +255,15 @@ Before judging a project's queue, every agent this sweep started on it and has n
 - The next sweep's time is counted from the moment the sweep loop started, in whole intervals, so a "Run now" does not shift the schedule.
 - The last sweep is recorded even when it ended early, so "switched off" and "on, and standing down for a reason" are distinguishable. Before the first sweep, the report carries only the next due time and no outcomes.
 
-### The jobs are built from the presets
+### The routines are built from the presets
 
 #### Context
 
-**Problem**: the dashboard lists the routines [7] and the daemon fires them; written out twice, the two would drift. What a job does is declared as data on the job, so a renamed preset cannot quietly unhook the behavior tied to it.
+**Problem**: the dashboard lists the routines [7] and the daemon fires them; written out twice, the two would drift. What a routine does is declared as data on the routine, so a renamed preset cannot quietly unhook the behavior tied to it.
 
 #### Business logic
 
-- Each job carries the preset's stable name, which is what the rotation's position and the switched-off list key on; the prompt rendered from the preset; and the preset's label and one-line tooltip, read off the preset so a relabeled preset relabels its routine and the sentence the launcher shows for a preset is the sentence the routines list shows for its routine.
-- Only the maintenance job carries a separate description line, "sweeping the codebase for maintenance work", because "Maintenance" names its preset rather than the work; the other routines' labels read as what they do, so their rows stay one line and their log lines say the label itself.
-- The drain [4] job is the "Spin up agents working on the AI queue" preset (`drain-queue`), declared as draining and as auto-merging its pull request. The planning job is declared as fanning out [14]; the triage jobs each declare their routine lock [10].
-- The routines list, in the order a surface shows them, is derived from the same jobs the daemon runs: the drain first, because it is what happens whenever there is queued work; the four rotation routines next, because they are what happens when there is not; the maintenance sweep last, as the calendar-paced exception outside both.
+- Each routine carries the preset's stable name, which is what the rotation's position and the switched-off list key on; the prompt rendered from the preset; and the preset's label and one-line tooltip, read off the preset so a relabeled preset relabels its routine and the sentence the launcher shows for a preset is the sentence the routines list shows for its routine.
+- Only the maintenance routine carries a separate description line, "sweeping the codebase for maintenance work", because "Maintenance" names its preset rather than the work; the other routines' labels read as what they do, so their rows stay one line and their log lines say the label itself.
+- The drain [4] routine is the "Spin up agents working on the AI queue" preset (`drain-queue`), declared as draining and as auto-merging its pull request. The planning routine is declared as fanning out [14]; the triage routines each declare their routine lock [10].
+- The routines list, in the order a surface shows them, is derived from the same routines the daemon runs: the drain first, because it is what happens whenever there is queued work; the four rotation routines next, because they are what happens when there is not; the maintenance sweep last, as the calendar-paced exception outside both.

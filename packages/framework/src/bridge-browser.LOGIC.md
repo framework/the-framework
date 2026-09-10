@@ -97,7 +97,7 @@ See `## Context`.
 
 #### Context
 
-**Problem**: the extension opens no Driver tab [6] while the daemon lists no cloud session [3], and the user has to sign in on that tab before any session exists.
+**Problem**: the extension opens no Driver tab [6] while the daemon lists no cloud session [3], and the user has to sign in on that tab before any cloud session exists.
 
 #### Business logic
 

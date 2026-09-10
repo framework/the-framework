@@ -32,12 +32,12 @@ What the tests cover, for the Auto PM sweep's policy and loop:
 **Drain and refill**
 
 - **The cycle comes back round** - a standing entry is drained, an empty queue is refilled, a new entry is drained again; draining never advances the rotation, so a queue worked off over several sweeps resumes the rotation where it was.
-- **Settling finished agents** - an agent whose queue landed ends that sweep so the next one re-reads the queue; a finished agent that wrote nothing is asked about exactly once and then dropped; an agent still going stays tracked.
+- **Closing out finished agents** - an agent whose queue landed ends that sweep so the next one re-reads the queue; a finished agent that wrote nothing is asked about exactly once and then dropped; an agent still going stays tracked.
 - **A switched-off drain routine** - the scheduled sweep falls through to the rotation and works nothing off the queue; a drain-only "Run now" stands down instead with "the queue has work waiting and its routine is switched off".
 
 **The maintenance sweep**
 
-- **Its prompt** - the maintenance job fires the "Maintenance" preset over the entire codebase, fully rendered.
+- **Its prompt** - the maintenance routine fires the "Maintenance" preset over the entire codebase, fully rendered.
 - **Its precedence** - a project that is due is swept before the rotation gets a turn; one that is not due, or whose schedule cannot be read, keeps doing the rotation; a queue with work is drained rather than swept, also when the drain routine is off and the turn fell through to the rotation.
 - **Its calendar** - a sweep does not cost the rotation its turn; the project is stamped only when the start took; a switched-off maintenance routine leaves its calendar untouched.
 
@@ -46,9 +46,9 @@ What the tests cover, for the Auto PM sweep's policy and loop:
 - **What it says** - after a sweep: whether the preference was on, when it ran, and per project the path, whether an agent started and the sentence ("doing the first thing"); a stand-down carries its reason; a sweep with the preference off reports it off with no per-project line.
 - **The next sweep** - before the first sweep the report carries no sweep time and no preference, only the next due time one interval after the loop started; an out-of-band sweep does not shift it.
 
-**The catalog of jobs**
+**The catalog of routines**
 
-- **What each job declares** - only the drain job says it drains; only the drain job auto-merges its pull request; only "Plan tickets" fans out; the two triage jobs hold a routine lock named after them and their prompts no longer abort on an existing branch.
+- **What each routine declares** - only the drain routine says it drains; only the drain routine auto-merges its pull request; only "Plan tickets" fans out; the two triage routines hold a routine lock named after them and their prompts no longer abort on an existing branch.
 - **The routines list** - it is the drain, the four rotation routines and maintenance, once each, drain first; every routine carries its preset's label and a fully rendered prompt; only maintenance carries a description line ("sweeping the codebase for maintenance work"), the others are their label.
 
 **Draining fans out**
@@ -67,7 +67,7 @@ What the tests cover, for the Auto PM sweep's policy and loop:
 
 **Dead claims**
 
-- **Freed on a commitless ending** - the exact claim minted for an agent that ended with nothing to hand off is released; a sweep that catches the gap between the agent's end and its handoff report holds the claim and releases it once the ending lands; the hold is bounded to two sweeps, after which the agent settles unread.
+- **Freed on a commitless ending** - the exact claim minted for an agent that ended with nothing to hand off is released; a sweep that catches the gap between the agent's end and its handoff report holds the claim and releases it once the ending lands; the hold is bounded to two sweeps, after which the agent is closed out unread.
 - **Not drained again** - an entry whose drain ended dry is not offered again for the daemon's lifetime, and the stand-down says "drained once with nothing to hand off".
 - **Never-started items** - the claims of a batch's items the start loop never reached are released rather than stranded.
 - **Retried releases** - a release that could not land is retried on the next sweep, once more, and then left.

@@ -2,11 +2,11 @@ Fixes the vocabulary of the event stream [1]: every kind of event an agent [2] c
 
 ## Context
 
-**User story**: the user watches an agent [2] in the agent view [6]: the timeline of what the coding agent [7] did, the questions it stopped at, the views [8] it pushed, the badge flipping from building to ready, the spend so far, and finally what became of the work (a pull request, a merge, or the reason nothing happened). A tab opened while the agent runs, or after it ended, shows the same story. Everything on that page is read off the events described here; nothing about an agent is learned any other way.
+**User story**: the user watches an agent [2] in the agent view [6]: everything the coding agent [7] did, in order, the questions it stopped at, the views [8] it pushed, the badge flipping from building to ready, the spend so far, and finally what became of the work (a pull request, a merge, or the reason nothing happened). A tab opened while the agent runs, or after it ended, shows the same story. Everything on that page is read off the events described here; nothing about an agent is learned any other way.
 
 **Business logic story**: the agent's process appends every event as one line to `.the-framework/events.jsonl` in the agent's checkout [9]. The dashboard, the terminal, the archive [10] and the run [11] are each a projection of that file: the dashboard's store folds the stream into the agent's current state, and that folded state is the one thing a dashboard tab opened later can read. That is why several facts below travel as events although they are known before the agent starts: a fact that is not an event is a fact a later tab never learns. In the same way, an agent the dashboard started has no terminal anyone reads, so an outcome that is not an event is an outcome nobody learns.
 
-**Problem**: the event stream [1] unifies three sources so that every surface renders one timeline: The Framework's own status (what the agent is, what it was asked, what became of its work), the coding agent's own progress forwarded as it comes, and what the agent tells the user through its turn signals [12]. Owning the stream, rather than exposing the coding agent's transport, is what keeps every surface identical whichever driver [13] runs the agent.
+**Problem**: the event stream [1] unifies three sources so that every surface renders the same sequence: The Framework's own status (what the agent is, what it was asked, what became of its work), the coding agent's own progress forwarded as it comes, and what the agent tells the user through its turn signals [12]. Owning the stream, rather than exposing the coding agent's transport, is what keeps every surface identical whichever driver [13] runs the agent.
 
 ## Glossary
 

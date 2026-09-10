@@ -45,7 +45,7 @@ See `## Context`.
 
 - The final message of every turn [2] is read for a gate [3]. A gate has a question, at least one option (each with an id, a label, an optional one-line detail, and possibly marked as a stop or as checked by default), an optional recommended option, an optional checklist form (multi-select), and optionally the markdown file the question is about, which the dashboard's right rail renders (a plan under approval).
 - The gate is put on the agent's event stream [10] as a question with its options, so the dashboard shows it as a card; the resolution follows on the same stream, naming the option or options picked and who picked them.
-- The first gate of an exchange keeps one stable id; every later gate in the same exchange gets a unique id numbered by its round, so a dashboard never confuses a re-ask with the answer it just resolved.
+- The first gate of an exchange keeps one stable id; every later gate in the same exchange gets a unique id numbered by its position in the exchange, so a dashboard never confuses a re-ask with the answer it just resolved.
 
 ### The pick re-prompts the agent
 
@@ -129,7 +129,7 @@ See `## Context`.
 
 #### Business logic
 
-- Each message [6] is delivered by resuming the same driver session [7], so the agent [1] has the whole conversation; the message appears in the feed as the agent's own "YOU" row and is not echoed as a separate log line. The message's turn has its turn signals [11] emitted and its gates [3] honored by the same loop, with the same await limit [5].
+- Each message [6] is delivered by resuming the same driver session [7], so the agent [1] has the whole conversation; the message appears in the dashboard's feed panel as the agent's own "YOU" row and is not echoed as a separate log line. The message's turn has its turn signals [11] emitted and its gates [3] honored by the same loop, with the same await limit [5].
 - By default the phase only drains: a message that has already arrived is processed, and once no message is queued the agent ends itself rather than parking, so the handoff fires at that natural end and a later message reopens the conversation by resuming the driver session. A stopped agent takes no queued message.
 - With stay-open on, for an agent whose own terminal dashboard is its single surface and has no daemon to resume through, the agent parks for the next message instead, and says so each time it parks by marking itself settled [13] on the event stream [10], so a reader can tell waiting from working. It ends when the message source closes or the agent is stopped.
 - A pick marked to stop ends the whole agent, not just the message it came from.

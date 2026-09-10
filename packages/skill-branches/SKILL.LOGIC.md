@@ -1,4 +1,4 @@
-The instructions every agent [1] reads as its `branches` skill [2]: its work goes on a branch named `agent-<name>`, which it names before its first change; its checkout [3] is its whole workspace; it commits as it goes; and it finishes only when `npx branches status` reports the checkout clean. Whoever started the agent pushes, opens the pull request and merges; the agent never does.
+The instructions every agent [1] reads as its `branches` skill [2]: its work goes on a branch named `agent-<name>`, which it names before its first change; it reads and writes only in its checkout [3]; it commits as it goes; and it finishes only when `npx branches status` reports the checkout clean. Whoever started the agent pushes, opens the pull request and merges; the agent never does.
 
 ## Context
 
@@ -22,8 +22,8 @@ The instructions every agent [1] reads as its `branches` skill [2]: its work goe
 - **The work goes on `agent-<name>`, and the agent never hands it off** - the branch is the agent's; the push, the pull request and the merge belong to whoever started it.
 - **How the command is run** - `npx branches` inside the checkout, after an install with the lockfile's package manager when `node_modules` is missing; `status` and `name` are the agent's commands, the rest are the caller's.
 - **Where the agent is** - `npx branches status` prints JSON whose `branch` is the branch the agent is on, and that branch decides everything below.
-- **On an `agent-` branch, the checkout is the whole workspace** - read and write only there, never edit the linked dependency files and skill directories, and stop when something needed lies outside.
-- **Name the session before the first change** - `npx branches name <name>`, `[a-z0-9-]+` starting with a letter or digit, saying what the work is; unless the branch already differs from the directory's name, which means it is named already.
+- **On an `agent-` branch, the checkout is all the agent touches** - read and write only there, never edit the linked dependency files and skill directories, and stop when something needed lies outside.
+- **Name the work before the first change** - `npx branches name <name>`, `[a-z0-9-]+` starting with a letter or digit, saying what the work is; unless the branch already differs from the directory's name, which means it is named already.
 - **On another branch under `.branches/`, stay** - the agent was put there on purpose and does not name it.
 - **In a plain clone, make an `agent-<name>` branch with git** - before the first change, and another name when that one exists locally or on `origin`.
 - **Commit as you go** - nothing is committed for the agent.
@@ -61,7 +61,7 @@ See `## Context`.
 
 The agent's [1] first step is `npx branches status`, which prints JSON; `branch` is the branch the agent is on, and `path` is its checkout's [3] root. Which branch it is decides which of the three situations below the agent is in: a branch starting with `agent-`, another branch in a checkout under `.branches/`, or another branch in a plain clone.
 
-### On an `agent-` branch, the checkout is the whole workspace
+### On an `agent-` branch, the checkout is all the agent touches
 
 #### Context
 
@@ -69,9 +69,9 @@ The agent's [1] first step is `npx branches status`, which prints JSON; `branch`
 
 #### Business logic
 
-When the branch starts with `agent-`, the checkout [3] is the agent's [1] whole workspace: it reads and writes only there. The dependency files and skill [2] directories in the checkout are links to the user's copies and are never edited. When something the agent needs lies outside its checkout, the agent says so and stops.
+When the branch starts with `agent-`, the checkout [3] is, in the skill's [2] words, the agent's [1] "whole workspace": it reads and writes only there. The dependency files and skill [2] directories in the checkout are links to the user's copies and are never edited. When something the agent needs lies outside its checkout, the agent says so and stops.
 
-### Name the session before the first change
+### Name the work before the first change
 
 #### Context
 
@@ -79,7 +79,7 @@ When the branch starts with `agent-`, the checkout [3] is the agent's [1] whole 
 
 #### Business logic
 
-Before its first change, the agent [1] on an `agent-` branch names its session with `npx branches name <name>`: `<name>` matches `[a-z0-9-]+`, starts with a letter or a digit, and says what the work is. The command renames the branch to `agent-<name>` and prints the branch it got in `branch`: `agent-<name>-2`, `-3`, and so on when `<name>` was taken. A name outside `[a-z0-9-]+` is refused as `invalid-name`. One exception: when the branch already differs from the last segment of `path`, the checkout's [3] directory name, the session is named already, as a continued agent's is, and the agent keeps that name.
+Before its first change, the agent [1] on an `agent-` branch gives its session name [4] with `npx branches name <name>`: `<name>` matches `[a-z0-9-]+`, starts with a letter or a digit, and says what the work is. The command renames the branch to `agent-<name>` and prints the branch it got in `branch`: `agent-<name>-2`, `-3`, and so on when `<name>` was taken. A name outside `[a-z0-9-]+` is refused as `invalid-name`. One exception: when the branch already differs from the last segment of `path`, the checkout's [3] directory name, the work is named already, as a continued agent's is, and the agent keeps that name.
 
 ### On another branch under `.branches/`, stay
 

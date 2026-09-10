@@ -22,7 +22,7 @@ Assembles the dashboard's quota [1] view: the account's windows as the coding ag
 
 - **The view the panel draws** - the last good reading's windows, when it was taken, the reason the newest attempt failed when it did, and the account's boundary, which is absent whenever it cannot honestly be placed.
 - **The boundary for one impending agent** - the same measurement with the named model's own week in force too; no model means the account's week alone.
-- **Measured on every call, never cached** - both answers are measured against the clock and the current spend offset each time they are asked, off the poller's last good reading, so no reading is spent by asking.
+- **Measured on every call, never cached** - both answers are measured against the clock and the current spend offset each time they are asked, off the last good reading, so no reading is spent by asking.
 - **The daemon's own source** - polls what Claude Code reports for the whole life of the dashboard, reads the spend offset from the preferences with a half-day cushion as the default, and stops polling when the dashboard closes.
 
 ## Business logic
@@ -60,7 +60,7 @@ See `## Context`.
 
 #### Business logic
 
-Each time either question is asked, the quota boundary [3] is measured anew against the current clock and the spend offset [5] as it is at that moment, using the poller's last good windows. No new reading is taken to answer, so asking once per project is free. Moving the spend offset slider therefore takes effect on the next call, with no restart.
+Each time either question is asked, the quota boundary [3] is measured anew against the current clock and the spend offset [5] as it is at that moment, using the last good reading's windows. No new reading is taken to answer, so asking once per project is free. Moving the spend offset slider therefore takes effect on the next call, with no restart.
 
 ### The daemon's own source
 

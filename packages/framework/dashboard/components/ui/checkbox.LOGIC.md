@@ -1,0 +1,1 @@
+Provides the dashboard's checkbox, drawn from the theme rather than by the browser: a small bordered square that fills with the primary color and shows a check mark when on, carries the same keyboard focus ring as the rest of the dashboard, and, when disabled, is faded and ignores the pointer.

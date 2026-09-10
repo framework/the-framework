@@ -2,7 +2,7 @@ The engine behind both notification feeds, the interventions [1] feed and the ac
 
 ## Context
 
-**User story**: the user configures a Discord webhook and is told when something new needs them or when an agent [2] starts or finishes; what already existed when the daemon started is never announced, and a repository the daemon cannot reach neither floods Discord with its backlog later nor silences the other projects.
+**User story**: the user configures a Discord webhook and is told when something new needs them or when an agent [2] starts or finishes; what already existed when the daemon started is never announced, and a repository the daemon cannot reach neither floods Discord later with everything it already held nor silences the other projects.
 
 **Problem**: the reads underneath a poll forgive their own failures, so a poll made while GitHub is unreachable succeeds with an empty list. Taken as a baseline, that empty list would make the next good poll announce every pre-existing item as new; taken as "seen", it would hide nothing, since it saw nothing. The engine therefore separates two facts: which items a poll saw, and which projects it read completely.
 
@@ -18,7 +18,7 @@ The engine behind both notification feeds, the interventions [1] feed and the ac
 - **Only what is new, per project** - an item is announced when its identity has not been seen before and its project has earned a baseline; every item seen is remembered either way.
 - **A project's first whole read seeds, never announces** - a project earns its baseline the first time a poll reads it completely, and the items found in that read are what already existed, not news.
 - **A failed poll earns nothing** - a poll whose project scan or projection fails announces nothing and seeds no baseline.
-- **Driven by the daemon's clock, one poll at a time** - the engine owns no timer; the daemon's clock asks for each poll, a poll requested while one is running is skipped, and a stopped watcher does nothing.
+- **Driven by the daemon's clock, one poll at a time** - the engine owns no clock of its own; the daemon's clock asks for each poll, a poll requested while one is running is skipped, and a stopped watcher does nothing.
 
 ## Business logic
 
@@ -36,7 +36,7 @@ Each poll reads the current items of every registered project along with the lis
 
 #### Context
 
-**Problem**: what is already open when the daemon starts is not news, and neither is the backlog of a project that becomes reachable later.
+**Problem**: what is already open when the daemon starts is not news, and neither is what a project already held when it becomes reachable later.
 
 #### Business logic
 
@@ -60,4 +60,4 @@ When the scan of the registered projects or the projection over them fails, the 
 
 #### Business logic
 
-The watcher owns no timer: the daemon's clock asks it to poll, and the daemon and the tests can drive a poll on demand. A poll requested while one is still running is skipped, so slow reads never pile up. The caller is handed a poll's new items only when there is at least one; empty polls are silent. Once the watcher is stopped, polls do nothing, and a poll already in flight when the stop happens announces nothing.
+The watcher owns no clock of its own: the daemon's clock asks it to poll, and the daemon and the tests can drive a poll on demand. A poll requested while one is still running is skipped, so slow reads never pile up. The caller is handed a poll's new items only when there is at least one; empty polls are silent. Once the watcher is stopped, polls do nothing, and a poll already in flight when the stop happens announces nothing.

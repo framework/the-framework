@@ -1,0 +1,1 @@
+The executable behind the `the-framework` command: it hands the command line to the CLI (`cli.ts`) and exits with the code the CLI answers. An error the CLI did not handle is printed and the process exits with code 1.

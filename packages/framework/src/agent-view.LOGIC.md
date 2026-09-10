@@ -23,7 +23,7 @@ Derives what the dashboard shows about an agent [1] from its event stream [2]: i
 
 ## Business logic — TL;DR
 
-- **Progress: the session name and ready for merge** - the name is read off the latest branch observation that carries one, and the agent is building until the ready-for-merge signal has been seen.
+- **Progress: the session name and ready for merge** - the name is the one carried by the latest branch observation, an observation without a name leaving the agent unnamed, and the agent is building until the ready-for-merge signal has been seen.
 - **The session name of a view built from the record** - a name is present only when the agent's branch carries one, so an unnamed agent has no name rather than an empty one.
 - **The errors the agent reported** - every error the agent reported, oldest first, each with its headline and its detail when the agent wrote one.
 - **The armed handoff and its outcome** - push and pull request read as armed until an announcement says otherwise, merge reads as off until one says so, a record snapshot may seed all three, the latest announcement wins, and the handoff's outcome is carried once it has run.
@@ -39,7 +39,7 @@ Derives what the dashboard shows about an agent [1] from its event stream [2]: i
 
 #### Business logic
 
-The session name is the one carried by the latest branch observation in the stream that carries a name. A branch observation without a name leaves the agent unnamed, whether the branch is the one the checkout [7] was born on or a branch The Framework did not mint; the writer of the observation is the one that knows which branch the checkout was created on, never this reader. The agent is ready for merge [4] once a ready-for-merge signal appears anywhere in the stream, and building before. An agent with no events at all is building and unnamed.
+The session name is the one carried by the latest branch observation in the stream. A latest observation without a name leaves the agent unnamed, whether the branch is the one the checkout [7] was born on or a branch The Framework did not mint, even when an earlier observation carried a name; the writer of the observation is the one that knows which branch the checkout was created on, never this reader. The agent is ready for merge [4] once a ready-for-merge signal appears anywhere in the stream, and building before. An agent with no events at all is building and unnamed.
 
 ### The session name of a view built from the record
 

@@ -1,0 +1,6 @@
+The plumbing shared by the daemon's plain HTTP surfaces outside the dashboard's own calls: the Claude web bridge [1] (`/_bridge`), the web-start endpoints (`/_web-start`) and the device relay [2] (`/_relay`). All three answer plain-text status lines and JSON payloads, and read JSON request bodies under a cap chosen by each route: a body that grows past the cap is refused with "body too large" rather than buffered, a body that is not JSON is refused with "body must be JSON", both as a 400 so the caller learns which of the two it hit, and a request on a POST-only route with any other method is refused with a 405 naming POST, as is a GET-only route with a non-GET naming GET. A route that refuses this way has already answered the request, so the route's own logic never runs on a bad request.
+
+## Glossary
+
+[1] the Claude web bridge: The daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session.
+[2] relay: Running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.

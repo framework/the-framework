@@ -4,7 +4,7 @@ The "Plan tickets (aka spike)" preset, both a launcher button and a routine [3]:
 
 **User story**: the user's tickets get costed plans, effort and uncertainty rated and an implementation sketched, without anyone asking for them one by one; the cheap-looking tickets are planned first, and a ticket already planned or already being worked is left alone.
 
-**Business logic story**: as a routine, the preset is part of Auto PM's [7] rotation (the rule in `src/auto-pm.ts`), where it is the one routine that fans out [8]: the daemon starts several planning agents at once, one per ticket to plan, rather than one agent working the entries in turn.
+**Business logic story**: as a routine, the preset is the last of Auto PM's [7] rotation (the rule in `src/auto-pm.ts`), because planning is the most expensive turn and the one whose output the earlier routines consume. It is the one routine that fans out [8]: the daemon claims the tickets open for planning, the most important first, and starts one agent per claimed ticket, each given this prompt followed by a narrowing that pins it to exactly that one ticket and has it write the plan itself with `tickets put <ticket>.plan.md` and then release its claim, stopping instead when the ticket is not claimed for it, claimed by someone else, or already planned. From the launcher, and when the fan-out is not available, one agent runs the prompt as written and only queues the planning work.
 
 ## Glossary
 

@@ -1,0 +1,1 @@
+Provides the dashboard's tooltip: a small card that opens instantly, with no hover delay, beside the control it explains, on whichever side the host asks for, and always paints above an open menu or popover so a hint offered inside a menu is never covered by that menu. Every tooltip is announced as a tooltip to assistive technology.

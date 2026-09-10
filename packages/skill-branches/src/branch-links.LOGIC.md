@@ -2,7 +2,7 @@ Keeps `.branches/` readable by current branch name: beside each checkout [1] who
 
 ## Context
 
-**User story**: an agent [3] names its work early, and its branch becomes `agent-<session name>` while its checkout's directory stays `agent-<agent id>`. The user who types `cd .branches/agent-<session name>` reaches that agent's checkout, and the listing of `.branches/` reads as the branches that exist now.
+**User story**: an agent [3] names its work early: its session name [4] renames its branch to `agent-<session name>` while its checkout's directory stays `agent-<agent id>`, named by its agent id [5]. The user who types `cd .branches/agent-<session name>` reaches that agent's checkout, and the listing of `.branches/` reads as the branches that exist now.
 
 **Problem**: renaming a checkout's directory under a running agent is not an option, so a rename costs a link instead. Links go stale as branches are renamed again and checkouts are reclaimed, and `.branches/` may hold the user's own files or links too, which must not be touched.
 

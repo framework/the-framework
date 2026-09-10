@@ -1,0 +1,43 @@
+Fixes the vocabulary the dashboard and the daemon speak to each other for starting an agent [1], adding a project, running a project's preview, the onboarding suggestion, a driver's [2] readiness, an agent's checkout [3], and the outcomes of removing a checkout or deleting an agent. The shapes live here, on neither the HTTP server nor the RPC mount, so both and the RPCs themselves depend on this one leaf rather than on each other. No behavior lives here; the defaults below are what an absent field means to whoever reads it.
+
+## Glossary
+
+[1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[2] driver: a coding agent wrapped as a black box. The user's driver choice is `claude` or `codex`.
+[3] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch. The user's own working copy is "the project's checkout".
+[4] build agent / prompt agent: the two kinds of agent: a build works the agent queue after its opening exchange; a prompt agent runs one prompt and stops there.
+[5] preset: a canned prompt the user launches from the dashboard.
+[6] composer: a project home's prompt editor, also used for live chat.
+[7] vanilla: an agent started without the built-in system prompt but with the signal protocols kept. transparent: an agent started with nothing of The Framework's — the raw coding agent.
+[8] ready for merge: the signal an agent emits when it believes its work is complete: it flips the agent's badge from building to ready and authorizes the handoff.
+[9] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down. An item on it is a queue entry.
+[10] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it).
+[11] the repo file: `the-framework.yml` at a project's root: per-repo defaults that travel with the code.
+[12] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
+[13] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
+[14] gate: a question with options at which an agent stops and waits for an answer.
+[15] settled: said of an agent whose work has stopped and which is waiting for the user: it is alive, takes messages, and does nothing until told.
+[16] routine: a preset the daemon fires on its own on a schedule.
+[17] stop: ending an agent before it finishes: the Stop button, Ctrl-C, or a pick marked to stop.
+[18] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
+[19] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
+[20] drain: starting an agent on the agent queue's first open entry — the half of Auto PM that spends existing work.
+[21] plan: a ticket's `.plan.md`: effort and uncertainty ratings and how to implement it.
+[22] fan-out: starting several agents at once, one per queue entry or one per ticket to plan.
+[23] driver session: the coding agent's own conversation for one agent, which the driver can resume by its session id.
+[24] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
+[25] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
+[26] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
+[27] preflight: the check that the chosen driver's coding agent can start an agent, run before a checkout is spent.
+
+## Business logic — TL;DR
+
+- **The kind of agent a start spawns** - `build` is the normal agent (a build agent [4]); `prompt` runs the posted text verbatim, which is what the page sends after a preset [5] prefilled the composer [6] and the user possibly edited it; `research` renders the research preset around the posted subject on the daemon's side, an empty subject meaning "this PR", and remains for callers of the API.
+- **A start's options** - each absent field means off, or the default: vanilla [7]; transparent [7]; context directories, each becoming a `Context:` line for the agent; the on-before-mergeable follow-up, which queues the quality follow-ups on the agent queue [9] when the agent signals ready for merge [8]; a real browser for the agent; the handoff [10] level, which when absent is left to the repo file [11] and then to the default `pr`, so the handoff is zero-config; the model, absent meaning the driver's [2] own default; the driver, `claude` or `codex`, absent meaning `claude`; the location [12], `local`, `actions` or `web`, absent meaning `local`; unattended [13], under which every gate [14] takes the recommended option, the agent stays out of the live chat loop so it ends once settled [15] and its armed handoff fires, set by the work the daemon starts on its own and by the dashboard surfaces that fire routine [16] or preset work, while a stop [17] still works because it ends the agent rather than answering a gate; an agent id [18] minted before the start, so that a claim [19] taken first names the very agent then started and the two are one, absent meaning the id is the moment the agent starts; the ticket the agent implements, set by the daemon when it drains [20] a queue entry that links to a ticket, so the Overview shows that ticket as being implemented instead of guessing from its plan [21]; that the agent plans its ticket rather than implementing it, set on a fanned-out [22] "Plan tickets" agent whose pull request lands only the plan and whose title must therefore not inherit the ticket's issue as `(fix #42)`, since merging a plan would close the issue with the work undone; a finished agent's driver session [23] to resume, sent with the `prompt` kind when the user messages an agent that has ended, so the prompt continues that conversation with its full prior context; an agent to continue, so the follow-up writes into that agent's own record on its own branch and a stopped agent the user messages again stays one row in the agent list; and the device [24] to run on, as its URL, its token and a label, which the dashboard sets at submit time from a saved device, is held in memory only, is never written to the preferences [26] or the registry and is never a CLI flag, and is stripped before the agent is forwarded so the device starts an ordinary local agent and never relays [25] onward.
+- **A start's result** - success, with the agent id [18] the daemon allocated whenever the agent got its own checkout [3], which the dashboard needs to select the agent it just started because with several agents running "the running one" no longer identifies it; or failure, with a message and whether the project was busy.
+- **Adding a project** - registered, together with whether it was already activated; or why not.
+- **The onboarding suggestion** - the daemon's own working directory, offered as the one-click first project, with its project id when it is already registered. Both are empty wherever adding projects is not wired, which is the case on the relay [25], so a daemon reached over the network never discloses its filesystem layout.
+- **A driver's readiness** - what the launcher hears from the preflight [27]: whether a start would die before the agent exists, the blocking problems, each naming its own fix, and the non-blocking warnings, chiefly running as root, which breaks every agent identically; every entry is already written for a human and is shown as is.
+- **A project's preview** - success with the live URL and the command that serves it, or why not; and whether the preview is running, with its URL and command.
+- **An agent's checkout** - its absolute path; whether it is the agent's own checkout [3] or the fallback to the project's checkout; whether it holds uncommitted changes; its branch, absent when the path is not a git repository; its size on disk, read only once nothing is writing to it and best-effort even then; the pull request opened for its branch when there is one; or that the pull request is not known yet because the lookup is still running, as distinct from there being none.
+- **Removing a checkout, deleting an agent** - each succeeds or fails with a message.

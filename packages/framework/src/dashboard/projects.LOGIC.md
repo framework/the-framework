@@ -32,7 +32,7 @@ See `## Context`.
 
 #### Business logic
 
-A summary is derived from a registry [4] record: the record's id, which is stable and safe in a URL; the absolute path; the display name, which is the last segment of the path; whether the project is activated, meaning its `.the-framework/` marker is present; and its last activity. The last activity is the newest among the project's agents [3], live and archived [5] alike, taking each agent's last-update time or, failing that, its start time; a project with no agents has no last activity. The repo file's [2] defaults are read fresh on every summary, so an edit to `the-framework.yml` shows on the next read; when the repo sets nothing, or the file is malformed, which the loader reports as empty rather than failing, the summary carries no defaults at all. Every read is forgiving: a failed marker check reads as not activated, failed agents read as no activity, a failed repo file read as no defaults, and none of them fails the summary. What the daemon's sweeps [6] currently find wrong with a project is not part of the summary; the dashboard's project list attaches it from the daemon's error state (`../project-errors.ts`).
+A summary is derived from a registry [4] record: the record's id, which is stable and safe in a URL; the absolute path; the display name, which is the last segment of the path; whether the project is activated, meaning its `.the-framework/` marker is present; and its last activity. The last activity is the newest among the project's agents [3], live and archived [5] alike, taking each agent's last-update time or, failing that, its start time; a project with no agents has no last activity. The repo file's [2] defaults are read fresh on every summary, so an edit to `the-framework.yml` shows on the next read; when the project sets nothing, or the file is malformed, which the loader reports as empty rather than failing, the summary carries no defaults at all. Every read is forgiving: a failed marker check reads as not activated, failed agents read as no activity, a failed repo file read as no defaults, and none of them fails the summary. What the daemon's sweeps [6] currently find wrong with a project is not part of the summary; the dashboard's project list attaches it from the daemon's error state (`../project-errors.ts`).
 
 ### Only projects whose directory is on disk are served
 
@@ -58,7 +58,7 @@ A project id resolves to the absolute path of the registry [4] record with that 
 
 #### Context
 
-**Problem**: a project whose sources cannot be read contributes no items, which is exactly what a project with nothing waiting contributes. A panel that only renders the list does not care; a notification feed that keeps a baseline of what it has already announced must not mistake an unreadable project for one that went quiet.
+**Problem**: a project whose sources cannot be read contributes no items, which is exactly what a project with nothing waiting contributes. A page that only renders the list does not care; a notification feed that keeps a baseline of what it has already announced must not mistake an unreadable project for one that went quiet.
 
 #### Business logic
 

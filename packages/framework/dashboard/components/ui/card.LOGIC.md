@@ -1,0 +1,1 @@
+Provides the bordered panel the dashboard's pages are built from: a rounded card surface with an optional header holding a small bold title, and a padded content area, so every panel on a page shares one look.

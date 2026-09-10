@@ -73,7 +73,7 @@ Items across all projects sort newest first, by the pull request's opening time 
 
 #### Context
 
-**Problem**: forgiveness is what keeps the feed useful when one project is unreachable, and it is also what would let that project's entire backlog announce itself as new the moment it came back: the notification sweep [4] keeps a baseline of what it has already announced, and a project that answered "nothing" because it could not be read would drop out of that baseline.
+**Problem**: forgiveness is what keeps the feed useful when one project is unreachable, and it is also what would let everything already open in that project announce itself as new the moment it came back: the notification sweep [4] keeps a baseline of what it has already announced, and a project that answered "nothing" because it could not be read would drop out of that baseline.
 
 #### Business logic
 

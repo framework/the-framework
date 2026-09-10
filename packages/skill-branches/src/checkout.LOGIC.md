@@ -13,13 +13,13 @@ Makes a checkout [1] as an agent [2] gets it, in one sequence whichever surface 
 [3] skill: one of the four capabilities an agent is taught — `branches`, `tickets`, `queue`, `logs` — each a package with the instructions the agent reads (its `SKILL.md`, linked into the checkout where the coding agent's harness looks for skills), a command on the agent's PATH, and an API the product calls.
 [4] coding agent: the CLI doing the actual work: Claude Code or Codex.
 [5] branch link: a symbolic link under `.branches/`, named as the branch a checkout is on now and pointing at that checkout's directory, so `.branches/<branch>` reaches the checkout by its current branch name.
-[6] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
-[7] birth branch: the branch a checkout is created on, `agent-<agent id>`, which also names the checkout's directory; the agent's branch until the agent names its work.
+[6] birth branch: the branch a checkout is created on, `agent-<agent id>`, which also names the checkout's directory; the agent's branch until the agent names its work.
+[7] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
 [8] reclaim: removing a finished agent's checkout once its work is on the remote.
 
 ## Business logic — TL;DR
 
-- **A new agent's checkout** - a worktree on the fresh birth branch [7] `agent-<agent id>`, from the base the caller names or the project's head, then settled.
+- **A new agent's checkout** - a worktree on the fresh birth branch [6] `agent-<agent id>`, from the base the caller names or the project's head, then settled.
 - **A continued agent's checkout** - a worktree on the branch the caller names, the one the agent's work is on, then settled the same way.
 - **What a checkout gets besides its files** - `.branches/` hidden from git, the user's dependency trees linked in, the `branches` skill and any further skills the caller names linked in, and the branch links reconciled, in that order.
 - **Only the worktree can fail the caller** - a checkout missing any of the rest is a worse agent, not a failed one.
@@ -34,7 +34,7 @@ See `## Context`.
 
 #### Business logic
 
-Given the project's checkout, an agent id [6] and, optionally, a base revision and further skills [3] to link, a worktree is created at `.branches/agent-<agent id>` on the new branch `agent-<agent id>`, the birth branch [7], starting from the base when one is named and from the commit the project's checkout is on otherwise (the creation rules, the id check included, are in `worktree.ts`). The checkout [1] is then settled as described below, and the caller gets the checkout's path and branch back.
+Given the project's checkout, an agent id [7] and, optionally, a base revision and further skills [3] to link, a worktree is created at `.branches/agent-<agent id>` on the new branch `agent-<agent id>`, the birth branch [6], starting from the base when one is named and from the commit the project's checkout is on otherwise (the creation rules, the id check included, are in `worktree.ts`). The checkout [1] is then settled as described below, and the caller gets the checkout's path and branch back.
 
 ### A continued agent's checkout
 
@@ -44,7 +44,7 @@ Given the project's checkout, an agent id [6] and, optionally, a base revision a
 
 #### Business logic
 
-Given the project's checkout, an agent id [6], the branch to continue on and, optionally, further skills [3] to link, a worktree is created at `.branches/agent-<agent id>` with that branch checked out, whatever the branch's name (the rules for a branch gone locally or gone everywhere are in `worktree.ts`). The checkout [1] is then settled exactly as a new agent's, and the caller gets the checkout's path and branch back.
+Given the project's checkout, an agent id [7], the branch to continue on and, optionally, further skills [3] to link, a worktree is created at `.branches/agent-<agent id>` with that branch checked out, whatever the branch's name (the rules for a branch gone locally or gone everywhere are in `worktree.ts`). The checkout [1] is then settled exactly as a new agent's, and the caller gets the checkout's path and branch back.
 
 ### What a checkout gets besides its files
 

@@ -2,7 +2,7 @@ The agent-facing side of the cloud session [1] start queue: how a web agent's [2
 
 ## Context
 
-**User story**: the user starts an agent [2] with location `web`. Its process needs a cloud session [1] opened on claude.ai for the repository, the branch and the prompt, which only the extension in the user's browser can do; the process queues the request here, then reads back the session it became and its URL.
+**User story**: the user starts an agent [2] with location `web`. Its process needs a cloud session [1] opened on claude.ai for the repository, the branch and the prompt, which only the extension in the user's browser can do; the process queues the request here, then reads back the cloud session it became and its URL.
 
 **Problem**: a request nobody will ever drain must be refused at once rather than time out, so the agent's process learns immediately that no extension is around and can fall back another way.
 
@@ -44,7 +44,7 @@ Only a POST to `/_web-start` queues a request; another method is 405 "method not
 
 #### Context
 
-**User story**: the agent's [2] process polls until the extension has created the cloud session [1], then records the session's id and opens nothing itself.
+**User story**: the agent's [2] process polls until the extension has created the cloud session [1], then records the cloud session's id and opens nothing itself.
 
 #### Business logic
 

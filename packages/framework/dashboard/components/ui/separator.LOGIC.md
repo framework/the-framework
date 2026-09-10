@@ -1,0 +1,1 @@
+Provides the thin divider line in the border color, horizontal across its container by default or vertical along its height when the host asks, announced as a separator to assistive technology; the sidebar uses it between its sections.

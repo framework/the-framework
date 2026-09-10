@@ -11,8 +11,8 @@ Gives an agent [1] in a shell, and the user, the `branches` command over this pa
 [3] skill: one of the four capabilities an agent is taught — `branches`, `tickets`, `queue`, `logs` — each a package with the instructions the agent reads (its `SKILL.md`), a command on the agent's PATH, and an API the product calls.
 [4] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
 [5] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
-[6] worktree root: a directory that is itself the top level of a git worktree: the project's checkout, or an agent's checkout that git still knows as a worktree.
-[7] branch link: a symbolic link under `.branches/`, named as the branch a checkout is on now and pointing at that checkout's directory, so `.branches/<branch>` reaches the checkout by its current branch name.
+[6] branch link: a symbolic link under `.branches/`, named as the branch a checkout is on now and pointing at that checkout's directory, so `.branches/<branch>` reaches the checkout by its current branch name.
+[7] worktree root: a directory that is itself the top level of a git worktree: the project's checkout, or an agent's checkout that git still knows as a worktree.
 [8] agent branch: a branch whose name starts with `agent-`, other than `agent-data`: the branch a checkout is created on, or the `agent-<session name>` it is renamed to. The only branches this package renames or deletes.
 [9] reclaim: removing a finished agent's checkout once its work is on the remote.
 [10] birth branch: the branch a checkout is created on, `agent-<agent id>`, which also names the checkout's directory; the agent's branch until the agent names its work.
@@ -92,7 +92,7 @@ See `## Context`.
 
 #### Business logic
 
-`create <id> [--base <ref>]` makes the checkout [2] for a new agent [1]: `.branches/agent-<id>` on the fresh branch `agent-<id>`, from `--base` when given and from the project's head otherwise, set up with the user's dependencies, the skill [3] links and the branch links [7] (the sequence is in `checkout.ts`). The result is `{"ok": true, "path": …, "branch": …}`. A branch or directory that already exists is git's own failure, `git-failed`.
+`create <id> [--base <ref>]` makes the checkout [2] for a new agent [1]: `.branches/agent-<id>` on the fresh branch `agent-<id>`, from `--base` when given and from the project's head otherwise, set up with the user's dependencies, the skill [3] links and the branch links [6] (the sequence is in `checkout.ts`). The result is `{"ok": true, "path": …, "branch": …}`. A branch or directory that already exists is git's own failure, `git-failed`.
 
 ### `attach`: a checkout for a continued agent
 
@@ -112,7 +112,7 @@ See `## Context`.
 
 #### Business logic
 
-`name <name>` renames the branch of the checkout [2] the command runs in to `agent-<name>`, suffixed `-2`, `-3`, and so on when the name is taken (the naming rules are in `worktree.ts`), and prints the branch it got as `branch`. Four refusals: `invalid-name` ("<name> is not a session name: use [a-z0-9-]+"); `not-a-worktree` ("<checkout> is not a git worktree"); `no-branch` ("<checkout> is on no branch"); `not-an-agent-branch` ("<checkout> is not on an agent branch; only agent-* branches are renamed"), so an agent that somehow runs in the user's own checkout never renames `main`. After a rename the branch links [7] under `.branches/` are reconciled at once, so `.branches/agent-<name>` reaches the checkout now and not at the daemon's next pass.
+`name <name>` renames the branch of the checkout [2] the command runs in to `agent-<name>`, suffixed `-2`, `-3`, and so on when the name is taken (the naming rules are in `worktree.ts`), and prints the branch it got as `branch`. Four refusals: `invalid-name` ("<name> is not a session name: use [a-z0-9-]+"); `not-a-worktree` ("<checkout> is not a git worktree"); `no-branch` ("<checkout> is on no branch"); `not-an-agent-branch` ("<checkout> is not on an agent branch; only agent-* branches are renamed"), so an agent that somehow runs in the user's own checkout never renames `main`. After a rename the branch links [6] under `.branches/` are reconciled at once, so `.branches/agent-<name>` reaches the checkout now and not at the daemon's next pass.
 
 ### `status`: where the agent is and whether it may finish
 
@@ -122,7 +122,7 @@ See `## Context`.
 
 #### Business logic
 
-`status [path]` reports on the checkout [2] the command runs in, or on the checkout root given: `{"ok": true, "path": …, "branch": …, "clean": …, "onRemote": …}`. `path` is the checkout's root. `branch` is the branch checked out, absent when the head is detached. `clean` is true when nothing is uncommitted and nothing is untracked; ignored files do not count (`worktree.ts`). `onRemote` is true when the branch's tip is the tip of `origin/<branch>` or an ancestor of it, read from the local remote-tracking refs (`worktree.ts`), and false when there is no branch. A path that is not a worktree root [6] is refused as `not-a-worktree` ("<path> is not a git worktree"), the path in the refusal: a directory left under `.branches/` that git does not know is never reported as being on the user's branch. Given a path, the command answers about that directory even outside a repository: `not-a-worktree`, not `not-a-repo`. A status git cannot read is `git-failed`, never a clean checkout.
+`status [path]` reports on the checkout [2] the command runs in, or on the checkout root given: `{"ok": true, "path": …, "branch": …, "clean": …, "onRemote": …}`. `path` is the checkout's root. `branch` is the branch checked out, absent when the head is detached. `clean` is true when nothing is uncommitted and nothing is untracked; ignored files do not count (`worktree.ts`). `onRemote` is true when the branch's tip is the tip of `origin/<branch>` or an ancestor of it, read from the local remote-tracking refs (`worktree.ts`), and false when there is no branch. A path that is not a worktree root [7] is refused as `not-a-worktree` ("<path> is not a git worktree"), the path in the refusal: a directory left under `.branches/` that git does not know is never reported as being on the user's branch. Given a path, the command answers about that directory even outside a repository: `not-a-worktree`, not `not-a-repo`. A status git cannot read is `git-failed`, never a clean checkout.
 
 ### `list`: every checkout under `.branches/`
 
@@ -132,7 +132,7 @@ See `## Context`.
 
 #### Business logic
 
-`list [--sizes]` answers with a bare JSON array, one row per checkout [2] directory under the project's `.branches/` (the listing rule is in `worktree.ts`: a directory named as an agent branch [8] with a valid agent id [5]; `agent-data`, links and files are not listed). Each row carries the agent id as `agentId` and the directory's path as `path`, `branch` when the directory is a worktree root [6] on a branch, and with `--sizes` its size in bytes as `sizeBytes` when the size could be read. A directory git no longer knows as a worktree is listed without a branch, never with the user's own; an unreadable size leaves the size out rather than reporting a wrong number. A project without `.branches/`, or with an empty one, lists nothing.
+`list [--sizes]` answers with a bare JSON array, one row per checkout [2] directory under the project's `.branches/` (the listing rule is in `worktree.ts`: a directory named as an agent branch [8] with a valid agent id [5]; `agent-data`, links and files are not listed). Each row carries the agent id as `agentId` and the directory's path as `path`, `branch` when the directory is a worktree root [7] on a branch, and with `--sizes` its size in bytes as `sizeBytes` when the size could be read. A directory git no longer knows as a worktree is listed without a branch, never with the user's own; an unreadable size leaves the size out rather than reporting a wrong number. A project without `.branches/`, or with an empty one, lists nothing.
 
 ### `remove`: reclaim one checkout
 
@@ -142,7 +142,7 @@ See `## Context`.
 
 #### Business logic
 
-`remove <id> [--no-push]` reclaims [9] the checkout [2] at `.branches/agent-<id>` under the rule that only what is on the remote may go, naming `agent-<id>` as the birth branch [10], with a push to `origin` allowed unless `--no-push` is given; the command line vouches for no pushed commit and passes no hook. A missing `.branches/agent-<id>` directory is its own refusal, `no-checkout` ("no checkout for agent <id>"). The reclaim rule's refusals come through with one line each: `not-a-worktree` ("agent <id>'s directory is not a git worktree; left alone"), `no-branch` ("agent <id>'s checkout is on no branch; kept"), `dirty` ("<branch> has uncommitted work; the checkout was kept") and `not-on-remote` ("<branch> is not on the remote (<what git said, or "not pushed">); the checkout was kept"). On success the result carries the branches that went with the checkout as `branchesDeleted`, when any did, and the branch links [7] are reconciled at once, since a link named after a branch that just went is stale from this moment.
+`remove <id> [--no-push]` reclaims [9] the checkout [2] at `.branches/agent-<id>` under the rule that only what is on the remote may go, naming `agent-<id>` as the birth branch [10], with a push to `origin` allowed unless `--no-push` is given; the command line vouches for no pushed commit and passes no hook. A missing `.branches/agent-<id>` directory is its own refusal, `no-checkout` ("no checkout for agent <id>"). The reclaim rule's refusals come through with one line each: `not-a-worktree` ("agent <id>'s directory is not a git worktree; left alone"), `no-branch` ("agent <id>'s checkout is on no branch; kept"), `dirty` ("<branch> has uncommitted work; the checkout was kept") and `not-on-remote` ("<branch> is not on the remote (<what git said, or "not pushed">); the checkout was kept"). On success the result carries the branches that went with the checkout as `branchesDeleted`, when any did, and the branch links [6] are reconciled at once, since a link named after a branch that just went is stale from this moment.
 
 ### `prune`: reclaim every checkout
 
@@ -152,4 +152,4 @@ See `## Context`.
 
 #### Business logic
 
-`prune [--no-push]` runs `remove`'s reclaim [9] for every checkout [2] directory under `.branches/`, with the same push rule for all, and never refuses as a whole: the result is `{"ok": true, "removed": [ids], "skipped": [{agentId, reason, detail}]}`, each skipped entry carrying the refusal's reason and its one-line explanation, and the exit code is 0 even when every checkout was skipped. A git failure inside a removal itself ends the pass as `git-failed`. The branch links [7] are reconciled once for the whole pass, after the last checkout, and only when something was removed.
+`prune [--no-push]` runs `remove`'s reclaim [9] for every checkout [2] directory under `.branches/`, with the same push rule for all, and never refuses as a whole: the result is `{"ok": true, "removed": [ids], "skipped": [{agentId, reason, detail}]}`, each skipped entry carrying the refusal's reason and its one-line explanation, and the exit code is 0 even when every checkout was skipped. A git failure inside a removal itself ends the pass as `git-failed`. The branch links [6] are reconciled once for the whole pass, after the last checkout, and only when something was removed.

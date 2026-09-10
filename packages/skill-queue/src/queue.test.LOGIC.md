@@ -1,0 +1,8 @@
+What the tests cover, on the queue's text and, for the edits, against a real git repository:
+
+- **Which lines are entries** - an unchecked task box (printed without its box), a `-` bullet, a `*` bullet and a numbered item are open entries; checked boxes in either case, an empty box, an empty bullet, a heading and prose are not.
+- **Priority sections need no reader support** - a file sorted `## Priority 10` down to `## Priority 0`, glosses and all, drains in that order with the headings skipped.
+- **Removing** - deletes the named open entry only, boxed or plain, and nothing else; an entry the queue does not have and a checked line change nothing.
+- **Appending without a priority** - a plain bullet lands at the end, into an empty file or after a last line with or without a line break.
+- **Placing by priority** - a new section lands between the higher and the lower sections; an entry joins an existing section at its end without a second heading; a file with no priority section gets one above its own headings with its title and introduction staying on top, and a file of prose alone gets one at its end; an entry outranking everything goes first; one outranked by everything goes last in its own section; a heading carrying the format's gloss is still its section.
+- **Edits on the branch** - adding with and without a priority, from the project's checkout and from an agent's checkout, lands on the same branch and reads back in order of work; done deletes the line rather than checking it off, as "queue done: <entry>" after "queue add: <entry>"; a done for an entry already gone lands changing nothing; a queue written by hand with a task box reads the same off the branch as through the reader.

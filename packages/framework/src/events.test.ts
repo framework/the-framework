@@ -114,13 +114,6 @@ test('formatFrameworkEvent shows a preview of the driver prompt, not just "promp
   assert.ok(line.length < 160 && line.endsWith('…'))
 })
 
-test('formatFrameworkEvent renders a preview line', () => {
-  assert.equal(
-    formatFrameworkEvent({ kind: 'preview', url: 'http://localhost:3000', command: 'npm run dev' }),
-    '▶ your app is running at http://localhost:3000',
-  )
-})
-
 test('formatFrameworkEvent distinguishes finished / stopped / failed (#218)', () => {
   assert.equal(formatFrameworkEvent({ kind: 'end', ok: true }), '✓ finished')
   assert.equal(formatFrameworkEvent({ kind: 'end', ok: false, stopped: true }), '■ stopped')

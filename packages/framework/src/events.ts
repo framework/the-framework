@@ -15,7 +15,7 @@ export interface ChoiceOption {
 /**
  * An interactive choice the agent pauses on until a pick arrives (#304). Emitted as
  * a `choice` {@link FrameworkEvent}; the dashboard renders it in a panel and posts
- * the pick back. The recommended option is the default the autopilot auto-accepts.
+ * the pick back. The recommended option is what an agent nobody is watching takes.
  */
 export interface ChoiceRequest {
   /** Unique id for this pending choice; the pick is posted back against it. */
@@ -25,7 +25,7 @@ export interface ChoiceRequest {
   /** The options to choose between (at least one). */
   options: readonly ChoiceOption[]
   /**
-   * The option id pre-selected as the default (autopilot auto-accepts it). Required
+   * The option id pre-selected as the default (taken when nobody is watching). Required
    * for a single-select; omitted for a {@link multi} select, where each option's own
    * {@link ChoiceOption.default} drives the pre-checked set instead.
    */
@@ -36,8 +36,6 @@ export interface ChoiceRequest {
    * *subset* of ids rather than one. Absent = the single-select gate (#304).
    */
   multi?: boolean
-  /** Auto-accept the recommended option after this many ms when autopilot is on. Default 10000. */
-  autoAcceptMs?: number
   /** The markdown file under approval (e.g. `PLAN_<slug>.agent.md`); the doc sidebar renders it. */
   file?: string
 }
@@ -49,7 +47,7 @@ export interface ChoiceRequest {
 export type OnBeforeMergeableSkip =
   /** The agent never signalled `setReadyForMerge()`, so there is nothing to clean up after. */
   | 'not-ready-for-merge'
-  /** The agent was stopped (Stop button, Ctrl+C, budget cap) rather than finished. */
+  /** The agent was stopped (the Stop button, Ctrl+C, an answer marked stop) rather than finished. */
   | 'run-stopped'
   /** A fake/offline run: no agent to hand the follow-up prompt to. */
   | 'fake-run'
@@ -84,7 +82,7 @@ export type AutoHandoffSkip =
   | 'already-landed'
   /** The branch is already on the remote at this commit, and only the push was asked for. */
   | 'already-pushed'
-  /** The agent was stopped (Stop button, Ctrl+C, budget cap) rather than finished. */
+  /** The agent was stopped (the Stop button, Ctrl+C, an answer marked stop) rather than finished. */
   | 'run-stopped'
   /** A fake/offline run: nothing real to publish. */
   | 'fake-run'
@@ -119,8 +117,8 @@ export type AutoMergeOutcome =
   | { outcome: 'withheld'; reason: MergeWithheldReason }
   | { outcome: 'failed'; error: string }
 
-/** Who resolved a {@link ChoiceRequest}: a human, the autopilot countdown, or a headless auto-accept. */
-export type ChoiceBy = 'user' | 'autopilot' | 'auto'
+/** Who resolved a {@link ChoiceRequest}: a human, or a headless auto-accept. */
+export type ChoiceBy = 'user' | 'auto'
 
 /** What a {@link import('./agent.js').RunFrameworkOptions.requestChoice} handler resolves with. */
 export interface ChoicePick {
@@ -170,12 +168,6 @@ export type FrameworkEvent =
   | { kind: 'intent'; text: string }
   /** The wrapped agent's own progress, forwarded verbatim (never gated on). */
   | { kind: 'driver'; event: DriverEvent }
-  /**
-   * The generated app is booted and serving. Emitted after a successful agent when
-   * a serve config is set: the app is kept running so the user can open it, and
-   * the dashboard shows a live preview link (torn down on Ctrl+C).
-   */
-  | { kind: 'preview'; url: string; command: string }
   /**
    * The agent's browser preview is up and listening on this loopback port (#813).
    *
@@ -319,11 +311,11 @@ export type FrameworkEvent =
   | { kind: 'settled' }
   /**
    * Cumulative token + cost usage for the agent so far (#322). Emitted after each
-   * agent turn that reports usage; the dashboard renders a live spend readout and
-   * the agent stops itself once `costUsd` reaches the budget cap, if one is set.
+   * agent turn that reports usage, for the dashboard's live spend readout. Nothing
+   * gates on it: an agent already running is never cut short over spending, and the
+   * account's quota decides what may *start* instead.
    *
-   * `costUsd` is absent when the agent reports tokens but no price (#540), which
-   * is also when no budget cap can fire.
+   * `costUsd` is absent when the agent reports tokens but no price (#540).
    */
   | {
       kind: 'usage'

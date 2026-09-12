@@ -198,7 +198,7 @@ test('an aborted signal ends the loop before starting another entry', async () =
   }
 })
 
-test('a backlog turn emits its signals: views, errors, session name, ready-for-merge', async () => {
+test('a backlog turn emits its signals: views, errors, ready-for-merge', async () => {
   const repo = await repoWorkspace()
   await seedQueue(repo, '- [ ] tidy the login redirect\n')
   try {

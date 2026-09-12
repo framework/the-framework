@@ -116,7 +116,7 @@ function ParkedQuestion({
           Sending “{failure.labels.join(', ')}” failed{failure.note ? `: ${failure.note}` : ''}. Pick again, or answer in the session.
         </p>
       )}
-      <ChoicePanel projectId={projectId} agentId={agentId} choice={bridgeChoiceRequest(question)} countdown={false} inline send={bridgeSend(sessionId)} />
+      <ChoicePanel projectId={projectId} agentId={agentId} choice={bridgeChoiceRequest(question)} inline send={bridgeSend(sessionId)} />
       <a href={url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 px-4 pb-2.5 text-xs text-primary hover:underline">
         Answer it in the session
         <ExternalLink className="h-3 w-3" aria-hidden />

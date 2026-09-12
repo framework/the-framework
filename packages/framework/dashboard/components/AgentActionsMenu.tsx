@@ -102,19 +102,19 @@ export function AgentActionsMenu({
 
   const openApp = (target: 'files' | 'editor') => run(() => sendOpenInApp(projectId, target, agentId ?? undefined), 'Failed to open.')
   const stopSession = () =>
-    void run(() => sendStop(projectId, agentId ?? undefined).then(() => true), 'Could not stop the session.').then(result => {
-      if (result) setStopRequested(true)
+    void run(() => sendStop(projectId, agentId ?? undefined), 'Could not stop the session.').then(outcome => {
+      if (outcome.ok) setStopRequested(true)
     })
   const mergeAgent = () => {
     if (!agentId) return
-    void run(() => sendMerge(projectId, agentId), 'Could not arm the merge.').then(result => {
-      if (result?.ok) setMergeRequested(true)
+    void run(() => sendMerge(projectId, agentId), 'Could not arm the merge.').then(outcome => {
+      if (outcome.ok) setMergeRequested(true)
     })
   }
   const removeWorktree = () => {
     if (!agentId) return
-    void run(() => sendRemoveWorktree(projectId, agentId), 'Could not remove the worktree.').then(result => {
-      if (result !== undefined) onWorktreeRemoved?.()
+    void run(() => sendRemoveWorktree(projectId, agentId), 'Could not remove the worktree.').then(outcome => {
+      if (outcome.ok) onWorktreeRemoved?.()
     })
   }
 
@@ -237,7 +237,7 @@ export function AgentActionsMenu({
           confirmLabel="Delete"
           confirmBusyLabel="Deleting…"
           fallbackError="Could not delete the agent."
-          onConfirm={() => sendDeleteAgent(projectId, agentId).then(result => (result.ok ? result : Promise.reject(new Error(result.error))))}
+          onConfirm={() => sendDeleteAgent(projectId, agentId)}
           onSuccess={onDeleted}
         />
       )}

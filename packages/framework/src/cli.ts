@@ -427,7 +427,7 @@ interface AgentEpilogue {
   maybeFireOnBeforeMergeable: () => Promise<void>
   /** Hand the session's work back (#1102): push its branch and open a draft PR, if still armed. */
   maybeAutoHandoff: () => Promise<void>
-  /** True once the agent stopped cleanly (interrupt / budget cap) rather than failed. */
+  /** True once the agent stopped cleanly (an interrupt, or an answer marked stop) rather than failed. */
   isStopped: () => boolean
   /** How a real failure is labelled: "run", "research", or "prompt run". */
   failLabel: string
@@ -435,7 +435,7 @@ interface AgentEpilogue {
 
 /**
  * Run one engine (a build or a direct prompt) and settle it identically: on success print its
- * line; on a clean stop (interrupt / budget cap #322) report it; on a real failure report it. The
+ * line; on a clean stop (an interrupt, or an answer marked stop) report it; on a real failure report it. The
  * teardown — flush the store, close the control channel + consumption guard — runs either way.
  * Returns the exit code (0 on success or a clean stop, 1 on a failure). Shared by both agent paths
  * so their epilogues cannot drift.
@@ -462,7 +462,7 @@ async function settleAgent(ctx: AgentEpilogue, run: () => Promise<{ successLine:
   } catch (err) {
     ctx.clearInterrupt()
     await ctx.store?.close()
-    // A clean stop (Stop button, Ctrl+C, or a budget cap #322) is not a failure: report it and
+    // A clean stop (the Stop button, Ctrl+C, or an answer marked stop) is not a failure: report it and
     // exit 0. The dashboard that spawned this session shows the stopped state from its event log.
     if (ctx.isStopped()) {
       io.out('\n■ Stopped.')
@@ -580,7 +580,7 @@ export interface AgentJournal {
   sawReadyForMerge: () => boolean
   /** The pull request the agent asked for via an `open-pr` block (#1567/#1618), if any. */
   pullRequest: () => ParsedPullRequest | undefined
-  /** The agent stopped cleanly (user interrupt / budget cap #322) rather than failed. */
+  /** The agent stopped cleanly (a user interrupt, or an answer marked stop) rather than failed. */
   stoppedCleanly: () => boolean
   /** Hold the browser preview's port until the session opens (#829/#813). */
   announceBrowserPort: (port: number) => void
@@ -606,8 +606,8 @@ export function createAgentJournal(deps: {
 }): AgentJournal {
   const { io, cwd, store, agentId } = deps
   // The framework's own verdict that the agent stopped cleanly rather than failed — set by a
-  // user interrupt or a budget cap (#322). Trusted over which signal aborted, since a budget
-  // stop trips an internal signal the CLI never sees.
+  // user interrupt, or by an answer the user marked stop. Trusted over which signal aborted,
+  // since an answer's stop trips an internal signal the CLI never sees.
   let stoppedCleanly = false
   let sawReadyForMerge = false
   // The branch as last read off the checkout (#1277): what the `branch` events said, so the
@@ -1009,9 +1009,6 @@ async function driveAgent(opts: AgentOptions, io: CliIO): Promise<number> {
     if (!journal.sawReadyForMerge()) return skip('not-ready-for-merge')
     if (journal.stoppedCleanly()) return skip('run-stopped')
     if (fake) return skip('fake-run')
-    // --eco-auto-maintenance (#314) no longer skips the whole agent: since #537 this prompt
-    // also carries `## Business knowledge`, which the flag does not name. It drops just
-    // `## Maintenance` inside renderOnBeforeMergeablePrompt() instead.
     // Every line of the prompt names the session, so there is nothing to queue without one.
     // An agent that made changes has one; this is the agent that ignored the instruction.
     const sessionName = journal.sessionName()
@@ -1413,7 +1410,7 @@ export function promptAgentSpec(prompt: string, cwd: string, vanilla = false): A
 
 /**
  * Run one direct prompt by spawning `framework --agent <spec>`, reusing the whole agent path
- * (preflight, driver, budget cap, session archive). The child inherits stdio so its agent streams to the
+ * (preflight, driver, session archive). The child inherits stdio so its agent streams to the
  * terminal. Note the spec carries no `onBeforeMergeable`, so a quality pass never triggers its own
  * on-before-mergeable prompt (the recursion guard). Resolves true on a clean exit (0). Never
  * re-execs a test entry (fork-bomb guard).

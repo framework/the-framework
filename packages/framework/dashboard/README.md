@@ -13,7 +13,7 @@ IPC:
 - **Reads** — `POST /_rpc/<name>` (`rpc/reads.ts`, `rpc/projects.ts`, …) for agent history, an agent's
   replay, and the surfaced PLAN/TODO docs.
 - **Live event stream** — Server-Sent Events at `GET /_rpc/events` (`rpc/events.ts`) tailing
-  the selected session's `.the-framework/events.jsonl`; each new line becomes one SSE frame.
+  the selected agent's `.the-framework/events.jsonl`; each new line becomes one SSE frame.
 
 The `rpc/` modules are typed stubs: each is declared against the implementation's own signature in
 `../src/dashboard-rpc/`, so a renamed or re-shaped RPC is a type error here rather than a 404 in
@@ -43,8 +43,8 @@ pnpm --filter framework dev:dashboard
 ```
 
 Populate a project to watch: run `dev:daemon` instead of `dev:dashboard`, which brings a real
-daemon up in the dev server's own process, and start a session from the UI. The dashboard is the
-only way to start one — the CLI keeps four options and no verbs, and a session's whole
+daemon up in the dev server's own process, and start an agent from the UI. The dashboard is the
+only way to start one — the CLI keeps four options and no verbs, and an agent's whole
 configuration travels to it as a JSON spec (`--agent <path>`), never as flags.
 
 ## Tests

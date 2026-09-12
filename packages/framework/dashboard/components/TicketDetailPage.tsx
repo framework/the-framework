@@ -37,11 +37,11 @@ export function TicketDetailPage({
 
   const queue = async () => {
     if (!ticket) return
-    const result = await run(
+    const outcome = await run(
       () => sendQueueTicket(projectId, ticket.title, { file: ticket.file, ...(ticket.priority ? { priority: ticket.priority } : {}) }),
       'The ticket could not be queued.',
     )
-    if (result?.ok) setQueued(true)
+    if (outcome.ok) setQueued(true)
   }
 
   // The manual lock release (#1420): nothing times a `.lock.md` out anymore, so a dead agent's
@@ -51,8 +51,8 @@ export function TicketDetailPage({
   const holder = ticket?.lockedByAgent?.name ?? ticket?.lockedBy
   const release = async () => {
     if (!ticket) return
-    const result = await run(() => sendReleaseTicketLock(projectId, ticket.file), 'The lock could not be released.')
-    if (result?.ok) setReleased(true)
+    const outcome = await run(() => sendReleaseTicketLock(projectId, ticket.file), 'The lock could not be released.')
+    if (outcome.ok) setReleased(true)
   }
 
   return (

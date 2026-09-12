@@ -7,8 +7,8 @@ import { nodeFs } from './node-fs.js'
  * finds the commits each repo has grown since its last maintenance review, and runs
  * the maintainability loop on them. Per-repo review state is a small local file
  * (`.the-framework/maintenance.json`, gitignored) recording the last-reviewed commit,
- * so a sweep only ever acts on new work. The capacity gate is the existing budget cap
- * (`--max-cost`). #298's "check the limit" half is reachable after all — the agent
+ * so a sweep only ever acts on new work. The capacity gate is the quota boundary, which
+ * decides whether unattended work may start. #298's "check the limit" half is reachable — the agent
  * reports the account's quota per turn (#517) and on demand (#521) — but this sweep
  * does not gate on it yet; that is #519's consumption limits.
  */

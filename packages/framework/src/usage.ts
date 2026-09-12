@@ -25,7 +25,8 @@ const ZERO: UsageTotals = {
 
 /**
  * Accumulates per-turn {@link DriverUsage} into a running total for the whole
- * run and lets a budget cap gate on it (#322).
+ * run, for the dashboard's live spend readout (#322). Nothing gates on the total:
+ * an agent already running is never cut short over what it has spent.
  *
  * This tracks what *this agent* spent, not where the account's subscription quota
  * stands — the agent reports that separately, per turn, as `DriverRateLimit`

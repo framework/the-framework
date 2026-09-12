@@ -9,7 +9,8 @@ import type { ProjectError } from '../project-errors.js'
 /**
  * The multi-project read side (#392): projects the daemon serves come from the registry (#390),
  * and every read resolves a project id to that project's path before running the per-cwd reader
- * underneath. One daemon serves them all; it runs one agent at a time per project (#393).
+ * underneath. One daemon serves them all, running as many agents per project as their own
+ * concurrency allows (#736), each in its own checkout.
  */
 
 /** One project's summary for the Projects sidebar (#314). */

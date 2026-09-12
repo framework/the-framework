@@ -36,7 +36,7 @@ export function ConfirmDialog({
   body: ReactNode
   confirmLabel: string
   confirmBusyLabel?: string
-  /** Runs on confirm; returning a falsy/thrown result keeps the dialog open with the error. */
+  /** Runs on confirm; a refused or thrown result keeps the dialog open with the error. */
   onConfirm: () => Promise<unknown>
   /** Fires once, after the dialog has closed on a successful confirm — safe to navigate away in. */
   onSuccess?: () => void
@@ -49,8 +49,8 @@ export function ConfirmDialog({
   const { busy, error, run, reset } = useAction()
 
   const confirm = (): void => {
-    void run(onConfirm, fallbackError).then(result => {
-      if (result === undefined) return
+    void run(onConfirm, fallbackError).then(outcome => {
+      if (!outcome.ok) return
       setOpen(false)
       // After the close, so a caller that unmounts this (navigating off the deleted session) does
       // not tear the dialog down mid-transition.

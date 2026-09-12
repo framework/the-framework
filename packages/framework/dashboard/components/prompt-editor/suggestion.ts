@@ -55,6 +55,9 @@ function makeRender(config: TriggerConfig) {
   let getRect: (() => DOMRect | null) | null = null
   // The editor's contenteditable, for the aria combobox wiring while the menu is open.
   let editorDom: HTMLElement | null = null
+  // Escape dismisses this menu for as long as the trigger stays armed: typing on does not bring
+  // it back, and only a fresh trigger opens one again.
+  let dismissed = false
 
   const setActive = (id: string | null): void => {
     if (!editorDom) return
@@ -68,7 +71,7 @@ function makeRender(config: TriggerConfig) {
     // stray `<`/`@` in prose is not a trap. The plugin stays active — the menu reappears if
     // a later key matches.
     const note = items.length === 0 && !props.query ? config.emptyNote : undefined
-    const visible = items.length > 0 || !!note
+    const visible = !dismissed && (items.length > 0 || !!note)
     if (el) el.style.display = visible ? '' : 'none'
     // aria-expanded tracks what the user actually sees, not the plugin's active range: a
     // mistyped query hides the menu while the plugin stays armed, and both the a11y tree and
@@ -94,6 +97,7 @@ function makeRender(config: TriggerConfig) {
 
   return {
     onStart(props: RenderProps) {
+      dismissed = false
       el = document.createElement('div')
       el.style.position = 'fixed'
       el.style.zIndex = '50'
@@ -113,10 +117,22 @@ function makeRender(config: TriggerConfig) {
       draw(props)
     },
     onKeyDown(props: { event: KeyboardEvent }) {
-      if (props.event.key === 'Escape') return false
+      // Escape closes the menu and stops there. Leaving it to the editor kept the menu on screen
+      // after the keystroke that means "dismiss this", and the editor's Enter-to-send guard reads
+      // an open menu — so the next Enter picked a suggestion instead of sending. A second Escape,
+      // with no menu open, reaches the surface around the editor as it always did.
+      if (props.event.key === 'Escape') {
+        if (!el || el.style.display === 'none') return false
+        dismissed = true
+        el.style.display = 'none'
+        editorDom?.setAttribute('aria-expanded', 'false')
+        setActive(null)
+        return true
+      }
       return listRef?.onKeyDown(props.event) ?? false
     },
     onExit() {
+      dismissed = false
       window.removeEventListener('scroll', reposition, true)
       window.removeEventListener('resize', reposition)
       editorDom?.setAttribute('aria-expanded', 'false')

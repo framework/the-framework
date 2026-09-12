@@ -24,9 +24,10 @@ export interface ProjectQueue {
   items: QueueItem[]
 }
 
-// A markdown list item (`-`, `*`, or `1.`), any leading indent. Same rule as the sweep's
-// `parseTodoEntries` (todo-loop.ts), deliberately: the queue's readers must agree on what an
-// entry is, or the card says "Nothing queued" while the sweep drains the same file (#1296).
+// A markdown list item (`-`, `*`, or `1.`), any leading indent. Deliberately the same rule the
+// drain reads the queue by — the `queue` skill's own parser, which `todo-loop.ts` calls — because
+// the queue's readers must agree on what an entry is, or the card says "Nothing queued" while the
+// sweep drains the same file (#1296).
 const LIST_ITEM = /^\s*(?:[-*]|\d+\.)\s+(.*\S)\s*$/
 // A GitHub-style task checkbox at the start of an item's text: `[ ]` open, `[x]` done.
 const CHECKBOX = /^\[([ xX])\]\s*(.*)$/

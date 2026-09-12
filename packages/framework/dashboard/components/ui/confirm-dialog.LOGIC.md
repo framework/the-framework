@@ -67,7 +67,7 @@ See `## Context`.
 
 #### Business logic
 
-An action fails by throwing or by answering with a refused result; either way the dialog stays open and shows the failure's message in red under the body, or the host's fallback text, "Something went wrong." by default, when the failure carries no message. The user may confirm again or cancel. When the dialog is opened again later, any earlier message is cleared. The dialog treats an action as succeeded only when it resolves to a result; one that resolves to nothing keeps the dialog open without a message.
+An action fails by throwing or by answering with a refused result; either way the dialog stays open and shows the failure's message in red under the body, or the host's fallback text, "Something went wrong." by default, when the failure carries no message. The user may confirm again or cancel. When the dialog is opened again later, any earlier message is cleared. An action that succeeds with nothing to report closes the dialog like any other success: only a refusal or a throw keeps it open.
 
 ### Success closes first, then the host continues
 

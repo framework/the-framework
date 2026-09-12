@@ -28,13 +28,13 @@ export function useStartAgent(): {
     options: StartArgs[3],
     fallback = 'Failed to start the agent.',
   ) => {
-    const result = await run(async () => {
-      const outcome = await sendStart(projectId, text, kind, options)
+    const outcome = await run(async () => {
+      const started = await sendStart(projectId, text, kind, options)
       // The daemon's refusal is phrased for its own log; give the dashboard its words.
-      if (!outcome.ok && outcome.busy) return { ...outcome, error: 'An agent is already active for this project.' }
-      return outcome
+      if (!started.ok && started.busy) return { ...started, error: 'An agent is already active for this project.' }
+      return started
     }, fallback)
-    return result?.ok ? result : undefined
+    return outcome.ok ? outcome.value : undefined
   }
   return { busy, error, reset, start }
 }

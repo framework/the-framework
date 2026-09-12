@@ -164,7 +164,7 @@ function promptContinuation(session: DriverSession, deps: AwaitTurnDeps): (quest
  * and a follow-up reopens the conversation via `--resume` (#762), like Claude Code web.
  * `stayOpen` keeps the old park-for-the-next-message lifecycle, for an agent whose own terminal
  * dashboard is the only surface — it has no daemon to resume through, so ending would leave
- * its composer a dead end; that agent still ends on Stop / budget cap (next -> undefined).
+ * its composer a dead end; that agent still ends on a Stop (next -> undefined).
  *
  * Reports the settled `exhausted` of the *last* chat turn (#742): entering chat means the
  * opening prompt's await-round cap is no longer the agent's end reason, and a phase that ends
@@ -186,7 +186,7 @@ export async function runChatPhase(session: DriverSession, messages: AgentMessag
       // session's natural end, and the agent's `end` event follows right behind it.
       message = deps.signal?.aborted ? undefined : messages.takeQueued()
     }
-    if (message === undefined) return { turn, exhausted, stopped: false } // idle queue / Stop / budget cap: end the conversation.
+    if (message === undefined) return { turn, exhausted, stopped: false } // idle queue or a Stop: end the conversation.
     // The message shows in the feed as the driver's own `start` event (the YOU row), so it is not
     // echoed as a separate log line — that only duplicated it.
     turn = await session.prompt(message.text, { ...signalOpt, resume: true })
@@ -248,7 +248,7 @@ const PROCEED: ChoicePick = { picked: 'proceed', by: 'auto' }
 
 /**
  * Resolve with the human's pick, or fall back to `fallback` if the pick rejects or
- * the agent aborts first (user stop / budget cap #322) — so a gate parked for input
+ * the agent aborts first (a user stop) — so a gate parked for input
  * never hangs. Never rejects. Cleans up its abort listener either way. The fallback
  * is the single-select `proceed` by default; a multi-select passes its default set.
  */

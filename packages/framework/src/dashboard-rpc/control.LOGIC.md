@@ -79,7 +79,7 @@ See `## Context`.
 #### Business logic
 
 - **Stop**: a stop entry, with nothing to validate. The agent's process aborts what it is doing.
-- **A pick** [17]: the gate's [2] id, the pick (one option id for a single choice, or the chosen subset for a multiple choice, which may be empty), and who picked. Who picked is the user unless the caller says otherwise; the record can also say the pick was made by the dashboard's autopilot countdown or automatically, for an agent nobody is watching.
+- **A pick** [17]: the gate's [2] id, the pick (one option id for a single choice, or the chosen subset for a multiple choice, which may be empty), and who picked. Who picked is the user unless the caller says otherwise; the record can also say the pick was made automatically, for an agent nobody is watching.
 - **A message** [3]: the text is trimmed, and an empty or whitespace-only message is dropped without writing anything. The agent drains messages between turns [15], each one continuing the same driver session [18].
 - **A handoff change** [4]: the level must be one of the four rungs, `local`, `push`, `pr` or `merge`; anything else is ignored and nothing is written. One rung travels, never a set of stages: a surface offering the stages as separate boxes resolves them to a rung on its own side, where an impossible combination (a pull request without a push) settles down to the rung actually asked for instead of being repaired upward into a push nobody ticked. The change is steering rather than a setting because it is about this one agent, and the agent echoes what it applied back as an event, so surfaces read the agent's own record rather than local state a reload would lose.
 

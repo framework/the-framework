@@ -358,13 +358,14 @@ export function pinnedPlanJob(job: AutoPmJob, assignment: PlanAssignment): AutoP
  * the maintenance sweep (#882), which is paced by a calendar because it looks at static history and
  * would otherwise never come due — hence its own {@link AUTO_PM_MAINTENANCE_JOB} outside the cycle.
  *
- * The gated triage sibling (#698) is deliberately not here: it ends in `<AWAIT>`, so firing it with
- * nobody at the keyboard would park an agent against a human who will never answer.
+ * The presets that end in `<AWAIT>` (Research, Suggest tickets to work on) are deliberately not
+ * here: firing one with nobody at the keyboard would park an agent against a human who will never
+ * answer.
  *
- * Each triage prompt pins its own session name and aborts if that branch already exists, so a
- * rotation that comes round again while the previous triage is still in flight is a no-op rather
- * than a duplicate. The rotation still advances past it, which is the wanted behaviour: the next
- * idle tick tries the next job instead of retrying a job that is already running.
+ * Each triage prompt pins its own session name, so a triage always lands on the same branch. What
+ * keeps a rotation from triaging twice is the routine lock (`routine-locks.ts`), taken before the
+ * agent starts: a firing that finds the lock held stands down without spending an agent, and the
+ * rotation advances past it rather than retrying a job that is already running.
  */
 export const AUTO_PM_JOBS: readonly AutoPmJob[] = [
   {

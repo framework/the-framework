@@ -128,9 +128,10 @@ export const presets = {
    * whether the work is cheap. Keeping them apart lets the rotation queue the cheap batch and the
    * significant batch on separate turns rather than in one indiscriminate sweep.
    *
-   * Each prompt pins its own `<SESSION_NAME>` and aborts when `agent-<SESSION_NAME>`
-   * already exists. That collision guard is what makes them safe to fire on a schedule: a triage
-   * still in flight owns the branch, so the next firing does nothing instead of triaging twice.
+   * Each prompt pins its own `<SESSION_NAME>`, so a triage always lands on the same branch and is
+   * recognizable there. What makes them safe to fire on a schedule is the routine lock the daemon
+   * takes before starting one (`routine-locks.ts`), which holds across machines: a triage still in
+   * flight owns the lock, so the next firing stands down instead of triaging twice.
    *
    * Both end with the same rule (#1641): a triage only writes `TODO_AGENTS.md`, never a ticket's
    * code. It is one file, `prompts/triage_scope.md`, appended here rather than pasted into each

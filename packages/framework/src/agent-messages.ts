@@ -27,7 +27,7 @@ export interface AgentMessages {
   /**
    * The next user message. Returns an already-queued message immediately (drain
    * between turns); otherwise waits for one (stay-open). Resolves `undefined` when
-   * the agent should stop waiting — the signal aborted (Stop / budget cap) or the
+   * the agent should stop waiting — the signal aborted (a Stop, or an answer marked stop) or the
    * source was closed — so the loop ends cleanly rather than hanging.
    */
   next(signal?: AbortSignal): Promise<ChatMessage | undefined>

@@ -152,7 +152,7 @@ function Buttons() {
   return (
     <div className="space-y-5">
       <Row label="Variants">
-        <Button>Start session</Button>
+        <Button>Start agent</Button>
         <Button variant="outline">Outline</Button>
         <Button variant="ghost">Ghost</Button>
       </Row>
@@ -209,7 +209,7 @@ function Cards() {
     <div className="grid gap-4 sm:grid-cols-2">
       <Card>
         <CardHeader>
-          <CardTitle>Session activity</CardTitle>
+          <CardTitle>Agent activity</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">Header plus content, the dashboard default.</p>
@@ -218,7 +218,7 @@ function Cards() {
       <Card>
         <CardContent className="flex flex-col gap-1">
           <div className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Active sessions
+            Active agents
           </div>
           <div className="text-2xl font-semibold tabular-nums text-primary">3</div>
         </CardContent>
@@ -230,9 +230,9 @@ function Cards() {
 function StatTiles() {
   const tiles = [
     ['Projects', 12, false],
-    ['Active sessions', 3, true],
-    ['Open TODOs', 47, false],
-    ['Total sessions', 218, false],
+    ['Active agents', 3, true],
+    ['Queue entries', 47, false],
+    ['Total agents', 218, false],
   ] as const
   return (
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -293,14 +293,14 @@ function EmptyStates() {
     <div className="grid gap-4 sm:grid-cols-2">
       <Card>
         <CardContent>
-          <p className="text-sm text-muted-foreground">No finished sessions yet.</p>
+          <p className="text-sm text-muted-foreground">No finished agents yet.</p>
         </CardContent>
       </Card>
       <Card>
         <CardContent className="flex flex-col items-start gap-3">
-          <p className="text-sm text-muted-foreground">Nothing in the backlog.</p>
+          <p className="text-sm text-muted-foreground">Nothing on the agent queue.</p>
           <Button size="sm" variant="outline">
-            Add a TODO
+            Add an entry
           </Button>
         </CardContent>
       </Card>

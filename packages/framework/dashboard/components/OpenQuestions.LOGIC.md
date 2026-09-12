@@ -20,7 +20,7 @@ The "Waiting on you" section: every open question [1] across all projects, longe
 ## Business logic — TL;DR
 
 - **When the section exists** - the daemon's list of open questions [1] is re-read every 5 seconds; with nothing open and nothing just answered, no section at all.
-- **One card per question** - each card names the agent [3] and its project, offers "Open session →" into that agent, and shows the gate [2] card with the auto-accept countdown off.
+- **One card per question** - each card names the agent [3] and its project, offers "Open session →" into that agent, and shows the gate [2] card, which is never answered for the user.
 - **Answering** - a pick [4] is posted against the question's own project and agent (through the bridge [8] for a cloud session [7]); a failed post keeps the gate open with the reason shown.
 - **An answered question collapses and stays** - it becomes a ✓ line that expands to show the options with the pick marked, keeps "Open session →", and survives the daemon dropping the gate until the page is reloaded.
 - **Order, count and the jump list** - open cards first in the daemon's order, then answered leftovers; the heading counts open ones only; with more than one card a jump list on the right scrolls to any of them.
@@ -48,7 +48,7 @@ See `## Context`.
 The section is titled "Waiting on you · <count of open questions>". Cards scroll inside their own area, capped at 70% of the viewport's height. Each open card has:
 
 - A header button (tooltip "Open this session") showing the agent's [3] label — its session name [5], else the first line of its intent cut at 80 characters, else its agent id — and the project's name, with "Open session →" on the right. Clicking it opens that agent's agent view [6], switching project when the agent belongs to another project.
-- The gate [2] card itself (`ChoicePanel.tsx`: the question, its options, the recommended one), rendered with its countdown off so nothing here is ever accepted automatically, whatever the autopilot preference says.
+- The gate [2] card itself (`ChoicePanel.tsx`: the question, its options, the recommended one). Nothing here is ever accepted automatically, whatever the autopilot preference says: the hub shows every parked gate at once, and answering them all would be a mass auto-accept.
 
 ### Answering
 

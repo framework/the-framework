@@ -37,7 +37,7 @@ test('AgentMessageQueue push() is a no-op after close()', async () => {
   assert.equal(await q.next(), undefined)
 })
 
-test('AgentMessageQueue next() unblocks on abort (Stop / budget cap)', async () => {
+test('AgentMessageQueue next() unblocks on abort (a Stop)', async () => {
   const q = new AgentMessageQueue()
   const ac = new AbortController()
   const pending = q.next(ac.signal)

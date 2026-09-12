@@ -7,7 +7,7 @@ description: Where the project's tickets live, how to read and change them, how 
 
 The tickets (`tickets/<DATE>_<SLUG>.md`, with their `.plan.md` and `.lock.md` siblings) live on the branch `agent-data`, never on a code branch. A `tickets` link at the repository root, if present, shows a possibly stale copy; never write there. The command reads fresh.
 
-Read and change them with the `tickets` command, a dependency of this repository (`@gemstack/skill-tickets`). With no `node_modules`, install first with the lockfile's package manager (`npm install` for `package-lock.json`). Then run it as `npx tickets`. Every change it makes is one commit pushed straight to the `agent-data` branch. A refusal exits 1 with a line on stderr; a wrong command line exits 2 with the usage.
+Read and change them with the `tickets` command, a dependency of this repository (`@gemstack/skill-tickets`), run as `npx tickets`. When that fails for a missing `node_modules`, install with the lockfile's package manager (`npm install` for `package-lock.json`) and run it again. Every change it makes is one commit pushed straight to the `agent-data` branch. A refusal exits 1 with a line on stderr; a wrong command line exits 2 with the usage.
 
 ## Read
 
@@ -25,8 +25,8 @@ npx tickets show <file>          one ticket: its text, its plan, who holds it
 npx tickets put <file>           write one file under tickets/ from stdin, the whole file, creating it if new;
                                  empty stdin writes an empty file
                                  (npx tickets put <file> < draft.md): a ticket or a plan
-npx tickets close <file>         once the work is merged: remove the ticket with its plan and lock;
-                                 refused while someone else holds it; its queue entry, if any,
+npx tickets close <file>         once the work is done and published: remove the ticket with its plan
+                                 and lock; refused while someone else holds it; its queue entry, if any,
                                  stays: `npx queue done` it
 ```
 
@@ -38,7 +38,7 @@ When the repository has the `queue` skill, a ticket goes on the agent queue as a
 npx queue add "[<title>](tickets/<file>)" --priority <N>
 ```
 
-Once the work is merged, `npx tickets close <file>` and `npx queue done` the entry.
+Once the work is done and published, `npx tickets close <file>` and `npx queue done` the entry.
 
 ## Claim before you plan or work a ticket
 

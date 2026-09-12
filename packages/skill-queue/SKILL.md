@@ -7,7 +7,7 @@ description: Where the project's agent queue lives, how to read it and change it
 
 The agent queue (`TODO_AGENTS.md`) lives on the branch `agent-data`, never on a code branch; your checkout does not contain it. It lists every task agents will work on next, in the order they will be taken.
 
-Read and change it with the `queue` command, a dependency of this repository (`@gemstack/skill-queue`). With no `node_modules`, install first with the lockfile's package manager (`npm install` for `package-lock.json`). Then run it as `npx queue`. Every change it makes is one commit pushed straight to the `agent-data` branch. A refusal exits 1 with a line on stderr; a wrong command line exits 2 with the usage.
+Read and change it with the `queue` command, a dependency of this repository (`@gemstack/skill-queue`), run as `npx queue`. When that fails for a missing `node_modules`, install with the lockfile's package manager (`npm install` for `package-lock.json`) and run it again. Every change it makes is one commit pushed straight to the `agent-data` branch. A refusal exits 1 with a line on stderr; a wrong command line exits 2 with the usage.
 
 ## Read
 

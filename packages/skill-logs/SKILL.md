@@ -7,7 +7,7 @@ description: The record of every run agents made on this project — what was as
 
 Every run an agent made on this project leaves a record on the branch `agent-data`, never on a code branch; your checkout does not contain it. A run is two files under `agents/<who>/`: the card, `<id>.json` — what was asked, the ticket, the branch, the pull request, how it ended, what it cost — and the diary, `<id>.jsonl` — what the agent said along the way, its result.
 
-Read them with the `logs` command, a dependency of this repository (`@gemstack/skill-logs`). With no `node_modules`, install first with the lockfile's package manager (`npm install` for `package-lock.json`). Then run it as `npx logs`. The command only reads: the program that ran an agent records its run, at its end. A refusal exits 1 with a line on stderr; a wrong command line exits 2 with the usage.
+Read them with the `logs` command, a dependency of this repository (`@gemstack/skill-logs`), run as `npx logs`. When that fails for a missing `node_modules`, install with the lockfile's package manager (`npm install` for `package-lock.json`) and run it again. The command only reads: the program that ran an agent records its run, at its end. A refusal exits 1 with a line on stderr; a wrong command line exits 2 with the usage.
 
 ## Read
 

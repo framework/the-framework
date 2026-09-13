@@ -25,7 +25,7 @@ export interface ProjectQueue {
 }
 
 // A markdown list item (`-`, `*`, or `1.`), any leading indent. Deliberately the same rule the
-// drain reads the queue by — the `queue` skill's own parser, which `todo-loop.ts` calls — because
+// agents read the queue by — the `queue` skill's own parser — because
 // the queue's readers must agree on what an entry is, or the card says "Nothing queued" while the
 // sweep drains the same file (#1296).
 const LIST_ITEM = /^\s*(?:[-*]|\d+\.)\s+(.*\S)\s*$/

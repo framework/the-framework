@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { makeWorld, waitFor, withFakeAwait } from './harness.js'
+import { makeWorld } from './harness.js'
 import {
   onTickets,
   onTicket,
@@ -9,12 +9,12 @@ import {
   onQueue,
   onAgents,
 } from '../dashboard-rpc/reads.js'
-import { sendChoice, sendQueueTicket } from '../dashboard-rpc/control.js'
-import { presets } from '../preset-catalog.js'
+import { sendQueueTicket } from '../dashboard-rpc/control.js'
 
 // The roadmap stories (README.md): tickets are proposals, the flat TODO queue holds confirmed
-// work, and a drain agent claims the queue's next entry — the propose -> decide -> work loop the
-// Tickets and Queue pages drive.
+// work — the propose -> decide half of the loop the Tickets and Queue pages drive. Working the
+// queue is the daemon's (#1774): it starts an agent when the branch moves, and that agent reads
+// the skills itself.
 
 const TICKET_FILE = '2026-08-01_login-page.md'
 const TICKET = [
@@ -60,7 +60,7 @@ test('browse the ticket backlog: list, detail, and the cross-project pages (#697
   }
 })
 
-test('queue a ticket, then a drain run claims it and the boards show it in progress (#1164/#1117)', async () => {
+test('queue a ticket, and the boards show it queued (#1164)', async () => {
   const world = await makeWorld()
   const rpc = world.rpc
   try {
@@ -82,33 +82,12 @@ test('queue a ticket, then a drain run claims it and the boards show it in progr
     // The queued ticket shows on the hot-tickets rail.
     const hotQueued = await rpc(onHotTickets)()
     assert.ok(hotQueued.some(h => h.projectId === project.id && h.ticket.file === TICKET_FILE))
-
-    // A hand-fired drain resolves the queue's next entry to its ticket (#1117) — the agent's meta
-    // names it while the agent is live, which is what flips the boards to "implementing".
-    const agentId = await withFakeAwait('choices', () => world.startAgent(project, presets.drainQueue.render()))
-    const tail = await world.tailAgent(project, agentId)
-    const gate = await waitFor(() => tail.events.find(e => e.kind === 'choice'), 'the drain run to park')
-
-    const sent = (await world.spawnedSpecs())[0]!
-    assert.equal(sent.options.ticket, `tickets/${TICKET_FILE}`, 'the drain child carries its ticket')
-
-    const running = await waitFor(async () => {
-      const agent = (await rpc(onAgents)(project.id)).find(r => r.id === agentId)
-      return agent?.ticket ? agent : undefined
-    }, 'the run meta to name the claimed ticket')
-    assert.equal(running.ticket, `tickets/${TICKET_FILE}`)
-    const hot = await rpc(onHotTickets)()
-    const implementing = hot.find(h => h.ticket.file === TICKET_FILE && h.agentId === agentId)
-    assert.ok(implementing, 'the hot rail links the ticket to the run implementing it')
-
-    if (gate.kind === 'choice') await rpc(sendChoice)(project.id, gate.id, gate.recommended!, 'user', agentId)
-    await world.waitAgent(project, agentId, 'done')
   } finally {
     await world.close()
   }
 })
 
-test('any other prompt claims nothing: the queue is only worked by a drain (#1117)', async () => {
+test('a prompt that is not about the queue leaves the queue alone', async () => {
   const world = await makeWorld()
   const rpc = world.rpc
   try {
@@ -120,8 +99,7 @@ test('any other prompt claims nothing: the queue is only worked by a drain (#111
 
     const agentId = await world.startAgent(project, 'Look into the flaky CI job')
     await world.waitAgent(project, agentId, 'done')
-    const agent = (await rpc(onAgents)(project.id)).find(r => r.id === agentId)
-    assert.equal(agent?.ticket, undefined, 'an unrelated prompt must not wear the queued ticket')
+    assert.ok((await rpc(onAgents)(project.id)).some(r => r.id === agentId), 'the run is on the list')
     // The queue entry is still open: nothing consumed it.
     const projectQueue = (await rpc(onQueue)()).find(q => q.projectId === project.id)
     assert.equal(projectQueue?.open, 1)

@@ -79,7 +79,7 @@ export function DashboardPage({
             that fires one now. */}
         <RoutineWork onAgentStarted={onAgentStarted} onSelectProject={onSelectProject} />
 
-        <HotTickets onSelectProject={onSelectProject} onSelectAgent={onSelectAgent} />
+        <HotTickets onSelectProject={onSelectProject} />
       </div>
     </ScrollArea>
   )

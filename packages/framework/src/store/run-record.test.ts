@@ -23,11 +23,10 @@ test('the meta round-trips through the skill\'s card: eleven fields on top, the 
     readyForMerge: true,
     mergeOutcome: 'auto-armed',
     pr: { number: 1765, url: 'https://x/pull/1765' },
-    ticket: 'tickets/2026-09-01_a.md',
     cost: 0.62,
   }
   const card = toRunCard(meta)
-  assert.deepEqual(Object.keys(card), ['id', 'startedAt', 'status', 'endedAt', 'intent', 'driver', 'model', 'branch', 'pr', 'ticket', 'cost', 'caller'])
+  assert.deepEqual(Object.keys(card), ['id', 'startedAt', 'status', 'endedAt', 'intent', 'driver', 'model', 'branch', 'pr', 'cost', 'caller'])
   assert.deepEqual(card.caller, { updatedAt: meta.updatedAt, pid: 923, host: 'laptop', kind: 'prompt', handoff: meta.handoff, workspace: '/w', readyForMerge: true, mergeOutcome: 'auto-armed' })
   assert.deepEqual(fromRunCard(card), meta)
   // The framework's last-updated time is its own, so even a bare meta carries a caller; a card

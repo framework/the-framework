@@ -28,11 +28,9 @@ import {
   type AgentKind,
 } from './agent.js'
 import { FAKE_INTENT, fakeDriver } from './fake-script.js'
-import { isTicketPath, ticketIssueRef } from '@gemstack/skill-tickets'
 import { isHandsOff, isAgentLocation, type AgentLocation } from './agent-location.js'
 import { handoffStages, isHandoffLevel, type HandoffLevel } from './handoff-level.js'
 import { readAgentSpec, removeAgentSpec, writeAgentSpec, type AgentSpec } from './agent-spec.js'
-import { agentTodoPending } from './todo-loop.js'
 import { loadFrameworkConfig, type FrameworkFileConfig } from './config.js'
 import {
   describeResolvedConfig,
@@ -44,7 +42,7 @@ import {
 import { loadUserSystemPrompt, SYSTEM_PROMPT_FILE } from './system-prompt-file.js'
 import { checkForUpdate, formatUpdateStatus, nodeVersionFetcher, type VersionFetcher } from './update-check.js'
 import { AgentStore, nodeStoreFs, type StoreFs } from './store/index.js'
-import { nodeGitRunner, readBranchFile, DATA_BRANCH } from '@gemstack/agent-data'
+import { nodeGitRunner } from '@gemstack/agent-data'
 import { currentBranch, agentBranchName, sessionNameOf } from '@gemstack/skill-branches'
 import { materializePresets } from './presets.js'
 import { isLoopbackHost, registerHomeProject, runDaemon, DEFAULT_DAEMON_HOST, DEFAULT_DAEMON_PORT } from './daemon.js'
@@ -199,9 +197,7 @@ export interface AgentOptions {
   model?: string | undefined
   /** Continue a finished agent's agent session (#720) — the prompt resumes that conversation (full prior context). Set by the dashboard when you message an agent that has ended. */
   resumeSession?: string | undefined
-  /** The `tickets/<file>.md` this agent is implementing (#1117). Set by the daemon when it starts a drain agent, from the ticket its queue entry links to; recorded on the agent's meta. */
-  ticket?: string | undefined
-  /** The {@link ticket} is being planned, not implemented (#1327), so the PR title must not inherit its issue as `(fix #42)` (#1334) — the plan's merge would close the issue with the work still undone. */
+  /** This agent plans a ticket rather than implementing it (#1327), so its pull request must not close the ticket's issue (#1334) — the plan's merge would close the issue with the work still undone. */
   planAgent?: boolean
   /** No human is watching (#846), so choice gates take the recommended option. */
   unattended?: boolean
@@ -227,7 +223,6 @@ export interface AgentOptions {
    * to `pr` — which is what makes the handoff zero-config.
    */
   handoff?: HandoffLevel | undefined
-  todoLoop: boolean
   /** Whether the session records itself to `.the-framework/`. Always true outside tests. */
   persist: boolean
   /** {@link AgentSpec.kind} `research`: run the Research preset as a direct prompt (#331). */
@@ -311,7 +306,6 @@ const SESSION_DEFAULTS = {
   onBeforeMergeable: false,
   browser: false,
   persist: true,
-  todoLoop: true,
 } as const
 
 /**
@@ -339,9 +333,6 @@ export function agentOptions(spec: AgentSpec, env: NodeJS.ProcessEnv = process.e
     ...(isAgentLocation(o.target) ? { target: o.target } : {}),
     ...(o.model?.trim() ? { model: o.model.trim() } : {}),
     ...(o.resumeSession?.trim() ? { resumeSession: o.resumeSession.trim() } : {}),
-    // The ticket comes off a queue file an agent writes, so it is re-checked here rather than
-    // trusted: a path that is not a ticket never reaches the agent (#1117).
-    ...(o.ticket && isTicketPath(o.ticket) ? { ticket: o.ticket } : {}),
     ...(o.planAgent ? { planAgent: true } : {}),
     ...(o.unattended ? { unattended: true } : {}),
     ...(defined(o.vanilla) ? { vanilla: o.vanilla } : {}),
@@ -649,7 +640,7 @@ export function createAgentJournal(deps: {
     // The agent names its branch in its own shell (#1725), invisibly to this process until it
     // looks: at the end of every turn, read the branch again so the dashboard's label follows the
     // name without waiting for the agent to end. Every path — a build, its await rounds, the chat,
-    // the backlog loop — ends its turns with the driver's result.
+    // the build path — ends its turns with the driver's result.
     if (event.kind === 'driver' && event.event.type === 'result') void observeBranch()
   }
 
@@ -853,7 +844,7 @@ async function driveAgent(opts: AgentOptions, io: CliIO): Promise<number> {
 
   // Continuing a build agent (#1467): the composer's Resume always arrives as a `prompt` start,
   // but the reopened meta remembers the flow the first leg ran. When it was a build agent and the
-  // conversation is resumable, re-enter the build flow (synthesize framing, backlog loop, the
+  // conversation is resumable, re-enter the build flow (synthesize framing, the
   // build ending) with the message sent verbatim — not the bare prompt ending that used to
   // downgrade a resumed build agent. Runs from before the meta recorded a kind stay on the prompt
   // path, exactly as they did.
@@ -906,14 +897,8 @@ async function driveAgent(opts: AgentOptions, io: CliIO): Promise<number> {
           armedHandoff = 'merge'
           mergeAuthorized = true
           announceHandoff?.()
-          // A session parked on the backlog offer (#323) is waiting to know whether to take more
-          // work. Merge answers that: wrap up now. Other gates keep waiting — they are questions
-          // about the work itself, which merging does not answer.
-          for (const [id, resolve] of pendingChoices) {
-            if (!/^todo-next(-\d+)?$/.test(id)) continue
-            pendingChoices.delete(id)
-            resolve({ picked: 'stop', by: 'user' })
-          }
+          // Parked gates keep waiting: they are questions about the work itself, which merging
+          // does not answer.
           return
         }
         const resolve = pendingChoices.get(entry.id)
@@ -989,10 +974,6 @@ async function driveAgent(opts: AgentOptions, io: CliIO): Promise<number> {
   // run that is set to merge. Derived from the rung, so the three can never contradict it.
   announceHandoff = () => onEvent({ kind: 'handoff-armed', ...handoffStages(armedHandoff) })
   announceHandoff()
-  // The ticket this agent implements (#1117), if the daemon named one. Once, at start: it is a fact
-  // about why the agent exists, not a state that changes, and folding it to meta is what lets the
-  // Overview mark that ticket as being implemented right now.
-  if (opts.ticket && isTicketPath(opts.ticket)) onEvent({ kind: 'ticket', path: opts.ticket })
   // The branch this agent actually starts on (#1277): recorded, not guessed, so surfaces reading
   // the meta mid-run resolve the same name teardown will later confirm.
   await journal.observeBranch()
@@ -1035,45 +1016,31 @@ async function driveAgent(opts: AgentOptions, io: CliIO): Promise<number> {
 
     // The merge half is authorized, not just configured (#1363; rule settled on #1390): the
     // agent's setReadyForMerge() — the same signal maybeFireOnBeforeMergeable requires above —
-    // is what says the work may land unattended, plus the session's own TODO file having no
-    // open entries. Never the global TODO_AGENTS.md: the queue is decoupled from sessions.
-    // Withheld is not skipped — push and PR go ahead, and with `armed.merge` off the PR opens
-    // as a draft for a human. Said on the handoff event (#835), or "auto-merge was on and
-    // nothing merged" has no answer.
+    // is what says the work may land unattended. Withheld is not skipped — push and PR go ahead,
+    // and with `armed.merge` off the PR opens as a draft for a human. Said on the handoff event
+    // (#835), or "auto-merge was on and nothing merged" has no answer.
     // A human's Merge action (#1391) bypasses the gate: the authorization the gate exists to
     // collect has been given directly, by someone who outranks the signal.
     let mergeGate: MergeWithheldReason | undefined
     if (armed.merge && !mergeAuthorized) {
-      const ready = journal.sawReadyForMerge()
-      mergeGate = withheldMerge({
-        readyForMerge: ready,
-        agentTodoOpen: ready && (await agentTodoPending(cwd, journal.sessionName())),
-      })
+      mergeGate = withheldMerge({ readyForMerge: journal.sawReadyForMerge() })
       if (mergeGate) armed.merge = false
     }
 
     // The branch as it is now, not as it was named at start: the agent renames it (#1725), and
     // the rename is exactly what the PR should be opened against. Read once for the whole
-    // epilogue, before the merge gate above asked for the session name.
+    // epilogue.
     const branch = journal.branch()
     if (!branch) return skip('branch-gone')
-    // The ticket's GitHub issue rides the PR title as `(fix #42)` (#1334): the squash-merge
-    // subject inherits the title, so the merge closes the issue — without it, an auto-merged
-    // quick-win leaves its ticket open. Not on a plan agent (#1327): its PR lands the plan, not
-    // the work, so the merge must not close the issue. Best-effort: a ticket that cannot be
-    // read fixes nothing. Read off the `agent-data` branch (#1582) — the worktree holds no tickets.
-    const fixes = opts.ticket && isTicketPath(opts.ticket) && !opts.planAgent
-      ? ticketIssueRef((await readBranchFile(cwd, DATA_BRANCH, opts.ticket).catch(() => undefined)) ?? '')
-      : undefined
     // The agent's own description of the work (#1567), when it wrote one: this is what an
     // `open-pr` block is for — the agent describes the change and the framework opens the PR,
-    // so it has no reason to run `gh pr create` itself and lose the title convention, the
-    // ticket's issue reference, and the recorded number along the way.
+    // so it has no reason to run `gh pr create` itself and lose the title convention and the
+    // recorded number along the way. The ticket's issue is the agent's to name (#1774): the
+    // framework no longer knows which ticket a run implements.
     //
     // A plan agent's description is defused first: its PR lands the plan, not the work, so a
     // closing phrase in it would close the ticket's issue on merge — which is exactly what
-    // happened on #1560. The same reasoning already keeps `(fix #N)` off a plan agent's title
-    // just above; the description is the other half of the same rule.
+    // happened on #1560.
     const written = journal.pullRequest()
     // Both halves are defused, not just the body: since #1618 the title is the agent's prose too,
     // and a closing phrase there would ride the squash-merge subject straight into the issue.
@@ -1084,7 +1051,6 @@ async function driveAgent(opts: AgentOptions, io: CliIO): Promise<number> {
       id: opts.agentId ?? '',
       branch,
       ...(intent ? { intent } : {}),
-      ...(fixes ? { fixes } : {}),
       ...(prTitle ? { prTitle } : {}),
       ...(description ? { description } : {}),
     }
@@ -1295,7 +1261,6 @@ async function driveAgent(opts: AgentOptions, io: CliIO): Promise<number> {
     // Resume the stopped leg's conversation (#720/#1467); the prompt above is the continuation
     // message, which `runAgent` then sends verbatim.
     ...(opts.resumeSession ? { resumeSessionId: opts.resumeSession } : {}),
-    ...(opts.todoLoop && !transparent ? {} : { todoLoop: false }),
   }
 
   return settleAgent(epilogue(label), async () => {
@@ -1442,7 +1407,7 @@ export type PromptRunner = (prompt: string, cwd: string, binPath: string) => Pro
 /**
  * Fire the built-in on-before-mergeable (#326) prompt after an agent signalled setReadyForMerge(): one
  * `framework prompt` child on the same workspace that appends the quality follow-ups to the
- * session's TODO file, for the backlog loop (#323/#538) to pick up.
+ * session's TODO file (#323/#538).
  *
  * It used to run maintainability, readability and security-audit inline instead, as three
  * child runs back to back (#556). Queueing is both what the doc says and the cheaper thing:

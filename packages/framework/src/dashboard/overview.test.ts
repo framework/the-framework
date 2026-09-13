@@ -197,60 +197,6 @@ test('buildHotTickets tolerates a project whose tickets cannot be read', async (
   assert.deepEqual(hot.map(h => h.ticket.file), ['x.md'])
 })
 
-/** A live agent meta carrying the ticket it is implementing (#1117). */
-const runOn = (id: string, ticket: string, status: AgentMeta['status'] = 'running') =>
-  ({ version: 1, status, id, startedAt: 't', updatedAt: 't', ticket, cwd: '/w' }) as never
-
-test('ticketBucket: a run implementing it is in-progress, whatever the plan says (#1117)', () => {
-  // The whole point of the link: a ticket nobody has planned yet, being coded right now, would
-  // otherwise fall through to a non-shown lane on the strength of a plan file alone.
-  assert.equal(ticketBucket(ticket('a'), { implementing: true }), 'in-progress')
-  assert.equal(ticketBucket(ticket('b', { priority: '8' }), { implementing: true }), 'in-progress')
-  // Absent evidence, the inference (#1112) is untouched.
-  assert.equal(ticketBucket(ticket('c', { planned: true }), { implementing: false }), 'in-progress')
-  assert.equal(ticketBucket(ticket('d'), { implementing: false }), null)
-})
-
-test('buildHotTickets marks the ticket a live run is implementing, with its run id (#1117)', async () => {
-  const hot = await buildHotTickets([project('alpha', '/a')], {
-    tickets: async () => [ticket('2026-07-25_login.md'), ticket('2026-07-26_other.md')],
-    liveAgents: async () => [runOn('run-7', 'tickets/2026-07-25_login.md')],
-    queue: async () => [],
-  })
-  const login = hot.find(h => h.ticket.file === '2026-07-25_login.md')
-  assert.equal(login?.bucket, 'in-progress', 'the ticket being coded is in progress')
-  assert.equal(login?.agentId, 'run-7', 'and carries the run, so the card can link into it')
-  // The ticket nobody is on and nothing queues is in no lane, so it drops off the card (#1139).
-  const other = hot.find(h => h.ticket.file === '2026-07-26_other.md')
-  assert.equal(other, undefined)
-})
-
-test('buildHotTickets ignores a finished run and another project\'s ticket (#1117)', async () => {
-  // An agent that has ended is not implementing anything, however recently it stopped — so x.md carries
-  // no agentId and sits in the AI Queue by its link alone.
-  const finished = await buildHotTickets([project('alpha', '/a')], {
-    tickets: async () => [ticket('x.md')],
-    liveAgents: async () => [runOn('run-7', 'tickets/x.md', 'done')],
-    queue: async () => [{ projectId: 'alpha', projectName: 'alpha', open: 1, total: 1, items: [{ text: '[x](tickets/x.md)', done: false }] }],
-  })
-  assert.equal(finished[0]?.agentId, undefined)
-  assert.equal(finished[0]?.bucket, 'ai-queue')
-
-  // A ticket path is only unique inside its own repo, so beta's run must not light up alpha's
-  // identically-named ticket. alpha's x.md is in no lane (no run, no queue link, no priority), so
-  // only beta's implementing copy survives.
-  const twoProjects = await buildHotTickets([project('alpha', '/a'), project('beta', '/b')], {
-    tickets: async () => [ticket('x.md')],
-    liveAgents: async cwd => (cwd === '/b' ? [runOn('run-9', 'tickets/x.md')] : []),
-    queue: async () => [],
-  })
-  assert.deepEqual(
-    twoProjects.map(h => ({ p: h.projectName, agent: h.agentId })),
-    [{ p: 'beta', agent: 'run-9' }],
-    'only beta reads as implementing; alpha\'s same-named ticket is in no lane and drops off',
-  )
-})
-
 test('buildOverview lists a web run whose cloud side is still at work, and says where it is (#1668)', async () => {
   const now = Date.parse('2026-08-23T20:00:00Z')
   const at = (hoursAgo: number) => new Date(now - hoursAgo * 60 * 60 * 1000).toISOString()

@@ -4,7 +4,6 @@ import { openInApp, type OpenTarget, type OpenResult } from '../dashboard/open-i
 import { contextBridgeBrowser, contextPreferences, contextStartAgent, resolveProjectPath, resolveAgentPath } from './context.js'
 import type { BridgeBrowserAction } from '../bridge-browser.js'
 import { relayOr } from './relay-agent.js'
-import { ticketForPrompt } from '../todo-loop.js'
 import { planTicketPrompt } from '../tickets.js'
 import { isTicketFile, queuePriorityForTicket, releaseTicket, TICKETS_DIR } from '@gemstack/skill-tickets'
 import { QUEUE_FILE, queueAdd } from '@gemstack/skill-queue'
@@ -190,19 +189,7 @@ export async function sendStart(
   const startAgent = contextStartAgent()
   const text = prompt.trim()
   if (!text && kind !== 'research') return { ok: false, error: 'a non-empty prompt is required' }
-  // A drain fired by hand is the same work the sweep does, so it says the same thing about itself
-  // (#1117). Resolved here rather than sent by the caller: the value lands on the agent's meta and is
-  // rendered, so it is read off the queue on this side instead of trusted from a browser. An
-  // explicit ticket on the options wins, since a caller that names one knows better than a guess.
-  const ticket = options.ticket ?? (await ticketForStart(projectId, text))
-  return startAgent(text, kind, ticket ? { ...options, ticket } : options, projectId)
-}
-
-/** The queue entry a hand-fired drain is about to work, or undefined for any other prompt (#1117). */
-async function ticketForStart(projectId: string, prompt: string): Promise<string | undefined> {
-  const cwd = await resolveProjectPath(projectId)
-  if (!cwd) return undefined
-  return ticketForPrompt(prompt, cwd).catch(() => undefined)
+  return startAgent(text, kind, options, projectId)
 }
 
 /**

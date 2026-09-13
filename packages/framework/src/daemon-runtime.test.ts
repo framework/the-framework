@@ -1,8 +1,13 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { spawn } from 'node:child_process'
-import { terminate, waitOutFinishedLeg, waitOutSlots, type FinishedLegState } from './daemon-runtime.js'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { childEnv, ROUTINE_SKILLS, terminate, waitOutFinishedLeg, waitOutSlots, type FinishedLegState } from './daemon-runtime.js'
 import { isPidAlive } from './store/index.js'
+import { AGENT_ID_ENV } from './agent-id.js'
+import { WORK_QUEUE_SKILL_NAME } from './auto-pm.js'
+import { DAEMON_URL_ENV } from './dashboard/web-start-endpoints.js'
 
 const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms))
 
@@ -218,4 +223,24 @@ test('terminate reaps the whole process group of an agent that ignores SIGTERM, 
       }
     }
   }
+})
+
+// What a spawned agent is handed (#1774): its own id, and nothing on its PATH. The skills'
+// commands resolve from the project's own dependencies, as each skill's SKILL.md says.
+
+test('a spawned agent gets its id as AGENT_ID and no PATH entries of the daemon (#1774)', () => {
+  const base = { PATH: '/usr/bin:/bin', HOME: '/home/me' }
+  const env = childEnv('http://127.0.0.1:4200', '2026-09-13T10-00-00-000Z', base)
+  assert.equal(env['PATH'], '/usr/bin:/bin', 'the PATH is the daemon\'s own, untouched')
+  assert.equal(env[AGENT_ID_ENV], '2026-09-13T10-00-00-000Z')
+  assert.equal(env[DAEMON_URL_ENV], 'http://127.0.0.1:4200')
+  // No id: the fallback agent in the project checkout is nobody in particular.
+  assert.equal(childEnv(undefined, undefined, base)[AGENT_ID_ENV], undefined)
+})
+
+test('the routine skill the daemon links into every checkout is the work-queue skill file (#1774)', () => {
+  assert.deepEqual(ROUTINE_SKILLS.map(s => s.name), [WORK_QUEUE_SKILL_NAME])
+  const skill = readFileSync(join(ROUTINE_SKILLS[0]!.dir, 'SKILL.md'), 'utf8')
+  assert.match(skill, /^---\nname: work-queue\n/, 'the front matter names the skill the daemon fires')
+  assert.match(skill, /\ndisable-model-invocation: true\n/, 'only a person or the daemon invokes it')
 })

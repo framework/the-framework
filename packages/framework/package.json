@@ -27,7 +27,8 @@
     "node": ">=22.12.0"
   },
   "files": [
-    "dist"
+    "dist",
+    "skills"
   ],
   "bin": {
     "the-framework": "dist/bin.js"

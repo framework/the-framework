@@ -19,8 +19,8 @@ import { Checkbox } from './ui/checkbox.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import { StartAgentButton } from './StartAgentButton.js'
 
-// The Overview's "Routine work" card (#1159): the jobs the idle sweep fires on a schedule, each with
-// a Run now button that starts it against a project immediately.
+// The Overview's "Routine work" card (#1159): the jobs the daemon fires on its own, each with a
+// Run now button that starts it against a project immediately.
 //
 // The list is `AUTO_PM_ROUTINES` itself, straight off the browser-safe client entry, so what is on
 // screen is what the daemon runs rather than a second copy of it: no read of its own, and no way
@@ -43,19 +43,20 @@ const NO_PROJECTS: ProjectSummary[] = []
 /**
  * The sweep a routine's Run now asks for, when it is a sweep rather than a plain start — or
  * nothing, for the routine a plain start serves exactly. Decided by what the job declares about
- * itself (it drains, fans out, or holds a lock), never by its name, so a renamed routine keeps
- * its path.
+ * itself (it works the queue, fans out, or holds a lock), never by its name, so a renamed routine
+ * keeps its path.
  *
- * The two that fan out (#1204) go because only the sweep can: it claims the work before each
- * agent starts — a queue entry for a drain, a ticket lock for planning — and a plain start could
- * only ever be one agent. A routine that holds a lock (#1643/#1659) goes for the same claim: the
- * sweep takes `routines/<name>.lock.md` before the start, and a plain start would run unguarded.
+ * The queued work (#1774) goes through the sweep because the sweep is what fires it: one agent
+ * per project, with the sweep's own gates. Planning (#1204) goes because only the sweep can claim
+ * a ticket before each agent starts, and a plain start could only ever be one agent. A routine
+ * that holds a lock (#1643/#1659) goes for the same claim: the sweep takes
+ * `routines/<name>.lock.md` before the start, and a plain start would run unguarded.
  *
- * The drain visits every project, which is what its tooltip says and why it sends no id. The
- * rest are the picked project's own work, so they carry one.
+ * The queued work visits every project, which is what its tooltip says and why it sends no id.
+ * The rest are the picked project's own work, so they carry one.
  */
 function narrowedSweep(job: AutoPmJob, projectId: string): { only: AutoPmOnly; projectId?: string } | undefined {
-  if (job.drains) return { only: 'drain' }
+  if (job.works) return { only: 'work' }
   if (job.fansOut) return { only: 'plan', projectId }
   if (job.lock !== undefined) return { only: { lock: job.lock }, projectId }
   return undefined
@@ -247,34 +248,34 @@ export function RoutineWork({
                     onStart={() => void runNow(job)}
                     onConfigure={() => projectId && onSelectProject(projectId)}
                     prompt={job.prompt}
-                    /* A fan-out routine's Run now is a sweep, and the launcher can only ever send
-                       one agent — so this row's secondary action really is a different job, and
-                       says so rather than looking like the same one. Both fan-out routines
-                       (#1204), not just the drain: the same sentence is true the moment a Run now
-                       stops being one start. */
+                    /* A routine whose Run now is a sweep over every project, or a fan-out, is
+                       not one agent — so this row's secondary action really is a different job,
+                       and says so rather than looking like the same one. */
                     configureDescription={
-                      job.drains || job.fansOut
-                        ? 'Opens the launcher with this prompt — one agent, not the fan-out.'
-                        : 'Opens the launcher with this prompt, so you can set the model and where it runs.'
+                      job.works
+                        ? 'Opens the launcher with this prompt — one agent in this project, not every project.'
+                        : job.fansOut
+                          ? 'Opens the launcher with this prompt — one agent, not the fan-out.'
+                          : 'Opens the launcher with this prompt, so you can set the model and where it runs.'
                     }
                     tooltipClassName="max-w-[22rem] space-y-1"
                     tooltip={
                       <>
                         {job.tooltip && <span className="block">{job.tooltip}</span>}
-                        {/* The drain row's Run now is the sweep, so neither half of the settings
-                            line would be true of it: the sweep resolves each project's own
-                            `the-framework.yml` on top of these preferences, and it visits every
-                            project rather than the one picked above. It says that instead. */}
+                        {/* The queued-work row's Run now is the sweep, so neither half of the
+                            settings line would be true of it: the sweep resolves each project's
+                            own `the-framework.yml` on top of these preferences, and it visits
+                            every project rather than the one picked above. It says that instead. */}
                         <span className="block text-muted-foreground">
-                          {job.drains ? "Each project's own settings decide the model and where it runs." : settings}
+                          {job.works ? "Each project's own settings decide the model and where it runs." : settings}
                         </span>
                         {/* Three cases, because the click does three different things (#1204).
                             A routine that fans out spends what the setting allows rather than one
                             agent, so a tooltip that exists to say what a click costs has to say
                             so — and "one per ticket" is why several here is not redundant work. */}
                         <span className="block text-muted-foreground">
-                          {job.drains
-                            ? `Sweeps every project the daemon watches, up to ${concurrency} ${concurrency === 1 ? 'agent' : 'agents'} each, unattended.`
+                          {job.works
+                            ? 'Starts one agent in every project the daemon watches, unattended.'
                             : job.fansOut
                               ? `Starts up to ${concurrency} ${concurrency === 1 ? 'agent' : 'agents'}${projectName ? ` in ${projectName}` : ''}, one per open ticket, unattended.`
                               : `Starts one agent${projectName ? ` in ${projectName}` : ''}, unattended — nothing is asked mid-run.`}
@@ -330,8 +331,8 @@ export function RoutineWork({
                 </Tooltip>
               </div>
               {/* The concurrency setting (#1204). Beside the switch it qualifies, and worded as
-                  what it does rather than as a number: only draining fans out, because that is the
-                  routine that takes work off the queue one entry at a time. */}
+                  what it does rather than as a number: the queued work runs one agent per move of
+                  the branch, and the cap is how many of them may overlap. */}
               <div className="mt-2 flex items-center justify-between gap-2">
                 <Tooltip>
                   <TooltipTrigger

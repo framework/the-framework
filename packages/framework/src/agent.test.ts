@@ -592,58 +592,7 @@ test('requestChoices resolves to the recommended option if the run aborts while 
   assert.equal(picked, 'b') // fell back to the recommended option, not a hang
 })
 
-test('a fake run skips the backlog loop by default; the demo stays deterministic (#323)', async () => {
-  const events: FrameworkEvent[] = []
-  const result = await runAgent({
-    prompt: FAKE_INTENT,
-    driver: fakeDriver(),
-    cwd: '/tmp/ws',
-    onEvent: e => events.push(e),
-  })
-  assert.equal(result.todo, undefined)
-  assert.equal(events.some(e => e.kind === 'log' && /Queue/.test(e.message)), false)
-})
-
-test('runAgent runs the backlog loop after the build when opted in (#323)', async () => {
-  const { mkdtemp, realpath, rm, writeFile } = await import('node:fs/promises')
-  const { tmpdir } = await import('node:os')
-  const { join } = await import('node:path')
-  const { nodeGitRunner, withFileBranch, DATA_BRANCH } = await import('@gemstack/agent-data')
-  // The queue lives on the `agent-data` branch (#1582/#1748), so the fixture is a real repo.
-  const git = nodeGitRunner()
-  const cwd = await realpath(await mkdtemp(join(tmpdir(), 'framework-run-todo-')))
-  await git(['init', '-b', 'main'], cwd)
-  await git(['config', 'user.email', 't@t'], cwd)
-  await git(['config', 'user.name', 't'], cwd)
-  await writeFile(join(cwd, 'README.md'), '# t\n')
-  await git(['add', '-A'], cwd)
-  await git(['commit', '-m', 'init'], cwd)
-  await withFileBranch(cwd, DATA_BRANCH, 'seed', async (dir: string) => {
-    await writeFile(join(dir, 'TODO_AGENTS.md'), '- [ ] leftover task\n', 'utf8')
-  })
-  try {
-    const events: FrameworkEvent[] = []
-    // The fake script only answers; the loop's own removal (#1582) drains the entry —
-    // proving the wiring runs post-build with the agent's own session.
-    const result = await runAgent({
-      prompt: FAKE_INTENT,
-      driver: fakeDriver(),
-      cwd,
-      todoLoop: true,
-      onEvent: e => events.push(e),
-    })
-    assert.deepEqual(result.todo, { completed: 1, reason: 'empty' })
-    assert.ok(events.some(e => e.kind === 'log' && /Queue: 1 open item\(s\)/.test(e.message)))
-    // The loop runs before the agent's end event.
-    const endIndex = events.findIndex(e => e.kind === 'end')
-    const doneIndex = events.findIndex(e => e.kind === 'log' && /Queue done/.test(e.message))
-    assert.ok(doneIndex !== -1 && doneIndex < endIndex)
-  } finally {
-    await rm(cwd, { recursive: true, force: true })
-  }
-})
-
-// The await rounds shared by the direct prompt path and the backlog loop (#569). Both used
+// The await rounds shared by the direct prompt path and the build path (#569). Both used
 // to carry their own copy, which is how the turn-signal emission missed one of them (#563).
 
 /** A gate the fake agent can emit, in the wire shape `parseAwaitGate` reads. */
@@ -821,14 +770,11 @@ test('a hand-off run ends at the hand-off: no review passes, no backlog gate (#1
     const events: FrameworkEvent[] = []
     const asked: ChoiceRequest[] = []
     const { driver, prompts } = handsOffDriver()
-    const { todo } = await runAgent({
+    await runAgent({
       prompt: FAKE_INTENT,
       driver,
       location: 'web',
       cwd,
-      // Explicit, so this proves the hand-off outranks an opt-in rather than merely
-      // sharing a default with it.
-      todoLoop: true,
       requestChoice: async req => {
         asked.push(req)
         return { picked: req.options[0]!.id, by: 'user' }
@@ -839,9 +785,8 @@ test('a hand-off run ends at the hand-off: no review passes, no backlog gate (#1
     // The build prompt was the whole agent: no phase followed it, so nothing read the
     // hand-off note as a reply.
     assert.equal(prompts().length, 1)
-    // The backlog is still there and still unasked about: this machine has no standing to
-    // ask which item to start next when the work is somewhere it cannot see.
-    assert.equal(todo, undefined)
+    // Nothing was asked: this machine has no standing to ask anything when the work is
+    // somewhere it cannot see.
     assert.deepEqual(asked, [])
     assert.ok(!events.some(e => e.kind === 'choice'))
     assert.match(await readFile(join(cwd, 'TODO_AGENTS.md'), 'utf8'), /leftover task/)
@@ -956,22 +901,20 @@ test('a build opens with the intent itself, rendered through the user-prompt slo
   await writeFile(join(cwd, 'src/index.ts'), 'export {}')
   try {
     const { driver, prompts } = realNamedDriver([{ text: 'added the feature' }])
-    await runAgent({ prompt: 'add a search box', driver, cwd, todoLoop: false })
+    await runAgent({ prompt: 'add a search box', driver, cwd })
     assert.equal(prompts[0], 'add a search box')
   } finally {
     await rm(cwd, { recursive: true, force: true })
   }
 })
 
-test('a prompt session runs its text without build framing, and works no backlog (#353)', async () => {
+test('a prompt session runs its text without build framing (#353)', async () => {
   const cwd = await mkdtemp(join(tmpdir(), 'fw-promptkind-'))
-  await writeFile(join(cwd, 'TODO_AGENTS.md'), '- [ ] leftover task\n')
   try {
     const { driver, prompts } = realNamedDriver([{ text: 'reviewed it' }])
-    const { todo } = await runAgent({ prompt: 'review the auth flow', kind: 'prompt', driver, cwd, vanilla: true })
-    assert.equal(prompts.length, 1, 'one prompt, and no backlog turns after it')
+    await runAgent({ prompt: 'review the auth flow', kind: 'prompt', driver, cwd, vanilla: true })
+    assert.equal(prompts.length, 1, 'one prompt, and nothing after it')
     assert.equal(prompts[0], 'review the auth flow')
-    assert.equal(todo, undefined)
   } finally {
     await rm(cwd, { recursive: true, force: true })
   }

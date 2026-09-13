@@ -69,7 +69,7 @@ describe('TicketsPanel (#697/#1144)', () => {
     await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith(expect.any(String), 'r3'))
   })
 
-  test('the start column spins up an agent working on the ticket, unattended and with the ticket named (#1117/#1279)', async () => {
+  test('the start column spins up an agent working on the ticket, unattended (#1279)', async () => {
     sendStart.mockResolvedValue({ ok: true, agentId: 'r4' })
     const onAgentStarted = vi.fn()
     const onOpen = vi.fn()
@@ -81,10 +81,9 @@ describe('TicketsPanel (#697/#1144)', () => {
     expect(sendStart.mock.calls[0]?.[2]).toBe('prompt')
     expect(sendStart.mock.calls[0]?.[1]).toBe(workOnTicketPrompt('2026-07-20_do-the-thing.md'))
     expect(sendStart.mock.calls[0]?.[1]).toBe('Work on tickets/2026-07-20_do-the-thing.md. Do not start any other ticket.')
-    // Unattended like the AI Queue card's play button (#1279), with the ticket on the options so
-    // the agent's meta names what it implements (#1117) — the prompt is not the drain preset, so
-    // the daemon would not infer it.
-    expect(sendStart.mock.calls[0]?.[3]).toEqual({ unattended: true, ticket: 'tickets/2026-07-20_do-the-thing.md' })
+    // Unattended like the AI Queue card's play button (#1279). The prompt names the ticket; the
+    // framework records nothing else about it (#1774).
+    expect(sendStart.mock.calls[0]?.[3]).toEqual({ unattended: true })
     await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith(expect.any(String), 'r4'))
     // A sibling of the row's open button, like the plan cell: starting must not also navigate.
     expect(onOpen).not.toHaveBeenCalled()

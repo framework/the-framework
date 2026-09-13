@@ -7,6 +7,7 @@ import { startDashboard, type Dashboard, type StartAgentOptions } from './dashbo
 import { createProjectRuntime, type ProjectRuntimeOptions } from './daemon-runtime.js'
 import { defaultQuotaSource } from './dashboard/quota.js'
 import { startBackgroundServices, type BackgroundServices } from './daemon-services.js'
+import { daemonFunnel } from './daemon-writes.js'
 import { projectErrorStore } from './project-errors.js'
 import { resolveDashboardBundle } from './dashboard/bundle.js'
 import { isActivated } from './project.js'
@@ -155,9 +156,11 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
 
   // Crash recovery (#642): a fresh daemon drives no in-flight run, so any run a dead
   // process left marked `running` is orphaned — it would show as active forever with a
-  // no-op Stop. Reconcile them to `stopped` across every registered project at boot.
+  // no-op Stop. Reconcile them to `stopped` across every registered project at boot. The
+  // records it writes are the daemon's own commits, signed as such (`daemon-writes.ts`).
+  const funnel = daemonFunnel()
   for (const record of await listProjects(undefined, env).catch(() => [])) {
-    const fixed = await reconcileOrphanedAgents(record.path).catch(() => 0)
+    const fixed = await reconcileOrphanedAgents(record.path, undefined, undefined, funnel).catch(() => 0)
     if (fixed > 0) console.log(`[framework] reconciled ${fixed} orphaned agent(s) in ${basename(record.path)}`)
   }
   // Browsers those agents left behind (#1719): a Chrome whose agent died by SIGKILL runs on

@@ -114,9 +114,8 @@ test('the session spec is what carries a session, and it round-trips through age
   assert.equal(o.research, false)
 })
 
-test('the backlog loop runs unless the spec says otherwise (#323)', () => {
-  assert.equal(opts().todoLoop, true)
-  // Unattended (#846): off unless asked, so an ordinary agent still parks its gates for the human.
+test('unattended is off unless the spec asks for it (#846)', () => {
+  // Off unless asked, so an ordinary agent still parks its gates for the human.
   assert.equal(opts().unattended, undefined)
   assert.equal(opts({ options: { unattended: true } }).unattended, true)
 })
@@ -224,15 +223,11 @@ test('runOnBeforeMergeable materializes the presets so the queued filePaths reso
   assert.ok(fs.files.has(join('/work/app', '.the-framework/presets/security_audit.md')))
 })
 
-test('the ticket a session implements is re-checked, since it comes off a file an agent wrote (#1117)', () => {
-  assert.equal(opts({ options: { ticket: 'tickets/2026-07-25_login.md' } }).ticket, 'tickets/2026-07-25_login.md')
-  assert.equal(opts().ticket, undefined) // nothing said = no particular ticket
-  for (const bad of ['tickets/../etc/passwd', '/etc/passwd', 'TODO_AGENTS.md', '']) {
-    assert.equal(opts({ options: { ticket: bad } }).ticket, undefined, `expected ${bad} to be dropped`)
-  }
-  // A planning agent says so (#1327): it is what keeps its PR title from inheriting the ticket's
-  // issue as `(fix #42)` and closing it with the work still undone.
+test('a planning agent says so (#1327)', () => {
+  // What keeps a closing phrase in its pull request from closing the ticket's issue with the work
+  // still undone.
   assert.equal(opts({ options: { planAgent: true } }).planAgent, true)
+  assert.equal(opts().planAgent, undefined)
 })
 
 test('transparent is unset by default (#625)', () => {

@@ -25,7 +25,6 @@ const PARAMLESS = [
   presets.suggestNewTickets,
   presets.suggestNewFeatures,
   presets.suggestTicketsToWorkOn,
-  presets.drainQueue,
   presets.triageQuick,
   presets.triageConsensual,
   presets.updateTickets,
@@ -37,7 +36,7 @@ test('every preset keeps its exact run-kind name', () => {
   assert.deepEqual(
     Object.values(presets).map(p => p.name).sort(),
     [
-      'drain-queue', 'maintainability', 'maintenance', 'market-research',
+      'maintainability', 'maintenance', 'market-research',
       'plan-tickets', 'readability', 'research', 'security-audit',
       'suggest-new-features', 'suggest-new-tickets', 'suggest-tickets-to-work-on',
       'triage-consensual', 'triage-quick', 'update-tickets', 'ux',
@@ -45,10 +44,9 @@ test('every preset keeps its exact run-kind name', () => {
   )
 })
 
-test('the launcher offers every preset except the daemon-only one', () => {
+test('the launcher offers every preset', () => {
   const offered = LAUNCHER_PRESETS.map(p => p.name)
-  assert.equal(offered.includes('drain-queue'), false, 'drain-queue is fired by the daemon only')
-  assert.equal(offered.length, Object.keys(presets).length - 1)
+  assert.equal(offered.length, Object.keys(presets).length)
   for (const preset of LAUNCHER_PRESETS) assert.ok(preset.label, `${preset.name} needs a label`)
 })
 

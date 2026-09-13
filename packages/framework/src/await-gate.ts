@@ -5,8 +5,7 @@ import type { ChatMessage, AgentMessages } from './agent-messages.js'
 
 // The shared await/choice/chat machinery (#304/#337/#339/#714), lifted out of the agent
 // lifecycle so the build path (run.ts), the direct prompt path (prompt-run.ts), and the
-// backlog loop (todo-loop.ts) can all reach it without importing the orchestrator — which is
-// what removed the agent <-> todo-loop cycle. run.ts composes these primitives into a lifecycle;
+// build path can all reach it without importing the orchestrator. run.ts composes these primitives into a lifecycle;
 // it does not own them.
 
 /** What a resolved gate yields. */
@@ -22,7 +21,7 @@ export interface GateAnswer {
  * prompt: emits the `choice`, parks for the pick (or the headless/abort fallback), and maps the
  * picked id(s) back to label(s). Round 0 keeps a stable gate id; later rounds get a unique one so
  * a dashboard never confuses a re-ask with the answer it just resolved. Shared by the build's
- * `agentAwaitGate`, the direct prompt path, and the backlog loop (#323).
+ * `agentAwaitGate` and the direct prompt path.
  *
  * One path, where there were four. A gate that takes several picks answers with the labels it got
  * (or `(none)`); every other gate answers with the one label picked. What used to distinguish an
@@ -208,7 +207,7 @@ export async function runChatPhase(session: DriverSession, messages: AgentMessag
  * messages (#714) rather than finishing.
  *
  * Every turn here is a turn like any other, so each one's signals are emitted. That is the
- * point of sharing this: the direct prompt path and the backlog loop each had their own copy
+ * point of sharing this: the direct prompt path and the build path each had their own copy
  * of these rounds, and the emission had to be added to each by hand (#563).
  */
 export async function runAwaitRounds(opts: AwaitRoundsOptions): Promise<AwaitRoundsResult> {

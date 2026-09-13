@@ -766,16 +766,13 @@ test('a different PR on the branch is not this run’s answer (E6)', async () =>
   assert.equal(found.value?.number, 42, 'the recorded number wins over whatever is on the branch now')
 })
 
-test('withheldMerge authorizes only a declared-done session with an empty session TODO (#1363)', () => {
+test('withheldMerge authorizes only a declared-done session (#1363)', () => {
   // The rule settled on #1390: config arms the merge, the agent authorizes it. No signal means
   // no merge, whatever else is true — this is what row 3 of the live matrix proved was missing
   // (the daemon merged 3s after the PR opened, with setReadyForMerge never called).
-  assert.equal(withheldMerge({ readyForMerge: false, agentTodoOpen: false }), 'not-ready-for-merge')
-  assert.equal(withheldMerge({ readyForMerge: false, agentTodoOpen: true }), 'not-ready-for-merge')
-  // The temporary safety belt: the agent said done but its own session file says otherwise.
-  assert.equal(withheldMerge({ readyForMerge: true, agentTodoOpen: true }), 'session-todo-open')
-  // Declared done, nothing pending in this session: the merge may run.
-  assert.equal(withheldMerge({ readyForMerge: true, agentTodoOpen: false }), undefined)
+  assert.equal(withheldMerge({ readyForMerge: false }), 'not-ready-for-merge')
+  // Declared done: the merge may run. The agent's word is enough (#1774).
+  assert.equal(withheldMerge({ readyForMerge: true }), undefined)
 })
 
 test("a run implementing a ticket carries its issue as `(fix #42)` in the PR title (#1334)", async () => {

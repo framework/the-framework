@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import type { AutoPmJob, AutoPmReport, Preferences, ProjectSummary } from '../../src/index.js'
 import {
   AUTO_PM_ROUTINES,
-  AUTO_PM_DRAIN_JOB,
+  AUTO_PM_WORK_JOB,
   AUTO_PM_MAINTENANCE_JOB,
   DEFAULT_AUTO_PM_CONCURRENCY,
 } from '../../src/client.js'
@@ -80,8 +80,8 @@ describe('RoutineWork (#1159)', () => {
     }
   })
 
-  // The drain leads the list, and since #1204 its Run now goes to the sweep, so the plain-start
-  // tests click the first *rotation* row instead.
+  // The queued work leads the list, and its Run now goes to the sweep, so the plain-start tests
+  // click the first *rotation* row instead.
   const ROTATION_JOB = AUTO_PM_ROUTINES[1]!
 
   test('Run now starts the routine prompt verbatim and selects the run it started (#1191)', async () => {
@@ -141,14 +141,14 @@ describe('RoutineWork (#1159)', () => {
     expect((await hoverTooltip(await runNowOf(ROTATION_JOB))).textContent).toContain('Claude web')
   })
 
-  test("the drain's Run now reports the sweep it fires, not these settings (#1506)", async () => {
+  test("the queued work's Run now reports the sweep it fires, not these settings (#1506)", async () => {
     prefs = { model: 'opus', autoPmConcurrency: 3 }
     renderCard()
-    const hint = await hoverTooltip(await runNowOf(AUTO_PM_DRAIN_JOB))
+    const hint = await hoverTooltip(await runNowOf(AUTO_PM_WORK_JOB))
     // The sweep visits every project and resolves each one's own committed settings on top of
     // these, so the model and place the other rows promise would both be a guess here.
     expect(hint.textContent).toContain("Each project's own settings decide the model and where it runs.")
-    expect(hint.textContent).toMatch(/Sweeps every project the daemon watches, up to 3 agents each, unattended/)
+    expect(hint.textContent).toMatch(/Starts one agent in every project the daemon watches, unattended/)
     expect(hint.textContent).not.toContain('Opus')
   })
 
@@ -169,7 +169,7 @@ describe('RoutineWork (#1159)', () => {
     renderCard()
     fireEvent.click(await runNowOf(PLAN_JOB))
     await waitFor(() => expect(sendAutoPmSweep).toHaveBeenCalled())
-    // Narrowed to planning, and scoped to the project the picker shows: the drain's Run now
+    // Narrowed to planning, and scoped to the project the picker shows: the queued work's Run now
     // deliberately sends no id because it sweeps every project, and this one is not that.
     expect(sendAutoPmSweep).toHaveBeenCalledWith({ only: 'plan', projectId: 'p1' })
     // The fan-out is the sweep's whole point here: a plain start is the pre-#1204 behaviour and
@@ -182,8 +182,8 @@ describe('RoutineWork (#1159)', () => {
     renderCard()
     const hint = await hoverTooltip(await runNowOf(PLAN_JOB))
     expect(hint.textContent).toMatch(/Starts up to 3 agents in gemstack, one per open ticket, unattended/)
-    // Not the drain's line: this one stays in the picked project and does resolve these settings.
-    expect(hint.textContent).not.toContain('Sweeps every project')
+    // Not the queued work's line: this one stays in the picked project and does resolve these settings.
+    expect(hint.textContent).not.toContain('every project the daemon watches')
     expect(hint.textContent).toContain('Claude Code · Opus · This machine')
   })
 
@@ -265,12 +265,12 @@ describe('RoutineWork (#1159)', () => {
     expect((screen.getByLabelText('Run in') as HTMLSelectElement).value).toBe('p1')
   })
 
-  test("the drain's menu item says it is one agent, not the fan-out its Run now fires (#1507)", async () => {
+  test("the queued work's menu item says it is one agent in one project, not every project (#1507)", async () => {
     renderCard()
-    await openRunMenu(AUTO_PM_DRAIN_JOB)
-    // The launcher can only ever send one agent, so this row's two halves really do different
-    // jobs — and the row says so rather than letting them look alike.
-    expect(await screen.findByText(/one agent, not the fan-out/)).toBeTruthy()
+    await openRunMenu(AUTO_PM_WORK_JOB)
+    // The launcher can only ever send one agent to one project, so this row's two halves really
+    // do different jobs — and the row says so rather than letting them look alike.
+    expect(await screen.findByText(/one agent in this project, not every project/)).toBeTruthy()
   })
 
   test('a routine whose Run now is a plain start promises the settings, not a caveat (#1507)', async () => {
@@ -291,23 +291,23 @@ describe('RoutineWork (#1159)', () => {
     await waitFor(() => expect(selected).toEqual(['p1']))
   })
 
-  test("the drain's Run now fires a drain-only sweep, the only thing that can fan out (#1204)", async () => {
-    // Rom's demo click: "Spin up agents working on the AI queue" must spin up to the concurrency,
-    // one agent per entry. A plain start could only ever be one agent on the first entry.
+  test("the queued work's Run now fires the sweep, narrowed to the queued work (#1204/#1774)", async () => {
+    // The click starts an agent on the queue in every project the daemon watches, with the
+    // sweep's own gates; a plain start could only ever be one agent in the picked project.
     sendAutoPmSweep.mockResolvedValue({ ok: true })
     const started: unknown[][] = []
     renderCard({ onAgentStarted: (...args) => started.push(args) })
     await waitFor(() => expect(screen.getAllByText('Run now').length).toBeGreaterThan(0))
     fireEvent.click(screen.getAllByText('Run now')[0]!)
-    // No project id on purpose: the drain sweeps every project the daemon watches, which is what
-    // its own tooltip promises — unlike the planning routine's click, which stays in the picked one.
-    await waitFor(() => expect(sendAutoPmSweep).toHaveBeenCalledWith({ only: 'drain' }))
+    // No project id on purpose: the queued work visits every project the daemon watches, which is
+    // what its own tooltip promises — unlike the planning routine's click, which stays in the picked one.
+    await waitFor(() => expect(sendAutoPmSweep).toHaveBeenCalledWith({ only: 'work' }))
     expect(start).not.toHaveBeenCalled()
     // No navigation: the batch lands in the Agents card, not one session's page.
     expect(started).toHaveLength(0)
   })
 
-  test("the drain's Run now on a host with no sweep says so instead of failing silently (#1204)", async () => {
+  test("the queued work's Run now on a host with no sweep says so instead of failing silently (#1204)", async () => {
     sendAutoPmSweep.mockResolvedValue({ ok: false })
     renderCard()
     await waitFor(() => expect(screen.getAllByText('Run now').length).toBeGreaterThan(0))
@@ -372,17 +372,17 @@ describe('RoutineWork (#1159)', () => {
     await waitFor(() => expect(screen.getAllByText('Run now').length).toBe(AUTO_PM_ROUTINES.length))
     // Nothing saved means nothing opted out: the schedule is whole until it is edited.
     for (const job of AUTO_PM_ROUTINES) expect(routineBox(job).getAttribute('aria-checked')).toBe('true')
-    fireEvent.click(screen.getByText(routineName(AUTO_PM_DRAIN_JOB)))
-    expect(updatePreferences).toHaveBeenCalledWith({ autoPmOptOut: [AUTO_PM_DRAIN_JOB.name] })
+    fireEvent.click(screen.getByText(routineName(AUTO_PM_WORK_JOB)))
+    expect(updatePreferences).toHaveBeenCalledWith({ autoPmOptOut: [AUTO_PM_WORK_JOB.name] })
   })
 
   test('an opted-out routine shows unticked, and re-ticking it drops only it (#1209)', async () => {
     const other = AUTO_PM_ROUTINES[1]!.name
-    prefs = { autoPmOptOut: [AUTO_PM_DRAIN_JOB.name, other] }
+    prefs = { autoPmOptOut: [AUTO_PM_WORK_JOB.name, other] }
     renderCard()
     await waitFor(() => expect(screen.getAllByText('Run now').length).toBe(AUTO_PM_ROUTINES.length))
-    expect(routineBox(AUTO_PM_DRAIN_JOB).getAttribute('aria-checked')).toBe('false')
-    fireEvent.click(screen.getByText(routineName(AUTO_PM_DRAIN_JOB)))
+    expect(routineBox(AUTO_PM_WORK_JOB).getAttribute('aria-checked')).toBe('false')
+    fireEvent.click(screen.getByText(routineName(AUTO_PM_WORK_JOB)))
     // The other opt-out survives: the row writes the whole set, so it must not clear its siblings.
     expect(updatePreferences).toHaveBeenCalledWith({ autoPmOptOut: [other] })
   })
@@ -467,26 +467,26 @@ describe('RoutineWork (#1159)', () => {
     sendAutoPmSweep.mockResolvedValue({
       ok: true,
       outcomes: [
-        { projectId: 'p1', path: '/home/me/alpha', started: true, message: 'started a drain' },
+        { projectId: 'p1', path: '/home/me/alpha', started: true, message: 'Work the queue' },
         { projectId: 'p2', path: '/home/me/beta', started: false, message: 'a run is already active' },
       ],
     })
     renderCard()
     fireEvent.click(await screen.findByText('Trigger routine now'))
-    await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/alpha: started a drain/))
+    await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/alpha: Work the queue/))
     expect(screen.getByRole('status').textContent).toMatch(/beta: a run is already active/)
   })
 
-  test("the drain's Run now reports its sweep's outcome the same way (#1433)", async () => {
+  test("the queued work's Run now reports its sweep's outcome the same way (#1433)", async () => {
     sendAutoPmSweep.mockResolvedValue({
       ok: true,
-      outcomes: [{ projectId: 'p1', path: '/home/me/repo', started: false, message: 'the queue is empty, so there is nothing to drain' }],
+      outcomes: [{ projectId: 'p1', path: '/home/me/repo', started: false, message: 'the routine that works the queue is switched off' }],
     })
     renderCard()
     await waitFor(() => expect(screen.getAllByText('Run now').length).toBeGreaterThan(0))
     fireEvent.click(screen.getAllByText('Run now')[0]!)
     await waitFor(() =>
-      expect(screen.getByRole('status').textContent).toBe('the queue is empty, so there is nothing to drain'),
+      expect(screen.getByRole('status').textContent).toBe('the routine that works the queue is switched off'),
     )
   })
 

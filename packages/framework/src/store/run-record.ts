@@ -5,8 +5,9 @@ import type { AgentMeta } from './agent-store.js'
 
 /**
  * The framework's run, in the `logs` skill's two shapes (#1769). The skill owns what a run's card
- * says to an agent — eleven plain fields — and four kinds of diary line; everything else the
- * framework records is its own. So the card carries the framework's remaining meta under the one
+ * says to an agent — eleven plain fields, of which the framework fills ten: which ticket a run
+ * worked is the agent's own doing now, not the framework's to know (#1774) — and four kinds of
+ * diary line; everything else the framework records is its own. So the card carries the framework's remaining meta under the one
  * key the skill stores and never reads, `caller`, and the diary carries the framework's other
  * events as they are, among the four the skill knows. This module is the whole mapping, both
  * ways: the daemon writes through it at teardown, and every reader of an archived run — the run
@@ -15,7 +16,7 @@ import type { AgentMeta } from './agent-store.js'
 
 /** The framework's meta as the skill's card: the skill's fields on top, the rest under `caller`. */
 export function toRunCard(meta: AgentMeta): RunCard {
-  const { id, startedAt, endedAt, status, intent, driver, model, branch, pr, ticket, cost, ...caller } = meta
+  const { id, startedAt, endedAt, status, intent, driver, model, branch, pr, cost, ...caller } = meta
   const card: RunCard = { id, startedAt, status }
   if (endedAt !== undefined) card.endedAt = endedAt
   if (intent !== undefined) card.intent = intent
@@ -23,7 +24,6 @@ export function toRunCard(meta: AgentMeta): RunCard {
   if (model !== undefined) card.model = model
   if (branch !== undefined) card.branch = branch
   if (pr !== undefined) card.pr = pr
-  if (ticket !== undefined) card.ticket = ticket
   if (cost !== undefined) card.cost = cost
   if (Object.keys(caller).length > 0) card.caller = caller
   return card

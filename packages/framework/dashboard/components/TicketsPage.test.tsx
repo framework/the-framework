@@ -255,7 +255,7 @@ describe('TicketsPage grouping (#1144)', () => {
     expect(onOpenTicket).toHaveBeenCalledWith('p2', 'b.md')
   })
 
-  test("a flat row's start button spins up an agent in that row's own project (#1117)", async () => {
+  test("a flat row's start button spins up an agent in that row's own project (#1144)", async () => {
     onAllTickets.mockResolvedValue([
       { projectId: 'p2', projectName: 'Beta', tickets: [ticket({ file: 'b.md', title: 'Beta ticket' })] },
     ])
@@ -267,10 +267,7 @@ describe('TicketsPage grouping (#1144)', () => {
     fireEvent.click(await screen.findByRole('button', { name: /start work on beta ticket/i }))
     // The row's own project, not a panel-bound one — the flat list carries one per row.
     await waitFor(() =>
-      expect(sendStart).toHaveBeenCalledWith('p2', expect.stringContaining('tickets/b.md'), 'prompt', {
-        unattended: true,
-        ticket: 'tickets/b.md',
-      }),
+      expect(sendStart).toHaveBeenCalledWith('p2', expect.stringContaining('tickets/b.md'), 'prompt', { unattended: true }),
     )
     await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith('p2', expect.any(String), 'r9'))
   })

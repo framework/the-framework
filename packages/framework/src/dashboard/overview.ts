@@ -138,14 +138,6 @@ export interface HotTicket {
   projectName: string
   bucket: HotBucket
   ticket: WorkspaceTicket
-  /**
-   * An agent is implementing this ticket right now (#1117): its id, for the card to link into.
-   *
-   * The difference between "someone planned this at some point" and "this is being coded as you
-   * look at it", which the plan/spike proxy could not tell apart. Only set for a ticket a live agent
-   * actually recorded (`AgentMeta.ticket`), so absent still means the lane was inferred.
-   */
-  agentId?: string
 }
 
 /** Where the ticket format's 10-0 scale starts reading as high. */
@@ -165,23 +157,18 @@ function isHighPriority(priority: string): boolean {
 
 /**
  * A ticket's lane (#1139), or null when it is in none of the three the card shows:
- * - in-progress: an agent is implementing it right now (#1117), or failing that the agent has
- *   planned it, so work is under way in the older, inferred sense.
+ * - in-progress: an agent has planned it, so work is under way in the inferred sense. Which
+ *   ticket an agent is implementing right now is the ticket's own claim to say (#1774); the
+ *   framework no longer records it on the run.
  * - ai-queue: it sits in the AI Queue — an open `TODO_AGENTS.md` entry links to it — so the
  *   framework will pick it up on its own.
  * - high-priority: none of the above, but flagged high priority; what a human would likely queue next.
  *
  * Precedence follows that order: work already under way outranks a queued ticket, which outranks a
  * bare priority flag. Everything else is dropped — the card is a shortlist, not the whole backlog.
- *
- * `implementing` is the only hard evidence and exists for a drain agent only, so the plan proxy
- * still carries every ticket someone is working by hand.
  */
-export function ticketBucket(
-  ticket: WorkspaceTicket,
-  opts: { implementing?: boolean; queued?: boolean } = {},
-): HotBucket | null {
-  if (opts.implementing || ticket.planned) return 'in-progress'
+export function ticketBucket(ticket: WorkspaceTicket, opts: { queued?: boolean } = {}): HotBucket | null {
+  if (ticket.planned) return 'in-progress'
   if (opts.queued) return 'ai-queue'
   if (ticket.priority && isHighPriority(ticket.priority)) return 'high-priority'
   return null
@@ -209,22 +196,19 @@ const HOT_TICKETS_LIMIT = 60
 /** Injectable readers so {@link buildHotTickets} is unit-testable off disk. */
 export interface HotTicketsDeps {
   tickets?: (cwd: string) => Promise<WorkspaceTicket[]>
-  /** The project's live agents, read for the ticket each one recorded (#1117). */
-  liveAgents?: (cwd: string) => Promise<LiveAgent[]>
   /** The cross-project TODO queue, for the AI-Queue lane (#1139). Defaults to {@link collectQueue}. */
   queue?: (projects: ProjectSummary[]) => Promise<ProjectQueue[]>
 }
 
 /**
  * Every project's tickets pooled and bucketed for the Overview's "hot tickets" card (#1139): what is
- * being worked on (implementing/planned), what sits in the AI Queue (an open `TODO_AGENTS.md`
- * entry links to it), and what is merely flagged high priority. Ordered lane-first (in-progress,
+ * being worked on (planned), what sits in the AI Queue (an open `TODO_AGENTS.md` entry links to
+ * it), and what is merely flagged high priority. Ordered lane-first (in-progress,
  * ai-queue, high-priority), file order within a lane; a ticket in none of the three is dropped.
  * Forgiving — a project whose tickets cannot be read simply contributes nothing.
  */
 export async function buildHotTickets(projects: ProjectSummary[], deps: HotTicketsDeps = {}): Promise<HotTicket[]> {
   const readT = deps.tickets ?? readTickets
-  const readAgents = deps.liveAgents ?? readLiveMetas
   // The AI Queue: which tickets an open TODO_AGENTS.md entry links to, per project (#1139).
   const queues = await (deps.queue ?? (p => collectQueue(p)))(projects)
   const queuedByProject = new Map<string, Set<string>>()
@@ -239,26 +223,12 @@ export async function buildHotTickets(projects: ProjectSummary[], deps: HotTicke
   }
   const all: HotTicket[] = []
   for (const project of projects) {
-    // Which of this project's tickets are being implemented right now, by agent id (#1117). Built
-    // per project because a ticket path is only unique within its own repo.
-    const implementing = new Map<string, string>()
-    for (const meta of await readAgents(project.path).catch(() => [])) {
-      if (meta.status !== 'running' || !meta.ticket) continue
-      implementing.set(meta.ticket, meta.id)
-    }
     const queued = queuedByProject.get(project.id) ?? new Set<string>()
     for (const ticket of await readT(project.path).catch(() => [])) {
-      const agentId = implementing.get(`${TICKETS_DIR}/${ticket.file}`)
-      const bucket = ticketBucket(ticket, { implementing: agentId !== undefined, queued: queued.has(ticket.file) })
+      const bucket = ticketBucket(ticket, { queued: queued.has(ticket.file) })
       // A ticket in none of the three shown lanes is left off the card entirely.
       if (!bucket) continue
-      all.push({
-        projectId: project.id,
-        projectName: project.name,
-        bucket,
-        ticket,
-        ...(agentId ? { agentId } : {}),
-      })
+      all.push({ projectId: project.id, projectName: project.name, bucket, ticket })
     }
   }
   const lane: Record<HotBucket, number> = { 'in-progress': 0, 'ai-queue': 1, 'high-priority': 2 }

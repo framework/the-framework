@@ -49,13 +49,11 @@ export async function onAutoPm(): Promise<AutoPmReport | undefined> {
  * off the loop's own report once the tick resolves, so the card can say them without a poll
  * having to race the sweep. `false` means the sweep itself failed.
  *
- * `only` narrows the sweep to one routine's work (#1204), which is what a Run now that fans out
- * means: `'drain'` spins agents up on the queue's entries, `'plan'` on the open tickets. Either
- * way the fan-out is the sweep's — a plain start could only ever be one agent — and having
- * nothing to work is reported rather than borrowed for a rotation job. `{ pinned }` is the
- * routine pinned to that branch (#1643): one agent, but the sweep releases a stale copy of the
- * branch before starting it, which a plain start never did. `projectId` scopes it to the project
- * the card has picked.
+ * `only` narrows the sweep to one routine's work (#1204): `'work'` starts an agent on the queued
+ * work in every project (#1774), `'plan'` fans out on the open tickets — the sweep's to do, since a
+ * plain start could only ever be one agent and would take no claim. `{ lock }` is the routine
+ * holding that lock (#1643/#1659): one agent, but the sweep takes the lock before starting it,
+ * which a plain start never did. `projectId` scopes it to the project the card has picked.
  */
 export async function sendAutoPmSweep(opts?: { only?: AutoPmOnly; projectId?: string }): Promise<{ ok: boolean; outcomes?: AutoPmOutcome[] }> {
   const sweep = contextAutoPmSweep()

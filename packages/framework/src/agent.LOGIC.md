@@ -1,4 +1,4 @@
-Runs one agent [1] from its first prompt to its end event: frames the coding agent [2], opens one driver session [3] for the whole agent, sends the opening prompt, honors every gate [4] the coding agent stops at, works the agent queue [5] when the agent is a build agent [6], takes the user's live chat [7], and ends, while streaming every step onto the one event stream [8] every surface is a projection of. A hands-off [9] agent is the exception to the middle of that story: its opening turn [10] is the whole agent.
+Runs one agent [1] from its first prompt to its end event: frames the coding agent [2], opens one driver session [3] for the whole agent, sends the opening prompt, honors every gate [4] the coding agent stops at, and then, when the agent is a build agent [6], takes the user's live chat [7], and ends, while streaming every step onto the one event stream [8] every surface is a projection of. A hands-off [9] agent is the exception to the middle of that story: its opening turn [10] is the whole agent.
 
 ## Context
 
@@ -15,7 +15,7 @@ Runs one agent [1] from its first prompt to its end event: frames the coding age
 [3] driver session: the coding agent's own conversation for one agent, which the driver can resume by its session id.
 [4] gate: a question with options at which an agent stops and waits for an answer: it emits the question in its turn's final message, the dashboard shows it as a card, and the answer re-prompts the agent. When nobody can answer, the recommended option is taken.
 [5] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down. An item on it is a queue entry.
-[6] build agent / prompt agent: the two kinds of agent: a build works the agent queue after its opening exchange; a prompt agent runs one prompt and stops there.
+[6] build agent / prompt agent: the two kinds of agent: a build is framed by The Framework's build prompt and takes live chat after its opening exchange; a prompt agent runs one prompt and stops there.
 [7] live chat: the user's own messages to a running agent, each continuing the same driver session. One of them is a message.
 [8] event stream: everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface (dashboard, terminal, archive, run) is a projection of it.
 [9] hands-off: said of an agent whose work leaves this machine, so its first prompt is the whole agent: an agent whose location is `web`.
@@ -36,7 +36,6 @@ Runs one agent [1] from its first prompt to its end event: frames the coding age
 [24] stop: ending an agent before it finishes: the Stop button, Ctrl-C, or a pick marked to stop.
 [25] await limit: the cap on consecutive gates within one exchange; an agent still asking past it finishes with its latest turn.
 [26] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles. The opposite is attended.
-[27] backlog loop: after a build agent's opening work settles, the loop that works the agent queue one entry per turn until it is empty.
 [28] settled: said of an agent whose work has stopped and which is waiting for the user: it is alive, takes messages, and does nothing until told.
 [29] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
 [30] view: a markdown document an agent pushes to the dashboard's right rail while it works.
@@ -49,12 +48,11 @@ Runs one agent [1] from its first prompt to its end event: frames the coding age
 - **One driver session for the whole agent** - every prompt of the agent goes into one driver session; a continuation resumes the stopped leg's conversation instead of starting a new one; the session is disposed however the agent ends.
 - **The opening prompt** - the user's text rendered through the built-in system prompt's user-prompt slot, or verbatim for a continuation, a vanilla or a transparent agent.
 - **The opening exchange** - the opening turn plus every gate it leads to, up to the await limit of five; nobody to answer means the recommended option; a pick marked stop ends the agent.
-- **A stop is honored before any phase counts as a success** - after the opening exchange, and again after the backlog and chat, a stopped agent ends as stopped, never as done.
-- **The backlog loop, and when it is skipped** - only a build agent that is not hands-off works the agent queue, and only when the loop is enabled, which it is by default for every driver but the fake demo one; a pick marked stop inside an entry ends the whole agent.
-- **Live chat, and where it happens** - a prompt agent takes chat inside its opening exchange, a build agent after its backlog; by default the agent drains what has arrived and ends on an idle queue, and only a stay-open agent parks for the next message.
-- **A hands-off agent ends at its first turn** - no backlog loop and no chat after it, an explicit "Handed off" line before the end, and the land-everything instruction in its system channel.
+- **A stop is honored before any phase counts as a success** - after the opening exchange, and again after the chat, a stopped agent ends as stopped, never as done.
+- **Live chat, and where it happens** - a prompt agent takes chat inside its opening exchange, a build agent after its opening work; by default the agent drains what has arrived and ends on an idle queue, and only a stay-open agent parks for the next message.
+- **A hands-off agent ends at its first turn** - no chat after it, an explicit "Handed off" line before the end, and the land-everything instruction in its system channel.
 - **Every turn's signals are read** - each final message is parsed for views, reported errors, the ready-for-merge signal and the pull request text, with one deduplication span across the opening exchange and chat.
-- **How the agent ends** - done with its final text and the backlog result; stopped when the user's Stop or a stop pick ended it, with "stopped by your answer" as the detail for a pick; failed on any other error; the error is passed on to the agent's process either way.
+- **How the agent ends** - done with its final text; stopped when the user's Stop or a stop pick ended it, with "stopped by your answer" as the detail for a pick; failed on any other error; the error is passed on to the agent's process either way.
 
 ## Business logic
 
@@ -96,7 +94,7 @@ Hands-off is decided here from the agent's location [22]: only `web` is hands-of
 
 The driver starts one driver session [3] bound to the agent's checkout [18], with the composed system channel, the chosen model, and the agent's stop signal. Every prompt of the agent goes into that session: the opening prompt, every gate [4] continuation, every queue entry, every chat message.
 
-A continuation names the driver session id of a stopped leg. The driver then resumes that conversation, so the coding agent [2] answers with its full prior context, and everything around the turn still runs: the gates, the backlog loop [27], live chat [7]. The flow resumes, not just the conversation.
+A continuation names the driver session id of a stopped leg. The driver then resumes that conversation, so the coding agent [2] answers with its full prior context, and everything around the turn still runs: the gates, live chat [7]. The flow resumes, not just the conversation.
 
 The driver session is disposed when the agent ends, whichever way it ends.
 
@@ -128,27 +126,11 @@ The opening prompt is sent as one turn [10]. When the turn's final message ends 
 
 #### Context
 
-**Problem**: the user's Stop and a pick marked stop trip the same stop signal between turns, but the exchange, the backlog loop and the chat do not observe that signal themselves. Without a check, a stopped agent would settle as done, and a done agent authorizes the handoff [15] of the very work the user declined.
+**Problem**: the user's Stop and a pick marked stop trip the same stop signal between turns, but the exchange and the chat do not observe that signal themselves. Without a check, a stopped agent would settle as done, and a done agent authorizes the handoff [15] of the very work the user declined.
 
 #### Business logic
 
-The agent checks its stop signal twice: right after the opening exchange, and again after the backlog loop [27] and the live chat [7], before the success path. When the signal is tripped, the agent ends as stopped (see "How the agent ends") and no later phase runs. The two sources of the signal are the user's Stop [24], which the agent's process raises from the Stop button, Ctrl-C or the control file [14], and a pick marked stop from any phase.
-
-### The backlog loop, and when it is skipped
-
-#### Context
-
-**User story**: a build agent whose opening work has settled goes on to work the agent queue [5] one entry per turn until the queue is empty, asking "Start the next queue item?" before each entry when someone can answer.
-
-#### Business logic
-
-The backlog loop [27] runs only when all three hold:
-
-- the agent is a build agent [6] (a prompt agent is one prompt by definition);
-- the agent is not hands-off [9];
-- the loop is enabled: explicitly by the agent's process, or by default when the driver [17] is not the fake demo driver, whose scripted demo writes no queue and must stay deterministic. The agent's process turns the loop off for a transparent [21] agent.
-
-The loop's own rules (the per-entry gate, the entry cap, the removal of each worked entry from the `agent-data` branch) are `todo-loop.ts`'s. Two of its outcomes matter here: a pick [23] marked stop [24] inside an entry's turn ends the whole agent through the stop signal, while the per-entry "Stop the queue loop" pick only ends the loop, after which the agent goes on to chat and to its end. The loop's result (entries worked, why it ended) is handed back with the agent's result.
+The agent checks its stop signal twice: right after the opening exchange, and again after the live chat [7], before the success path. When the signal is tripped, the agent ends as stopped (see "How the agent ends") and no later phase runs. The two sources of the signal are the user's Stop [24], which the agent's process raises from the Stop button, Ctrl-C or the control file [14], and a pick marked stop from any phase.
 
 ### Live chat, and where it happens
 
@@ -160,7 +142,7 @@ The loop's own rules (the per-entry gate, the entry cap, the removal of each wor
 
 #### Business logic
 
-Where chat runs depends on the kind of agent: a prompt agent [6] takes it inside the opening exchange, right after its gates, because nothing comes between; a build agent takes it after the backlog loop [27], and only if the agent has not been stopped by then. A hands-off [9] agent is wired like a prompt agent: its message source is drained inside the opening exchange.
+Where chat runs depends on the kind of agent: a prompt agent [6] takes it inside the opening exchange, right after its gates, because nothing comes between; a build agent takes it after its opening work, and only if the agent has not been stopped by then. A hands-off [9] agent is wired like a prompt agent: its message source is drained inside the opening exchange.
 
 Each message is sent as a turn [10] resuming the same driver session [3], and the gates [4] that turn ends on are honored like the opening exchange's, with the same await limit. How chat ends:
 
@@ -182,8 +164,7 @@ For an agent whose location [22] is `web`:
 
 - the system channel carries the land-everything instruction ("This session runs detached — land everything"), and nothing else about its gates changes: a cloud session's gates are the same as a local agent's;
 - the opening exchange runs as for any agent;
-- the backlog loop [27] is skipped even when it was explicitly enabled, and the agent queue [5] is left untouched and unasked about;
-- the chat after the backlog is skipped;
+- the chat after the opening exchange is skipped;
 - before the end event the log says "Handed off: the rest of this session happens in its own session, which opens its own pull request.", so a finished hands-off agent does not read as one that gave up after a turn;
 - the agent then ends as done; the agent's process words its own success line as handed off, since this machine built nothing it saw.
 
@@ -205,7 +186,7 @@ Every turn's final message is read for the turn signals [16] (the parsing rules 
 
 #### Business logic
 
-- Done: once every phase has run and the stop signal is clear, the end event says the agent finished well, and the agent hands back its final text, every event in order, and the backlog loop's result when the loop ran.
+- Done: once every phase has run and the stop signal is clear, the end event says the agent finished well, and the agent hands back its final text and every event in order.
 - Stopped: when the agent's turn loop threw and either the user's Stop [24] signal is tripped or a pick [23] marked stop tripped the agent's own stop, the end event says the agent did not finish and was stopped. Its detail is "stopped by your answer" for a stop pick, else the message of the error the abort raised.
 - Failed: any other error ends the agent with an end event that says it did not finish, with the error's message as the detail.
 - In the stopped and failed cases the error is passed on to the agent's process, whose epilogue decides what the handoff does with a stopped agent.

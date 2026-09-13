@@ -1,4 +1,4 @@
-Holds every built-in preset in one table: fifteen rows, each naming the preset, its prompt (shipped as `prompts/presets/<stem>.md` and compiled in), its launcher [1] button's label, an optional one-line tooltip, what its one blank means when it has one, and whether it must always open an agent [2] of its own. From the table it derives the fourteen buttons the launcher shows, in order, and the rule that recognizes the prompt that drains [3] the agent queue [4]. The table reads nothing from the machine, so the dashboard renders any preset in the browser before an agent exists.
+Holds every built-in preset in one table: fourteen rows, each naming the preset, its prompt (shipped as `prompts/presets/<stem>.md` and compiled in), its launcher [1] button's label, an optional one-line tooltip, what its one blank means when it has one, and whether it must always open an agent [2] of its own. From the table it derives the fourteen buttons the launcher shows, in order. The table reads nothing from the machine, so the dashboard renders any preset in the browser before an agent exists.
 
 ## Context
 
@@ -10,12 +10,12 @@ Holds every built-in preset in one table: fifteen rows, each naming the preset, 
 
 [1] launcher: the Start form on project home, a project's own page.
 [2] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
-[3] drain: starting an agent on the agent queue's first open entry — the half of Auto PM that spends existing work.
+[3] the queued work: the routine that spends existing work: one agent started with `/work-queue` when the `agent-data` branch moved, which takes one task off the agent queue by composing the skills in its checkout.
 [4] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down. An item on it is a queue entry.
 [5] composer: the prompt editor on project home, also used for live chat.
 [6] agent view: one agent's page in the dashboard.
 [7] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
-[8] routine: a preset the daemon fires on its own on a schedule — update tickets, triage quick, triage consensual, plan tickets, maintenance — each switchable off and runnable on demand.
+[8] routine: a job the daemon fires on its own — the queued work, update tickets, triage quick, triage consensual, plan tickets, maintenance — each switchable off and runnable on demand.
 [9] prompt agent: an agent that runs one prompt and stops there; a build agent works the agent queue after its opening exchange.
 [10] gate: a question with options at which an agent stops and waits for an answer: it emits the question in its turn's final message, the dashboard shows it as a card, and the answer re-prompts the agent. When nobody can answer, the recommended option is taken.
 [11] routine lock: a file on the `agent-data` branch (`routines/<name>.lock.md`) a daemon takes before running a routine so the routine runs once across machines.
@@ -30,8 +30,7 @@ Holds every built-in preset in one table: fifteen rows, each naming the preset, 
 - **Presets with a blank, and presets that scope themselves** - six presets wrap the user's target, the "what", whose default is the launching agent's session name or else the entire codebase; the other nine scope themselves to the repository's own tickets, plans or queue and render verbatim.
 - **The triage pair shares one queue-only rule** - both triage prompts end with the same appended rule: only queue work, never do it.
 - **"Update from GitHub" always opens its own agent** - picked from inside an agent view, it still starts a new agent rather than continuing that agent's driver session.
-- **What the launcher offers, in order** - fourteen buttons in a fixed order; the drain is absent because only the daemon fires it.
-- **Recognizing the drain prompt** - a prompt drains the agent queue exactly when its text equals the rendered drain preset, so a drain the user started by hand counts and a prompt that merely mentions the queue does not.
+- **What the launcher offers, in order** - fourteen buttons in a fixed order, one per preset; the routine only the daemon fires is a skill file, not a preset.
 - **Which presets may run unattended** - the presets that stop at a gate need a human and never back a routine; the ones that end in work or in tickets do not, and only those are routines.
 
 ## Business logic
@@ -58,7 +57,6 @@ Each row carries the preset's name, by which the daemon's routines [8] and their
 - "Suggest new tickets", name `suggest-new-tickets`: a single line the dashboard prefills and the user edits freely.
 - "Suggest new features", name `suggest-new-features`, tooltip "Propose net-new features as tickets in `tickets/`".
 - "Suggest tickets to work on", name `suggest-tickets-to-work-on`, tooltip "Add tickets to queue (TODO_AGENTS.md)".
-- "Spin up agents working on the AI queue", name `drain-queue`, tooltip "Work the entries already on the queue (TODO_AGENTS.md)".
 - "Add quick-win work to AI Queue", name `triage-quick`, tooltip "Add `tickets/*.md` to queue (TODO_AGENTS.md), only quick-win and consensual tickets".
 - "Add consensual work to AI Queue", name `triage-consensual`, tooltip "Add `tickets/*.md` to queue (TODO_AGENTS.md), only significant (no quick-wins) and consensual tickets".
 
@@ -102,17 +100,7 @@ The "Update from GitHub" row is marked as always running in an agent of its own.
 
 #### Business logic
 
-The launcher [1] shows fourteen buttons, in this order: "Research", "Readability", "Maintainability", "Security audit", "UX (auto)", "Suggest new tickets", "Suggest new features", "Suggest tickets to work on", "Plan tickets (aka spike)", "Market research", "Update from GitHub", "Maintenance", "Add quick-win work to AI Queue", "Add consensual work to AI Queue". "Spin up agents working on the AI queue" is not among them: only the daemon fires the drain [3].
-
-### Recognizing the drain prompt
-
-#### Context
-
-**Problem**: the daemon knows a drain [3] by the mark on its routine [8], but an agent [2] the user started arrives as plain prompt text with no such mark, so the text is all there is to recognize it by. The dashboard needs that recognition to show which agents are working the agent queue [4]: a lane on the Overview [13], and which ticket an agent is implementing.
-
-#### Business logic
-
-A prompt drains the queue exactly when its text, ignoring surrounding whitespace, equals the rendered "Spin up agents working on the AI queue" preset. The comparison is against the preset as rendered now, not against a copy of its words, so rewording the preset cannot leave the rule behind. It is deliberately exact: a prompt that merely mentions the queue is not a drain, and mistaking one for the other would name a ticket as being implemented by an agent doing something else entirely.
+The launcher [1] shows fourteen buttons, in this order: "Research", "Readability", "Maintainability", "Security audit", "UX (auto)", "Suggest new tickets", "Suggest new features", "Suggest tickets to work on", "Plan tickets (aka spike)", "Market research", "Update from GitHub", "Maintenance", "Add quick-win work to AI Queue", "Add consensual work to AI Queue": every preset. The routine that works the agent queue [4] is not a preset but the skill file `skills/work-queue/SKILL.md`, which only the daemon fires (the rules in `auto-pm.ts`).
 
 ### Which presets may run unattended
 

@@ -14,7 +14,7 @@ Lists one project's tickets as one-liner rows — priority, topics, who holds th
 [4] holder: who a claim names: the agent's id when the daemon started the agent, else the branch the `tickets` command ran on.
 [5] session name: the name an agent gives its own work; its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
 [6] prompt agent: an agent that runs one prompt and stops there.
-[7] drain: starting an agent on the agent queue's first open entry.
+[7] the queued work: the routine that spends existing work: one agent started with `/work-queue` when the `agent-data` branch moved, which takes one task off the agent queue by composing the skills in its checkout.
 [8] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles. The opposite is attended.
 [9] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: keep the work in its checkout, push its branch, also open a pull request, also merge it.
 [10] launcher: the Start form on a project's own page.
@@ -89,13 +89,13 @@ The two states are told apart by color and weight, not by the icon alone, so the
 
 **User story**: the user reading the backlog wants the ticket worked now, without queueing it and without opening it first.
 
-**Problem**: an agent [1] given a ticket to work could wander into other tickets, and the daemon must know which ticket the agent is implementing in order to record it and to claim [3] it for the agent.
+**Problem**: an agent [1] given a ticket to work could wander into other tickets.
 
 #### Business logic
 
-The start column is a play button labeled "Start work on <title>", with the tooltip "Spin up an agent working on this ticket". It starts a prompt agent [6] on this project with the prompt "Work on tickets/<file>. Do not start any other ticket." — the drain [7] preset's wording narrowed to this one ticket — and names the ticket to the daemon as `tickets/<file>`, since the prompt is not the drain preset's and the daemon would not otherwise know which ticket is being implemented.
+The start column is a play button labeled "Start work on <title>", with the tooltip "Spin up an agent working on this ticket". It starts a prompt agent [6] on this project with the prompt "Work on tickets/<file>. Do not start any other ticket." — and nothing else: the agent claims the ticket itself through the `tickets` skill.
 
-That agent runs unattended [8]: one agent on one ticket is the same work the daemon's own drain starts, so it runs the same way, ending when its work settles and firing the handoff [9] it was armed with. A refusal reads "The work agent could not be started.".
+That agent runs unattended [8]: one agent on one ticket is run the way the daemon runs the queued work [7], ending when its work settles and firing the handoff [9] it was armed with. A refusal reads "The work agent could not be started.".
 
 When a start succeeds, the surrounding page is told what was asked and which agent was started, so it can take the user to the agent instead of leaving them on rows that have not changed yet.
 

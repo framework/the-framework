@@ -13,7 +13,7 @@ Computes the quota boundary [1]: the share of the account's quota [2] week that 
 [3] coding agent: the CLI doing the actual work: Claude Code or Codex.
 [4] spend offset: the user's adjustment of the quota boundary, in percentage points of the week.
 [5] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
-[6] Auto PM: the daemon's unattended product management: drain the agent queue, and refill it by running the routines.
+[6] Auto PM: the daemon's unattended product management: work the agent queue when the `agent-data` branch moves, and refill it by running the routines.
 [7] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
 
 ## Business logic — TL;DR

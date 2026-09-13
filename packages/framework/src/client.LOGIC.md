@@ -9,13 +9,13 @@ Names the one set of rules the dashboard [1] runs in the browser: every decision
 ## Glossary
 
 [1] the dashboard: the browser app the daemon serves — the product's only user interface.
-[2] preset: a canned prompt the user launches from the dashboard (research, readability, maintainability, security audit, UX, maintenance, market research, update tickets, plan tickets, suggest new tickets, suggest new features, suggest tickets to work on, drain queue, triage quick, triage consensual).
+[2] preset: a canned prompt the user launches from the dashboard (research, readability, maintainability, security audit, UX, maintenance, market research, update tickets, plan tickets, suggest new tickets, suggest new features, suggest tickets to work on, triage quick, triage consensual).
 [3] the built-in system prompt: the standing instructions every agent starts with; `SYSTEM.md` is the project's own instructions added on top.
 [4] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it).
 [5] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. A web agent is one whose location is `web`.
 [6] launcher: the Start form on a project's own page.
-[7] routine: a preset the daemon fires on its own on a schedule — update tickets, triage quick, triage consensual, plan tickets, maintenance — each switchable off and runnable on demand.
-[8] Auto PM: the daemon's unattended product management: drain the agent queue, and refill it by running the routines.
+[7] routine: a job the daemon fires on its own — the queued work, update tickets, triage quick, triage consensual, plan tickets, maintenance — each switchable off and runnable on demand.
+[8] Auto PM: the daemon's unattended product management: work the agent queue when the `agent-data` branch moves, and refill it by running the routines.
 [9] event: everything an agent does, one event per line appended to its event stream; every surface is a projection of it.
 [10] pick: the answer to a gate: the option or options chosen, by the user or automatically.
 [11] driver session: the coding agent's own conversation for one agent, which the driver can resume by its session id.
@@ -29,7 +29,7 @@ Names the one set of rules the dashboard [1] runs in the browser: every decision
 
 - **Nothing server-only may be reached** - no rule shared here, and nothing any of them reaches in turn, may use a capability that exists only outside a browser; a rule with a server half keeps that half in a separate module, the way reading the project's own `SYSTEM.md` from disk is kept apart from composing the prompt text.
 - **What an agent will be told** - the presets [2] and their prompts, the ask that plans one ticket, and the composition and rendering of the built-in system prompt [3], so the launcher [6] can prefill and show the user the exact text an agent [5] will receive instead of describing it.
-- **What the daemon does on its own** - the routines [7] Auto PM [8] fires, and its drain and maintenance work, so the list the user sees and can run on demand is the list the daemon runs, not a copy of it.
+- **What the daemon does on its own** - the routines [7] Auto PM [8] fires, the queued work and the maintenance sweep among them, so the list the user sees and can run on demand is the list the daemon runs, not a copy of it.
 - **How an agent's activity reads** - an agent [5]'s events [9] rendered as terminal text, which options a pick [10] chose, the driver session [11] behind the agent, the agent's progress, the errors it reported, and where its handoff [4] stands.
 - **What an agent will be started with** - the mapping from the user's preferences to an agent [5]'s options and its handoff [4] rung, how `the-framework.yml` at a project's root, the per-repo defaults that travel with the code, reads as preferences, and the handoff ladder itself with the conversions between the checkbox row and a rung, so an impossible combination resolves on the screen that collected it.
 - **The defaults and limits the user adjusts** - the notification defaults, whether a notification method and category is on, the default and maximum spend offset [12], and how many agents Auto PM [8] runs at once.

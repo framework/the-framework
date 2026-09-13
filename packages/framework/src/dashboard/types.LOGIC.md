@@ -21,7 +21,7 @@ Fixes the vocabulary the dashboard and the daemon speak to each other for starti
 [17] stop: ending an agent before it finishes: the Stop button, Ctrl-C, or a pick marked to stop.
 [18] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
 [19] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
-[20] drain: starting an agent on the agent queue's first open entry — the half of Auto PM that spends existing work.
+[20] the queued work: the routine that spends existing work: one agent started with `/work-queue` when the `agent-data` branch moved, which takes one task off the agent queue by composing the skills in its checkout.
 [21] plan: a ticket's `.plan.md`: effort and uncertainty ratings and how to implement it.
 [22] fan-out: starting several agents at once, one per queue entry or one per ticket to plan.
 [23] driver session: the coding agent's own conversation for one agent, which the driver can resume by its session id.

@@ -17,7 +17,7 @@ Keeps the one file The Framework owns for the user, the registry [1] at `~/.the-
 [7] ready for merge: the signal an agent emits when it believes its work is complete: it flips the agent's badge from building to ready and authorizes the handoff.
 [8] transparent: an agent started with nothing of The Framework's — the raw coding agent.
 [9] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds. The other is activity: an agent started or finished.
-[10] Auto PM: the daemon's unattended product management: drain the agent queue, and refill it by running the routines.
+[10] Auto PM: the daemon's unattended product management: work the agent queue when the `agent-data` branch moves, and refill it by running the routines.
 [11] the bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge token is the secret the extension presents; the bridge browser is the Chrome for Testing the daemon runs for it.
 [12] the Overview: the dashboard's cross-project page at `/`.
 [13] coding agent: the CLI doing the actual work: Claude Code or Codex.
@@ -28,8 +28,8 @@ Keeps the one file The Framework owns for the user, the registry [1] at `~/.the-
 [18] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
 [19] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
 [20] quota boundary: the share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
-[21] routine: a preset the daemon fires on its own on a schedule — update tickets, triage quick, triage consensual, plan tickets, maintenance — each switchable off and runnable on demand.
-[22] drain: starting an agent on the agent queue's first open entry — the half of Auto PM that spends existing work.
+[21] routine: a job the daemon fires on its own — the queued work, update tickets, triage quick, triage consensual, plan tickets, maintenance — each switchable off and runnable on demand.
+[22] the queued work: the routine that spends existing work: one agent started with `/work-queue` when the `agent-data` branch moved, which takes one task off the agent queue by composing the skills in its checkout.
 [23] fan-out: starting several agents at once, one per queue entry or one per ticket to plan.
 [24] tick: one beat of the daemon's single background clock; each sweep says how many ticks it waits between turns.
 
@@ -138,7 +138,7 @@ Each of these keys of the preferences [2] is kept only when its value is a true 
 #### Business logic
 
 - `autoSpendOffset`, the spend offset [17]: a finite number, rounded to a whole number and clamped between -50 and 50 percentage points; anything else is dropped. Absent means about 7.1 points, a half day's share of the quota [18] week (100 divided by 14): unattended [19] work then starts a little ahead of the quota boundary [20] instead of exactly on it, where normal jitter would stop it. Negative holds unattended work back further; positive lets it borrow from the days still to come. It is an offset rather than an absolute percentage so the limit travels with the boundary as the week goes on.
-- `autoPmConcurrency`: how many agents Auto PM [10] may keep going at once on one project: a finite number, rounded, floored at 1, with no upper bound; anything else is dropped. Absent means 2. Only the routine [21] that drains [22] the queue fans out [23]; the routines that invent work stay at one agent per tick [24] whatever this says.
+- `autoPmConcurrency`: how many agents Auto PM [10] may keep going at once on one project: a finite number, rounded, floored at 1, with no upper bound; anything else is dropped. Absent means 2. The queued work [22] runs one agent per move of the branch and the cap is how many may overlap; planning fans out [23] to it; the routines that rewrite the queue stay at one agent per tick [24] whatever this says.
 
 ### The list preferences
 

@@ -1,94 +1,71 @@
-What the tests cover, for the Auto PM sweep's policy and loop:
+What the tests cover, for the Auto PM sweep's policy and loop. The loop is driven against a fake `agent-data` branch whose commits are either moves (a person's or an agent's) or a daemon's, and a fake start that records what was started.
 
 **Whether a start is allowed**
 
-- **The happy case** - a dry agent queue and a barely touched quota week start an agent in product management mode.
+- **The happy case** - a barely touched quota week allows a start.
 - **The preference** - with Auto PM off nothing starts, from the decision and from the loop alike.
 - **The concurrency cap** - a project at its cap is left alone with a reason that says "already going"; below the cap it is topped up rather than refused; at a cap above one the refusal names the cap ("at most 2 at once"); an unset cap means the shipped default of 2, and a cap of zero is floored at one so a hand-edited nought cannot wedge the sweep.
-- **Drain before refill** - a queue with open entries starts a drain rather than refusing; a queue that cannot be read refuses with "queue could not be read" instead of counting as empty or as full.
 - **The cooldown** - a start one minute ago holds the project off, an hour ago does not; a "Run now" passes through the cooldown but still stops at the cap.
 
 **The quota boundary**
 
-- **Fails closed** - a quota that cannot be read refuses to start ("could not be read"), the opposite of the per-agent guard that never stops the user's own work.
-- **Under and at the line** - under the boundary the start is allowed; at the boundary exactly, not only past it, it stands down.
-- **Naming where it stands** - the refusal names the window and the line ("99% used, at or past day 3 of the week's 32%"), and with the default half-day spend offset the limit reads to one decimal ("your 39% limit (+7.1 on the week's 32%)"), never fifteen digits.
-- **A restarted daemon is not blind** - the reading is the account's absolute week, so a daemon that just started still stands down on a week at 95%.
+- **Unreadable refuses** - no quota reading at all refuses with "could not be read".
+- **Under, at and past the line** - under the boundary starts; at 99% used with a third of the week gone the refusal names the window, the day and the line ("99% used, at or past day 3 of the week's 32%"); meeting the boundary exactly refuses too; a fractional spend offset is said to one decimal ("+7.1"), never as fifteen digits.
+- **A restarted daemon is not blind** - the reading is the account's absolute figure, so a fresh daemon refuses at 95% used.
 
-**The sweep loop**
+**The trigger and the chain**
 
-- **One start per idle project** - an idle project gets an agent; a second sweep inside the cooldown starts nothing more; a refused start gives the cooldown back so the next sweep tries again.
-- **"Run now"** - an on-demand sweep runs with the preference off and the report still says the box was off; it skips the cooldown, so a click right after a start starts again; every other stand-down, the cap included, still holds.
-- **Unreadable readings** - a queue that cannot be read starts nothing and does not break the sweep; an unreadable switched-off list means no routine is off; an unreadable concurrency falls back to the default of 2, never to one.
-- **Stopping** - a daemon stopping while a sweep sits between its readings and the spawn starts nothing, on any project of that sweep; a stopped sweep never runs again.
+- **The first look** - remembers the head and starts nothing on the queued work; with no rotation wired it says "there is no job to run"; with one, the rotation gets its start-up turn.
+- **A move starts the queued work once** - a commit no daemon wrote starts one `/work-queue` agent; the next look, with the run settled and nothing new, starts nothing.
+- **A daemon's commit is not a move** - commits carrying the daemon's trailer start nothing, however many.
+- **The chain** - three tasks under a cap of one: the first run's claim moves the branch but the cap holds; the run ends having closed its ticket, and the next run starts; and so on for three; the fourth finds nothing, moves nothing, and once it settles the chain stops.
+- **After an empty run the rotation** - a run that settles without a move hands the turn to the rotation; a move takes it back; a rotation run that moved nothing hands the turn to the next routine.
+- **Only the rotation is paced** - a move starts the queued work a minute after a rotation start; the rotation's next turn waits out the cooldown.
+- **The heartbeat** - with nothing moved, the queued work starts once the heartbeat interval has passed since it last started, and not before the next one.
+- **The queued work's "Run now"** - starts an agent on the queue without a move; with the routine switched off it says "the routine that works the queue is switched off".
+- **A plain "Run now"** - starts the queued work when the branch moved, else the rotation's next routine.
+- **The routine off, a move** - is the rotation's turn, and nothing works the queue.
+- **An unreadable branch** - stands the project down naming the branch.
+- **The log says a stand-down once** - the same stand-down over three looks is one log line; the report carries it every time.
+- **The queued-work routine** - its prompt is the slash command of the `work-queue` skill file, which names itself, is invocable only by a person or the daemon, and tells the agent one task, commit without pushing, committed counts as published, say so and stop; it is the only routine that works the queue and the only one that auto-merges.
 
-**The routine rotation**
+**The rotation**
 
-- **Its order** - update tickets, triage the quick wins, triage the consensual work, then plan; both triage routines are in it; the gated "Suggest tickets to work on" preset is not, and no routine's prompt contains a gate.
-- **Walking the cycle** - successive idle sweeps fire the routines in turn and wrap around; a refused start retries the same routine instead of skipping it; a routine the user unticked is filtered out so the remaining ones alternate every turn; with every routine off nothing starts and the reason is "every routine that makes new work is switched off".
-- **One agent per turn** - a rotation routine starts one agent however high the concurrency.
-- **Nothing left to plan** - a planning turn with no candidate advances the rotation, reports "already has a plan", and the next sweep fires the next routine.
-
-**Drain and refill**
-
-- **The cycle comes back round** - a standing entry is drained, an empty queue is refilled, a new entry is drained again; draining never advances the rotation, so a queue worked off over several sweeps resumes the rotation where it was.
-- **Closing out finished agents** - an agent whose queue landed ends that sweep so the next one re-reads the queue; a finished agent that wrote nothing is asked about exactly once and then dropped; an agent still going stays tracked.
-- **A switched-off drain routine** - the scheduled sweep falls through to the rotation and works nothing off the queue; a drain-only "Run now" stands down instead with "the queue has work waiting and its routine is switched off".
+- **The order** - update tickets, triage quick, triage consensual, plan tickets; the gated "Suggest tickets to work on" is never in it and no routine's prompt contains a gate.
+- **Walking the cycle** - with the cooldown zeroed, successive empty runs walk first, second, first; a refused start retries the same routine rather than skipping it.
+- **A finished run is asked about once** - each run this loop started is settled exactly once; a run still going holds the rotation's turn and the sweep reports "nothing moved".
+- **Switched-off routines** - an unticked routine is filtered out of the cycle so the rest alternate; unticking every routine starts nothing and says "every routine that makes new work is switched off"; an unreadable opt-out list means none is off.
 
 **The maintenance sweep**
 
-- **Its prompt** - the maintenance routine fires the "Maintenance" preset over the entire codebase, fully rendered.
-- **Its precedence** - a project that is due is swept before the rotation gets a turn; one that is not due, or whose schedule cannot be read, keeps doing the rotation; a queue with work is drained rather than swept, also when the drain routine is off and the turn fell through to the rotation.
-- **Its calendar** - a sweep does not cost the rotation its turn; the project is stamped only when the start took; a switched-off maintenance routine leaves its calendar untouched.
+- **The job** - fires the [Maintenance] preset over the entire codebase, fully rendered.
+- **Its precedence** - a project that is due is swept before the rotation gets a turn; one that is not due, or whose schedule cannot be read, keeps doing the rotation; a move is worked, never swept; with the queued-work routine off, a move is a rotation turn and the sweep is not due again.
+- **Its calendar** - the sweep does not advance the rotation; it is stamped only when the start took; an unticked maintenance routine leaves its calendar alone.
 
-**The report**
+**Stopping and reporting**
 
-- **What it says** - after a sweep: whether the preference was on, when it ran, and per project the path, whether an agent started and the sentence ("doing the first thing"); a stand-down carries its reason; a sweep with the preference off reports it off with no per-project line.
-- **The next sweep** - before the first sweep the report carries no sweep time and no preference, only the next due time one interval after the loop started; an out-of-band sweep does not shift it.
+- **A stop mid-sweep** - a sweep stopped between its readings and the spawn starts nothing, on any project; a stopped sweep does not tick again.
+- **The report** - names what was started, carries the reason for a stand-down ("already going"), says when the preference was off with no outcomes, offers a next sweep before the first has run, and is not skewed by an out-of-band tick.
+- **The routines list** - the queued work, the four rotation routines and maintenance, once each, the queued work first; every routine carries a label and a fully rendered prompt; only "Maintenance" describes itself.
 
-**The catalog of routines**
+**Naming what holds a slot**
 
-- **What each routine declares** - only the drain routine says it drains; only the drain routine auto-merges its pull request; only "Plan tickets" fans out; the two triage routines hold a routine lock named after them and their prompts no longer abort on an existing branch.
-- **The routines list** - it is the drain, the four rotation routines and maintenance, once each, drain first; every routine carries its preset's label and a fully rendered prompt; only maintenance carries a description line ("sweeping the codebase for maintenance work"), the others are their label.
-
-**Draining fans out**
-
-- **One entry per agent** - a standing queue fans out to the cap in one sweep, each agent pinned to a different entry in queue order, and stops at the cap rather than at the queue's length.
-- **Slots are named** - at the cap the reason is exactly "2 runs are already going (run-a (pid 111), run-b (pid 222)), and the routine keeps at most 2 at once", and with nothing to name and a cap of one, "1 run is already going"; a batch that came out short reports "started 2 agents alongside 1 already going (<label>): draining the queue entry "entry a"; draining the queue entry "entry b"".
-- **No double hand-out** - an entry pinned to an agent still in flight is not handed out again; a queue whose every entry is being worked stands down with "every open queue entry is already being worked on"; agents already live count against the cap so the sweep tops up rather than doubles; the first refused start ends the batch so the refused work is retried.
-- **Drain-only "Run now"** - with entries waiting it fans out like any drain; with an empty queue it says "the queue is empty, so there is nothing to drain" instead of firing a rotation routine.
-
-**Claims on drained tickets**
-
-- **Claimed before the start** - a batch's ticket-linked entries are claimed in one call before any agent starts, each prompt names the ticket "already claimed for you", and the agent ids are minted a millisecond apart from the sweep's clock so a batch stays distinct.
-- **Ticketless entries** - an entry with no ticket link is not offered to the claim and drains without one; without the claim seam a ticket-linked entry drains exactly as before, with no claim in its prompt.
-- **A lost race** - an entry whose ticket was claimed elsewhere is dropped from the batch, not the batch; a batch that lost every claim stands down with "every entry in this batch links a ticket another agent already claimed".
-- **The pinned drain prompt** - with a claim it says the ticket is claimed for the agent, that `tickets show` names it as holder, that it must run `tickets close` once published, and that a ticket claimed by someone else "is not yours"; without a claim the prompt is the plain pin.
-
-**Dead claims**
-
-- **Freed on a commitless ending** - the exact claim minted for an agent that ended with nothing to hand off is released; a sweep that catches the gap between the agent's end and its handoff report holds the claim and releases it once the ending lands; the hold is bounded to two sweeps, after which the agent is closed out unread.
-- **Not drained again** - an entry whose drain ended dry is not offered again for the daemon's lifetime, and the stand-down says "drained once with nothing to hand off".
-- **Never-started items** - the claims of a batch's items the start loop never reached are released rather than stranded.
-- **Retried releases** - a release that could not land is retried on the next sweep, once more, and then left.
-- **Every other ending** - an agent that published, or whose handoff skipped because its pull request already exists, keeps its claim for its own pull request to lift.
+- **The cap's wording** - names each run holding a slot ("2 runs are already going (run-a (pid 111), run-b (pid 222)), and the routine keeps at most 2 at once"); at a cap of one the old wording stands.
+- **A short fan-out** - a plan batch that came out short says alongside whom ("started 2 agents alongside 1 already going (…): planning "a.md"; planning "b.md"").
 
 **Planning fans out**
 
-- **One claimed ticket per agent** - the planning routine fans out to the cap, one agent per candidate in most-important-first order, the whole batch claimed in one call before any start, each prompt naming the holder; only the tickets actually claimed go out; a claim that took nothing falls back to one unpinned agent with the stock prompt; without the claim seam the routine stays one agent per sweep however high the cap.
-- **No double hand-out** - a ticket pinned to a planning agent still in flight is not offered again.
-- **The pinned plan prompt** - the pin is appended after the stock prompt, names "exactly one ticket", says `tickets show` names the agent as holder, and tells it to write the plan with `tickets put` and lift the claim with `tickets release`.
-- **Plan-only "Run now"** - it spends the whole cap rather than one agent; it plans instead of draining however full the queue is; it stands down with "the planning routine is switched off" when the routine is unticked; it visits only the project the card picked; it costs neither the maintenance sweep nor the rotation its turn.
+- **One locked ticket per agent** - up to the concurrency, in most-important-first order, locked in one batch before any start, each agent's prompt naming the ticket claimed for it; only the tickets the lock actually claimed go out; nothing claimed falls back to one unpinned agent; without the lock seam the job stays one per tick; a ticket a live plan run is pinned to is not offered again; nothing left to plan advances the rotation; an unreadable concurrency falls back to the default; a refused start ends the batch.
+- **The pinned plan prompt** - appended to the preset's text, so its rules ride along verbatim: one ticket, `tickets show` names the holder, `tickets put` the plan, `tickets release` the claim.
+- **Only "Plan tickets" fans out** - among the catalog's rotation routines; every other routine stays one run per tick however high the cap.
+- **Plan "Run now"** - fans out to the concurrency in the picked project only, never works the queue however much the branch moved, stands down when planning is switched off, and costs neither the maintenance sweep nor the rotation its turn.
+
+**Dead claims**
+
+- **Released when the run ended dry** - a claim whose run settled with nothing to hand off is released, exactly the minted claim; the end-before-handoff gap holds the claim for at most two more sweeps, then settles unread; a ticket whose plan agent ended dry is not planned again for the daemon's lifetime; claims of a batch the start loop never reached are released; a release that could not land is retried once; a run that published, or whose pull request was already open, leaves its lock alone.
 
 **Routine locks**
 
-- **Taken and released** - a locked routine takes its lock before the start; while its agent runs the next sweep stands down with the lock's own sentence naming the holder ("triage-quick is already running on laptop (since T0)"); when the agent ends the lock is released, whatever the ending, and the routine may run again in the same sweep.
-- **A held lock** - a lock another machine holds stands the routine down naming that holder, with no agent started.
-- **Given back and retried** - a refused start gives the lock back at once; a release that could not land keeps the lock standing and is retried on the next sweep.
-- **Unlocked routines and unwired loops** - a routine without a lock never asks for one; a loop wired without the locking seam starts a locked routine unguarded; a previous daemon's dead locks are released on a project's first sweep only.
-
-**"Run now" on a locked routine**
-
-- **Lock, then one agent** - the click takes the lock and starts exactly one agent, whatever turn the rotation is on and however much room the cap has.
-- **Told apart** - a switched-off locked routine stands the click down with "<label> is switched off"; a lock nothing holds with "no routine holds the <lock> lock"; the cap holds the click as it holds the sweep.
-- **Never borrowed** - a full queue does not turn the click into a drain and the rotation's turn does not take it; the scheduled sweep after it still gets the rotation routine it was owed.
+- **Taken before, released after** - a locked routine takes its lock before it starts and releases it when the run ends, whatever the ending, and may be taken again at once; a held lock stands the routine down naming its holder with no agent started; a refused start gives the lock back; a failed release is retried next sweep and the routine waits meanwhile; an unlocked routine never asks, and a loop wired without the seam starts unguarded; a previous daemon's dead locks are released on the project's first sweep only.
+- **A locked routine's "Run now"** - takes the lock then starts exactly one agent; a switched-off locked routine stands the click down by its label, an unknown lock says "no routine holds the <lock> lock", and a live agent at the cap holds the click; a click never falls through to the queued work or another rotation routine, and the next scheduled sweep still gets the move it was owed.
+- **Which routines lock** - the two triage routines, each by its own name, and their prompts carry no branch abort.

@@ -14,7 +14,7 @@ The backend end-to-end stories: what the user sees between registering a project
 [6] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later.
 [7] gate: a question with options at which an agent stops and waits for an answer: it emits the question in its turn's final message, the dashboard shows it as a card, and the answer re-prompts the agent.
 [8] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
-[9] Auto PM: the daemon's unattended product management: drain the agent queue, and refill it by running the routines.
+[9] Auto PM: the daemon's unattended product management: work the agent queue when the `agent-data` branch moves, and refill it by running the routines.
 [10] sweep: a background job the daemon runs on its clock.
 [11] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [12] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request, the default), `merge` (also merge it).
@@ -23,7 +23,7 @@ The backend end-to-end stories: what the user sees between registering a project
 [15] turn: one prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
 [16] stop: ending an agent before it finishes: the Stop button, Ctrl-C, or a pick marked to stop.
 [17] reclaim: removing a finished agent's checkout once its work is on the remote.
-[18] drain: starting an agent on the agent queue's first open entry.
+[18] the queued work: the routine that spends existing work: one agent started with `/work-queue` when the `agent-data` branch moved, which takes one task off the agent queue by composing the skills in its checkout.
 
 ## Business logic — TL;DR
 
@@ -31,4 +31,4 @@ The backend end-to-end stories: what the user sees between registering a project
 - **Projects and settings** (`story-projects-and-settings.test.ts`) - registering a repository installs and lists it, unknown projects degrade quietly, preferences [8] set in Settings reach the next continued agent, and the usage panel and the Auto PM [9] line show what the daemon reports and fire a sweep [10] on demand.
 - **The agent lifecycle** (`story-session-lifecycle.test.ts`) - what the user sees between Start and the archived row: the live event stream in order, the finished row, a publish-nothing agent keeping its checkout [11], the archived replay and the cross-project surfaces, two agents at once each in its own checkout, and a finished agent pushed from the handoff [12] panel.
 - **Steering and gates** (`story-steering-and-gates.test.ts`) - answering a parked agent's question from the open questions [13] list, live chat [14] becoming the next turn [15] and surviving into the agent's record, rearming the handoff mid-run, and a stop [16] whose checkout is reclaimed [17] once its work is on the remote, then a delete that removes the row.
-- **Tickets and the queue** (`story-tickets-and-queue.test.ts`) - browsing the ticket backlog, queueing a ticket and having a drain [18] claim it so the boards show it in progress, and any other prompt claiming nothing.
+- **Tickets and the queue** (`story-tickets-and-queue.test.ts`) - browsing the ticket backlog, queueing a ticket so the boards show it queued, and a prompt about something else leaving the queue alone.

@@ -21,7 +21,7 @@ Decides what becomes of an agent's [1] work once the agent has ended, its handof
 [9] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
 [10] hands-off: said of an agent whose work leaves this machine, so its first prompt is the whole agent: an agent whose location is `web`.
 [11] archive: the transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
-[12] run: only the `logs` skill's record of one agent on the `agent-data` branch: a card (what was asked, the ticket, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said).
+[12] run: only the `logs` skill's record of one agent on the `agent-data` branch: a card (what was asked, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said).
 [13] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
 [14] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down.
 [15] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
@@ -46,7 +46,7 @@ Decides what becomes of an agent's [1] work once the agent has ended, its handof
 - **The "Open PR" button** - the agent's existing pull request first, even for a gone branch, unless the agent moved past it; a gone branch and an empty branch are refused with a reason; otherwise a pull request ready for review.
 - **A pull request for a branch only the remote has** - a cloud session's own branch gets a draft pull request with nothing pushed and `gh`'s default base.
 - **The "Merge" button on a finished agent** - refused when the agent has no pull request or it is no longer open; otherwise merged, a draft marked ready on the way, directly where GitHub cannot arm auto-merge.
-- **The pull request's title** - the agent's own title, else its session name, else "Session <agent id>", with the ticket's issue reference as "(fix #42)"; never the prompt.
+- **The pull request's title** - the agent's own title, else its session name, else "Session <agent id>", with an issue reference as "(fix #42)" when the caller names one; never the prompt.
 - **The pull request's body** - the agent's own description, else what was asked for, then which agent did it.
 - **What a handoff reports** - a button answers with success (and the pull request's URL and number) or one error line; the automatic handoff answers skipped with its reason, done, or failed at the push or the pull request step, and the number rides along so it gets recorded on the agent.
 
@@ -141,7 +141,7 @@ The push and the pull request start armed, so the common case costs nothing: an 
 
 #### Business logic
 
-An armed merge may run only when the agent [1] emitted the ready-for-merge [4] signal and its own TODO file, `TODO_<session name [13]>.agent.md` in its checkout [3], has no open entries. The first condition that fails is the recorded reason: the agent never declared ready for merge (`not-ready-for-merge`), else its own TODO file still has open entries (`session-todo-open`). The agent queue [14] (`TODO_AGENTS.md`) never withholds a merge: it is decoupled from agents, and withholding on it would mean no merge ever runs while the project has a backlog at all. A withheld merge is not a failed handoff: the push and the pull request go ahead, and the pull request opens as a draft for a human. The user's "Merge" on a running agent bypasses this gate: the authorization the gate exists to collect has been given directly (`../cli.ts`, `../dashboard-rpc/control.ts`).
+An armed merge may run only when the agent [1] emitted the ready-for-merge [4] signal; the agent's word is enough. The recorded reason for withholding is `not-ready-for-merge`. A withheld merge is not a failed handoff: the push and the pull request go ahead, the pull request just opens as a draft for a human.
 
 ### The automatic handoff when an agent ends
 

@@ -8,14 +8,14 @@ The three things the dashboard's usage panel asks the daemon: where the account'
 
 [1] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
 [2] quota boundary: the share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
-[3] Auto PM: the daemon's unattended product management: drain the agent queue, and refill it by running the routines.
+[3] Auto PM: the daemon's unattended product management: work the agent queue when the `agent-data` branch moves, and refill it by running the routines.
 [4] sweep: a background job the daemon runs on its clock: Auto PM, the CI watch, the notification watchers, the sweep that reclaims checkouts, the branch-links sweep, the cloud scratch sweep, cloud work adoption.
 [5] tick: one beat of the daemon's single background clock; each sweep says how many ticks it waits between turns.
 [6] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
 [7] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
 [8] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down.
-[9] drain: starting an agent on the agent queue's first open entry — the half of Auto PM that spends existing work.
-[10] routine: a preset the daemon fires on its own on a schedule — update tickets, triage quick, triage consensual, plan tickets, maintenance — each switchable off and runnable on demand.
+[9] the queued work: the routine that spends existing work: one agent started with `/work-queue` when the `agent-data` branch moved, which takes one task off the agent queue by composing the skills in its checkout.
+[10] routine: a job the daemon fires on its own — the queued work, update tickets, triage quick, triage consensual, plan tickets, maintenance — each switchable off and runnable on demand.
 [11] fan-out: starting several agents at once, one per queue entry or one per ticket to plan.
 [12] ticket: a markdown file under `tickets/` on the `agent-data` branch, with an optional plan and claim.
 [13] routine lock: a file on the `agent-data` branch a daemon takes before running a routine so the routine runs once across machines.
@@ -81,10 +81,10 @@ The daemon runs one sweep [4] immediately. It runs whether or not Auto PM [3] is
 
 The answer waits for the sweep to finish and carries what it decided, one line per project [15], so the panel can state the outcome without a poll having to race the sweep. A sweep that failed outright answers that it did not succeed. A sweep that ran but whose decisions could not be read back answers as a success with no lines.
 
-The request can narrow what the sweep does, which is what a "Run now" that fans out [11] means:
+The request can narrow what the sweep does, which is what a "Run now" on a routine's row means:
 
-- draining [9]: agents [7] are started on the agent queue's [8] entries. When the queue is empty this is reported as having nothing to work, rather than the click being borrowed for some other routine's [10] work nobody asked for.
+- the queued work [9]: one agent [7] is started on the agent queue [8] in every project, whether or not the branch moved; a run that finds nothing queued spends one run finding that out, which is what the click asked for.
 - planning: agents are started on the open tickets [12] to plan, through the same claim-then-start path the scheduled routine takes, so the fan-out [11] respects the same limits and claims.
-- one named routine [10], identified by the routine lock [13] it takes: a single agent, started by the sweep so the lock that guards it is taken the same way a scheduled firing takes it, and started from a fresh copy of its branch.
+- one named routine [10], identified by the routine lock [13] it takes: a single agent, started by the sweep so the lock that guards it is taken the same way a scheduled firing takes it.
 
 The request can also be scoped to a single project [15], which is what the panel's own project selection means.

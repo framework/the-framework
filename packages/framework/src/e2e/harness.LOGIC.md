@@ -9,7 +9,7 @@ The world the backend end-to-end stories run in: one daemon per story, its busin
 [5] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
 [6] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
 [7] quota boundary: the share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
-[8] Auto PM: the daemon's unattended product management: drain the agent queue, and refill it by running the routines.
+[8] Auto PM: the daemon's unattended product management: work the agent queue when the `agent-data` branch moves, and refill it by running the routines.
 [9] sweep: a background job the daemon runs on its clock: Auto PM, the CI watch, the notification watchers, the sweep that reclaims checkouts, the branch-links sweep, the cloud scratch sweep, cloud work adoption.
 [10] bridge browser: the Chrome for Testing the daemon runs for the Claude web bridge.
 [11] preflight: the check that the chosen driver's coding agent can start an agent, run before a checkout is spent.

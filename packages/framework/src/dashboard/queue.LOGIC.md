@@ -9,8 +9,8 @@ Rolls the agent queue [1] of every project up into the dashboard's cross-project
 ## Glossary
 
 [1] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down. An item on it is a queue entry.
-[2] Auto PM: the daemon's unattended product management: drain the agent queue, and refill it by running the routines.
-[3] drain: starting an agent on the agent queue's first open entry — the half of Auto PM that spends existing work.
+[2] Auto PM: the daemon's unattended product management: work the agent queue when the `agent-data` branch moves, and refill it by running the routines.
+[3] the queued work: the routine that spends existing work: one agent started with `/work-queue` when the `agent-data` branch moved, which takes one task off the agent queue by composing the skills in its checkout.
 
 ## Business logic — TL;DR
 

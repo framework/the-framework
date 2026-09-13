@@ -11,7 +11,7 @@ The "Maintenance" preset, both a launcher button and a routine [3]: the agent [1
 [1] agent: the unit of work: one task worked by a coding agent under The Framework's control, in its own checkout, on its own branch, streaming events, handed off when it ends.
 [2] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down. An item on it is a queue entry.
 [3] routine: a preset the daemon fires on its own on a schedule, each switchable off and runnable on demand.
-[4] Auto PM: the daemon's unattended product management: drain the agent queue, and refill it by running the routines.
+[4] Auto PM: the daemon's unattended product management: work the agent queue when the `agent-data` branch moves, and refill it by running the routines.
 [5] skill: one of the four capabilities an agent is taught (`branches`, `tickets`, `queue`, `logs`), each a package with the instructions the agent reads, a command on the agent's PATH, and an API the product calls.
 
 ## Business logic — TL;DR

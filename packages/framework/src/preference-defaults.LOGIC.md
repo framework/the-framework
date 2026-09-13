@@ -11,7 +11,7 @@ Fixes what an unset preference [1] means and the bounds that the controls writin
 [1] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 [2] spend offset: the user's adjustment of the quota boundary, in percentage points of the week.
 [3] quota boundary: the share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
-[4] Auto PM: the daemon's unattended product management: drain the agent queue, and refill it by running the routines.
+[4] Auto PM: the daemon's unattended product management: work the agent queue when the `agent-data` branch moves, and refill it by running the routines.
 [5] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
 [6] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds. The other is activity: an agent started or finished.
 [7] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.

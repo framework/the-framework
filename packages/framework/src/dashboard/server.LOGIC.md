@@ -15,7 +15,7 @@ The daemon's one HTTP server on its port. It serves the built dashboard, mounts 
 [5] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
 [6] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 [7] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
-[8] Auto PM: the daemon's unattended product management: drain the agent queue, and refill it by running the routines.
+[8] Auto PM: the daemon's unattended product management: work the agent queue when the `agent-data` branch moves, and refill it by running the routines.
 [9] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
 
 ## Business logic — TL;DR

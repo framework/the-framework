@@ -4,7 +4,7 @@ Runs the exchange in which an agent [1] stops to ask: a turn [2] whose final mes
 
 **User story**: an agent working the user's task reaches a decision it will not take alone and asks, with options; the dashboard shows the question as a card with the recommended option pre-selected. The user picks, and the agent continues with that decision. The user may pick an option the agent marked as a stop, which ends the agent at that turn. When the user is not there, the recommended option is taken and the agent goes on. Once the agent's work has settled, the user writes to it from the composer and each message continues the same conversation.
 
-**Business logic story**: one loop serves every path that runs gates: the opening exchange of a build agent [8] and of a prompt agent [8], each live-chat message, and the backlog loop [9]. The paths differ only in how a turn is continued. The syntax of a gate in a final message and the wording of the continuation are fixed in `turn-gate.ts`; the queue of live-chat messages in `agent-messages.ts`.
+**Business logic story**: one loop serves every path that runs gates: the opening exchange of a build agent [8] and of a prompt agent [8], each live-chat message.
 
 ## Glossary
 
@@ -16,7 +16,6 @@ Runs the exchange in which an agent [1] stops to ask: a turn [2] whose final mes
 [6] live chat: the user's own messages to a running agent, each continuing the same driver session. One of them is a message.
 [7] driver session: the coding agent's own conversation for one agent, which the driver can resume by its session id.
 [8] build agent / prompt agent: the two kinds of agent: a build works the agent queue after its opening exchange; a prompt agent runs one prompt and stops there.
-[9] backlog loop: after a build agent's opening work settles, the loop that works the agent queue one entry per turn until it is empty.
 [10] event stream: everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface (dashboard, terminal, archive, run) is a projection of it.
 [11] turn signals: what The Framework reads off a turn's final message: the ready-for-merge signal, the pull request title and body, markdown views, reported errors, and the gate it stops at.
 [12] stop: ending an agent before it finishes: the Stop button, Ctrl-C, or a pick marked to stop.

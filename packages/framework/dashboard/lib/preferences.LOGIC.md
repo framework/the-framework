@@ -13,7 +13,7 @@ Holds the browser's view of the user's preferences [1]: loads them from the daem
 [3] Settings: the settings page.
 [4] launcher: the Start form on a project's own page.
 [5] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it).
-[6] Auto PM: the daemon's unattended product management: drain the agent queue, and refill it by running the routines.
+[6] Auto PM: the daemon's unattended product management: work the agent queue when the `agent-data` branch moves, and refill it by running the routines.
 [7] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
 [8] transparent: an agent started with nothing of The Framework's — the raw coding agent.
 [9] vanilla: an agent started without the built-in system prompt but with the signal protocols kept.

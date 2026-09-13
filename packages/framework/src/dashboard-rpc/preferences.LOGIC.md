@@ -13,7 +13,7 @@ The Settings surface of the dashboard's calls: reading and saving the user's pre
 [3] Settings: the settings page.
 [4] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later. The user's driver choice is `claude` or `codex`; the driver implementations are `claude-code`, `codex`, `github-actions`, `claude-web` and `fake`.
 [5] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it). "Handoff level" is a rung of that ladder.
-[6] Auto PM: the daemon's unattended product management: drain the agent queue, and refill it by running the routines.
+[6] Auto PM: the daemon's unattended product management: work the agent queue when the `agent-data` branch moves, and refill it by running the routines.
 [7] spend offset: the user's adjustment of the quota boundary, in percentage points of the week.
 [8] registry: `~/.the-framework.json`: where the user's preferences are kept, and which also lists the projects.
 [9] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).

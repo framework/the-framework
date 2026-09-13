@@ -16,7 +16,7 @@ Answers everything the dashboard reads about a project or an agent [1]: the agen
 [6] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
 [7] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 [8] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
-[9] run: only the `logs` skill's record of one agent on the `agent-data` branch: a card (what was asked, the ticket, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said).
+[9] run: only the `logs` skill's record of one agent on the `agent-data` branch: a card (what was asked, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said).
 [10] archive: the transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
 [11] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
 [12] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
@@ -27,7 +27,7 @@ Answers everything the dashboard reads about a project or an agent [1]: the agen
 [17] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds. The other is activity: an agent started or finished.
 [18] open question: a gate nobody has answered yet, as the dashboard lists them across projects.
 [19] gate: a question with options at which an agent stops and waits for an answer: it emits the question in its turn's final message, the dashboard shows it as a card, and the answer re-prompts the agent.
-[20] routine: a preset the daemon fires on its own on a schedule — update tickets, triage quick, triage consensual, plan tickets, maintenance — each switchable off and runnable on demand.
+[20] routine: a job the daemon fires on its own — the queued work, update tickets, triage quick, triage consensual, plan tickets, maintenance — each switchable off and runnable on demand.
 [21] the built-in system prompt: the standing instructions every agent starts with (`prompts/system_prompt.md`); `SYSTEM.md` is the project's own instructions added on top.
 [22] pick: the answer to a gate: the option or options chosen, by the user or automatically.
 [23] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).

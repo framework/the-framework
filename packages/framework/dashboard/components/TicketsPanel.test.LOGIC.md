@@ -6,7 +6,7 @@ What the tests cover:
 - **Opening a ticket** - clicking the title hands back the ticket's file name, the same name the ticket's own address uses.
 - **The plan column when a plan exists** - a "View the plan for <title>" button opens that ticket's plan; there is no "planned" badge, the column says it; and no configure chevron, because reading a plan starts nothing.
 - **The plan column when none exists** - "Create a plan for <title>" starts an agent with exactly the shared plan ask, "Create tickets/<stem>.plan.md", attended, and reports the started agent so the user can be taken to it.
-- **The start column** - "Start work on <title>" starts an agent with exactly "Work on tickets/<file>. Do not start any other ticket.", unattended and with the ticket named as `tickets/<file>` so the daemon knows what is being implemented, and reports the started agent; starting does not also open the ticket.
+- **The start column** - "Start work on <title>" starts an agent with exactly "Work on tickets/<file>. Do not start any other ticket.", unattended, and reports the started agent; starting does not also open the ticket.
 - **Every control is beside the row, not inside it** - starting, selecting, clicking a topic and following the GitHub link never open the ticket; the GitHub link points at the issue's own address and shows its label.
 - **Selection** - a row carries a "Select <title>" tick box only where the surrounding page acts on a selection, shows what the page says it is, and toggles by file name without opening the ticket.
 - **Click-to-filter** - a topic badge hands its topic back, and the claim marker asks for the list to be narrowed to claimed tickets.

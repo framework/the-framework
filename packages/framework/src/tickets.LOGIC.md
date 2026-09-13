@@ -5,9 +5,9 @@ Fixes the one wording of the ask for a ticket's plan, "Create tickets/<stem>.pla
 [1] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down. An item on it is a queue entry.
 [2] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
 [3] queue entry: an item on the agent queue.
-[4] drain: starting an agent on the agent queue's first open entry — the half of Auto PM that spends existing work.
+[4] the queued work: the routine that spends existing work: one agent started with `/work-queue` when the `agent-data` branch moved, which takes one task off the agent queue by composing the skills in its checkout.
 
 ## Business logic — TL;DR
 
 - **The plan ask** - "Create tickets/<stem>.plan.md" for the ticket `tickets/<stem>.md`; as a queue entry it is plain text and not a link to the ticket, so it never reads as the ticket being queued for implementation.
-- **Who wrote a plan** - the newest agent whose ask contains the plan ask for that ticket, whether the ask is the sentence itself (the plan column's attended start) or a longer prompt carrying it (a drain [4] pinned to that entry); a plan written by an agent whose ask never named it, such as an unpinned drain told to work "the first open entry", is attributed to nobody.
+- **Who wrote a plan** - the newest agent whose ask contains the plan ask for that ticket, whether the ask is the sentence itself (the plan column's attended start) or a longer prompt carrying it; a plan written by an agent whose ask never named it, such as one told `/work-queue`, is not attributed.

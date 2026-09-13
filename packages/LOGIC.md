@@ -17,6 +17,7 @@ The deliverables The Framework ships, one directory each. The product is the `fr
 - **The `tickets` skill** (`skill-tickets/`) - the `@gemstack/skill-tickets` npm package: the project's tickets with their plans and claims on the `agent-data` branch, the `tickets` command that reads, writes, claims and closes them, and the skill text. Depends on `agent-data`.
 - **The `queue` skill** (`skill-queue/`) - the `@gemstack/skill-queue` npm package: the agent queue on the `agent-data` branch, the `queue` command that reads it, adds an entry at a priority and takes one off, and the skill text. Depends on `agent-data`.
 - **The `logs` skill** (`skill-logs/`) - the `@gemstack/skill-logs` npm package: the record of every run agents made on a project, on the `agent-data` branch, and the read-only `logs` command; the product writes every run through it. Depends on `agent-data`.
+- **The routines** (`routines/`) - the `@gemstack/routines` npm package: the jobs a daemon fires on its own, one skill file each under `skills/<name>/` and no code, each composing the capability skills of a project; the queued work first.
 - **The Claude web bridge's extension** (`chrome-extension/`) - a Chrome extension, not an npm package: the far end of the Claude web bridge [5], reading claude.ai in a signed-in browser. Talks to the product over HTTP only.
 - **The website** (`the-framework.ai/`) - the marketing site at https://the-framework.ai. Presents the product; shares no code with it.
 

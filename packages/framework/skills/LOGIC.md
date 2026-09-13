@@ -1,3 +1,0 @@
-The routine skills The Framework ships: skill files the daemon fires, one directory each, linked into every checkout the daemon makes where the coding agent's harness looks for skills (`.claude/skills/<name>`, `.agents/skills/<name>`). Each is marked so that only a person or the daemon invokes it, and its body is the job's prompt: the daemon starts the agent with the skill's slash command and the harness expands it.
-
-- **Working the queue** (`work-queue/`) - one queued task off the agent queue, unattended; the routine the daemon fires when the `agent-data` branch moved (the rules in `../src/auto-pm.ts`).

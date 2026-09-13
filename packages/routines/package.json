@@ -1,0 +1,17 @@
+{
+  "name": "@gemstack/routines",
+  "version": "0.0.1",
+  "description": "The routines a daemon fires on its own: jobs for coding agents, one skill file each, that compose the tickets, queue and other capability skills of a project.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/framework/the-framework.git",
+    "directory": "packages/routines"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "skills"
+  ]
+}

@@ -666,7 +666,7 @@ test("a spawned agent gets the daemon's PATH untouched, and its checkout links t
     // project's own dependencies, `npx tickets`, as its SKILL.md says.
     assert.equal(recorded.trim(), process.env['PATH'], "the agent's PATH is the daemon's own")
     // Two skills are linked into the checkout, where each harness looks for them: the branches
-    // package's own (#1739), and the routine skill the daemon fires (#1774). The skills an agent
+    // package's own (#1739), and the routine skill the daemon fires (#1774), from the routines package. The skills an agent
     // composes — tickets, queue, logs — are the project's tracked files, not links.
     const checkout = worktreePath(cwd, result.agentId!)
     for (const harnessDir of HARNESS_SKILL_DIRS) {

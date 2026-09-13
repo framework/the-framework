@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { closeSync, mkdirSync, openSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { createRequire } from 'node:module'
 import { appendFile, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { agentIdFromStartedAt, startedAtFromAgentId, readWorktreeAgent, restoreArchivedAgent, listAgents, findAgent, archivedAgentPaths, readLiveMetas, readLiveMeta, resolveAgentEventsPath, EVENTS_FILE, META_FILE, isPidAlive, toRunCard, diaryOf, fromDiaryLine, type AgentMeta } from './store/index.js'
 import { isGitRepo, nodeGitRunner, isGitTimeout } from '@gemstack/agent-data'
@@ -122,14 +122,13 @@ export function childEnv(daemonUrl: string | undefined, agentId: string | undefi
 
 /**
  * The routine skills the daemon fires (#1774), linked into every checkout it makes beside the
- * `branches` skill, through the branches package's caller-given list: `skills/work-queue/SKILL.md`
- * ships with this package, and the daemon starts the queued work with `/work-queue`. The skills
- * an agent composes — tickets, queue, logs — are the project's own tracked files, not the daemon's
- * to link.
+ * `branches` skill, through the branches package's caller-given list. They ship in the
+ * `@gemstack/routines` package, one `skills/<name>/SKILL.md` each, no code; the daemon starts the
+ * queued work with `/work-queue`. The skills an agent composes — tickets, queue, logs — are the
+ * project's own tracked files, not the daemon's to link.
  */
-export const ROUTINE_SKILLS: readonly SkillLink[] = [
-  { name: WORK_QUEUE_SKILL_NAME, dir: fileURLToPath(new URL(`../skills/${WORK_QUEUE_SKILL_NAME}/`, import.meta.url)) },
-]
+const ROUTINES_DIR = join(dirname(createRequire(import.meta.url).resolve('@gemstack/routines/package.json')), 'skills')
+export const ROUTINE_SKILLS: readonly SkillLink[] = [{ name: WORK_QUEUE_SKILL_NAME, dir: join(ROUTINES_DIR, WORK_QUEUE_SKILL_NAME) }]
 
 /** The daemon's signed write funnel to the data branch (`daemon-writes.ts`): the run's record is its own commit. */
 const funnel = daemonFunnel()

@@ -1,0 +1,131 @@
+---
+name: tickets
+description: Where the project's tickets live, how to read and change them, how to claim a ticket so no two agents work the same one, how to queue one, and the formats.
+---
+
+# Tickets
+
+The tickets (`tickets/<DATE>_<SLUG>.md`, with their `.plan.md` and `.lock.md` siblings) live on the branch `agent-data`, never on a code branch. A `tickets` link at the repository root, if present, shows a possibly stale copy; never write there. The command reads fresh.
+
+Read and change them with the `tickets` command, a dependency of this repository (`@gemstack/skill-tickets`), run as `npx tickets`. When that fails for a missing `node_modules`, install with the lockfile's package manager (`npm install` for `package-lock.json`) and run it again. Every change it makes is one commit pushed straight to the `agent-data` branch. A refusal exits 1 with a line on stderr; a wrong command line exits 2 with the usage.
+
+## Read
+
+```
+npx tickets list                 every open ticket, as one JSON array: file, title, summary, priority, topics,
+                                 github, date, planned, effort, uncertainty, locked, lockedBy
+                                 (priority, topics, github, effort, uncertainty, locked, lockedBy
+                                 absent when unset)
+npx tickets show <file>          one ticket: its text, its plan, who holds it
+```
+
+## Change
+
+```
+npx tickets put <file>           write one file under tickets/ from stdin, the whole file, creating it if new;
+                                 empty stdin writes an empty file
+                                 (npx tickets put <file> < draft.md): a ticket or a plan
+npx tickets close <file>         once the work is done and published: remove the ticket with its plan
+                                 and lock; refused while someone else holds it; its queue entry, if any,
+                                 stays: `npx queue done` it
+```
+
+## Queue a ticket
+
+When the repository has the `queue` skill, a ticket goes on the agent queue as a link, its title as the label, at the ticket's own `Priority:` (5 when it has none):
+
+```
+npx queue add "[<title>](tickets/<file>)" --priority <N>
+```
+
+Once the work is done and published, `npx tickets close <file>` and `npx queue done` the entry.
+
+## Claim before you plan or work a ticket
+
+```
+npx tickets claim <file>         {"ok":true,"file":…,"holder":…} — the ticket is yours
+                                 {"ok":false,"reason":"claimed","holder":…,"file":…} — someone else's
+                                 (no holder when the lock's line does not parse): pick another; never remove
+                                 or overwrite their lock. A claim guards claim, close and release;
+                                 put overwrites whoever holds the ticket
+npx tickets release <file>       lift your own claim when the plan or the work is done, and before you
+                                 stop unless you closed it; nothing lifts it on a timeout
+```
+
+Every `<file>` above takes a ticket's filename (`2042-01-01_some-ticket.md`) or the `tickets/…` path a queue entry links to; `put` also takes that ticket's `.plan.md` name, and writes a plan for a ticket that does not exist, without complaint, invisible to `show`. You claim as `AGENT_ID` when it is set, else as your current branch (so a rename or a branch switch between claim and release changes who you are: release from the branch you claimed on, or the lock stays until a person edits the branch).
+
+## Formats
+
+### A ticket: `tickets/<DATE>_<SLUG>.md`
+
+DATE: yyyy-mm-dd. SLUG: a succinct kebab-case slug of the ticket title.
+
+```md
+Priority: 0-10 [optional, 10: critical — act immediately, 0: only if capacity]
+Topics: [list-of-topics] [optional]
+GitHub: [#42](https://github.com/org/repo/issues/42) [optional]
+
+# Ticket title
+
+## TLDR
+
+...
+
+## Why it matters
+
+...
+
+[optional: more info (any heading and format you want)]
+```
+
+`Priority:`, `Effort:` and `Uncertainty:` are bare whole numbers above the `# ` title; anything else reads as absent for queue placement and the scales, and a ticket with no readable `Priority:` queues at 5.
+
+### A claim: `tickets/<DATE>_<SLUG>.lock.md`
+
+Written by `npx tickets claim`, removed by `npx tickets release` or `npx tickets close`. One line: `CLAIMED: <holder>`.
+
+### A plan: `tickets/<DATE>_<SLUG>.plan.md`
+
+The plan for an existing ticket (`tickets/2042-01-01_some-ticket.md` → `tickets/2042-01-01_some-ticket.plan.md`).
+
+```md
+Effort: 0-10 [0: implementation is trivial, 10: implementation takes months]
+Uncertainty: 0-10 [0: implementation without meaningful alternatives, 10: highly uncertain how to implement]
+Outdated: yes [optional, only if the ticket was updated in a way that makes the plan outdated]
+
+# [Plan] Ticket title
+
+Single sentence describing this file's content.
+
+## TLDR [optional]
+
+Brief overview of this file's content.
+
+## Problems [optional]
+
+List of all significant aspects with low confidence on how to implement, with explanation why uncertain.
+
+## Solutions [optional]
+
+For each problem, list of ways to solve the problem (including meaningful shortcuts, for quicker implementation).
+
+## Considerations [optional]
+
+Exhaustive list of all significant aspects to be considered (including edge cases).
+
+## Implementation [optional]
+
+Concrete plan to implement the ticket.
+```
+
+Notes:
+- Covers both spiking (e.g. high-level research without implementation plan) and planning (e.g. concrete implementation proposal)
+- The `.plan.md` file can be modified multiple times over an extended period (e.g. a ticket requiring repeated human intervention, transitioning from spiking to concrete plan)
+- All sections are just proposals and optional: you can use any headings with any format
+- The uncertainty value:
+  - Gauges whether there are *significant* alternatives, minor variability such as syntax should be ignored
+  - Is used for evaluating whether human intervention is needed (0 => clearly no human intervention needed)
+- Example of how to gauge uncertainty and alternatives:
+  - List all aspects that need to be considered
+  - Give an uncertainty rating (0-10) to each aspect following this criteria: is there an obviously optimal way to implement it (0), or is it highly unclear whether it can be implemented in a better way (10)?
+  - Explore and suggest alternatives for each aspect with a low rating

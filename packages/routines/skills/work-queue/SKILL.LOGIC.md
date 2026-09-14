@@ -14,3 +14,4 @@ The `work-queue` routine skill: the prompt of the agent the daemon starts on the
 - **Committed counts as published** - once the work is committed it closes the task's ticket and marks the queue entry done, so a ticket whose skill says "close once published" is closed rather than left open.
 - **Release before stopping** - any claim it still holds is released unless it closed the ticket.
 - **Nothing queued** - it says so and stops.
+- **No ticketing system, no AI queue** - it shows an error to the user and stops; the note is in capability words and names no skill.

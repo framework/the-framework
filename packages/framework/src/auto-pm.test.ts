@@ -559,6 +559,9 @@ test('AUTO_PM_WORK_JOB fires the routine skill by its slash command, and lands i
   assert.match(skill, /do not push/)
   assert.match(skill, /committed counts as published/)
   assert.match(skill, /If nothing is queued, say so and stop/)
+  // Rom's note (#1774): a command assumes no capability; when it would be broken without one, it says so in capability words, never a skill's name.
+  assert.match(skill, /no ticketing system or no AI queue, show an error to the user and stop/)
+  assert.doesNotMatch(skill, /`tickets`|`queue`|npx/)
   // The queued work implements entries whose triage a human could have vetoed, so its review
   // happened before the agent. Every other job writes tickets/plans and has nothing to merge.
   assert.equal(AUTO_PM_WORK_JOB.autoMerge, true)

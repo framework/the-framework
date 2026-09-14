@@ -26,7 +26,7 @@ Drives Codex as a driver [1]: each turn [2] is one non-interactive invocation of
 ## Business logic — TL;DR
 
 - **Starting and prompting Codex** - every turn [2] spawns `codex` in its non-interactive mode with streamed JSON output, pointed at the driver session's [3] directory, with the prompt over standard input.
-- **Sandboxed to the directory** - Codex runs under its `workspace-write` sandbox unless the driver [1] was configured with `read-only` or `danger-full-access`; the flag that bypasses Codex's approvals and sandbox is never passed.
+- **Sandboxed to the directory** - Codex runs under its `workspace-write` sandbox unless the driver [1] was configured with `read-only` or `danger-full-access`; under `workspace-write` the directory's git repository data is writable too, so the coding agent [4] can commit; the flag that bypasses Codex's approvals and sandbox is never passed.
 - **Framing rides ahead of the prompt** - Codex has no system prompt flag, so the driver session's framing [10] and the turn's extra framing are placed in front of the prompt, as their own block.
 - **Model pass-through** - the model the caller names is passed to Codex as is; without one, Codex's own default runs.
 - **Every turn starts fresh** - the driver never resumes a Codex conversation: a request to continue the previous turn, and an earlier session id to continue, are ignored and the turn runs fresh.
@@ -56,6 +56,8 @@ Every turn [2] spawns the `codex` command, found on `PATH` unless the driver [1]
 #### Business logic
 
 Unless told otherwise, Codex runs with its `workspace-write` sandbox, so the coding agent [4] can edit the directory it was pointed at and nothing else on the machine; this is the counterpart of Claude Code's `acceptEdits` permission mode. The driver [1] can be configured with `read-only` or with `danger-full-access` instead. Codex's flag that bypasses both its approvals and its sandbox is never passed, whatever the configuration.
+
+Under `workspace-write`, Codex keeps a `.git` directory at the root of the directory read-only. In a plain clone, as opposed to a git worktree such as an agent's checkout [8], that makes the coding agent's [4] first commit or branch rename fail. So on every turn [2] the driver asks git for the absolute path of the directory's git repository data (the common git directory, which for a worktree is the main checkout's `.git`) and tells Codex to make that path writable as well. The path is resolved per turn, not once, because the coding agent may turn the directory into a git repository during an earlier turn. When the directory is not in a git repository, or git is not installed, nothing is added and the turn runs as before. Nothing is added under `read-only` or `danger-full-access`. A writable git directory also lets the coding agent change the repository's hooks and configuration, which run later outside the sandbox; this is accepted, since committing is the coding agent's job and a worktree's git data was already writable. Extra command-line arguments the driver was configured with come after, so one that sets Codex's writable paths itself replaces this path rather than adding to it.
 
 ### Framing rides ahead of the prompt
 

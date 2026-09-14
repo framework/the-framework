@@ -1,4 +1,4 @@
-import { spawn as nodeSpawn } from 'node:child_process'
+import { execFile, spawn as nodeSpawn } from 'node:child_process'
 import { runCliSession, type AgentCliParser, type SpawnLike } from './cli-session.js'
 import { combineFraming, combineSignals, makeEmit, readWorkspaceFile } from './session-support.js'
 import type { Driver, DriverEvent, DriverPromptOptions, DriverSession, DriverStartOptions, DriverTurn, DriverUsage } from './types.js'
@@ -18,7 +18,11 @@ export interface CodexDriverOptions {
   bin?: string
   /** Sandbox policy. Default `"workspace-write"`. */
   sandbox?: CodexSandbox
-  /** Extra CLI args appended verbatim (escape hatch). */
+  /**
+   * Extra CLI args appended verbatim (escape hatch). Appended last, so a
+   * `-c sandbox_workspace_write.writable_roots=...` here replaces the git dir
+   * the driver makes writable rather than adding to it.
+   */
   extraArgs?: string[]
   /** Environment for the child process. Default `process.env`. */
   env?: NodeJS.ProcessEnv
@@ -69,14 +73,16 @@ export class CodexSession implements DriverSession {
     this.id = `codex-${++sessionCounter}`
   }
 
-  prompt(text: string, opts: DriverPromptOptions = {}): Promise<DriverTurn> {
+  async prompt(text: string, opts: DriverPromptOptions = {}): Promise<DriverTurn> {
     // Codex takes no system-prompt flag, so the framing rides in front of the
     // prompt. Blank-line separated, so it reads as its own block.
     const framing = combineFraming(this.startOpts.system, opts.system)
     const prompt = framing ? `${framing}\n\n${text}` : text
+    // Resolved every turn, not at start: the agent may `git init` in turn 1.
+    const gitDir = await gitCommonDir(this.cwd)
     return runCliSession({
       bin: this.config.bin ?? 'codex',
-      args: this.buildArgs(),
+      args: this.buildArgs(gitDir),
       cwd: this.cwd,
       env: this.config.env ?? process.env,
       prompt,
@@ -97,15 +103,32 @@ export class CodexSession implements DriverSession {
     return Promise.resolve()
   }
 
-  private buildArgs(): string[] {
+  private buildArgs(gitDir: string | undefined): string[] {
     // No prompt argument: it goes over stdin, so a long one never hits the
     // arg-length limit. `--skip-git-repo-check` because Codex otherwise refuses
     // to run outside a git repo, and a workspace may legitimately not be one yet.
-    const args = ['exec', '--json', '--skip-git-repo-check', '--sandbox', this.config.sandbox ?? 'workspace-write', '-C', this.cwd]
+    const sandbox = this.config.sandbox ?? 'workspace-write'
+    const args = ['exec', '--json', '--skip-git-repo-check', '--sandbox', sandbox, '-C', this.cwd]
+    // `workspace-write` keeps a `.git/` directory at the workspace root read-only,
+    // so in a plain checkout (not a worktree) the agent's commit fails on
+    // `.git/index.lock` (verified on codex-cli 0.144.4, #1747). The git dir is made
+    // writable: committing is the agent's job, and a worktree's git dir already is.
+    // The `-c` value is TOML; a JSON string array is a valid TOML array.
+    if (sandbox === 'workspace-write' && gitDir) args.push('-c', `sandbox_workspace_write.writable_roots=${JSON.stringify([gitDir])}`)
     if (this.startOpts.model) args.push('-m', this.startOpts.model)
     if (this.config.extraArgs) args.push(...this.config.extraArgs)
     return args
   }
+}
+
+/** The absolute git common dir of `cwd`, or `undefined` when it is not a repository or git is missing. */
+function gitCommonDir(cwd: string): Promise<string | undefined> {
+  return new Promise(resolve => {
+    execFile('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd }, (err, stdout) => {
+      const dir = String(stdout).trim()
+      resolve(err || !dir ? undefined : dir)
+    })
+  })
 }
 
 /**

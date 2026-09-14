@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { spawn } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { childEnv, ROUTINE_SKILLS, terminate, waitOutFinishedLeg, waitOutSlots, type FinishedLegState } from './daemon-runtime.js'
+import { childEnv, COMMAND_SKILLS, terminate, waitOutFinishedLeg, waitOutSlots, type FinishedLegState } from './daemon-runtime.js'
 import { isPidAlive } from './store/index.js'
 import { AGENT_ID_ENV } from './agent-id.js'
 import { WORK_QUEUE_SKILL_NAME } from './auto-pm.js'
@@ -238,9 +238,9 @@ test('a spawned agent gets its id as AGENT_ID and no PATH entries of the daemon 
   assert.equal(childEnv(undefined, undefined, base)[AGENT_ID_ENV], undefined)
 })
 
-test('the routine skill the daemon links into every checkout is the work-queue skill file (#1774)', () => {
-  assert.deepEqual(ROUTINE_SKILLS.map(s => s.name), [WORK_QUEUE_SKILL_NAME])
-  const skill = readFileSync(join(ROUTINE_SKILLS[0]!.dir, 'SKILL.md'), 'utf8')
+test('the command skill the daemon links into every checkout is the work-queue skill file (#1774)', () => {
+  assert.deepEqual(COMMAND_SKILLS.map(s => s.name), [WORK_QUEUE_SKILL_NAME])
+  const skill = readFileSync(join(COMMAND_SKILLS[0]!.dir, 'SKILL.md'), 'utf8')
   assert.match(skill, /^---\nname: work-queue\n/, 'the front matter names the skill the daemon fires')
   assert.match(skill, /\ndisable-model-invocation: true\n/, 'only a person or the daemon invokes it')
 })

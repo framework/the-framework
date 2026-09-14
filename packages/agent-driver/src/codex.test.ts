@@ -1,4 +1,8 @@
 import { strict as assert } from 'node:assert'
+import { execFileSync } from 'node:child_process'
+import { mkdtemp, realpath, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { test } from 'node:test'
 import { Readable, Writable } from 'node:stream'
 import { CodexDriver, CodexJsonParser, parseCodexUsage } from './codex.js'
@@ -140,6 +144,38 @@ test('CodexDriver runs sandboxed in the workspace, never with the bypass (#539)'
   assert.ok(!seen.includes('--dangerously-bypass-approvals-and-sandbox'))
   // Codex refuses to run outside a git repo, and a fresh workspace isn't one yet.
   assert.ok(seen.includes('--skip-git-repo-check'))
+})
+
+test('CodexDriver makes the git dir writable, so a plain checkout can commit (#1747)', async () => {
+  const dir = await realpath(await mkdtemp(join(tmpdir(), 'codex-git-')))
+  try {
+    execFileSync('git', ['init', '-q'], { cwd: dir })
+    let seen: readonly string[] = []
+    const driver = new CodexDriver({ spawn: fakeSpawn(REAL_RUN, args => (seen = args)) })
+    const session = await driver.start({ cwd: dir })
+    await session.prompt('go')
+    // `workspace-write` keeps a root `.git/` read-only; without this the commit fails on `.git/index.lock`.
+    assert.deepEqual([...seen], [
+      'exec', '--json', '--skip-git-repo-check', '--sandbox', 'workspace-write', '-C', dir,
+      '-c', `sandbox_workspace_write.writable_roots=["${join(dir, '.git')}"]`,
+    ])
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('CodexDriver widens no read-only sandbox, even in a repository (#1747)', async () => {
+  const dir = await realpath(await mkdtemp(join(tmpdir(), 'codex-git-')))
+  try {
+    execFileSync('git', ['init', '-q'], { cwd: dir })
+    let seen: readonly string[] = []
+    const driver = new CodexDriver({ sandbox: 'read-only', spawn: fakeSpawn(REAL_RUN, args => (seen = args)) })
+    const session = await driver.start({ cwd: dir })
+    await session.prompt('go')
+    assert.ok(!seen.includes('-c'))
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
 })
 
 test('CodexDriver sends the prompt over stdin, not as an argument (#539)', async () => {

@@ -1,21 +1,16 @@
 Priority: 9
-Topics: [dashboard, skills]
 GitHub: [#1768](https://github.com/framework/the-framework/issues/1768)
 
 # Dashboard architecture
 
 ## TLDR
 
-With the skills architecture a user cherry-picks skills (e.g. skip `skills-branch` on Claude Code Web, which manages branches itself; skip `skills-tickets`). The dashboard should show UI only for the skills that are picked. How do we structure it?
-
-Maintainer's direction (2026-09-09): one page per skill (tickets → `/tickets`, logs → `/agents`), plus a hook for skills to add cards to the landing page. Modularity matters ~10x more than minor UX paper cuts.
-
-The plan, its questions and the picks live in #1774 (see that ticket).
+With the skills architecture a user picks the skills they want: skip `branches` because Claude Code Web already manages branches, or skip `tickets` if they don't want that feature. The dashboard should show UI only for the skills that are picked. How is it structured? The maintainer's direction: one page per skill (`/tickets` for tickets, `/agents` for the logs) and a hook for skills to add cards to the landing page. Modularity is "10x more important than minor UX paper cuts". The plan and its six questions live in #1774 (its own ticket).
 
 ## Why it matters
 
-Labeled highest priority. Without it the dashboard hard-codes every skill, which defeats the modular skills architecture.
+Labeled highest priority. Without it, skills are modular in the repository but not in the UI: the dashboard keeps showing pages for skills a project dropped, and cannot show a replacement skill.
 
 ## Source
 
-Imported from GitHub issue [framework/the-framework#1768](https://github.com/framework/the-framework/issues/1768), created 2026-09-09, labels: `highest-prio 🌟`. Comments folded through 2026-09-09T23:45Z.
+Imported from GitHub issue [framework/the-framework#1768](https://github.com/framework/the-framework/issues/1768), created 2026-09-09, labels: `highest-prio 🌟`, 2 comments (last folded: 2026-09-09T23:45Z).

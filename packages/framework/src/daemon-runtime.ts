@@ -121,14 +121,14 @@ export function childEnv(daemonUrl: string | undefined, agentId: string | undefi
 }
 
 /**
- * The routine skills the daemon fires (#1774), linked into every checkout it makes beside the
- * `branches` skill, through the branches package's caller-given list. They ship in the
- * `@gemstack/routines` package, one `skills/<name>/SKILL.md` each, no code; the daemon starts the
- * queued work with `/work-queue`. The skills an agent composes — tickets, queue, logs — are the
+ * The command skills the daemon fires (#1774), linked into every checkout it makes beside the
+ * `branches` skill, through the branches package's caller-given list. Each ships as its own
+ * package, `@gemstack/skill-<command>`, a `SKILL.md` and no code; the daemon starts the queued
+ * work with `/work-queue`. The skills an agent composes — tickets, queue, logs — are the
  * project's own tracked files, not the daemon's to link.
  */
-const ROUTINES_DIR = join(dirname(createRequire(import.meta.url).resolve('@gemstack/routines/package.json')), 'skills')
-export const ROUTINE_SKILLS: readonly SkillLink[] = [{ name: WORK_QUEUE_SKILL_NAME, dir: join(ROUTINES_DIR, WORK_QUEUE_SKILL_NAME) }]
+const WORK_QUEUE_SKILL_DIR = dirname(createRequire(import.meta.url).resolve('@gemstack/skill-work-queue/package.json'))
+export const COMMAND_SKILLS: readonly SkillLink[] = [{ name: WORK_QUEUE_SKILL_NAME, dir: WORK_QUEUE_SKILL_DIR }]
 
 /** The daemon's signed write funnel to the data branch (`daemon-writes.ts`): the run's record is its own commit. */
 const funnel = daemonFunnel()
@@ -498,7 +498,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
           // says which name it got; re-attaching by the birth branch would continue the agent on a
           // branch without its previous commits.
           const branch = agentBranchFor(archived ?? { id: agentId })
-          await attachCheckout(projectCwd, { agentId, branch, skills: ROUTINE_SKILLS })
+          await attachCheckout(projectCwd, { agentId, branch, skills: COMMAND_SKILLS })
         }
         await restoreArchivedAgent(projectCwd, path, agentId).catch(() => false)
         return { cwd: path, agentId }
@@ -560,7 +560,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
     try {
       // The package's one sequence (#1725): the worktree, the parent's dependencies linked in, the
       // routine skill linked in, the branches view (#1580) told now rather than at the next tick.
-      const worktree = await createCheckout(projectCwd, { agentId, skills: ROUTINE_SKILLS })
+      const worktree = await createCheckout(projectCwd, { agentId, skills: COMMAND_SKILLS })
       return { ok: true, workspace: { cwd: worktree.path, agentId } }
     } catch (err) {
       if (await isGitRepo(projectCwd)) {

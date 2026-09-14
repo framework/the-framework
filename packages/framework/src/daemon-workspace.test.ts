@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, writeFile, readdir, readFile, readlink, rm, stat, realp
 import { join, resolve } from 'node:path'
 import { execFile } from 'node:child_process'
 import { tmpdir } from 'node:os'
-import { createProjectRuntime, cleanupTimedOutWorktree, markFailedStart, agentStderrPath, isTransientAgentFailure, lastAgentFailureDetail, MAX_TRANSIENT_RETRIES, ROUTINE_SKILLS } from './daemon-runtime.js'
+import { createProjectRuntime, cleanupTimedOutWorktree, markFailedStart, agentStderrPath, isTransientAgentFailure, lastAgentFailureDetail, MAX_TRANSIENT_RETRIES, COMMAND_SKILLS } from './daemon-runtime.js'
 import type { PreflightResult } from './preflight.js'
 
 /**
@@ -666,11 +666,11 @@ test("a spawned agent gets the daemon's PATH untouched, and its checkout links t
     // project's own dependencies, `npx tickets`, as its SKILL.md says.
     assert.equal(recorded.trim(), process.env['PATH'], "the agent's PATH is the daemon's own")
     // Two skills are linked into the checkout, where each harness looks for them: the branches
-    // package's own (#1739), and the routine skill the daemon fires (#1774), from the routines package. The skills an agent
+    // package's own (#1739), and the command skill the daemon fires (#1774), from its own package. The skills an agent
     // composes — tickets, queue, logs — are the project's tracked files, not links.
     const checkout = worktreePath(cwd, result.agentId!)
     for (const harnessDir of HARNESS_SKILL_DIRS) {
-      for (const [name, dir] of [['branches', BRANCHES_SKILL_DIR], ...ROUTINE_SKILLS.map(s => [s.name, s.dir] as const)] as const) {
+      for (const [name, dir] of [['branches', BRANCHES_SKILL_DIR], ...COMMAND_SKILLS.map(s => [s.name, s.dir] as const)] as const) {
         const target = await readlink(join(checkout, harnessDir, name))
         assert.equal(await realpath(resolve(join(checkout, harnessDir), target)), await realpath(dir), `${harnessDir}/${name} links the directory holding its SKILL.md`)
       }

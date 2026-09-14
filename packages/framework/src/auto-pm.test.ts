@@ -544,13 +544,13 @@ test('a stand-down is logged when it is news, not once a minute (#1774)', async 
   assert.equal(loop.report().outcomes[0]?.message, 'there is no job to run')
 })
 
-test('AUTO_PM_WORK_JOB fires the routine skill by its slash command, and lands its own PRs (#1216/#1774)', () => {
+test('AUTO_PM_WORK_JOB fires the command skill by its slash command, and lands its own PRs (#1216/#1774)', () => {
   // The prompt is the skill's name as a slash command; the agent's harness expands it. The skill
-  // file ships in the routines package, and only a person or the daemon may invoke it.
+  // file ships as its own package, and only a person or the daemon may invoke it.
   assert.equal(AUTO_PM_WORK_JOB.prompt, `/${WORK_QUEUE_SKILL_NAME}`)
   assert.equal(AUTO_PM_WORK_JOB.works, true)
-  const routines = dirname(createRequire(import.meta.url).resolve('@gemstack/routines/package.json'))
-  const skill = readFileSync(join(routines, 'skills', WORK_QUEUE_SKILL_NAME, 'SKILL.md'), 'utf8')
+  const pkg = dirname(createRequire(import.meta.url).resolve('@gemstack/skill-work-queue/package.json'))
+  const skill = readFileSync(join(pkg, 'SKILL.md'), 'utf8')
   assert.match(skill, new RegExp(`^---\\nname: ${WORK_QUEUE_SKILL_NAME}\\n`))
   assert.match(skill, /\ndisable-model-invocation: true\n/)
   // What the agent is told: one task, commit but do not push, committed counts as published,

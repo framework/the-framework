@@ -1,35 +1,27 @@
-Priority: 9
-Topics: [dashboard, skills, daemon]
 GitHub: [#1774](https://github.com/framework/the-framework/issues/1774)
 
 # Dashboard architecture: the plan and six questions
 
 ## TLDR
 
-The plan for #1768. The issue body's recommendations are superseded by the picks comment (2026-09-09) and the daemon-half comment (2026-09-13); where they differ, the picks win:
+The plan for #1768: a dashboard that shows a page, card or control only for the skills a repository picked. Today it is one React app in the framework that knows all four skills (`branches`, `tickets`, `queue`, `logs`) by name and by import. The picks posted on the thread win over the issue body:
 
-- **Q1, where a skill's dashboard code lives:** out of the framework, in the skill's own package, on its own export path (a separate package later if a reason shows up).
-- **Q2, how the framework knows a skill:** capabilities. The framework names no skill and imports no skill. Routines are prompts; the agent reads the project's skills folder and composes the skills itself. A missing capability is reported by the agent (a `show-error` skill as the channel). Verified by a 16-run experiment ($3.69): the agent composes skills from Sonnet up; the prompt must carry the *rules of the job* (one entry, never ask, how to publish, stop when empty). "Skill absent" must mean both its `SKILL.md` and its package are gone. Stalled agents leave locks.
-- **Q3:** no skill knows another. Cross-skill features are the dashboard composing generic pieces (actions on links, agent ids as links).
-- **Q4:** the dashboard reserves nothing. Each skill's widget defines its route, sidebar row, Overview card, actions — or nothing.
-- **Q5:** live runs are the framework's; finished runs belong to the records (logs) capability, no fallback archive. Without it, a finished run vanishes with its checkout and the page says so, naming the capability, not our package.
-- **Q6, order:** (1) SKILL.md files tracked in projects; (2) the daemon half; (3) the dashboard half — slots/sockets, logs widget first; (4) queue, tickets, branches one at a time.
-
-## Progress
-
-- Step 1: done (#1778, the tickets, queue and logs skills are tracked files of the project).
-- Step 2, the daemon half: merged as #1777 (2026-09-14). Picks from the 2026-09-13 comment: the drain is a routine skill `work-queue/SKILL.md` with `disable-model-invocation: true` fired as `/work-queue`; the daemon fires when the `agent-data` head moves by a commit it did not write (chained, plus a daily heartbeat); checkout-before and record-after stay framework code importing branches and logs for now (zero imports at step 4); stalled locks handled by a release rule in the routine plus the ticket page's Release button; proof = three real queued entries drained unattended.
-
-## What is left
-
-- Follow-ups from the daemon half, one PR each: the four rotation jobs (update tickets, triage quick, triage consensual, plan tickets — last, its fan-out needs design) become routine skills until the daemon imports nothing from tickets; routines declare their own triggers so the scheduler knows no names; the scheduler becomes a library package.
-- Step 3, the dashboard half (UI later, per the maintainer).
-- Step 4, queue, tickets, branches widgets; branches to zero imports.
+- **Q1, where a skill's dashboard code lives:** out of the framework, in the skill's own package on its own export path. It can be split into a separate package later.
+- **Q2, how the framework knows a skill: capabilities.** The framework stops knowing skills. A routine is a prompt ("get tickets to work on") plus the rules of the job, and the agent composes whatever skills are in the folder. The experiment backed it (16 `claude -p` runs, Sonnet and Opus): with the job rules in the prompt, both models did `queue` → `tickets claim` → work → push → `tickets close` → `queue done` → stop. Claims held with two agents on one queue, and an empty queue stopped for $0.11–0.18. The four names and imports go. Checkout before the run and the record after it stay framework code for now.
+- **Q3, skills knowing each other:** never a skill, only the framework. The cross-skill sentence in SKILL.md goes. The Queue button becomes a generic "actions on a link" slot the queue widget fills. A claim's holder is an agent id the dashboard links when a records widget exists. The hot-tickets card is the framework's, or splits in two.
+- **Q6, the daemon half (built as #1777):** the drain becomes a routine skill, `work-queue/SKILL.md` with `disable-model-invocation: true`, in its own package `@gemstack/routines`. The daemon fires `/work-queue`, then reads no queue, claims no ticket and names no skill. `auto-pm.ts`'s sweep and the `todo-loop.ts` drain go. Two kinds of skill: capability skills (a SKILL.md and a command) and routine skills (a SKILL.md only, composing capabilities).
 
 ## Why it matters
 
-This is the concrete plan behind the highest-priority issue: it removes every hard-coded skill from the daemon and the dashboard so skills can be skipped or swapped.
+Labeled via #1768 as the highest priority: modularity (skip or *replace* a skill) beats UX paper cuts. It sets how every later skill and routine plugs into the framework and the dashboard.
+
+## Open points
+
+- A stalled agent leaves its locks, and nothing lifts them.
+- Two tickets SKILL.md sentences get in the way: "close once merged" stalls Opus in a run with no merge step, and "install first" sends Sonnet to `npm install`.
+- "A skill is absent" has to mean both its SKILL.md and its package are gone, or the agent still finds the command.
+- Q4/Q5 (pages that need two skills; runs without the logs skill) and the rest of the order: see the thread.
 
 ## Source
 
-Imported from GitHub issue [framework/the-framework#1774](https://github.com/framework/the-framework/issues/1774), created 2026-09-09. Comments folded through 2026-09-13T17:23Z.
+Imported from GitHub issue [framework/the-framework#1774](https://github.com/framework/the-framework/issues/1774), created 2026-09-09, no labels, 3 comments (last folded: 2026-09-13T21:29Z).

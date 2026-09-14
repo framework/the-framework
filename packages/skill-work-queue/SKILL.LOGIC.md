@@ -1,10 +1,10 @@
-The `work-queue` routine skill: the prompt of the agent the daemon starts on the queued work, as a skill file the coding agent's harness expands from `/work-queue`. Marked so that only a person or the daemon invokes it; the agent never chooses it by itself.
+The `work-queue` command skill: the prompt of the agent a runner starts on the queued work, as a skill file the coding agent's harness expands from `/work-queue`. Marked so that only a person or a runner invokes it; the agent never chooses it by itself.
 
 ## Context
 
 **User story**: the daemon starts an agent with `/work-queue`. The agent reads the skills in its checkout, takes one queued task, works it in its own branch, commits, closes the task's ticket, marks the queue entry done, and stops; the run that started it publishes the branch. An agent that finds nothing queued says so and stops.
 
-**Business logic story**: the skill names no skill and no command. The agent composes the `tickets` and `queue` skills tracked in the project on its own; what this file carries is the rules of the job, which an unattended agent cannot infer from the skills alone.
+**Business logic story**: the skill names no skill and no command, and assumes no capability. The agent composes the `tickets` and `queue` skills tracked in the project on its own; what this file carries is the rules of the job, which an unattended agent cannot infer from the skills alone. Where the job is broken without a capability, the skill says so in capability words and stops.
 
 ## Business logic — TL;DR
 

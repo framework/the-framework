@@ -1,4 +1,4 @@
-Decides, once per look [1] and per project, whether the daemon may spend the account's quota [2] on work nobody asked for, and on what. Auto PM [3] either starts an agent [6] on the queued work [4] because the `agent-data` branch [11] moved, or, once a run found nothing queued, refills the agent queue [5] by firing the next routine [7] of a fixed rotation. The daemon reads no queue and names no skill: it reads the head of the branch, and it starts the queued work with one slash command, `/work-queue`, the routine skill [22] shipped with The Framework. Every reason not to start is a sentence the daemon logs and the dashboard shows.
+Decides, once per look [1] and per project, whether the daemon may spend the account's quota [2] on work nobody asked for, and on what. Auto PM [3] either starts an agent [6] on the queued work [4] because the `agent-data` branch [11] moved, or, once a run found nothing queued, refills the agent queue [5] by firing the next routine [7] of a fixed rotation. The daemon reads no queue and names no skill: it reads the head of the branch, and it starts the queued work with one slash command, `/work-queue`, the command skill [22] shipped with The Framework. Every reason not to start is a sentence the daemon logs and the dashboard shows.
 
 ## Context
 
@@ -29,7 +29,7 @@ Decides, once per look [1] and per project, whether the daemon may spend the acc
 [19] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [20] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
 [21] holder: who a claim names: the agent's id when the daemon started the agent, else the branch the `tickets` command ran on.
-[22] routine skill: a skill file (`SKILL.md`) marked so that only a person or the daemon invokes it, whose body is the job's prompt; the daemon starts the agent with the skill's slash command and the coding agent's harness expands it.
+[22] command skill: a skill file (`SKILL.md`) marked so that only a person or the daemon invokes it, whose body is the job's prompt, shipped as its own package; the daemon starts the agent with the skill's slash command and the coding agent's harness expands it.
 [23] the heartbeat: one run on the queued work a day when nothing moved, the belt for a move the daemon missed.
 [24] the chain: the queued work firing again as its run ends, because the run's own commits moved the branch; it ends with a run that moves nothing.
 
@@ -53,7 +53,7 @@ Decides, once per look [1] and per project, whether the daemon may spend the acc
 - **Starting, and stopping** - the first refused start ends the batch, claims of agents that never started are released, and a stopped daemon spawns nothing more.
 - **"Run now": a look a person asked for** - runs with the preference off and without the cooldown, scoped to one project or one routine; the queued work's row starts an agent on the queue whether or not the branch moved.
 - **What the last look reports** - the dashboard shows whether the preference was on, when the look ran, when the next is due, and one sentence per project; the log gets a stand-down only when it is news.
-- **The routines** - the queued work is the routine skill `work-queue`; the rest are built from the presets: name, prompt, label and tooltip come off the preset; what a routine does (works the queue, fans out, takes a lock, auto-merges) is declared on the routine, never matched by name.
+- **The routines** - the queued work is the command skill `work-queue`; the rest are built from the presets: name, prompt, label and tooltip come off the preset; what a routine does (works the queue, fans out, takes a lock, auto-merges) is declared on the routine, never matched by name.
 
 ## Business logic
 
@@ -75,7 +75,7 @@ See `## Context`.
 
 #### Business logic
 
-A project whose branch moved [15] starts one agent [6] told `/work-queue`, the routine skill [22] shipped in the `@gemstack/routines` package and linked into every checkout the daemon makes (`daemon-runtime.ts`), unattended [16], with its handoff [18] at `merge`, since what it implements has already been triaged onto the queue where a human could have vetoed it. One agent per move, however high the concurrency cap: the next start needs the branch to move again, which the agent's own commits do. The start spends the move and the rotation's turn alike: whether the queue wants refilling is for this run to find out. A commit the daemon wrote itself is not a move: the run's record the daemon writes at teardown, a routine lock [10] it takes or drops, a claim [9] it mints for a plan agent all carry the trailer, on this machine and on every other machine running the daemon, so a record never starts the next run and two daemons on one branch never fire empty runs at each other's records. A person's writes from the dashboard — queue an entry, release a claim — carry no trailer and are moves: a person asking for work is exactly what should start a run.
+A project whose branch moved [15] starts one agent [6] told `/work-queue`, the command skill [22] shipped as the `@gemstack/skill-work-queue` package and linked into every checkout the daemon makes (`daemon-runtime.ts`), unattended [16], with its handoff [18] at `merge`, since what it implements has already been triaged onto the queue where a human could have vetoed it. One agent per move, however high the concurrency cap: the next start needs the branch to move again, which the agent's own commits do. The start spends the move and the rotation's turn alike: whether the queue wants refilling is for this run to find out. A commit the daemon wrote itself is not a move: the run's record the daemon writes at teardown, a routine lock [10] it takes or drops, a claim [9] it mints for a plan agent all carry the trailer, on this machine and on every other machine running the daemon, so a record never starts the next run and two daemons on one branch never fire empty runs at each other's records. A person's writes from the dashboard — queue an entry, release a claim — carry no trailer and are moves: a person asking for work is exactly what should start a run.
 
 ### The chain, and after an empty run the rotation
 
@@ -280,7 +280,7 @@ Before deciding, every agent this loop started on the project and has not yet be
 
 #### Business logic
 
-- The queued work [4] is the routine skill [22] `work-queue`: its name is the skill's, its prompt is the slash command `/work-queue`, its label "Work the queue" and its tooltip "Work one queued task off the agent queue, unattended." are written here, and it is declared as working the queue and as auto-merging its pull request. The skill file itself is `skills/work-queue/SKILL.md` in the `@gemstack/routines` package, which The Framework depends on.
+- The queued work [4] is the command skill [22] `work-queue`: its name is the skill's, its prompt is the slash command `/work-queue`, its label "Work the queue" and its tooltip "Work one queued task off the agent queue, unattended." are written here, and it is declared as working the queue and as auto-merging its pull request. The skill file itself is the `SKILL.md` of the `@gemstack/skill-work-queue` package, which The Framework depends on.
 - Each preset-backed routine carries the preset's stable name, which is what the rotation's position and the switched-off list key on; the prompt rendered from the preset; and the preset's label and one-line tooltip, read off the preset so a relabeled preset relabels its routine and the sentence the launcher shows for a preset and the sentence the routines list shows for its routine are the same sentence.
 - Only the maintenance routine carries a separate description line, "sweeping the codebase for maintenance work", because "Maintenance" names its preset rather than the work; the other routines' labels read as what they do, so their rows stay one line and their log lines say the label itself.
 - The planning routine is declared as fanning out [14]; the triage routines each declare their routine lock [10].

@@ -100,7 +100,7 @@ The "Update from GitHub" row is marked as always running in an agent of its own.
 
 #### Business logic
 
-The launcher [1] shows fourteen buttons, in this order: "Research", "Readability", "Maintainability", "Security audit", "UX (auto)", "Suggest new tickets", "Suggest new features", "Suggest tickets to work on", "Plan tickets (aka spike)", "Market research", "Update from GitHub", "Maintenance", "Add quick-win work to AI Queue", "Add consensual work to AI Queue": every preset. The routine that works the agent queue [4] is not a preset but the skill file `skills/work-queue/SKILL.md` of the `@gemstack/routines` package, which only the daemon fires (the rules in `auto-pm.ts`).
+The launcher [1] shows fourteen buttons, in this order: "Research", "Readability", "Maintainability", "Security audit", "UX (auto)", "Suggest new tickets", "Suggest new features", "Suggest tickets to work on", "Plan tickets (aka spike)", "Market research", "Update from GitHub", "Maintenance", "Add quick-win work to AI Queue", "Add consensual work to AI Queue": every preset. The routine that works the agent queue [4] is not a preset but the `SKILL.md` of the `@gemstack/skill-work-queue` package, a command skill only a person or the daemon fires (the rules in `auto-pm.ts`).
 
 ### Which presets may run unattended
 

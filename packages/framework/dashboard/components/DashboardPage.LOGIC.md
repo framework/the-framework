@@ -10,7 +10,7 @@ The Overview [1], the dashboard's landing page shown while no project is selecte
 [2] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
 [3] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds.
 [4] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
-[5] routine: a preset the daemon fires on its own on a schedule — update tickets, triage quick, triage consensual, plan tickets, maintenance — each switchable off and runnable on demand.
+[5] routine: a job the daemon fires on its own — the queued work, update tickets, triage quick, triage consensual, plan tickets, maintenance — each switchable off and runnable on demand.
 [6] gate: a question with options at which an agent stops and waits for an answer: it emits the question in its turn's final message, the dashboard shows it as a card, and the answer re-prompts the agent.
 [7] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down.
 

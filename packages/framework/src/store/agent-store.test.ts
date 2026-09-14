@@ -270,16 +270,6 @@ test('applyEventToMeta records the branch as observed, and ready-for-merge besid
   assert.equal(ready.branch, 'agent-add-comments') // ready doesn't clobber the branch
 })
 
-test('applyEventToMeta records the ticket a run is implementing (#1117)', () => {
-  assert.equal(BASE.ticket, undefined, 'a run nobody linked to a ticket says nothing')
-  const on = applyEventToMeta(BASE, { kind: 'ticket', path: 'tickets/2026-07-25_login.md' }, AT)
-  assert.equal(on.ticket, 'tickets/2026-07-25_login.md')
-  // It is a fact about why the agent exists, so it outlives the work: a reader looking at a finished
-  // run still gets to see which ticket it was.
-  const ended = applyEventToMeta(on, { kind: 'end', ok: true }, AT)
-  assert.equal(ended.ticket, 'tickets/2026-07-25_login.md')
-})
-
 test('applyEventToMeta tracks the pending choice gate a run is parked on (#636)', () => {
   assert.equal(BASE.pendingChoice, undefined)
   const asked = applyEventToMeta(BASE, { kind: 'choice', id: 'g1', title: 'Cache the auth store?', options: [{ id: 'y', label: 'Yes' }] }, AT)

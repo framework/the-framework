@@ -43,60 +43,6 @@ async function registerProject(cwd: string, over: Parameters<typeof provideTestC
   return projectId(resolve(cwd))
 }
 
-// An agent started from the dashboard has to name the ticket it is about to implement, the same way
-// the sweep's own drain does (#1117). The daemon reads that off the `drains` flag on its job; a
-// click arrives with nothing but prompt text, so the resolution happens here.
-
-/** The options `startAgent` was handed, plus a workspace with one queued ticket to resolve against. */
-async function harness(): Promise<{ cwd: string; id: string; started: () => StartAgentOptions | undefined }> {
-  const cwd = await dataRepo({
-    'TODO_AGENTS.md': ['## Priority 9', '', '- [ ] [Add a login page](tickets/2026-07-25_login.md)', ''].join('\n'),
-  })
-  let seen: StartAgentOptions | undefined
-  const id = await registerProject(cwd, {
-    startAgent: async (_text: string, _kind: string, options: StartAgentOptions) => {
-      seen = options
-      return { ok: true, agentId: 'r1' }
-    },
-  })
-  return { cwd, id, started: () => seen }
-}
-
-test('a drain started from the dashboard carries the ticket it is about to work (#1117)', async () => {
-  const { cwd, id, started } = await harness()
-  try {
-    const result = await sendStart(id, presets.drainQueue.render())
-    assert.equal(result.ok, true)
-    // Without this the agent implemented the ticket and the Overview's in-progress lane stayed empty,
-    // because only the daemon's own drain was tagging what it took off the queue.
-    assert.equal(started()?.ticket, 'tickets/2026-07-25_login.md')
-  } finally {
-    await rm(cwd, { recursive: true, force: true })
-  }
-})
-
-test('any other prompt starts without a ticket, however busy the queue is (#1117)', async () => {
-  const { cwd, id, started } = await harness()
-  try {
-    await sendStart(id, 'Have a look at the login page')
-    // Naming the queue's next entry here would show a ticket as being implemented on the strength
-    // of an agent that never touched it.
-    assert.equal(started()?.ticket, undefined)
-  } finally {
-    await rm(cwd, { recursive: true, force: true })
-  }
-})
-
-test('a ticket named by the caller is not replaced by the guess (#1117)', async () => {
-  const { cwd, id, started } = await harness()
-  try {
-    await sendStart(id, presets.drainQueue.render(), 'build', { ticket: 'tickets/2026-07-20_chosen.md' })
-    assert.equal(started()?.ticket, 'tickets/2026-07-20_chosen.md')
-  } finally {
-    await rm(cwd, { recursive: true, force: true })
-  }
-})
-
 // The manual `.lock.md` release (#1420): the only way a claim lifts besides the agent's own PR
 // deleting it, so the RPC has to hold the same line the file readers do about what a ticket
 // filename is, and actually land the release as a commit.

@@ -15,12 +15,12 @@ Runs The Framework's one daemon per machine, in the foreground: it binds the das
 [5] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [6] control file: `.the-framework/control.jsonl`: the file the daemon appends steering to (stops, picks, chat messages) and the agent's process tails.
 [7] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
-[8] Auto PM: the daemon's unattended product management: drain the agent queue, and refill it by running the routines.
+[8] Auto PM: the daemon's unattended product management: work the agent queue when the `agent-data` branch moves, and refill it by running the routines.
 [9] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
 [10] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 [11] gate: a question with options at which an agent stops and waits for an answer: it emits the question in its turn's final message, the dashboard shows it as a card, and the answer re-prompts the agent.
 [12] pick: the answer to a gate: the option or options chosen, by the user or automatically.
-[13] run: only the `logs` skill's record of one agent on the `agent-data` branch: a card (what was asked, the ticket, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said).
+[13] run: only the `logs` skill's record of one agent on the `agent-data` branch: a card (what was asked, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said).
 [14] archive: the transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
 [15] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
 [16] spend offset: the user's adjustment of the quota boundary, in percentage points of the week.
@@ -70,7 +70,7 @@ The directory the daemon is started in is its home project. Its `.the-framework/
 
 #### Business logic
 
-At boot, across every registered project, each agent whose run [13] or archive [14] says running while its process is provably gone, or whose record names no process to check, is given a surrogate end: the agent is marked stopped with the detail "its process died without reporting an end", and the gate it died holding expires with it. The end is written to the run on the `agent-data` branch [15] and to the archive, each best-effort. An agent whose process is alive on this machine is left alone, because a second daemon may be driving it. The number repaired is logged per project as "[framework] reconciled N orphaned agent(s) in <project>". Then every agent browser nobody owns any more, a Chrome running on the throwaway profile agents use whose parent process is no longer an agent, is ended and its profile removed, and the process ids are logged as "[framework] closed N orphaned agent browser(s): pid …"; this does nothing on Windows. The exact liveness and ownership rules are in `store/agent-store.ts` and `browser.ts`. Each repair is best-effort and a failure is silent.
+At boot, across every registered project, each agent whose run [13] or archive [14] says running while its process is provably gone, or whose record names no process to check, is given a surrogate end: the agent is marked stopped with the detail "its process died without reporting an end", and the gate it died holding expires with it. The end is written to the run on the `agent-data` branch [15], as a commit signed with the daemon's trailer (`daemon-writes.ts`) so the daemon's own sweep does not read it as work, and to the archive, each best-effort. An agent whose process is alive on this machine is left alone, because a second daemon may be driving it. The number repaired is logged per project as "[framework] reconciled N orphaned agent(s) in <project>". Then every agent browser nobody owns any more, a Chrome running on the throwaway profile agents use whose parent process is no longer an agent, is ended and its profile removed, and the process ids are logged as "[framework] closed N orphaned agent browser(s): pid …"; this does nothing on Windows. The exact liveness and ownership rules are in `store/agent-store.ts` and `browser.ts`. Each repair is best-effort and a failure is silent.
 
 ### Nothing is resumed at boot
 

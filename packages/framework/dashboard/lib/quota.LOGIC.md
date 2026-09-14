@@ -4,7 +4,7 @@ Feeds the usage panel: the account's quota [1] reading with where it stands agai
 
 [1] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
 [2] quota boundary: the share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
-[3] Auto PM: the daemon's unattended product management: drain the agent queue, and refill it by running the routines.
+[3] Auto PM: the daemon's unattended product management: work the agent queue when the `agent-data` branch moves, and refill it by running the routines.
 [4] sweep: a background job the daemon runs on its clock: Auto PM, the CI watch, the notification watchers, the sweep that reclaims checkouts, the branch-links sweep, the cloud scratch sweep, cloud work adoption.
 
 ## Business logic — TL;DR

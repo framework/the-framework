@@ -3,7 +3,6 @@ import { composeAgentSystem, renderSystemPrompt, type TfContext } from './system
 import { createAgentControls, emitSessionStart, endStopDetail } from './agent-telemetry.js'
 import { createTurnSignalEmitter } from './turn-gate.js'
 import { runAwaitRounds } from './await-gate.js'
-import { runTodoLoop, type TodoLoopResult } from './todo-loop.js'
 import { type ChoicePick, type ChoiceRequest, type FrameworkEvent } from './events.js'
 import type { AgentMessages } from './agent-messages.js'
 import { isHandsOff, type AgentLocation } from './agent-location.js'
@@ -32,7 +31,7 @@ export interface RunAgentOptions {
    * around; for `prompt`, the text sent as-is (modulo the system template's user slot).
    */
   prompt: string
-  /** Which opening prompt this session gets, and whether the backlog loop follows. Default `build`. */
+  /** Which opening prompt this session gets, and whether live chat follows. Default `build`. */
   kind?: AgentKind
   /**
    * Where this session's turns execute (#1050/#610). Default `local`. Only `web` hands the work
@@ -78,18 +77,11 @@ export interface RunAgentOptions {
    */
   requestChoice?: (req: ChoiceRequest) => Promise<ChoicePick>
   /**
-   * Work the agent's own `TODO_AGENTS.md` backlog after the opening exchange settles (#323), one
-   * gated entry per turn until it is empty. Default: on for a `build` session with a real driver,
-   * off otherwise (a `prompt` session is one prompt by definition, and the fake driver's scripted
-   * demo writes no backlog and must stay deterministic). Set explicitly to force either way.
-   */
-  todoLoop?: boolean
-  /**
    * Continue a stopped session's conversation (#720/#1467): the captured agent session id to
    * `--resume`. When set, {@link prompt} is sent verbatim as a continuation message rather than
    * composed — the resumed transcript already carries the framing, which is exactly why #782
    * refused to bolt a resumed session onto a fresh build. Everything around the turn still runs:
-   * the gates, the backlog loop, live chat — the flow resumes, not just the conversation.
+   * the gates, live chat — the flow resumes, not just the conversation.
    */
   resumeSessionId?: string
   /**
@@ -115,8 +107,6 @@ export interface RunAgentResult {
   text: string
   /** Every event emitted, in order. */
   events: FrameworkEvent[]
-  /** How the backlog loop (#323) ended, when it ran. */
-  todo?: TodoLoopResult
 }
 
 /**
@@ -224,24 +214,8 @@ export async function runAgent(opts: RunAgentOptions): Promise<RunAgentResult> {
       throw agentSignal.reason instanceof Error ? agentSignal.reason : new Error('[framework] run stopped')
     }
 
-    // The backlog loop (#323): with the opening work settled, consume the agent's own TODO
-    // backlog one gated entry per turn until it is empty. The session signal (a Stop, an answer marked stop)
-    // #322) and the item cap bound it for unattended sessions.
-    let todo: TodoLoopResult | undefined
-    if (kind === 'build' && !handsOff && (opts.todoLoop ?? opts.driver.id !== 'fake')) {
-      todo = await runTodoLoop({
-        session,
-        cwd: opts.cwd,
-        emit,
-        requestChoice: opts.requestChoice,
-        signal: agentSignal,
-      })
-      // A plan declined mid-backlog with a stop-marked answer ends the session, the same as #217.
-      if (todo.sessionStopped) answerController.abort(new Error('[framework] stopped by your answer'))
-    }
-
-    // Live chat (#714) for a build, once its backlog is worked: a prompt session already took it
-    // inside the rounds above, where there is nothing to come between.
+    // Live chat (#714) for a build, once its opening work settles: a prompt session already took
+    // it inside the rounds above, where there is nothing to come between.
     if (opts.messages && kind === 'build' && !handsOff && !agentSignal.aborted) {
       const chat = await runChatAfterBacklog(session, opts, emit, emitTurnSignals, agentSignal)
       text = chat.text
@@ -262,7 +236,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<RunAgentResult> {
       emit({ kind: 'log', message: 'Handed off: the rest of this session happens in its own session, which opens its own pull request.' })
     }
     emit({ kind: 'end', ok: true })
-    return { text, events, ...(todo ? { todo } : {}) }
+    return { text, events }
   } catch (err) {
     const { stopped, detail } = endStopDetail({ err, ...(opts.signal ? { signal: opts.signal } : {}), answerController })
     emit({ kind: 'end', ok: false, ...(stopped ? { stopped: true } : {}), detail })

@@ -132,7 +132,7 @@ export interface Preferences {
    * Opted *out* rather than opted in, so the list only ever names exceptions: a routine added in a
    * later version is on for everyone, instead of silently never running for whoever saved the
    * setting before it shipped. It names routines rather than indexing them for the same reason
-   * {@link AutoPmJob.drains} is a flag — a reorder must not move which one is switched off.
+   * {@link AutoPmJob.works} is a flag — a reorder must not move which one is switched off.
    */
   autoPmOptOut?: string[]
   /**

@@ -15,7 +15,7 @@ Every fact the daemon reads from GitHub, and the one thing it writes there, goes
 [5] launcher: the Start form on project home, a project's own page.
 [6] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
 [7] CI watch: the sweep that merges the pull requests The Framework opened once their checks pass, and starts a fix agent when a check goes red.
-[8] routine: a preset the daemon fires on its own on a schedule — update tickets, triage quick, triage consensual, plan tickets, maintenance — each switchable off and runnable on demand.
+[8] routine: a job the daemon fires on its own — the queued work, update tickets, triage quick, triage consensual, plan tickets, maintenance — each switchable off and runnable on demand.
 [9] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
 [10] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds.
 

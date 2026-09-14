@@ -33,8 +33,6 @@ export function formatFrameworkEvent(event: FrameworkEvent): string {
       return `  pull request written${event.title ? `: ${event.title}` : ''}`
     case 'settled':
       return `◆ done for now — waiting for your next message`
-    case 'ticket':
-      return `  implementing ${event.path}`
     case 'branch':
       return `  branch: ${event.branch}`
     case 'cloud-anchor':
@@ -124,8 +122,6 @@ export function mergeWithheldWhy(reason: MergeWithheldReason): string {
   switch (reason) {
     case 'not-ready-for-merge':
       return 'the session never signalled ready-for-merge'
-    case 'session-todo-open':
-      return "the session's own TODO file still has open entries"
   }
 }
 

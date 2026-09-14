@@ -14,7 +14,7 @@ Shows every registered project's tickets on one page, the dashboard's Tickets vi
 [4] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
 [5] holder: who a claim names: the agent's id when the daemon started the agent, else the branch the `tickets` command ran on.
 [6] plan: a ticket's `.plan.md`: effort and uncertainty ratings and how to implement it.
-[7] Auto PM: the daemon's unattended product management: drain the agent queue, and refill it by running the routines.
+[7] Auto PM: the daemon's unattended product management: work the agent queue when the `agent-data` branch moves, and refill it by running the routines.
 [8] the Overview: the dashboard's cross-project page at `/`.
 [9] prompt agent: an agent that runs one prompt and stops there.
 [10] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles. The opposite is attended.
@@ -152,7 +152,7 @@ After success the button reads "Plans queued" with a check mark and is disabled 
 What a row shows, including its plan column, its start controls and how a claim [4] names its holder [5], is described in `TicketsPanel.tsx`. This page wires the row's actions, in flat mode directly and in grouped mode through each project's panel, always against the row's own project:
 - Opening a row opens the ticket's own page; the plan column's link opens the ticket's plan view. Both are addressed by project and ticket file.
 - "Start a plan" from a row starts an attended prompt agent [9] on the ticket's project with the prompt `Create tickets/<stem>.plan.md`. When the agent could not be started, the daemon's reason, or "The planning agent could not be started." when it gives none, appears above the filter bar.
-- "Start work" from a row starts a prompt agent on the ticket's project, unattended [10], with the ticket named on the agent as `tickets/<file>` so the daemon claims the ticket for it; the prompt's wording is in `TicketsPanel.tsx`. Failure shows the daemon's reason or "The work agent could not be started.".
+- "Start work" from a row starts a prompt agent on the ticket's project, unattended [10]; the prompt's wording is in `TicketsPanel.tsx`. Failure shows the daemon's reason or "The work agent could not be started.".
 - Every "Configure first, then run" on this page selects the row's own project, landing on that project's launcher.
 - On a claimed row, the holder's name links to the holding agent's page in the ticket's project, when the holder is one of that project's agents.
 

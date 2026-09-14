@@ -4,7 +4,7 @@ The Overview's [1] "AI Queue" card: every project's open queue entries [2], grou
 
 **User story**: the user opens the Overview, reads under "AI Queue" what the agents will pick up next in each project, clicks a ticket's title to read it, presses play on one entry to have it worked now, or sets "3" and presses the fan-out button to start three agents on a project's top three entries.
 
-**Business logic story**: the daemon's drain [6] half of Auto PM [7] starts an agent on the agent queue's first open entry on its own clock; this card is the same work started on the user's click, so an agent started here runs exactly the way a drained one does.
+**Business logic story**: the queued work [6] half of Auto PM [7] starts an agent on the agent queue when the `agent-data` branch moves; this card starts an agent on one named entry on the user's click, and it runs the way the daemon's agent does: unattended.
 
 ## Glossary
 
@@ -13,8 +13,8 @@ The Overview's [1] "AI Queue" card: every project's open queue entries [2], grou
 [3] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
 [4] fan-out: starting several agents at once, one per queue entry or one per ticket to plan.
 [5] launcher: project home is a project's own page with the launcher (the Start form) and its composer (the prompt editor, also used for live chat).
-[6] drain: starting an agent on the agent queue's first open entry — the half of Auto PM that spends existing work.
-[7] Auto PM: the daemon's unattended product management: drain the agent queue, and refill it by running the routines.
+[6] the queued work: the routine that spends existing work: one agent started with `/work-queue` when the `agent-data` branch moved, which takes one task off the agent queue by composing the skills in its checkout.
+[7] Auto PM: the daemon's unattended product management: work the agent queue when the `agent-data` branch moves, and refill it by running the routines.
 [8] prompt agent: a prompt agent runs one prompt and stops there.
 [9] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
 [10] skill: one of the four capabilities an agent is taught — `branches`, `tickets`, `queue`, `logs`.
@@ -56,7 +56,7 @@ Each row prints the entry's title rather than its source: the text of a link at 
 
 #### Context
 
-**User story**: the user presses play on "Improve tooltip…" and watches one agent [3] implement that entry, as the drain [6] sweep would have, but now.
+**User story**: the user presses play on "Improve tooltip…" and watches one agent [3] implement that entry, now.
 
 #### Business logic
 
@@ -66,7 +66,7 @@ The play button, named "Spin up an agent working on this entry", starts a prompt
 
 #### Context
 
-**Problem**: several agents told "work the first open entry" would all implement the same one; a batch must pin each agent to its own entry, the way the daemon's drain [6] batch does.
+**Problem**: several agents told "work the first open entry" would all implement the same one; a batch must pin each agent to its own entry, the way the daemon's plan fan-out does.
 
 #### Business logic
 

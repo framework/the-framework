@@ -1,6 +1,5 @@
 import { definePreset, type PresetDef } from './preset-prompt.js'
 import {
-  PRESETS_DRAIN_QUEUE,
   PRESETS_MAINTAINABILITY,
   PRESETS_MAINTENANCE,
   PRESETS_MARKET_RESEARCH,
@@ -117,9 +116,6 @@ export const presets = {
    */
   suggestTicketsToWorkOn: definePreset({ name: 'suggest-tickets-to-work-on', template: PRESETS_SUGGEST_TICKETS_TO_WORK_ON, label: 'Suggest tickets to work on', tooltip: 'Add tickets to queue (TODO_AGENTS.md)' }),
 
-  /** [Drain queue] (#855): work the entries already on `TODO_AGENTS.md`. */
-  drainQueue: definePreset({ name: 'drain-queue', template: PRESETS_DRAIN_QUEUE, label: 'Spin up agents working on the AI queue', tooltip: 'Work the entries already on the queue (TODO_AGENTS.md)' }),
-
   /**
    * [Do quick-win work] (#891) and [Do consensual work] (#892): read `tickets/*.md`, pick the ones
    * matching one filter, and append them to `TODO_AGENTS.md` — how the queue refills itself from
@@ -145,28 +141,11 @@ export const presets = {
 export type PresetKey = keyof typeof presets
 
 /**
- * Whether a prompt is the one that takes work OFF the queue (#1117).
- *
- * The daemon knows a drain by the `drains` flag on its job; an agent started by hand arrives as bare
- * prompt text with no such marking, so the text is all there is to recognise it by. Compared
- * against the rendered preset rather than against a copy of its words, so rewording the preset
- * cannot leave this behind — that drift would show up only as a lane on the Overview quietly
- * staying empty, which is the kind of bug nobody reports.
- *
- * Deliberately exact: a prompt that merely mentions the queue is not a drain, and mistaking one
- * for the other would name a ticket as being implemented by an agent doing something else entirely.
- */
-export function drainsQueue(prompt: string): boolean {
-  return prompt.trim() === presets.drainQueue.render().trim()
-}
-
-/**
  * The presets the launcher offers, in the order it shows them.
  *
  * One list rather than a `launcher: true` flag on each row: membership and order are the same
- * decision, and a flag would have stated half of it while the order lived somewhere else. It is
- * also the answer to "which presets are user-facing" — `drainQueue` is absent because only the
- * daemon fires it, which previously had nothing marking it internal.
+ * decision, and a flag would have stated half of it while the order lived somewhere else. Every
+ * preset is on it: the routine only the daemon fires is a skill file now (#1774), not a preset.
  */
 export const LAUNCHER_PRESETS: readonly PresetDef[] = [
   presets.research,

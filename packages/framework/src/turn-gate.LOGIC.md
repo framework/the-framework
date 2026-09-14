@@ -24,7 +24,7 @@ Reads the turn signals [1] off a turn's [2] final message, the one place The Fra
 [14] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
 [15] vanilla: an agent started without the built-in system prompt but with the signal protocols kept.
 [16] stop: ending an agent before it finishes: the Stop button, Ctrl-C, or a pick marked to stop.
-[17] skill: one of the four capabilities an agent is taught — `branches`, `tickets`, `queue`, `logs` — each a package with the instructions the agent reads, a command on the agent's PATH, and an API the product calls.
+[17] skill: one of the four capabilities an agent is taught — `branches`, `tickets`, `queue`, `logs` — each a package with the instructions the agent reads, a command run as `npx <skill>`, and an API the product calls.
 [18] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it).
 [19] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
 [20] build agent / prompt agent: the two kinds of agent: a build works the agent queue after its opening exchange; a prompt agent runs one prompt and stops there.

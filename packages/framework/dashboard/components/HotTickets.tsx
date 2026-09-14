@@ -52,14 +52,7 @@ const LEFT_LANES: LaneDef[] = [
 ]
 const RIGHT_LANES: LaneDef[] = [{ key: 'high-priority', label: 'High priority', dot: 'bg-info' }]
 
-export function HotTickets({
-  onSelectProject,
-  onSelectAgent,
-}: {
-  onSelectProject: (id: string) => void
-  /** A ticket an agent is implementing knows which run (#1117), so its row opens that session. */
-  onSelectAgent: (id: string, agentId: string) => void
-}) {
+export function HotTickets({ onSelectProject }: { onSelectProject: (id: string) => void }) {
   const { value: tickets } = usePolled<HotTicket[]>(onHotTickets, EMPTY, 10_000, [])
 
   const renderLane = (lane: LaneDef) => (
@@ -68,7 +61,6 @@ export function HotTickets({
       lane={lane}
       tickets={tickets.filter(t => t.bucket === lane.key)}
       onSelectProject={onSelectProject}
-      onSelectAgent={onSelectAgent}
     />
   )
 
@@ -100,12 +92,10 @@ function Lane({
   lane,
   tickets,
   onSelectProject,
-  onSelectAgent,
 }: {
   lane: LaneDef
   tickets: HotTicket[]
   onSelectProject: (id: string) => void
-  onSelectAgent: (id: string, agentId: string) => void
 }) {
   const empty = tickets.length === 0
   return (
@@ -128,9 +118,8 @@ function Lane({
                   render={
                     <button
                       type="button"
-                      // A ticket being implemented names its agent, and that session is what the row is
-                      // reporting; one with no agent yet opens its project's launcher, asking for it.
-                      onClick={() => (t.agentId ? onSelectAgent(t.projectId, t.agentId) : openTicket(t, onSelectProject))}
+                      // The row opens its project's launcher with the ticket drafted in, asking for it.
+                      onClick={() => openTicket(t, onSelectProject)}
                       className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
                     />
                   }
@@ -149,21 +138,9 @@ function Lane({
   )
 }
 
-// The one fact that earns the lane: an agent implementing it right now, else the plan that made it
-// in-progress, else the priority that put it in the high-priority lane. AI-Queue rows carry
-// nothing extra — the lane already says it.
-//
-// `implementing` is coloured rather than muted like the others (#1117), because it is the only tag
-// that describes something happening as you read it: `planned` is a mark work left behind, and a
-// lane holding both should not read as though they were the same claim.
+// The one fact that earns the lane: the plan that made it in-progress, else the priority that put
+// it in the high-priority lane. AI-Queue rows carry nothing extra — the lane already says it.
 function TicketTag({ ticket: t }: { ticket: HotTicket }) {
-  if (t.agentId) {
-    return (
-      <span className="shrink-0 rounded border border-primary/40 px-1 text-[10px] uppercase tracking-wide text-primary">
-        implementing
-      </span>
-    )
-  }
   const tag =
     t.bucket === 'in-progress'
       ? t.ticket.planned

@@ -29,10 +29,9 @@ export const SKILL_DIR = join(dirname(fileURLToPath(import.meta.url)), '..')
  * A skill to link into a checkout: its name (the directory a harness lists it under) and the
  * directory holding its `SKILL.md`.
  *
- * TEMPORARY (#1748): a caller names the *other* skills it wants in a checkout — the `tickets`
- * skill, today — because nothing else puts a skill there yet. Dies when the skills are committed
- * into the repository by use-npm-skills: a tracked `.claude/skills/<name>` is in every worktree by
- * itself, and this package goes back to linking only its own.
+ * A caller names the skills it ships itself and wants in every checkout it makes — the daemon's
+ * routine skills, which live with the daemon and not in the repository. A skill a project uses
+ * is the project's own tracked `.claude/skills/<name>`, in every worktree by itself.
  */
 export interface SkillLink {
   name: string
@@ -44,7 +43,7 @@ export const OWN_SKILL: SkillLink = { name: SKILL_NAME, dir: SKILL_DIR }
 
 /**
  * Link the skill into `checkout` for every harness — this package's own, plus whatever `skills`
- * the caller names (temporary, see {@link SkillLink}) — and hide the links from the project's git
+ * the caller names (see {@link SkillLink}) — and hide the links from the project's git
  * through the repository's exclude file: a symlink at the checkout root would otherwise ride any
  * sweeping `git add -A` onto the agent's branch. Best-effort: an entry already at a link's path is
  * left alone, and a link that cannot be made is a worse run, not a failed one.

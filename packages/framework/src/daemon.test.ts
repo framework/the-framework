@@ -362,6 +362,13 @@ fs.appendFileSync(${JSON.stringify(join(cwd, 'started.log'))}, agentId + '\\n')
     // while the worktree still exists (#799) — otherwise the handoff has nothing to read.
     const doneMeta = await archivedMeta(doneId)
     assert.equal(doneMeta?.branch, `agent-${doneId}`, "the finished run's branch is recorded")
+    // The record is the daemon's own commit on the data branch, signed with its trailer, so the
+    // sweep that watches the branch for work does not read the record as a move (#1774).
+    assert.match(
+      await git(['log', '-1', '--format=%B', 'refs/heads/agent-data'], cwd),
+      /^logs: record run \S+\n\nDaemon: \S+\n/,
+      "the record's commit message ends in the daemon's trailer",
+    )
     assert.match(
       await git(['log', '--format=%s', `refs/remotes/origin/agent-${doneId}`], cwd),
       /\S/,

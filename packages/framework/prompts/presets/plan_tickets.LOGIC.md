@@ -14,7 +14,7 @@ The "Plan tickets (aka spike)" preset, both a launcher button and a routine [3]:
 [4] plan: a ticket's `.plan.md`: effort and uncertainty ratings and how to implement it.
 [5] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
 [6] skill: one of the four capabilities an agent is taught (`branches`, `tickets`, `queue`, `logs`), each a package with the instructions the agent reads, a command on the agent's PATH, and an API the product calls.
-[7] Auto PM: the daemon's unattended product management: drain the agent queue, and refill it by running the routines.
+[7] Auto PM: the daemon's unattended product management: work the agent queue when the `agent-data` branch moves, and refill it by running the routines.
 [8] fan-out: starting several agents at once, one per queue entry or one per ticket to plan.
 
 ## Business logic — TL;DR

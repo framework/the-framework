@@ -14,7 +14,7 @@ Serves the live event stream [1] for one selected agent [2] to the browser: ever
 [4] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [5] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
 [6] archive: the transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
-[7] run: only the `logs` skill's record of one agent on the `agent-data` branch: a card (what was asked, the ticket, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said).
+[7] run: only the `logs` skill's record of one agent on the `agent-data` branch: a card (what was asked, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said).
 [8] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 [9] end-of-replay marker: the one wire-only event the stream sends after the events already on disk have been delivered and before any live event; it is not an agent event, is never written to any file, and the browser swallows it.
 

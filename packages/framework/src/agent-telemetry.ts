@@ -7,7 +7,7 @@ import { UsageMeter } from './usage.js'
 // (`prompt-run.ts`) differ in what they *do* with the agent, but the accounting around
 // it is the same: name the session, follow the driver's event stream, total the usage,
 // and stop the agent when it has spent too much (#322) or the account's quota ran out
-// (#529). This lived twice, byte-identical, which is how the backlog loop ended up
+// (#529). This lived twice, byte-identical, which is how the build path ended up
 // without a copy of the sibling turn-signal parsing at all (#563).
 
 /** Inputs to {@link emitSessionStart}. */

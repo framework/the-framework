@@ -2,15 +2,21 @@ import type { QuotaBoundaryStatus } from './quota-boundary.js'
 import type { AutoHandoffSkip } from './events.js'
 import { presets } from './preset-catalog.js'
 import { DEFAULT_AUTO_PM_CONCURRENCY } from './preference-defaults.js'
-import { TICKETS_DIR, ticketFromQueueEntry } from '@gemstack/skill-tickets/names'
 import { agentIdFromStartedAt } from './agent-id.js'
 
 /**
  * Auto PM (#685): spend leftover subscription quota on product management instead of
  * letting it expire. While the account is still under its quota boundary (#879) and nobody
- * is at the keyboard, the daemon runs the cycle by itself: it works the agent queue down entry by entry (#855),
- * and once that is empty it refills it — triaging tickets, then spiking and planning
- * the ones that have neither yet.
+ * is at the keyboard, the daemon runs the cycle by itself: it starts an agent on the queued work
+ * whenever the `agent-data` branch moved (#1774), and once a run finds nothing queued it refills
+ * the queue — triaging tickets, then spiking and planning the ones that have neither yet.
+ *
+ * The daemon reads no queue and names no skill (#1774). It watches one thing, the head of the
+ * `agent-data` branch, and reacts to the commits it did not write itself: someone queued an entry,
+ * an agent claimed or closed a ticket. The agent started for that reads the skills in its checkout
+ * and takes one queued task; its own commits move the branch again, so the daemon fires again as
+ * the run ends, and the chain drains the queue by itself. A run that finds nothing writes nothing,
+ * and the chain stops. One heartbeat a day is the belt.
  *
  * The whole feature is one policy question ("is now a good time to spend tokens on our
  * own roadmap?"), so that question lives here as a pure function and the daemon only
@@ -18,26 +24,27 @@ import { agentIdFromStartedAt } from './agent-id.js'
  * and #879 defines the boundary this reads.
  */
 
-/** How often the daemon re-asks {@link autoPmDecision}. */
-export const DEFAULT_AUTO_PM_INTERVAL_MS = 10 * 60 * 1000
+/** How often the daemon looks at the branch and re-asks {@link autoPmDecision}: right after each data pull. */
+export const DEFAULT_AUTO_PM_INTERVAL_MS = 60 * 1000
 
 /**
- * How long a project is left alone after an auto agent is started for it. A spawned agent
- * takes a moment to appear in the daemon's live-run map, and without this the next tick
- * would see "nothing running, queue still empty" and start a second one.
+ * How long a project is left alone after the rotation starts an agent for it. The rotation
+ * invents work on an idle project, and this is what paces it. A move of the branch is never
+ * paced: someone, or an agent, asked for that run.
  */
 const DEFAULT_AUTO_PM_COOLDOWN_MS = 30 * 60 * 1000
+
+/**
+ * The belt (#1774): a run on the queued work once a day even when nothing moved, so a branch the
+ * daemon missed a move on — a range git could not walk, a restart between a push and the look —
+ * is looked at by an agent within a day.
+ */
+export const DEFAULT_AUTO_PM_HEARTBEAT_MS = 24 * 60 * 60 * 1000
 
 /** What the policy was told about one project at one moment. */
 export interface AutoPmInputs {
   /** The `autoPm` preference. Off = the feature does nothing at all. */
   enabled: boolean
-  /**
-   * Whether the project's agent queue (`TODO_AGENTS.md`) has no open entry left, or `undefined`
-   * when it could not be read. Unreadable is not empty and not full: it fails closed, because
-   * since #855 both answers now *start* something and only "we could not tell" does not.
-   */
-  backlogEmpty: boolean | undefined
   /** Live agents on this project, measured against {@link AutoPmInputs.concurrency}. */
   activeAgents: number
   /**
@@ -54,7 +61,10 @@ export interface AutoPmInputs {
   concurrency?: number
   /** Where the account stands against its quota boundary, or `undefined` when it could not be read. */
   quota: QuotaBoundaryStatus | undefined
-  /** Milliseconds since this project was last auto-started, or `undefined` if it never was. */
+  /**
+   * Milliseconds since the rotation last started an agent for this project, or `undefined` when
+   * the cooldown does not apply: the rotation never did, or this start is for a move of the branch.
+   */
   sinceLastStartMs?: number
   /** Override {@link DEFAULT_AUTO_PM_COOLDOWN_MS}. */
   cooldownMs?: number
@@ -69,17 +79,11 @@ export interface AutoPmInputs {
 /** Why the sweep is not starting anything. Logged, so it reads as a sentence. */
 export type AutoPmRefusal = { start: false; reason: string }
 
-/**
- * Which half of the cycle a start belongs to (#855). `drain` works an entry the queue already
- * holds; `pm` puts new work in it. The queue decides: standing work is spent before more is made.
- */
-export type AutoPmMode = 'drain' | 'pm'
-
 /** Whether the budget allows spending unasked at all, before asking what to spend it on. */
 export type QuotaDecision = { start: true } | AutoPmRefusal
 
-/** Start (and at what), or the reason not to. */
-export type AutoPmDecision = { start: true; mode: AutoPmMode } | AutoPmRefusal
+/** Start, or the reason not to. */
+export type AutoPmDecision = { start: true } | AutoPmRefusal
 
 /**
  * Whether the budget allows spending unasked.
@@ -120,7 +124,7 @@ export function quotaHeadroom(quota: QuotaBoundaryStatus | undefined): QuotaDeci
 }
 
 /**
- * Whether to start a PM agent for one project right now. Every condition is a reason to
+ * Whether to start an agent for one project right now. Every condition is a reason to
  * *not* spend the user's quota, checked cheapest first so the common "someone is working"
  * case never reaches the meter.
  */
@@ -141,23 +145,15 @@ export function autoPmDecision(input: AutoPmInputs): AutoPmDecision {
   if (!input.onDemand && input.sinceLastStartMs !== undefined && input.sinceLastStartMs < cooldownMs) {
     return { start: false, reason: 'a run was started for this project a moment ago' }
   }
-  if (input.backlogEmpty === undefined) {
-    return { start: false, reason: 'the agent queue could not be read, so there is no way to tell what to do' }
-  }
-  const headroom = quotaHeadroom(input.quota)
-  if (!headroom.start) return headroom
-  // The queue picks the job, and a non-empty one wins (#855). It used to be a refusal, on the
-  // reasoning that the backlog loop would drain it — but that loop only exists inside an agent a
-  // human started, so unattended the queue filled once and nothing ever emptied it again.
-  return { start: true, mode: input.backlogEmpty ? 'pm' : 'drain' }
+  return quotaHeadroom(input.quota)
 }
 
 /**
  * One thing auto PM knows how to do while the machine is idle (#773).
  *
  * The jobs form a cycle, and the order matters: triage turns tickets into queued work, [Plan
- * tickets] turns the rest into plans. Once a job queues something the sweep switches to draining it
- * (#855), and the rotation resumes where it left off once the queue is empty again.
+ * tickets] turns the rest into plans. Once a job queues something the branch moves and the queued
+ * work is started (#1774); the rotation resumes where it left off once a run finds nothing queued.
  */
 export interface AutoPmJob {
   /** Stable id: the rotation and the opt-out list (#1209) key on it. */
@@ -186,50 +182,43 @@ export interface AutoPmJob {
    */
   tooltip?: string | undefined
   /**
-   * This job works an entry already on the queue, rather than putting entries on it (#1117).
-   *
-   * Only the draining job has a specific piece of work it is about to pick up, so only it can be
-   * told which ticket that is. Declared here rather than matched on {@link AutoPmJob.name} at the
-   * call site, so the job says what it does and a rename cannot quietly unhook it.
+   * This job works the queued work rather than making more of it (#1774): the daemon fires it
+   * when the `agent-data` branch moved, and a Run now on its row is that same fire, asked for.
+   * Declared here rather than matched on {@link AutoPmJob.name} at the call site, so the job says
+   * what it does and a rename cannot quietly unhook it.
    */
-  drains?: boolean
-  /**
-   * The one queue entry a {@link AutoPmJob.drains} job is pinned to (#1204). Set only on the
-   * per-start variants {@link pinnedDrainJob} builds: the catalog's own drain job carries none,
-   * since which entry is next is known only at the moment the sweep starts one.
-   */
-  entry?: string
+  works?: boolean
   /**
    * The routine lock this job holds while it runs (#1659), as `routines/<lock>.lock.md` on the
    * agent-data branch: the triage routines rewrite the shared queue and may take hours, so no two may
    * run at once, on any machine. The sweep mints it before the start and releases it when the
-   * run ends. Declared as data on the job, like {@link AutoPmJob.drains}, so the sweep never
+   * run ends. Declared as data on the job, like {@link AutoPmJob.works}, so the sweep never
    * matches on {@link AutoPmJob.name} at the call site.
    */
   lock?: string
   /**
-   * Merge this job's PR once its agent opens it (#1216). Set on the drain job: what it implements
-   * has already been triaged as consensual, quick-win work a human could have vetoed on the
-   * queue, so its PR is the one kind whose review happened before the agent. Declared as data on
-   * the job for the same no-name-matching reason as {@link AutoPmJob.drains}.
+   * Merge this job's PR once its agent opens it (#1216). Set on the job that works the queue: what
+   * it implements has already been triaged as consensual, quick-win work a human could have vetoed
+   * on the queue, so its PR is the one kind whose review happened before the agent. Declared as
+   * data on the job for the same no-name-matching reason as {@link AutoPmJob.works}.
    */
   autoMerge?: boolean
   /**
    * This rotation job may fan out to several agents pinned one ticket each (#1327). Only
    * [Plan tickets] declares it: unlike the other rotation jobs it writes per-ticket sibling files
    * rather than rewriting the shared queue document, so concurrent copies do disjoint work and
-   * land disjoint edits — the exact property that already lets draining fan out. Declared as data
-   * on the job for the same no-name-matching reason as {@link AutoPmJob.drains}.
+   * land disjoint edits. Declared as data on the job for the same no-name-matching reason as
+   * {@link AutoPmJob.works}.
    */
   fansOut?: boolean
   /**
    * The one ticket a fanned-out job is pinned to (#1327), as its filename inside `tickets/`. Set
-   * only on the per-start variants {@link pinnedPlanJob} builds, like {@link AutoPmJob.entry} is
-   * for drains: which tickets are open is known only at the moment the sweep locks them.
+   * only on the per-start variants {@link pinnedPlanJob} builds: which tickets are open is known
+   * only at the moment the sweep locks them.
    */
   ticket?: string
   /**
-   * The `.lock.md` claim the sweep minted for this start (#1420/#1583), on both pinned variants.
+   * The `.lock.md` claim the sweep minted for this start (#1420/#1583), on the pinned variants.
    * What lets the sweep free the claim itself when the agent settles with nothing to hand off:
    * the agent's PR is what normally deletes the lock, and an agent that never made a commit is
    * never opening one.
@@ -258,49 +247,6 @@ function mintAgentIds(now: number, count: number): string[] {
   return Array.from({ length: count }, (_, i) => agentIdFromStartedAt(new Date(now + i).toISOString()))
 }
 
-/**
- * A drain job pinned to one named queue entry (#1204).
- *
- * With a single agent the stock prompt ("the FIRST open entry") is exact. With several going at
- * once it is a collision: every drain forks the same checkout, so every one of them reads the same
- * first entry and implements it as many times over. Naming the entry is what makes a batch of
- * drains work on disjoint things.
- *
- * The prompt also tells the agent to stop when the entry is gone: the
- * assignment is a snapshot, and a human may retire the entry between the sweep's read and the
- * run's own.
- *
- * When the entry links back to a ticket the sweep has claimed (#1420), the agent is also told
- * which claim is its own — the same contract {@link pinnedPlanJob} carries, because the same
- * gap exists: without the lock the claim on the *implementation* lived only in this daemon's
- * memory, so another machine's sweep could book the same ticket. Ticket, plan and lock live on
- * the `agent-data` branch (#1582/#1748), so the agent closes the ticket there once its work is published — nothing
- * else releases a lock since #1420 dropped the timer. The queue entry itself is NOT the agent's
- * to touch: the daemon checks it off at settle, once the run's ending reports the work landed.
- */
-export function pinnedDrainJob(job: AutoPmJob, entry: string, assignment?: PlanAssignment): AutoPmJob {
-  const stem = assignment?.ticket.replace(/\.md$/, '')
-  return {
-    ...job,
-    entry,
-    ...(assignment ? { claim: assignment } : {}),
-    prompt: [
-      'Work on this one open entry of the agent queue only (use the `tickets` skill):',
-      '',
-      `- ${entry}`,
-      '',
-      'Do not start any other entry, and do not take the entry off the queue — the framework does once your work lands. If the entry is no longer on the queue, stop and do nothing.',
-      ...(assignment
-        ? [
-            '',
-            `The entry's ticket, \`${TICKETS_DIR}/${stem}.md\`, is already claimed for you: \`tickets show ${stem}.md\` names you as its holder. Once your work is published, run \`tickets close ${stem}.md\` — closed tickets leave the branch, and the claim goes with the ticket. If the ticket is not claimed, or claimed by someone else, it is not yours — stop and do nothing.`,
-          ]
-        : []),
-    ].join('\n'),
-    describe: `draining the queue entry "${entryPreview(entry)}"`,
-  }
-}
-
 /** An entry as a log line can carry it: one line, bounded. */
 function entryPreview(entry: string): string {
   const flat = entry.replace(/\s+/g, ' ').trim()
@@ -311,10 +257,10 @@ function entryPreview(entry: string): string {
  * A fan-out job pinned to one locked ticket (#1327).
  *
  * The stock prompt covers every ticket that has no plan or claim yet, and with a batch going out
- * that instruction is the same collision {@link pinnedDrainJob} exists for: every agent forks the
- * same checkout and would pick the same most-important ticket. The pin is *appended* to the stock
- * prompt rather than spliced into it, so the verdict rules the preset carries keep riding along
- * verbatim and a rewritten preset (the maintainer owns its wording) cannot silently lose the pin.
+ * that instruction is a collision: every agent forks the same checkout and would pick the same
+ * most-important ticket. The pin is *appended* to the stock prompt rather than spliced into it,
+ * so the verdict rules the preset carries keep riding along verbatim and a rewritten preset (the
+ * maintainer owns its wording) cannot silently lose the pin.
  *
  * The agent is also told which claim is its own: its ticket's `.lock.md` already exists with the
  * `CLAIMED:` line the daemon pushed (#1420), and finding anything else there means the
@@ -353,8 +299,8 @@ export function pinnedPlanJob(job: AutoPmJob, assignment: PlanAssignment): AutoP
  * nothing changed since the last one is a no-op rather than a re-import.
  *
  * This rotation is what #891/#892 mean by "with a cron job regularly firing this preset". No
- * separate scheduler is involved and none is needed: the rotation already fires on every idle tick
- * where the queue is dry, which is exactly when the queue wants refilling. That is the opposite of
+ * separate scheduler is involved and none is needed: the rotation fires after every run that found
+ * nothing queued, which is exactly when the queue wants refilling. That is the opposite of
  * the maintenance sweep (#882), which is paced by a calendar because it looks at static history and
  * would otherwise never come due — hence its own {@link AUTO_PM_MAINTENANCE_JOB} outside the cycle.
  *
@@ -398,16 +344,25 @@ export const AUTO_PM_JOBS: readonly AutoPmJob[] = [
 ]
 
 /**
- * The job for a queue that is not empty (#855): work its first entry off. Outside the rotation
- * on purpose — the rotation is about what to *make* when there is nothing to do, and this is
- * the thing to do.
+ * The routine skill the daemon fires on the queued work (#1774): `skills/work-queue/SKILL.md` in
+ * the `@gemstack/routines` package, linked into every checkout the daemon makes, marked so that
+ * only a person or the daemon invokes it. Its prompt is the slash command; the agent's harness
+ * expands it.
  */
-export const AUTO_PM_DRAIN_JOB: AutoPmJob = {
-  name: presets.drainQueue.name,
-  prompt: presets.drainQueue.render(),
-  label: presets.drainQueue.label,
-  tooltip: presets.drainQueue.tooltip,
-  drains: true,
+export const WORK_QUEUE_SKILL_NAME = 'work-queue'
+
+/**
+ * The job for the queued work (#1774): one agent, told nothing but `/work-queue`, takes one
+ * queued task off the queue by composing the skills in its checkout. Outside the rotation on
+ * purpose — the rotation is about what to *make* when there is nothing to do, and this is the
+ * thing to do. Its label and tooltip are written here: the routine is a skill file, not a preset.
+ */
+export const AUTO_PM_WORK_JOB: AutoPmJob = {
+  name: WORK_QUEUE_SKILL_NAME,
+  prompt: `/${WORK_QUEUE_SKILL_NAME}`,
+  label: 'Work the queue',
+  tooltip: 'Work one queued task off the agent queue, unattended.',
+  works: true,
   autoMerge: true,
 }
 
@@ -415,11 +370,11 @@ export const AUTO_PM_DRAIN_JOB: AutoPmJob = {
  * The periodic codebase-wide sweep (#882): fire the [Maintenance] preset (#881) so a repo that
  * adopted The Framework late gets its pre-existing history looked at.
  *
- * Outside the rotation, like {@link AUTO_PM_DRAIN_JOB} and for the same kind of reason: the
- * rotation is "what to make next" and cycles every idle tick, while this is paced by a calendar
- * and must not advance or be advanced by the cycle. It takes precedence over the rotation when
- * due, because the entries it queues are what the rotation would otherwise be inventing work
- * instead of.
+ * Outside the rotation, like {@link AUTO_PM_WORK_JOB} and for the same kind of reason: the
+ * rotation is "what to make next" and cycles on every run that found nothing queued, while this is
+ * paced by a calendar and must not advance or be advanced by the cycle. It takes precedence over
+ * the rotation when due, because the entries it queues are what the rotation would otherwise be
+ * inventing work instead of.
  *
  * The prompt renders at module load with no session, so `tf.params.what` falls back to its
  * default of the entire codebase, which is exactly this job's scope.
@@ -437,12 +392,12 @@ export const AUTO_PM_MAINTENANCE_JOB: AutoPmJob = {
  *
  * Derived from the three constants above rather than written out again, so the list the dashboard
  * shows and the jobs the daemon actually runs cannot drift. The order is the sweep's own precedence
- * (#855/#882 read the other way round): draining comes first because it is what happens whenever
- * there is queued work, the rotation is what happens when there is not, and the calendar-paced
- * maintenance sweep is the exception outside both.
+ * (#855/#882 read the other way round): the queued work comes first because it is what happens
+ * whenever the branch moved, the rotation is what happens when a run found nothing, and the
+ * calendar-paced maintenance sweep is the exception outside both.
  */
 export const AUTO_PM_ROUTINES: readonly AutoPmJob[] = [
-  AUTO_PM_DRAIN_JOB,
+  AUTO_PM_WORK_JOB,
   ...AUTO_PM_JOBS,
   AUTO_PM_MAINTENANCE_JOB,
 ]
@@ -451,20 +406,16 @@ export const AUTO_PM_ROUTINES: readonly AutoPmJob[] = [
 const doing = (job: AutoPmJob) => job.describe ?? job.label ?? job.name
 
 /**
- * What became of one attempt to land an agent's queue (#852). The two flags are separate on purpose:
- * a finished agent that wrote no queue is `settled` without being `promoted`, and must stop being
- * retried; a still-running one is neither, and is tried again next tick.
+ * What became of one look at an agent this loop started. A finished agent is `settled` and stops
+ * being asked about; a still-running one is not, and is asked again next tick.
  */
-export interface PromoteOutcome {
-  /** Stop tracking this agent: it is finished, whether or not it left anything behind. */
+export interface SettleOutcome {
+  /** Stop tracking this agent: it is finished. */
   settled: boolean
-  /** The checkout's queue actually changed. */
-  promoted: boolean
   /**
-   * Why the settled run's handoff skipped, when its record says so (#1583). Rides on this outcome
-   * because the promotion already read the run's record, and the sweep needs exactly one fact
-   * from it: a run that ended `no-commits` will never open the PR that lifts the `.lock.md` it
-   * was started under, so the sweep releases that claim itself.
+   * Why the settled run's handoff skipped, when its record says so (#1583). The sweep needs
+   * exactly one fact from the record: a run that ended `no-commits` will never open the PR that
+   * lifts the `.lock.md` it was started under, so the sweep releases that claim itself.
    */
   handoffSkip?: AutoHandoffSkip
   /**
@@ -480,7 +431,7 @@ export interface PromoteOutcome {
 export interface AutoPmProject {
   /** Registry id, as `start` and the live-agent lookup take it. */
   id: string
-  /** Absolute repo path, for reading its queue. */
+  /** Absolute repo path, for reading its branch. */
   path: string
 }
 
@@ -497,12 +448,18 @@ export interface AutoPmDeps {
    */
   optedOut?(): Promise<readonly string[]>
   /**
-   * The open entries of a project's agent queue, in file order. Empty = the queue has run dry, and
-   * a rejection = it could not be read, which fails closed exactly as the old boolean did (#855).
-   * The entries themselves rather than just emptiness, because a batch of drains is pinned one
-   * entry each (#1204) and the assignment has to come from the read the decision was made on.
+   * The local head of the project's `agent-data` branch (#1774), or `undefined` when the branch
+   * does not exist yet. Read after the daemon's data pull, so it says what other machines and the
+   * agents pushed.
    */
-  queue(project: AutoPmProject): Promise<readonly string[]>
+  dataHead(project: AutoPmProject): Promise<string | undefined>
+  /**
+   * How many commits between two heads of the branch were written by something other than a
+   * daemon (#1774): a person queuing an entry, an agent claiming or closing a ticket. The daemon's
+   * own writes — a run's record, a routine lock, a claim — carry a trailer and are not counted,
+   * or every record would start the next run.
+   */
+  foreignCommits(project: AutoPmProject, from: string, to: string): Promise<number>
   /**
    * The agents live on a project, one label each (#1646) — the run's id and pid, as the daemon
    * holds them. Their number is what the cap is measured against; their names are what the
@@ -526,10 +483,10 @@ export interface AutoPmDeps {
    * projects on two models can stand at two different places against the same reading.
    */
   quota(project: AutoPmProject): Promise<QuotaBoundaryStatus | undefined>
-  /** The jobs to rotate through, in cycle order. Used only while the queue is empty. */
+  /** The jobs to rotate through, in cycle order. Used once a run found nothing queued. */
   jobs: readonly AutoPmJob[]
-  /** The job for a queue with open entries (#855); {@link AUTO_PM_DRAIN_JOB} by default. */
-  drainJob?: AutoPmJob
+  /** The job for the queued work (#1774); {@link AUTO_PM_WORK_JOB} by default. */
+  workJob?: AutoPmJob
   /**
    * Whether a project is due its periodic codebase sweep (#882). Injected rather than computed
    * here because the schedule lives in a file in the project checkout, and this module is pure
@@ -541,7 +498,7 @@ export interface AutoPmDeps {
   recordMaintenance?(project: AutoPmProject): Promise<void>
   /** The job fired when {@link AutoPmDeps.maintenanceDue} says yes; {@link AUTO_PM_MAINTENANCE_JOB} by default. */
   maintenanceJob?: AutoPmJob
-  /** Start the PM agent. Resolves the agent's id, or undefined when the daemon refused. */
+  /** Start the agent. Resolves the agent's id, or undefined when the daemon refused. */
   start(project: AutoPmProject, job: AutoPmJob): Promise<string | undefined>
   /**
    * Take a job's {@link AutoPmJob.lock} before its run starts (#1659): `routines/<lock>.lock.md`
@@ -563,11 +520,11 @@ export interface AutoPmDeps {
    */
   releaseDeadLocks?(project: AutoPmProject): Promise<unknown>
   /**
-   * Settle a finished agent's queue entry (#852/#1582): the daemon retires the entry it pinned to
-   * the run once the run's ending says the work was published. Called before the sweep decides
-   * anything, so an entry whose run just landed stops reading as open work to start over again.
+   * Whether an agent this loop started has finished (#852/#1583), and how its handoff ended.
+   * Asked before the sweep decides anything, so a run that just ended is closed out first: its
+   * routine lock released, a claim it abandoned freed, the rotation's turn earned.
    */
-  promote(project: AutoPmProject, agent: { agentId: string; entry?: string }): Promise<PromoteOutcome>
+  settled(project: AutoPmProject, agent: { agentId: string }): Promise<SettleOutcome>
   /**
    * The tickets open for planning (#1327): no plan or `.lock.md` claim yet (#1420) — most
    * important first, as filenames inside `tickets/`. Asked only when the tick lands on a
@@ -590,25 +547,11 @@ export interface AutoPmDeps {
     assignments: readonly PlanAssignment[],
   ): Promise<readonly PlanAssignment[]>
   /**
-   * Claim the tickets a drain batch is about to implement (#1420), the same way
-   * {@link AutoPmDeps.lockPlans} claims them for planning — one pushed `.lock.md` per ticket —
-   * but skipping only on an existing lock: a `.plan.md` is the drain's input, not a competing
-   * claim. Asked only for the entries that link back to a ticket; a self-contained TODO has
-   * nothing on disk to lock and keeps the queue document as its coordination point. Resolves the
-   * subset actually locked — an entry whose ticket was claimed elsewhere is dropped from the
-   * batch, and the next tick reconsiders it. Absent, drains run exactly as before this seam:
-   * the in-memory pin still guards this daemon's own fan-out.
-   */
-  lockDrains?(
-    project: AutoPmProject,
-    assignments: readonly PlanAssignment[],
-  ): Promise<readonly PlanAssignment[]>
-  /**
    * Free a claim this loop minted whose agent settled with nothing to hand off (#1583): the
    * lock's normal release is the agent's own PR deleting it, and a run whose handoff skipped as
-   * `no-commits` is never opening one — without this the queue livelocks on the dead claim until
-   * a human clicks Release. Keyed off the run's recorded ending, never a timer (#1420). Only the
-   * exact minted claim is freed — the callee leaves a lock naming anyone else alone.
+   * `no-commits` is never opening one — without this the planning livelocks on the dead claim
+   * until a human clicks Release. Keyed off the run's recorded ending, never a timer (#1420).
+   * Only the exact minted claim is freed — the callee leaves a lock naming anyone else alone.
    *
    * Resolves `true` when the claim is dealt with (freed, already gone, or someone else's), and
    * `false` when the release could not land — a transient `index.lock`, say — so the loop holds
@@ -622,6 +565,8 @@ export interface AutoPmDeps {
   intervalMs?: number
   /** Override the per-project cooldown. */
   cooldownMs?: number
+  /** Override {@link DEFAULT_AUTO_PM_HEARTBEAT_MS}. */
+  heartbeatMs?: number
   /** Clock, injectable for tests. */
   now?: () => number
 }
@@ -672,26 +617,28 @@ export interface AutoPmLoop {
    * `onDemand` marks a sweep a person explicitly asked for (#1210's trigger button). The `autoPm`
    * preference is consent to spend quota *unasked*, and a click is asking — so an on-demand sweep
    * runs with the preference off. It skips the cooldown for the same reason (#1642): the cooldown
-   * paces the unattended sweep, and for half an hour after any run it made Run now a button that
-   * could start nothing. Every other reason to stand down (live agents, the quota boundary,
-   * unticked routines) still holds.
+   * paces the unattended rotation, and for half an hour after any run it made Run now a button
+   * that could start nothing. Every other reason to stand down (live agents, the quota boundary,
+   * unticked routines) still holds. A plain on-demand sweep starts the queued work when the branch
+   * moved, else the rotation's next job: the click is the ask, so it does not wait for a run to
+   * have found nothing.
    *
-   * `only` narrows the sweep to one routine's work (#1204), for a Run now that fans out:
+   * `only` narrows the sweep to one routine's work (#1204), for a Run now on a routine's row:
    *
-   * - `'drain'` — the drain row's Run now means "spin agents up on the queue", so a tick that
-   *   would fall through to a rotation job (the queue is empty) says so instead of borrowing the
-   *   click for work nobody asked for.
-   * - `'plan'` — the same for the one rotation job that fans out ({@link AutoPmJob.fansOut}).
-   *   Its Run now used to be a plain single start, so the concurrency setting was the one thing
-   *   that click ignored; narrowing here reaches the same claim-then-start path the rotation
-   *   takes, locks included.
+   * - `'work'` — the queued-work row's Run now means "start an agent on the queue now", whether
+   *   or not the daemon saw the branch move; a tick that has nothing queued spends one run finding
+   *   that out, which is what the click asked for.
+   * - `'plan'` — the one rotation job that fans out ({@link AutoPmJob.fansOut}). Its Run now
+   *   used to be a plain single start, so the concurrency setting was the one thing that click
+   *   ignored; narrowing here reaches the same claim-then-start path the rotation takes, locks
+   *   included.
    * - `{ lock }` — the rotation job holding that lock ({@link AutoPmJob.lock}), for a triage's Run
    *   now (#1643/#1659). One agent, like the rotation's own firing, but through the sweep so the
    *   lock is taken before the start — a plain start would run unguarded.
    *
    * `projectId` scopes the sweep to one project, which is what a Run now fired from a card with a
    * project picked means. Absent, every project the daemon watches is visited, which is what the
-   * drain row's Run now says it does.
+   * queued-work row's Run now says it does.
    */
   tick(opts?: { onDemand?: boolean; only?: AutoPmOnly; projectId?: string }): Promise<void>
   /** What the last sweep decided, for the dashboard to show (#1161). */
@@ -700,21 +647,21 @@ export interface AutoPmLoop {
 }
 
 /**
- * Which routine's work a narrowed sweep is for (#1204/#1643). `'drain'` and `'plan'` are the
- * fan-out kinds: a drain takes one entry *off* the queue and a pinned plan agent writes one
- * ticket's own sibling files, so several agents do disjoint work. `{ lock }` names a rotation
- * job by the lock it holds ({@link AutoPmJob.lock}): one agent is all it can use, and the lock
- * that guards it is the sweep's to take (#1659) — a Run now that started it outside the sweep
- * would run unguarded. Keyed on the lock rather than the job's name for the same
+ * Which routine's work a narrowed sweep is for (#1204/#1643). `'work'` is the queued work
+ * (#1774) and `'plan'` the fan-out that writes one ticket's own sibling files per agent. `{ lock }`
+ * names a rotation job by the lock it holds ({@link AutoPmJob.lock}): one agent is all it can
+ * use, and the lock that guards it is the sweep's to take (#1659) — a Run now that started it
+ * outside the sweep would run unguarded. Keyed on the lock rather than the job's name for the same
  * no-name-matching reason the job carries the property at all: the card sends whatever the job
  * it renders declares. A rotation job that neither fans out nor holds a lock has nothing to
  * narrow to — a plain start is exactly what it is.
  */
-export type AutoPmOnly = 'drain' | 'plan' | { lock: string }
+export type AutoPmOnly = 'work' | 'plan' | { lock: string }
 
 /**
- * Start the auto-PM sweep (#685): every {@link DEFAULT_AUTO_PM_INTERVAL_MS}, ask
- * {@link autoPmDecision} for each project and start an agent for the ones that say yes.
+ * Start the auto-PM sweep (#685): every {@link DEFAULT_AUTO_PM_INTERVAL_MS}, look at each
+ * project's `agent-data` branch, ask {@link autoPmDecision}, and start an agent for the projects
+ * that say yes.
  *
  * Ticks never overlap — a sweep reads a live-agent map that its own `start` calls mutate,
  * so a second sweep running over the first would decide against a stale picture.
@@ -725,31 +672,49 @@ export type AutoPmOnly = 'drain' | 'plan' | { lock: string }
 export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
   const now = deps.now ?? (() => Date.now())
   const intervalMs = deps.intervalMs ?? DEFAULT_AUTO_PM_INTERVAL_MS
+  const heartbeatMs = deps.heartbeatMs ?? DEFAULT_AUTO_PM_HEARTBEAT_MS
   const startedAt = now()
   // What the last sweep decided, for `report()`. Undefined only in the moment before the
   // start-up sweep below lands.
   let lastSweep: { enabled: boolean; sweptAt: number; outcomes: AutoPmOutcome[] } | undefined
+  // When the rotation last started an agent per project: what the cooldown is measured from.
   const lastStart = new Map<string, number>()
-  // Runs this loop started whose queue has not reached the checkout yet, oldest first. A drain
-  // remembers the entry it was pinned to (#1204), and a fanned-out plan agent its ticket (#1327), so
-  // while either is still in flight a later tick does not hand the same work to a second agent.
-  // The claim rides along (#1583) so a run that settles with nothing to hand off gets the lock
-  // minted for it released rather than stranded; `waits` counts the sweeps spent holding a
-  // finished run whose epilogue has not reported yet, so the hold is bounded.
-  type PendingAgent = { agentId: string; entry?: string; ticket?: string; claim?: PlanAssignment; lock?: string; waits?: number }
+  // The head of each project's `agent-data` branch as this loop last saw it (#1774). Seeded on the
+  // first look and never fired on: a daemon that just started knows nothing about what moved
+  // while it was down, and the heartbeat is the belt for that.
+  const seen = new Map<string, string>()
+  // Projects whose branch moved by a commit no daemon wrote since the last start on the queued
+  // work. Consumed by that start, and by nothing else: a rotation start leaves it standing.
+  const moved = new Set<string>()
+  // Projects owed a rotation turn (#1774): the last run this loop started there ended without
+  // moving the branch — it found nothing queued — so the queue wants refilling. Also every project
+  // on its first look, which is the rotation's start-up turn a daemon has always taken.
+  const rotationDue = new Set<string>()
+  // When the queued work was last started per project, for the daily heartbeat. Seeded at the
+  // first look, so the first heartbeat is a day after the daemon started.
+  const lastWork = new Map<string, number>()
+  // Runs this loop started that have not settled yet, oldest first. A fanned-out plan agent
+  // remembers its ticket (#1327), so while it is still in flight a later tick does not hand the
+  // same ticket to a second agent; the claim rides along (#1583) so a run that settles with
+  // nothing to hand off gets the lock minted for it released rather than stranded; `waits` counts
+  // the sweeps spent holding a finished run whose epilogue has not reported yet, so the hold is
+  // bounded.
+  type PendingAgent = { agentId: string; ticket?: string; claim?: PlanAssignment; lock?: string; waits?: number }
   const pending = new Map<string, PendingAgent[]>()
-  // Work this loop already spawned an agent for that ended with nothing to hand off (#1583): the
-  // drain's entry, or the plan agent's ticket. Releasing such a claim re-opens the work, and a
-  // job that deterministically ends commitless would otherwise respawn every cooldown, forever,
-  // burning a quota run per cycle. One attempt per daemon lifetime: a restart forgets the set,
-  // which allows one more try rather than forbidding the work for good — a human retires or
-  // fixes the entry in between.
+  // Tickets whose plan agent ended with nothing to hand off (#1583). Releasing such a claim
+  // re-opens the work, and a job that deterministically ends commitless would otherwise respawn
+  // every cooldown, forever, burning a quota run per cycle. One attempt per daemon lifetime: a
+  // restart forgets the set, which allows one more try rather than forbidding the work for good —
+  // a human retires or fixes the ticket in between.
   const endedDry = new Map<string, Set<string>>()
   // Where each project is in the job cycle. Per project, not global: two repos idle at once
   // should each work through the rotation, not take alternate halves of it.
   const nextJob = new Map<string, number>()
   // Projects this loop has swept at least once, for the one-time boot release above.
   const swept = new Set<string>()
+  // The last sentence said per project, so a stand-down that holds for a day is logged once, not
+  // once a minute: the loop looks every minute now (#1774), and the log is a person's to read.
+  const lastSaid = new Map<string, string>()
   let sweeping = false
   let stopped = false
 
@@ -758,9 +723,18 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
     sweeping = true
     let enabled = false
     const outcomes: AutoPmOutcome[] = []
-    // Every branch that logs also records, so the panel says exactly what the log says.
-    const note = (project: AutoPmProject, started: boolean, message: string) =>
+    // Every branch that logs also records, so the panel says exactly what the log says. A start
+    // is always logged; a stand-down only when it is news.
+    const note = (project: AutoPmProject, started: boolean, message: string) => {
       outcomes.push({ projectId: project.id, path: project.path, started, message })
+      if (started) {
+        lastSaid.delete(project.id)
+        return
+      }
+      if (lastSaid.get(project.id) === message) return
+      lastSaid.set(project.id, message)
+      deps.log(`[framework] auto PM: standing down for ${project.path} — ${message}`)
+    }
     try {
       // The preference is the cheapest gate and the one the user flips most, so it is read
       // once per sweep rather than per project. An on-demand sweep outranks it — the click is
@@ -796,15 +770,31 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
           swept.add(project.id)
           await deps.releaseDeadLocks?.(project).catch(() => undefined)
         }
-        // Settle the runs a previous sweep started before judging the queue: a finished drain's
-        // entry is taken off the queue here, and a claim its agent abandoned is freed.
+        // The one reading this loop acts on (#1774): the branch's head, against the head it last
+        // saw. The first look only remembers it — and owes the rotation its start-up turn, which
+        // a daemon has always taken. A later look that finds a commit no daemon wrote is a move.
+        const head = await deps.dataHead(project).catch(() => undefined)
+        if (head === undefined) {
+          note(project, false, 'the agent-data branch could not be read, so there is no way to tell whether anything moved')
+          continue
+        }
+        const was = seen.get(project.id)
+        if (was === undefined) {
+          seen.set(project.id, head)
+          rotationDue.add(project.id)
+          lastWork.set(project.id, now())
+        } else if (head !== was) {
+          seen.set(project.id, head)
+          if ((await deps.foreignCommits(project, was, head).catch(() => 0)) > 0) moved.add(project.id)
+        }
+        // Close out the runs a previous sweep started before deciding: a finished routine's lock
+        // is released, a claim its agent abandoned is freed, and a run that ended without moving
+        // the branch earns the rotation its turn.
         const outstanding = pending.get(project.id) ?? []
         if (outstanding.length) {
           const stillPending: PendingAgent[] = []
-          let landed = 0
           for (const agent of outstanding) {
-            const outcome = await deps.promote(project, agent).catch((): PromoteOutcome => ({ settled: false, promoted: false }))
-            if (outcome.promoted) landed++
+            const outcome = await deps.settled(project, agent).catch((): SettleOutcome => ({ settled: false }))
             if (!outcome.settled) {
               stillPending.push(agent)
               continue
@@ -812,11 +802,9 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
             // The run ended cleanly but its epilogue has not reported yet — `end` lands before
             // the handoff event does — and the ending is the one fact the release keys off, so a
             // claim-carrying agent caught in that gap is held a couple more sweeps rather than
-            // settled blind. Bounded, so a process that died mid-epilogue cannot pin its queue
-            // entry forever; past the bound it settles unread, which is the pre-#1583 behavior.
-            // Held for the entry's check-off too (#1582): retiring a drained entry keys off the
-            // same reported ending the claim release does.
-            if ((agent.claim || agent.entry !== undefined) && outcome.handoffPending && (agent.waits ?? 0) < 2) {
+            // settled blind. Bounded, so a process that died mid-epilogue cannot hold its claim
+            // forever; past the bound it settles unread, which is the pre-#1583 behavior.
+            if (agent.claim && outcome.handoffPending && (agent.waits ?? 0) < 2) {
               stillPending.push({ ...agent, waits: (agent.waits ?? 0) + 1 })
               continue
             }
@@ -828,7 +816,7 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
               // Remembered before the release, not after: respawning the same work is the hazard
               // whether or not the release lands.
               const dry = endedDry.get(project.id) ?? new Set()
-              dry.add(agent.entry ?? agent.claim.ticket)
+              dry.add(agent.claim.ticket)
               endedDry.set(project.id, dry)
               const ok = await deps.releaseLock(project, agent.claim).catch(() => false)
               if (!ok && (agent.waits ?? 0) < 2) {
@@ -845,61 +833,24 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
           }
           if (stillPending.length) pending.set(project.id, stillPending)
           else pending.delete(project.id)
-          if (landed) {
-            // The queue the decision below reads was just filled, so that read is stale. Leave it
-            // to the next tick, and let the backlog loop have the work in the meantime.
-            deps.log(`[framework] auto PM: landed the queue from ${landed} run(s) in ${project.path}`)
-            note(project, false, `landed the queue from ${landed} finished run${landed === 1 ? '' : 's'}`)
-            continue
-          }
+          // The chain's end (#1774): every run this loop started has ended, and none of them
+          // moved the branch — the last one found nothing queued. The queue wants refilling, so
+          // the rotation gets the next turn. While a run is still going its commits may yet
+          // arrive, so the judgement waits for it.
+          if (!stillPending.length && !moved.has(project.id)) rotationDue.add(project.id)
         }
-        const entries = await deps.queue(project).catch(() => undefined)
         // Per project, because the model the work would run on is (#1619). It costs no reading:
         // the meter is polled elsewhere and this only measures the last one against the boundary.
         const quota = await deps.quota(project).catch(() => undefined)
         const running = deps.activeAgents(project)
         const activeAgents = running.length
-        const since = lastStart.get(project.id)
-        const decision = autoPmDecision({
-          enabled: true,
-          backlogEmpty: entries === undefined ? undefined : entries.length === 0,
-          activeAgents,
-          running,
-          concurrency,
-          quota,
-          ...(since !== undefined ? { sinceLastStartMs: now() - since } : {}),
-          ...(deps.cooldownMs !== undefined ? { cooldownMs: deps.cooldownMs } : {}),
-          ...(opts?.onDemand ? { onDemand: true } : {}),
-        })
-        if (!decision.start) {
-          // Logged, so a wedged sweep is distinguishable from a healthy idle one (#855).
-          deps.log(`[framework] auto PM: standing down for ${project.path} — ${decision.reason}`)
-          note(project, false, decision.reason)
-          continue
-        }
-        const drainJob = wanted(deps.drainJob ?? AUTO_PM_DRAIN_JOB)
-        // A drain-only sweep (#1204) works the queue or says why not — it never borrows the
-        // click for a rotation job the user did not ask for. Logged like every other stand-down
-        // (#855/#1433): these two used to be the only silent ones.
-        if (opts?.only === 'drain') {
-          if (decision.mode !== 'drain') {
-            deps.log(`[framework] auto PM: standing down for ${project.path} — the queue is empty, so there is nothing to drain`)
-            note(project, false, 'the queue is empty, so there is nothing to drain')
-            continue
-          }
-          if (!drainJob) {
-            deps.log(`[framework] auto PM: standing down for ${project.path} — the queue has work waiting and its routine is switched off`)
-            note(project, false, 'the queue has work waiting and its routine is switched off')
-            continue
-          }
-        }
+        const workJob = wanted(deps.workJob ?? AUTO_PM_WORK_JOB)
         // The planning routine this click asked for, read off the *enabled* rotation so an
         // unticked box stands the click down instead of firing a routine the card shows as off.
         // `fansOut` rather than a name, for the same no-name-matching reason the job carries the
         // property at all.
         const planJob = opts?.only === 'plan' ? rotation.find(item => item.fansOut) : undefined
         if (opts?.only === 'plan' && !planJob) {
-          deps.log(`[framework] auto PM: standing down for ${project.path} — the planning routine is switched off`)
           note(project, false, 'the planning routine is switched off')
           continue
         }
@@ -912,52 +863,71 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
         const lockedJob = lock === undefined ? undefined : rotation.find(item => item.lock === lock)
         if (lock !== undefined && !lockedJob) {
           const off = deps.jobs.find(item => item.lock === lock)
-          const reason = off ? `${off.label ?? off.name} is switched off` : `no routine holds the ${lock} lock`
-          deps.log(`[framework] auto PM: standing down for ${project.path} — ${reason}`)
-          note(project, false, reason)
+          note(project, false, off ? `${off.label ?? off.name} is switched off` : `no routine holds the ${lock} lock`)
+          continue
+        }
+        // The queued-work row's Run now (#1204/#1774): the click asks for an agent on the queue,
+        // and gets that or the reason not.
+        if (opts?.only === 'work' && !workJob) {
+          note(project, false, 'the routine that works the queue is switched off')
           continue
         }
         // The one routine the click named, when it named one: it takes the tick outright below.
-        const named = planJob ?? lockedJob
+        const named = planJob ?? lockedJob ?? (opts?.only === 'work' ? workJob : undefined)
         /**
-         * What this tick does, which is the queue-picked mode (#855) unless the draining routine
-         * is switched off — then the rotation gets the tick instead of the sweep standing down.
-         *
-         * #1209 means "do not *work* the queue", and the rotation does not work it: triage and
-         * planning put entries *on* it. Standing down here read that switch as "do nothing at
-         * all", which made every inventing routine unreachable for as long as the queue had
-         * anything on it — and since the queue is auto-populated, that is most of the time. The
-         * only way to reach `Spike & plan` was to empty the queue by hand (#1432).
-         *
-         * A drain-only sweep never gets here: it has already stood down above, because the click
-         * that fires it asked for the queue specifically.
+         * What this tick does (#1774). The queued work, when the branch moved by a commit no
+         * daemon wrote, or when the daily heartbeat is due; else the rotation, when a run found
+         * nothing queued (or on the first look, or on a click); else nothing. With the queued-work
+         * routine switched off, a move is the rotation's turn instead: #1209 means "do not work
+         * the queue", and the rotation does not work it — triage and planning put entries on it.
+         * Standing down there would make every inventing routine unreachable for as long as the
+         * queue had anything on it (#1432).
          */
-        // A click that named a routine is never a drain, however full the queue is: the queue-picked
-        // mode would otherwise send it to work entries instead of the routine it asked for.
-        const mode: 'pm' | 'drain' = named ? 'pm' : decision.mode === 'drain' && !drainJob ? 'pm' : decision.mode
+        const heartbeat = now() - (lastWork.get(project.id) ?? now()) >= heartbeatMs
+        const asked = moved.has(project.id) || heartbeat
+        if (asked && !workJob) rotationDue.add(project.id)
+        const work = named === undefined && asked && workJob !== undefined
+        if (!named && !work && !rotationDue.has(project.id) && !opts?.onDemand) {
+          note(project, false, 'nothing moved on the agent-data branch since the last run')
+          continue
+        }
+        // The rotation is paced by the cooldown; a move of the branch and a click are asks, and
+        // the queued work is never paced (#1774): the daemon fires again as the run ends.
+        const since = lastStart.get(project.id)
+        const decision = autoPmDecision({
+          enabled: true,
+          activeAgents,
+          running,
+          concurrency,
+          quota,
+          ...(!work && !named && since !== undefined ? { sinceLastStartMs: now() - since } : {}),
+          ...(deps.cooldownMs !== undefined ? { cooldownMs: deps.cooldownMs } : {}),
+          ...(opts?.onDemand ? { onDemand: true } : {}),
+        })
+        if (!decision.start) {
+          note(project, false, decision.reason)
+          continue
+        }
         const index = nextJob.get(project.id) ?? 0
         // A due codebase sweep (#882) outranks the rotation: the rotation invents work, and the
-        // sweep is a standing instruction to go find some. Only ever while the queue is empty --
-        // a repo with entries waiting has plenty to do, and the sweep would only add more.
+        // sweep is a standing instruction to go find some. Only ever on a rotation turn -- a
+        // project whose branch moved has plenty to do, and the sweep would only add more.
         //
         // Asked before the schedule is read, so a switched-off sweep costs no disk read and,
         // more importantly, leaves its calendar untouched: it must come due normally once it is
         // switched back on, rather than having been silently ticked past while it was off.
-        // `decision.mode`, not the effective `mode` above: the question here is whether the queue
-        // is genuinely empty, and a tick that fell through to the rotation because draining is
-        // switched off still has entries waiting — exactly the case this sweep stays out of.
         const maintenanceJob = wanted(deps.maintenanceJob ?? AUTO_PM_MAINTENANCE_JOB)
         // Never on a click that named a routine: that click takes the tick outright below, so the
         // sweep does not run — and a schedule stamped for a sweep that never ran postpones the
         // real one a whole interval. Asked first, so such a click also costs no schedule read.
         const sweep =
           !named &&
-          decision.mode === 'pm' &&
+          !work &&
           maintenanceJob !== undefined &&
           (await deps.maintenanceDue?.(project).catch(() => false)) === true
         // The routine a click named outranks both the calendar and the rotation index: it asked for
         // that one, so neither a due codebase sweep nor whose turn it is may take its tick.
-        const job = named ?? (sweep ? maintenanceJob : mode === 'drain' ? drainJob : rotation[index % rotation.length])
+        const job = named ?? (work ? workJob : sweep ? maintenanceJob : rotation[index % rotation.length])
         if (!job) {
           // Told apart on purpose: a rotation emptied by the checkboxes is a setting the user can
           // see and undo, and reads nothing like a daemon wired without jobs at all.
@@ -968,90 +938,29 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
           )
           continue
         }
-        // What to start this tick (#1204/#1327). Draining fans out, and so does a rotation job
-        // that declares {@link AutoPmJob.fansOut} — the property both share is what each agent
-        // does to shared files: a drain takes one entry *off* the queue, a pinned plan agent writes
-        // one ticket's *own* sibling files, so several agents do disjoint work and land disjoint
-        // edits. Every other rotation job rewrites the whole queue document from the same fork
-        // point, so two at once would revert each other's promotion; those stay one per tick.
+        // What to start this tick. The queued work is one agent per move (#1774): the agent's own
+        // claim moves the branch again, and a cap with room starts the next one alongside it. A
+        // rotation job that declares {@link AutoPmJob.fansOut} fans out (#1327): a pinned plan
+        // agent writes one ticket's *own* sibling files, so several agents do disjoint work and
+        // land disjoint edits. Every other rotation job rewrites the whole queue document from
+        // the same fork point, so two at once would revert each other's promotion; those stay one
+        // per tick.
         const batch: AutoPmJob[] = [job]
-        if (mode === 'drain') {
-          // An entry an agent still in flight was pinned to is not offered again.
-          const assigned = new Set(
-            (pending.get(project.id) ?? []).flatMap(agent => (agent.entry !== undefined ? [agent.entry] : [])),
-          )
-          // An entry someone else already worked is not on the queue to begin with (E2): the
-          // check-off travels in that agent's own PR, and the merge is what takes it off. A third
-          // claim used to be re-derived here — from agent metas, their PRs, and the queue diffs of
-          // open PRs on other machines — which is a guess assembled at read time rather than a
-          // claim anyone wrote down.
-          // An entry whose agent already ended with nothing to hand off (#1583) is not offered
-          // again either: its released claim would just mint the same commitless run every
-          // cooldown. A human retires or reshapes the entry; a daemon restart allows one retry.
-          const dry = endedDry.get(project.id)
-          const open = (entries ?? []).filter(entry => !assigned.has(entry) && !dry?.has(entry))
-          if (!open.length) {
-            note(
-              project,
-              false,
-              (entries ?? []).some(entry => dry?.has(entry))
-                ? 'every open queue entry is being worked on, or already drained once with nothing to hand off'
-                : 'every open queue entry is already being worked on',
-            )
-            continue
-          }
-          const picks = open.slice(0, concurrency - activeAgents)
-          // The cross-machine claim on what a drain *implements* (#1420): an entry that links
-          // back to a ticket (#1164) gets its `.lock.md` before its agent starts, the same
-          // pushed claim planning already makes — without it the booking lived only in this
-          // daemon's `pending` map, and another machine's sweep could implement the same ticket.
-          // A ticketless entry has nothing on disk to lock and proceeds as before. Ids are minted
-          // here, before the claim (#1748): the lock names the agent that is about to start.
-          const ids = mintAgentIds(now(), picks.length)
-          const linked = new Map(
-            picks.flatMap((entry, i) => {
-              const ticket = ticketFromQueueEntry(entry)
-              return ticket ? [[entry, { ticket: ticket.slice(TICKETS_DIR.length + 1), agentId: ids[i]! }] as const] : []
-            }),
-          )
-          // Matched back by agent id, not ticket: two entries linking the same ticket race for
-          // one lock, and only the assignment whose id the lock actually names may carry it.
-          const locked = new Set(
-            deps.lockDrains && linked.size
-              ? (await deps.lockDrains(project, [...linked.values()]).catch(() => [])).map(a => a.agentId)
-              : [],
-          )
-          batch.length = 0
-          batch.push(
-            ...picks.flatMap(entry => {
-              const assignment = linked.get(entry)
-              // No seam wired means no claim to carry: the entry drains exactly as before #1420.
-              if (!assignment || !deps.lockDrains) return [pinnedDrainJob(job, entry)]
-              // A lost race costs this batch the entry, not the batch: the claim that won it is
-              // pushed, so the check-off will arrive in that agent's own PR.
-              return locked.has(assignment.agentId) ? [pinnedDrainJob(job, entry, assignment)] : []
-            }),
-          )
-          if (!batch.length) {
-            note(project, false, 'every entry in this batch links a ticket another agent already claimed')
-            continue
-          }
-        } else if (job.fansOut && deps.planCandidates && deps.lockPlans) {
+        if (!job.works && job.fansOut && deps.planCandidates && deps.lockPlans) {
           // The fan-out for a rotation job that writes per-ticket files (#1327). Both seams or
           // neither: candidates without locks would fan out unguarded, which is exactly the
           // double-work the locks exist to prevent — so a loop wired without them keeps the
           // stock single agent already in the batch.
           //
-          // A ticket an agent still in flight was pinned to is not offered again, same as a drain's
-          // entry. The durable half is the lock files themselves: unlike drain entries, the claim
-          // is on disk and pushed, so no #1253-style meta lookup is needed here.
+          // A ticket an agent still in flight was pinned to is not offered again. The durable
+          // half is the lock files themselves: the claim is on disk and pushed, so no meta lookup
+          // is needed here.
           const pinned = new Set(
             (pending.get(project.id) ?? []).flatMap(agent => (agent.ticket !== undefined ? [agent.ticket] : [])),
           )
           const candidates = ((await deps.planCandidates(project).catch(() => [])) ?? []).filter(
-            // A ticket whose plan agent already ended with nothing to hand off (#1583) is skipped
-            // for the same reason a drained-dry entry is: its released claim respawns the same
-            // commitless run forever.
+            // A ticket whose plan agent already ended with nothing to hand off (#1583) is skipped:
+            // its released claim respawns the same commitless run forever.
             ticket => !pinned.has(ticket) && !endedDry.get(project.id)?.has(ticket),
           )
           if (!candidates.length) {
@@ -1080,9 +989,11 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
         // missing from the live-agent map the daemon has by then cleared, so nothing suspends or
         // terminates it (#983). Break, not continue: stopping is a verdict on the whole sweep.
         if (stopped) break
-        // Armed before the first spawn and once for the whole batch: starting is slow, and a tick
-        // that overlapped the spawns would otherwise see too few live agents and top up past the cap.
-        lastStart.set(project.id, now())
+        // The rotation's cooldown is armed before the first spawn and once for the whole batch:
+        // starting is slow, and a tick that overlapped the spawns would otherwise see too few live
+        // agents and top up past the cap. The queued work arms nothing: its next start needs a
+        // move of the branch, which is a better guard than a clock.
+        if (!job.works) lastStart.set(project.id, now())
         const started: AutoPmJob[] = []
         let standDown: string | undefined
         for (const item of batch) {
@@ -1094,7 +1005,6 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
           if (item.lock && deps.lockRoutine) {
             const taken = await deps.lockRoutine(project, item.lock).catch((): { ok: false; reason: string } => ({ ok: false, reason: 'the routine lock could not be taken' }))
             if (!taken.ok) {
-              deps.log(`[framework] auto PM: standing down for ${project.path} — ${taken.reason}`)
               standDown = taken.reason
               break
             }
@@ -1110,12 +1020,11 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
             break
           }
           started.push(item)
-          // Held until a later tick settles it: the entry it drains stays pinned meanwhile.
+          // Held until a later tick settles it: the ticket it plans stays pinned meanwhile.
           pending.set(project.id, [
             ...(pending.get(project.id) ?? []),
             {
               agentId,
-              ...(item.entry !== undefined ? { entry: item.entry } : {}),
               ...(item.ticket !== undefined ? { ticket: item.ticket } : {}),
               ...(item.claim !== undefined ? { claim: item.claim } : {}),
               ...(item.lock !== undefined ? { lock: item.lock } : {}),
@@ -1125,24 +1034,34 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
         // A claim whose agent never started is dead on arrival (#1583): the batch's locks were
         // committed and pushed before the first spawn, so a refused start — or a stop mid-batch —
         // would strand the claims of every item the loop never reached, with no run that could
-        // ever settle them free. Released here, not left for the promote loop: these never enter
+        // ever settle them free. Released here, not left for the settle loop: these never enter
         // `pending`.
         for (const item of batch) {
           if (item.claim && !started.includes(item)) await deps.releaseLock?.(project, item.claim).catch(() => false)
         }
         if (started.length) {
-          // Advanced only on a start that took, so a refused job is retried rather than skipped.
-          // Draining does not advance it: it is not part of the cycle, and a queue worked off
-          // over several ticks must not skip the rotation forward once per entry.
-          //
-          // A sweep does not advance it either, and stamps its own schedule instead: it is paced
-          // by the calendar, not the cycle, so borrowing this tick must not cost the rotation its
-          // turn. Stamped after the start took for the same reason the rotation is -- a sweep the
-          // daemon refused should be retried next tick, not postponed a whole interval.
-          // A click that named a routine does not advance it either, for the reason a sweep does
-          // not: it borrows the tick for that routine, so the rotation keeps the turn it was on.
-          if (sweep) await deps.recordMaintenance?.(project).catch(() => {})
-          else if (mode === 'pm' && !named) nextJob.set(project.id, index + 1)
+          if (job.works) {
+            // The move is spent (#1774): the next start on the queued work needs the branch to
+            // move again — which the agent's own commits do, as the run ends. The rotation's turn
+            // is spent too: whether the queue wants refilling is for this run to find out.
+            moved.delete(project.id)
+            rotationDue.delete(project.id)
+            lastWork.set(project.id, now())
+          } else {
+            // Advanced only on a start that took, so a refused job is retried rather than skipped.
+            //
+            // A sweep does not advance it, and stamps its own schedule instead: it is paced
+            // by the calendar, not the cycle, so borrowing this tick must not cost the rotation its
+            // turn. Stamped after the start took for the same reason the rotation is -- a sweep the
+            // daemon refused should be retried next tick, not postponed a whole interval.
+            // A click that named a routine does not advance it either, for the reason a sweep does
+            // not: it borrows the tick for that routine, so the rotation keeps the turn it was on.
+            if (sweep) await deps.recordMaintenance?.(project).catch(() => {})
+            else if (!named) nextJob.set(project.id, index + 1)
+            // The turn the rotation was owed is taken; the next is earned by a run that finds
+            // nothing queued, never by a rotation run's own ending.
+            rotationDue.delete(project.id)
+          }
           // One line per project however many agents went out, and a single start keeps the old
           // wording exactly.
           const described = started.map(item => doing(item)).join('; ')

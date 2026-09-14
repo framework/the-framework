@@ -95,14 +95,6 @@ export interface AgentMeta {
    */
   cloudAnchor?: string
   /**
-   * The ticket this agent is implementing (#1117), repo-relative (`tickets/<file>.md`).
-   *
-   * Set only when the framework picked the ticket itself, so the Overview can show a ticket that is
-   * being coded right now as `implementing` instead of inferring it from the plan/spike it left
-   * behind. Absent on every agent nobody linked to a ticket.
-   */
-  ticket?: string
-  /**
    * The pull request this session's work is on (E6), recorded when one is opened rather than
    * re-derived from branch names and timestamps by every surface that wants it.
    */
@@ -335,9 +327,6 @@ export function applyEventToMeta(meta: AgentMeta, event: FrameworkEvent, at: str
       if (event.outcome === 'skipped') next.handoffSkip = event.reason
       else delete next.handoffSkip
       if (event.outcome !== 'failed' && event.merge) next.mergeOutcome = event.merge.outcome
-      break
-    case 'ticket':
-      next.ticket = event.path
       break
     case 'pull-request':
       next.pr = { number: event.number, url: event.url }

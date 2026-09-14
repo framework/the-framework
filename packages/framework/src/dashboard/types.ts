@@ -89,16 +89,10 @@ export interface StartAgentOptions {
    */
   agentId?: string
   /**
-   * The `tickets/<file>.md` this agent implements (#1117). Set by the daemon
-   * when it starts a drain agent and the queue entry it will work links back to a ticket, so the
-   * Overview can show that ticket as being implemented rather than guessing from its plan.
-   */
-  ticket?: string
-  /**
-   * This agent plans its {@link ticket} rather than implementing it. Set by
-   * the daemon on a fanned-out [Plan tickets] run (#1327), whose PR lands only the plan: the
-   * ticket still rides for the agent's meta, but the PR title must not inherit the issue as
-   * `(fix #42)` (#1334) — a plan's merge would close the issue with the work still undone.
+   * This agent plans a ticket rather than implementing it. Set by the daemon on a fanned-out
+   * [Plan tickets] run (#1327), whose PR lands only the plan: a closing phrase in its title or
+   * description must not close the ticket's issue (#1334) — a plan's merge would close the issue
+   * with the work still undone.
    */
   planAgent?: boolean
   /** Resume a finished agent's conversation (#720): its captured agent session id. The agent's prompt continues that session (full prior context) instead of starting fresh. Sent with `kind: 'prompt'` when you message an agent that has ended. */

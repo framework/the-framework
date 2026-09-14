@@ -28,12 +28,12 @@ Carries out every action the user takes on an agent [1] or a project from the da
 [18] driver session: the coding agent's own conversation for one agent, which the driver can resume by its session id.
 [19] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
 [20] build agent / prompt agent: the two kinds of agent: a build works the agent queue after its opening exchange; a prompt agent runs one prompt and stops there.
-[21] preset: a canned prompt the user launches from the dashboard; the drain preset is the one that works the agent queue's first open entry.
-[22] drain: starting an agent on the agent queue's first open entry — the half of Auto PM that spends existing work.
+[21] preset: a canned prompt the user launches from the dashboard.
+[22] the queued work: the routine that spends existing work: one agent started with `/work-queue` when the `agent-data` branch moved, which takes one task off the agent queue by composing the skills in its checkout.
 [23] the Overview: the dashboard's cross-project page at `/`.
 [24] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
 [25] vanilla: an agent started without the built-in system prompt but with the signal protocols kept. transparent: an agent started with nothing of The Framework's — the raw coding agent.
-[26] run: only the `logs` skill's record of one agent on the `agent-data` branch: a card (what was asked, the ticket, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said).
+[26] run: only the `logs` skill's record of one agent on the `agent-data` branch: a card (what was asked, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said).
 [27] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
 [28] archive: the transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
 [29] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
@@ -45,7 +45,7 @@ Carries out every action the user takes on an agent [1] or a project from the da
 - **Steering lands in the agent's own control file** - every stop, pick, message, handoff change and merge authorization is one line appended to the control file of the checkout the agent id resolves to; when the project is unknown here nothing is written.
 - **The steering entries and what each validates** - a stop needs nothing; a pick carries the gate's id, the option or options, and who picked; a message is trimmed and an empty one is dropped; a handoff change must name one of the four rungs or it is ignored.
 - **Answering the question a cloud session is parked on** - the pick is queued for the bridge's extension to type into the session, accepted only as labels of the question actually parked, and can be withdrawn until it is collected.
-- **Starting an agent** - a build or prompt agent needs a non-empty prompt, a research agent may have none; a hand-fired drain is tagged with the ticket it is about to work; the daemon's own start decides the rest and reports busy when it must.
+- **Starting an agent** - a build or prompt agent needs a non-empty prompt, a research agent may have none; the daemon's own start decides the rest and reports busy when it must.
 - **Removing a retained checkout** - refused while the agent is still going, for an unsafe id, for a checkout that is not there, and whenever the work is not yet on the remote; a clean checkout is pushed first and then removed.
 - **Deleting an agent** - refused while the agent is still going; the checkout goes with whatever it holds, the agent's records go, and its branch stays.
 - **Opening a checkout in the file manager or an editor** - a local command against the agent's own checkout, or the project's; the editor is the one the preferences name, else the environment's, else VS Code.
@@ -99,13 +99,13 @@ The pick is not a control-file write: it goes to the bridge's store of parked qu
 
 **User story**: the user fills the launcher and presses Start. The launcher's options travel with the start, the daemon spawns the agent, and the browser selects the agent it just started.
 
-**Problem**: the daemon's start is the one place that may spawn an agent, because it keeps the guard that refuses to start the same work twice; every start from the dashboard has to go through it. And a drain [22] fired by hand is the same work the daemon's own drain does, so it must say the same thing about itself: which ticket it is about to implement, so the Overview [23] shows that ticket as being worked rather than a lane staying empty.
+**Problem**: the daemon's start is the one place that may spawn an agent, because it keeps the guard that refuses to start the same work twice; every start from the dashboard has to go through it.
 
 #### Business logic
 
 The kind is a build agent [20] by default, a prompt agent, or a research agent. A build or a prompt agent needs a non-empty prompt after trimming ("a non-empty prompt is required"); a research agent may be started with none, its subject defaulting on the daemon's side. The options travel through untouched to the daemon's start, where their meaning is fixed (`dashboard/types.ts`): vanilla [25] or transparent, in-context directories, the on-before-mergeable follow-ups, a real browser for the agent, the handoff [4] level, the model, the driver, the location [24], unattended [19], a pre-minted agent id, the ticket it implements and whether it only plans it, the driver session [18] to resume, the agent to continue, and the device [12] to run on. The device's URL and token are memory-only relay configuration: never persisted, never a CLI flag, and stripped before the device starts the agent so it never relays onward.
 
-One thing is resolved here rather than trusted from the browser: the ticket. When the caller names a ticket it is kept. Otherwise, when the prompt is exactly the drain preset's [21] prompt, the ticket the agent queue's [7] first open entry links to becomes the agent's ticket; any other prompt, however busy the queue, gets none, since naming the queue's next entry would show a ticket as being implemented by an agent doing something else. A queue that cannot be read yields no ticket. The daemon's start answers: started, with the agent id when the agent got its own checkout; busy, when the same work is already active; or an error saying why.
+Nothing is resolved here beyond the trimmed prompt: the options travel as the browser sent them. The daemon's start answers: started, with the agent id when the agent got its own checkout; busy, when the same work is already active; or an error saying why.
 
 ### Removing a retained checkout
 

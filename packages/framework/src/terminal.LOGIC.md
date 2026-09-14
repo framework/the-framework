@@ -27,11 +27,11 @@ Renders an agent's [1] event stream [2] in a terminal, one human-readable line p
 
 ## Business logic — TL;DR
 
-- **The agent's setup** - the driver and model in the checkout with the session link, the prompt, the branch, the ticket, the cloud anchor, the browser addresses, the pull request number.
+- **The agent's setup** - the driver and model in the checkout with the session link, the prompt, the branch, the cloud anchor, the browser addresses, the pull request number.
 - **What the agent signals** - its log lines, errors with their detail indented, views by title, "✓ ready for merge", the pull request it wrote, and "done for now" when it is settled.
 - **Gates and picks** - the question with one option per line, the recommended one marked, and the pick with who made it.
 - **The handoff, announced then reported** - one line saying what will happen when the agent ends, then what happened to the push and the pull request, and always a line for the merge.
-- **Why a merge was withheld** - "the session never signalled ready-for-merge" or "the session's own TODO file still has open entries", the same words the CLI prints.
+- **Why a merge was withheld** - "the session never signalled ready-for-merge", the same words the CLI prints.
 - **Why a handoff or the extra turn was skipped** - every reason as a sentence in the reader's terms.
 - **Usage** - the spend in dollars over the turns, or the tokens when no price was reported, never a zero that reads as free.
 - **The driver's own events** - the prompt, the text, the actions, the turn boundary, quota warnings only when the quota is tight, errors and notices.
@@ -47,7 +47,6 @@ See `## Context`.
 
 #### Business logic
 
-The opening line names the driver [5] (or "fake" for a fake agent [1]), the model when one was chosen, the checkout, and the session link [6] when the driver reports one: "◆ <driver> (<model>) in <checkout> — <link>". A later session id is "session <id>", with the link when known. The system prompt is acknowledged by its size only: "system prompt sent (<n> chars)". The prompt the agent was given is "▶ "<prompt>"", flattened to one line and cut to 100 characters. Then, as they happen: "your app is running at <url>" for a preview, "◆ browser preview: http://127.0.0.1:<port>/stream" and "◆ browser: <url>" for a browser, "branch: <branch>", "implementing <ticket path>", "hand-off anchor: <the first seven characters of the cloud anchor [7]>", and "pull request: #<number>".
 
 ### What the agent signals
 
@@ -89,7 +88,7 @@ When the agent [1] ends, the handoff's outcome is one line: "✓ opened <pull re
 
 #### Business logic
 
-An armed merge is withheld for one of two reasons, said as: "the session never signalled ready-for-merge", or "the session's own TODO file still has open entries" (the rule behind the second is `todo-loop.ts`'s). The wording is shared with the CLI's own output line.
+An armed merge is withheld for one reason, said as "the session never signalled ready-for-merge". The wording is shared with the CLI's own output line.
 
 ### Why a handoff or the extra turn was skipped
 

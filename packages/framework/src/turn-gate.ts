@@ -89,13 +89,13 @@ export interface ParsedAwaitGate {
 /**
  * How many times the agent may stop to ask, and be resumed, before an agent stops honoring
  * gates and just finishes. A property of the await protocol, so every path that runs gates
- * shares it: a build, a direct prompt, and the backlog loop each used to declare their own.
+ * shares it: a build and a direct prompt each used to declare their own.
  */
 export const MAX_AWAIT_ROUNDS = 5
 
 /**
  * The prompt that resumes the agent after the user answers a gate. One wording for
- * every path that runs gates (a direct prompt, the backlog loop, a build): the agent
+ * every path that runs gates (a direct prompt, a build): the agent
  * already knows what it is working on from the session, so the clause that used to
  * vary per caller ("Continue" / "Continue the backlog entry" / "Continue building X")
  * carried no distinct meaning to it. One constant so a reword lands everywhere at once

@@ -12,7 +12,7 @@ import { AWAIT_PROTOCOL, BROWSER_PROTOCOL, HANDS_OFF_PROTOCOL, SIGNAL_PROTOCOL }
  * anti-lazy-pill (#297/#301) it grew out of: the prompt is analyzed first — an
  * ambiguous one becomes a ranked `showChoices()` list, a
  * large scope becomes a PLAN file to approve, a very large one also spins off a TODO
- * backlog (consumed by the backlog loop, #323), the work moves onto its own
+ * backlog (#323), the work moves onto its own
  * `agent-<session>` branch before the first change, and the alternatives flow
  * rates problem "variability" before code is written.
  *

@@ -13,7 +13,7 @@ The "Usage" panel: the account's quota [1] week drawn as one week-long track —
 [3] spend offset: the user's adjustment of the quota boundary, in percentage points of the week.
 [4] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
 [5] coding agent: the CLI doing the actual work: Claude Code or Codex.
-[6] Auto PM: the daemon's unattended product management: drain the agent queue, and refill it by running the routines.
+[6] Auto PM: the daemon's unattended product management: work the agent queue when the `agent-data` branch moves, and refill it by running the routines.
 [7] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
 [8] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down.
 [9] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).

@@ -14,7 +14,7 @@ The "Update from GitHub" preset, both a launcher button and a routine [3]: the o
 [2] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
 [3] routine: a preset the daemon fires on its own on a schedule, each switchable off and runnable on demand.
 [4] skill: one of the four capabilities an agent is taught (`branches`, `tickets`, `queue`, `logs`), each a package with the instructions the agent reads, a command on the agent's PATH, and an API the product calls.
-[5] Auto PM: the daemon's unattended product management: drain the agent queue, and refill it by running the routines.
+[5] Auto PM: the daemon's unattended product management: work the agent queue when the `agent-data` branch moves, and refill it by running the routines.
 [6] plan: a ticket's `.plan.md`: effort and uncertainty ratings and how to implement it.
 [7] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
 

@@ -532,19 +532,13 @@ const ARMED_HANDOFF: HandoffIntent = { push: true, pr: true }
  * Whether an armed merge may actually run (#1363), and if not, why.
  *
  * The rule settled on #1390: config *arms* the merge, the agent *authorizes* it. Landing on the
- * default branch unattended takes (a) the agent having declared the session done via
- * setReadyForMerge() — the same signal the on-before-mergeable step requires — and (b) the
- * framework not already knowing of work pending in this session (its own TODO file; never the
- * global queue, which is decoupled from sessions). A withheld merge is not a failed handoff:
- * push and PR go ahead, the PR just opens as a draft for a human.
- *
- * (b) is a temporary safety belt: the agent's word should ultimately be enough. Deleting it means
- * deleting `agentTodoOpen` here and `agentTodoPending` in todo-loop.ts.
+ * default branch unattended takes the agent having declared the session done via
+ * setReadyForMerge() — the same signal the on-before-mergeable step requires. The agent's word is
+ * enough (#1774): the belt that read the session's own TODO file beside it is gone. A withheld
+ * merge is not a failed handoff: push and PR go ahead, the PR just opens as a draft for a human.
  */
-export function withheldMerge(deps: { readyForMerge: boolean; agentTodoOpen: boolean }): MergeWithheldReason | undefined {
-  if (!deps.readyForMerge) return 'not-ready-for-merge'
-  if (deps.agentTodoOpen) return 'session-todo-open'
-  return undefined
+export function withheldMerge(deps: { readyForMerge: boolean }): MergeWithheldReason | undefined {
+  return deps.readyForMerge ? undefined : 'not-ready-for-merge'
 }
 
 /**

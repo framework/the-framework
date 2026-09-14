@@ -12,7 +12,7 @@ The "Add quick-win work to AI Queue" preset, both a launcher button and a routin
 [2] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down. An item on it is a queue entry.
 [3] plan: a ticket's `.plan.md`: effort and uncertainty ratings and how to implement it.
 [4] routine: a preset the daemon fires on its own on a schedule, each switchable off and runnable on demand.
-[5] Auto PM: the daemon's unattended product management: drain the agent queue, and refill it by running the routines.
+[5] Auto PM: the daemon's unattended product management: work the agent queue when the `agent-data` branch moves, and refill it by running the routines.
 [6] routine lock: a file on the `agent-data` branch (`routines/<name>.lock.md`) a daemon takes before running a routine so the routine runs once across machines.
 [7] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
 [8] skill: one of the four capabilities an agent is taught (`branches`, `tickets`, `queue`, `logs`), each a package with the instructions the agent reads, a command on the agent's PATH, and an API the product calls.

@@ -16,16 +16,17 @@ import { startDaemonTick, DAEMON_TICK_MS } from './daemon-tick.js'
 import { ciFixPrompt, startCiWatch } from './ci-watch.js'
 import { acquireRoutineLock, releaseDeadRoutineLocks, releaseRoutineLock } from './routine-locks.js'
 import { maintenanceDue, readMaintenanceState, mergeMaintenanceState } from './maintenance.js'
-import { claimTickets, readTickets, releaseTicket, syncTickets, TICKETS_DIR, ticketFromQueueEntry, ticketsDir } from '@gemstack/skill-tickets'
-import { queueDone, readQueueEntries, syncQueue } from '@gemstack/skill-queue'
-import { nextQueuedTicket } from './todo-loop.js'
+import { claimTickets, readTickets, releaseTicket, TICKETS_DIR, ticketsDir } from '@gemstack/skill-tickets'
+import { DATA_BRANCH, pullFileBranch } from '@gemstack/agent-data'
+import { daemonFunnel, dataHead, foreignCommits } from './daemon-writes.js'
 import type { ProjectErrors } from './project-errors.js'
 import { readFile, writeFile } from 'node:fs/promises'
 import { startMergedWorktreeSweep, type MergedSweepOptions } from './merged-worktrees.js'
 import { reconcileBranchLinks } from '@gemstack/skill-branches'
 import { startProjectPass } from './project-pass.js'
 import { startCloudScratchSweep } from './cloud-scratch-refs.js'
-import { startCloudWorkAdoption } from './cloud-work.js'
+import { adoptCloudWork, startCloudWorkAdoption } from './cloud-work.js'
+import { patchRun } from '@gemstack/skill-logs'
 import { resolveAgentPr } from './dashboard/agent-handoff.js'
 import { sendChoice, sendMessage, sendStop } from './dashboard-rpc/control.js'
 import type { ProjectSummary } from './dashboard/projects.js'
@@ -49,7 +50,14 @@ import type { StartAgentOptions, StartAgentResult } from './dashboard/types.js'
  * wants between turns and `daemon-tick.ts` fires them.
  */
 
-/** Ticks between auto-PM sweeps, and between worktree sweeps: both are ten-minute jobs. */
+/** Ticks between worktree sweeps, branch-link passes and cloud work adoption: ten-minute jobs. */
+const TEN_MINUTES_EVERY = Math.round((10 * 60 * 1000) / DAEMON_TICK_MS)
+
+/**
+ * Ticks between auto-PM looks (#1774): one a minute, right behind the data pull, since what it
+ * looks at is the head that pull just brought in. A look costs one `git rev-parse`; a run only
+ * ever starts when the branch moved.
+ */
 const AUTO_PM_EVERY = Math.round(DEFAULT_AUTO_PM_INTERVAL_MS / DAEMON_TICK_MS)
 
 /**
@@ -117,15 +125,14 @@ export interface BackgroundServiceDeps {
 
 /**
  * One project's data-sync turn (#1599): converge the `agent-data` branch — the skills' branch,
- * which also carries the `logs` skill's runs and the routine locks — with origin (the `tickets`
- * skill's checkout, root link and pull, then the `queue` skill's seed and pull), and set or clear
- * the project's `data-sync` error by the outcome. The clear is unconditional on success, so the
- * error lives exactly as long as the condition — the next tick after the user fixes the remote,
- * it is gone.
+ * which carries the tickets, the queue, the `logs` skill's runs and the routine locks — with
+ * origin through the shared branch library, one pull, and set or clear the project's `data-sync`
+ * error by the outcome. The clear is unconditional on success, so the error lives exactly as long
+ * as the condition — the next tick after the user fixes the remote, it is gone. The daemon knows
+ * nothing of what is on the branch (#1774): a skill's own setup makes its files.
  */
 export async function syncProjectData(path: string, errors: ProjectErrors, log: (message: string) => void): Promise<void> {
-  const tickets = await syncTickets(path, { log })
-  const result = tickets.ok ? await syncQueue(path, { log }) : tickets
+  const result = await pullFileBranch(path, DATA_BRANCH, { log })
   if (result.ok) errors.clear(path, 'data-sync')
   else {
     log(`[framework] data sync: ${result.error}`)
@@ -198,12 +205,16 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
   const quotaFor = async (projectId: string) =>
     deps.quota.boundaryFor((await resolveProjectAgentOptions(projectId, env)).model)
 
-  // Auto PM (#685/#773): while the queue is dry and there is quota to spare, triage and
-  // plan tickets rather than let the day's allowance expire unused.
+  // Auto PM (#685/#773/#1774): while the `agent-data` branch moves and there is quota to spare,
+  // start an agent on the queued work; once a run finds nothing queued, triage and plan tickets
+  // rather than let the day's allowance expire unused.
+  // Every write the daemon makes on its own goes through one funnel that signs the commit
+  // (`daemon-writes.ts`), so the sweep's trigger can tell them from everyone else's.
+  const funnel = daemonFunnel()
   // The sweep's assignments name agent ids; the skill's claims name holders — the same string,
   // read back into the sweep's shape.
-  const claim = async (path: string, assignments: readonly PlanAssignment[], phase: 'plan' | 'drain'): Promise<PlanAssignment[]> => {
-    const locked = await claimTickets(path, assignments.map(a => ({ ticket: a.ticket, holder: a.agentId })), phase, { log })
+  const claim = async (path: string, assignments: readonly PlanAssignment[]): Promise<PlanAssignment[]> => {
+    const locked = await claimTickets(path, assignments.map(a => ({ ticket: a.ticket, holder: a.agentId })), 'plan', { log, funnel })
     return locked.map(c => ({ ticket: c.ticket, agentId: c.holder }))
   }
   const autoPm = startAutoPm({
@@ -213,9 +224,11 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
     // Which routines the user unticked (#1209). Global rather than per project, like the master
     // switch it sits under: the rotation is one schedule for the machine, not one per repo.
     optedOut: async () => (await prefs()).autoPmOptOut ?? [],
-    // The queue's open entries rather than a bare emptiness bit: a batch of concurrent drains is
-    // pinned one entry each (#1204), so the sweep needs the entries the decision was made on.
-    queue: project => readQueueEntries(project.path),
+    // The one thing the sweep reads (#1774): the branch's head, and how many of the commits since
+    // its last look were written by something other than a daemon. Both are git reads on the
+    // project's repository; the daemon holds no copy of the queue and names no skill.
+    dataHead: project => dataHead(project.path),
+    foreignCommits: (project, from, to) => foreignCommits(project.path, from, to),
     // One label per held slot (#1646): the run's id and its pid, so the sweep's stand-down and
     // fan-out lines name what they were measured against instead of a bare number.
     activeAgents: project => deps.activeAgentSlots(project.id).map(describeSlot),
@@ -234,22 +247,23 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
     // The routine lock (#1659): a pushed `routines/<name>.lock.md`, minted before the triage
     // starts and dropped by this daemon when its run ends. On boot, the locks a previous daemon
     // on this machine left go too, unless a run of this machine's started since is still going.
-    lockRoutine: (project, name) => acquireRoutineLock(project.path, name, { log }),
+    lockRoutine: (project, name) => acquireRoutineLock(project.path, name, { log, funnel }),
     releaseRoutine: async (project, name) => {
-      const ok = await releaseRoutineLock(project.path, name, { log })
+      const ok = await releaseRoutineLock(project.path, name, { log, funnel })
       if (ok) log(`[framework] auto PM: released the ${name} lock — its run ended`)
       else log(`[framework] auto PM: the release of the ${name} lock could not be committed; it will be retried`)
       return ok
     },
     releaseDeadLocks: async project => {
       const running = (await listAgents(project.path).catch(() => [])).filter(a => a.status === 'running' && a.host === hostname())
-      const released = await releaseDeadRoutineLocks(project.path, since => running.some(a => a.startedAt >= since), { log })
+      const released = await releaseDeadRoutineLocks(project.path, since => running.some(a => a.startedAt >= since), { log, funnel })
       for (const name of released) log(`[framework] auto PM: released the ${name} lock a previous daemon left behind`)
     },
     // The tickets a [Plan tickets] fan-out may claim (#1327/#1420): unplanned and not claimed
     // by a `.lock.md` — most important first. No stale-lock sweep runs here: #1420
     // removed the timer, so a lock stands until the agent's PR deletes it or a human releases
-    // it from the dashboard.
+    // it from the dashboard. The plan fan-out is the one place the daemon still reads and claims
+    // tickets (#1774); its own design is a follow-up.
     planCandidates: async project => {
       const rank = (priority?: string) => {
         const n = Number(priority)
@@ -263,14 +277,11 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
     // The daemon writes and pushes the locks, never the agent (#1327/#1320): an agent only
     // pushes at the end of its session onto its own branch, and a claim that stayed local would
     // not reach the machines it exists for.
-    lockPlans: (project, assignments) => claim(project.path, assignments, 'plan'),
-    // The same claim for what a drain is about to *implement* (#1420): drain mode skips only on
-    // an existing lock, because the plan it would also find is the drain's input, not a rival.
-    lockDrains: (project, assignments) => claim(project.path, assignments, 'drain'),
+    lockPlans: (project, assignments) => claim(project.path, assignments),
     // The one dead claim the daemon can *know* is dead (#1583): the run it minted the lock for
     // settled with nothing to hand off, so the PR that would delete the lock is never coming.
     releaseLock: async (project, claim) => {
-      const result = await releaseTicket(project.path, claim.ticket, { heldBy: claim.agentId }, { log })
+      const result = await releaseTicket(project.path, claim.ticket, { heldBy: claim.agentId }, { log, funnel })
       if (result === 'released')
         log(`[framework] auto PM: released the lock on ${claim.ticket} — its agent ended with nothing to hand off`)
       if (result === 'error')
@@ -278,68 +289,36 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
       return result !== 'error'
     },
     start: async (project, job) => {
-      // A draining agent works one open queue entry, and since #1164 that entry links back to the
-      // ticket it was queued from — so this is the one moment the framework knows what an agent is
-      // about to implement, and can say so on the agent's meta (#1117). A sweep-built drain names its
-      // own pinned entry (#1204), so the drain-lane (#1117) keeps working with several drains in flight;
-      // the first-open-entry read is the fallback for a drain job wired without one. Every other
-      // job puts work on the queue rather than taking it off, so there is nothing to name.
-      const ticket = job.drains
-        ? job.entry !== undefined
-          ? ticketFromQueueEntry(job.entry)
-          : await nextQueuedTicket(project.path).catch(() => undefined)
-        : // A fanned-out plan agent is pinned to one ticket too (#1327), so its meta names it the
-          // same way a pinned drain's does.
-          job.ticket !== undefined
-          ? `${TICKETS_DIR}/${job.ticket}`
-          : undefined
-      // The ticket is the durable claim: the pushed drain lock above (#1420) outlives this
-      // process. An entry with no ticket has only the sweep's in-memory pin — auto-pm.SPEC.md
-      // owns the hand-off window that leaves open.
       const result = await startUnattended(project.id, job.prompt, {
         // The claim the sweep minted names this id (#1748): the agent is born with it, so the
         // lock and the run are one and `tickets show` names the agent that holds the ticket.
         ...(job.claim ? { agentId: job.claim.agentId } : {}),
-        ...(ticket ? { ticket } : {}),
         // A fanned-out plan agent plans its ticket rather than implementing it (#1327), so its PR
-        // title must not inherit the issue as `(fix #42)` — the plan's merge would close the
-        // issue with the work still undone (#1334).
-        ...(ticket && !job.drains ? { planAgent: true } : {}),
-        // The job says its PRs may land themselves (#1216): the drain implements work whose
-        // review already happened on the queue. Rides to the agent as the ladder's top rung.
+        // description must not close the ticket's issue — the plan's merge would close the issue
+        // with the work still undone (#1334).
+        ...(job.ticket !== undefined ? { planAgent: true } : {}),
+        // The job says its PRs may land themselves (#1216): the queued work implements entries
+        // whose review already happened on the queue. Rides to the agent as the ladder's top rung.
         ...(job.autoMerge ? { handoff: 'merge' as const } : {}),
       })
       return result.ok ? result.agentId : undefined
     },
-    // The daemon retires a drained entry itself (#1582): the queue has one local writer, so the
-    // entry is deleted in one write to the `agent-data` branch at settle — done means deleted — not
-    // an agent edit promoted off a branch. It waits for the run's epilogue — the report is what
-    // says the work was published — and a run that published nothing leaves its entry open (its
-    // claim is freed below).
-    promote: async (project, { agentId, entry }) => {
+    // Whether a run the sweep started has ended (#852/#1583), off the run's own record. The
+    // daemon touches no queue at the run's end (#1774): the agent marked its own entry done, and
+    // the record the daemon writes is the run's, not the queue's.
+    settled: async (project, { agentId }) => {
       const agent = (await listAgents(project.path).catch(() => [])).find(r => r.id === agentId)
       // Unknown or still going: not settled, so it is tried again next tick.
-      if (!agent || agent.status === 'running') return { settled: false, promoted: false }
+      if (!agent || agent.status === 'running') return { settled: false }
       // The run's own recorded ending rides along (#1583): a settled run whose handoff skipped
       // as `no-commits` is the one case the sweep may free the lock it minted. A clean end whose
       // handoff has not reported yet is said too — only a `done` run gets the epilogue, so only
       // there does an absent report mean "still publishing" rather than "never will".
-      const flags = {
+      return {
+        settled: true,
         ...(agent.handoffSkip !== undefined ? { handoffSkip: agent.handoffSkip } : {}),
         ...(agent.status === 'done' && agent.handoffReport === undefined ? { handoffPending: true } : {}),
       }
-      // Published: the epilogue reported a hand-off, or skipped because the PR was already open
-      // (a resumed run whose earlier leg published). Anything else left the work unlanded.
-      const published =
-        agent.status === 'done' && (agent.handoffReport === 'done' || agent.handoffSkip === 'already-open')
-      if (entry === undefined || !published) return { settled: true, promoted: false, ...flags }
-      const result = await queueDone(project.path, entry, { log })
-      if (!result.ok) {
-        // Not settled: the write is retried next tick, and the entry stays held meanwhile.
-        log(`[framework] auto PM: the drained entry could not be taken off the queue (${agentId})`)
-        return { settled: false, promoted: false, ...flags }
-      }
-      return { settled: true, promoted: result.changed, ...flags }
     },
     log,
   })
@@ -406,7 +385,8 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
   // the `claude/*` head descending from its hand-off anchor, record the branch and PR on the
   // run's archive, and open the armed draft PR the session never did. Daemon-side by necessity:
   // the branch does not exist yet when the wrapper ends — the cloud VM is still provisioning.
-  const cloudWork = startCloudWorkAdoption({ projects, log })
+  // Its patch of a run's card is the daemon's own commit, signed as such (`daemon-writes.ts`).
+  const cloudWork = startCloudWorkAdoption({ projects, log, adopt: cwd => adoptCloudWork(cwd, { patch: (root, id, patch) => patchRun(root, id, patch, { funnel }) }) })
 
   // `resolve` matters: projectId hashes the path string, and `--cwd` reaches us verbatim, so a
   // relative path would hash to an id no project lookup can resolve. Same derivation the runtime uses.
@@ -504,14 +484,14 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
     jobs: [
       // Ten minutes. Its start-up turn is the point: the case it exists for is a machine that was
       // off (or a daemon that was down) while a session's push could not land.
-      { name: 'worktree sweep', every: AUTO_PM_EVERY, run: () => mergedWorktrees.tick() },
+      { name: 'worktree sweep', every: TEN_MINUTES_EVERY, run: () => mergedWorktrees.tick() },
       // After the worktree sweep, so links to checkouts the sweep just reclaimed drop in the same
       // turn. A rename settles within a tick; a fresh worktree gets its link at allocation.
-      { name: 'branch links', every: AUTO_PM_EVERY, run: () => branchLinks.tick() },
+      { name: 'branch links', every: TEN_MINUTES_EVERY, run: () => branchLinks.tick() },
       // The eager data pull (#1582): converge every project's data checkout on what other
       // machines and cloud sessions pushed, and carry out anything a failed cycle left local.
       // Its start-up turn is also what creates the checkout on a fresh clone. Before auto PM in
-      // the list, so a sweep the same tick reads the queue the pull just brought in. A project
+      // the list, so a look the same tick sees the head the pull just brought in. A project
       // that cannot converge is recorded as such for the dashboard (#1599).
       {
         name: 'data sync',
@@ -526,8 +506,9 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
       // The watched things change slowly and a poll costs a read per project. Their first turn is
       // the baseline seed, which must happen at start-up or the whole open backlog reads as new.
       { name: 'Discord watchers', every: 2, run: async () => { for (const w of discordWatchers) await w.poll() } },
-      // Ten minutes. Its start-up turn matters too: a daemon started with the setting already on
-      // would otherwise sit idle with quota going spare (#1161).
+      // One minute, behind the pull (#1774). Its start-up turn matters too: it remembers where
+      // the branch stands, and takes the rotation's first turn for a daemon started with the
+      // setting already on, which would otherwise sit idle with quota going spare (#1161).
       { name: 'auto PM', every: AUTO_PM_EVERY, run: () => autoPm.tick() },
       // Hourly. Its start-up turn is what starts a `cloud-*` ref's one-day clock (#1547): the
       // sweep ages those refs from when it first saw them, so the sooner it looks, the sooner
@@ -535,7 +516,7 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
       { name: 'cloud scratch sweep', every: CLOUD_SCRATCH_EVERY, run: () => cloudScratch.tick() },
       // Ten minutes: the cloud session it waits on lives minutes-to-hours itself, and the pass
       // costs an `ls-remote` per project only while a settled web run is actually waiting.
-      { name: 'cloud work adoption', every: AUTO_PM_EVERY, run: () => cloudWork.tick() },
+      { name: 'cloud work adoption', every: TEN_MINUTES_EVERY, run: () => cloudWork.tick() },
     ],
   })
 

@@ -12,10 +12,7 @@ import { linkSkill, type SkillLink } from './skill-links.js'
  * daemon allocating a run, the command line).
  */
 
-/**
- * Other skills to link into the checkout beside this package's own. TEMPORARY (#1748): see
- * `SkillLink` — gone once skills are committed into the repository.
- */
+/** Other skills to link into the checkout beside this package's own: see `SkillLink`. */
 export interface CheckoutSkills {
   skills?: readonly SkillLink[]
 }

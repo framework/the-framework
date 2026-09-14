@@ -1,10 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtemp, mkdir, writeFile, readdir, readFile, readlink, rm, stat, realpath } from 'node:fs/promises'
-import { join, delimiter, resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 import { execFile } from 'node:child_process'
 import { tmpdir } from 'node:os'
-import { createProjectRuntime, cleanupTimedOutWorktree, markFailedStart, agentStderrPath, isTransientAgentFailure, lastAgentFailureDetail, MAX_TRANSIENT_RETRIES } from './daemon-runtime.js'
+import { createProjectRuntime, cleanupTimedOutWorktree, markFailedStart, agentStderrPath, isTransientAgentFailure, lastAgentFailureDetail, MAX_TRANSIENT_RETRIES, ROUTINE_SKILLS } from './daemon-runtime.js'
 import type { PreflightResult } from './preflight.js'
 
 /**
@@ -15,10 +15,7 @@ import type { PreflightResult } from './preflight.js'
 const agentReady = (): Promise<PreflightResult> => Promise.resolve({ ok: true, checks: [] })
 import { EVENTS_FILE, META_FILE, startedAtFromAgentId, type AgentMeta } from './store/index.js'
 import { BRANCHES_DIR, nodeGitRunner, GitTimeoutError } from '@gemstack/agent-data'
-import { worktreePath, agentBranchName, CLI_BIN_DIR, HARNESS_SKILL_DIRS, SKILL_DIR as BRANCHES_SKILL_DIR } from '@gemstack/skill-branches'
-import { CLI_BIN_DIR as TICKETS_BIN_DIR, SKILL_DIR as TICKETS_SKILL_DIR } from '@gemstack/skill-tickets'
-import { CLI_BIN_DIR as QUEUE_BIN_DIR, SKILL_DIR as QUEUE_SKILL_DIR } from '@gemstack/skill-queue'
-import { CLI_BIN_DIR as LOGS_BIN_DIR, SKILL_DIR as LOGS_SKILL_DIR } from '@gemstack/skill-logs'
+import { worktreePath, agentBranchName, HARNESS_SKILL_DIRS, SKILL_DIR as BRANCHES_SKILL_DIR } from '@gemstack/skill-branches'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import { addProject, projectId } from './registry.js'
 import type { AgentSpec } from './agent-spec.js'
@@ -646,7 +643,7 @@ async function writePathStub(dir: string, log: string): Promise<string> {
   return stub
 }
 
-test('a spawned agent finds the `branches` command on its PATH (#1725)', async () => {
+test("a spawned agent gets the daemon's PATH untouched, and its checkout links the branches and work-queue skills (#1725/#1774)", async () => {
   const cwd = await realpath(await mkdtemp(join(tmpdir(), 'framework-agent-path-')))
   try {
     const git = nodeGitRunner()
@@ -665,24 +662,19 @@ test('a spawned agent finds the `branches` command on its PATH (#1725)', async (
       await new Promise(r => setTimeout(r, 20))
       recorded = await readFile(log, 'utf8').catch(() => '')
     }
-    const path = recorded.trim()
-    assert.deepEqual(path.split(delimiter).slice(0, 4), [CLI_BIN_DIR, TICKETS_BIN_DIR, QUEUE_BIN_DIR, LOGS_BIN_DIR], 'the packages\' bin dirs come first: branches, tickets, queue, logs (#1748/#1769)')
-    assert.equal(path.split(delimiter).slice(4).join(delimiter), process.env['PATH'], "after the daemon's own")
-    // By name, the way the agent's shell resolves it, against the project the daemon started it in.
-    const listed = await new Promise<string>((resolvePromise, rejectPromise) =>
-      execFile('branches', ['list'], { cwd, env: { ...process.env, PATH: path } }, (err, stdout) => (err ? rejectPromise(err) : resolvePromise(stdout))),
-    )
-    assert.deepEqual(
-      (JSON.parse(listed) as { agentId: string }[]).map(row => row.agentId),
-      [result.agentId],
-      'and it reports the checkout the daemon allocated',
-    )
-    // The four skills are in the checkout too, where each harness looks for them (#1739/#1748/#1769).
+    // The daemon puts nothing on the agent's PATH (#1774): a skill's command resolves from the
+    // project's own dependencies, `npx tickets`, as its SKILL.md says.
+    assert.equal(recorded.trim(), process.env['PATH'], "the agent's PATH is the daemon's own")
+    // Two skills are linked into the checkout, where each harness looks for them: the branches
+    // package's own (#1739), and the routine skill the daemon fires (#1774), from the routines package. The skills an agent
+    // composes — tickets, queue, logs — are the project's tracked files, not links.
+    const checkout = worktreePath(cwd, result.agentId!)
     for (const harnessDir of HARNESS_SKILL_DIRS) {
-      for (const [name, dir] of [['branches', BRANCHES_SKILL_DIR], ['tickets', TICKETS_SKILL_DIR], ['queue', QUEUE_SKILL_DIR], ['logs', LOGS_SKILL_DIR]] as const) {
-        const target = await readlink(join(worktreePath(cwd, result.agentId!), harnessDir, name))
-        assert.equal(await realpath(resolve(join(worktreePath(cwd, result.agentId!), harnessDir), target)), await realpath(dir), `${harnessDir}/${name} links the package holding its SKILL.md`)
+      for (const [name, dir] of [['branches', BRANCHES_SKILL_DIR], ...ROUTINE_SKILLS.map(s => [s.name, s.dir] as const)] as const) {
+        const target = await readlink(join(checkout, harnessDir, name))
+        assert.equal(await realpath(resolve(join(checkout, harnessDir), target)), await realpath(dir), `${harnessDir}/${name} links the directory holding its SKILL.md`)
       }
+      assert.deepEqual((await readdir(join(checkout, harnessDir))).sort(), ['branches', 'work-queue'], `${harnessDir} holds exactly those two links`)
     }
     await runtime.dispose()
   } finally {

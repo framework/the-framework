@@ -18,7 +18,7 @@ Builds the data behind the dashboard's cross-project Overview [1] and its shared
 [8] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
 [9] archive: the transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
 [10] the Claude web bridge (the bridge): the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session.
-[11] drain: starting an agent on the agent queue's first open entry — the half of Auto PM that spends existing work.
+[11] the queued work: the routine that spends existing work: one agent started with `/work-queue` when the `agent-data` branch moved, which takes one task off the agent queue by composing the skills in its checkout.
 [12] plan: a ticket's `.plan.md`: effort and uncertainty ratings and how to implement it.
 
 ## Business logic — TL;DR
@@ -87,15 +87,15 @@ Every project's agents, archive [9] included, are pooled and ordered by their st
 
 #### Context
 
-**User story**: the Overview's [1] hot-tickets card is a shortlist, not the whole backlog: what is being worked on right now, what The Framework will pick up on its own, and what a human would likely queue next. A ticket being coded at this moment links to the agent [2] coding it.
+**User story**: the Overview's [1] hot-tickets card is a shortlist, not the whole backlog: what is being worked on, what The Framework will pick up on its own, and what a human would likely queue next.
 
-**Problem**: a ticket's plan [12] says that someone planned it at some point, not that it is being coded as the user looks. Only an agent's own record tells the two apart, and an agent records the ticket it implements only when the daemon started it on a queue entry (a drain [11]), so tickets worked by hand still count through their plan.
+**Problem**: a ticket's plan [12] says that someone planned it at some point. Which ticket an agent is implementing right now is the ticket's own claim to say; The Framework no longer records it on the run, and the lane that read it will come back from the claim.
 
 #### Business logic
 
 Every project's tickets are read (`tickets.ts`) and each ticket is placed in the first lane that applies, or left off the card when none does:
 
-- **in progress**: a running agent of the same project recorded this ticket as the one it is implementing, in which case the row carries that agent's id for the card to link into; or, failing that, the ticket has a plan [12]. An agent that has ended is not implementing anything, however recently it stopped.
+- **in progress**: the ticket has a plan [12].
 - **on the agent queue** (the card's "AI Queue" lane): an open entry of the project's agent queue [3] begins with a markdown link, and that link points at this ticket's file under `tickets/`. A link elsewhere in the entry does not count, and neither does a link to something other than a ticket. A finished entry does not count.
 - **high priority**: the ticket's `Priority:` reads 7 or more on the ticket format's 10-to-0 scale, where 10 is critical and 0 is only-if-capacity. Word spellings such as `high`, `urgent`, `p0` or `p1` are not on that scale and never qualify.
 

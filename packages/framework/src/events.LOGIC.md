@@ -20,7 +20,7 @@ Fixes the vocabulary of the event stream [1]: every kind of event an agent [2] c
 [8] view: a markdown document an agent pushes to the dashboard's right rail while it works.
 [9] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [10] archive: the transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
-[11] run: only the `logs` skill's record of one agent on the `agent-data` branch: a card (what was asked, the ticket, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said). Never the unit of work.
+[11] run: only the `logs` skill's record of one agent on the `agent-data` branch: a card (what was asked, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said). Never the unit of work.
 [12] turn signals: what The Framework reads off a turn's final message: the ready-for-merge signal, the pull request title and body, markdown views, reported errors, and the gate it stops at.
 [13] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later. The user's driver choice is `claude` or `codex`; the driver implementations are `claude-code`, `codex`, `github-actions`, `claude-web` and `fake`.
 [14] turn: one prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
@@ -29,7 +29,7 @@ Fixes the vocabulary of the event stream [1]: every kind of event an agent [2] c
 [17] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles. The opposite is attended.
 [18] ready for merge: the signal an agent emits when it believes its work is complete: it flips the agent's badge from building to ready and authorizes the handoff.
 [19] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
-[20] drain: starting an agent on the agent queue's first open entry — the half of Auto PM that spends existing work.
+[20] the queued work: the routine that spends existing work: one agent started with `/work-queue` when the `agent-data` branch moved, which takes one task off the agent queue by composing the skills in its checkout.
 [21] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
 [22] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
 [23] cloud anchor: an empty commit a web agent pushes before its task leaves this machine, unique to the agent: the branch the cloud session later pushes descends from it, which is how the daemon recognises that branch as the agent's (cloud work adoption).
@@ -46,7 +46,7 @@ Fixes the vocabulary of the event stream [1]: every kind of event an agent [2] c
 - **What the agent shows the user** - a view updates in place by title, a reported error stays in the log as history, a log line narrates, and the agent's browser travels as a page URL and a stream port only, never as frames.
 - **A gate and its pick** - a gate is a question, at least one option and, for a single-select gate, a recommended option; a checklist pre-checks options instead; the pick is one option id or the chosen subset, and says whether the user or nobody picked.
 - **Ready for merge and the pull request text** - the ready-for-merge signal flips the agent from building to ready without blocking it; the pull request title and description the agent wrote travel as an event the handoff uses, the latest one winning.
-- **Facts that must survive a reload** - what the handoff is armed to do, the ticket being implemented, the branch and session name, the pull request once opened, and the cloud anchor each travel as events because only an event reaches a tab opened later.
+- **Facts that must survive a reload** - what the handoff is armed to do, the branch and session name, the pull request once opened, and the cloud anchor each travel as events because only an event reaches a tab opened later.
 - **The on-before-mergeable outcome** - the follow-up queued its prompts, queued them without finishing cleanly, or declined for one of five reasons; it is silent when the option was off.
 - **The handoff outcome** - the handoff is done (pushed, a pull request, how the merge went), skipped for one of nine reasons that are not faults, or failed at the push or at the pull request.
 - **How a merge went, and why it is withheld** - GitHub's own auto-merge is preferred, a direct merge is the fallback, the CI watch takes a pull request whose checks are pending, a failed merge never fails the handoff, and a merge is withheld when the agent never said it was ready or its own to-do list is still open.
@@ -123,7 +123,7 @@ A pick is normalized to a list of option ids wherever a list is needed: a subset
 #### Business logic
 
 - Ready for merge [18]: the agent [2] signaled that it believes the work is complete and ready for human review. Non-blocking: it flips the agent's badge from building to ready, and the on-before-mergeable follow-up hangs off it.
-- The pull request text: the title and description the agent asked for through its `open-pr` signal. This is how an agent opens a pull request through The Framework instead of running `gh pr create` itself, so the ticket's issue reference and the recording of the pull request number still apply. The title is the agent's name for the work and the description is what changed; either may be absent when the agent wrote only the other. Non-blocking; the handoff [5] uses the latest one.
+- The pull request text: the title and description the agent asked for through its `open-pr` signal. This is how an agent opens a pull request through The Framework instead of running `gh pr create` itself, so the recording of the pull request number still applies. The title is the agent's name for the work and the description is what changed; either may be absent when the agent wrote only the other. Non-blocking; the handoff [5] uses the latest one.
 
 Both are read off a turn's [14] final message as turn signals [12]; the parsing rules are `turn-gate.ts`'s.
 
@@ -131,12 +131,11 @@ Both are read off a turn's [14] final message as turn signals [12]; the parsing 
 
 #### Context
 
-**Problem**: the dashboard's checkboxes, the ticket an agent [2] was started for and the branch it works on are known to the process that started the agent, but a dashboard tab opened later can only read the agent's folded state, which is built from events alone. Anything that is not an event is lost to that tab.
+**Problem**: the dashboard's checkboxes and the branch an agent [2] works on are known to the process that started the agent, but a dashboard tab opened later can only read the agent's folded state, which is built from events alone. Anything that is not an event is lost to that tab.
 
 #### Business logic
 
 - What the handoff [5] is armed to do: whether a push and whether a pull request are armed, and whether a merge is. Emitted at the start and again whenever the dashboard's checkboxes change it, which is what makes the boxes survive a reload. The merge flag has no checkbox and never changes during the agent [2], so every re-emit repeats it; when it is absent it reads as off, the conservative display. It is carried so the armed line can say the most consequential half of the plan: without it, a merge-armed agent would advertise "open a draft PR" and then merge.
-- The ticket the agent was started to implement, as a path `tickets/<file>.md` on the `agent-data` branch [19]. Emitted once at the start, and only when The Framework itself chose the ticket: the drain [20] agent whose queue entry links back to the ticket it was queued from. Absent means nobody knows what the agent is implementing, which is the case for every hand-written prompt.
 - The branch the agent's work is on, observed off the checkout [9] rather than guessed: emitted at the start with the branch the agent actually begins on, and again whenever a later read finds it changed, since the agent renames its own branch through `branches name`. When the branch carries a session name [21], the event carries it too. The session name is read off the branch by the agent's process, the one writer that knows which branch the checkout was created on; a reader of the stream alone cannot tell that birth branch from a named one. Every surface resolves the branch and the session name from this event first.
 - The pull request the agent's work is on, its number and URL, the moment one is opened for it, so that no surface has to guess the pull request from the branch afterwards.
 - The cloud anchor [23]: the empty commit an agent whose location [22] is `web` pushed before its task left this machine, unique to the agent. The branch the cloud session [24] later works on is a `claude/*` name of the cloud's own choosing, never the agent's designated branch, and is recognized as the agent's by descending from this commit; the daemon's cloud work adoption matches the anchor against the remote's `claude/*` heads once the cloud session has pushed.

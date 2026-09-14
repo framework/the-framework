@@ -8,7 +8,7 @@ Reads the git status bar of a project or of an agent's [1] checkout [2]: the cur
 [4] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
 [5] project home: a project's own page with the launcher (the Start form) and its composer (the prompt editor, also used for live chat).
 [6] agent view: one agent's page.
-[7] routine: a preset the daemon fires on its own on a schedule — update tickets, triage quick, triage consensual, plan tickets, maintenance — each switchable off and runnable on demand.
+[7] routine: a job the daemon fires on its own — the queued work, update tickets, triage quick, triage consensual, plan tickets, maintenance — each switchable off and runnable on demand.
 
 ## Business logic — TL;DR
 

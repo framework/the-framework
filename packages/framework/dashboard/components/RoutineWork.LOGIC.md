@@ -4,20 +4,20 @@ The Overview's "Routine work" card: the routines [1] Auto PM [2] fires on its sc
 
 **User story**: from the Overview [4] the user sees which routines the daemon will run on its own, switches single routines out of the schedule, runs one right now in the project of their choice, reads what it is about to spend before pressing, and reads why the last sweep started nothing.
 
-**Business logic story**: Auto PM has two halves, the drain [5] that spends existing work on the agent queue [6] and the rotation of routines that refills it; this card is the one surface that lists both. "Run now" on an ordinary routine takes the same path the launcher on a project home [7] takes, so the work starts now rather than the sweep being asked to come round sooner. A routine the sweep has to prepare (claim a queue entry, lock tickets, hold a routine lock [8]) is instead asked of the sweep, narrowed to that one routine.
+**Business logic story**: Auto PM has two halves, the queued work [5] that spends existing work on the agent queue [6] and the rotation of routines that refills it; this card is the one surface that lists both. "Run now" on an ordinary routine takes the same path the launcher on a project home [7] takes, so the work starts now rather than the sweep being asked to come round sooner. A routine the sweep has to prepare (lock tickets, hold a routine lock [8]), and the queued work, which the sweep fires, are instead asked of the sweep, narrowed to that one routine.
 
 ## Glossary
 
-[1] routine: a preset the daemon fires on its own on a schedule — update tickets, triage quick, triage consensual, plan tickets, maintenance — each switchable off and runnable on demand.
-[2] Auto PM: the daemon's unattended product management: drain the agent queue, and refill it by running the routines.
+[1] routine: a job the daemon fires on its own — the queued work, update tickets, triage quick, triage consensual, plan tickets, maintenance — each switchable off and runnable on demand.
+[2] Auto PM: the daemon's unattended product management: work the agent queue when the `agent-data` branch moves, and refill it by running the routines.
 [3] sweep: a background job the daemon runs on its clock: Auto PM, the CI watch, the notification watchers, the sweep that reclaims checkouts, the branch-links sweep, the cloud scratch sweep, cloud work adoption.
 [4] the Overview: the dashboard's cross-project page at `/`.
-[5] drain: starting an agent on the agent queue's first open entry — the half of Auto PM that spends existing work.
+[5] the queued work: the routine that spends existing work: one agent started with `/work-queue` when the `agent-data` branch moved, which takes one task off the agent queue by composing the skills in its checkout.
 [6] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down. An item on it is a queue entry.
 [7] project home: a project's own page with the launcher (the Start form) and its composer (the prompt editor, also used for live chat).
 [8] routine lock: a file on the `agent-data` branch (`routines/<name>.lock.md`) a daemon takes before running a routine so the routine runs once across machines.
 [9] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
-[10] fan-out: starting several agents at once, one per queue entry or one per ticket to plan.
+[10] fan-out: starting several agents at once, one per ticket to plan.
 [11] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 [12] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
 [13] prompt agent: an agent that runs one prompt and stops there (as opposed to a build agent, which works the agent queue after its opening exchange).
@@ -34,9 +34,9 @@ The Overview's "Routine work" card: the routines [1] Auto PM [2] fires on its sc
 - **A remembered project to run in** - with several projects a "Run in" list picks the project, remembered as a preference across navigations, reloads and tabs; a pick naming a removed project falls back to the first project.
 - **Each routine's place in the schedule** - the checkbox on a row switches that one routine out of or back into the schedule; what is recorded is the opt-out, so a routine added later is on for everyone.
 - **"Run now" as a plain start** - "Update from GitHub" and "Maintenance" start one unattended prompt agent in the picked project on the user's own settings, and the dashboard goes to that agent.
-- **"Run now" as a narrowed sweep** - the drain, "Plan tickets (aka spike)" and the two triage routines ask the sweep for that one routine's work, because only the sweep can claim, fan out or lock; the answer lands on the card and nobody is navigated away.
+- **"Run now" as a narrowed sweep** - the queued work, "Plan tickets (aka spike)" and the two triage routines ask the sweep for that one routine's work, because only the sweep can visit every project, claim, fan out or lock; the answer lands on the card and nobody is navigated away.
 - **What a click will spend, said before it is spent** - hovering "Run now" tells what the routine does, which coding agent, model and location the start reads from the preferences, and how many unattended agents it starts where.
-- **"Configure first, then run"** - the chevron beside "Run now" opens the picked project's launcher with the routine's prompt so model and location can be set first; for a fanning-out routine it warns that the launcher sends one agent, not the fan-out.
+- **"Configure first, then run"** - the chevron beside "Run now" opens the picked project's launcher with the routine's prompt so model and location can be set first; for the queued work it warns that the launcher sends one agent in this project, not every project, and for the planning routine that it sends one agent, not the fan-out.
 - **The schedule's master switch and its countdown** - the foot's checkbox is the same "Auto PM" preference the Settings page offers, labeled "Auto-runs in N min" while the schedule is on and the daemon has reported a next sweep, "Auto-run" otherwise; with every routine unticked it warns that the schedule has nothing to run.
 - **Sweeping on demand** - "Trigger routine now" runs one sweep immediately, even while auto-run is off, and the card then says what the sweep decided per project, or that this dashboard is not running the sweep.
 - **Concurrent agents** - a whole number of at least 1 (2 by default) saying how many agents the routine may keep going at once on queued work, with a line explaining what that means.
@@ -54,7 +54,7 @@ The Overview's "Routine work" card: the routines [1] Auto PM [2] fires on its sc
 
 The card is titled "Routine work". With no project registered it holds only the line "Add a project to run a routine." Otherwise it lists every routine [1] the sweep [3] can fire, in the sweep's own order of precedence (the rules in `src/auto-pm.ts`):
 
-1. "Spin up agents working on the AI queue" — the drain [5], which works entries already on the agent queue [6]; its pull request is merged once opened.
+1. "Work the queue" — the queued work [5], one agent told `/work-queue`; its pull request is merged once opened.
 2. "Update from GitHub" — brings the project's tickets up to date with its GitHub issues.
 3. "Add quick-win work to AI Queue" — the quick triage; holds the routine lock [8] `triage-quick` while it runs.
 4. "Add consensual work to AI Queue" — the consensual triage; holds the routine lock `triage-consensual`.
@@ -97,11 +97,11 @@ For "Update from GitHub" and "Maintenance", "Run now" starts one prompt agent [1
 
 #### Context
 
-**Problem**: a plain start can only ever be one agent [9], and it runs unguarded. The drain [5] and "Plan tickets (aka spike)" fan out [10], and only the sweep [3] can claim the work before each agent starts: a queue entry per drain, a ticket lock per plan. The two triage routines rewrite the shared agent queue [6] and may take hours, so they hold a routine lock [8] the sweep mints before the start. Which path a routine takes is decided by what the routine declares about itself, never by its name, so a renamed routine keeps its path.
+**Problem**: a plain start can only ever be one agent [9] in one project, and it runs unguarded. The queued work [5] visits every project; "Plan tickets (aka spike)" fans out [10], and only the sweep [3] can claim a ticket before each agent starts. The two triage routines rewrite the shared agent queue [6] and may take hours, so they hold a routine lock [8] the sweep mints before the start. Which path a routine takes is decided by what the routine declares about itself, never by its name, so a renamed routine keeps its path.
 
 #### Business logic
 
-For the drain, "Plan tickets (aka spike)", "Add quick-win work to AI Queue" and "Add consensual work to AI Queue", "Run now" asks the daemon to sweep now, narrowed to that one routine's work: the drain's sweep names no project because the drain visits every project the daemon watches; the other three are scoped to the picked project. Narrowing to the clicked routine means "nothing to do" is reported on the card rather than the click quietly borrowing a different routine's work. While the sweep runs, that row's button reads "Starting…". The user is not navigated anywhere: the agents land in the Overview's Agents card, where a batch is watchable. When the sweep is done the card shows its answer under the foot (see "Sweeping on demand" for the wording); when the daemon serving this dashboard runs no sweep, it shows "This dashboard is not running the sweep, so there is nothing to trigger here."
+For the queued work, "Plan tickets (aka spike)", "Add quick-win work to AI Queue" and "Add consensual work to AI Queue", "Run now" asks the daemon to sweep now, narrowed to that one routine's work: the queued work's sweep names no project because it visits every project the daemon watches; the other three are scoped to the picked project. Narrowing to the clicked routine means "nothing to do" is reported on the card rather than the click quietly borrowing a different routine's work. While the sweep runs, that row's button reads "Starting…". The user is not navigated anywhere: the agents land in the Overview's Agents card, where a batch is watchable. When the sweep is done the card shows its answer under the foot (see "Sweeping on demand" for the wording); when the daemon serving this dashboard runs no sweep, it shows "This dashboard is not running the sweep, so there is nothing to trigger here."
 
 ### What a click will spend, said before it is spent
 
@@ -114,8 +114,8 @@ For the drain, "Plan tickets (aka spike)", "Add quick-win work to AI Queue" and 
 Hovering a routine's "Run now" shows up to three lines:
 
 1. The preset's [17] own one-line description, the same sentence the launcher shows for that preset: "Work the entries already on the queue (TODO_AGENTS.md)", "Bring `tickets/` up to date with the GitHub issues. An empty `tickets/` gets a full first import.", "Add `tickets/*.md` to queue (TODO_AGENTS.md), only quick-win and consensual tickets", "Add `tickets/*.md` to queue (TODO_AGENTS.md), only significant (no quick-wins) and consensual tickets", "Turn `tickets/*.md` into costed plans (`tickets/*.plan.md`)", "Queue maintainability + security work per codebase subset (TODO_AGENTS.md)".
-2. The settings the start reads, rendered from the very preferences the start uses: which coding agent [15], which model and which location [16], as one line such as "Claude Code · Opus · This machine"; a model that is not pinned, or is pinned for the other coding agent, reads "the CLI's own default" (the rule in `lib/agent-settings.ts`). For the drain [5] this line is instead "Each project's own settings decide the model and where it runs.", because the sweep resolves each project's own `the-framework.yml` and visits every project rather than the picked one.
-3. What the click spends: for the drain, "Sweeps every project the daemon watches, up to N agents each, unattended." ("agent" when N is 1); for a routine that fans out [10], "Starts up to N agents in <project>, one per open ticket, unattended."; for every other routine, "Starts one agent in <project>, unattended — nothing is asked mid-run." N is the "Concurrent agents" setting and <project> the picked project's name.
+2. The settings the start reads, rendered from the very preferences the start uses: which coding agent [15], which model and which location [16], as one line such as "Claude Code · Opus · This machine"; a model that is not pinned, or is pinned for the other coding agent, reads "the CLI's own default" (the rule in `lib/agent-settings.ts`). For the queued work [5] this line is instead "Each project's own settings decide the model and where it runs.", because the sweep resolves each project's own `the-framework.yml` and visits every project rather than the picked one.
+3. What the click spends: for the queued work, "Starts one agent in every project the daemon watches, unattended."; for a routine that fans out [10], "Starts up to N agents in <project>, one per open ticket, unattended."; for every other routine, "Starts one agent in <project>, unattended — nothing is asked mid-run." N is the "Concurrent agents" setting and <project> the picked project's name.
 
 ### "Configure first, then run"
 
@@ -159,7 +159,7 @@ The same line reports a narrowed sweep fired by a row's "Run now".
 
 #### Context
 
-**Business logic story**: only the drain [5] fans out [10], because it takes work off the agent queue [6] one entry at a time, so several agents [9] at once do disjoint work; a routine that invents work rewrites the queue and stays one agent per sweep whatever this says (the rules in `src/auto-pm.ts`).
+**Business logic story**: the queued work [5] runs one agent per move of the `agent-data` branch and the cap is how many of them may overlap; planning fans out [10] to it; a routine that rewrites the queue stays one agent per sweep whatever this says (the rules in `src/auto-pm.ts`).
 
 #### Business logic
 

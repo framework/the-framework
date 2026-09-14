@@ -1,39 +1,29 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { mkdtemp, rm, writeFile, mkdir, readFile } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { startBackgroundServices, syncProjectData } from './daemon-services.js'
 import { projectErrorStore } from './project-errors.js'
-import { fileBranchPath, withFileBranch, DATA_BRANCH } from '@gemstack/agent-data'
+import { withFileBranch, DATA_BRANCH } from '@gemstack/agent-data'
 import { pollerQuotaSource, type QuotaSource } from './dashboard/quota.js'
 import { QuotaPoller } from './quota-poller.js'
+import { AUTO_PM_JOBS, AUTO_PM_MAINTENANCE_JOB, AUTO_PM_WORK_JOB } from './auto-pm.js'
+import { daemonFunnel } from './daemon-writes.js'
 import type { DriverQuotaWindow } from 'agent-driver'
 import type { StartAgentOptions, StartAgentResult } from './dashboard/types.js'
 
 /**
- * The concurrent-agents setting, end to end (#1204).
+ * The daemon half of #1774, end to end with the daemon's own spawn stubbed.
  *
- * `auto-pm.test.ts` covers the policy with every reading injected, which is the half that was
- * already known good. What was unverified is the wiring either side of it: that the number the
- * dashboard writes into the registry is the number `startBackgroundServices` hands the sweep, and
- * that a real checkout with a real `TODO_AGENTS.md` fans out to that many starts, one pinned entry
- * each. Both halves are real here — the registry is read off disk by `readPreferences`, the queue
- * off disk by `findTodoBacklog` — and only the daemon's own spawn is stubbed, because the assertion
- * is about how many agents are asked for and with what, not about the child processes.
+ * `auto-pm.test.ts` covers the policy with every reading injected. What was unverified is the
+ * wiring either side of it: that the two git reads the sweep is handed see a real `agent-data`
+ * branch move, that a commit written through the daemon's own funnel does not count as one, and
+ * that what the sweep starts is one agent told `/work-queue` and nothing else. Real git and a real
+ * registry; only the child process is stubbed, because the assertion is about what is asked for.
  */
-
-/** Six open entries, distinguishable, in the format the sweep's reader actually parses. */
-const QUEUE_ENTRIES = [
-  '[Entry one](tickets/2026-07-01_one.md) — the first thing',
-  '[Entry two](tickets/2026-07-01_two.md) — the second thing',
-  '[Entry three](tickets/2026-07-01_three.md) — the third thing',
-  '[Entry four](tickets/2026-07-01_four.md) — the fourth thing',
-  '[Entry five](tickets/2026-07-01_five.md) — the fifth thing',
-  '[Entry six](tickets/2026-07-01_six.md) — the sixth thing',
-]
 
 const git = promisify(execFile)
 
@@ -56,29 +46,24 @@ function weekResetText(): string {
   return `${month} ${resets.getUTCDate()} at 7am (UTC)`
 }
 
+/** Every routine but the queued work, so a test about the trigger sees only that one start. */
+const ROTATION_OFF = [...AUTO_PM_JOBS, AUTO_PM_MAINTENANCE_JOB].map(job => job.name)
+
 /** A registry + checkout wired to `startBackgroundServices`, with every start recorded. */
 async function services(preferences: Record<string, unknown>, quota?: QuotaSource) {
-  const config = await mkdtemp(join(tmpdir(), 'framework-concurrency-cfg-'))
-  const project = await mkdtemp(join(tmpdir(), 'framework-concurrency-proj-'))
-  // A real git checkout whose tickets and queue live on the data branch (#1582), because the
-  // drain claims each entry's ticket with a committed `.lock.md` before its agent starts (#1420)
-  // — in a bare directory that cycle would fail and the whole batch would be dropped.
+  const config = await mkdtemp(join(tmpdir(), 'framework-daemon-half-cfg-'))
+  const project = await mkdtemp(join(tmpdir(), 'framework-daemon-half-proj-'))
+  // A real git checkout with the data branch already born (#1582): the sweep's first look
+  // remembers its head, and the tests move it from there.
   await git('git', ['init', '-q', '-b', 'main'], { cwd: project })
   await git('git', ['config', 'user.email', 'test@example.com'], { cwd: project })
   await git('git', ['config', 'user.name', 'Test'], { cwd: project })
   await git('git', ['config', 'commit.gpgsign', 'false'], { cwd: project })
   const seeded = await withFileBranch(project, DATA_BRANCH, 'seed', async dir => {
     await mkdir(join(dir, 'tickets'), { recursive: true })
-    for (const entry of QUEUE_ENTRIES) {
-      const ticket = /\((tickets\/[^)]+)\)/.exec(entry)![1]!
-      await writeFile(join(dir, ticket), `# ${ticket}\n`)
-    }
-    await writeFile(
-      join(dir, 'TODO_AGENTS.md'),
-      ['# TODO_AGENTS', '', '## Priority 9', '', ...QUEUE_ENTRIES.map(entry => `- ${entry}`), ''].join('\n'),
-    )
+    await writeFile(join(dir, 'TODO_AGENTS.md'), '')
   })
-  assert.ok(seeded.ok, 'the fixture queue must land on the data branch')
+  assert.ok(seeded.ok, 'the data branch must exist before the daemon looks')
   await writeFile(
     join(config, 'the-framework.json'),
     JSON.stringify({
@@ -105,13 +90,20 @@ async function services(preferences: Record<string, unknown>, quota?: QuotaSourc
     projectErrors: projectErrorStore(),
     log: () => {},
   })
+  /** Someone queued an entry: a plain write through the skills' own funnel. */
+  const queue = async (entry: string) => {
+    const wrote = await withFileBranch(project, DATA_BRANCH, `queue add: ${entry}`, async dir => {
+      await writeFile(join(dir, 'TODO_AGENTS.md'), `- ${entry}\n`)
+    })
+    assert.ok(wrote.ok, 'the fixture entry must land on the data branch')
+  }
   const stop = async () => {
     // Awaited: the sweep in flight is what the cleanup below would otherwise delete out from under.
     await started.quiesce()
     await rm(config, { recursive: true, force: true })
     await rm(project, { recursive: true, force: true })
   }
-  return { starts, stop, services: started, projectDir: project }
+  return { starts, stop, services: started, projectDir: project, queue }
 }
 
 /** Poll until `check` holds or the deadline passes; the sweep is fired and not awaited. */
@@ -120,144 +112,71 @@ async function settle(check: () => boolean, ms = 5000): Promise<void> {
   while (!check() && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 10))
 }
 
-test('the concurrency setting on disk is the number of agents the routine spins up (#1204)', async () => {
-  // Four, so a pass cannot be the shipped default of two or a hardwired one.
-  const { starts, stop, services: running, projectDir } = await services({ autoPm: true, autoPmConcurrency: 4 })
+test('a commit on the data branch that no daemon wrote starts one agent on the queued work (#1774)', async () => {
+  const { starts, stop, services: running, queue } = await services({ autoPm: true, autoPmConcurrency: 4, autoPmOptOut: ROTATION_OFF })
   try {
-    // No wake call: the daemon sweeps once on start-up, which is the path a machine booted with
-    // the setting already on actually takes.
-    await settle(() => starts.length >= 4)
-    assert.equal(starts.length, 4, 'the batch is the setting, not the default and not the queue length')
-    // One entry each, in queue order: this is what makes four agents do disjoint work rather than
-    // four copies of the first entry. The prompt is where the pin lives (E2) — it used to also
-    // ride the agent's meta, so a third claim mechanism could be re-derived from it later.
-    for (const [index, start] of starts.entries()) {
-      assert.match(start.prompt, /Work on this one open entry of the agent queue only/)
-      assert.ok(start.prompt.includes(QUEUE_ENTRIES[index]!), `the prompt pins ${QUEUE_ENTRIES[index]}`)
-      // Nobody is at the keyboard, so a gate must auto-answer rather than park (#846/#1279).
-      assert.equal(start.options.unattended, true)
-      // The drain job lands its own PRs (#1216): the job's flag rides the start as the ladder's
-      // top rung, so it reaches the agent already meaning "push, open, merge".
-      assert.equal(start.options.handoff, 'merge')
-      // A drain implements its ticket, so its PR title may close the issue — planAgent is only
-      // for the fanned-out planners (#1327), whose merge must not.
-      assert.equal(start.options.planAgent, undefined)
-      assert.equal(start.projectId, 'proj-1')
-    }
-    // The ticket the entry links to rides along, so the four agents land in four lanes (#1117).
-    assert.deepEqual(
-      starts.map(s => s.options.ticket),
-      ['tickets/2026-07-01_one.md', 'tickets/2026-07-01_two.md', 'tickets/2026-07-01_three.md', 'tickets/2026-07-01_four.md'],
-    )
-    // And the dashboard is told the batch went out, rather than only the first of it (#1161).
+    // The start-up look remembers the head and starts nothing: the daemon knows nothing about
+    // what moved while it was down.
+    await settle(() => running.autoPmReport().outcomes.length > 0)
+    assert.equal(starts.length, 0, 'the first look starts nothing on the queued work')
+    await queue('[Entry one](tickets/2026-07-01_one.md)')
+    await running.wakeAutoPm()
+    assert.equal(starts.length, 1, 'one agent per move, however high the concurrency: the next needs the branch to move again')
+    const [start] = starts
+    // The agent is told the routine skill and nothing else: no entry, no ticket, no skill name.
+    assert.equal(start!.prompt, AUTO_PM_WORK_JOB.prompt)
+    assert.equal(start!.prompt, '/work-queue')
+    // Nobody is at the keyboard, so a gate must auto-answer rather than park (#846/#1279).
+    assert.equal(start!.options.unattended, true)
+    // The queued work lands its own PRs (#1216): the job's flag rides the start as the ladder's
+    // top rung, so it reaches the agent already meaning "push, open, merge".
+    assert.equal(start!.options.handoff, 'merge')
+    assert.equal(start!.options.planAgent, undefined)
+    assert.equal(start!.options.agentId, undefined, 'the daemon minted no claim, so the run picks its own id')
+    assert.equal(start!.projectId, 'proj-1')
+    // And the dashboard is told what went out (#1161).
     const outcome = running.autoPmReport().outcomes[0]
     assert.equal(outcome?.started, true)
-    assert.match(outcome?.message ?? '', /started 4 agents/)
-    // The claim the sweep committed ahead of each agent (#1420/#1748): the ticket's lock is on
-    // the `agent-data` branch and names the id the agent is started with, so the lock and the run are one.
-    const lock = await readFile(join(fileBranchPath(projectDir, DATA_BRANCH), 'tickets/2026-07-01_one.lock.md'), 'utf8')
-    assert.match(lock, /^CLAIMED: \d{4}-\d{2}-\d{2}T/, "the first entry's ticket carries a claim naming an agent id")
-    assert.equal(starts[0]!.options.agentId, lock.slice('CLAIMED: '.length).trim(), 'and the agent is started with that id')
+    assert.equal(outcome?.message, AUTO_PM_WORK_JOB.label)
+    // The move is spent: the next look, with nothing new on the branch, starts nothing.
+    await running.wakeAutoPm()
+    assert.equal(starts.length, 1)
   } finally {
     await stop()
   }
 })
 
-test("the drain row's Run now fans out to the setting with auto-run off (#1204/#1210)", async () => {
+test("a commit the daemon wrote itself is not a move: its run records must not start the next run (#1774)", async () => {
+  const { starts, stop, services: running, projectDir } = await services({ autoPm: true, autoPmOptOut: ROTATION_OFF })
+  try {
+    await settle(() => running.autoPmReport().outcomes.length > 0)
+    // The daemon's funnel, as the teardown's record write uses it: signed with the trailer.
+    const recorded = await daemonFunnel()(projectDir, 'logs: record run 2026-09-13T10-00-00-000Z', async dir => {
+      await mkdir(join(dir, 'agents', 'test'), { recursive: true })
+      await writeFile(join(dir, 'agents', 'test', '2026-09-13T10-00-00-000Z.json'), '{}\n')
+    })
+    assert.ok(recorded.ok)
+    await running.wakeAutoPm()
+    assert.equal(starts.length, 0)
+    // The rotation's start-up turn is still owed and has nothing to fire, which is what the
+    // report says; the record moved nothing.
+    assert.equal(running.autoPmReport().outcomes[0]?.message, 'every routine that makes new work is switched off')
+  } finally {
+    await stop()
+  }
+})
+
+test("the queued-work row's Run now starts one agent with auto-run off, and no move (#1204/#1210/#1774)", async () => {
   const { starts, stop, services: running } = await services({ autoPm: false, autoPmConcurrency: 3 })
   try {
     // The start-up sweep reads the switch and stands down; the click is what asks.
     await settle(() => starts.length > 0, 300)
     assert.equal(starts.length, 0, 'auto-run off means the schedule starts nothing by itself')
-    // Exactly what the card's Run now sends for the draining routine, through the same
-    // `wakeAutoPm` seam the RPC calls.
-    running.wakeAutoPm({ onDemand: true, only: 'drain' })
-    await settle(() => starts.length >= 3)
-    assert.equal(starts.length, 3, 'the click spins the setting up, not one agent')
-    for (const [index, start] of starts.entries()) {
-      assert.ok(start.prompt.includes(QUEUE_ENTRIES[index]!), `the prompt pins ${QUEUE_ENTRIES[index]}`)
-    }
-  } finally {
-    await stop()
-  }
-})
-
-/** An archived meta in the transient `.the-framework/agents/`, where the promote poll reads it. */
-async function archiveMeta(projectDir: string, meta: { id: string } & Record<string, unknown>): Promise<void> {
-  const dir = join(projectDir, '.the-framework', 'agents')
-  await mkdir(dir, { recursive: true })
-  await writeFile(join(dir, `${meta.id}.json`), JSON.stringify({ startedAt: '2026-08-19T00:00:00.000Z', updatedAt: '2026-08-19T00:01:00.000Z', ...meta }))
-}
-
-test('a drained entry is taken off the queue once its run reports the work published (#1582/#1748)', async () => {
-  // The whole retire loop, with only the agent stubbed: the sweep pins the entry, the run's
-  // archived record reports the hand-off, and the daemon — the queue's one local writer — lands
-  // the removal as a commit on the `agent-data` branch. The agent never touches the queue.
-  const { starts, stop, services: running, projectDir } = await services({ autoPm: false, autoPmConcurrency: 1 })
-  try {
-    running.wakeAutoPm({ onDemand: true, only: 'drain' })
-    await settle(() => starts.length >= 1)
-    assert.ok(starts[0]!.prompt.includes(QUEUE_ENTRIES[0]!), 'the first entry is the pinned one')
-    // The run settles `done` and its epilogue reported the push/PR: the one ending that retires.
-    await archiveMeta(projectDir, { id: 'run-1', status: 'done', handoffReport: 'done' })
-    running.wakeAutoPm({ onDemand: true, only: 'drain' })
-    // Waited for on the branch, not the checkout file: the funnel writes the file first and
-    // commits a beat later, and only the commit is the retirement every machine pulls.
-    const deadline = Date.now() + 5000
-    let subjects = ''
-    while (Date.now() < deadline) {
-      subjects = await git('git', ['log', '--format=%s', `refs/heads/${DATA_BRANCH}`], { cwd: projectDir }).then(r => r.stdout, () => '')
-      if (subjects.includes('queue done: ')) break
-      await new Promise(resolve => setTimeout(resolve, 25))
-    }
-    assert.ok(subjects.includes(`queue done: ${QUEUE_ENTRIES[0]!}`), 'the removal is a commit on the `agent-data` branch')
-    const queue = await readFile(join(fileBranchPath(projectDir, DATA_BRANCH), 'TODO_AGENTS.md'), 'utf8')
-    assert.ok(!queue.includes(QUEUE_ENTRIES[0]!), 'the drained entry is deleted — done means deleted, not checked off')
-    // The fixture seeds bare bullets, and untouched ones must stay exactly as written.
-    assert.ok(queue.includes(`- ${QUEUE_ENTRIES[1]!}`), 'the untouched entries stay open')
-  } finally {
-    await stop()
-  }
-})
-
-test('a run whose hand-off failed leaves its entry open: unpublished work is not retired (#1582)', async () => {
-  // The negative half of the gate above, seen live in the PR smoke: the push or PR did not land
-  // (`handoffReport: 'failed'`), so the daemon settles the run without checking anything off —
-  // the entry stays open for the next drain rather than vanishing with the work unpublished.
-  const { starts, stop, services: running, projectDir } = await services({ autoPm: false, autoPmConcurrency: 1 })
-  try {
-    running.wakeAutoPm({ onDemand: true, only: 'drain' })
-    await settle(() => starts.length >= 1)
-    await archiveMeta(projectDir, { id: 'run-1', status: 'done', handoffReport: 'failed' })
-    running.wakeAutoPm({ onDemand: true, only: 'drain' })
-    // No positive signal marks "the promote settled without retiring", so give the tick a
-    // moment and then require the queue untouched — the check-off in the sibling test lands
-    // well inside this window when the gate passes.
-    await settle(() => false, 1500)
-    const queue = await readFile(join(fileBranchPath(projectDir, DATA_BRANCH), 'TODO_AGENTS.md'), 'utf8')
-    assert.ok(queue.includes(`- ${QUEUE_ENTRIES[0]!}`), "the failed run's entry stays open")
-  } finally {
-    await stop()
-  }
-})
-
-test('a drain claims an entry whose ticket file is gone, recreating tickets/ on the way (#1582)', async () => {
-  // The live-smoke regression: retiring the last ticket removes `tickets/` itself (git keeps no
-  // empty dirs), while the queue entry linking it stays open — a failed publish leaves exactly
-  // this state. The next drain must still claim and start, not stand the batch down with
-  // "another agent already claimed".
-  const { starts, stop, services: running, projectDir } = await services({ autoPm: false, autoPmConcurrency: 1 })
-  try {
-    const cleared = await withFileBranch(projectDir, DATA_BRANCH, 'retire every ticket', async dir => {
-      await rm(join(dir, 'tickets'), { recursive: true, force: true })
-    })
-    assert.ok(cleared.ok, 'the fixture must drop tickets/ from the data branch')
-    running.wakeAutoPm({ onDemand: true, only: 'drain' })
-    await settle(() => starts.length >= 1)
-    assert.equal(starts.length, 1, 'the batch starts instead of standing down')
-    assert.ok(starts[0]!.prompt.includes(QUEUE_ENTRIES[0]!), 'the first entry is the pinned one')
-    const lock = await readFile(join(fileBranchPath(projectDir, DATA_BRANCH), 'tickets/2026-07-01_one.lock.md'), 'utf8')
-    assert.match(lock, /^CLAIMED: \d{4}-/, 'the claim landed in a recreated tickets/')
+    // Exactly what the card's Run now sends for the queued work, through the same `wakeAutoPm`
+    // seam the RPC calls.
+    await running.wakeAutoPm({ onDemand: true, only: 'work' })
+    assert.equal(starts.length, 1, 'the click is one agent on the queue, whatever the branch did')
+    assert.equal(starts[0]!.prompt, AUTO_PM_WORK_JOB.prompt)
   } finally {
     await stop()
   }
@@ -305,11 +224,11 @@ test("unattended work stands down when the model it would run on has spent its o
     { label: 'Current week (all models)', kind: 'week', percentUsed: 30, resetsAtText: weekResetText() },
     { label: 'Current week (Fable)', kind: 'week-model', percentUsed: 100, resetsAtText: weekResetText() },
   ])
-  const { starts, stop, services: running } = await services({ autoPm: true, autoPmConcurrency: 4, model: 'claude-fable-5' }, quota)
+  const { starts, stop, services: running, queue } = await services({ autoPm: true, model: 'claude-fable-5', autoPmOptOut: ROTATION_OFF }, quota)
   try {
-    // Waited on the sweep's own report rather than a bare delay: the assertion is that the pass ran
-    // and decided not to start, which a timeout could not tell from a pass that had not run yet.
     await settle(() => running.autoPmReport().outcomes.length > 0)
+    await queue('[Entry one](tickets/2026-07-01_one.md)')
+    await running.wakeAutoPm()
     assert.equal(starts.length, 0, 'a spent model week starts nothing, however much of the account week is left')
     // And it says which window stopped it: "the quota" alone would send someone to a panel that
     // is showing 30% and looking fine.
@@ -328,10 +247,12 @@ test('the same spent model week does not stop work on a model that has its own a
     { label: 'Current week (all models)', kind: 'week', percentUsed: 30, resetsAtText: weekResetText() },
     { label: 'Current week (Fable)', kind: 'week-model', percentUsed: 100, resetsAtText: weekResetText() },
   ])
-  const { starts, stop } = await services({ autoPm: true, autoPmConcurrency: 2, model: 'claude-opus-5' }, quota)
+  const { starts, stop, services: running, queue } = await services({ autoPm: true, model: 'claude-opus-5', autoPmOptOut: ROTATION_OFF }, quota)
   try {
-    await settle(() => starts.length >= 2)
-    assert.equal(starts.length, 2, 'the batch goes out as usual')
+    await settle(() => running.autoPmReport().outcomes.length > 0)
+    await queue('[Entry one](tickets/2026-07-01_one.md)')
+    await running.wakeAutoPm()
+    assert.equal(starts.length, 1, 'the run goes out as usual')
     assert.equal(starts[0]!.options.model, 'claude-opus-5', 'and on the model the gate was measured for')
   } finally {
     await stop()

@@ -95,9 +95,7 @@ export type AutoHandoffSkip =
  */
 export type MergeWithheldReason =
   /** The agent never called setReadyForMerge(): the work was never declared done. */
-  | 'not-ready-for-merge'
-  /** The session's own `TODO_<SESSION_NAME>.agent.md` still has open entries. */
-  | 'session-todo-open'
+  'not-ready-for-merge'
 
 /**
  * How the merge half of a handoff went (#1216), when the agent was armed for it. Lives here beside
@@ -243,19 +241,9 @@ export type FrameworkEvent =
    */
   | { kind: 'handoff-armed'; push: boolean; pr: boolean; merge?: boolean }
   /**
-   * The ticket this agent was started to implement (#1117), as a repo-relative `tickets/<file>.md`.
-   *
-   * Emitted once at start, and only when the framework itself chose the ticket — today that is the
-   * [Drain queue] run, whose queue entry links back to the ticket it was queued from (#1164). An
-   * event rather than a start argument for the usual reason: only an event reaches the agent's meta,
-   * and the meta is what a dashboard tab opened mid-run reads. Absent means nobody knows what this
-   * run is implementing, which is every hand-written prompt.
-   */
-  | { kind: 'ticket'; path: string }
-  /**
    * The pull request this session's work is on (E6), the moment one is opened for it.
    *
-   * An event for the same reason `ticket` and `branch` are: only an event reaches the agent's meta,
+   * An event for the same reason `branch` is: only an event reaches the agent's meta,
    * and the meta is what every later surface reads. Before this, each of them re-resolved the PR
    * live from the branch — trying the recorded branch, then the session-name branch, then the
    * run-id branch, and filtering the results by whether the PR predated the session — which is a

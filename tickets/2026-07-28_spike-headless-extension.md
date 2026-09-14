@@ -6,25 +6,28 @@ GitHub: [#1332](https://github.com/framework/the-framework/issues/1332)
 
 ## TLDR
 
-**Answered and built (2026-08-26).** Headless is no: Cloudflare's interstitial on claude.ai never clears in a headless browser, whatever the profile or cookies, and faking a headed fingerprint was rejected. The agreed shape was built instead, in three merged steps:
+**Answered and built; closing is the maintainer's call.** Headless is out: the extension runs headless, but claude.ai's Cloudflare check never clears a headless browser (cookies do not help, faking the fingerprint was rejected). The agreed shape was built instead, in three merged steps:
 
-1. **The Driver tab** (#1703, #1707): one pinned tab cycles every web run's session, routed by the claude.ai/code sidebar. Each row's status icon carries a plain-text `aria-label` (`Awaiting input`, `Unread response`, `Idle`, PR state), so only waiting sessions are visited, by in-app navigation. A full-page "The Framework Driver" overlay with debug logs marks the tab.
-2. **Dashboard state from the reported status** (#1668): `cloudRunState` shows a real waiting/running.
-3. **The daemon-owned browser** (#1718): behind a "Bridge browser" preference, the daemon downloads Chrome for Testing, installs the extension over CDP `Extensions.loadUnpacked` with developer mode on (so the #1712 self-reload works; `--load-extension` gets the extension disabled on reload), seeds the token, and keeps the window minimized (macOS clamps off-screen positions; minimized still passes Cloudflare). Settings raises it for the one-time sign-in. Two Drivers can serve one daemon; an answer is claimed on read.
+1. **The Driver tab** (#1703/#1707): one tab cycles through the sessions, routed by the session list's status icons (readable in code as plain `aria-label`s — the precondition held), instead of one tab per session.
+2. **Dashboard state from the reported status** (#1668).
+3. **The daemon-owned browser** (#1718, behind the **Bridge browser** preference): the daemon downloads Chrome for Testing, installs the extension over CDP `Extensions.loadUnpacked` with developer mode on (a `--load-extension` install is disabled by Chrome 137+ on the extension's self-reload from #1712), seeds the token, opens the Driver tab and keeps the window **minimized** (macOS clamps off-screen positions back; a minimized headed window passes Cloudflare). Dogfooded on macOS with the user's own Chrome quit.
 
-Dogfooded end to end on macOS with the user's own Chrome quit. The maintainer confirmed on Linux (2026-08-27) — with one bug found.
+**What is left here:**
 
-## What is left
+- **A crash to fix:** the daemon's browser only launches if the daemon was started with the bridge already on. Turning the bridge on and picking the browser in the same daemon session fails the launch, and the failure crashes the daemon instead of reporting an error (hit by the maintainer on 2026-08-27). Wanted: an error saying "restart the dashboard first", no crash.
+- **Linux:** untried; a headed browser needs a display (Xvfb), not built. Windows untested.
 
-- **Bug: enabling the bridge and picking the daemon's browser in the same daemon session crashes the daemon.** The browser only launches if the daemon started with the bridge already on; the failed launch throws instead of reporting. Fix: show "restart the dashboard first" (or launch properly) instead of crashing. Promised on the thread 2026-08-27, not yet confirmed fixed.
-- Linux without a display needs Xvfb; unbuilt, not ticketed until someone runs a headless-server daemon. Windows untested.
-- Split out: #1720 (ship the extension inside the npm package, so the daemon's browser works outside a checkout) and #1719 (closed).
-- The spike itself is answered; closing the issue is the maintainer's call.
+Filed separately: #1720 (ship the extension in the npm package, so the daemon's browser works outside a checkout); #1719 (an agent's browser outliving a hard-killed agent, closed).
 
 ## Why it matters
 
-Web runs no longer depend on the user's Chrome being open, and one tab scales to many sessions. The remaining crash is what the maintainer hit on first try, so it is the blocker for anyone else enabling the daemon's browser.
+The extension path is the shipped direction for web runs. The Driver tab is what lets one browser serve 50 sessions, and the daemon's own browser is what lets web runs work without the user's Chrome open. The crash above sits on the recommended setting's first-use path.
 
 ## Source
 
-Imported from GitHub issue [framework/the-framework#1332](https://github.com/framework/the-framework/issues/1332), created 2026-07-28, labels: `priority: high`, `UX ✨`. Comments folded through 2026-08-27T15:15Z. The body cross-links #1554 (choices support in the CC web driver) as the other half of full-fledged CC web support.
+Imported from GitHub issue [framework/the-framework#1332](https://github.com/framework/the-framework/issues/1332), created 2026-07-28, labels: `priority: high`, `UX ✨`, 28 comments (last folded: 2026-08-27T15:15Z).
+
+### Notes from the GitHub thread
+
+- Once the extension is on the Web Store, the daemon's Chrome can install it through the `ExtensionInstallForcelist` policy, with no developer mode and no reload problem. Prerequisite: accept a minimum extension version instead of the exact one (#1519).
+- Two Drivers can serve one daemon (the user's Chrome and the daemon's browser), so an answer is claimed on read and never typed twice.

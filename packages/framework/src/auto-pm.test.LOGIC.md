@@ -27,7 +27,7 @@ What the tests cover, for the Auto PM sweep's policy and loop. The loop is drive
 - **The routine off, a move** - is the rotation's turn, and nothing works the queue.
 - **An unreadable branch** - stands the project down naming the branch.
 - **The log says a stand-down once** - the same stand-down over three looks is one log line; the report carries it every time.
-- **The queued-work routine** - its prompt is the slash command of the `work-queue` skill file, which names itself, is invocable only by a person or the daemon, and tells the agent one task, commit without pushing, committed counts as published, say so and stop; it is the only routine that works the queue and the only one that auto-merges.
+- **The queued-work routine** - its prompt is the slash command `/work-queue`; it is the only routine that works the queue and the only one that auto-merges.
 
 **The rotation**
 

@@ -3,11 +3,12 @@ import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promi
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { test } from 'node:test'
-import { nodeGitRunner } from './git.js'
+import { nodeGitRunner, type GitRunner } from './git.js'
 import {
   ensureFileBranch,
   fileBranchPath,
   fileBranchRepo,
+  isIndexLocked,
   listBranchDir,
   pullFileBranch,
   readBranchFile,
@@ -205,6 +206,38 @@ test('a push lost to another writer re-applies the intent once, not twice', asyn
     // The first run's commit was wound back, so the append is on the branch exactly once.
     assert.equal(await git(['show', `${BRANCH}:queue.md`], bare), '- first\n- appended\n')
     assert.equal(await git(['show', `${BRANCH}:theirs.md`], bare), 'theirs\n')
+  } finally {
+    await cleanup()
+  }
+})
+
+test('another process holding the index is waited out: the cycle runs again and the write lands once', async () => {
+  const { repo, bare, cleanup } = await initSyncedRepos()
+  try {
+    // git's own refusal, as the daemon and the scheduler hand it to each other on one clone.
+    const refusal = new Error("Command failed: git add -A\nfatal: Unable to create '/x/.git/worktrees/store/index.lock': File exists.\n\nAnother git process seems to be running in this repository")
+    assert.equal(isIndexLocked(refusal), true)
+    assert.equal(isIndexLocked(new Error('Command failed: git push')), false)
+    let refusals = 2
+    const locked: GitRunner = (args, cwd) => {
+      if (args[0] === 'add' && refusals-- > 0) return Promise.reject(refusal)
+      return git(args, cwd)
+    }
+    let runs = 0
+    const result = await withFileBranch(repo, BRANCH, 'append', async dir => {
+      runs++
+      await writeFile(join(dir, 'queue.md'), '- once\n')
+    }, { git: locked })
+    assert.deepEqual(result, { ok: true, changed: true, pushed: true })
+    assert.equal(runs, 3, 'the change re-ran after each refusal')
+    assert.equal(await git(['show', `${BRANCH}:queue.md`], bare), '- once\n')
+    assert.equal((await git(['log', '--oneline', BRANCH], repo)).trim().split('\n').length, 2, 'born, then one commit')
+    // A lock that never lifts is reported like any other failure, and the checkout is clean.
+    refusals = Number.POSITIVE_INFINITY
+    const stuck = await withFileBranch(repo, BRANCH, 'again', async dir => writeFile(join(dir, 'queue.md'), '- twice\n'), { git: locked })
+    assert.equal(stuck.ok, false)
+    assert.match((stuck as { error: string }).error, /index\.lock/)
+    assert.equal(await readFile(join(fileBranchPath(repo, BRANCH), 'queue.md'), 'utf8'), '- once\n')
   } finally {
     await cleanup()
   }

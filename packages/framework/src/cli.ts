@@ -51,13 +51,6 @@ import { createGateKeepalive } from './gate-keepalive.js'
 import { ensureDaemonToken, readDaemonToken, readPreferences } from './registry.js'
 import { DEFAULT_SPEND_OFFSET } from './preference-defaults.js'
 import {
-  planMaintenanceSweep,
-  maintainSweep,
-  mergeMaintenanceState,
-  short,
-  type RepoReview,
-} from './maintenance.js'
-import {
   listProjectWorktrees,
   removeProjectWorktree,
   pruneProjectWorktrees,

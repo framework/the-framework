@@ -18,7 +18,7 @@ The landing page of https://the-framework.ai and the pieces every page of the si
 - **The problem** (`StopBabysitting.tsx`) - the site's core argument: five ways a coding agent [1] lets its user down, the bad fix people try, and The Framework's solution for each.
 - **What runs without a human** (`AutonomousAi.tsx`) - the claims about what AI does on its own under The Framework, followed by the reassurances that bound them.
 - **The two building blocks** (`HowItWorks.tsx`, `EnhancedSystemPrompt.tsx`, `Queues.tsx`, `Prompts.tsx`) - the enhanced system prompt and the queues, side by side, closed by the note that the prompts are open source and can be replaced with the visitor's own.
-- **The features** (`Features.tsx`) - eight cards, each a claim with a one-sentence explanation, marked "Coming soon" where the feature is not shipped.
+- **The features** (`Features.tsx`) - nine cards, each a claim with a one-sentence explanation, from bringing your own subscription to a headless browser the agents control; none is marked "Coming soon".
 - **What the visitor keeps** (`YourFramework.tsx`) - the promises that it is the visitor's framework: only the features they pick, and nothing forced.
 - **The invitation** (`Cta.tsx`, `TopNav.tsx`, `Footer.tsx`) - the closing call to join the Discord server or star the repository, and the navigation and footer that carry the same three addresses on every page of the site.
 - **The shared vocabulary** (`ui.tsx`, `icons.tsx`, `copy.ts`) - the visual pieces the sections are drawn from and the three addresses the whole site links to, the Discord, GitHub and npm logos, and the click-to-copy behavior behind every command chip and the hero's "Try:" box.

@@ -8,4 +8,4 @@ The `@gemstack/skill-update-tickets` npm package: the `update-tickets` command s
 
 ## Business logic — TL;DR
 
-- **The job** (`SKILL.md`) - bringing the project's tickets up to date with its issue tracker, unattended; the routine the scheduler fires on the interval the project's schedule gives it.
+- **The job** (`SKILL.md`) - bringing the project's tickets up to date with its issue tracker and its merged pull requests, unattended; the routine the scheduler fires on the interval the project's schedule gives it.

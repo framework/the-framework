@@ -10,7 +10,8 @@ The `plan-tickets` command skill: the prompt of the agent a runner starts for qu
 
 - **Nobody answers** - the agent never asks and decides by itself.
 - **Which tickets** - open, not planned, not held by someone; the ten most important of them.
-- **One entry per ticket** - an entry on the agent queue asking for that ticket's plan to be written, naming the ticket's file, at a priority picked after reading the ticket by a mix of sensible criteria, a low-effort-looking ticket ranking higher; a ticket whose plan is already asked for on the queue is skipped.
+- **One entry per ticket** - an entry on the agent queue asking for that ticket's plan to be written, naming the ticket's file, at a priority picked after reading the ticket by a mix of sensible criteria, a low-effort-looking ticket ranking higher; a ticket whose plan is already asked for on the queue is skipped, and so is a ticket in review (one with a pull request named on it).
+- **A rejected write** - a write to the queue rejected because someone else wrote first is tried once more after reading again.
 - **Only queue** - it writes no plan itself.
 - **Nothing to plan** - it says so and stops.
 - **No ticketing system, no AI queue** - it shows an error to the user and stops; in capability words, naming no skill.

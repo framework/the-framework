@@ -40,6 +40,14 @@ test('readTickets reads the GitHub: link, split into its label and URL, and leav
   assert.equal(bare?.github, undefined)
 })
 
+test('readTickets reads the PR: link the same way, the ticket in review, and leaves it off when absent', async () => {
+  const [inReview] = await readTickets(await dir({ '2026-07-20_thing.md': 'GitHub: [#42](https://github.com/org/repo/issues/42)\nPR: [#1790](https://github.com/org/repo/pull/1790)\n\n# Thing\n' }))
+  assert.deepEqual(inReview?.pr, { label: '#1790', url: 'https://github.com/org/repo/pull/1790' })
+  assert.deepEqual(inReview?.github, { label: '#42', url: 'https://github.com/org/repo/issues/42' })
+  const [bare] = await readTickets(await dir({ '2026-07-20_thing.md': 'PR: not a link\n\n# Thing\n' }))
+  assert.equal(bare?.pr, undefined)
+})
+
 test('readTickets dates a ticket by its filename, not its mtime, when the filename carries one', async () => {
   const cwd = await dir({ '2026-07-20_thing.md': '# Thing\n' })
   await new Promise(r => setTimeout(r, 1100))

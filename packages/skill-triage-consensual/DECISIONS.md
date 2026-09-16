@@ -19,8 +19,8 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   convention, a command is a skill.
 - A command is marked `disable-model-invocation`: a person or a runner fires it, the
   agent never picks it on its own.
-- A runner fires a command by its name, `/triage-consensual`; the agent's harness expands
-  the skill. The command's words are the rules of the job — significant work whose plan
-  has no open question and no variability; each goes on the queue at the ticket's own
-  priority, 5 when it has none; only queue, never do, so a human can still veto on the
-  queue — never a skill's name or command.
+- A runner fires a command by its name, `/triage-consensual`; the agent's harness
+  expands the skill. The command's words are the rules of the job — planned, significant
+  work whose plan has no open question and no variability, not a ticket in review; each
+  goes on the queue at the ticket's own priority, 5 when it has none; only queue, never
+  do, so a human can still veto on the queue — never a skill's name or command.

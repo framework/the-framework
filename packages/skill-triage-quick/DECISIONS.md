@@ -21,6 +21,7 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   agent never picks it on its own.
 - A runner fires a command by its name, `/triage-quick`; the agent's harness expands the
   skill. The command's words are the rules of the job — a quick win is a planned ticket
-  with a low effort and no uncertainty; each goes on the queue with a sensible priority,
-  the cheapest first; only queue, never do, so a human can still veto on the queue — never
-  a skill's name or command.
+  with a low effort and no uncertainty, not one whose plan records a decision not to do
+  the work, not one in review; each goes on the queue with a sensible priority, the
+  cheapest first; only queue, never do, so a human can still veto on the queue — never a
+  skill's name or command.

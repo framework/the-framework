@@ -28,6 +28,7 @@ Implements a branch of the project's repository used as a file store: files that
 - **The write cycle** - sync with origin, apply the change to the checkout, commit whatever changed under the caller's message, push whenever the branch is ahead of origin's copy.
 - **Sync: rebase onto origin, and origin wins a conflict** - unpushed local commits are rebased onto origin's copy; when the rebase fails, the checkout is reset to origin's copy and those commits are dropped, unreported.
 - **A push that loses a race re-applies the change once** - the attempt's commit is wound back, the cycle re-syncs and re-applies; a second failed push keeps the commit local and reports it, for the next cycle to carry out; never a force push.
+- **Another process holding the index is waited out** - git's refusal to take the checkout's index lock, which two processes on one clone hand each other, resets the checkout, waits half a second and runs the cycle again, three times at most.
 - **A failed change leaves the checkout clean** - any other failure, a timeout included, resets the checkout to its last commit, removes stray files, and is reported rather than thrown.
 - **The pull** - a write cycle with no change, run on the daemon's clock so this machine converges on what others pushed and pushes what an earlier cycle left stranded; a repository with no remote is an error it names.
 - **Reads from anywhere, and never a failure** - a file or a directory listing is read off the checkout, the local branch, or origin's copy, from any directory of the repository, an agent's checkout included; whatever is missing reads as absent.
@@ -115,6 +116,16 @@ Without a remote, a sync does nothing. With one, the branch is fetched from orig
 #### Business logic
 
 The change is an intent and the commit only its serialization, so the caller's change must be safe to run again. When the push fails on the first attempt, the attempt's commit is wound back to the tip the cycle started from (when a commit was made), the cycle syncs again, bringing in what the other writer pushed, and runs the change again against the fresher files, so the change lands exactly once. When the push fails on the second attempt too (the network, most likely), the commit stays local in the checkout [2] and the cycle reports the failure as "the <branch> branch could not be pushed: <git's reason>", marked as committed: the next write cycle [3] or pull rebases that commit onto whatever origin has by then, and its push carries it out together with the new change. A push killed on its time budget counts as a failed push and may have landed anyway; the next sync's rebase absorbs a commit origin already has. The branch is never force-pushed.
+
+### Another process holding the index is waited out
+
+#### Context
+
+**Problem**: the one-at-a-time rule is a process's own; two processes on one clone (the daemon's pull and a scheduler's, each on its own clock) can run a cycle on the same checkout at once, and git refuses the second with "Unable to create '…/index.lock': File exists" rather than waiting. On the scheduler's side a refused pull loses a whole tick.
+
+#### Business logic
+
+When a cycle fails with git's index-lock refusal, the checkout is reset as for any failure (next section), the cycle waits half a second and runs again, the change included, up to three more times. A lock that never lifts is then reported as the failure it is.
 
 ### A failed change leaves the checkout clean
 

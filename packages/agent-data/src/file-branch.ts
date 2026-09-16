@@ -171,9 +171,24 @@ function resolveMessage(message: CommitMessage): string {
 }
 
 /**
+ * git's refusal when another process holds the checkout's index: the one failure two processes
+ * on one clone (a daemon and a scheduler, each with its own in-process chain) hand each other.
+ * git does not wait for the index lock, so the cycle waits instead and runs again.
+ */
+const INDEX_LOCK_RETRIES = 3
+const INDEX_LOCK_WAIT_MS = 500
+export function isIndexLocked(err: unknown): boolean {
+  return /index\.lock['"]?: File exists/.test(errorMessage(err))
+}
+
+/**
  * Apply one change to the branch through its persistent checkout: sync with origin, run `op`
  * against the checkout, commit whatever it changed, push. The single funnel a long-lived
  * process's writes go through.
+ *
+ * Another process holding the checkout's index (its `index.lock`) is waited out: the checkout
+ * is reset, the cycle waits half a second and runs again, three times at most, before the
+ * failure is reported like any other.
  *
  * `op` must be re-runnable: when the push loses a race with another writer, the cycle re-syncs
  * and runs it again against the fresher state rather than force-fitting a stale commit — the op
@@ -193,41 +208,57 @@ export async function withFileBranch(
   const r = resolveDeps(deps)
   const path = fileBranchPath(repo, branch)
   return serialize(repo, branch, async () => {
-    try {
-      await ensureCore(repo, branch, r)
-      const remote = await hasRemote(repo, r.git)
-      for (let attempt = 0; ; attempt++) {
-        await syncCore(repo, branch, r)
-        // The tip before this op's commit: what a lost push winds back to before re-applying, so
-        // the op's first serialization is dropped rather than rebased under its second run.
-        const before = (await r.git(['rev-parse', 'HEAD'], path)).trim()
-        await op(path)
-        await r.git(['add', '-A'], path)
-        const staged = (await r.git(['status', '--porcelain'], path)).trim()
-        if (staged) await r.git(['commit', '-m', resolveMessage(message)], path)
-        if (!remote) return { ok: true, changed: Boolean(staged), pushed: false }
-        // Unpushed commits — this cycle's, or an earlier cycle's that the sync just rebased. The
-        // push is owed whenever any exist, even when this op itself wrote nothing new.
-        const ahead = (await refExists(repo, `refs/remotes/origin/${branch}`, r.git))
-          ? (await r.git(['rev-list', '--count', `origin/${branch}..${branch}`], repo)).trim() !== '0'
-          : true
-        if (!ahead) return { ok: true, changed: false, pushed: false }
-        try {
-          await r.git(['push', 'origin', `${branch}:${branch}`], path)
-          return { ok: true, changed: Boolean(staged), pushed: true }
-        } catch (err) {
-          if (attempt >= 1) return { ok: false, committed: true, error: `the ${branch} branch could not be pushed: ${errorMessage(err)}` }
-          if (staged) await r.git(['reset', '--hard', before], path)
-        }
-      }
-    } catch (err) {
-      // The op's half-written files must not ride a later, unrelated commit: put the checkout
-      // back to its committed state before reporting.
-      await r.git(['reset', '--hard'], path).catch(() => {})
-      await r.git(['clean', '-fd'], path).catch(() => {})
-      return { ok: false, committed: false, error: errorMessage(err) }
+    for (let locked = 0; ; locked++) {
+      const outcome = await cycle(repo, branch, path, message, op, r)
+      if (outcome.ok || !isIndexLocked(outcome.error) || locked >= INDEX_LOCK_RETRIES) return outcome
+      await new Promise(resolve => setTimeout(resolve, INDEX_LOCK_WAIT_MS))
     }
   })
+}
+
+/** One write cycle, unserialized: sync, apply, commit, push (twice on a lost race). Never throws. */
+async function cycle(
+  repo: string,
+  branch: string,
+  path: string,
+  message: CommitMessage,
+  op: (dir: string) => Promise<void>,
+  r: Resolved,
+): Promise<FileBranchWrite> {
+  try {
+    await ensureCore(repo, branch, r)
+    const remote = await hasRemote(repo, r.git)
+    for (let attempt = 0; ; attempt++) {
+      await syncCore(repo, branch, r)
+      // The tip before this op's commit: what a lost push winds back to before re-applying, so
+      // the op's first serialization is dropped rather than rebased under its second run.
+      const before = (await r.git(['rev-parse', 'HEAD'], path)).trim()
+      await op(path)
+      await r.git(['add', '-A'], path)
+      const staged = (await r.git(['status', '--porcelain'], path)).trim()
+      if (staged) await r.git(['commit', '-m', resolveMessage(message)], path)
+      if (!remote) return { ok: true, changed: Boolean(staged), pushed: false }
+      // Unpushed commits — this cycle's, or an earlier cycle's that the sync just rebased. The
+      // push is owed whenever any exist, even when this op itself wrote nothing new.
+      const ahead = (await refExists(repo, `refs/remotes/origin/${branch}`, r.git))
+        ? (await r.git(['rev-list', '--count', `origin/${branch}..${branch}`], repo)).trim() !== '0'
+        : true
+      if (!ahead) return { ok: true, changed: false, pushed: false }
+      try {
+        await r.git(['push', 'origin', `${branch}:${branch}`], path)
+        return { ok: true, changed: Boolean(staged), pushed: true }
+      } catch (err) {
+        if (attempt >= 1) return { ok: false, committed: true, error: `the ${branch} branch could not be pushed: ${errorMessage(err)}` }
+        if (staged) await r.git(['reset', '--hard', before], path)
+      }
+    }
+  } catch (err) {
+    // The op's half-written files must not ride a later, unrelated commit: put the checkout
+    // back to its committed state before reporting.
+    await r.git(['reset', '--hard'], path).catch(() => {})
+    await r.git(['clean', '-fd'], path).catch(() => {})
+    return { ok: false, committed: false, error: errorMessage(err) }
+  }
 }
 
 /** How a pull went: converged with origin, or why it could not. */

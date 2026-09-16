@@ -1,0 +1,14 @@
+{
+  "id": "2026-09-16T20-36-22-782Z",
+  "startedAt": "2026-09-16T20:36:22.782Z",
+  "status": "running",
+  "intent": "/triage-consensual",
+  "driver": "claude-code",
+  "model": "opus",
+  "caller": {
+    "scheduler": {
+      "command": "triage-consensual",
+      "host": "Suleimans-MacBook-Pro.local"
+    }
+  }
+}

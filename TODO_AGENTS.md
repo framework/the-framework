@@ -1,6 +1,5 @@
 ## Priority 6
 
-- [Landing page: New feature "Headless browser"](tickets/2026-07-26_landing-headless-browser.md)
 - [App instead of `localhost`?](tickets/2026-07-12_app-instead-of-localhost.md)
 
 ## Priority 5

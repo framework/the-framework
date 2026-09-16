@@ -22,6 +22,7 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - A runner fires a command by its name, `/update-tickets`; the agent's harness expands
   the skill. The command's words are the rules of the job — note the time before fetching
   and record it after, so nothing edited meanwhile is missed; only what changed since the
-  last import; one ticket per issue, updated in place, closed when the issue is; an error
-  in capability words when the tracker or the last-import time is missing — never a
-  skill's name or command.
+  last import; one ticket per issue, updated in place, closed when the issue is; the
+  tickets named by the pull requests merged since the last import closed too, which is
+  how a ticket closes at its merge; an error in capability words when the tracker or the
+  last-import time is missing — never a skill's name or command.

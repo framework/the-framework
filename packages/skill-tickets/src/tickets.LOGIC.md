@@ -1,4 +1,4 @@
-Reads tickets off the `tickets/` directory of the `agent-data` branch [1] into rows: what the head of each ticket's markdown says about itself (title, summary, priority, topics, GitHub link, date) plus what the plan and the claim [2] beside it add (planned, locked, holder [3], effort, uncertainty). The same reader serves the `tickets` command's `list` and `show` and the daemon, which serves the dashboard's ticket rows and runs the routines, whether the directory is a checkout on disk or a tree read straight off the branch without a checkout; it also reads `tickets/meta.json`, the stamp of the last issue import.
+Reads tickets off the `tickets/` directory of the `agent-data` branch [1] into rows: what the head of each ticket's markdown says about itself (title, summary, priority, topics, GitHub link, pull request link, date) plus what the plan and the claim [2] beside it add (planned, locked, holder [3], effort, uncertainty). The same reader serves the `tickets` command's `list` and `show` and the daemon, which serves the dashboard's ticket rows and runs the routines, whether the directory is a checkout on disk or a tree read straight off the branch without a checkout; it also reads `tickets/meta.json`, the stamp of the last issue import.
 
 ## Context
 
@@ -13,12 +13,12 @@ Reads tickets off the `tickets/` directory of the `agent-data` branch [1] into r
 [3] holder: who a claim names: the agent's id when the daemon started the agent, else the branch the `tickets` command ran on.
 [4] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
 [5] sibling: a ticket's plan file (`<name>.plan.md`) or claim file (`<name>.lock.md`), written about the ticket and never a ticket of its own.
-[6] key block: the `key: value` lines above a ticket's or a plan's `# ` heading, where `Priority:`, `Topics:`, `GitHub:`, `Effort:` and `Uncertainty:` are read from.
+[6] key block: the `key: value` lines above a ticket's or a plan's `# ` heading, where `Priority:`, `Topics:`, `GitHub:`, `PR:`, `Effort:` and `Uncertainty:` are read from.
 
 ## Business logic — TL;DR
 
-- **What a ticket's row holds** - one row per ticket, the same fields for `list` and `show`: file, title, summary, date and whether planned always; priority, topics, GitHub link, locked, holder, effort and uncertainty only when they have a value.
-- **The key block above the title** - `Priority:`, `Topics:` and `GitHub:` are read only from the key block [6], the lines above the `# ` heading, keys matched in any case; any other line there is noise.
+- **What a ticket's row holds** - one row per ticket, the same fields for `list` and `show`: file, title, summary, date and whether planned always; priority, topics, GitHub link, pull request link, locked, holder, effort and uncertainty only when they have a value.
+- **The key block above the title** - `Priority:`, `Topics:`, `GitHub:` and `PR:` are read only from the key block [6], the lines above the `# ` heading, keys matched in any case; any other line there is noise.
 - **The title, else the filename made readable** - the first `# ` heading is the title; without one, the filename without `.md`, percent escapes decoded and underscores turned into spaces.
 - **The summary is the first prose line** - the first line after `## TLDR` that is not blank, not a heading and not a `Source:` line; without a `## TLDR`, the first such line after the title; empty when there is none.
 - **A ticket's date, and newest first** - the `yyyy-mm-dd` the filename starts with, at midnight UTC; else the file's modification time; else the Unix epoch; a listing is ordered newest first.
@@ -44,11 +44,11 @@ A row names the ticket by its filename inside `tickets/`, which is also its iden
 
 #### Context
 
-**Problem**: `Priority:`, `Topics:` and `GitHub:` are plain text lines a ticket's body could also contain, so reading keys out of the body would turn a sentence that mentions "priority:" into a field. Restricting keys to the lines above the title keeps the format unambiguous while staying tolerant of tickets written before it.
+**Problem**: `Priority:`, `Topics:`, `GitHub:` and `PR:` are plain text lines a ticket's body could also contain, so reading keys out of the body would turn a sentence that mentions "priority:" into a field. Restricting keys to the lines above the title keeps the format unambiguous while staying tolerant of tickets written before it.
 
 #### Business logic
 
-The lines above the first `# ` heading are the ticket's key block [6]; a ticket with no heading has no key block, so none of the keys are read. In the key block, a line whose lowercased text starts with `priority:`, `topics:` or `github:` gives that key its value: the text after the colon with surrounding whitespace removed, the first such line winning. A `Priority:` value is lowercased and kept as written (`High` becomes `high`, `7` stays `7`); an empty value counts as absent. A `Topics:` value drops one leading `[` and one trailing `]`, then splits on commas into trimmed tags with empty tags dropped, so `[dx, ui, docs]` and `dx, ui, docs` both give three topics; a value with no tag left counts as absent. A `GitHub:` value gives a link only when it holds a markdown link, `[label](url)`: the first such link's label and URL are kept as written, the label never re-derived from the URL; a `GitHub:` line without a link gives no link. Any other line in the key block, such as a leftover `Status:` line, is noise and never a field.
+The lines above the first `# ` heading are the ticket's key block [6]; a ticket with no heading has no key block, so none of the keys are read. In the key block, a line whose lowercased text starts with `priority:`, `topics:`, `github:` or `pr:` gives that key its value: the text after the colon with surrounding whitespace removed, the first such line winning. A `Priority:` value is lowercased and kept as written (`High` becomes `high`, `7` stays `7`); an empty value counts as absent. A `Topics:` value drops one leading `[` and one trailing `]`, then splits on commas into trimmed tags with empty tags dropped, so `[dx, ui, docs]` and `dx, ui, docs` both give three topics; a value with no tag left counts as absent. A `GitHub:` value gives a link only when it holds a markdown link, `[label](url)`: the first such link's label and URL are kept as written, the label never re-derived from the URL; a `GitHub:` line without a link gives no link. A `PR:` value is read by the same rule: the pull request that closes the ticket once merged, present while the ticket is in review. Any other line in the key block, such as a leftover `Status:` line, is noise and never a field.
 
 ### The title, else the filename made readable
 

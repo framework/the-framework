@@ -22,10 +22,10 @@ The instructions every agent [1] reads before touching a ticket: where the ticke
 - **Where the tickets are and how to reach them** - tickets live on the `agent-data` branch, never on a code branch; the root `tickets` link is a possibly stale copy never to be written; the agent installs the repository's dependencies if needed and runs `npx tickets`, whose every change is one commit pushed straight to the branch.
 - **Reading** - `list` gives every open ticket as one JSON array of rows; `show <file>` gives one ticket with its text, its plan and who holds it; `meta` gives when the tickets last caught up with the issue tracker.
 - **Changing** - `put <file>` writes one whole file under `tickets/` from stdin, a ticket or a plan; `close <file>`, only once the work is merged, removes the ticket with its plan and claim, refused while someone else holds it, and leaves its queue entry to `npx queue done`.
-- **Queueing a ticket** - with the `queue` skill present, a ticket goes on the agent queue as a markdown link labeled with its title, at the ticket's own `Priority:` (5 when it has none).
+- **Queueing a ticket, and the ticket in review** - with the `queue` skill present, a ticket goes on the agent queue as a markdown link labeled with its title, at the ticket's own `Priority:` (5 when it has none); once its pull request is open the agent marks the entry done, writes the pull request into the ticket as its `PR:` line and releases its claim, and names the ticket (and its issue) in the pull request's body; the ticket closes when the pull request merges, never before.
 - **Claim before planning or working** - `claim <file>` makes the ticket the agent's or names who holds it; on someone else's the agent picks another and never removes or overwrites their claim; `release <file>` lifts the agent's own claim when done and before it stops, since nothing lifts a claim on a timeout.
 - **Naming a ticket, and who the agent is** - every `<file>` is a ticket's filename or the `tickets/…` path a queue entry links to; the agent claims as `AGENT_ID` when set, else as its current branch, so it releases from the branch it claimed on.
-- **The ticket format** - `tickets/<DATE>_<SLUG>.md`: optional `Priority:`, `Topics:` and `GitHub:` above a `# ` title, then `## TLDR` and `## Why it matters`; the numeric keys are bare whole numbers or they read as absent.
+- **The ticket format** - `tickets/<DATE>_<SLUG>.md`: optional `Priority:`, `Topics:`, `GitHub:` and `PR:` above a `# ` title, a `PR:` line meaning the ticket is in review and is not to be chosen or queued, then `## TLDR` and `## Why it matters`; the numeric keys are bare whole numbers or they read as absent.
 - **The claim format** - `tickets/<DATE>_<SLUG>.lock.md`, one line, `CLAIMED: <holder>`, written by `claim`, removed by `release` or `close`.
 - **The plan format** - `tickets/<DATE>_<SLUG>.plan.md`: `Effort:` and `Uncertainty:` on a 0 to 10 scale, an optional `Outdated: yes`, a `# [Plan]` title, and free sections; the uncertainty gauges significant alternatives and decides whether a human is needed.
 
@@ -69,7 +69,7 @@ See `## Context`.
 
 #### Business logic
 
-When the repository has the `queue` skill [5], a ticket goes on the agent queue as a link, the ticket's title as the label, at the ticket's own `Priority:`, or 5 when it has none: `npx queue add "[<title>](tickets/<file>)" --priority <N>`. Once the work is merged, the agent runs `npx tickets close <file>` and then `npx queue done` for the entry.
+When the repository has the `queue` skill [5], a ticket goes on the agent queue as a link, the ticket's title as the label, at the ticket's own `Priority:`, or 5 when it has none: `npx queue add "[<title>](tickets/<file>)" --priority <N>`. Once the work is committed and its pull request is open, the agent runs `npx queue done` for the entry, writes the pull request into the ticket as its `PR:` line with `npx tickets put`, and releases its claim; the ticket is in review. The agent does not close it: the ticket closes when the pull request merges, through the update from the issue tracker, which reads the pull request's `Closes tickets/<file>` line (and GitHub closes the issue named by `Closes #<number>`).
 
 ### Claim before planning or working
 
@@ -99,7 +99,7 @@ Every `<file>` takes a ticket's filename (`2042-01-01_some-ticket.md`) or the `t
 
 #### Business logic
 
-A ticket is `tickets/<DATE>_<SLUG>.md`, `<DATE>` as `yyyy-mm-dd` and `<SLUG>` a succinct kebab-case slug of the title. Above the `# ` title stand the optional keys: `Priority:` from 0 to 10 (10 is critical, act immediately; 0 is only if capacity), `Topics:` as a bracketed list, and `GitHub:` as a markdown link to the issue. Then the title, a `## TLDR` section, a `## Why it matters` section, and optionally more, under any heading and in any format. `Priority:`, `Effort:` and `Uncertainty:` are bare whole numbers above the `# ` title; anything else reads as absent for queue placement and the scales, and a ticket with no readable `Priority:` queues at 5.
+A ticket is `tickets/<DATE>_<SLUG>.md`, `<DATE>` as `yyyy-mm-dd` and `<SLUG>` a succinct kebab-case slug of the title. Above the `# ` title stand the optional keys: `Priority:` from 0 to 10 (10 is critical, act immediately; 0 is only if capacity), `Topics:` as a bracketed list, `GitHub:` as a markdown link to the issue, and `PR:` as a markdown link to the pull request that closes the ticket once merged, present while the ticket is in review, when it is skipped for work and never queued again until the line is removed. Then the title, a `## TLDR` section, a `## Why it matters` section, and optionally more, under any heading and in any format. `Priority:`, `Effort:` and `Uncertainty:` are bare whole numbers above the `# ` title; anything else reads as absent for queue placement and the scales, and a ticket with no readable `Priority:` queues at 5.
 
 ### The claim format
 

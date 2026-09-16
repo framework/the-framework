@@ -22,6 +22,16 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   persistent checkout still commits its own `tickets/` under the same repo-wide exclude.
 - Closing a ticket deletes it, its plan and its claim, and nothing else; a queue entry
   linking it stays until `queue done`.
+- A ticket closes when its pull request merges, never when the work is committed: a
+  pull request closed unmerged must leave the ticket. In between the ticket is in review:
+  it carries the pull request as a `PR:` line, written by the agent that opened it, which
+  then releases its claim; a ticket in review is skipped for work and never queued. The
+  close itself is the tracker update's: the pull request's body names the ticket it
+  closes (`Closes tickets/<file>`) and the issue (`Closes #<number>`), and the routine
+  that syncs the tickets with the tracker closes the tickets of merged pull requests and
+  of closed issues. Picked over the agent holding its claim until the merge (a close by
+  anyone but the holder is refused), over a workflow on the git host (not every user has
+  one) and over a routine of its own (an agent per close).
 - A ticket's row, the same fields in `list` and `show`: the title from its `# ` line, the
   summary from the first prose line after `## TLDR`, else after the title, scanning past
   headings, `Priority:` lowercased.

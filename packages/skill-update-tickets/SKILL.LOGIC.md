@@ -2,7 +2,7 @@ The `update-tickets` command skill: the prompt of the agent a runner starts for 
 
 ## Context
 
-**User story**: a runner, the scheduler or a person, starts an agent with `/update-tickets`. The agent notes the time, reads when the tickets last caught up with the tracker, fetches what changed since, writes one ticket per issue, closes the tickets of closed issues, records the new import time, and says in one line how many it added, updated and removed.
+**User story**: a runner, the scheduler or a person, starts an agent with `/update-tickets`. The agent notes the time, reads when the tickets last caught up with the tracker, fetches what changed since, writes one ticket per issue, closes the tickets of closed issues and of the pull requests merged since, records the new import time, and says in one line how many it added, updated and removed.
 
 **Business logic story**: the skill names no skill and no command, and assumes no capability. The agent composes the capability skills tracked in the project on its own; what this file carries is the rules of the job, which an unattended agent cannot infer from the skills alone. Where the job is broken without a capability, the skill says so in capability words and stops.
 
@@ -12,5 +12,7 @@ The `update-tickets` command skill: the prompt of the agent a runner starts for 
 - **The time first** - it notes the current UTC time before fetching, and records that time at the end, so an issue edited meanwhile is picked up by the next update rather than missed.
 - **Where it starts from** - it reads when the tickets last caught up with the tracker; tickets with no such time, a tracker it cannot reach, or a tracker it is not logged in to are an error shown to the user, saying which, and it stops; no tickets at all is a first import of every open issue; otherwise only what changed since that time is fetched, issues and discussion.
 - **One ticket per issue** - a new issue gets a ticket; an existing ticket is updated in place, keeping its file name and its plan, the plan marked outdated when the change calls for it; a comment is folded in only where it changes what the work is, never pasted; a closed issue has its ticket closed.
+- **Merged pull requests** - every pull request merged since the last import whose body names a ticket with `Closes tickets/<file>` has that ticket closed; a ticket already gone is nothing to do. This is how a ticket in review closes at its merge.
+- **A rejected write** - a write to the tickets rejected because someone else wrote first is tried once more after reading again.
 - **The record and the line** - the noted time is recorded as the new import time, and the agent says in one line how many tickets it added, updated and removed.
 - **No ticketing system** - it shows an error to the user and stops; in capability words, naming no skill.

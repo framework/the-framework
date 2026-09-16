@@ -9,8 +9,9 @@ The `triage-consensual` command skill: the prompt of the agent a runner starts f
 ## Business logic — TL;DR
 
 - **Nobody answers** - the agent never asks and decides by itself.
-- **Consensual work** - a significant ticket, no quick win, whose plan has no open question, no variability, one fairly obvious plan.
-- **Queueing** - each picked ticket goes on the agent queue as a link to the ticket labeled with its title, at the ticket's own priority, 5 when it has none; a ticket already on the queue or held by someone is skipped.
+- **Consensual work** - a planned ticket (one without a plan is never consensual yet), significant, no quick win, whose plan has no open question, no variability, one fairly obvious plan.
+- **Queueing** - each picked ticket goes on the agent queue as a link to the ticket labeled with its title, at the ticket's own priority, 5 when it has none; a ticket already on the queue, held by someone or in review (with a pull request named on it) is skipped.
+- **A rejected write** - a write to the queue rejected because someone else wrote first is tried once more after reading again.
 - **Only queue, never do** - the queue is the only thing it changes; it implements no ticket however clear its plan, so a human can still veto it on the queue.
 - **Nothing qualifies** - it says so and stops.
 - **No ticketing system, no AI queue** - it shows an error to the user and stops; in capability words, naming no skill.

@@ -13,9 +13,9 @@ Read and change them with the `tickets` command, a dependency of this repository
 
 ```
 npx tickets list                 every open ticket, as one JSON array: file, title, summary, priority, topics,
-                                 github, date, planned, effort, uncertainty, locked, lockedBy
-                                 (priority, topics, github, effort, uncertainty, locked, lockedBy
-                                 absent when unset)
+                                 github, pr, date, planned, effort, uncertainty, locked, lockedBy
+                                 (priority, topics, github, pr, effort, uncertainty, locked, lockedBy
+                                 absent when unset; pr set means the ticket is in review)
 npx tickets show <file>          one ticket: its text, its plan, who holds it
 npx tickets meta                 when the tickets last caught up with the issue tracker:
                                  {"lastImportedAt": <ISO 8601>}, or {} when no import was recorded
@@ -27,9 +27,9 @@ npx tickets meta                 when the tickets last caught up with the issue 
 npx tickets put <file>           write one file under tickets/ from stdin, the whole file, creating it if new;
                                  empty stdin writes an empty file
                                  (npx tickets put <file> < draft.md): a ticket or a plan
-npx tickets close <file>         once the work is done and published: remove the ticket with its plan
-                                 and lock; refused while someone else holds it; its queue entry, if any,
-                                 stays: `npx queue done` it
+npx tickets close <file>         once the work is merged, or the ticket is not wanted: remove the ticket
+                                 with its plan and lock; refused while someone else holds it; its queue
+                                 entry, if any, stays: `npx queue done` it
 ```
 
 ## Queue a ticket
@@ -40,7 +40,7 @@ When the repository has the `queue` skill, a ticket goes on the agent queue as a
 npx queue add "[<title>](tickets/<file>)" --priority <N>
 ```
 
-Once the work is done and published, `npx tickets close <file>` and `npx queue done` the entry.
+Once the work is committed and its pull request is open, `npx queue done` the entry, write the pull request into the ticket as its `PR:` line (`npx tickets put <file>` with the whole ticket, the line added above the title) and release your claim: the ticket is in review. Do not close it: it closes when the pull request merges, through the update from the issue tracker. The pull request's body names the ticket it closes with a line `Closes tickets/<file>`, and the issue with `Closes #<number>` when the ticket has one.
 
 ## Claim before you plan or work a ticket
 
@@ -66,6 +66,7 @@ DATE: yyyy-mm-dd. SLUG: a succinct kebab-case slug of the ticket title.
 Priority: 0-10 [optional, 10: critical — act immediately, 0: only if capacity]
 Topics: [list-of-topics] [optional]
 GitHub: [#42](https://github.com/org/repo/issues/42) [optional]
+PR: [#1790](https://github.com/org/repo/pull/1790) [optional: the pull request that closes this ticket, once one is open]
 
 # Ticket title
 
@@ -80,7 +81,7 @@ GitHub: [#42](https://github.com/org/repo/issues/42) [optional]
 [optional: more info (any heading and format you want)]
 ```
 
-`Priority:`, `Effort:` and `Uncertainty:` are bare whole numbers above the `# ` title; anything else reads as absent for queue placement and the scales, and a ticket with no readable `Priority:` queues at 5.
+A ticket with a `PR:` line is in review: skip it when choosing work, and never queue it again while the line stands; remove the line to have it worked again. `Priority:`, `Effort:` and `Uncertainty:` are bare whole numbers above the `# ` title; anything else reads as absent for queue placement and the scales, and a ticket with no readable `Priority:` queues at 5.
 
 ### A claim: `tickets/<DATE>_<SLUG>.lock.md`
 

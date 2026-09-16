@@ -21,7 +21,7 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   agent never picks it on its own.
 - A runner fires a command by its name, `/plan-tickets`; the agent's harness expands the
   skill. The command's words are the rules of the job — the ten most important tickets
-  that are neither planned nor held, one queue entry per ticket asking for its plan, a
-  priority picked after reading the ticket, no plan written by this agent — never a
+  that are neither planned nor held nor in review, one queue entry per ticket asking for its
+  plan, a priority picked after reading the ticket, no plan written by this agent — never a
   skill's name or command. Picked over one agent per ticket with a claim: the queue is
   the fan-out, and the queued work writes each plan one at a time.

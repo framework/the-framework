@@ -20,7 +20,7 @@ Runs the daemon's own browser for the Claude web bridge [1]: a Chrome for Testin
 
 - **Where the bridge browser lives** - under `$XDG_CONFIG_HOME/the-framework-browser` when that variable is set, else `~/.the-framework-browser`, beside the registry, with a profile that persists across restarts.
 - **Chrome for Testing, downloaded once** - the newest Chrome for Testing already under that directory, else the current stable build downloaded there with progress reported.
-- **The extension files come from a checkout** - the extension is taken from `packages/chrome-extension` next to this package, so the bridge browser runs only from a checkout.
+- **Where the extension files come from** - a checkout's `packages/chrome-extension` first, else the copy the build puts in the package; a package's copy is installed from the bridge browser's own `extension` folder.
 - **Stopping a browser a dead daemon left behind** - whatever process holds the profile's lock is asked to leave, given 5 seconds, then killed.
 - **The launch** - headed, on a free port, on the persistent profile, without the OS keychain, ready only once the debugging port answers within 30 seconds.
 - **Installing the extension, with developer mode on** - the extension is installed over the debugging connection and Chrome's developer-mode switch is flipped on so the extension survives reloading itself.
@@ -51,15 +51,22 @@ The bridge browser [5]'s directory holds its profile and its binary: `$XDG_CONFI
 
 The browser is the newest Chrome for Testing already under the directory's `chrome` cache. When none is there, the current stable build is looked up and downloaded once, about 150 MB, and the launch reports "looking up the current Chrome for Testing", "downloading Chrome for Testing <build>" and then the same line with a percentage as the download progresses. A platform Chrome for Testing has no build for fails the launch.
 
-### The extension files come from a checkout
+### Where the extension files come from
 
 #### Context
 
-See `## Context`.
+**User story**: a user who runs The Framework through npx, not from a git checkout, switches the bridge browser on, and it works. A maintainer who edits the extension in a checkout sees the edit reach the running bridge browser without a rebuild.
+
+**Problem**: Chrome derives an unpacked extension's identity from the folder it was installed from, and npx puts every version of the package in a different folder. Installing from there would leave the profile with one dead copy of the extension per version the user ever ran, each shown with an error on Chrome's extensions page.
 
 #### Business logic
 
-The extension's files are the checkout's `packages/chrome-extension`, next to this package. The extension is not part of the published package, so outside a checkout the launch fails at once with "the extension files are not beside this package (packages/chrome-extension): the bridge browser runs from a checkout".
+The extension's files are looked for in two places, in this order, and a folder counts only when its manifest names the bridge extension ("The Framework: Claude web bridge"):
+
+1. The checkout's `packages/chrome-extension`, next to this package. It is installed from where it is: its folder never moves, and the extension reloads itself when its files are edited there.
+2. The copy the package's build puts in `dist/chrome-extension`, which is what an installed package has. Once any browser an earlier daemon left behind is stopped, and before the launch, that copy replaces the contents of the bridge browser's own `extension` folder, and the extension is installed from there, so its identity stays the same across package versions.
+
+When neither folder holds the extension, the launch fails at once with "the extension files are missing from this package (dist/chrome-extension)".
 
 ### Stopping a browser a dead daemon left behind
 

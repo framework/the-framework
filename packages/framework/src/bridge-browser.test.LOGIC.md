@@ -2,7 +2,8 @@ What the tests cover, for the daemon's bridge browser:
 
 - **Where it lives** - under `$XDG_CONFIG_HOME/the-framework-browser` when that variable is set, else `~/.the-framework-browser`, beside the registry so a test's isolation covers it too.
 - **The launch flags** - headed, since claude.ai's bot gate rejects a headless browser; on its own profile; with its debugging port open; with extension debugging enabled, which installing over the connection needs; without the OS keychain, so an unattended browser never pops a password dialog; and never with a command-line extension install, which Chrome disables on the first reload.
-- **The extension files** - the extension is the checkout's `chrome-extension` package next to this one.
+- **The extension files** - in a checkout, the extension is the checkout's `chrome-extension` package next to this one; the checkout's folder wins over the package's copy, the package's copy is used when the checkout's is missing, a folder whose manifest names another extension is skipped, and nothing is found when neither is there; the build's copy holds exactly the files the extension's self-reload watches.
+- **Installing a package's copy** - the copy replaces whatever was in the bridge browser's `extension` folder, and the extension is installed from that folder.
 - **The profile lock** - the lock names the process holding it; no lock, or a lock that names no process, means nobody holds it.
 - **The macOS application** - the application bundle around the binary is what gets activated; a bare binary has none.
 - **What the extension is handed** - the daemon's address, the bridge token quoted so it cannot break out, automatic opening switched on, and the Driver tab opened pinned on `https://claude.ai/code`.

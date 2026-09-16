@@ -1,14 +1,18 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, symlink } from 'node:fs/promises'
+import { spawnSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
+import { mkdir, mkdtemp, readdir, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
+import { pathToFileURL } from 'node:url'
+import { runInNewContext } from 'node:vm'
 import {
   appBundle,
   bridgeBrowserDir,
   bridgeBrowserLaunchArgs,
   bridgeBrowserOwner,
-  bridgeExtensionDir,
+  bridgeExtensionSource,
   freeProfile,
   profileLockOwner,
   seedExpression,
@@ -36,8 +40,39 @@ test('the launch is headed, on its own profile, with the extension-debugging fla
 })
 
 test('the extension is the checkout’s, next to this package', () => {
-  const dir = bridgeExtensionDir()
-  assert.ok(dir?.endsWith('/chrome-extension/'), dir)
+  const source = bridgeExtensionSource()
+  assert.equal(source?.checkout, true)
+  assert.ok(source?.dir.endsWith('/packages/chrome-extension/'), source?.dir)
+})
+
+test('the extension comes from the checkout first, then from the package’s dist copy, and only when its manifest is the bridge’s (#1720)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'agent-bridge-source-'))
+  const moduleUrl = pathToFileURL(join(root, 'framework/dist/bridge-browser.js')).href
+  const manifest = async (dir: string, name: string) => {
+    await mkdir(dir, { recursive: true })
+    await writeFile(join(dir, 'manifest.json'), JSON.stringify({ name }))
+  }
+  assert.equal(bridgeExtensionSource(moduleUrl), undefined, 'neither folder is there')
+
+  await manifest(join(root, 'chrome-extension'), 'Some other package')
+  assert.equal(bridgeExtensionSource(moduleUrl), undefined, 'a foreign chrome-extension folder is not the bridge')
+
+  await manifest(join(root, 'framework/dist/chrome-extension'), 'The Framework: Claude web bridge')
+  assert.deepEqual(bridgeExtensionSource(moduleUrl), { dir: join(root, 'framework/dist/chrome-extension/'), checkout: false })
+
+  await manifest(join(root, 'chrome-extension'), 'The Framework: Claude web bridge')
+  assert.deepEqual(bridgeExtensionSource(moduleUrl), { dir: join(root, 'chrome-extension/'), checkout: true })
+})
+
+test('the build copies every file the extension’s self-reload watches into the package (#1720)', async () => {
+  const target = await mkdtemp(join(tmpdir(), 'agent-bridge-copy-'))
+  const script = new URL('../scripts/copy-extension.mjs', import.meta.url)
+  const run = spawnSync(process.execPath, [script.pathname, target], { encoding: 'utf8' })
+  assert.equal(run.status, 0, run.stderr)
+  const fingerprint = readFileSync(new URL('../../chrome-extension/fingerprint.js', import.meta.url), 'utf8')
+  const watched = runInNewContext(`${fingerprint}\nWATCHED_FILES`) as string[]
+  assert.ok(watched.includes('manifest.json'))
+  assert.deepEqual((await readdir(target)).sort(), [...watched].sort())
 })
 
 test('the profile lock names the process holding it, and nothing when there is no lock', async () => {
@@ -143,7 +178,7 @@ function fakeDeps(chrome: ReturnType<typeof fakeChrome>, child: ReturnType<typeo
   return { deps, log }
 }
 
-const options = (dir: string) => ({ daemonUrl: 'http://127.0.0.1:4200', token: 'tok', dir, extensionDir: '/repo/packages/chrome-extension' })
+const options = (dir: string) => ({ daemonUrl: 'http://127.0.0.1:4200', token: 'tok', dir, extension: { dir: '/repo/packages/chrome-extension', checkout: true } })
 
 test('the launch installs the extension over CDP, turns developer mode on, seeds the token, and minimizes (#1332)', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'agent-bridge-'))
@@ -172,6 +207,21 @@ test('the launch installs the extension over CDP, turns developer mode on, seeds
   assert.deepEqual(log.activated, ['/bin/chrome'], 'the app is brought to the front for the sign-in')
   await browser.hide()
   assert.deepEqual(chrome.calls.filter(c => c.method === 'Browser.setWindowBounds').at(-1)?.params, { windowId: 7, bounds: { windowState: 'minimized' } })
+})
+
+test('a package’s extension is copied into the bridge browser’s own folder and installed from there, so its id outlives the package version (#1720)', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'agent-bridge-'))
+  const packaged = await mkdtemp(join(tmpdir(), 'agent-bridge-packaged-'))
+  await writeFile(join(packaged, 'manifest.json'), '{"version":"new"}')
+  await mkdir(join(dir, 'extension'))
+  await writeFile(join(dir, 'extension', 'stale.js'), '')
+  const chrome = fakeChrome()
+  const { deps } = fakeDeps(chrome, fakeProcess())
+  await startBridgeBrowser({ ...options(dir), extension: { dir: packaged, checkout: false } }, deps)
+
+  assert.deepEqual(chrome.calls.find(c => c.method === 'Extensions.loadUnpacked')?.params, { path: join(dir, 'extension') })
+  assert.deepEqual(await readdir(join(dir, 'extension')), ['manifest.json'], 'the old copy is replaced, not merged')
+  assert.equal(readFileSync(join(dir, 'extension', 'manifest.json'), 'utf8'), '{"version":"new"}')
 })
 
 test('a stale browser holding the profile is stopped before the launch, gently first', async () => {

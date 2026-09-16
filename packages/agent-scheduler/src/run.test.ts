@@ -6,7 +6,7 @@ import { FakeDriver, type Driver, type DriverSession, type DriverStartOptions } 
 import { worktreePath } from '@gemstack/skill-branches'
 import { findRun, readDiary } from '@gemstack/skill-logs'
 import { readLiveMeta } from './live-log.js'
-import { runCommand } from './run.js'
+import { runCommand, STOPPED_DETAIL } from './run.js'
 import { git, removeRepo, testRepo } from './test-repo.js'
 
 // One run end to end on a real repository, with the agent faked: the marker, the checkout, the
@@ -136,6 +136,43 @@ test('the tick\'s run does not mark itself again, and a dirty tree keeps the che
     assert.equal(await readFile(join(worktreePath(repo, 'given-id'), 'scratch.txt'), 'utf8'), 'uncommitted\n')
     // The record was still written, over no marker, since the tick's marker is the tick's.
     assert.equal((await findRun(repo, 'given-id'))?.status, 'done')
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test('a signal to the run\'s process stops it: the session aborted, the run recorded `stopped`, the checkout reclaimed', async () => {
+  const repo = await testRepo()
+  try {
+    let prompted!: () => void
+    const started = new Promise<void>(resolve => (prompted = resolve))
+    // An agent that works until told to stop, the way agent-driver ends a session on its signal.
+    const patient: Driver = {
+      id: 'fake',
+      start: async (opts: DriverStartOptions): Promise<DriverSession> => ({
+        id: 'x',
+        cwd: opts.cwd,
+        prompt: async () => {
+          opts.onEvent?.({ type: 'text', text: 'Working…' })
+          prompted()
+          await new Promise<void>((_, reject) => opts.signal!.addEventListener('abort', () => reject(new Error('fake prompt aborted')), { once: true }))
+          return { text: '' }
+        },
+        dispose: async () => {},
+      }),
+    }
+    const running = runCommand(repo, { prompt: '/work-queue', model: 'opus', driver: patient, now: () => NOW, gh: async () => '[]' })
+    await started
+    process.kill(process.pid, 'SIGINT') // what a dashboard's Stop sends; this test's own process has the run's handler
+    const outcome = await running
+    assert.equal(outcome.status, 'stopped')
+    assert.equal(outcome.detail, STOPPED_DETAIL)
+    assert.deepEqual(outcome.checkout, { reclaimed: true })
+    const card = await findRun(repo, outcome.id)
+    assert.equal(card?.status, 'stopped')
+    const diary = (await readDiary(repo, outcome.id))!
+    assert.deepEqual(diary.find(l => l.kind === 'said'), { kind: 'said', text: 'Working…' })
+    assert.deepEqual(diary.at(-1), { kind: 'ended', status: 'stopped', detail: STOPPED_DETAIL })
   } finally {
     await removeRepo(repo)
   }

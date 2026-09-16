@@ -9,18 +9,19 @@ import { JsonlTailer, followFile } from './jsonl-tail.js'
  * The dashboard-to-agent control channel (#344): the reverse of the event log.
  * Events flow run -> `.the-framework/events.jsonl` -> daemon -> browser; steering
  * flows browser -> daemon -> `.the-framework/control.jsonl` -> run. The daemon
- * appends a {@link ControlEntry} per Stop click / choice pick, and the agent tails
- * the file, aborting or resolving its parked gate. Same file-is-the-seam design
+ * appends a {@link ControlEntry} per choice pick / message, and the agent tails
+ * the file, resolving its parked gate. Same file-is-the-seam design
  * as the forward direction — no run<->daemon IPC.
  */
 
 /** The control log filename under `.the-framework/`. */
 export const CONTROL_FILE = 'control.jsonl'
 
-/** One steering instruction from the dashboard to the live agent. */
+/**
+ * One steering instruction from the dashboard to the live agent. Stop is not one: it is a
+ * signal to the agent's process, whose pid the agent's meta names (`dashboard-rpc/control.ts`).
+ */
 export type ControlEntry =
-  /** Stop the agent (the daemon dashboard's Stop button). */
-  | { kind: 'stop' }
   /** Resolve a parked choice gate: the pick for the pending {@link ChoiceRequest} id. */
   | { kind: 'choice'; id: string; pick: string | string[]; by: ChoiceBy }
   /** A live-chat message the user sent to the running agent (#714). */
@@ -94,7 +95,6 @@ export function watchControl(
 function isControlEntry(value: unknown): value is ControlEntry {
   if (!value || typeof value !== 'object') return false
   const v = value as Record<string, unknown>
-  if (v['kind'] === 'stop') return true
   if (v['kind'] === 'merge') return true
   // The rung must be one of the four: a half-written entry would otherwise disarm by accident,
   // and this decides whether the session's work reaches the remote at all.

@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { join } from 'node:path'
 import { mkdtemp, rm, mkdir, writeFile, readFile, realpath } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { hostname, tmpdir } from 'node:os'
 import { sendStop, sendMessage, sendChoice, sendRemoveWorktree } from './control.js'
 import { onRetainedWorktrees, onAgents } from './reads.js'
 import { addProject, projectId as idFor } from '../registry.js'
@@ -20,7 +20,7 @@ import { provideTestContext } from './test-context.js'
 // registry is never touched.
 
 /** A project with one live agent in a worktree. Returns its ids and the two candidate log paths. */
-async function projectWithWorktreeAgent(): Promise<{
+async function projectWithWorktreeAgent(owner: { pid: number; host: string } = { pid: 0, host: 'elsewhere' }): Promise<{
   dir: string
   projectId: string
   agentId: string
@@ -35,7 +35,7 @@ async function projectWithWorktreeAgent(): Promise<{
   // The live meta is what readLiveMetas discovers, and its id is what the caller addresses.
   await writeFile(
     join(worktree, THE_FRAMEWORK_DIR, 'agent.json'),
-    JSON.stringify({ version: 1, status: 'running', id: agentId, startedAt: agentId, updatedAt: agentId }),
+    JSON.stringify({ version: 1, status: 'running', id: agentId, startedAt: agentId, updatedAt: agentId, ...owner }),
   )
 
   const previous = process.env.XDG_CONFIG_HOME
@@ -65,15 +65,48 @@ const entries = async (path: string): Promise<unknown[]> =>
     .filter(Boolean)
     .map(line => JSON.parse(line) as unknown)
 
-test('sendStop with a run id writes to that run worktree control log, not the project root (#749)', async () => {
-  const ctx = await projectWithWorktreeAgent()
+// Stop is a signal to the process the agent's meta names, whoever runs the agent: this daemon's own
+// child, or another tool's run. The meta here names this test process, whose handler catches it.
+test('sendStop signals the pid the agent meta names, and writes nothing', async () => {
+  const ctx = await projectWithWorktreeAgent({ pid: process.pid, host: hostname() })
+  let signalled!: () => void
+  const caught = new Promise<void>(resolve => (signalled = resolve))
+  const onSignal = (): void => signalled()
+  process.on('SIGINT', onSignal)
   try {
     await sendStop(ctx.projectId, ctx.agentId)
-    assert.deepEqual(await entries(ctx.agentControl), [{ kind: 'stop' }], 'the run gets the stop it is tailing for')
-    assert.deepEqual(await entries(ctx.rootControl), [], 'and nothing is written where nothing is listening')
+    await caught
+    assert.deepEqual(await entries(ctx.agentControl), [], 'a stop is not a control entry')
+    assert.deepEqual(await entries(ctx.rootControl), [])
   } finally {
+    process.off('SIGINT', onSignal)
     ctx.restore()
     await rm(ctx.dir, { recursive: true, force: true })
+  }
+})
+
+test('sendStop leaves an agent alone whose process is not this machine\'s, or is gone', async () => {
+  const elsewhere = await projectWithWorktreeAgent({ pid: process.pid, host: 'another-box' })
+  try {
+    const onSignal = (): void => assert.fail('signalled a pid on another host')
+    process.on('SIGINT', onSignal)
+    try {
+      await sendStop(elsewhere.projectId, elsewhere.agentId)
+      await new Promise(r => setTimeout(r, 50))
+    } finally {
+      process.off('SIGINT', onSignal)
+    }
+  } finally {
+    elsewhere.restore()
+    await rm(elsewhere.dir, { recursive: true, force: true })
+  }
+  // A dead pid on this host: nothing to signal, and nothing thrown.
+  const dead = await projectWithWorktreeAgent({ pid: 2 ** 22 - 1, host: hostname() })
+  try {
+    await sendStop(dead.projectId, dead.agentId)
+  } finally {
+    dead.restore()
+    await rm(dead.dir, { recursive: true, force: true })
   }
 })
 
@@ -97,10 +130,10 @@ test('an unknown or absent run id falls back to the project root, as before #736
   const ctx = await projectWithWorktreeAgent()
   try {
     // No agent id at all: the pre-#736 addressing, still right for an agent with no worktree.
-    await sendStop(ctx.projectId)
+    await sendMessage(ctx.projectId, 'one')
     // An agent that has since finished and had its worktree removed must not throw or vanish.
-    await sendStop(ctx.projectId, 'a-run-that-is-gone')
-    assert.deepEqual(await entries(ctx.rootControl), [{ kind: 'stop' }, { kind: 'stop' }])
+    await sendMessage(ctx.projectId, 'two', 'a-run-that-is-gone')
+    assert.deepEqual(await entries(ctx.rootControl), [{ kind: 'message', text: 'one' }, { kind: 'message', text: 'two' }])
     assert.deepEqual(await entries(ctx.agentControl), [], 'the live run is left alone')
   } finally {
     ctx.restore()
@@ -262,10 +295,10 @@ test('a run that has a worktree but has not written its state yet still resolves
     const fresh = '2026-07-19T11-30-00-000Z'
     const worktree = worktreePath(ctx.dir, fresh)
     await mkdir(worktree, { recursive: true }) // the daemon has made the checkout; the run has not started writing
-    await sendStop(ctx.projectId, fresh)
+    await sendMessage(ctx.projectId, 'hello', fresh)
     assert.deepEqual(
       await entries(join(worktree, THE_FRAMEWORK_DIR, CONTROL_FILE)),
-      [{ kind: 'stop' }],
+      [{ kind: 'message', text: 'hello' }],
       'addressed at the run whose worktree exists, not the project root',
     )
     assert.deepEqual(await entries(ctx.rootControl), [], 'the project root is left alone')
@@ -279,8 +312,8 @@ test('a run id with no worktree at all still falls back to the project root (#76
   const ctx = await projectWithWorktreeAgent()
   try {
     // The non-git fallback path, and any run whose worktree has since been removed.
-    await sendStop(ctx.projectId, '2026-07-19T11-45-00-000Z')
-    assert.deepEqual(await entries(ctx.rootControl), [{ kind: 'stop' }])
+    await sendMessage(ctx.projectId, 'hello', '2026-07-19T11-45-00-000Z')
+    assert.deepEqual(await entries(ctx.rootControl), [{ kind: 'message', text: 'hello' }])
   } finally {
     ctx.restore()
     await rm(ctx.dir, { recursive: true, force: true })

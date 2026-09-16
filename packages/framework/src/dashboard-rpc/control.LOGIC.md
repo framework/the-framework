@@ -4,7 +4,7 @@ Carries out every action the user takes on an agent [1] or a project from the da
 
 **User story**: on the agent view the user presses Stop, picks an option on a gate's card, types a message in the composer, moves the handoff, and, once the agent has ended, pushes its branch, opens a pull request for it, merges it, removes the checkout it kept, or deletes the agent altogether. On the project home the user starts an agent from the launcher, puts a ticket on the agent queue, or frees a ticket a dead agent still holds. In Settings the user shows or restarts the bridge browser. Each of these is one call from the browser to the daemon, and this is what the call does before it answers.
 
-**Business logic story**: steering a live agent is the reverse of its event stream [13]. Events flow from the agent's process through its events file to the browser; steering flows from the browser through the daemon into the agent's control file [14], which the agent's process tails and acts on: it stops, resolves the gate it is parked on, drains messages between turns [15], or re-arms its handoff. Nothing here talks to the agent's process directly.
+**Business logic story**: steering a live agent is the reverse of its event stream [13]. Events flow from the agent's process through its events file to the browser; steering flows from the browser through the daemon into the agent's control file [14], which the agent's process tails and acts on: it resolves the gate it is parked on, drains messages between turns [15], or re-arms its handoff. Stop alone is a signal to the agent's process, whose pid the agent's meta names: the meta is the file the dashboard shows the agent from, and whoever runs the agent, this daemon's own child or another tool's process, is stopped the same way; the daemon names none of them.
 
 ## Glossary
 
@@ -21,7 +21,7 @@ Carries out every action the user takes on an agent [1] or a project from the da
 [11] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
 [12] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 [13] event stream: everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface (dashboard, terminal, archive, run) is a projection of it.
-[14] control file: `.the-framework/control.jsonl`: the file the daemon appends steering to (stops, picks, chat messages) and the agent's process tails.
+[14] control file: `.the-framework/control.jsonl`: the file the daemon appends steering to (picks, chat messages, handoff moves, merge authorizations) and the agent's process tails.
 [15] turn: one prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
 [16] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
 [17] pick: the answer to a gate: the option or options chosen, by the user or automatically.
@@ -42,8 +42,9 @@ Carries out every action the user takes on an agent [1] or a project from the da
 
 ## Business logic — TL;DR
 
-- **Steering lands in the agent's own control file** - every stop, pick, message, handoff change and merge authorization is one line appended to the control file of the checkout the agent id resolves to; when the project is unknown here nothing is written.
-- **The steering entries and what each validates** - a stop needs nothing; a pick carries the gate's id, the option or options, and who picked; a message is trimmed and an empty one is dropped; a handoff change must name one of the four rungs or it is ignored.
+- **Stop is a signal** - the agent's meta names the process running it; when that process is this machine's and alive, it gets SIGINT, and nothing is written; otherwise nothing happens.
+- **Steering lands in the agent's own control file** - every pick, message, handoff change and merge authorization is one line appended to the control file of the checkout the agent id resolves to; when the project is unknown here nothing is written.
+- **The steering entries and what each validates** - a pick carries the gate's id, the option or options, and who picked; a message is trimmed and an empty one is dropped; a handoff change must name one of the four rungs or it is ignored.
 - **Answering the question a cloud session is parked on** - the pick is queued for the bridge's extension to type into the session, accepted only as labels of the question actually parked, and can be withdrawn until it is collected.
 - **Starting an agent** - a build or prompt agent needs a non-empty prompt, a research agent may have none; the daemon's own start decides the rest and reports busy when it must.
 - **Removing a retained checkout** - refused while the agent is still going, for an unsafe id, for a checkout that is not there, and whenever the work is not yet on the remote; a clean checkout is pushed first and then removed.
@@ -60,15 +61,25 @@ Carries out every action the user takes on an agent [1] or a project from the da
 
 ## Business logic
 
+### Stop is a signal
+
+#### Context
+
+**Problem**: the daemon's own agent reads the control file [14]; an agent another tool started (a scheduled run) reads nothing of the daemon's. Both write the meta the dashboard shows them from, and the meta names the process running the agent. A stop written to the control file would reach only the first; a signal reaches whoever runs the agent, and the daemon names no tool.
+
+#### Business logic
+
+The checkout the agent id [16] resolves to is read for its live meta. When the meta says `running`, names a pid and this machine as its host, and that process is alive, the process gets SIGINT; a process gone between the check and the signal is not an error. Otherwise, a meta that is missing, ended, from another machine or without a live process, nothing happens: there is nothing here to stop. Nothing is written to the control file. What the process does with the signal is its own: the daemon's own agent aborts and records itself stopped (`cli.ts`).
+
 ### Steering lands in the agent's own control file
 
 #### Context
 
-**Problem**: an agent tails the control file [14] inside its own checkout [6]. An instruction written at the project's root reaches nothing, and the Stop button, a pick and a message would each silently do nothing. So every steering call carries the agent id [16] and writes where that agent listens.
+**Problem**: an agent tails the control file [14] inside its own checkout [6]. An instruction written at the project's root reaches nothing, and a pick and a message would each silently do nothing. So every steering call carries the agent id [16] and writes where that agent listens.
 
 #### Business logic
 
-A stop, a pick, a message, a handoff change and a merge authorization are each appended as one line to the control file of the checkout the agent id resolves to: the agent's own checkout while it exists, else the project's root, which is right for an agent that has no checkout of its own (the resolution is `context.ts`'s). Without an agent id the project's root is addressed. When the project id names no project on this machine, nothing is written at all. The call answers as soon as the line is written; whether the agent acts on it is the agent's affair, and a line written to an agent that has just ended lands unread.
+A pick, a message, a handoff change and a merge authorization are each appended as one line to the control file of the checkout the agent id resolves to: the agent's own checkout while it exists, else the project's root, which is right for an agent that has no checkout of its own (the resolution is `context.ts`'s). Without an agent id the project's root is addressed. When the project id names no project on this machine, nothing is written at all. The call answers as soon as the line is written; whether the agent acts on it is the agent's affair, and a line written to an agent that has just ended lands unread.
 
 ### The steering entries and what each validates
 
@@ -78,7 +89,6 @@ See `## Context`.
 
 #### Business logic
 
-- **Stop**: a stop entry, with nothing to validate. The agent's process aborts what it is doing.
 - **A pick** [17]: the gate's [2] id, the pick (one option id for a single choice, or the chosen subset for a multiple choice, which may be empty), and who picked. Who picked is the user unless the caller says otherwise; the record can also say the pick was made automatically, for an agent nobody is watching.
 - **A message** [3]: the text is trimmed, and an empty or whitespace-only message is dropped without writing anything. The agent drains messages between turns [15], each one continuing the same driver session [18].
 - **A handoff change** [4]: the level must be one of the four rungs, `local`, `push`, `pr` or `merge`; anything else is ignored and nothing is written. One rung travels, never a set of stages: a surface offering the stages as separate boxes resolves them to a rung on its own side, where an impossible combination (a pull request without a push) settles down to the rung actually asked for instead of being repaired upward into a push nobody ticked. The change is steering rather than a setting because it is about this one agent, and the agent echoes what it applied back as an event, so surfaces read the agent's own record rather than local state a reload would lose.
@@ -223,4 +233,4 @@ The action must be one of show, hide or restart; anything else is refused ("unkn
 
 #### Business logic
 
-Stop, a pick, a message, a handoff change, the push, opening a pull request and the merge are forwarded when the agent id names an agent this daemon relays; for an ordinary local agent they run here unchanged. When the device cannot be reached, or refuses, the steering calls answer nothing, exactly as they do after a successful write, so a stop or a pick sent to an unreachable device is lost silently; the push, the pull request and the merge answer "could not reach the device". Starting an agent, removing a checkout, deleting an agent, opening a checkout in an app, the queue and claim actions and the bridge actions are never forwarded: a device runs its own guarded start, and destroying a device's history or checkouts is not something a relaying daemon may do.
+Stop, a pick, a message, a handoff change, the push, opening a pull request and the merge are forwarded when the agent id names an agent this daemon relays (a stop is then that device's signal); for an ordinary local agent they run here unchanged. When the device cannot be reached, or refuses, the steering calls answer nothing, exactly as they do after a successful write, so a stop or a pick sent to an unreachable device is lost silently; the push, the pull request and the merge answer "could not reach the device". Starting an agent, removing a checkout, deleting an agent, opening a checkout in an app, the queue and claim actions and the bridge actions are never forwarded: a device runs its own guarded start, and destroying a device's history or checkouts is not something a relaying daemon may do.

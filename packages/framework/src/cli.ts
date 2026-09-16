@@ -495,10 +495,10 @@ async function resolvePromptConfig(
  * Returns 0 on success, 1 on an agent error, 2 on a usage error.
  */
 /**
- * Whether this agent can be steered over `.the-framework/control.jsonl` (#344): Stop, a choice pick,
- * a live message. True when its own dashboard is up (#427), or when whoever spawned it handed it a
- * agent id — the dashboard spawns each session with one in its spec, and steers it
- * from its own process.
+ * Whether this agent can be steered over `.the-framework/control.jsonl` (#344): a choice pick,
+ * a live message. (Stop is a signal to this process, whoever sends it.) True when its own
+ * dashboard is up (#427), or when whoever spawned it handed it a agent id — the dashboard spawns
+ * each session with one in its spec, and steers it from its own process.
  *
  * This used to have a third clause, "a daemon is alive somewhere on this machine", read from a
  * global state file. That file is gone with the background daemon (D4b), and it was never a fact
@@ -847,8 +847,9 @@ async function driveAgent(opts: AgentOptions, io: CliIO): Promise<number> {
   const continueBuild =
     opts.continueAgent === true && !!opts.resumeSession && !transparent && store?.snapshot().kind === 'build'
 
-  // Steer this agent through .the-framework/control.jsonl (#344): a Stop button or choice
-  // pick appends an entry, we tail the file and abort / resolve the parked gate. Reset
+  // Steer this agent through .the-framework/control.jsonl (#344): a choice pick or a message
+  // appends an entry, we tail the file and resolve the parked gate. (Stop is a signal to this
+  // process, handled by armInterrupt above.) Reset
   // first so a previous agent's picks can never fire into this one (gate ids repeat across
   // runs).
   //
@@ -873,10 +874,6 @@ async function driveAgent(opts: AgentOptions, io: CliIO): Promise<number> {
     try {
       await resetControl(cwd)
       control = watchControl(cwd, entry => {
-        if (entry.kind === 'stop') {
-          controller.abort()
-          return
-        }
         if (entry.kind === 'message') {
           messages.push(entry.text)
           return
@@ -912,8 +909,8 @@ async function driveAgent(opts: AgentOptions, io: CliIO): Promise<number> {
   // workspace daemon's via the control channel (#344). With neither, the gates auto-accept
   // the recommended option (#304). The agent's requestChoice parks a resolver in pendingChoices
   // keyed by the choice id; a dashboard/daemon pick (or an abort) resolves it.
-  // An unattended agent (#846) is steerable but unwatched: keep the control channel for Stop and
-  // live messages, and leave requestChoice unset so each gate takes its recommended option. Auto
+  // An unattended agent (#846) is steerable but unwatched: keep the control channel for live
+  // messages, and leave requestChoice unset so each gate takes its recommended option. Auto
   // PM (#685) fires when nobody is there, and a parked gate would hang it until someone looked.
   //
   // Each parked wait is held by the keepalive (#1359): a daemon-spawned agent (--no-dashboard, all
@@ -938,7 +935,7 @@ async function driveAgent(opts: AgentOptions, io: CliIO): Promise<number> {
   // stay alive for the composer.
   //
   // Not tied to the gates (#846): an unattended agent leaves `requestChoice` unset so its gates
-  // take the recommended option, but its control channel still carries Stop and the user's own
+  // take the recommended option, but its control channel still carries the user's own
   // messages — "messages still work" is what the SPEC promises of it. Reading the queue off the
   // gate switch dropped every message typed at a preset agent, reported as queued.
   const chatQueue =

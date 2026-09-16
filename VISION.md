@@ -45,3 +45,4 @@
 - [Autonomous Product Management](https://github.com/framework/the-framework/discussions/1673)
 - For large codebases: `CODEBASE_OVERVIEW.md`
 - [Discord Bot](https://github.com/framework/the-framework/discussions/1675)
+- [Native app for the dashboard](https://github.com/framework/the-framework/issues/411), beside `localhost`

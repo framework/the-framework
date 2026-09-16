@@ -69,8 +69,16 @@ const entries = async (path: string): Promise<unknown[]> =>
 // child, or another tool's run. The meta here names this test process, whose handler catches it.
 test('sendStop signals the pid the agent meta names, and writes nothing', async () => {
   const ctx = await projectWithWorktreeAgent({ pid: process.pid, host: hostname() })
+  // A signal watcher does not keep the event loop alive: a bound timer holds it open until the
+  // signal lands, and fails the test rather than letting the process drain with the wait pending.
   let signalled!: () => void
-  const caught = new Promise<void>(resolve => (signalled = resolve))
+  const caught = new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('no SIGINT within 5s')), 5000)
+    signalled = () => {
+      clearTimeout(timer)
+      resolve()
+    }
+  })
   const onSignal = (): void => signalled()
   process.on('SIGINT', onSignal)
   try {

@@ -155,7 +155,14 @@ test('a signal to the run\'s process stops it: the session aborted, the run reco
         prompt: async () => {
           opts.onEvent?.({ type: 'text', text: 'Working…' })
           prompted()
-          await new Promise<void>((_, reject) => opts.signal!.addEventListener('abort', () => reject(new Error('fake prompt aborted')), { once: true }))
+          // A bound wait: nothing else holds the event loop open while the signal is in flight.
+          await new Promise<void>((_, reject) => {
+            const timer = setTimeout(() => reject(new Error('no signal within 5s')), 5000)
+            opts.signal!.addEventListener('abort', () => {
+              clearTimeout(timer)
+              reject(new Error('fake prompt aborted'))
+            }, { once: true })
+          })
           return { text: '' }
         },
         dispose: async () => {},

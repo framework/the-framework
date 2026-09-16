@@ -40,7 +40,7 @@ Answers everything the dashboard reads about a project or an agent [1]: the agen
 - **Retained checkouts** - the ids of ended agents whose checkout is still on disk, live agents excluded.
 - **Where an agent is working** - its checkout's path, whether that checkout is its own, its branch, whether it holds uncommitted changes, its size once nothing writes to it, and the pull request that belongs to this agent and not a predecessor's.
 - **Documents and tickets** - the surfaced documents at the project root, the project's tickets off the `agent-data` branch, one ticket's full text, the agent that wrote a ticket's plan, and when the tickets last caught up with GitHub.
-- **Cross-project rollups** - every registered project's tickets, the aggregated agent queue, the Overview, recent agents, hot tickets, interventions, open questions, activity and the dashboard page, each built over every project the registry lists.
+- **Cross-project rollups** - every registered project's tickets, the aggregated agent queue, the Overview, recent agents, hot tickets, interventions, open questions, activity, the dashboard page and every project's scheduler state, each built over every project the registry lists.
 - **The files of a checkout and their status** - every file git sees, and each file's untracked/modified/deleted status, from the agent's own checkout when an agent id is given.
 - **One file's diff, one file's content, and what the agent changed** - the diff of a changed file, the content of an unchanged one, and every changed file with its line counts, always read from the checkout's own git state.
 - **The project's GitHub URL and git status** - the URL from the `origin` remote; the branch, dirty flag and linked pull request of the project or of one agent's checkout, filtered to that agent's lifetime.
@@ -131,7 +131,7 @@ The surfaced documents are read at the project root in sidebar order (`dashboard
 
 #### Business logic
 
-Each rollup is built over every project the registry lists (the builders are `dashboard/overview.ts`, `dashboard/queue.ts`, `dashboard/interventions.ts`, `dashboard/open-questions.ts`, `dashboard/activity.ts` and `dashboard/dashboard.ts`), and a registry that cannot be read means no projects. Recent agents carry the same annotations as the agent history. The interventions [17] and the activity feed report, beside their items, which projects were read whole: a project whose sources could not be read contributes no items, exactly like a project with nothing waiting, and the browser's notifier needs the difference, because a queue that came back empty only because GitHub was unreachable is not a baseline to announce the whole backlog against later.
+Each rollup is built over every project the registry lists (the builders are `dashboard/overview.ts`, `dashboard/queue.ts`, `dashboard/scheduler-state.ts`, `dashboard/interventions.ts`, `dashboard/open-questions.ts`, `dashboard/activity.ts` and `dashboard/dashboard.ts`), and a registry that cannot be read means no projects. Recent agents carry the same annotations as the agent history. The interventions [17] and the activity feed report, beside their items, which projects were read whole: a project whose sources could not be read contributes no items, exactly like a project with nothing waiting, and the browser's notifier needs the difference, because a queue that came back empty only because GitHub was unreachable is not a baseline to announce the whole backlog against later.
 
 ### The files of a checkout and their status
 

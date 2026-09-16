@@ -18,6 +18,7 @@ import { bridgeSessionsFrom } from './dashboard/bridge-sessions.js'
 import { bridgeQuestions } from './dashboard/bridge-store.js'
 import { bridgeBrowserDir, bridgeBrowserOwner, startBridgeBrowser, type BridgeBrowser, type BridgeBrowserOptions } from './bridge-browser.js'
 import { closeOrphanedAgentBrowsers } from './browser.js'
+import { runProjectHooks } from './project-hooks.js'
 import { readAllAgents } from './store/index.js'
 import type { BridgeSession } from './dashboard/index.js'
 
@@ -255,6 +256,13 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
   // above: the launch needs the address the dashboard only has now.
   if ((await readPreferences(undefined, env).catch((): Preferences => ({}))).bridgeBrowser === true) void bridgeBrowser.start()
 
+  // Each project's open hooks (#1774): the lines its own `.the-framework/hooks.yml` names, run in
+  // the project once the dashboard listens, so a slow line never delays the URL. The daemon names
+  // no tool; the file does. Bounded and logged, never a reason the daemon did not come up.
+  for (const record of await listProjects(undefined, env).catch(() => [])) {
+    await runProjectHooks(record.path, 'open', { log: console.log })
+  }
+
   // Every background start is a verbatim prompt agent (#353): these are preset prompts and chat
   // text, not build intents to scaffold from.
   const startAgent = (prompt: string, options: StartAgentOptions, id: string) => runtime.onStart(prompt, 'prompt', options, id)
@@ -283,6 +291,11 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
   // Nothing may start or steer an agent from here on, so the background services go first (#923):
   // a CI fix starting mid-shutdown would start one while we stop the rest.
   await services.quiesce()
+  // Each project's close hooks (#1774), the counterpart of the open hooks above: once nothing may
+  // start an agent any more, before the agents this daemon spawned are stopped.
+  for (const record of await listProjects(undefined, env).catch(() => [])) {
+    await runProjectHooks(record.path, 'close', { log: console.log })
+  }
   // Stop the agents this daemon spawned, before the previews they may be serving. Left running they
   // are orphans nothing tracks; stopped here they keep their worktree and branch, so the dashboard
   // can continue them on the next start.

@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { mkdtemp, writeFile, appendFile, rm, mkdir, readFile, realpath, stat } from 'node:fs/promises'
 import { spawn } from 'node:child_process'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { basename, join, resolve } from 'node:path'
 import type { FrameworkEvent } from './events.js'
 import {
   EventTailer,
@@ -200,6 +200,45 @@ test('runDaemon comes up on a fresh workspace with no .the-framework yet', async
     ac.abort()
     await done
   } finally {
+    ac.abort()
+    await rm(cwd, { recursive: true, force: true })
+  }
+})
+
+test("a project's open hooks run once the dashboard listens, its close hooks at shutdown, each line in the project (#1774)", async () => {
+  const cwd = await realpath(await tmpWorkspace())
+  const env = await configEnv(cwd)
+  await writeFile(
+    join(cwd, THE_FRAMEWORK_DIR, 'hooks.yml'),
+    'open:\n  - echo open-1 >> hooks.log\n  - pwd -P >> hooks.log\n  - exit 3\n  - echo open-2 >> hooks.log\nclose:\n  - echo close >> hooks.log\n',
+  )
+  const logged: string[] = []
+  const original = console.log
+  console.log = (...args: unknown[]) => void logged.push(args.map(String).join(' '))
+  const ac = new AbortController()
+  try {
+    const { done, state } = await startDaemon(cwd, { driverPreflight: agentReady, port: 0, signal: ac.signal, env })
+    assert.match(state.url, /^http:\/\/127\.0\.0\.1:\d+$/)
+    // The hooks run after the URL is reported, so wait for the last open line to land.
+    let log = ''
+    for (let i = 0; i < 200 && !log.includes('open-2'); i++) {
+      await sleep(25)
+      log = await readFile(join(cwd, 'hooks.log'), 'utf8').catch(() => '')
+    }
+    assert.equal(log, `open-1\n${cwd}\nopen-2\n`, 'every open line ran, in order, in the project, the failing one included')
+    ac.abort()
+    await done
+    assert.equal(await readFile(join(cwd, 'hooks.log'), 'utf8'), `open-1\n${cwd}\nopen-2\nclose\n`)
+    const hookLines = logged.filter(l => l.includes(' hook ('))
+    assert.deepEqual(hookLines, [
+      `[framework] open hook (${basename(cwd)}): echo open-1 >> hooks.log: exit 0`,
+      `[framework] open hook (${basename(cwd)}): pwd -P >> hooks.log: exit 0`,
+      `[framework] open hook (${basename(cwd)}): exit 3: exit 3`,
+      `[framework] open hook (${basename(cwd)}): echo open-2 >> hooks.log: exit 0`,
+      `[framework] close hook (${basename(cwd)}): echo close >> hooks.log: exit 0`,
+    ])
+  } finally {
+    console.log = original
     ac.abort()
     await rm(cwd, { recursive: true, force: true })
   }

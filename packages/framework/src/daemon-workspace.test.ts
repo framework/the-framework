@@ -81,6 +81,30 @@ async function withCapturedLog(body: () => Promise<void>): Promise<string> {
   return lines.join('\n')
 }
 
+test("adding a project while the daemon runs also runs that project's open hooks (#1774)", async () => {
+  const cwd = await realpath(await mkdtemp(join(tmpdir(), 'framework-add-hooks-')))
+  try {
+    // An already activated project, so Add is the registration alone and no git init runs.
+    const project = join(cwd, 'project')
+    await mkdir(join(project, THE_FRAMEWORK_DIR), { recursive: true })
+    await writeFile(join(project, THE_FRAMEWORK_DIR, '.gitignore'), '*\n')
+    await writeFile(join(project, THE_FRAMEWORK_DIR, 'hooks.yml'), 'open:\n  - pwd -P >> hooks.log\nclose:\n  - echo close >> hooks.log\n')
+    const config = join(cwd, 'cfg')
+    await mkdir(config, { recursive: true })
+    const runtime = createProjectRuntime({ driverPreflight: agentReady, cwd, env: { XDG_CONFIG_HOME: config } })
+    let result: { ok: boolean } | undefined
+    const log = await withCapturedLog(async () => {
+      result = await runtime.onAddProject(project)
+    })
+    assert.deepEqual(result, { ok: true, alreadyActivated: true })
+    assert.equal(await readFile(join(project, 'hooks.log'), 'utf8'), `${project}\n`, 'the open line ran in the project; the close line did not')
+    assert.match(log, /\[framework\] open hook \(project\): pwd -P >> hooks.log: exit 0/)
+    await runtime.dispose()
+  } finally {
+    await rm(cwd, RETRIED_RM)
+  }
+})
+
 test('a Start landing after the stop pass is refused, never spawned into the shutdown gap (#983)', async () => {
   // The HTTP surface closes after the agents do, so a Start can arrive mid-shutdown. Spawned, it
   // would be a detached child outside the snapshot stopAgents terminated — an orphan on ppid 1.

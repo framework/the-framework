@@ -1,4 +1,4 @@
-The Overview [1], the dashboard's landing page shown while no project is selected: an at-a-glance board of the onboarding checklist until it is dismissed, the quota [2] first, then side by side the "Human Queue" of interventions [3] only a person can clear and, stacked beside it, the agents [4] working now over the "AI Queue" of what agents take up next, followed by the hot tickets across every project. The board's agents and queues are re-read from the daemon every five seconds; the interventions arrive from the shell, the same set that fires the notifications. Every row jumps into its project, its agent, its ticket or its pull request.
+The Overview [1], the dashboard's landing page shown while no project is selected: an at-a-glance board of the onboarding checklist until it is dismissed, the quota [2] first, then side by side the "Human Queue" of interventions [3] only a person can clear and, stacked beside it, the agents [4] working now over the "AI Queue" of what agents take up next over the "Scheduler" card of each project's scheduler, followed by the hot tickets across every project. The board's agents and queues are re-read from the daemon every five seconds; the interventions arrive from the shell, the same set that fires the notifications. Every row jumps into its project, its agent, its ticket or its pull request.
 
 ## Context
 
@@ -15,7 +15,7 @@ The Overview [1], the dashboard's landing page shown while no project is selecte
 
 ## Business logic — TL;DR
 
-- **The board's order** - onboarding checklist (until dismissed), the quota card, then the "Human Queue" beside the "Agents" card stacked on the "AI Queue" card, then the hot tickets.
+- **The board's order** - onboarding checklist (until dismissed), the quota card, then the "Human Queue" beside the "Agents" card stacked on the "AI Queue" card stacked on the "Scheduler" card, then the hot tickets.
 - **The Human Queue** - the interventions across every project, three kinds of row: "Awaiting" opens the agent parked on a gate, "Unpushed" opens the agent whose commits never left the machine, and a pull request row opens it on GitHub; "AI doesn't need you." when empty.
 - **Dismissing the checklist** - hides it on the Overview only; the Settings page keeps it.
 
@@ -29,7 +29,7 @@ See `## Context`.
 
 #### Business logic
 
-From top to bottom: the onboarding checklist while it is not dismissed (`OnboardingChecklist.tsx`); the quota [2] card, first because it is the one figure that governs everything an agent [4] may do next (`Quota.tsx`); then two columns: the "Human Queue" on the left, and on the right the "Agents" card (`Agents.tsx`) over the "AI Queue" card of every project's open entries on the agent queue [6] (`AiQueue.tsx`); then the hot tickets (`HotTickets.tsx`). The working agents and the per-project queues come from one daemon read that is repeated every five seconds; until the first read answers, the cards that depend on it show their loading state. An agent started from the checklist or the queue lands the user on that agent.
+From top to bottom: the onboarding checklist while it is not dismissed (`OnboardingChecklist.tsx`); the quota [2] card, first because it is the one figure that governs everything an agent [4] may do next (`Quota.tsx`); then two columns: the "Human Queue" on the left, and on the right the "Agents" card (`Agents.tsx`) over the "AI Queue" card of every project's open entries on the agent queue [6] (`AiQueue.tsx`) over the "Scheduler" card of every project's scheduler (`SchedulerCard.tsx`, which reads on its own); then the hot tickets (`HotTickets.tsx`). The working agents and the per-project queues come from one daemon read that is repeated every five seconds; until the first read answers, the cards that depend on it show their loading state. An agent started from the checklist or the queue lands the user on that agent.
 
 ### The Human Queue
 

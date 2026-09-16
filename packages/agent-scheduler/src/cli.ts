@@ -15,7 +15,7 @@ export const USAGE = `usage: agent-scheduler <command>
   tick                          pull agent-data, sweep, read agent-schedule.md, start what is due
   run <prompt> [--model <id>]   one run of <prompt> in its own checkout, now, recorded; needs no scheduler
   start [--keep-alive]          the scheduler on, ticking every minute in its own process
-  stop                          the scheduler off; runs in flight go to the end
+  stop [--unless-keep-alive]    the scheduler off; runs in flight go to the end; with the flag a keep-alive scheduler is left running
   status                        the state file, and whether the scheduler's process is alive
   model <id>                    the model every run starts on (this user)
   offset <points>               how far past the spend boundary a run may still start (this user)
@@ -101,9 +101,11 @@ const COMMANDS: Record<string, Command> = {
   },
 
   async stop(args, io, git) {
-    parse(args, {}, 0)
+    const { values } = parse(args, { 'unless-keep-alive': { type: 'boolean' } }, 0)
     const repo = await project(io.cwd, git)
-    return { ok: true, ...(await stopScheduler(repo)) }
+    const state = await stopScheduler(repo, { ...(values['unless-keep-alive'] ? { unlessKeepAlive: true } : {}) })
+    if (state.kept) io.stderr('keep-alive is on, the scheduler keeps running')
+    return { ok: true, ...state }
   },
 
   async status(args, io, git) {

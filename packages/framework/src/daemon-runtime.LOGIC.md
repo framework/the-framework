@@ -34,6 +34,7 @@ What the daemon does for a project: starting an agent [1] (the project it is for
 [24] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
 [25] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
 [26] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
+[27] hooks: the shell lines a project's own `.the-framework/hooks.yml` names under `open` and `close`, run in the project by the daemon when the dashboard opens and closes.
 
 ## Business logic — TL;DR
 
@@ -48,7 +49,7 @@ What the daemon does for a project: starting an agent [1] (the project it is for
 - **When the process ends** - the spec is removed, the slot freed, and for an agent with its own checkout a chain runs: a failed-start marker if it never reported anything, the teardown, then the transient-death retry.
 - **Teardown: record the run, then reclaim the checkout** - the agent's branch is read while the checkout exists, its run [5] written to the `agent-data` branch [13], and the checkout removed only once its work is on the remote, whatever state the agent ended in.
 - **One more try after a transient death** - a local agent that failed by its own report on a transport error is continued unattended [14] after 15 seconds, at most twice.
-- **Adding a project** - an existing directory is activated and registered; an already activated one is a success that says so.
+- **Adding a project** - an existing directory is activated and registered, and its open hooks [27] run; an already activated one is a success that says so.
 - **What the sweeps read: slots and busy ids** - a project's slots are its live and mid-spawn agents, re-checked against the operating system, and the busy ids also include agents mid-teardown.
 - **Stopping every agent at shutdown** - each agent this daemon spawned gets a graceful stop then a forced one, the daemon waits until it has let go of the repository, and reports which agents it stopped.
 
@@ -192,7 +193,7 @@ After its teardown, an agent that failed is continued once more when all of this
 
 #### Business logic
 
-The path is resolved against the daemon's home directory and must be an existing directory; otherwise the answer is "path does not exist or is not a directory: <path>" rather than a confusing git error. The repository is then activated by the rule in `install.ts` and registered by path; an activation failure is the answer, and a project that was already activated is a success that says so. Registration is best-effort: a registry that cannot be written does not fail the activation.
+The path is resolved against the daemon's home directory and must be an existing directory; otherwise the answer is "path does not exist or is not a directory: <path>" rather than a confusing git error. The repository is then activated by the rule in `install.ts` and registered by path; an activation failure is the answer, and a project that was already activated is a success that says so. Registration is best-effort: a registry that cannot be written does not fail the activation. Then the project's open hooks [27] run, the way they would have at the daemon's boot had the project been registered then (the rules are in `project-hooks.ts`); the answer waits for them, and a hook that fails is logged, never the answer.
 
 ### What the sweeps read: slots and busy ids
 

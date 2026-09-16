@@ -37,6 +37,7 @@ export type { ActiveAgent, HotBucket, HotTicket, Overview, ProjectTickets, Recen
 export type { ProjectSummary, ProjectionRead } from './dashboard/projects.js'
 export type { ProjectError, ProjectErrorCode } from './project-errors.js'
 export type { ProjectQueue } from './dashboard/queue.js'
+export type { ProjectScheduler, SchedulerDecision, SchedulerState, SchedulerTick } from './dashboard/scheduler-state.js'
 export type { QuotaView } from './dashboard/quota.js'
 export type { TicketsMeta, WorkspaceTicket, WorkspaceTicketDetail } from './dashboard/tickets.js'
 export type { AgentWorktree, OnboardingSuggestion } from './dashboard/types.js'

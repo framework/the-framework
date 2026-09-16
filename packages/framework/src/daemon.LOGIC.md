@@ -1,4 +1,4 @@
-Runs The Framework's one daemon per machine, in the foreground: it binds the dashboard on a port and host, decides whether a shared token guards it, registers the directory it was started in as a project, repairs what a previous daemon left behind, wires the dashboard to the runtime that starts agents [1] and to the sweeps [2] that work in the background, runs the bridge browser [3] when asked, and on Ctrl-C closes all of it in an order that lets nothing start while the rest stops. It also fixes the event-typed name of the tail on `.the-framework/events.jsonl` (the tailing rules are in `jsonl-tail.ts`) and the "strictly inside" test the home project registration relies on.
+Runs The Framework's one daemon per machine, in the foreground: it binds the dashboard on a port and host, decides whether a shared token guards it, registers the directory it was started in as a project, repairs what a previous daemon left behind, runs each project's open hooks [19] once the dashboard listens, wires the dashboard to the runtime that starts agents [1] and to the sweeps [2] that work in the background, runs the bridge browser [3] when asked, and on Ctrl-C runs each project's close hooks [19] and closes all of it in an order that lets nothing start while the rest stops. It also fixes the event-typed name of the tail on `.the-framework/events.jsonl` (the tailing rules are in `jsonl-tail.ts`) and the "strictly inside" test the home project registration relies on.
 
 ## Context
 
@@ -26,6 +26,7 @@ Runs The Framework's one daemon per machine, in the foreground: it binds the das
 [16] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 [17] prompt agent: one of the two kinds of agent: a prompt agent runs one prompt and stops there, while a build agent works the agent queue after its opening exchange.
 [18] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
+[19] hooks: the shell lines a project's own `.the-framework/hooks.yml` names under `open` and `close`, run in the project by the daemon when the dashboard opens and closes; per user, since the file is ignored by git.
 
 ## Business logic — TL;DR
 
@@ -33,9 +34,10 @@ Runs The Framework's one daemon per machine, in the foreground: it binds the das
 - **The home project** - the directory the daemon starts in gets its `.the-framework/` directory up front and, when it is activated, joins the Projects list, unless it lies inside a project already registered.
 - **What boot repairs** - across every registered project, agents [1] recorded as running whose process is gone are given their missing end, and agent browsers nobody owns any more are closed.
 - **Nothing is resumed at boot** - the agents the previous daemon stopped stay stopped, keeping their checkout [5] and branch for the user to continue from the dashboard.
+- **The projects' hooks** - once the dashboard listens, every registered project's open hooks [19] run, one project after another; at shutdown, once the sweeps are quiesced, every registered project's close hooks run; the daemon names no tool, and a hook that fails, hangs or is missing never stops the daemon.
 - **What the dashboard is wired to** - one quota [7] source shared with the CI watch's fix agent, the per-project error state the sweeps [2] write, the relay [8] endpoints for devices [9], Discord credentials that take effect on save, and preference writes that act the moment they switch the bridge browser [3].
 - **The bridge and its browser** - the bridge [3] is on only when its preference was on at boot, reuses the shared token as its secret, and its browser launches in the background once the dashboard listens if the user asked for it; the Driver tab's session list is gathered across every project.
-- **Foreground only, and the order of shutdown** - the daemon runs until Ctrl-C; then the sweeps stop first so nothing new can start, the agents it spawned are stopped and named, and the quota source, the bridge browser, the runtime and the HTTP server follow; a start that fails after the port is bound releases the port.
+- **Foreground only, and the order of shutdown** - the daemon runs until Ctrl-C; then the sweeps stop first so nothing new can start, the projects' close hooks run, the agents it spawned are stopped and named, and the quota source, the bridge browser, the runtime and the HTTP server follow; a start that fails after the port is bound releases the port.
 
 ## Business logic
 
@@ -80,6 +82,18 @@ At boot, across every registered project, each agent whose run [12] or archive [
 #### Business logic
 
 The daemon starts no agent at boot on its own. Starting again the agents the previous daemon stopped would be doing behind the user's back what the user just ended. A stopped agent keeps its checkout [5] and its branch, so it is the user's to continue from the dashboard whenever they want.
+
+### The projects' hooks
+
+#### Context
+
+**User story**: the user keeps `.the-framework/hooks.yml` in a project with `npx agent-scheduler start` under `open` and `npx agent-scheduler stop --unless-keep-alive` under `close`; from then on the project's scheduler is on whenever the dashboard is, and off when the dashboard closes unless the scheduler was told to keep alive. The daemon knows nothing of the scheduler: it runs the lines the file names.
+
+**Problem**: a tool that starts agents on a schedule should follow the dashboard's own life without The Framework naming that tool; and a line a person wrote must never keep the dashboard from coming up or from closing.
+
+#### Business logic
+
+The hooks [19] are the project's own: the rules for the file and for running a line are in `project-hooks.ts`. Once the dashboard listens and its URL is reported, the daemon runs the open hooks of every registered project, one project after another, each in that project's root, so a slow line delays the background sweeps [2] at most, never the URL. A project added from the dashboard while the daemon runs gets its open hooks run at that moment (the rule is in `daemon-runtime.ts`), since the boot never saw it. At shutdown, once the sweeps are quiesced and before the agents this daemon spawned are stopped, the close hooks of every registered project run the same way. Every line's outcome is logged as "[framework] open hook (<project>): <line>: exit <code>" (or "timed out after 60s", or "could not start: <why>"), and what the line said on stderr is logged under it. A project without the file has no hooks and nothing is logged for it.
 
 ### What the dashboard is wired to
 
@@ -128,6 +142,6 @@ The cloud sessions the Driver tab serves are gathered across every registered pr
 
 The daemon runs until it receives SIGINT or SIGTERM (Ctrl-C), or, in tests, until the caller's signal fires. There is no detached mode, so there is no liveness record, no machine-wide state file, and no second process to find, reuse or stop.
 
-Shutdown proceeds in this order. The sweeps are quiesced first, so nothing may start or steer an agent from then on. The agents this daemon spawned are stopped next, before any preview they may be serving; stopped here they keep their checkout [5] and branch, so the dashboard can continue them on the next start, and their ids are logged as "[framework] stopped N agent(s): …", because a process still alive at this point that the dashboard showed as finished is the one fact that explains a slot the sweeps could not account for. The archives need no flush: an agent's teardown writes its archive through the `agent-data` branch [14] the moment the agent settles. Then the quota [7] reader is stopped, the bridge browser closed, the runtime disposed, and the HTTP server closed.
+Shutdown proceeds in this order. The sweeps are quiesced first, so nothing may start or steer an agent from then on. Then every registered project's close hooks [19] run. The agents this daemon spawned are stopped next, before any preview they may be serving; stopped here they keep their checkout [5] and branch, so the dashboard can continue them on the next start, and their ids are logged as "[framework] stopped N agent(s): …", because a process still alive at this point that the dashboard showed as finished is the one fact that explains a slot the sweeps could not account for. The archives need no flush: an agent's teardown writes its archive through the `agent-data` branch [14] the moment the agent settles. Then the quota [7] reader is stopped, the bridge browser closed, the runtime disposed, and the HTTP server closed.
 
 When startup fails after the port is bound, the HTTP server is closed before the failure is reported, so the process does not stay alive holding the port.

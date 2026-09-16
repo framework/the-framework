@@ -151,9 +151,14 @@ async function loop(repo: string, everyMs: number, log: (line: string) => void):
   })
 }
 
-/** `stop`: the state off, and the scheduler's process asked to stop. Agents in flight run to the end. */
-export async function stopScheduler(repo: string): Promise<State> {
+/**
+ * `stop`: the state off, and the scheduler's process asked to stop. Agents in flight run to the end.
+ * With `unlessKeepAlive`, a keep-alive scheduler is left as it is and the answer says `kept`: the
+ * one reader of keep-alive, meant for the line a dashboard runs when it closes.
+ */
+export async function stopScheduler(repo: string, opts: { unlessKeepAlive?: boolean } = {}): Promise<State & { kept: boolean }> {
   const state = await readState(repo)
+  if (opts.unlessKeepAlive && state.keepAlive) return { ...state, kept: true }
   if (state.pid !== undefined && isPidAlive(state.pid)) {
     try {
       process.kill(state.pid, 'SIGINT')
@@ -161,10 +166,11 @@ export async function stopScheduler(repo: string): Promise<State> {
       // Gone between the probe and the signal.
     }
   }
-  return updateState(repo, s => {
+  const stopped = await updateState(repo, s => {
     const { pid: _pid, startedAt: _startedAt, ...rest } = s
     return { ...rest, on: false }
   })
+  return { ...stopped, kept: false }
 }
 
 /** `status`: the state, and whether its process is alive. */

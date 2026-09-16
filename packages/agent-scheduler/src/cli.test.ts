@@ -4,7 +4,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { runCli } from './cli.js'
-import { readState, statePath } from './state.js'
+import { DEFAULT_STATE, readState, statePath, writeState } from './state.js'
 import { removeRepo, testRepo } from './test-repo.js'
 
 // The contract on top of the functions: JSON on stdout, a line for a person on stderr, and an
@@ -68,6 +68,39 @@ test('usage errors exit 2 with the usage on stderr and nothing on stdout; outsid
   } finally {
     await removeRepo(repo)
     await rm(elsewhere, { recursive: true, force: true })
+  }
+})
+
+test('stop --unless-keep-alive leaves a keep-alive scheduler running, and stops any other', async () => {
+  const repo = await testRepo()
+  try {
+    // This test's own process stands in for the scheduler's: a stop that signalled it would end the test.
+    await writeState(repo, { ...DEFAULT_STATE, on: true, keepAlive: true, pid: process.pid, startedAt: '2026-01-01T00:00:00.000Z' })
+    const kept = await run(repo, 'stop', '--unless-keep-alive')
+    assert.equal(kept.code, 0)
+    assert.equal(kept.err, 'keep-alive is on, the scheduler keeps running')
+    const out = kept.out as { ok: boolean; on: boolean; kept: boolean; pid?: number }
+    assert.equal(out.kept, true)
+    assert.equal(out.on, true)
+    assert.equal(out.pid, process.pid)
+    const after = await readState(repo)
+    assert.equal(after.on, true)
+    assert.equal(after.pid, process.pid, 'the state is untouched')
+
+    // Without keep-alive the flag changes nothing: off, no pid (the pid here is a dead one, so nothing is signalled).
+    await writeState(repo, { ...DEFAULT_STATE, on: true, keepAlive: false, pid: 2 ** 31 - 1 })
+    const stopped = await run(repo, 'stop', '--unless-keep-alive')
+    assert.equal(stopped.code, 0)
+    assert.equal(stopped.err, '')
+    assert.deepEqual(stopped.out, { ok: true, on: false, keepAlive: false, model: 'opus', spendOffset: 100 / 14, kept: false })
+
+    // A plain stop stops a keep-alive scheduler too: it is how a person turns the thing off.
+    await writeState(repo, { ...DEFAULT_STATE, on: true, keepAlive: true, pid: 2 ** 31 - 1 })
+    const plain = await run(repo, 'stop')
+    assert.equal((plain.out as { on: boolean; kept: boolean }).on, false)
+    assert.equal((plain.out as { kept: boolean }).kept, false)
+  } finally {
+    await removeRepo(repo)
   }
 })
 

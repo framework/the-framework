@@ -22,6 +22,7 @@ import { scopedKey, parseScopedKey, keyBelongsTo } from './runtime-keys.js'
 import { addProject, listProjects, projectId } from './registry.js'
 import { resolveProjectAgentOptions } from './daemon-services.js'
 import { installProject } from './install.js'
+import { runProjectHooks } from './project-hooks.js'
 import { withAgentLock } from './agent-locks.js'
 import { errorMessage } from './error-message.js'
 import { preflight, preflightProblems, type PreflightResult } from './preflight.js'
@@ -848,6 +849,9 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
     const result = await installProject(abs)
     if (!result.ok) return { ok: false, error: result.error }
     await addProject(abs, new Date().toISOString()).catch(() => {})
+    // The project's open hooks (#1774): a project added while the daemon runs is a project the
+    // boot never saw, so its open lines run now, the way they would have at boot.
+    await runProjectHooks(abs, 'open', { log: console.log })
     return { ok: true, alreadyActivated: result.alreadyActivated === true }
   }
 

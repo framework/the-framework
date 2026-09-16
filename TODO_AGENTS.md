@@ -5,7 +5,6 @@
 
 
 ## Priority 4
-- Write the plan: [Dashboard architecture: the plan and six questions](tickets/2026-09-09_dashboard-architecture-plan.md)
 
 
 ## Priority 3

@@ -1,14 +1,12 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { closeSync, mkdirSync, openSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
-import { createRequire } from 'node:module'
 import { appendFile, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { agentIdFromStartedAt, startedAtFromAgentId, readWorktreeAgent, restoreArchivedAgent, listAgents, findAgent, archivedAgentPaths, readLiveMetas, readLiveMeta, resolveAgentEventsPath, EVENTS_FILE, META_FILE, isPidAlive, toRunCard, diaryOf, fromDiaryLine, type AgentMeta } from './store/index.js'
 import { isGitRepo, nodeGitRunner, isGitTimeout } from '@gemstack/agent-data'
-import { createCheckout, attachCheckout, agentBranchName, worktreePath, worktreeBranch, removeWorktree, pruneWorktrees, agentIdFromWorktreeDir, type SkillLink } from '@gemstack/skill-branches'
+import { createCheckout, attachCheckout, agentBranchName, worktreePath, worktreeBranch, removeWorktree, pruneWorktrees, agentIdFromWorktreeDir } from '@gemstack/skill-branches'
 import { writeRun, type AnyDiaryLine } from '@gemstack/skill-logs'
 import { AGENT_ID_ENV } from './agent-id.js'
-import { WORK_QUEUE_SKILL_NAME } from './auto-pm.js'
 import { daemonFunnel } from './daemon-writes.js'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import type { FrameworkEvent } from './events.js'
@@ -119,16 +117,6 @@ export function childEnv(daemonUrl: string | undefined, agentId: string | undefi
   if (agentId) env[AGENT_ID_ENV] = agentId
   return daemonUrl ? { ...env, [DAEMON_URL_ENV]: daemonUrl } : env
 }
-
-/**
- * The command skills the daemon fires (#1774), linked into every checkout it makes beside the
- * `branches` skill, through the branches package's caller-given list. Each ships as its own
- * package, `@gemstack/skill-<command>`, a `SKILL.md` and no code; the daemon starts the queued
- * work with `/work-queue`. The skills an agent composes — tickets, queue, logs — are the
- * project's own tracked files, not the daemon's to link.
- */
-const WORK_QUEUE_SKILL_DIR = dirname(createRequire(import.meta.url).resolve('@gemstack/skill-work-queue/package.json'))
-export const COMMAND_SKILLS: readonly SkillLink[] = [{ name: WORK_QUEUE_SKILL_NAME, dir: WORK_QUEUE_SKILL_DIR }]
 
 /** The daemon's signed write funnel to the data branch (`daemon-writes.ts`): the run's record is its own commit. */
 const funnel = daemonFunnel()
@@ -498,7 +486,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
           // says which name it got; re-attaching by the birth branch would continue the agent on a
           // branch without its previous commits.
           const branch = agentBranchFor(archived ?? { id: agentId })
-          await attachCheckout(projectCwd, { agentId, branch, skills: COMMAND_SKILLS })
+          await attachCheckout(projectCwd, { agentId, branch })
         }
         await restoreArchivedAgent(projectCwd, path, agentId).catch(() => false)
         return { cwd: path, agentId }
@@ -559,8 +547,10 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
   ): Promise<{ ok: true; workspace: { cwd: string; agentId?: string } } | { ok: false; error: string }> => {
     try {
       // The package's one sequence (#1725): the worktree, the parent's dependencies linked in, the
-      // routine skill linked in, the branches view (#1580) told now rather than at the next tick.
-      const worktree = await createCheckout(projectCwd, { agentId, skills: COMMAND_SKILLS })
+      // branches view (#1580) told now rather than at the next tick. The daemon links no skill of
+      // its own (#1774): the command skill it fires, `work-queue`, is a tracked file of the project,
+      // in every checkout by itself, like `tickets`, `queue` and `logs`.
+      const worktree = await createCheckout(projectCwd, { agentId })
       return { ok: true, workspace: { cwd: worktree.path, agentId } }
     } catch (err) {
       if (await isGitRepo(projectCwd)) {

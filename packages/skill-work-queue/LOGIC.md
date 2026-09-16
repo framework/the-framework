@@ -8,4 +8,4 @@ The `@gemstack/skill-work-queue` npm package: the `work-queue` command skill [1]
 
 ## Business logic — TL;DR
 
-- **Working the queue** (`SKILL.md`) - one queued task off the agent queue, unattended; the job The Framework's daemon fires when the `agent-data` branch moved (the rules in `packages/framework/src/auto-pm.ts`).
+- **Working the queue** (`SKILL.md`) - one queued task off the agent queue, unattended; the job The Framework's daemon fires when the `agent-data` branch moved (the rules in `packages/framework/src/auto-pm.ts`); a project tracks the file as `.claude/skills/work-queue/SKILL.md`, the daemon links nothing.

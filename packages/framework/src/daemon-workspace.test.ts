@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, writeFile, readdir, readFile, readlink, rm, stat, realp
 import { join, resolve } from 'node:path'
 import { execFile } from 'node:child_process'
 import { tmpdir } from 'node:os'
-import { createProjectRuntime, cleanupTimedOutWorktree, markFailedStart, agentStderrPath, isTransientAgentFailure, lastAgentFailureDetail, MAX_TRANSIENT_RETRIES, COMMAND_SKILLS } from './daemon-runtime.js'
+import { createProjectRuntime, cleanupTimedOutWorktree, markFailedStart, agentStderrPath, isTransientAgentFailure, lastAgentFailureDetail, MAX_TRANSIENT_RETRIES } from './daemon-runtime.js'
 import type { PreflightResult } from './preflight.js'
 
 /**
@@ -643,7 +643,7 @@ async function writePathStub(dir: string, log: string): Promise<string> {
   return stub
 }
 
-test("a spawned agent gets the daemon's PATH untouched, and its checkout links the branches and work-queue skills (#1725/#1774)", async () => {
+test("a spawned agent gets the daemon's PATH untouched, and its checkout links the branches skill and nothing else (#1725/#1774)", async () => {
   const cwd = await realpath(await mkdtemp(join(tmpdir(), 'framework-agent-path-')))
   try {
     const git = nodeGitRunner()
@@ -665,16 +665,15 @@ test("a spawned agent gets the daemon's PATH untouched, and its checkout links t
     // The daemon puts nothing on the agent's PATH (#1774): a skill's command resolves from the
     // project's own dependencies, `npx tickets`, as its SKILL.md says.
     assert.equal(recorded.trim(), process.env['PATH'], "the agent's PATH is the daemon's own")
-    // Two skills are linked into the checkout, where each harness looks for them: the branches
-    // package's own (#1739), and the command skill the daemon fires (#1774), from its own package. The skills an agent
-    // composes — tickets, queue, logs — are the project's tracked files, not links.
+    // One skill is linked into the checkout, where each harness looks for them: the branches
+    // package's own (#1739). The daemon links no skill of its own (#1774): the command skill it
+    // fires, `work-queue`, and the skills an agent composes — tickets, queue, logs — are the
+    // project's tracked files, in every checkout by themselves.
     const checkout = worktreePath(cwd, result.agentId!)
     for (const harnessDir of HARNESS_SKILL_DIRS) {
-      for (const [name, dir] of [['branches', BRANCHES_SKILL_DIR], ...COMMAND_SKILLS.map(s => [s.name, s.dir] as const)] as const) {
-        const target = await readlink(join(checkout, harnessDir, name))
-        assert.equal(await realpath(resolve(join(checkout, harnessDir), target)), await realpath(dir), `${harnessDir}/${name} links the directory holding its SKILL.md`)
-      }
-      assert.deepEqual((await readdir(join(checkout, harnessDir))).sort(), ['branches', 'work-queue'], `${harnessDir} holds exactly those two links`)
+      const target = await readlink(join(checkout, harnessDir, 'branches'))
+      assert.equal(await realpath(resolve(join(checkout, harnessDir), target)), await realpath(BRANCHES_SKILL_DIR), `${harnessDir}/branches links the directory holding its SKILL.md`)
+      assert.deepEqual(await readdir(join(checkout, harnessDir)), ['branches'], `${harnessDir} holds exactly that one link`)
     }
     await runtime.dispose()
   } finally {

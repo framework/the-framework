@@ -344,10 +344,10 @@ export const AUTO_PM_JOBS: readonly AutoPmJob[] = [
 ]
 
 /**
- * The command skill the daemon fires on the queued work (#1774): the `SKILL.md` of the
- * `@gemstack/skill-work-queue` package, linked into every checkout the daemon makes, marked so
- * that only a person or the daemon invokes it. Its prompt is the slash command; the agent's
- * harness expands it.
+ * The command skill the daemon fires on the queued work (#1774): `work-queue`, a skill file the
+ * project tracks under `.claude/skills/<command>`, marked so that only a person or the daemon
+ * invokes it. Its prompt is the slash command; the agent's harness expands it. The daemon ships
+ * no skill file, links none into a checkout and depends on no skill package.
  */
 export const WORK_QUEUE_SKILL_NAME = 'work-queue'
 

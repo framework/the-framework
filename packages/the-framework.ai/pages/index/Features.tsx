@@ -51,6 +51,13 @@ export function Features() {
           </FeatureText>
         </div>
         <div style={{ ...featureCardStyle, gap: 12 }}>
+          <h3 style={{ margin: 0, fontSize: 19, fontWeight: 600 }}>Headless browser</h3>
+          <FeatureText>
+            The Framework launches a headless Chromium that agents fully control — DOM, console, network and
+            screenshots via Chrome MCP. No AI browser extension needed. Watch it live and take over on login walls.
+          </FeatureText>
+        </div>
+        <div style={{ ...featureCardStyle, gap: 12 }}>
           <h3 style={{ margin: 0, fontSize: 19, fontWeight: 600 }}>Notifications</h3>
           <FeatureText>Get browser and/or Discord notifications when AI is finished or needs you.</FeatureText>
         </div>

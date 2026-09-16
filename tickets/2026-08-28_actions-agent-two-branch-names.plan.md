@@ -14,7 +14,7 @@ The work never gets lost. It always lands on `claude/<session id>`, and the agen
 - `packages/framework/src/cli.ts:1136` builds `actionsConfig` with no `branchPrefix`. So `ActionsSession` (`packages/agent-driver/src/actions.ts:123`) names the run branch `claude/actions-<n>-<tag>`. It passes that name to every dispatch as the `branch` input (`actions.ts:176`).
 - The system channel gives every agent outside a daemon-made checkout `prompts/branch_yourself.md` (`prompts/LOGIC.md`, step 3). A GitHub Actions runner is one of those agents. The file says: `git checkout -b agent-<SESSION_NAME>`, then commit there.
 - `.github/workflows/framework-agent.yml` ("Push the run branch") commits anything left uncommitted. It then pushes `HEAD:refs/heads/$RUN_BRANCH`. HEAD is whatever branch the agent checked out, so the agent's `agent-<name>` commits get pushed under the `claude/…` name. The `agent-<name>` branch itself is never pushed. It disappears with the runner.
-- The next turn is dispatched with `ref: this.branch`, which is the `claude/…` branch (`actions.ts:182`). On the fresh runner, the agent runs `git checkout -b agent-<name>` again from there, and the push goes back to `claude/…`. So the turns chain correctly.
+- The next turn is dispatched with `ref: this.branch`, which is the `claude/…` branch (`actions.ts:183`). On the fresh runner, the agent runs `git checkout -b agent-<name>` again from there, and the push goes back to `claude/…`. So the turns chain correctly.
 - Result: the work is always on `claude/<session id>`. It is never split between two branches. The ticket's worry ("which one carries the work depends on the workflow") only applies to a user's own workflow that pushes a different ref. The shipped one does not.
 
 ## Corrections to the ticket
@@ -25,7 +25,7 @@ The work never gets lost. It always lands on `claude/<session id>`, and the agen
 ## Options
 
 1. (a) Set `branchPrefix: 'agent-'` in `cli.ts:1136`. Branches become `agent-actions-<n>-<tag>`. That follows the `agent-` convention, but not the agent's own session name. Uncertainty 2.
-2. (a') Also let the agent's name win: the workflow pushes HEAD to the agent's own branch name, and the driver reads that name back from the artifact (`artifact.branch` is already read, `actions.ts:163`). The next turn would then dispatch from `agent-<name>`, and the session would have to follow a branch that can change between turns. Uncertainty 5. It adds a moving part for a cosmetic gain.
+2. (a') Also let the agent's name win: the workflow pushes HEAD to the agent's own branch name, and the driver reads that name back from the artifact (`artifact.branch` is already read, `actions.ts:148`). The next turn would then dispatch from `agent-<name>`, and the session would have to follow a branch that can change between turns. Uncertainty 5. It adds a moving part for a cosmetic gain.
 3. (b) Drop the branch instruction for Actions. The system prompt would pick a variant of `branch_yourself.md` for the actions target: "commit on the branch you are on; the workflow pushes it". The rename step goes away and nothing is left that contradicts the workflow. Uncertainty 1.
 4. (c) Leave it as is and add a line to `framework-agent.LOGIC.md` saying the agent's branch name is replaced by the run branch. Uncertainty 0.
 

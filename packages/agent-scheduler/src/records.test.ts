@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { DATA_BRANCH } from '@gemstack/agent-data'
 import { findRun, listRuns, readDiary } from '@gemstack/skill-logs'
-import { inFlight, markerCard, recordRun, schedulerMark, withdrawMarker, writeMarker } from './records.js'
+import { inFlight, lastStart, markerCard, recordRun, schedulerMark, withdrawMarker, writeMarker } from './records.js'
 import { git, removeRepo, testRepo } from './test-repo.js'
 
 // The marker is the logs skill's record, on the real branch: written before the agent exists,
@@ -22,6 +22,20 @@ test('a marker is a running card on agent-data, pushed to origin, that the logs 
     assert.deepEqual(schedulerMark(found!), mark)
     assert.deepEqual(await readDiary(repo, card.id), [])
     assert.match(await git(['log', '-1', '--format=%s', `origin/${DATA_BRANCH}`], repo), /^logs: record run 2026-09-16T14-01-00-000Z/)
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test('the last start of a command is its newest card on any machine, whatever became of the run; a command never started has none', async () => {
+  const repo = await testRepo()
+  try {
+    await writeMarker(repo, markerCard({ id: 'a1', startedAt: '2026-09-16T14:01:00.000Z', prompt: '/work-queue', driver: 'claude-code', model: 'opus', mark }))
+    await recordRun(repo, { id: 'a0', startedAt: '2026-09-16T09:00:00.000Z', status: 'done', caller: { scheduler: { command: 'work-queue', host: 'other-box' } } }, [])
+    await recordRun(repo, { id: 'a2', startedAt: '2026-09-16T14:02:00.000Z', status: 'failed', caller: { scheduler: { command: 'work-queue', host: 'other-box' } } }, [])
+    await recordRun(repo, { id: 'd1', startedAt: '2026-09-16T15:00:00.000Z', status: 'running', intent: 'a dashboard run' }, [])
+    assert.equal(await lastStart(repo, 'work-queue'), '2026-09-16T14:02:00.000Z')
+    assert.equal(await lastStart(repo, 'triage-quick'), undefined)
   } finally {
     await removeRepo(repo)
   }

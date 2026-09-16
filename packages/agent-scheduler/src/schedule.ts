@@ -8,9 +8,13 @@ import { DEFAULT_CAP, SCHEDULE_FILE } from './names.js'
  * command is named, and `.claude/skills/<command>` in the repository is what runs.
  *
  *     - work-queue: when `npx queue`, cap 1
+ *     - triage-quick: every 6h
+ *     - update-tickets: every 1h, when `gh issue list …`
  *
  * `when` is a shell command, run at the repository root. The command is due while the check
- * exits 0 and prints something other than an empty JSON value. `cap` is how many runs of the
+ * exits 0 and prints something other than an empty JSON value. `every` is how often at most: the
+ * command is due only once that long has passed since its last recorded start. A line carries
+ * one or both; with both, the command starts only when both hold. `cap` is how many runs of the
  * command may be in flight at once, across every machine that shares the repository.
  *
  * Every other line — headings, blank lines, prose — is the person's, and is not read. A list line
@@ -22,8 +26,10 @@ import { DEFAULT_CAP, SCHEDULE_FILE } from './names.js'
 export interface ScheduledCommand {
   /** The command: the `.claude/skills/<name>` the agent's harness expands from `/<name>`. */
   name: string
-  /** The check, a shell command line. */
-  when: string
+  /** The check, a shell command line; absent when the line paces by time alone. */
+  when?: string
+  /** How often at most: the least time since the command's last recorded start, and the text as written (`6h`). */
+  every?: { ms: number; text: string }
   /** Runs in flight at once, across every machine. */
   cap: number
   /** The file's line number, for a message. */
@@ -38,7 +44,10 @@ export interface Schedule {
 }
 
 const COMMAND_LINE = /^-\s+([a-z0-9][a-z0-9-]*):\s*(.+)$/
-const WHEN = /^when\s+`([^`]+)`\s*(?:,\s*cap\s+(\d+))?\s*$/
+const EVERY = /^every\s+(\d+)(m|h|d)$/
+const WHEN = /^when\s+`([^`]+)`$/
+const CAP = /^cap\s+(\d+)$/
+const UNIT_MS = { m: 60_000, h: 3_600_000, d: 86_400_000 } as const
 
 /** The schedule out of the file's markdown. Pure. */
 export function parseSchedule(md: string): Schedule {
@@ -47,15 +56,59 @@ export function parseSchedule(md: string): Schedule {
     const line = index + 1
     if (!/^-\s/.test(text)) return
     const head = COMMAND_LINE.exec(text.trim())
-    const rule = head ? WHEN.exec(head[2]!) : null
-    if (!head || !rule) {
+    const command = head ? parseRule(head[1]!, head[2]!, line) : undefined
+    if (!command) {
       schedule.unreadable.push({ line, text: text.trim() })
       return
     }
-    const cap = rule[2] === undefined ? DEFAULT_CAP : Number(rule[2])
-    schedule.commands.push({ name: head[1]!, when: rule[1]!.trim(), cap: Math.max(1, cap), line })
+    schedule.commands.push(command)
   })
   return schedule
+}
+
+/**
+ * The clauses after the name, in any order, each at most once: `every <N><m|h|d>`, `when \`…\``,
+ * `cap <N>`. At least one of `every` and `when`, else nothing says when. `every 0` is refused
+ * rather than read as "always", which is the clause being absent.
+ */
+function parseRule(name: string, rule: string, line: number): ScheduledCommand | undefined {
+  let when: string | undefined
+  let every: { ms: number; text: string } | undefined
+  let cap: number | undefined
+  for (const clause of clauses(rule)) {
+    const asEvery = EVERY.exec(clause)
+    const asWhen = WHEN.exec(clause)
+    const asCap = CAP.exec(clause)
+    if (asEvery && every === undefined && Number(asEvery[1]) > 0) {
+      every = { ms: Number(asEvery[1]) * UNIT_MS[asEvery[2] as keyof typeof UNIT_MS], text: `${asEvery[1]}${asEvery[2]}` }
+    } else if (asWhen && when === undefined) {
+      when = asWhen[1]!.trim()
+    } else if (asCap && cap === undefined) {
+      cap = Math.max(1, Number(asCap[1]))
+    } else {
+      return undefined
+    }
+  }
+  if (when === undefined && every === undefined) return undefined
+  return { name, ...(when !== undefined ? { when } : {}), ...(every ? { every } : {}), cap: cap ?? DEFAULT_CAP, line }
+}
+
+/** The rule split on the commas outside backticks, each piece trimmed. */
+function clauses(rule: string): string[] {
+  const out: string[] = []
+  let current = ''
+  let quoted = false
+  for (const ch of rule) {
+    if (ch === '`') quoted = !quoted
+    if (ch === ',' && !quoted) {
+      out.push(current)
+      current = ''
+    } else {
+      current += ch
+    }
+  }
+  out.push(current)
+  return out.map(s => s.trim()).filter(Boolean)
 }
 
 /** The repository's schedule, or `undefined` when it has none. */

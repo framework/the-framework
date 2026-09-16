@@ -20,7 +20,7 @@ The `tickets` command: the six operations an agent [1], or a person in a shell, 
 - **The contract: JSON out, a line for a person, an exit code** - every command prints one JSON document on stdout; a refusal adds one line on stderr and exits 1; a command line that cannot be read prints the usage on stderr, nothing on stdout, and exits 2; anything else that fails exits 1 as `git-failed`.
 - **Naming a ticket** - every command takes a ticket's bare filename or its `tickets/<file>` path; a plan's or claim's name, or any name that leaves `tickets/`, is refused as `invalid-path`, except that `put` also takes a `.plan.md` and `meta.json`.
 - **Reads come off origin** - `list` and `show` fetch origin once and read its copy of the branch; with no origin the local branch is read; outside a repository every command refuses `not-a-repo`.
-- **`list` and `show`** - `list` answers every open ticket's row as one JSON array; `show` answers one ticket's row and whole text, its plan's text when it has one, and its holder when the claim names one; a missing ticket is `no-ticket`.
+- **`list`, `show` and `meta`** - `list` answers every open ticket's row as one JSON array; `meta` answers when the tickets last caught up with the issue tracker, `{"lastImportedAt": …}`, or `{}` when nothing usable was recorded; `show` answers one ticket's row and whole text, its plan's text when it has one, and its holder when the claim names one; a missing ticket is `no-ticket`.
 - **Writes are one pushed commit each, on a throwaway checkout** - `put`, `close`, `claim` and `release` each make one commit on a throwaway checkout of origin's tip and push it straight to the branch; nothing lands in the caller's checkout; with no remote the write is refused as `no-remote`.
 - **Who the command acts as** - `close`, `claim` and `release` act as `AGENT_ID` when it is set, else as the current branch; a checkout on no branch refuses `no-identity`.
 - **`put`** - writes one whole file under `tickets/` from stdin, a ticket, a plan or `meta.json`, creating it if new and overwriting it whoever holds the ticket; never a claim.
@@ -60,9 +60,11 @@ Every command names a ticket by its bare filename (`2042-01-01_some-ticket.md`) 
 
 `list` and `show` fetch origin once and read everything from origin's copy of the `agent-data` branch [3], by the `agent-data` package's reader, so a command sees what every writer pushed. With no origin, the local branch is read; writes are refused there, so nobody else can have moved it. Outside a repository, every command, reads and writes alike, refuses `not-a-repo` before touching anything.
 
-### `list` and `show`
+### `list`, `show` and `meta`
 
-#### Context
+# `meta` answers the last-import stamp the tickets record: `{"lastImportedAt": <ISO 8601>}`, or `{}` when no file, an unreadable one, or one without a usable date was recorded; it never fails over that file.
+
+### Context
 
 See `## Context`.
 

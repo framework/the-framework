@@ -18,6 +18,7 @@ A run in flight is a run record [1]: the `logs` skill's card on the project's `a
 
 - **The marker** - a card with the run's id, its start time, `status: running`, the prompt as the intent, the driver, the model and the tool's mark, written to the branch with an empty diary; the write says whether it reached origin.
 - **In flight** - the running cards of one command on the branch, whatever the machine; a running card without the tool's mark, a dashboard's own run for instance, is not counted.
+- **The last start** - the newest start time among one command's cards on the branch, whatever the machine and whatever became of the run, for the schedule's interval; nothing when the command never started.
 - **Withdrawing** - a marker whose tick lost the cap is deleted from the branch, so no record says running for a run that never was.
 - **The record at the end** - the card and the diary written over the marker, same id, same file; the mark stays on the card.
 

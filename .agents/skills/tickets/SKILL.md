@@ -17,6 +17,8 @@ npx tickets list                 every open ticket, as one JSON array: file, tit
                                  (priority, topics, github, effort, uncertainty, locked, lockedBy
                                  absent when unset)
 npx tickets show <file>          one ticket: its text, its plan, who holds it
+npx tickets meta                 when the tickets last caught up with the issue tracker:
+                                 {"lastImportedAt": <ISO 8601>}, or {} when no import was recorded
 ```
 
 ## Change

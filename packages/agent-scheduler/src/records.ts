@@ -32,6 +32,16 @@ export function schedulerMark(card: RunCard): SchedulerMark | undefined {
   return { command, host, ...(typeof pid === 'number' ? { pid } : {}) }
 }
 
+/** When one command last started, on any machine, whatever became of the run; nothing when it never did. */
+export async function lastStart(repo: string, command: string, deps: LogsDeps = {}): Promise<string | undefined> {
+  const cards = await listRuns(repo, {}, deps)
+  let latest: string | undefined
+  for (const card of cards) {
+    if (schedulerMark(card)?.command === command && (latest === undefined || card.startedAt > latest)) latest = card.startedAt
+  }
+  return latest
+}
+
 /** The runs of one command still in flight, on any machine. */
 export async function inFlight(repo: string, command: string, deps: LogsDeps = {}): Promise<RunCard[]> {
   const cards = await listRuns(repo, {}, deps)

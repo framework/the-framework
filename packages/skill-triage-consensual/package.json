@@ -1,0 +1,17 @@
+{
+  "name": "@gemstack/skill-triage-consensual",
+  "version": "0.0.1",
+  "description": "The triage-consensual command for coding agents: put the significant, consensual tickets on the project's agent queue, unattended. A skill file only, no code.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/framework/the-framework.git",
+    "directory": "packages/skill-triage-consensual"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "SKILL.md"
+  ]
+}

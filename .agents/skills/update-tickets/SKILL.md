@@ -1,0 +1,7 @@
+---
+name: update-tickets
+description: Bring the project's tickets up to date with its issue tracker, unattended.
+disable-model-invocation: true
+---
+
+Bring the tickets up to date with the project's issue tracker. Nobody will answer you: never ask, decide yourself. Note the current UTC time first, in ISO 8601: it is the import time you record at the end, and noting it before you fetch is deliberate, so an issue edited while you work is picked up by the next update instead of being missed. Read when the tickets last caught up with the tracker. If there are tickets but no such time, or the tracker cannot be reached, or you are not logged in to it, show an error to the user saying which of those it is and stop. If there are no tickets at all, treat it as a first import and bring every open issue across. Otherwise fetch only the issues and the discussion changed since that time. Reconcile, one ticket per issue: an issue with no ticket yet gets one; an issue that has a ticket has it updated in place, keeping its file name and its plan, and marking the plan outdated when the change calls for it; a comment is folded in only where it changes what the work is, never pasted; an issue now closed has its ticket closed. Record the time you noted as the new import time, and say in one line how many tickets you added, updated and removed. If this project has no ticketing system, show an error to the user and stop.

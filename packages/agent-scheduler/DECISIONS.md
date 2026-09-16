@@ -36,6 +36,14 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   empty), over the tool reading the queue (the tool would know a skill), and over a bare
   clock (empty runs). A list line the parser cannot read is skipped and named, never
   guessed.
+- A schedule line paces a command two ways, alone or together: `when` says there is work
+  (the check's output), `every` says how often at most (the least time since the command's
+  last recorded start, read off the run records on the branch, so every machine agrees and
+  nothing new is stored). A routine whose run changes nothing cannot be paced by a check
+  alone: it would start every minute. Picked over a rotation of the routines in a fixed
+  order behind an empty queue (one line then depends on another, and idle it started an
+  agent every 30 minutes), and over a clock time (`at 09:00`: machine-local, and two
+  machines fire twice). Order is what the numbers say.
 - The state, `.agent-scheduler/state.json`, untracked, per user, hidden through git's
   exclude file the way `.branches/` is: on or off, keep-alive, the model, the spend cushion,
   the scheduler's pid, the last tick and what it decided. Nothing the tool knows is only in

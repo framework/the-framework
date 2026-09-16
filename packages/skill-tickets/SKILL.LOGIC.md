@@ -20,7 +20,7 @@ The instructions every agent [1] reads before touching a ticket: where the ticke
 ## Business logic — TL;DR
 
 - **Where the tickets are and how to reach them** - tickets live on the `agent-data` branch, never on a code branch; the root `tickets` link is a possibly stale copy never to be written; the agent installs the repository's dependencies if needed and runs `npx tickets`, whose every change is one commit pushed straight to the branch.
-- **Reading** - `list` gives every open ticket as one JSON array of rows; `show <file>` gives one ticket with its text, its plan and who holds it.
+- **Reading** - `list` gives every open ticket as one JSON array of rows; `show <file>` gives one ticket with its text, its plan and who holds it; `meta` gives when the tickets last caught up with the issue tracker.
 - **Changing** - `put <file>` writes one whole file under `tickets/` from stdin, a ticket or a plan; `close <file>`, only once the work is merged, removes the ticket with its plan and claim, refused while someone else holds it, and leaves its queue entry to `npx queue done`.
 - **Queueing a ticket** - with the `queue` skill present, a ticket goes on the agent queue as a markdown link labeled with its title, at the ticket's own `Priority:` (5 when it has none).
 - **Claim before planning or working** - `claim <file>` makes the ticket the agent's or names who holds it; on someone else's the agent picks another and never removes or overwrites their claim; `release <file>` lifts the agent's own claim when done and before it stops, since nothing lifts a claim on a timeout.

@@ -1,6 +1,5 @@
 ## Priority 6
 
-- [App instead of `localhost`?](tickets/2026-07-12_app-instead-of-localhost.md)
 
 ## Priority 5
 - Write the plan: [Follow-ups from the DECISIONS.md and SKILL.md cold reads](tickets/2026-09-04_cold-read-follow-ups.md)

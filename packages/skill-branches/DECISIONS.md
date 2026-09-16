@@ -87,8 +87,14 @@ push.
   goes, to stop whatever serves the tree; the command line passes no hook.
 
 ## The skill
-- The agent commits and stops: it never pushes, opens a pull request, or merges. Whoever
-  started it does that.
+- The agent publishes its own work when it finishes: `npx branches publish` pushes its
+  branch, opens the pull request with the title and body the agent wrote, and arms the
+  merge on green when the command that started it says the work may land on its own.
+  Picked over whoever started the agent publishing for it, which needed a run process
+  that knew the agent's words: the agent knows them. Whoever started the agent may still
+  say they publish for it; then the agent never does.
+- `publish` refuses a checkout that is not clean, opens no second request for a branch
+  that has one open, and never opens a draft when the merge is armed.
 - Before its first change the agent names its session, saying what the work is, unless its
   branch already differs from its folder name, as a continued agent's does: it is already
   named. The agent finishes only when `npx branches status` reports the checkout clean, or

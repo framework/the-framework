@@ -1,4 +1,4 @@
-The `@gemstack/skill-work-queue` npm package: the `work-queue` command skill [1], one `SKILL.md` and no code. A command skill is a job for a coding agent [2] that composes the capability skills [3] of a project; it names no skill, no command and no package, and it is marked so that only a person or a runner invokes it, never the agent by itself. One package per command, named `@gemstack/skill-<command>`. The Framework's daemon depends on this package and starts an agent with the skill's slash command, `/work-queue`; a project that installs the skill without The Framework fires it by hand or from another runner.
+The `@gemstack/skill-work-queue` npm package: the `work-queue` command skill [1], one `SKILL.md` and no code. A command skill is a job for a coding agent [2] that composes the capability skills [3] of a project; it names no skill, no command and no package, and it is marked so that only a person or a runner invokes it, never the agent by itself. One package per command, named `@gemstack/skill-<command>`. A project tracks the skill file as `.claude/skills/work-queue/SKILL.md`; the scheduler, `agent-scheduler`, starts an agent with the skill's slash command, `/work-queue`, when the project's schedule says the queue has entries, and a person fires it by hand the same way. Nothing depends on the package.
 
 ## Glossary
 
@@ -8,4 +8,4 @@ The `@gemstack/skill-work-queue` npm package: the `work-queue` command skill [1]
 
 ## Business logic — TL;DR
 
-- **Working the queue** (`SKILL.md`) - one queued task off the agent queue, unattended; the job The Framework's daemon fires when the `agent-data` branch moved (the rules in `packages/framework/src/auto-pm.ts`); a project tracks the file as `.claude/skills/work-queue/SKILL.md`, the daemon links nothing.
+- **Working the queue** (`SKILL.md`) - one queued task off the agent queue, unattended, published by the agent as a pull request that merges on green; the job the scheduler fires while the queue has entries.

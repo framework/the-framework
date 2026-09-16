@@ -78,23 +78,10 @@ export interface StartAgentOptions {
    * parking for an answer, which is the fallback a fully headless agent already uses and the one
    * autopilot would have clicked. It also keeps the agent out of the stay-open chat loop, so it
    * ends at settle and its armed handoff fires. Set by the work the daemon starts on its own
-   * (auto PM, #685) and by dashboard surfaces that fire routine/preset work (#1279).
+   * (the CI watch's fix, #1418) and by dashboard surfaces that fire preset work (#1279).
    * Stop still works — that aborts the agent controller, not a gate.
    */
   unattended?: boolean
-  /**
-   * The id this run is born with, when the caller minted it before the start (#1748): the sweep
-   * claims a ticket for the agent first — the lock names this id — and starts the agent with it,
-   * so the claim and the agent are one. Absent, the run's id is the moment it starts.
-   */
-  agentId?: string
-  /**
-   * This agent plans a ticket rather than implementing it. Set by the daemon on a fanned-out
-   * [Plan tickets] run (#1327), whose PR lands only the plan: a closing phrase in its title or
-   * description must not close the ticket's issue (#1334) — a plan's merge would close the issue
-   * with the work still undone.
-   */
-  planAgent?: boolean
   /** Resume a finished agent's conversation (#720): its captured agent session id. The agent's prompt continues that session (full prior context) instead of starting fresh. Sent with `kind: 'prompt'` when you message an agent that has ended. */
   resumeSession?: string
   /**

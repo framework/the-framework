@@ -2,7 +2,7 @@ Joins the preset registry with the preset catalog on the daemon's side: the six 
 
 ## Context
 
-**User story**: an agent that signals ready for merge [4] gets an extra turn that queues quality follow-ups such as "Apply `.the-framework/presets/maintainability.md` with tf.params.what set to changes introduced by <session name>"; the agent that later drains [5] that entry opens the file at that path and applies it to the target the entry names. The "Maintenance" routine [6] queues the same kind of entry per codebase subset.
+**User story**: an agent that signals ready for merge [4] gets an extra turn that queues quality follow-ups such as "Apply `.the-framework/presets/maintainability.md` with tf.params.what set to changes introduced by <session name>"; the agent that later drains [5] that entry opens the file at that path and applies it to the target the entry names. The "Maintenance" preset queues the same kind of entry per codebase subset.
 
 **Business logic story**: the registry in `preset-registry.ts` names the stems and the paths and touches nothing on the machine, so presets render in the browser; the catalog in `preset-catalog.ts` owns the prompts; this file is the one place the two meet, so a stem without a prompt cannot exist unnoticed.
 
@@ -12,8 +12,7 @@ Joins the preset registry with the preset catalog on the daemon's side: the six 
 [2] queue entry: an item on the agent queue, `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down.
 [3] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
 [4] ready for merge: the signal an agent emits when it believes its work is complete: it flips the agent's badge from building to ready and authorizes the handoff.
-[5] the queued work: the routine that spends existing work: one agent started with `/work-queue` when the `agent-data` branch moved, which takes one task off the agent queue by composing the skills in its checkout.
-[6] routine: a job the daemon fires on its own — the queued work, update tickets, triage quick, triage consensual, plan tickets, maintenance — each switchable off and runnable on demand.
+[5] the queued work: one agent started with `/work-queue`, which takes one task off the agent queue by composing the skills in its checkout.
 
 ## Business logic — TL;DR
 

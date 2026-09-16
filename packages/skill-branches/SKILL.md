@@ -5,11 +5,11 @@ description: Where your work goes (a branch named agent-<name>), how to name it,
 
 # Branch management
 
-Your work goes on a branch named `agent-<name>`, unless whoever started you continued you on another. Whoever started you pushes, opens the pull request, and merges. You never do.
+Your work goes on a branch named `agent-<name>`, unless whoever started you continued you on another. When you finish, you publish it yourself: push, pull request, and merge on green when the work may land on its own. Unless whoever started you said they publish for you: then you never do.
 
 ## The command
 
-`branches` is a dependency of this repository (`@gemstack/skill-branches`). If `node_modules` is missing, install with the lockfile's package manager (`npm install` for `package-lock.json`). Then run `npx branches` inside your checkout. `status` and `name` are yours; the rest are the caller's.
+`branches` is a dependency of this repository (`@gemstack/skill-branches`). If `node_modules` is missing, install with the lockfile's package manager (`npm install` for `package-lock.json`). Then run `npx branches` inside your checkout. `status`, `name` and `publish` are yours; the rest are the caller's.
 
 ## Where you are
 
@@ -48,3 +48,13 @@ npx branches status
 ```
 
 It must report `"clean": true`. `clean` is false while anything is uncommitted or untracked: commit or delete what you added; if what remains is not yours, say so and finish.
+
+## Publish
+
+Once clean, unless whoever started you said they publish for you:
+
+```
+npx branches publish --title "<one line naming what the change does>" --body "<what changed, and why>"
+```
+
+It pushes your branch, opens the pull request, and prints it in `pr`. Add `--merge` when the work may land on its own: the request then merges once its checks pass. Add `--draft` for a request a person should look at first. A branch that already has an open request gets no second one. `clean` false is refused as `dirty`: commit or delete first.

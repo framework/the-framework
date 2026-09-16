@@ -9,7 +9,7 @@ The CI watch [1]: the sweep [2] that, once per tick [3] of the daemon's clock, w
 ## Glossary
 
 [1] CI watch: the sweep that merges the pull requests The Framework opened once their checks pass, and starts a fix agent when a check goes red.
-[2] sweep: a background job the daemon runs on its clock: Auto PM, the CI watch, the notification watchers, the sweep that reclaims checkouts, the branch-links sweep, the cloud scratch sweep, cloud work adoption.
+[2] sweep: a background job the daemon runs on its clock: the CI watch, the notification watchers, the sweep that reclaims checkouts, the branch-links sweep, the cloud scratch sweep, cloud work adoption.
 [3] tick: one beat of the daemon's single background clock; each sweep says how many ticks it waits between turns.
 [4] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
 [5] fix agent: the agent the CI watch starts when a check goes red on a watched pull request.

@@ -14,7 +14,6 @@ Serves the dashboard's RPC surface at `/_rpc`: a call is a `POST /_rpc/<name>` w
 [4] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 [5] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 [6] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
-[7] Auto PM: the daemon's unattended product management: work the agent queue when the `agent-data` branch moves, and refill it by running the routines.
 
 ## Business logic — TL;DR
 
@@ -82,4 +81,4 @@ See `## Context`.
 
 #### Business logic
 
-Mounting the surface installs one context every RPC reads: the daemon's start closure (a prompt, the kind, the start options and the project), its add-project closure, the events source for relayed [3] agents, the relayed-agent lookup (which device [4] an agent runs on, and a project's relayed agents), the preferences [5] store, the quota [6] source, the Discord credentials store, which also reloads the Discord services on a save, what Auto PM [7] last decided, a way to run Auto PM now that resolves when it has finished so the caller can report what it decided, each project's current errors, and the daemon's bridge browser with its show, hide and restart.
+Mounting the surface installs one context every RPC reads: the daemon's start closure (a prompt, the kind, the start options and the project), its add-project closure, the events source for relayed [3] agents, the relayed-agent lookup (which device [4] an agent runs on, and a project's relayed agents), the preferences [5] store, the quota [6] source, the Discord credentials store, which also reloads the Discord services on a save, each project's current errors, and the daemon's bridge browser with its show, hide and restart.

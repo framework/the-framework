@@ -35,7 +35,7 @@ The file is looked for in the directory given, which is the agent [5]'s checkout
 
 #### Context
 
-**Problem**: a repository's publish level is a fact about the repository: publishing a branch is reversible, landing it on the default branch is not, so `merge` has to be asked for in writing, and is meant for work whose review already happened before the agent, such as what a routine merges after a plan the user could veto.
+**Problem**: a repository's publish level is a fact about the repository: publishing a branch is reversible, landing it on the default branch is not, so `merge` has to be asked for in writing, and is meant for work whose review already happened before the agent, such as queued work whose review already happened on the queue.
 
 #### Business logic
 

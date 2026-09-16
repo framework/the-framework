@@ -1,7 +1,3 @@
-What the tests cover, with a real registry and a real `agent-data` branch and only the daemon's own spawn stubbed:
+What the tests cover, with real git:
 
-- **A move starts one agent on the queued work** - with Auto PM on and the rotation switched off, the start-up look starts nothing; a commit on the data branch written through the skills' plain funnel (someone queued an entry) starts exactly one agent, however high the concurrency, told `/work-queue` and nothing else, unattended, with its handoff at `merge`, no plan-agent mark and no pre-minted id; the report names the routine; the next look with nothing new starts nothing.
-- **The daemon's own commit is not a move** - a run's record written through the daemon's funnel starts nothing, and the report says the owed rotation turn has nothing to fire.
-- **"Run now" with the schedule off** - with Auto PM off the start-up look starts nothing; the queued work's "Run now" starts one agent on the queue without any move.
 - **The data-sync error** - a project whose data branch has no remote carries a `data-sync` error naming the missing remote, said on the daemon log too, and the error is gone the first time a sync converges after a remote is added.
-- **The quota gate is the model's week** - with most of the account's week left but the week of the model the agent would run on fully spent, a move starts nothing and the report names the window that stopped it ("Current week (Fable) is 100% used"); the same spent model week does not stop the run on another model with allowance left, which starts on that model.

@@ -105,7 +105,7 @@ export function defaultQuotaSource(env: NodeJS.ProcessEnv = process.env): QuotaS
   const driver = new ClaudeCodeDriver()
   const poller = new QuotaPoller({ read: () => driver.readQuota() })
   poller.start()
-  // One source, so the bar the user reads and the line auto PM obeys cannot disagree (#960): the
+  // One source, so the bar the user reads and the line unattended work obeys cannot disagree (#960): the
   // slider is read here rather than in each consumer. An unreadable registry means the default
   // policy, which is what a fresh install runs anyway.
   return pollerQuotaSource(poller, undefined, async () => {

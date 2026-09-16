@@ -17,21 +17,16 @@ Keeps the one file The Framework owns for the user, the registry [1] at `~/.the-
 [7] ready for merge: the signal an agent emits when it believes its work is complete: it flips the agent's badge from building to ready and authorizes the handoff.
 [8] transparent: an agent started with nothing of The Framework's — the raw coding agent.
 [9] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds. The other is activity: an agent started or finished.
-[10] Auto PM: the daemon's unattended product management: work the agent queue when the `agent-data` branch moves, and refill it by running the routines.
-[11] the bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge token is the secret the extension presents; the bridge browser is the Chrome for Testing the daemon runs for it.
-[12] the Overview: the dashboard's cross-project page at `/`.
-[13] coding agent: the CLI doing the actual work: Claude Code or Codex.
-[14] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later. The user's driver choice is `claude` or `codex`.
-[15] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
-[16] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it).
-[17] spend offset: the user's adjustment of the quota boundary, in percentage points of the week.
-[18] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
-[19] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
-[20] quota boundary: the share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
-[21] routine: a job the daemon fires on its own — the queued work, update tickets, triage quick, triage consensual, plan tickets, maintenance — each switchable off and runnable on demand.
-[22] the queued work: the routine that spends existing work: one agent started with `/work-queue` when the `agent-data` branch moved, which takes one task off the agent queue by composing the skills in its checkout.
-[23] fan-out: starting several agents at once, one per queue entry or one per ticket to plan.
-[24] tick: one beat of the daemon's single background clock; each sweep says how many ticks it waits between turns.
+[10] the bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge token is the secret the extension presents; the bridge browser is the Chrome for Testing the daemon runs for it.
+[11] the Overview: the dashboard's cross-project page at `/`.
+[12] coding agent: the CLI doing the actual work: Claude Code or Codex.
+[13] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later. The user's driver choice is `claude` or `codex`.
+[14] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
+[15] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it).
+[16] spend offset: the user's adjustment of the quota boundary, in percentage points of the week.
+[17] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
+[18] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
+[19] quota boundary: the share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
 
 ## Business logic — TL;DR
 
@@ -41,8 +36,8 @@ Keeps the one file The Framework owns for the user, the registry [1] at `~/.the-
 - **Reading forgivingly** - a missing, unreadable or malformed file reads as an empty registry, and every value read is validated.
 - **The on/off preferences** - each kept only as a true or false, each with its own meaning when absent.
 - **The choice preferences** - the model, the driver, the editor, the theme, the location and the handoff level, each constrained to the values the dashboard offers.
-- **The number preferences** - the spend offset, clamped to the slider's reach, and the number of concurrent Auto PM agents, floored at one.
-- **The list preferences** - the routines opted out of Auto PM, the project the routine card targets, and the custom presets, each trimmed, bounded and cleared when empty.
+- **The number preference** - the spend offset, clamped to the slider's reach.
+- **The list preference** - the custom presets, trimmed, bounded and cleared when empty.
 - **Unknown keys are dropped, never migrated** - a key this version does not know is dropped on read and never written back.
 - **Saving preferences: replace or patch** - a save replaces the block, a patch merges only the keys it names; blank clears; the dashboard's store tells the daemon which keys were written.
 - **Atomic, owner-only, serialized writes** - written to a temporary file with owner-only permission and renamed over the real one, one mutation after another.
@@ -109,38 +104,37 @@ Each of these keys of the preferences [2] is kept only when its value is a true 
 - `notifyDiscord`: notify on Discord too; absent means off, because Discord reaches the user when no dashboard is open, and it also needs the webhook described below.
 - `notifyHumanIntervention`: the "needs you" category, an intervention [9]; absent means on, the baseline The Framework leans on.
 - `notifyNewActivity`: the activity category, an agent started or finished; absent means off. The two categories compose with the two methods above: a notification is delivered by a method only when both its category and that method are on.
-- `autoPm`: let the daemon run Auto PM [10]; absent means off, because it spends the user's allowance without being asked.
-- `bridge`: switch the bridge [11] on; absent means off, because it opens the daemon's one route reachable from another origin.
+- `autoPm`: let the daemon put an agent on a watched pull request whose checks fail, by itself, while there is quota left in the week; absent means off, because it spends the user's allowance without being asked.
+- `bridge`: switch the bridge [10] on; absent means off, because it opens the daemon's one route reachable from another origin.
 - `bridgeBrowser`: let the daemon run its own bridge browser; absent means off, because it downloads a browser and keeps a signed-in claude.ai session on disk. It only matters with `bridge` on.
-- `onboardingDismissed`: the Onboarding checklist on the Overview [12] has been dismissed; absent means show it, and dismissing hides it only there, the same checklist staying available on Settings.
+- `onboardingDismissed`: the Onboarding checklist on the Overview [11] has been dismissed; absent means show it, and dismissing hides it only there, the same checklist staying available on Settings.
 
 ### The choice preferences
 
 #### Context
 
-**Problem**: a value outside the set the dashboard offers must not reach the coding agent's [13] command line, where it would fail the turn on a word nobody chose.
+**Problem**: a value outside the set the dashboard offers must not reach the coding agent's [12] command line, where it would fail the turn on a word nobody chose.
 
 #### Business logic
 
-- `model`: the model agents run on, free text, trimmed; a blank value is dropped, and so is the word "Default" in any casing, which is a picker label and not a model. Absent means the driver's [14] own default.
+- `model`: the model agents run on, free text, trimmed; a blank value is dropped, and so is the word "Default" in any casing, which is a picker label and not a model. Absent means the driver's [13] own default.
 - `driver`: `claude` or `codex`; anything else is dropped. Absent means `claude`.
 - `editor`: the command "Open in editor" runs (`code`, `cursor`, `zed`, ...), trimmed and cut to 100 characters; blank is dropped. Absent means the `FRAMEWORK_EDITOR` environment variable, then `code`.
 - `theme`: `system`, `light` or `dark`; anything else is dropped. Absent means `system`, following the operating system.
-- `target`: the location [15] `local`, `actions` or `web`; anything else is dropped. Absent means `local`.
-- `handoff`: the handoff [16] level `local`, `push`, `pr` or `merge`; anything else is dropped. Absent means `pr`, which is what makes the handoff zero-config: work never sits on a local branch nobody is told about.
+- `target`: the location [14] `local`, `actions` or `web`; anything else is dropped. Absent means `local`.
+- `handoff`: the handoff [15] level `local`, `push`, `pr` or `merge`; anything else is dropped. Absent means `pr`, which is what makes the handoff zero-config: work never sits on a local branch nobody is told about.
 
-### The number preferences
+### The number preference
 
 #### Context
 
-**Problem**: a hand-edited number must not put a limit where the dashboard's own control could not, and a zero must not wedge a routine whose switch still reads as on.
+**Problem**: a hand-edited number must not put a limit where the dashboard's own control could not.
 
 #### Business logic
 
-- `autoSpendOffset`, the spend offset [17]: a finite number, rounded to a whole number and clamped between -50 and 50 percentage points; anything else is dropped. Absent means about 7.1 points, a half day's share of the quota [18] week (100 divided by 14): unattended [19] work then starts a little ahead of the quota boundary [20] instead of exactly on it, where normal jitter would stop it. Negative holds unattended work back further; positive lets it borrow from the days still to come. It is an offset rather than an absolute percentage so the limit travels with the boundary as the week goes on.
-- `autoPmConcurrency`: how many agents Auto PM [10] may keep going at once on one project: a finite number, rounded, floored at 1, with no upper bound; anything else is dropped. Absent means 2. The queued work [22] runs one agent per move of the branch and the cap is how many may overlap; planning fans out [23] to it; the routines that rewrite the queue stay at one agent per tick [24] whatever this says.
+- `autoSpendOffset`, the spend offset [16]: a finite number, rounded to a whole number and clamped between -50 and 50 percentage points; anything else is dropped. Absent means about 7.1 points, a half day's share of the quota [17] week (100 divided by 14): unattended [18] work then starts a little ahead of the quota boundary [19] instead of exactly on it, where normal jitter would stop it. Negative holds unattended work back further; positive lets it borrow from the days still to come. It is an offset rather than an absolute percentage so the limit travels with the boundary as the week goes on.
 
-### The list preferences
+### The list preference
 
 #### Context
 
@@ -148,8 +142,6 @@ Each of these keys of the preferences [2] is kept only when its value is a true 
 
 #### Business logic
 
-- `autoPmOptOut`: the routines [21] Auto PM [10] must not fire, by name. Text entries only, each trimmed and cut to 100 characters, blanks removed, duplicates removed, at most 50 kept. An empty list is dropped: absent means every routine runs, which is exactly what re-ticking the last unticked routine writes. The names are not checked against the routine catalog, so a name a newer version wrote survives a downgrade, and a routine added later is on for everyone.
-- `autoPmProject`: the project the routine card's "Run now" targets, by project id: trimmed, cut to 100 characters, blank dropped. Absent means the first registered project. It is not checked against the project list here: the card validates it against the projects it shows and falls back when the project is gone.
 - `customPresets`: the presets the user saved. Each needs an `id`, a `label` and a `prompt`, all text and non-blank after trimming; the label is cut to 80 characters and the prompt to 20,000; an entry with a duplicate id, or malformed in any way, is skipped rather than failing the read; at most 30 are kept, in file order. When none survive, the key is left out of the file.
 
 ### Unknown keys are dropped, never migrated

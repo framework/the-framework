@@ -1,4 +1,4 @@
-Maps what the user set to the options an agent [1] starts with: the repo file [2]'s keys become the preferences [3] they speak for, the handoff [4] defaults to `pr` when nobody said, and a settled set of preferences becomes the agent's options, some always stated explicitly and others sent only when they differ from the default. One mapping shared by the launcher [5], the dashboard's queue and routine surfaces, and the daemon's own starts, so an unattended [6] agent honors the same driver [7], model and per-project settings as one started by hand.
+Maps what the user set to the options an agent [1] starts with: the repo file [2]'s keys become the preferences [3] they speak for, the handoff [4] defaults to `pr` when nobody said, and a settled set of preferences becomes the agent's options, some always stated explicitly and others sent only when they differ from the default. One mapping shared by the launcher [5], the dashboard's queue and preset surfaces, and the daemon's own starts, so an unattended [6] agent honors the same driver [7], model and per-project settings as one started by hand.
 
 ## Context
 

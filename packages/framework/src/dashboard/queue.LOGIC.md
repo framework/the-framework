@@ -1,16 +1,15 @@
-Rolls the agent queue [1] of every project up into the dashboard's cross-project Queue: the entries parsed out of each project's surfaced `TODO` documents, with how many are still open and how many there are in all, one block per project, the project with the most open entries first. The rule for what counts as a queue entry is the same one Auto PM [2] drains by, so the card and the daemon never disagree about the same file.
+Rolls the agent queue [1] of every project up into the dashboard's cross-project Queue: the entries parsed out of each project's surfaced `TODO` documents, with how many are still open and how many there are in all, one block per project, the project with the most open entries first. The rule for what counts as a queue entry is the `queue` skill's own, so the card and the agents never disagree about the same file.
 
 ## Context
 
 **User story**: with no project selected, the user sees how much work waits for agents across every project, and which project has the most, without opening each project's `TODO_AGENTS.md`. On the Overview, the count of open entries is the sum of these blocks.
 
-**Problem**: two readers of one file with two ideas of what an entry is make the dashboard say "Nothing queued" while the daemon drains [3] that very file. Triage agents write entries as a ticket link followed by a note, with no checkbox; a reader that only counts checkboxes reads such a queue as empty.
+**Problem**: two readers of one file with two ideas of what an entry is make the dashboard say "Nothing queued" while the queued work [2] takes entries off that very file. Triage agents write entries as a ticket link followed by a note, with no checkbox; a reader that only counts checkboxes reads such a queue as empty.
 
 ## Glossary
 
 [1] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down. An item on it is a queue entry.
-[2] Auto PM: the daemon's unattended product management: work the agent queue when the `agent-data` branch moves, and refill it by running the routines.
-[3] the queued work: the routine that spends existing work: one agent started with `/work-queue` when the `agent-data` branch moved, which takes one task off the agent queue by composing the skills in its checkout.
+[2] the queued work: one agent started with `/work-queue`, which takes one task off the agent queue by composing the skills in its checkout.
 
 ## Business logic — TL;DR
 
@@ -27,7 +26,7 @@ See `## Context`.
 
 #### Business logic
 
-Each line of a document is read on its own. A line that is a markdown list item, with `-`, `*` or a number followed by a period as its marker and any indentation before it, is one queue entry [1]; every other line, whether a heading, prose or blank, is ignored. When the item's text starts with a GitHub-style checkbox, `[ ]` makes the entry open and `[x]` or `[X]` makes it done, and the text after the checkbox is the entry's text; an item whose text after the checkbox is empty is dropped. An item with no checkbox is an open entry whose text is the whole item. This is deliberately the rule of the `queue` skill's own parser, which the daemon's drain [3] reads the queue by (`../todo-loop.ts`).
+Each line of a document is read on its own. A line that is a markdown list item, with `-`, `*` or a number followed by a period as its marker and any indentation before it, is one queue entry [1]; every other line, whether a heading, prose or blank, is ignored. When the item's text starts with a GitHub-style checkbox, `[ ]` makes the entry open and `[x]` or `[X]` makes it done, and the text after the checkbox is the entry's text; an item whose text after the checkbox is empty is dropped. An item with no checkbox is an open entry whose text is the whole item. This is deliberately the rule of the `queue` skill's own parser, which the queued work [2] reads the queue by.
 
 ### One block per project, most open first
 

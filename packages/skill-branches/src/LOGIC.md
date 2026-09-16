@@ -1,4 +1,4 @@
-Implements the `branches` skill [1]: one git worktree per agent [2] under the project's `.branches/` directory, the agent's checkout [3], named as its branch; made with everything an agent needs, renamed after the work once the agent names it, listed and sized for the dashboard, and reclaimed [4] once its work is on the remote, so nothing local is ever the last copy of anything. The daemon calls it as a library and every agent runs it as the `branches` command. The `*.BUG-ANALYSIS.md` notes beside the sources are review bookkeeping and carry no business logic.
+Implements the `branches` skill [1]: one git worktree per agent [2] under the project's `.branches/` directory, the agent's checkout [3], named as its branch; made with everything an agent needs, renamed after the work once the agent names it, listed and sized for the dashboard, published by the agent itself when it finishes, and reclaimed [4] once its work is on the remote, so nothing local is ever the last copy of anything. The daemon calls it as a library and every agent runs it as the `branches` command. The `*.BUG-ANALYSIS.md` notes beside the sources are review bookkeeping and carry no business logic.
 
 ## Context
 
@@ -31,6 +31,7 @@ Implements the `branches` skill [1]: one git worktree per agent [2] under the pr
 - **The skill linked in** (`skill-links.ts`, `skill-links.test.ts`) - `SKILL.md` reachable where each coding agent [10] looks for skills at the checkout root, hidden from git, an existing entry left alone; further skills the caller names beside it.
 - **The links under `.branches/`** (`branch-links.ts`, `branch-links.test.ts`) - a branch link [11] per checkout whose branch differs from its directory's name, stale ones dropped, nothing else touched; run after every change and as a sweep [12].
 - **Reclaiming** (`reclaim.ts`, `reclaim.test.ts`) - only what is on the remote may go: the refusals `not-a-worktree`, `no-branch`, `dirty` and `not-on-remote`, the push when the caller allows it, and the branches that go with a reclaimed [4] checkout.
+- **Publishing** (`publish.ts`) - the agent's own last step: a clean checkout's branch pushed, its pull request opened with the agent's words, the merge armed on request; a branch with an open request gets no second one.
 - **The `branches` command** (`cli.ts`, `cli.test.ts`) - `create`, `attach`, `name`, `status`, `list`, `remove` and `prune`: one JSON document on stdout, one line on stderr, exit code 0, 1 or 2.
 - **The executable's home** (`bin-dir.ts`) - the `bin/` directory the daemon puts on every agent's PATH.
 - **The entry point** (`index.ts`) - what the daemon and the dashboard import, and the naming rules alone for the dashboard's browser code.

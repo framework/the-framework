@@ -237,20 +237,6 @@ test('sanitizePreferences reads only the current spellings', async () => {
   assert.deepEqual(await stored({ driver: 'codex', agent: 'gpt-9000' }), { driver: 'codex' })
 })
 
-test('sanitizePreferences keeps the routine opt-out list, trimmed and deduplicated (#1209)', async () => {
-  // A list preference, so like the string ones the boolean-only loop would eat it whole. Junk
-  // entries are dropped one by one rather than taking the list with them: losing the list would
-  // switch every routine back on, which spends quota nobody asked to spend.
-  const fs = memFs()
-  await writePreferences({ autoPmOptOut: ['drain-queue', ' maintenance ', 'drain-queue', '', 7 as never] }, fs, ENV)
-  assert.deepEqual(await readPreferences(fs, ENV), { autoPmOptOut: ['drain-queue', 'maintenance'] })
-  // Empty is dropped like every other empty list, and means what absent means: nothing opted out.
-  // That is exactly what re-ticking the last unticked routine writes, so it has to clear the key.
-  assert.deepEqual(await patchPreferences({ autoPmOptOut: [] }, fs, ENV), {})
-  await writePreferences({ autoPmOptOut: 'drain-queue' as never }, fs, ENV)
-  assert.deepEqual(await readPreferences(fs, ENV), {})
-})
-
 test('patchPreferences merges only the keys it is given (#1148)', async () => {
   // The dashboard used to send its whole cached object, so a tab that had been open since before
   // someone else's change wrote the old value back over it. A patch touches only what it names.
@@ -319,41 +305,6 @@ test('writePreferences round-trips and clamps the spend-limit slider (#960)', as
   await writePreferences({ autoSpendOffset: Number.NaN }, fs, ENV)
   assert.deepEqual(await readPreferences(fs, ENV), {})
   await writePreferences({ autoSpendOffset: '20' } as never, fs, ENV)
-  assert.deepEqual(await readPreferences(fs, ENV), {})
-})
-
-test('writePreferences keeps the routine card\'s picked project, trimmed, and drops an empty one (#1647)', async () => {
-  const fs = memFs({ [FILE]: JSON.stringify({ projects: [APP_A], preferences: {} }) })
-  await writePreferences({ autoPmProject: ' tf-1334-dogfood-f8nvbw ' }, fs, ENV)
-  assert.deepEqual(await readPreferences(fs, ENV), { autoPmProject: 'tf-1334-dogfood-f8nvbw' })
-  // Not checked against the project list here: the card validates the id against the projects it
-  // shows, so a project removed since falls back there rather than being erased on read.
-  await writePreferences({ autoPmProject: '' }, fs, ENV)
-  assert.deepEqual(await readPreferences(fs, ENV), {})
-  await writePreferences({ autoPmProject: 42 as never }, fs, ENV)
-  assert.deepEqual(await readPreferences(fs, ENV), {})
-})
-
-test('writePreferences round-trips and floors the concurrent-agents setting (#1204)', async () => {
-  const fs = memFs({ [FILE]: JSON.stringify({ projects: [APP_A], preferences: {} }) })
-  await writePreferences({ autoPmConcurrency: 4 }, fs, ENV)
-  assert.deepEqual(await readPreferences(fs, ENV), { autoPmConcurrency: 4 })
-
-  // No upper bound — how many agents to run at once is the user's call — but floored at one: zero
-  // agents is what the `autoPm` switch already spells, and a hand-edited nought would wedge the
-  // routine with the switch still reading on.
-  await writePreferences({ autoPmConcurrency: 9000 }, fs, ENV)
-  assert.deepEqual(await readPreferences(fs, ENV), { autoPmConcurrency: 9000 })
-  await writePreferences({ autoPmConcurrency: 0 }, fs, ENV)
-  assert.deepEqual(await readPreferences(fs, ENV), { autoPmConcurrency: 1 })
-  await writePreferences({ autoPmConcurrency: -3 }, fs, ENV)
-  assert.deepEqual(await readPreferences(fs, ENV), { autoPmConcurrency: 1 })
-  // A whole number of agents, and nothing but a number at all.
-  await writePreferences({ autoPmConcurrency: 2.6 }, fs, ENV)
-  assert.deepEqual(await readPreferences(fs, ENV), { autoPmConcurrency: 3 })
-  await writePreferences({ autoPmConcurrency: Number.NaN }, fs, ENV)
-  assert.deepEqual(await readPreferences(fs, ENV), {})
-  await writePreferences({ autoPmConcurrency: '5' } as never, fs, ENV)
   assert.deepEqual(await readPreferences(fs, ENV), {})
 })
 
@@ -470,8 +421,9 @@ test('registryPreferencesStore round-trips through the same file', async () => {
 })
 
 test('registryPreferencesStore tells its listener which keys were written (#1161)', async () => {
-  // The daemon wakes auto PM only on the write that switched it on, so it needs the caller's own
-  // keys — the merged result would say "on" every time anything else was saved while it was on.
+  // The daemon launches or closes the bridge browser only on the write that switched it, so it
+  // needs the caller's own keys — the merged result would say "on" every time anything else was
+  // saved while it was on.
   const fs = memFs()
   const written: Preferences[] = []
   const store = registryPreferencesStore(fs, ENV, patch => written.push(patch))

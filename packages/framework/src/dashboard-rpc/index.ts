@@ -21,7 +21,7 @@ export {
 } from './preferences.js'
 export type { CredentialSource, DiscordCredentialStatus, DiscordCredentialsPatch } from '../discord-credentials.js'
 export { type EditorInfo } from '../dashboard/open-in-app.js'
-export { onQuota, onAutoPm, sendAutoPmSweep } from './quota.js'
+export { onQuota } from './quota.js'
 export { checkDevices, type DeviceCheck } from './devices.js'
 
 import * as reads from './reads.js'

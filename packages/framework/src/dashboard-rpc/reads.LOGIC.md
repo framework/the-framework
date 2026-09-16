@@ -18,7 +18,7 @@ Answers everything the dashboard reads about a project or an agent [1]: the agen
 [8] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
 [9] run: only the `logs` skill's record of one agent on the `agent-data` branch: a card (what was asked, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said).
 [10] archive: the transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
-[11] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
+[11] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [12] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
 [13] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
 [14] retained checkout: the checkout of an agent that has ended and is still on disk, kept so the user can inspect what the agent left; nothing removes it on a timer.
@@ -27,10 +27,9 @@ Answers everything the dashboard reads about a project or an agent [1]: the agen
 [17] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds. The other is activity: an agent started or finished.
 [18] open question: a gate nobody has answered yet, as the dashboard lists them across projects.
 [19] gate: a question with options at which an agent stops and waits for an answer: it emits the question in its turn's final message, the dashboard shows it as a card, and the answer re-prompts the agent.
-[20] routine: a job the daemon fires on its own — the queued work, update tickets, triage quick, triage consensual, plan tickets, maintenance — each switchable off and runnable on demand.
-[21] the built-in system prompt: the standing instructions every agent starts with (`prompts/system_prompt.md`); `SYSTEM.md` is the project's own instructions added on top.
-[22] pick: the answer to a gate: the option or options chosen, by the user or automatically.
-[23] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
+[20] the built-in system prompt: the standing instructions every agent starts with (`prompts/system_prompt.md`); `SYSTEM.md` is the project's own instructions added on top.
+[21] pick: the answer to a gate: the option or options chosen, by the user or automatically.
+[22] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 
 ## Business logic — TL;DR
 
@@ -108,7 +107,7 @@ The answer is the ids of the checkouts still on disk under the project's `.branc
 
 **User story**: an agent's action bar says which checkout the agent has, on which branch, whether it holds uncommitted changes, how much disk the checkout takes once the agent is done, and which pull request its branch has.
 
-**Problem**: the git status bar reads the project, so without this an agent's own branch was visible nowhere, and a retained checkout was a name in a list with no size and no way in. And an agent on a branch that successive agents reuse (a routine's [20] branch) must not wear a predecessor's merged pull request as its own.
+**Problem**: the git status bar reads the project, so without this an agent's own branch was visible nowhere, and a retained checkout was a name in a list with no size and no way in. And an agent on a branch that successive agents reuse (a preset's pinned branch such as `the-framework/triage-quick`) must not wear a predecessor's merged pull request as its own.
 
 #### Business logic
 
@@ -182,7 +181,7 @@ The project must be known, the id safe, and the agent found in the project's rec
 
 #### Context
 
-**User story**: the prompt preview claims to show the entire system prompt an agent starts with, which is the built-in system prompt [21] plus the project's `SYSTEM.md`.
+**User story**: the prompt preview claims to show the entire system prompt an agent starts with, which is the built-in system prompt [20] plus the project's `SYSTEM.md`.
 
 #### Business logic
 
@@ -192,13 +191,13 @@ The answer is the trimmed text of `SYSTEM.md` at the project's root, or nothing 
 
 #### Context
 
-**User story**: a `web` agent's page shows the question its cloud session [12] is parked on, where the pick [22] the user made stands (queued, delivered, or failed with the extension's reason), and what the session has said so far; Settings shows whether the extension has ever reached the daemon and how it went, offers the bridge token to paste into the extension, and shows the bridge browser's state.
+**User story**: a `web` agent's page shows the question its cloud session [12] is parked on, where the pick [21] the user made stands (queued, delivered, or failed with the extension's reason), and what the session has said so far; Settings shows whether the extension has ever reached the daemon and how it went, offers the bridge token to paste into the extension, and shows the bridge browser's state.
 
 **Problem**: the bridge sees a claude.ai page, which knows its own session and nothing about agents, so these reads are keyed by the cloud session's id; the agent view derives that id from the agent's own record, and the join happens in the browser. An extension that is misconfigured looks exactly like one that is not installed, since both leave no question behind, so the last contact is reported even when it was refused: a refused request at least proves something is trying.
 
 #### Business logic
 
-A session id that does not look like a cloud session id (`session_` followed by up to 128 letters or digits) answers nothing, or an empty transcript. The parked question is whatever the bridge last reported for that session, nothing when there is none; the answer is the one the user picked in whatever state it is, nothing when none was picked; the transcript is what the bridge scraped, in order. The bridge's status is the last contact (when, which route, and the status it got), how many questions are parked, what the page script last said about itself, and the extension's last version claim with whether it was turned away. The bridge token is handed out only while the bridge preference [23] is on, so a daemon with the feature off never hands the secret to a page; it is nothing otherwise, and nothing when no token exists. The bridge browser's state is off, starting (with the step it is on), running (since when, visible or not, and whether the claude.ai tab sits on the sign-in page), or stopped and why.
+A session id that does not look like a cloud session id (`session_` followed by up to 128 letters or digits) answers nothing, or an empty transcript. The parked question is whatever the bridge last reported for that session, nothing when there is none; the answer is the one the user picked in whatever state it is, nothing when none was picked; the transcript is what the bridge scraped, in order. The bridge's status is the last contact (when, which route, and the status it got), how many questions are parked, what the page script last said about itself, and the extension's last version claim with whether it was turned away. The bridge token is handed out only while the bridge preference [22] is on, so a daemon with the feature off never hands the secret to a page; it is nothing otherwise, and nothing when no token exists. The bridge browser's state is off, starting (with the step it is on), running (since when, visible or not, and whether the claude.ai tab sits on the sign-in page), or stopped and why.
 
 ### Reads about a relayed agent go to the device
 

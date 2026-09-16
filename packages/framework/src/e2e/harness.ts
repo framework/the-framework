@@ -26,7 +26,6 @@ import type { FrameworkEvent } from '../events.js'
 import type { StartAgentKind, StartAgentOptions } from '../dashboard/types.js'
 import type { AgentSpec } from '../agent-spec.js'
 import type { QuotaView } from '../dashboard/quota.js'
-import type { AutoPmReport, AutoPmOnly } from '../auto-pm.js'
 
 // Re-home the process-global config home FIRST: the registry, preferences, and daemon state all
 // resolve through $XDG_CONFIG_HOME at call time, and run-tests.mjs gives the whole suite ONE
@@ -68,8 +67,6 @@ export interface StoryWorld {
   runtime: ProjectRuntime
   /** The usage panel's reading (mutable): what `onQuota` serves. */
   quota: { view: QuotaView }
-  /** The auto-PM panel's stubs (mutable): what `onAutoPm` reports and what a sweep records. */
-  autoPm: { report?: AutoPmReport; sweeps: Array<{ only?: AutoPmOnly; projectId?: string }> }
   /**
    * Bind one dashboard RPC to this world's context. The real mount wires the context once, at
    * start-up; a story stands several worlds up in one process, so re-providing before every call
@@ -135,7 +132,7 @@ const agentReady = async () => ({ ok: true, checks: [] })
 /**
  * Stand up one story world. The dashboard context mirrors `runDaemon`'s `startDashboard` wiring
  * piece for piece — same closures, same registry-backed stores — except where the daemon holds a
- * live poller/loop (quota, auto PM), which a story controls through mutable stubs instead.
+ * live poller (quota), which a story controls through a mutable stub instead.
  */
 export async function makeWorld(): Promise<StoryWorld> {
   const home = mkdtempSync(join(tmpdir(), 'framework-e2e-home-'))
@@ -150,7 +147,6 @@ export async function makeWorld(): Promise<StoryWorld> {
   })
 
   const quota = { view: { windows: [] } as QuotaView }
-  const autoPm: StoryWorld['autoPm'] = { sweeps: [] }
   const context = {
     startAgent: runtime.onStart,
     addProject: runtime.onAddProject,
@@ -161,10 +157,6 @@ export async function makeWorld(): Promise<StoryWorld> {
     // The story sets one view; both questions are answered off it, since a story that cares about
     // the model's own week states that window in the view it sets (#1619).
     quota: { read: async () => quota.view, boundaryFor: async () => quota.view.boundary, stop: () => {} },
-    autoPm: () => autoPm.report,
-    autoPmSweep: async (opts?: { only?: AutoPmOnly; projectId?: string }) => {
-      autoPm.sweeps.push(opts ?? {})
-    },
     projectErrors: () => [],
     bridgeBrowser: { status: async () => ({ state: 'off' as const }), start: async () => {}, stop: async () => {}, act: async () => {} },
   }
@@ -185,7 +177,6 @@ export async function makeWorld(): Promise<StoryWorld> {
     home,
     runtime,
     quota,
-    autoPm,
     rpc,
 
     async spawnedSpecs() {

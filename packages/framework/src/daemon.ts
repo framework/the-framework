@@ -7,7 +7,6 @@ import { startDashboard, type Dashboard, type StartAgentOptions } from './dashbo
 import { createProjectRuntime, type ProjectRuntimeOptions } from './daemon-runtime.js'
 import { defaultQuotaSource } from './dashboard/quota.js'
 import { startBackgroundServices, type BackgroundServices } from './daemon-services.js'
-import { daemonFunnel } from './daemon-writes.js'
 import { projectErrorStore } from './project-errors.js'
 import { resolveDashboardBundle } from './dashboard/bundle.js'
 import { isActivated } from './project.js'
@@ -156,11 +155,9 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
 
   // Crash recovery (#642): a fresh daemon drives no in-flight run, so any run a dead
   // process left marked `running` is orphaned — it would show as active forever with a
-  // no-op Stop. Reconcile them to `stopped` across every registered project at boot. The
-  // records it writes are the daemon's own commits, signed as such (`daemon-writes.ts`).
-  const funnel = daemonFunnel()
+  // no-op Stop. Reconcile them to `stopped` across every registered project at boot.
   for (const record of await listProjects(undefined, env).catch(() => [])) {
-    const fixed = await reconcileOrphanedAgents(record.path, undefined, undefined, funnel).catch(() => 0)
+    const fixed = await reconcileOrphanedAgents(record.path).catch(() => 0)
     if (fixed > 0) console.log(`[framework] reconciled ${fixed} orphaned agent(s) in ${basename(record.path)}`)
   }
   // Browsers those agents left behind (#1719): a Chrome whose agent died by SIGKILL runs on
@@ -187,8 +184,9 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
   // dashboard context the mount is wired with. A missing bundle (a broken install) surfaces as a
   // 503 from the server.
   const clientBundleDir = await resolveDashboardBundle()
-  // Owned here rather than left to the dashboard (#685): auto PM has to consult the same
-  // long-lived meter the usage panel draws, and a second poller would double a rate-limited read.
+  // Owned here rather than left to the dashboard (#685): the CI watch's fix gate has to consult
+  // the same long-lived meter the usage panel draws, and a second poller would double a
+  // rate-limited read.
   const quota = defaultQuotaSource()
   // The per-project error state (#1500): the background services write it, the dashboard reads it.
   const projectErrors = projectErrorStore()
@@ -230,22 +228,11 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
     // finishable in-product: the credential is written to the registry, then this daemon's own
     // Discord services are rebuilt against it, so the bot connects without a restart.
     discord: registryDiscordCredentialsStore({ env, onChange: () => services?.reloadDiscord() }),
-    // Same idea for "Spend what's left on the roadmap" (#1161): the sweep re-reads the preference
-    // per tick, so without this the box you just ticked sits there doing nothing for up to ten
-    // minutes and reads as broken. Only on the write that switches it *on* — an unrelated setting
-    // saved while it happens to be on is not a reason to go spend quota.
+    // The bridge browser follows its switch the same way (#1332): on launches it, off closes it.
     preferences: registryPreferencesStore(nodeRegistryFs(), env, written => {
-      if (written.autoPm === true) void services?.wakeAutoPm()
-      // The bridge browser follows its switch the same way (#1332): on launches it, off closes it.
       if (written.bridgeBrowser === true) void bridgeBrowser.start()
       if (written.bridgeBrowser === false) void bridgeBrowser.stop()
     }),
-    // Only the daemon runs the sweep, so only it can say what the sweep decided.
-    autoPm: () => services?.autoPmReport(),
-    // ...and only it can be asked to sweep now (#1210). On demand, not the plain wake the
-    // switched-on preference above uses: the button is an explicit ask, so the sweep runs even
-    // while auto-run is off — one sweep for the click, and the schedule stays off.
-    autoPmSweep: opts => services?.wakeAutoPm({ onDemand: true, ...opts }),
     projectErrors: projectErrors.list,
     bridgeBrowser,
     ...(token ? { token } : {}),
@@ -273,7 +260,7 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
   const startAgent = (prompt: string, options: StartAgentOptions, id: string) => runtime.onStart(prompt, 'prompt', options, id)
 
   // Everything that runs in the background beside serving the dashboard: the Discord watchers,
-  // auto PM, and the conversation committer.
+  // the CI watch, the data sync and the sweeps.
   //
   // Nothing is resumed at boot. Ctrl-C closed the last dashboard and every session it was running,
   // and that was a deliberate act — starting those sessions again behind the user's back is not
@@ -294,7 +281,7 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
   await waitForShutdown(opts.signal)
 
   // Nothing may start or steer an agent from here on, so the background services go first (#923):
-  // auto PM or a Discord message arriving mid-shutdown would start one while we stop the rest.
+  // a CI fix starting mid-shutdown would start one while we stop the rest.
   await services.quiesce()
   // Stop the agents this daemon spawned, before the previews they may be serving. Left running they
   // are orphans nothing tracks; stopped here they keep their worktree and branch, so the dashboard

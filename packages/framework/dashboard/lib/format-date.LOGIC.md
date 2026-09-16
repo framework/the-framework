@@ -1,4 +1,4 @@
-Fixes how every moment and every span of time is worded in the dashboard: full dates, short dates, how long ago something happened, how long until something will happen, plain durations, and the wording of a quota [1] reset. It is also the single place that refuses to render a timestamp it cannot read, so no surface ever shows the browser's literal "Invalid Date".
+Fixes how every moment and every span of time is worded in the dashboard: full dates, short dates, how long ago something happened, plain durations, and the wording of a quota [1] reset. It is also the single place that refuses to render a timestamp it cannot read, so no surface ever shows the browser's literal "Invalid Date".
 
 ## Context
 
@@ -10,9 +10,7 @@ Fixes how every moment and every span of time is worded in the dashboard: full d
 
 [1] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
 [2] agent: the unit of work: one task worked by a coding agent under The Framework's control, in its own checkout, on its own branch, streaming events, handed off when it ends.
-[3] sweep: a background job the daemon runs on its clock.
-[4] routine: a preset the daemon fires on its own on a schedule.
-[5] quota boundary: the share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
+[3] quota boundary: the share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
 
 ## Business logic — TL;DR
 
@@ -20,7 +18,6 @@ Fixes how every moment and every span of time is worded in the dashboard: full d
 - **Dates and times** - three widths: the full local date and time, a short "Jul 18, 10:35 PM" for lines where the time stands in as a name, and the date alone for dense table columns.
 - **How long ago, in full detail** - "22s ago", "30m ago", "5h ago", "5d ago", "2w ago", "3y ago"; never a bare date, so every row in a list of agents [2] is dated the same way whether it ended this minute or last year.
 - **How long ago, at a glance** - "just now", "12m ago", "3h ago", "2d ago", and past a week the local date.
-- **How long until** - "in 4 min" or "in 1 hr"; a moment already past reads "any moment" rather than as overdue.
 - **Durations** - the largest whole unit, as "2s", "10m", "2h", "1d", and spelled out as "1 day" or "2 hours" where the figure sits inside a sentence.
 - **When the quota resets** - "Tuesday 8:59pm" beside the week's bar, and "Quota resets on Jul 28, 8:59pm (Europe/Berlin)" in full, naming the time zone.
 
@@ -70,21 +67,11 @@ The gap between now and the moment, floored to its largest whole unit, with "ago
 
 The gap between now and the moment, rounded to its nearest unit: under a minute reads "just now"; then minutes, then hours, then days, up to and including a week. Beyond a week the local date is shown instead, because at that distance the calendar is the more useful fact.
 
-### How long until
-
-#### Context
-
-**User story**: the usage panel says when the next sweep [3] will run and a routine's [4] card says when it will fire next, so the user knows whether to wait or to run it now.
-
-#### Business logic
-
-The gap between the moment and now, rounded to minutes: under an hour it reads "in 4 min", otherwise it is rounded to hours and reads "in 1 hr". A moment that has already passed reads "any moment" rather than as late: a schedule the daemon has not reached yet is imminent, not overdue.
-
 ### Durations
 
 #### Context
 
-**User story**: the user reads how far the account's spending is from the quota boundary [5] as a compact figure, and reads the same span spelled out in the sentence that explains the figure.
+**User story**: the user reads how far the account's spending is from the quota boundary [3] as a compact figure, and reads the same span spelled out in the sentence that explains the figure.
 
 #### Business logic
 

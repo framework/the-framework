@@ -7,7 +7,6 @@ import { isGitRepo, nodeGitRunner, isGitTimeout } from '@gemstack/agent-data'
 import { createCheckout, attachCheckout, agentBranchName, worktreePath, worktreeBranch, removeWorktree, pruneWorktrees, agentIdFromWorktreeDir } from '@gemstack/skill-branches'
 import { writeRun, type AnyDiaryLine } from '@gemstack/skill-logs'
 import { AGENT_ID_ENV } from './agent-id.js'
-import { daemonFunnel } from './daemon-writes.js'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import type { FrameworkEvent } from './events.js'
 import { removeAgentSpec, writeAgentSpec } from './agent-spec.js'
@@ -117,9 +116,6 @@ export function childEnv(daemonUrl: string | undefined, agentId: string | undefi
   if (agentId) env[AGENT_ID_ENV] = agentId
   return daemonUrl ? { ...env, [DAEMON_URL_ENV]: daemonUrl } : env
 }
-
-/** The daemon's signed write funnel to the data branch (`daemon-writes.ts`): the run's record is its own commit. */
-const funnel = daemonFunnel()
 
 /** Where a spawned agent's stderr lands (#1261), so a child that dies at boot leaves a trace. */
 export function agentStderrPath(cwd: string): string {
@@ -432,7 +428,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
   // Set by the first stopAgents call and never cleared: the daemon shuts down once. A Start
   // landing after the stop pass would spawn a detached agent outside the snapshot stopAgents
   // terminates — an orphan on `ppid 1` nothing ever stops — because the HTTP surface closes
-  // after the agents do. Same shape as auto-pm's stop re-checks (#983).
+  // after the agents do (#983).
   let closing = false
   // A finished leg's exit → retirement chain, parked per agent slot so a continuation that raced
   // the exit (#1529) can await the retirement instead of reusing a checkout mid-removal.
@@ -548,8 +544,8 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
     try {
       // The package's one sequence (#1725): the worktree, the parent's dependencies linked in, the
       // branches view (#1580) told now rather than at the next tick. The daemon links no skill of
-      // its own (#1774): the command skill it fires, `work-queue`, is a tracked file of the project,
-      // in every checkout by itself, like `tickets`, `queue` and `logs`.
+      // its own (#1774): the command skill `work-queue` is a tracked file of the project, in every
+      // checkout by itself, like `tickets`, `queue` and `logs`.
       const worktree = await createCheckout(projectCwd, { agentId })
       return { ok: true, workspace: { cwd: worktree.path, agentId } }
     } catch (err) {
@@ -590,15 +586,13 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
         // the enclosing repo's branch, and the archive would record the user's `main` as the run's.
         const branch = await worktreeBranch(worktree)
         // Recorded as the `logs` skill's run on the data branch (#1179/#1582/#1769), under the
-        // identity this repo commits as, through the daemon's signed write funnel: the record is
-        // committed and pushed the moment it lands — durable without a human, and never a commit
-        // on main — and its commit carries the daemon's trailer, so the sweep that watches the
-        // branch does not read the record as work (#1774). The card is the skill's shape with the
-        // rest of the meta under `caller`; the diary is the event log with the four kinds the
-        // skill knows mapped onto its lines.
+        // identity this repo commits as, through the skill's own funnel: the record is committed
+        // and pushed the moment it lands — durable without a human, and never a commit on main.
+        // The card is the skill's shape with the rest of the meta under `caller`; the diary is
+        // the event log with the four kinds the skill knows mapped onto its lines.
         const run = await readWorktreeAgent(worktree, undefined, branch)
         if (run) {
-          const archived = await writeRun(projectCwd, toRunCard(run.meta), diaryOf(run.events), { funnel })
+          const archived = await writeRun(projectCwd, toRunCard(run.meta), diaryOf(run.events))
           if (!archived.ok && !archived.committed)
             console.log(`[framework] could not archive session ${basename(worktree)}: ${archived.error}`)
         }
@@ -760,11 +754,10 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
     const continued = options.continueAgentId ? await continueWorkspace(projectCwd, options.continueAgentId) : undefined
     // A repo that could not be given a worktree fails the Start rather than borrowing the user's
     // own checkout (#997); the dashboard shows the reason, and starting again is the retry.
-    // The id is the moment of the start — unless the caller minted it first (#1748): a sweep
-    // that claimed a ticket for this agent wrote the lock under the id it now starts it with.
+    // The id is the moment of the start.
     const allocated = continued
       ? ({ ok: true, workspace: continued } as const)
-      : await allocateWorkspace(projectCwd, options.agentId ?? agentIdFromStartedAt(new Date().toISOString()))
+      : await allocateWorkspace(projectCwd, agentIdFromStartedAt(new Date().toISOString()))
     if (!allocated.ok) return { ok: false, error: allocated.error }
     const workspace = allocated.workspace
     // An agent in its own worktree is keyed by that worktree, so it never collides with a

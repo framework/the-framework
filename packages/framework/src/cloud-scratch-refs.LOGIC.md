@@ -9,7 +9,7 @@ The cloud scratch sweep [1]: the sweep [2] that, once per tick [3] of the daemon
 ## Glossary
 
 [1] cloud scratch sweep: the sweep that deletes, from origin, the scratch refs a web agent's handoff to a cloud session left behind once they are provably dead.
-[2] sweep: a background job the daemon runs on its clock: Auto PM, the CI watch, the notification watchers, the sweep that reclaims checkouts, the branch-links sweep, the cloud scratch sweep, cloud work adoption.
+[2] sweep: a background job the daemon runs on its clock: the CI watch, the notification watchers, the sweep that reclaims checkouts, the branch-links sweep, the cloud scratch sweep, cloud work adoption.
 [3] tick: one beat of the daemon's single background clock; each sweep says how many ticks it waits between turns.
 [4] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. A web agent is one whose location is `web`.
 [5] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.

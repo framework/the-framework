@@ -6,7 +6,6 @@ import { registryPreferencesStore, type PreferencesStore } from '../registry.js'
 import { registryDiscordCredentialsStore } from '../discord-credentials-store.js'
 import type { DiscordCredentialsStore } from '../discord-credentials.js'
 import { defaultQuotaSource, type QuotaSource } from './quota.js'
-import type { AutoPmReporter, AutoPmOnly } from '../auto-pm.js'
 import type { ProjectErrorsReader } from '../project-errors.js'
 import type { BridgeBrowserOwner } from '../bridge-browser.js'
 import { serveClientBundle } from './static.js'
@@ -56,13 +55,6 @@ export interface DashboardOptions {
   discord: DiscordCredentialsStore
   /** Where the usage panel reads the quota from (#533). */
   quota: QuotaSource
-  /** What auto PM last decided (#1161), for the line under the panel's toggle. */
-  autoPm: AutoPmReporter
-  /**
-   * Fire an auto PM sweep now instead of waiting out the interval (#1210). Resolves when the
-   * sweep does (#1433), so the trigger RPC can await it.
-   */
-  autoPmSweep: (opts?: { only?: AutoPmOnly; projectId?: string }) => void | Promise<void>
   /** What a project currently suffers from (#1500), for the project list to carry. */
   projectErrors: ProjectErrorsReader
   /** The daemon's own bridge browser (#1332): its status, and the show/hide/restart the settings page asks for. */
@@ -161,8 +153,6 @@ export function startDashboard(opts: DashboardOptions): Promise<Dashboard> {
       remote: opts.remote,
       preferences: opts.preferences,
       discord: opts.discord,
-      autoPm: opts.autoPm,
-      autoPmSweep: opts.autoPmSweep,
       projectErrors: opts.projectErrors,
       bridgeBrowser: opts.bridgeBrowser,
       quota,

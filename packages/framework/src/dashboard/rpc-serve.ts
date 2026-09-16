@@ -9,7 +9,6 @@ import type { PreferencesStore } from '../registry.js'
 import type { DiscordCredentialsStore } from '../discord-credentials.js'
 import type { QuotaSource } from './quota.js'
 import type { BridgeBrowserOwner } from '../bridge-browser.js'
-import type { AutoPmReporter, AutoPmOnly } from '../auto-pm.js'
 import type { ProjectErrorsReader } from '../project-errors.js'
 import type { AddProjectResult, StartAgentKind, StartAgentOptions, StartAgentResult } from './types.js'
 import type { AgentMeta } from '../store/index.js'
@@ -61,13 +60,6 @@ export interface DashboardContext {
   quota: QuotaSource
   /** The Discord credentials store (#1095), which also reloads the Discord services on a save. */
   discord: DiscordCredentialsStore
-  /** What auto PM last decided (#1161). */
-  autoPm: AutoPmReporter
-  /**
-   * Run an auto PM sweep now rather than at the next interval (#1210). Resolves when the sweep
-   * does (#1433), so the trigger RPC can await it and return what it decided.
-   */
-  autoPmSweep: (opts?: { only?: AutoPmOnly; projectId?: string }) => void | Promise<void>
   /** What a project currently suffers from (#1500): the daemon's error state, read per project. */
   projectErrors: ProjectErrorsReader
   /** The daemon's own bridge browser (#1332): status, and show/hide/restart on request. */

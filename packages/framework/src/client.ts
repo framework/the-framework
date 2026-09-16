@@ -41,11 +41,6 @@ export { presets, LAUNCHER_PRESETS, type PresetKey } from './preset-catalog.js'
 // the server's queue write, so the plan column's start, the queued entry, and the dedupe that
 // recognizes a queued copy all carry the exact same sentence (#1187).
 export { planTicketPrompt } from './tickets.js'
-// The routines the daemon fires (#1159), so the dashboard can list them and run one on demand.
-// The jobs carry their prompt verbatim — the presets above, or the routine skill's slash command
-// (#1774) — so this needs no backend of its own, and the list on screen is the list the daemon
-// runs rather than a copy of it.
-export { AUTO_PM_ROUTINES, AUTO_PM_JOBS, AUTO_PM_WORK_JOB, AUTO_PM_MAINTENANCE_JOB, type AutoPmJob } from './auto-pm.js'
 // The identity + diff both notifier paths run, and the preference defaults both sides read (#627).
 // Pure, so the dashboard shares them rather than keeping copies that drift silently.
 export { interventionKey, activityKey } from './dashboard/keys.js'
@@ -54,7 +49,7 @@ export { interventionKey, activityKey } from './dashboard/keys.js'
 // GitHub reach take an empty backlog for a real one. Pure, and its only import is a type.
 export { SeenTracker } from './dashboard/keyed-watcher.js'
 export type { ProjectionRead } from './dashboard/projects.js'
-export { NOTIFICATION_DEFAULTS, MAX_SPEND_OFFSET, DEFAULT_SPEND_OFFSET, DEFAULT_AUTO_PM_CONCURRENCY, notifies, notifyMethodEnabled, notifyCategoryEnabled, type NotifyMethod, type NotifyCategory } from './preference-defaults.js'
+export { NOTIFICATION_DEFAULTS, MAX_SPEND_OFFSET, DEFAULT_SPEND_OFFSET, notifies, notifyMethodEnabled, notifyCategoryEnabled, type NotifyMethod, type NotifyCategory } from './preference-defaults.js'
 // The preferences -> run options mapping (#858), shared with the daemon so an unattended agent
 // starts with the same settings a launcher-started one would. Pure field logic, no Node imports.
 export { agentOptionsFromPreferences, handoffFromPreferences, preferencesFromFileConfig } from './agent-options.js'

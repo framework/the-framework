@@ -4,7 +4,6 @@ import type { DashboardContext, EventsSource, RemoteAgents } from '../dashboard/
 import type { PreferencesStore } from '../registry.js'
 import type { DiscordCredentialsStore } from '../discord-credentials.js'
 import type { QuotaSource } from '../dashboard/quota.js'
-import type { AutoPmReporter, AutoPmOnly } from '../auto-pm.js'
 import type { ProjectErrorsReader } from '../project-errors.js'
 import type { BridgeBrowserOwner } from '../bridge-browser.js'
 
@@ -102,16 +101,6 @@ export function contextDiscord(): DiscordCredentialsStore {
 /** The quota source behind the usage panel (#533). */
 export function contextQuota(): QuotaSource {
   return fromContext('quota')
-}
-
-/** Where auto PM's last decision is read from (#1161). */
-export function contextAutoPm(): AutoPmReporter {
-  return fromContext('autoPm')
-}
-
-/** How a sweep is fired on demand (#1210). */
-export function contextAutoPmSweep(): (opts?: { only?: AutoPmOnly; projectId?: string }) => void | Promise<void> {
-  return fromContext('autoPmSweep')
 }
 
 /** What a project currently suffers from (#1500), as the daemon's background jobs last recorded it. */

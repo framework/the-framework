@@ -1,0 +1,11 @@
+What the tests cover, with every reading injected (the wiring to a real project is `scheduler.ts`'s):
+
+- **A start** - a due command under its cap with quota to spare gets a running marker (the prompt `/<command>`, the state's model, the mark with the command and this host), is spawned with the same id, and the decision is `started <id>` with the run's id.
+- **Off** - the pull and the sweep still run, no check runs, the note is `off`.
+- **A failed pull** - the note is `agent-data could not be pulled: <error>` and nothing is spawned.
+- **No schedule** - the note is `no agent-schedule.md`.
+- **The order of the checks** - `no such command in this project` runs no check; `check failed: <last stderr line>`; `not due`; `cap reached (1 in flight: <id> on <host>)` without reading the quota or writing a marker; `quota: <window> is 90% used, at or past day 4 of the week's N%` with nothing spawned.
+- **An unreadable quota** - `quota: the quota could not be read, so there is no way to tell what is spare`.
+- **Two machines** - a marker ranked past the cap by an earlier id that landed meanwhile is withdrawn with `cap reached (…)` naming the other; with a cap of two the marker within the cap keeps its place; a marker whose push failed twice is withdrawn with `another machine got there first: …` and nothing spawned.
+- **Unreadable schedule lines** - named as `line N` with `unreadable: …` while the readable command still starts.
+- **One quota read per tick** - two commands start on one reading.

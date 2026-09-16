@@ -1,0 +1,1 @@
+The entry point: re-exports everything a program or a dashboard imports from the package: the names and defaults, the schedule reader and the due rule, the state, the spend boundary, the run records and markers, the live log, one run, the sweep, the tick, the processes (`start`, `stop`, `status`, the detached run), the pull request reader and the command line. No rule of its own.

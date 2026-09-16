@@ -14,7 +14,7 @@ is written in TypeScript any more, so prompting can change without touching the 
 | `protocols/signal.md` | How to emit `setReadyForMerge()`, the pull request to open, and an error only the user can fix (#326). |
 | `protocols/browser.md` | Added only when the run has a real Chrome attached: the `chrome-devtools` tools and what the agent may do with them (#793). |
 | `protocols/hands_off.md` | Added only when the session runs detached (a web run): land everything, since nothing on a machine follows it. |
-| `presets/*.md` | One file per preset; `src/preset-catalog.ts` is the table saying which button or routine each backs. Launcher buttons: research (#331), readability (#360), maintainability (#361), security_audit (#461), ux (#472), maintenance (#881), market_research (#694), plan_tickets (#685), suggest_new_tickets (#462), suggest_new_features, suggest_tickets_to_work_on, drain_queue (#855). Routine prompts: update_tickets (#1208), triage_quick (#891), triage_consensual (#892). |
+| `presets/*.md` | One file per preset; `src/preset-catalog.ts` is the table saying which button each backs: research (#331), readability (#360), maintainability (#361), security_audit (#461), ux (#472), maintenance (#881), market_research (#694), plan_tickets (#685), suggest_new_tickets (#462), suggest_new_features, suggest_tickets_to_work_on, update_tickets (#1208), triage_quick (#891), triage_consensual (#892). |
 
 ## Editing
 

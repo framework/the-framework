@@ -89,12 +89,3 @@ export const MAX_SPEND_OFFSET = 50
  * cushion gives it room to breathe without meaningfully loosening the spend-boundary policy (#879).
  */
 export const DEFAULT_SPEND_OFFSET = 100 / (7 * 2)
-
-/**
- * How many agents the routine keeps going at once when `autoPmConcurrency` is unset (#1204).
- *
- * Two, not one: the point of the setting is that the routine may overlap work, and a default of
- * one would leave the feature invisible until someone finds the control. Two is the smallest
- * number that shows it while staying conservative about quota.
- */
-export const DEFAULT_AUTO_PM_CONCURRENCY = 2

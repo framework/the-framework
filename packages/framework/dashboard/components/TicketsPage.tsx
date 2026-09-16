@@ -114,9 +114,9 @@ export function TicketsPage({
   // preset's own plan ask. Both walk the shown order, so within a priority section entries keep
   // the order the reader saw; both read the queue at click time and leave alone what is already
   // there ("add" means the set ends up queued — a duplicate entry would outlive its agent's
-  // check-off as an open entry naming a closed ticket, costing the sweep an agent). No agent
-  // starts here — the queue is what the routine drain fans out over (#1204) and what the queue
-  // card's play buttons work one entry at a time (#855). Each stops at the first failure; the
+  // check-off as an open entry naming a closed ticket, costing an agent). No agent starts
+  // here — the queue is what the queue card's play buttons work, one entry at a time or fanned
+  // out (#855/#1204). Each stops at the first failure; the
   // daemon's own reason lands in `error`, and everything already queued stays.
 
   /** The open queue as both queue-adds dedupe against it, read at click time: every open

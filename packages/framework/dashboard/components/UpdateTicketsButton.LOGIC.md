@@ -9,14 +9,13 @@
 ## Glossary
 
 [1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
-[2] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
+[2] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [3] preset: a canned prompt the user launches from the dashboard.
-[4] routine: a preset the daemon fires on its own on a schedule.
-[5] launcher: the Start form on a project's own page.
+[4] launcher: the Start form on a project's own page.
 
 ## Business logic — TL;DR
 
-- **One instruction behind one label** - the button sends the "Update from GitHub" preset's own text, the same one the daemon's routine sends.
+- **One instruction behind one label** - the button sends the "Update from GitHub" preset's own text.
 - **The promise depends on what is on record** - the tooltip says "everything open comes across" only when no import was ever recorded.
 - **Configure first, then run** - the chevron beside it hands the same instruction to the launcher instead of spending an agent.
 - **Busy while it starts** - the button reads "Starting…" and is out while its start is in flight.
@@ -31,7 +30,7 @@ See `## Context`.
 
 #### Business logic
 
-The button reads "Update from GitHub" with a refresh icon and sends the "Update from GitHub" preset's [3] rendered text — the same instruction the daemon fires as its update-tickets routine [4]. That preset covers both cases: a project with no tickets at all is treated as a first import, which is why an empty `tickets/` needs no separate offer of its own.
+The button reads "Update from GitHub" with a refresh icon and sends the "Update from GitHub" preset's [3] rendered text. That preset covers both cases: a project with no tickets at all is treated as a first import, which is why an empty `tickets/` needs no separate offer of its own.
 
 ### The promise depends on what is on record
 
@@ -47,7 +46,7 @@ When the caller knows when the tickets last caught up with GitHub, the tooltip r
 
 #### Context
 
-**Problem**: which coding agent runs, on which model and where, is set in the launcher [5], not here.
+**Problem**: which coding agent runs, on which model and where, is set in the launcher [4], not here.
 
 #### Business logic
 

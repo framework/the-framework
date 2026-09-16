@@ -1,0 +1,1 @@
+A test helper, not business logic: a throwaway project for the tests: one commit on `main`, a bare `origin`, the `agent-data` branch born on origin, and a tracked `.claude/skills/work-queue`; real git, because the run records, the checkouts and the reclaim rule are git. Removed with its origin after each test.

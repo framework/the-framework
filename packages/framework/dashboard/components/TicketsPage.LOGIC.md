@@ -10,15 +10,14 @@ Shows every registered project's tickets on one page, the dashboard's Tickets vi
 
 [1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
 [2] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down. An item on it is a queue entry. The dashboard labels it "AI queue".
-[3] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
+[3] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [4] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
 [5] holder: who a claim names: the agent's id when the daemon started the agent, else the branch the `tickets` command ran on.
 [6] plan: a ticket's `.plan.md`: effort and uncertainty ratings and how to implement it.
-[7] Auto PM: the daemon's unattended product management: work the agent queue when the `agent-data` branch moves, and refill it by running the routines.
-[8] the Overview: the dashboard's cross-project page at `/`.
-[9] prompt agent: an agent that runs one prompt and stops there.
-[10] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles. The opposite is attended.
-[11] launcher: the Start form on a project's own page (its project home).
+[7] the Overview: the dashboard's cross-project page at `/`.
+[8] prompt agent: an agent that runs one prompt and stops there.
+[9] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles. The opposite is attended.
+[10] launcher: the Start form on a project's own page (its project home).
 
 ## Business logic — TL;DR
 
@@ -105,7 +104,7 @@ While at least one shown row is ticked, the heading shows "N selected" and a "Cl
 
 #### Context
 
-**User story**: the user has narrowed the list to what should be worked next and wants all of it on the agents' to-do list, without opening each ticket. Nothing starts right away: what is queued is worked later by Auto PM [7] or by the user from the Overview's [8] queue card, one entry at a time.
+**User story**: the user has narrowed the list to what should be worked next and wants all of it on the agents' to-do list, without opening each ticket. Nothing starts right away: what is queued is worked later, one entry at a time, by the user from the Overview's [7] queue card.
 
 **Problem**: a ticket queued twice would leave an open entry naming a closed ticket after the first entry is worked off, and that stray entry costs an agent. So "add" means "make sure it is queued", never "append".
 
@@ -145,14 +144,14 @@ After success the button reads "Plans queued" with a check mark and is disabled 
 
 #### Context
 
-**User story**: from a row the user starts an agent [1] on that ticket right away, in the ticket's own project, or goes to that project's launcher [11] to adjust driver, model or location first. A ticket an agent already holds shows who, and leads to that agent's page.
+**User story**: from a row the user starts an agent [1] on that ticket right away, in the ticket's own project, or goes to that project's launcher [10] to adjust driver, model or location first. A ticket an agent already holds shows who, and leads to that agent's page.
 
 #### Business logic
 
 What a row shows, including its plan column, its start controls and how a claim [4] names its holder [5], is described in `TicketsPanel.tsx`. This page wires the row's actions, in flat mode directly and in grouped mode through each project's panel, always against the row's own project:
 - Opening a row opens the ticket's own page; the plan column's link opens the ticket's plan view. Both are addressed by project and ticket file.
-- "Start a plan" from a row starts an attended prompt agent [9] on the ticket's project with the prompt `Create tickets/<stem>.plan.md`. When the agent could not be started, the daemon's reason, or "The planning agent could not be started." when it gives none, appears above the filter bar.
-- "Start work" from a row starts a prompt agent on the ticket's project, unattended [10]; the prompt's wording is in `TicketsPanel.tsx`. Failure shows the daemon's reason or "The work agent could not be started.".
+- "Start a plan" from a row starts an attended prompt agent [8] on the ticket's project with the prompt `Create tickets/<stem>.plan.md`. When the agent could not be started, the daemon's reason, or "The planning agent could not be started." when it gives none, appears above the filter bar.
+- "Start work" from a row starts a prompt agent on the ticket's project, unattended [9]; the prompt's wording is in `TicketsPanel.tsx`. Failure shows the daemon's reason or "The work agent could not be started.".
 - Every "Configure first, then run" on this page selects the row's own project, landing on that project's launcher.
 - On a claimed row, the holder's name links to the holding agent's page in the ticket's project, when the holder is one of that project's agents.
 

@@ -7,7 +7,7 @@ The project home [1]: a project's own page, one scrolling column that stacks the
 [3] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
 [4] open question: a gate nobody has answered yet, as the dashboard lists them across projects.
 [5] agent view: one agent's page.
-[6] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
+[6] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 
 ## Business logic — TL;DR
 

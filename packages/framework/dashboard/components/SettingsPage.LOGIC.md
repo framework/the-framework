@@ -11,7 +11,7 @@ The Settings page: every preference [1] the user can set, on one page, each chan
 [1] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 [2] the Overview: the dashboard's cross-project page at `/`.
 [3] project home: a project's own page with the launcher (the Start form) and its composer (the prompt editor, also used for live chat).
-[4] sweep: a background job the daemon runs on its clock: Auto PM, the CI watch, the notification watchers, the sweep that reclaims checkouts, the branch-links sweep, the cloud scratch sweep, cloud work adoption.
+[4] sweep: a background job the daemon runs on its clock: the CI watch, the notification watchers, the sweep that reclaims checkouts, the branch-links sweep, the cloud scratch sweep, cloud work adoption.
 [5] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
 [6] agent view: one agent's page.
 [7] coding agent: the CLI doing the actual work: Claude Code or Codex.
@@ -24,14 +24,12 @@ The Settings page: every preference [1] the user can set, on one page, each chan
 [14] ready for merge: the signal an agent emits when it believes its work is complete: it flips the agent's badge from building to ready and authorizes the handoff.
 [15] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it). "Handoff level" is a rung of that ladder.
 [16] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds. The other is activity: an agent started or finished.
-[17] Auto PM: the daemon's unattended product management: work the agent queue when the `agent-data` branch moves, and refill it by running the routines.
-[18] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down.
-[19] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
-[20] quota boundary: the share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
-[21] spend offset: the user's adjustment of the quota boundary, in percentage points of the week.
-[22] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
-[23] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
-[24] the Claude web bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge token is the secret the extension presents; the bridge browser is the Chrome for Testing the daemon runs for it.
+[17] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
+[18] quota boundary: the share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
+[19] spend offset: the user's adjustment of the quota boundary, in percentage points of the week.
+[20] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
+[21] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
+[22] the Claude web bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge token is the secret the extension presents; the bridge browser is the Chrome for Testing the daemon runs for it.
 
 ## Business logic — TL;DR
 
@@ -42,7 +40,7 @@ The Settings page: every preference [1] the user can set, on one page, each chan
 - **Devices, beside "Run on"** - the saved devices follow directly, because a device is the other place an agent can run.
 - **Run options: the launcher's table, with reasons** - the same seven checkboxes the launcher's gear shows, each showing the effective value, and a row a rule turns off stays visible, greyed, with the reason in its place.
 - **Notifications: how they reach you, and what about** - two delivery rows ("Browser", "Discord") and two category rows ("Human Queue", "New activity"), each showing both the preference and whether delivery can happen, with Discord's setup one button away.
-- **Automation: Auto PM and the spend offset** - "Auto PM" is off until turned on; "Spend offset" is a whole number within ±50 that shows the default in force (7.1) when untouched.
+- **Automation: fixing red pull requests, and the spend offset** - "Fix red pull requests" is off until turned on; "Spend offset" is a whole number within ±50 that shows the default in force (7.1) when untouched.
 - **Claude web: the bridge, and which browser does its work** - "Browser bridge" is off by default; while on, one exclusive choice decides whether the daemon runs the bridge browser or the user's own Chrome does the work, each option carrying its own setup.
 - **A list with nothing to pick is not shown** - a drop-down row with no choices is left out rather than rendered empty.
 
@@ -140,11 +138,11 @@ The "Notifications" section has four rows. Two say how a notification reaches th
 - "Human Queue" ("An agent awaiting your answer, or a PR ready to review."): the intervention [16] category; on when nothing is stored.
 - "New activity" ("Also ping when an agent starts or finishes."): the activity category; off when nothing is stored.
 
-### Automation: Auto PM and the spend offset
+### Automation: fixing red pull requests, and the spend offset
 
 #### Context
 
-**User story**: the user lets the daemon spend leftover quota [19] on the roadmap by itself: Auto PM [17] drains the agent queue [18] and refills it with its routines while the week's quota lasts. Because it spends the allowance unasked, it stays off until the user turns it on.
+**User story**: the user lets the daemon spend leftover quota [17] by itself on one thing: an agent put on a pull request The Framework is watching whose checks fail, while the week's quota lasts. Because it spends the allowance unasked, it stays off until the user turns it on.
 
 **Problem**: a typed offset beyond the allowed range must not be clamped on save while the box keeps showing what was typed, and an untouched offset must show the default the daemon is actually using rather than a zero it is not.
 
@@ -152,14 +150,14 @@ The "Notifications" section has four rows. Two say how a notification reaches th
 
 The "Automation" section has two rows:
 
-- "Auto PM" ("Start queued work on its own while there is quota left in the week."): off when nothing is stored.
-- "Spend offset" ("How far unattended work sits from the quota boundary, in percentage points (max 50). Negative holds it back; positive lets it borrow from the days ahead."): a number field. The spend offset [21] moves the quota boundary [20] for unattended [22] work, in percentage points of the quota week: negative holds it back, positive lets it borrow from the days ahead. A typed value is rounded to a whole number and clamped into -50 to 50 before it is saved, so the box never shows a value the daemon will not use; a saved value is always a whole number. When nothing is stored, the box shows the default in force, half a day's share of the week (100 divided by 14, shown to one decimal as 7.1), not zero.
+- "Fix red pull requests" ("Put an agent on a watched pull request whose checks fail, on its own, while there is quota left in the week."): off when nothing is stored.
+- "Spend offset" ("How far unattended work sits from the quota boundary, in percentage points (max 50). Negative holds it back; positive lets it borrow from the days ahead."): a number field. The spend offset [19] moves the quota boundary [18] for unattended [20] work, in percentage points of the quota week: negative holds it back, positive lets it borrow from the days ahead. A typed value is rounded to a whole number and clamped into -50 to 50 before it is saved, so the box never shows a value the daemon will not use; a saved value is always a whole number. When nothing is stored, the box shows the default in force, half a day's share of the week (100 divided by 14, shown to one decimal as 7.1), not zero.
 
 ### Claude web: the bridge, and which browser does its work
 
 #### Context
 
-**Problem**: an agent [5] whose location [9] is `web` hands its task to a cloud session [23] and ends, so the questions the cloud session asks would never reach the dashboard. The Claude web bridge [24] carries them back and types the answers into the cloud session, and it needs a browser signed in to claude.ai to do so. Two toggles named "Browser bridge" and "Bridge browser" would read as anagrams of each other; the one real decision is which browser does the work.
+**Problem**: an agent [5] whose location [9] is `web` hands its task to a cloud session [21] and ends, so the questions the cloud session asks would never reach the dashboard. The Claude web bridge [22] carries them back and types the answers into the cloud session, and it needs a browser signed in to claude.ai to do so. Two toggles named "Browser bridge" and "Bridge browser" would read as anagrams of each other; the one real decision is which browser does the work.
 
 #### Business logic
 

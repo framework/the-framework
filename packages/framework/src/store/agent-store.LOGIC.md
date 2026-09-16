@@ -18,7 +18,7 @@ Keeps on disk everything The Framework itself knows about one agent [1]: the age
 [5] archive: the transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
 [6] run: only the `logs` skill's record of one agent on the `agent-data` branch: a card (what was asked, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said). Never the unit of work.
 [7] skill: one of the four capabilities an agent is taught — `branches`, `tickets`, `queue`, `logs` — each a package with the instructions the agent reads (its `SKILL.md`, a tracked file of the project where the coding agent's harness looks for skills), a command run as `npx <skill>`, and an API the product calls.
-[8] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks. Born as an orphan, written through one sync → commit → push cycle.
+[8] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs. Born as an orphan, written through one sync → commit → push cycle.
 [9] coding agent: the CLI doing the actual work: Claude Code or Codex.
 [10] the Overview: the dashboard's cross-project page at `/`.
 [11] stop: ending an agent before it finishes: the Stop button, Ctrl-C, or a pick marked to stop.
@@ -34,22 +34,21 @@ Keeps on disk everything The Framework itself knows about one agent [1]: the age
 [21] pick: the answer to a gate: the option or options chosen, by the user or automatically.
 [22] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it). "Handoff level" is a rung of that ladder.
 [23] settled: said of an agent whose work has stopped and which is waiting for the user: it is alive, takes messages, and does nothing until told.
-[24] sweep: a background job the daemon runs on its clock: Auto PM, the CI watch, the notification watchers, the sweep that reclaims checkouts (the daemon's log calls it the "worktree sweep"), the branch-links sweep, the cloud scratch sweep, cloud work adoption.
+[24] sweep: a background job the daemon runs on its clock: the CI watch, the notification watchers, the sweep that reclaims checkouts (the daemon's log calls it the "worktree sweep"), the branch-links sweep, the cloud scratch sweep, cloud work adoption.
 [25] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later. The user's driver choice is `claude` or `codex`; the driver implementations are `claude-code`, `codex`, `github-actions`, `claude-web` and `fake`.
 [26] leg: one process's stretch of an agent's life: a fresh agent has one leg, and a continued agent one more per continuation, each leg writing into the same agent.
 [27] ready for merge: the signal an agent emits when it believes its work is complete: it flips the agent's badge from building to ready and authorizes the handoff.
-[28] the queued work: the routine that spends existing work: one agent started with `/work-queue` when the `agent-data` branch moved, which takes one task off the agent queue by composing the skills in its checkout.
-[29] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
-[30] CI watch: the sweep that merges the pull requests The Framework opened once their checks pass, and starts a fix agent when a check goes red.
-[31] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
-[32] cloud anchor: an empty commit a web agent pushes before its task leaves this machine, unique to the agent: the branch the cloud session later pushes descends from it, which is how the daemon recognises that branch as the agent's (cloud work adoption).
-[33] hands-off: said of an agent whose work leaves this machine, so its first prompt is the whole agent: an agent whose location is `web`.
-[34] agent view: one agent's page.
-[35] build agent / prompt agent: the two kinds of agent: a build works the agent queue after its opening exchange; a prompt agent runs one prompt and stops there.
-[36] the Claude web bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge token is the secret the extension presents; the bridge browser is the Chrome for Testing the daemon runs for it; the Driver tab is the extension's one pinned tab that reads claude.ai's session list, visits sessions and types answers.
-[37] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
-[38] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
-[39] control file: `.the-framework/control.jsonl`: the file the daemon appends steering to (stops, picks, chat messages) and the agent's process tails.
+[28] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
+[29] CI watch: the sweep that merges the pull requests The Framework opened once their checks pass, and starts a fix agent when a check goes red.
+[30] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
+[31] cloud anchor: an empty commit a web agent pushes before its task leaves this machine, unique to the agent: the branch the cloud session later pushes descends from it, which is how the daemon recognises that branch as the agent's (cloud work adoption).
+[32] hands-off: said of an agent whose work leaves this machine, so its first prompt is the whole agent: an agent whose location is `web`.
+[33] agent view: one agent's page.
+[34] build agent / prompt agent: the two kinds of agent: a build works the agent queue after its opening exchange; a prompt agent runs one prompt and stops there.
+[35] the Claude web bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge token is the secret the extension presents; the bridge browser is the Chrome for Testing the daemon runs for it; the Driver tab is the extension's one pinned tab that reads claude.ai's session list, visits sessions and types answers.
+[36] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
+[37] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
+[38] control file: `.the-framework/control.jsonl`: the file the daemon appends steering to (stops, picks, chat messages) and the agent's process tails.
 
 ## Business logic — TL;DR
 
@@ -127,14 +126,14 @@ Each event is folded into the status snapshot by one pure rule, the same on a li
 - **Intent** - the intent event replaces the intent, unless a continuation pinned it.
 - **Browser preview port** - the browser-stream event records the loopback port the agent's browser preview listens on, which is how the daemon, a different process, learns where to proxy the pane from.
 - **Handoff arming** - the handoff-armed event records whether the handoff [22] is armed to push, to open a pull request, and to merge. The merge flag mirrors the merge arming for display only: the agent merges off its own configuration, never off the snapshot. A snapshot without this fact is read as armed to push and open a pull request, and as not armed to merge.
-- **Handoff report** - the handoff event records how the handoff went: `done`, `skipped` or `failed`. Between a clean end and this fact, an armed agent is still pushing or opening its pull request, which is the window a list shows as "publishing…"; absent reads as "still going". When the report is `skipped`, its reason is recorded (for instance `no-commits`), and on any other outcome the reason is cleared: a continued agent's second leg can publish after its first leg skipped, and a stale `no-commits` on a published agent is exactly the lie a release must not act on. The reason is what lets the daemon tell "published elsewhere" from "ended with nothing to hand off": a drain [28] that settles with `no-commits` will never run the pull request that lifts its ticket's claim [29], so the sweep releases the claim it minted. Unless the handoff failed, the outcome of its merge half is recorded too — `auto-armed`, `merged`, `watched`, `withheld` or `failed` — which the CI watch [30] scans: `watched` is a pull request waiting for green that this machine must merge, `auto-armed` one GitHub lands by itself but whose checks going red is still this machine's to notice.
+- **Handoff report** - the handoff event records how the handoff went: `done`, `skipped` or `failed`. Between a clean end and this fact, an armed agent is still pushing or opening its pull request, which is the window a list shows as "publishing…"; absent reads as "still going". When the report is `skipped`, its reason is recorded (for instance `no-commits`), and on any other outcome the reason is cleared: a continued agent's second leg can publish after its first leg skipped, and a stale `no-commits` on a published agent is exactly the lie a release must not act on. The reason is what tells "published elsewhere" from "ended with nothing to hand off": an agent that settles with `no-commits` will never run the pull request that lifts its ticket's claim [28]. Unless the handoff failed, the outcome of its merge half is recorded too — `auto-armed`, `merged`, `watched`, `withheld` or `failed` — which the CI watch [29] scans: `watched` is a pull request waiting for green that this machine must merge, `auto-armed` one GitHub lands by itself but whose checks going red is still this machine's to notice.
 - **Pull request** - the pull-request event records the number and URL once one is opened, so that no surface re-derives it from branch names and timestamps.
-- **Branch** - the branch event records the branch the agent's work is on, as the agent observes it. The agent renames its branch itself when it names its work, so the branch named after the agent id [13] is not guaranteed to be the one holding the commits. The session name [31] is this branch minus its `agent-` prefix, read off it by every surface and never stored beside it.
-- **Cloud anchor** - the cloud-anchor event records the cloud anchor [32] a hands-off [33] agent pushed; it is absent on every other agent and on a web agent whose push before the task left this machine failed.
+- **Branch** - the branch event records the branch the agent's work is on, as the agent observes it. The agent renames its branch itself when it names its work, so the branch named after the agent id [13] is not guaranteed to be the one holding the commits. The session name [30] is this branch minus its `agent-` prefix, read off it by every surface and never stored beside it.
+- **Cloud anchor** - the cloud-anchor event records the cloud anchor [31] a hands-off [32] agent pushed; it is absent on every other agent and on a web agent whose push before the task left this machine failed.
 - **Settled** - the settled event records when the agent settled [23]; the next turn's [20] start clears it, because a new turn means the agent is working again. It is deliberately not a status: the agent is still alive while it waits, still takes messages and still holds the project, and every reader keys "live" off the status `running`.
 - **Cost** - each usage event that carries a price adds it to the running total in US dollars; the total is absent until one does.
 - **End** - the end event settles the status: `done` when the agent finished well, `stopped` when it was stopped [11], `failed` otherwise. It records the end time and clears the pending gate (a finished agent awaits nothing), the settled time (nor is it waiting on the user) and the browser preview port (the preview dies with the agent, and a kept port would send the pane at whatever the operating system hands that number next).
-- **Owning process, location and kind** - the process id and host of the owning process, the location [14] and the kind are seeded at open and never change through events. The location lets the agent view [34] tell a GitHub Actions agent's burst of events from a stalled live stream, show a cloud agent's session link after a reload, and switch the browser pane off. The kind lets a continuation re-enter the flow its first leg ran: the dashboard's resume always arrives as a prompt start, and without the record a resumed build agent [35] would end as a bare prompt agent.
+- **Owning process, location and kind** - the process id and host of the owning process, the location [14] and the kind are seeded at open and never change through events. The location lets the agent view [33] tell a GitHub Actions agent's burst of events from a stalled live stream, show a cloud agent's session link after a reload, and switch the browser pane off. The kind lets a continuation re-enter the flow its first leg ran: the dashboard's resume always arrives as a prompt start, and without the record a resumed build agent [34] would end as a bare prompt agent.
 
 ### What is never persisted
 
@@ -146,8 +145,8 @@ Each event is folded into the status snapshot by one pure rule, the same on a li
 
 - The coding agent's [9] own conversation — its driver session [19], with every tool call — is never written here; the driver [25] keeps it and resumes it by session id. The event stream [2] keeps only The Framework's own events, among them what the agent [1] said and answered.
 - A `local` location [14] is not written: absent means local, the default every reader assumes.
-- Two annotations exist only on the way to the dashboard and are never on disk: that the Claude web bridge [36] holds a question the agent's cloud session [37] is parked on (the bridge's state lives in memory), and that the agent was started by another machine's daemon (the shared branch shows every machine's runs [6], and only this daemon knows which host it is). Both are added by the reads in `dashboard-rpc/reads.ts`.
-- An agent relayed [15] to a device [38] has no checkout [3] and no process on this machine, so its status snapshot [4] — status `running`, the location `remote`, the prompt as intent, the device's label — is a memory-only record the daemon keeps while the agent runs (`daemon-runtime.ts`); it is never written to disk.
+- Two annotations exist only on the way to the dashboard and are never on disk: that the Claude web bridge [35] holds a question the agent's cloud session [36] is parked on (the bridge's state lives in memory), and that the agent was started by another machine's daemon (the shared branch shows every machine's runs [6], and only this daemon knows which host it is). Both are added by the reads in `dashboard-rpc/reads.ts`.
+- An agent relayed [15] to a device [37] has no checkout [3] and no process on this machine, so its status snapshot [4] — status `running`, the location `remote`, the prompt as intent, the device's label — is a memory-only record the daemon keeps while the agent runs (`daemon-runtime.ts`); it is never written to disk.
 - The status snapshot's scratch file, `agent.json.<process id>.tmp`, is a transient step of a write (see "Appending and torn writes") and never a record: the archive [5] listing takes only `.json` files.
 
 ### Appending and torn writes
@@ -213,7 +212,7 @@ An agent whose process died without reporting an end is given one on its behalf,
 
 **User story**: an agent [1] whose process crashed, was killed, or died while the machine slept must not stay a running row with a "Stop" [11] button that does nothing; the dashboard clears it on its next poll, without waiting for a daemon restart.
 
-**Problem**: nothing is left to read the control file [39] of such an agent, so steering it is a no-op.
+**Problem**: nothing is left to read the control file [38] of such an agent, so steering it is a no-op.
 
 #### Business logic
 
@@ -231,7 +230,7 @@ An agent whose process died without reporting an end is given one on its behalf,
 #### Business logic
 
 At startup the daemon (`daemon.ts`) runs the crash rescue [18] over every place a `running` record can be, ending each one whose owning process it cannot find, in this order:
-- Runs [6] on the `agent-data` branch: a card at `running` whose owning process is dead or unknowable is written again through the `logs` skill [7], as a commit signed with the daemon's trailer when the daemon is the one repairing (`daemon-writes.ts`), with the ended status on the card and the surrogate end [16] as the last diary line — as one commit, because a card edited in place on the branch's checkout is not a fact yet: the next sync's rebase refuses the dirty tree and resets it. It counts as reconciled when the commit landed, pushed or not.
+- Runs [6] on the `agent-data` branch: a card at `running` whose owning process is dead or unknowable is written again through the `logs` skill [7], with the ended status on the card and the surrogate end [16] as the last diary line — as one commit, because a card edited in place on the branch's checkout is not a fact yet: the next sync's rebase refuses the dirty tree and resets it. It counts as reconciled when the commit landed, pushed or not.
 - Archive entries: the surrogate end is appended to `<id>.jsonl` and `<id>.json` is rewritten as stopped. These go before the live status snapshot [4], so the archive entry made from it is not counted twice.
 - The live status snapshot at the project root: flipped through the surrogate end and archived.
 - Agents inside `.branches/*` checkouts: the surrogate end is recorded in the checkout's own files first, so that the copy which follows is an event stream [2] that actually ends; then the agent is copied into the project's archive. The checkout itself stays on disk: an agent that ended this way did not end cleanly, and those are kept for inspection; removing one is an explicit action.

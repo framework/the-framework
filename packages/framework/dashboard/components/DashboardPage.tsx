@@ -9,14 +9,13 @@ import { usePolled } from '../lib/use-async.js'
 import { usePreferences } from '../lib/preferences.js'
 import { OnboardingChecklist } from './OnboardingChecklist.js'
 import { HotTickets } from './HotTickets.js'
-import { RoutineWork } from './RoutineWork.js'
 import { Agents } from './Agents.js'
 import { AiQueue } from './AiQueue.js'
 import { ScrollArea } from './ui/scroll-area.js'
 
 // The Overview landing page (#1139): a focused at-a-glance board — usage first, then what needs a
 // human (Human Queue) beside the agents working now stacked on what the AI takes up next (AI
-// Queue), the routine jobs, and the hot tickets across every project. Each section is a projection
+// Queue), and the hot tickets across every project. Each section is a projection
 // of the same .the-framework files over the `onDashboard` RPC, polled so it stays live;
 // selecting a row jumps into its project or straight into a session. Shown by the shell when no
 // project is picked.
@@ -74,10 +73,6 @@ export function DashboardPage({
             />
           </div>
         </div>
-
-        {/* Routine work sits below the AI Queue (#1139/#1159): the scheduled jobs and the button
-            that fires one now. */}
-        <RoutineWork onAgentStarted={onAgentStarted} onSelectProject={onSelectProject} />
 
         <HotTickets onSelectProject={onSelectProject} />
       </div>

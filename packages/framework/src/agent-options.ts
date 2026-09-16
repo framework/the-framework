@@ -7,7 +7,7 @@ import type { FrameworkFileConfig } from './config.js'
  * Turning the user's preferences into the options an agent starts with (#858).
  *
  * This lived in the dashboard client, which was fine while the browser was the only thing that
- * started runs. Auto PM (#685) starts them too, and passed nothing at all — so an unattended agent
+ * started runs. The daemon starts them too (#685), and passed nothing at all — so an unattended agent
  * ignored the driver, the model and every other per-project setting (#840) that an agent started from
  * the launcher would have honoured.
  *

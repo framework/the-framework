@@ -15,7 +15,7 @@ The text is a template: `${{ tf.session_name }}` is the finished agent's session
 [3] vanilla: an agent started without the built-in system prompt but with the signal protocols kept.
 [4] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [5] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down. An item on it is a queue entry.
-[6] the queued work: the routine that spends existing work: one agent started with `/work-queue` when the `agent-data` branch moved, which takes one task off the agent queue by composing the skills in its checkout.
+[6] drain: an agent started with `/work-queue`, the command of the `work-queue` skill, which takes one task off the agent queue by composing the skills in its checkout.
 [7] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local`, `push`, `pr` (the default), `merge`.
 [8] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
 [9] skill: one of the four capabilities an agent is taught (`branches`, `tickets`, `queue`, `logs`), each a package with the instructions the agent reads, a command on the agent's PATH, and an API the product calls.

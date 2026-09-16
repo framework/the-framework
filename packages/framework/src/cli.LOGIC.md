@@ -21,7 +21,7 @@ Implements the `the-framework` command: four options and no verbs, where the bar
 [9] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
 [10] on-before-mergeable follow-up: the built-in prompt `prompts/on_before_mergeable_prompt.md`, run as a separate prompt agent on the finished agent's checkout once the agent has signaled ready for merge: it queues quality follow-ups for the work on the agent queue and folds what the work taught into the project's knowledge documents.
 [11] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it). "Handoff level" is a rung of that ladder.
-[12] the queued work: the routine the daemon starts on the agent queue when the `agent-data` branch moves; its agent reads the queue itself.
+[12] the backlog loop: a build agent's loop over the agent queue, one task at a time until the queue is empty.
 [13] coding agent: the CLI doing the actual work: Claude Code or Codex.
 [14] daemon token: the shared secret that authenticates a dashboard exposed to the network: generated once for a daemon bound to a non-loopback address, kept in `~/.the-framework.json`, carried by the URL the terminal prints, and required on every request.
 [15] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
@@ -29,26 +29,25 @@ Implements the `the-framework` command: four options and no verbs, where the bar
 [17] driver session: the coding agent's own conversation for one agent, which the driver can resume by its session id.
 [18] ticket: a markdown file under `tickets/` on the `agent-data` branch (`<date>_<slug>.md`), with an optional plan (`.plan.md`) and claim (`.lock.md`).
 [19] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down. An item on it is a queue entry.
-[20] plan agent: an agent started to write a ticket's plan rather than to implement the ticket; its pull request lands the plan, not the work.
-[21] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles. The opposite is attended.
-[22] vanilla: an agent started without the built-in system prompt but with the signal protocols kept.
-[23] transparent: an agent started with nothing of The Framework's — the raw coding agent.
-[24] build agent / prompt agent: the two kinds of agent: a build works the agent queue after its opening exchange; a prompt agent runs one prompt and stops there.
-[25] preflight: the check that the chosen driver's coding agent can start an agent, run before a checkout is spent.
-[26] turn: one prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
-[27] the built-in system prompt: the standing instructions every agent starts with (`prompts/system_prompt.md`); `SYSTEM.md` is the project's own instructions added on top.
-[28] pick: the answer to a gate: the option or options chosen, by the user or automatically.
-[29] stop: ending an agent before it finishes: the Stop button, Ctrl-C, or a pick marked to stop.
-[30] settled: said of an agent whose work has stopped and which is waiting for the user: it is alive, takes messages, and does nothing until told.
-[31] ready for merge: the signal an agent emits when it believes its work is complete: it flips the agent's badge from building to ready and authorizes the handoff.
-[32] skill: one of the four capabilities an agent is taught — `branches`, `tickets`, `queue`, `logs` — each a package with the instructions the agent reads, a command run as `npx <skill>`, and an API the product calls.
-[33] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
-[34] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
-[35] the bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session.
-[36] hands-off: said of an agent whose work leaves this machine, so its first prompt is the whole agent: an agent whose location is `web`.
-[37] archive: the transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
-[38] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
-[39] CI watch: the sweep that merges the pull requests The Framework opened once their checks pass, and starts a fix agent when a check goes red.
+[20] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles. The opposite is attended.
+[21] vanilla: an agent started without the built-in system prompt but with the signal protocols kept.
+[22] transparent: an agent started with nothing of The Framework's — the raw coding agent.
+[23] build agent / prompt agent: the two kinds of agent: a build works the agent queue after its opening exchange; a prompt agent runs one prompt and stops there.
+[24] preflight: the check that the chosen driver's coding agent can start an agent, run before a checkout is spent.
+[25] turn: one prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
+[26] the built-in system prompt: the standing instructions every agent starts with (`prompts/system_prompt.md`); `SYSTEM.md` is the project's own instructions added on top.
+[27] pick: the answer to a gate: the option or options chosen, by the user or automatically.
+[28] stop: ending an agent before it finishes: the Stop button, Ctrl-C, or a pick marked to stop.
+[29] settled: said of an agent whose work has stopped and which is waiting for the user: it is alive, takes messages, and does nothing until told.
+[30] ready for merge: the signal an agent emits when it believes its work is complete: it flips the agent's badge from building to ready and authorizes the handoff.
+[31] skill: one of the four capabilities an agent is taught — `branches`, `tickets`, `queue`, `logs` — each a package with the instructions the agent reads, a command run as `npx <skill>`, and an API the product calls.
+[32] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
+[33] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
+[34] the bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session.
+[35] hands-off: said of an agent whose work leaves this machine, so its first prompt is the whole agent: an agent whose location is `web`.
+[36] archive: the transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
+[37] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
+[38] CI watch: the sweep that merges the pull requests The Framework opened once their checks pass, and starts a fix agent when a check goes red.
 
 ## Business logic — TL;DR
 
@@ -77,7 +76,7 @@ Implements the `the-framework` command: four options and no verbs, where the bar
 - **The flow the agent opens with** - research renders the Research preset around the text, a prompt agent runs its text verbatim, a build agent frames it; transparent forces the prompt path.
 - **How the agent ends** - a success line, then the branch read, the follow-up, the handoff and the archive, exit 0; a stop prints "■ Stopped." and exits 0; a failure prints why and exits 1; the handles are released either way.
 - **The on-before-mergeable follow-up** - after a ready-for-merge signal, one vanilla prompt agent is spawned on the same checkout to queue the quality follow-ups, never from a test entry and never recursively, and every reason for skipping it is an event.
-- **The handoff** - at the armed level, only what the agent committed is published, a merge is withheld without the agent's authorization, a plan agent's pull request text is defused, and every outcome is an event and a terminal line.
+- **The handoff** - at the armed level, only what the agent committed is published, a merge is withheld without the agent's authorization, and every outcome is an event and a terminal line.
 
 ## Business logic
 
@@ -139,7 +138,7 @@ After the running lines the terminal prints "Type a prompt on the dashboard to s
 
 #### Business logic
 
-`--agent <path>` reads and consumes the spec; a path that cannot be read as a spec ends the process with "could not read the session spec (<reason>)." and exit code 2. The agent [1]'s options are read off the spec with these defaults: driver [8] `claude`, no in-context directories, the on-before-mergeable follow-up [10] off, no browser, persistence on. From the spec itself: the prompt becomes the agent's intent; the kind is build, prompt or research; the checkout [15] to run in; the agent id [16] when the daemon minted one; whether this process continues an existing agent; the driver, kept only when it names a known driver; the location [9], kept only when it is one of the three; the model and the driver session [17] id to resume, trimmed and kept only when non-blank; the ticket [18] the agent implements, kept only when it is a ticket path, because it comes off the agent queue [19], a file an agent wrote, and is re-checked rather than trusted; whether the agent is a plan agent [20]; whether it is unattended [21]; vanilla [22] and transparent [23] as three-state values, where absent means "the spec said nothing" and the repo file [3] decides; the handoff [11] level, kept only when it names a rung; and the follow-up and browser switches. Setting `FRAMEWORK_FAKE=1` in the environment makes the agent a fake one, run by the offline demo driver of `fake-script.ts`, whatever the spec says; a fake agent with no prompt runs the demo's own intent.
+`--agent <path>` reads and consumes the spec; a path that cannot be read as a spec ends the process with "could not read the session spec (<reason>)." and exit code 2. The agent [1]'s options are read off the spec with these defaults: driver [8] `claude`, no in-context directories, the on-before-mergeable follow-up [10] off, no browser, persistence on. From the spec itself: the prompt becomes the agent's intent; the kind is build, prompt or research; the checkout [15] to run in; the agent id [16] when the daemon minted one; whether this process continues an existing agent; the driver, kept only when it names a known driver; the location [9], kept only when it is one of the three; the model and the driver session [17] id to resume, trimmed and kept only when non-blank; the ticket [18] the agent implements, kept only when it is a ticket path, because it comes off the agent queue [19], a file an agent wrote, and is re-checked rather than trusted; whether it is unattended [20]; vanilla [21] and transparent [22] as three-state values, where absent means "the spec said nothing" and the repo file [3] decides; the handoff [11] level, kept only when it names a rung; and the follow-up and browser switches. Setting `FRAMEWORK_FAKE=1` in the environment makes the agent a fake one, run by the offline demo driver of `fake-script.ts`, whatever the spec says; a fake agent with no prompt runs the demo's own intent.
 
 ### What is refused before anything is spent
 
@@ -153,9 +152,9 @@ Three refusals happen before any driver [8] exists:
 
 - An agent whose prompt is empty ends with "this session has no prompt to run." and exit code 2. Research is the one kind whose empty prompt is fine, because its "what" has a preset default, and a fake agent has its demo intent.
 - The layout gate: when the checkout [15] carries `.the-framework/LAYOUT` and it differs from what this build writes, the build refuses outright, prints the refusal naming both layouts and the fix for each direction, and exits 1. A checkout without the marker passes. The rule lives in `layout.ts`.
-- A driver session [17] id to resume on a build agent [24] (as opposed to a prompt agent [24]) ends with "a resumed agent session only applies to a prompt session, not a build." plus the help pointer and exit code 2. Research, a prompt agent, a transparent [23] agent and a continuation of an existing agent are exempt, because for them the resumed conversation is the point.
+- A driver session [17] id to resume on a build agent [23] (as opposed to a prompt agent [23]) ends with "a resumed agent session only applies to a prompt session, not a build." plus the help pointer and exit code 2. Research, a prompt agent, a transparent [22] agent and a continuation of an existing agent are exempt, because for them the resumed conversation is the point.
 
-The preflight [25] is not repeated here: the daemon ran it before spawning the process and refused the start on the surface the user was looking at, and an agent whose location [9] is `actions` needs no coding agent [13] on this machine at all.
+The preflight [24] is not repeated here: the daemon ran it before spawning the process and refused the start on the surface the user was looking at, and an agent whose location [9] is `actions` needs no coding agent [13] on this machine at all.
 
 ### Resolving the configuration over its layers
 
@@ -165,23 +164,23 @@ The preflight [25] is not repeated here: the daemon ran it before spawning the p
 
 #### Business logic
 
-The repo file [3] is read from the agent's checkout [15]; when the spec names no checkout, a fake agent runs in a `framework-fake-workspace` directory under the system's temporary directory and any other agent in the current directory. A repo file that cannot be parsed is reported as a warning and ignored, never a failed agent (`config.ts`). The three settings the file may carry, vanilla [22], transparent [23] and the handoff [11] level, are resolved over two layers, the nearest that set a value winning: the agent spec [2]'s own values first, then the file. A `false` in the spec is an answer, not an absence, so it turns off what the file switched on; when neither layer set the handoff level it is `pr`. When any value came from a layer, one "◆ config: …" line says what is in effect and where it came from, worded by `config-layers.ts`. Transparent is resolved once here and governs everything below: the system prompt, the backlog loop [12], the flow, and what the record calls the agent.
+The repo file [3] is read from the agent's checkout [15]; when the spec names no checkout, a fake agent runs in a `framework-fake-workspace` directory under the system's temporary directory and any other agent in the current directory. A repo file that cannot be parsed is reported as a warning and ignored, never a failed agent (`config.ts`). The three settings the file may carry, vanilla [21], transparent [22] and the handoff [11] level, are resolved over two layers, the nearest that set a value winning: the agent spec [2]'s own values first, then the file. A `false` in the spec is an answer, not an absence, so it turns off what the file switched on; when neither layer set the handoff level it is `pr`. When any value came from a layer, one "◆ config: …" line says what is in effect and where it came from, worded by `config-layers.ts`. Transparent is resolved once here and governs everything below: the system prompt, the backlog loop [12], the flow, and what the record calls the agent.
 
 ### What the terminal is told before the first turn
 
 #### Context
 
-**Problem**: a setting that silently does nothing is worse than one that errors. Which coding agent [13] is about to spend the user's subscription, and which settings are not in force while it does, is said before the first turn [26].
+**Problem**: a setting that silently does nothing is worse than one that errors. Which coding agent [13] is about to spend the user's subscription, and which settings are not in force while it does, is said before the first turn [25].
 
 #### Business logic
 
-For a real (not fake) agent: when the driver [8] is not Claude Code, "◆ driver: <driver label>"; when the browser was asked for on a driver other than Claude Code, "note: the browser has no effect on <driver label>: the browser tools are wired through Claude Code's MCP config." on the error stream. An `actions` agent announces "◆ run on: GitHub Actions (<owner>/<repo>)"; a `web` agent announces "◆ run on: Claude Code on the web (a cloud session on your own account, created by the browser extension)". A transparent [23] agent announces "◆ transparent: on — raw <driver label>, no framework prompt, dashboard, or TODO loop". Then the system prompt in force: "◆ system prompt: SYSTEM.md" when the checkout [15] has one; "◆ built-in system prompt: off (<layer>)" when the built-in system prompt [27] is off through vanilla [22], naming the layer that turned it off, and nothing extra for transparent, which already announced itself; and "◆ context: <directories>" when in-context directories were given.
+For a real (not fake) agent: when the driver [8] is not Claude Code, "◆ driver: <driver label>"; when the browser was asked for on a driver other than Claude Code, "note: the browser has no effect on <driver label>: the browser tools are wired through Claude Code's MCP config." on the error stream. An `actions` agent announces "◆ run on: GitHub Actions (<owner>/<repo>)"; a `web` agent announces "◆ run on: Claude Code on the web (a cloud session on your own account, created by the browser extension)". A transparent [22] agent announces "◆ transparent: on — raw <driver label>, no framework prompt, dashboard, or TODO loop". Then the system prompt in force: "◆ system prompt: SYSTEM.md" when the checkout [15] has one; "◆ built-in system prompt: off (<layer>)" when the built-in system prompt [26] is off through vanilla [21], naming the layer that turned it off, and nothing extra for transparent, which already announced itself; and "◆ context: <directories>" when in-context directories were given.
 
 ### The coding agent runs without permission prompts
 
 #### Context
 
-**Problem**: every turn [26] of a Claude Code agent is headless, so nobody can answer an interactive approval. Claude Code's own default quietly denies installs, builds and test runs, and an agent so limited can never verify that the project builds or runs.
+**Problem**: every turn [25] of a Claude Code agent is headless, so nobody can answer an interactive approval. Claude Code's own default quietly denies installs, builds and test runs, and an agent so limited can never verify that the project builds or runs.
 
 #### Business logic
 
@@ -195,17 +194,17 @@ Every Claude Code turn runs with its permission prompts bypassed, so the full lo
 
 #### Business logic
 
-Unless persistence is off, which only tests do, the store opens in the checkout [15]'s `.the-framework/` directory and every event is appended there (`store/`). A new agent starts its event file empty, discarding what a previous agent left in that checkout; a continuation of an existing agent keeps the existing log, so messaging a stopped agent stays one row in the history. The store is seeded with: the prompt as the agent's intent (research with no text is labeled by the Research preset's default "what"), the daemon's agent id [16] when it minted one, so the checkout directory and the agent recorded inside it share one id; the kind, build or prompt, where a transparent [23] agent and a research agent both count as prompt; and the location [9] when one was given. A store that cannot open prints "could not persist session state (<reason>); continuing without it" and the agent runs without persistence.
+Unless persistence is off, which only tests do, the store opens in the checkout [15]'s `.the-framework/` directory and every event is appended there (`store/`). A new agent starts its event file empty, discarding what a previous agent left in that checkout; a continuation of an existing agent keeps the existing log, so messaging a stopped agent stays one row in the history. The store is seeded with: the prompt as the agent's intent (research with no text is labeled by the Research preset's default "what"), the daemon's agent id [16] when it minted one, so the checkout directory and the agent recorded inside it share one id; the kind, build or prompt, where a transparent [22] agent and a research agent both count as prompt; and the location [9] when one was given. A store that cannot open prints "could not persist session state (<reason>); continuing without it" and the agent runs without persistence.
 
 ### A continuation re-enters the flow it recorded
 
 #### Context
 
-**User story**: the user messages an agent that has ended; the dashboard reopens it as a continuation, and a build agent [24] continues as a build, with the message sent verbatim, rather than being downgraded to a bare prompt agent.
+**User story**: the user messages an agent that has ended; the dashboard reopens it as a continuation, and a build agent [23] continues as a build, with the message sent verbatim, rather than being downgraded to a bare prompt agent.
 
 #### Business logic
 
-A process that continues an existing agent [1], with a driver session [17] id to resume and not transparent [23], re-enters the build flow when the reopened record says the agent was a build; the message is the continuation's opening prompt, sent verbatim, and the backlog loop [12] and the build's ending follow. Every other continuation runs as a prompt agent [24], as does a record that never said what its flow was.
+A process that continues an existing agent [1], with a driver session [17] id to resume and not transparent [22], re-enters the build flow when the reopened record says the agent was a build; the message is the continuation's opening prompt, sent verbatim, and the backlog loop [12] and the build's ending follow. Every other continuation runs as a prompt agent [23], as does a record that never said what its flow was.
 
 ### Steering over the control file
 
@@ -229,21 +228,21 @@ When the control file cannot be reset or tailed, "control channel unavailable (<
 
 #### Context
 
-**Problem**: a gate [6] parked with nobody to answer it hangs an agent [1] forever, and a process with nothing left to do between turns [26] would exit while parked, leaving the picks that later arrive read by nobody.
+**Problem**: a gate [6] parked with nobody to answer it hangs an agent [1] forever, and a process with nothing left to do between turns [25] would exit while parked, leaving the picks that later arrive read by nobody.
 
 #### Business logic
 
-A gate parks, waiting for a pick [28] from the control file [5], only when the control file is tailed and the agent is attended; an unattended [21] agent keeps its control file for stops and messages but takes the recommended option at every gate (`agent.ts`). Each parked wait is held open by the keepalive of `gate-keepalive.ts`, so the process cannot exit while a gate or a message wait is pending. A stop [29], from Stop, Ctrl+C or a stop entry, answers every parked gate with "proceed" as an automatic pick and closes the message queue, so a stopped agent never hangs on a gate.
+A gate parks, waiting for a pick [27] from the control file [5], only when the control file is tailed and the agent is attended; an unattended [20] agent keeps its control file for stops and messages but takes the recommended option at every gate (`agent.ts`). Each parked wait is held open by the keepalive of `gate-keepalive.ts`, so the process cannot exit while a gate or a message wait is pending. A stop [28], from Stop, Ctrl+C or a stop entry, answers every parked gate with "proceed" as an automatic pick and closes the message queue, so a stopped agent never hangs on a gate.
 
 ### Live chat
 
 #### Context
 
-**User story**: the user types into the composer while the agent [1] works, and the message is delivered between turns; once the agent has settled [30] with nothing queued, it ends, and the dashboard reopens the conversation as a continuation when the user writes again.
+**User story**: the user types into the composer while the agent [1] works, and the message is delivered between turns; once the agent has settled [29] with nothing queued, it ends, and the dashboard reopens the conversation as a continuation when the user writes again.
 
 #### Business logic
 
-The message queue is handed to the agent only when the agent has an agent id [16], meaning the dashboard started it and has a place to carry the conversation on, and the control file [5] is tailed. Whether gates park has no bearing on it: an unattended [21] agent still takes the user's messages. Such an agent drains what has queued and then ends itself; it never stays open waiting for a next message, so a headless agent ends when done. The wait for the next message is held open by the same keepalive as a gate, and a stop [29] closes the queue, which releases it.
+The message queue is handed to the agent only when the agent has an agent id [16], meaning the dashboard started it and has a place to carry the conversation on, and the control file [5] is tailed. Whether gates park has no bearing on it: an unattended [20] agent still takes the user's messages. Such an agent drains what has queued and then ends itself; it never stays open waiting for a next message, so a headless agent ends when done. The wait for the next message is held open by the same keepalive as a gate, and a stop [28] closes the queue, which releases it.
 
 ### Ctrl+C and SIGTERM
 
@@ -263,17 +262,17 @@ While the agent [1] runs, the first Ctrl+C or SIGTERM prints "■ Interrupt: sto
 
 #### Business logic
 
-Every event the agent [1] emits is rendered as a terminal line (`terminal.ts`) and appended to the store, in that order, and the journal remembers what the end of the agent needs: whether the ready for merge [31] signal was seen; the pull request title and description the agent wrote in its final message, the latest wins because the agent may revise them as the work changes; the branch the checkout [15] is on; and whether the agent ended stopped. Two things about the browser preview are held rather than emitted at once: the preview's port waits for the first session event, because the dashboard renders only what follows the last session event and an earlier line would be dropped; and the page the preview is on is emitted as soon as it changes once a session is open and re-emitted after every later session event, so a continuation's fresh slice has a browser row to host the preview.
+Every event the agent [1] emits is rendered as a terminal line (`terminal.ts`) and appended to the store, in that order, and the journal remembers what the end of the agent needs: whether the ready for merge [30] signal was seen; the pull request title and description the agent wrote in its final message, the latest wins because the agent may revise them as the work changes; the branch the checkout [15] is on; and whether the agent ended stopped. Two things about the browser preview are held rather than emitted at once: the preview's port waits for the first session event, because the dashboard renders only what follows the last session event and an earlier line would be dropped; and the page the preview is on is emitted as soon as it changes once a session is open and re-emitted after every later session event, so a continuation's fresh slice has a browser row to host the preview.
 
 ### The branch is observed, never assumed
 
 #### Context
 
-**Problem**: the agent renames its own branch, in its own shell, through the `branches` skill [32]'s command, invisibly to this process; the dashboard's label, the pull request and the follow-up all need the name the branch has now.
+**Problem**: the agent renames its own branch, in its own shell, through the `branches` skill [31]'s command, invisibly to this process; the dashboard's label, the pull request and the follow-up all need the name the branch has now.
 
 #### Business logic
 
-The checkout [15]'s current branch is read at start, at the end of every turn [26], and once more before the epilogue reads it. Only a change is recorded, as a branch event carrying the branch and, once the agent has named its work, the session name [33]: the branch minus its `agent-` prefix, but not while the branch is still the one the agent id [16] names. Outside a git checkout, or on a detached head, nothing is recorded but the loss is remembered, so the epilogue never publishes a branch the checkout has left.
+The checkout [15]'s current branch is read at start, at the end of every turn [25], and once more before the epilogue reads it. Only a change is recorded, as a branch event carrying the branch and, once the agent has named its work, the session name [32]: the branch minus its `agent-` prefix, but not while the branch is still the one the agent id [16] names. Outside a git checkout, or on a detached head, nothing is recorded but the loss is remembered, so the epilogue never publishes a branch the checkout has left.
 
 ### What the agent's record learns at start
 
@@ -283,7 +282,7 @@ The checkout [15]'s current branch is read at start, at the end of every turn [2
 
 #### Business logic
 
-Before the first turn [26], two facts are emitted: the armed handoff [11], spelled out as its three stages (push, pull request, merge) derived from the rung so no two surfaces can disagree; and the branch the agent actually starts on, read rather than guessed. Which ticket the agent works is the agent's own doing, not The Framework's to know.
+Before the first turn [25], two facts are emitted: the armed handoff [11], spelled out as its three stages (push, pull request, merge) derived from the rung so no two surfaces can disagree; and the branch the agent actually starts on, read rather than guessed. Which ticket the agent works is the agent's own doing, not The Framework's to know.
 
 ### The browser
 
@@ -299,14 +298,14 @@ A browser is launched only for a real, local agent whose driver [8] is Claude Co
 
 #### Context
 
-**User story**: the user picks where the agent [1] runs, on this machine, on a GitHub Actions runner, or as a cloud session [34] on their own claude.ai account, and the agent's turns run there.
+**User story**: the user picks where the agent [1] runs, on this machine, on a GitHub Actions runner, or as a cloud session [33] on their own claude.ai account, and the agent's turns run there.
 
 #### Business logic
 
 The driver [8] is built for the agent's location [9] (`target-driver.ts`):
 
 - `actions` needs the repository's GitHub owner and name, read from the project's origin remote, and a GitHub user token from the environment or, failing that, from the `gh` CLI; never from the repo file [3], which is public. Without a remote the agent ends with "--run-on actions needs a GitHub origin remote on this repo."; without a token, with a message that says a user token with the `repo` and `workflow` scopes is needed, that it must be set in the environment the daemon runs in or obtained with `gh auth login`, and that it must belong to a user, not an App, because the agent workflow refuses a bot-triggered run. Both end the agent as described under giving up before a driver exists. The workflow driven is `framework-agent.yml`.
-- `web` hands the task to a cloud session created on the user's own account by the bridge [35]'s extension. To reach the bridge, the process needs the URL of the daemon that spawned it, which the daemon put in the process's environment, and the daemon token [14] read from `~/.the-framework.json`. With both, the cloud driver asks that daemon to have the extension create the session; with either missing, the driver runs without that configuration and the agent fails saying that web agents start from the dashboard (`driver/cloud.ts`). A hands-off [36] agent's cloud session opens on the branch this process pushed, so commits never pushed are not in it.
+- `web` hands the task to a cloud session created on the user's own account by the bridge [34]'s extension. To reach the bridge, the process needs the URL of the daemon that spawned it, which the daemon put in the process's environment, and the daemon token [14] read from `~/.the-framework.json`. With both, the cloud driver asks that daemon to have the extension create the session; with either missing, the driver runs without that configuration and the agent fails saying that web agents start from the dashboard (`driver/cloud.ts`). A hands-off [35] agent's cloud session opens on the branch this process pushed, so commits never pushed are not in it.
 - Any other location, or none, is `local`: the driver for the chosen coding agent [13] on this machine, with the browser tools folded into Claude Code's configuration when the browser option is on, pointed at the shared Chrome when one was launched.
 - A fake agent gets the offline demo driver whatever its location.
 
@@ -318,7 +317,7 @@ The driver [8] is built for the agent's location [9] (`target-driver.ts`):
 
 #### Business logic
 
-A configuration fault found after the store opened but before a driver [8] exists prints the reason, appends a failed end event carrying it, closes the store so the archive [37] is written, disarms the interrupt trap, closes the control file [5] watcher and the browser, and exits with code 2. Persistence is best-effort throughout: a store that cannot write its own failure still lets the process exit.
+A configuration fault found after the store opened but before a driver [8] exists prints the reason, appends a failed end event carrying it, closes the store so the archive [36] is written, disarms the interrupt trap, closes the control file [5] watcher and the browser, and exits with code 2. Persistence is best-effort throughout: a store that cannot write its own failure still lets the process exit.
 
 ### The flow the agent opens with
 
@@ -328,7 +327,7 @@ A configuration fault found after the store opened but before a driver [8] exist
 
 #### Business logic
 
-A research agent's opening prompt is the Research preset rendered around the text given; a prompt agent [24] runs its text verbatim, since it may already be an edited preset that must not be re-rendered; a build agent [24] is framed by `agent.ts`. A transparent [23] agent takes the prompt path whatever its kind; a build continuation stays a build. The agent [1] also receives: the location [9]; whether The Framework owns the checkout [15], true for an agent with an agent id [16] that runs locally, the one case where the daemon's PATH with the `branches` command is present; the driver session [17] id to resume, when continuing; the model when one was chosen; `SYSTEM.md` from the checkout as the project's own instructions; whether the built-in system prompt [27] is left out, which vanilla [22] and transparent both do; whether a browser is really attached; the in-context directories; and the session link to show in the dashboard, which is Claude Code's generic entry point, shown as "Open Claude Code", for a live Claude Code agent and nothing for a Codex or a fake agent, because Codex keeps its sessions locally with nothing equivalent to open.
+A research agent's opening prompt is the Research preset rendered around the text given; a prompt agent [23] runs its text verbatim, since it may already be an edited preset that must not be re-rendered; a build agent [23] is framed by `agent.ts`. A transparent [22] agent takes the prompt path whatever its kind; a build continuation stays a build. The agent [1] also receives: the location [9]; whether The Framework owns the checkout [15], true for an agent with an agent id [16] that runs locally, the one case where the daemon's PATH with the `branches` command is present; the driver session [17] id to resume, when continuing; the model when one was chosen; `SYSTEM.md` from the checkout as the project's own instructions; whether the built-in system prompt [26] is left out, which vanilla [21] and transparent both do; whether a browser is really attached; the in-context directories; and the session link to show in the dashboard, which is Claude Code's generic entry point, shown as "Open Claude Code", for a live Claude Code agent and nothing for a Codex or a fake agent, because Codex keeps its sessions locally with nothing equivalent to open.
 
 ### How the agent ends
 
@@ -338,7 +337,7 @@ A research agent's opening prompt is the Research preset rendered around the tex
 
 #### Business logic
 
-When the agent finishes, the terminal shows the success line for its flow: "✓ done." for a build, "✓ prompt session done." for a prompt agent [24], "✓ research done: see the REVIEW-PROBLEMS / TODO files it wrote." for research, and for a hands-off [36] agent "✓ handed off. The session continues where it was sent, and opens its own pull request.", because this machine never saw what was built. Then, in this order: the branch is read once more; the on-before-mergeable follow-up [10] runs; the handoff [11] runs, so whatever the follow-up committed is part of what is published; and the store closes, which writes the archive [37], so both outcomes are in the copy the dashboard's history reads. The exit code is 0. When the agent ends by error: the store closes; if the agent was stopped [29], by Stop, Ctrl+C or a pick marked to stop, as its end event says, "■ Stopped." is printed and the exit code is 0, because a stop is not a failure; otherwise "✗ <session|research|prompt session> failed: <reason>" is printed and the exit code is 1. Either way the interrupt trap is disarmed, the control file [5] watcher closed, and the browser preview and the browser closed.
+When the agent finishes, the terminal shows the success line for its flow: "✓ done." for a build, "✓ prompt session done." for a prompt agent [23], "✓ research done: see the REVIEW-PROBLEMS / TODO files it wrote." for research, and for a hands-off [35] agent "✓ handed off. The session continues where it was sent, and opens its own pull request.", because this machine never saw what was built. Then, in this order: the branch is read once more; the on-before-mergeable follow-up [10] runs; the handoff [11] runs, so whatever the follow-up committed is part of what is published; and the store closes, which writes the archive [36], so both outcomes are in the copy the dashboard's history reads. The exit code is 0. When the agent ends by error: the store closes; if the agent was stopped [28], by Stop, Ctrl+C or a pick marked to stop, as its end event says, "■ Stopped." is printed and the exit code is 0, because a stop is not a failure; otherwise "✗ <session|research|prompt session> failed: <reason>" is printed and the exit code is 1. Either way the interrupt trap is disarmed, the control file [5] watcher closed, and the browser preview and the browser closed.
 
 ### The on-before-mergeable follow-up
 
@@ -348,7 +347,7 @@ When the agent finishes, the terminal shows the success line for its flow: "✓ 
 
 #### Business logic
 
-The follow-up [10] runs only when the option was on. When it was, every reason for not running it is emitted as an event: the agent never signaled ready for merge [31]; the agent was stopped [29]; the agent is fake; the agent never named its work, so there is no session name [33] for the prompt to refer to; or this process does not know its own executable. Otherwise the presets are materialized under the checkout [15] first, best-effort, so the queued entries can name their files ("  ! on-before-mergeable: could not materialize presets (<reason>)" when that fails), "◆ on-before-mergeable: queueing quality follow-ups for <session name>" is printed, and one child process runs `the-framework --agent <spec>` on the same checkout with the rendered prompt as a prompt agent [24] whose stdio is the terminal's. That child is vanilla [22], so it skips the built-in system prompt [27]'s session-naming step and stays on the agent's current branch, where its output rides to review with the work; and its spec carries no on-before-mergeable option, so a follow-up never triggers a follow-up of its own. The child is never spawned from a test entry. Its spec is removed when it exits or fails to start. The outcome event is "queued" when the child exited cleanly and "incomplete" otherwise, with "  ! on-before-mergeable queueing did not complete cleanly." on the terminal.
+The follow-up [10] runs only when the option was on. When it was, every reason for not running it is emitted as an event: the agent never signaled ready for merge [30]; the agent was stopped [28]; the agent is fake; the agent never named its work, so there is no session name [32] for the prompt to refer to; or this process does not know its own executable. Otherwise the presets are materialized under the checkout [15] first, best-effort, so the queued entries can name their files ("  ! on-before-mergeable: could not materialize presets (<reason>)" when that fails), "◆ on-before-mergeable: queueing quality follow-ups for <session name>" is printed, and one child process runs `the-framework --agent <spec>` on the same checkout with the rendered prompt as a prompt agent [23] whose stdio is the terminal's. That child is vanilla [21], so it skips the built-in system prompt [26]'s session-naming step and stays on the agent's current branch, where its output rides to review with the work; and its spec carries no on-before-mergeable option, so a follow-up never triggers a follow-up of its own. The child is never spawned from a test entry. Its spec is removed when it exits or fails to start. The outcome event is "queued" when the child exited cleanly and "incomplete" otherwise, with "  ! on-before-mergeable queueing did not complete cleanly." on the terminal.
 
 ### The handoff
 
@@ -356,14 +355,14 @@ The follow-up [10] runs only when the option was on. When it was, every reason f
 
 **User story**: when the agent [1] ends, its branch is pushed and a pull request opened at the level the checkboxes were left at, the pull request is merged only when the agent itself declared the work done or the user pressed Merge, and the agent's events say exactly what happened, including why nothing did.
 
-**Problem**: publishing work the user cut short is the opposite of what stopping meant; merging unattended on configuration alone would land undeclared work; and a plan agent [20]'s pull request must not close the ticket [18]'s issue, since the work is still undone.
+**Problem**: publishing work the user cut short is the opposite of what stopping meant; merging unattended on configuration alone would land undeclared work.
 
 #### Business logic
 
-The handoff [11] runs at the armed level: the resolved configuration's level, moved since by handoff and merge entries on the control file [5]. Nothing is published, and the skip is an event with its reason, when the level does not include a push, when the agent was stopped [29], or when the agent is fake. The Framework commits nothing on the agent's behalf: what is published is what the agent committed, and uncommitted work stays in the checkout [15].
+The handoff [11] runs at the armed level: the resolved configuration's level, moved since by handoff and merge entries on the control file [5]. Nothing is published, and the skip is an event with its reason, when the level does not include a push, when the agent was stopped [28], or when the agent is fake. The Framework commits nothing on the agent's behalf: what is published is what the agent committed, and uncommitted work stays in the checkout [15].
 
-An armed merge must also be authorized. Unless a human pressed Merge, the merge is withheld when the agent never signaled ready for merge [31]; the agent's word is enough, and no file of the agent's is read beside it. A withheld merge is not a skipped handoff: the push and the pull request go ahead, the pull request opens as a draft for a human, and the event carries the reason, which the terminal words as "the session never signalled ready-for-merge".
+An armed merge must also be authorized. Unless a human pressed Merge, the merge is withheld when the agent never signaled ready for merge [30]; the agent's word is enough, and no file of the agent's is read beside it. A withheld merge is not a skipped handoff: the push and the pull request go ahead, the pull request opens as a draft for a human, and the event carries the reason, which the terminal words as "the session never signalled ready-for-merge".
 
-The branch published is the branch as observed now, after any rename by the agent; a checkout on no branch skips with the reason `branch-gone`. The pull request text is what the agent wrote in its final message, when it did: its title and description, so the agent has no reason to open a pull request itself. Which ticket [18] the agent implemented, and so which GitHub issue its title should close, is the agent's own to say in its title; The Framework reads no ticket for it. For a plan agent both the title and the description are also defused (`closing-keywords.ts`), so no closing phrase in its prose closes the issue either. The push, the pull request and the merge themselves, and the further reasons to skip (no commits, no remote, a pull request already open, work already landed, branch already pushed), are `dashboard/agent-handoff.ts`'s; a pull request opens as a draft unless the merge is armed and authorized.
+The branch published is the branch as observed now, after any rename by the agent; a checkout on no branch skips with the reason `branch-gone`. The pull request text is what the agent wrote in its final message, when it did: its title and description, so the agent has no reason to open a pull request itself. Which ticket [18] the agent implemented, and so which GitHub issue its title should close, is the agent's own to say in its title; The Framework reads no ticket for it. The push, the pull request and the merge themselves, and the further reasons to skip (no commits, no remote, a pull request already open, work already landed, branch already pushed), are `dashboard/agent-handoff.ts`'s; a pull request opens as a draft unless the merge is armed and authorized.
 
-Every outcome is emitted as a handoff event, and a pull request that was opened is recorded as its own event with its number and URL, so every later surface reads the number off the agent. The terminal says "◆ Opened <url>", "◆ Pushed <branch>.", or "✗ could not open the PR: <error>" / "✗ could not push the branch: <error>". The merge half rides on the outcome rather than failing it: "◆ Auto-merge armed: the PR lands when its checks pass." when GitHub's own auto-merge took it, "◆ Merge on green: the daemon merges the PR when its checks pass." when the CI watch [39] took it, "◆ Merged the PR." when it was merged directly, "◆ Merge withheld: <reason>." as above, or "✗ could not merge the PR: <error>", after which the pull request still exists for a human to merge by hand.
+Every outcome is emitted as a handoff event, and a pull request that was opened is recorded as its own event with its number and URL, so every later surface reads the number off the agent. The terminal says "◆ Opened <url>", "◆ Pushed <branch>.", or "✗ could not open the PR: <error>" / "✗ could not push the branch: <error>". The merge half rides on the outcome rather than failing it: "◆ Auto-merge armed: the PR lands when its checks pass." when GitHub's own auto-merge took it, "◆ Merge on green: the daemon merges the PR when its checks pass." when the CI watch [38] took it, "◆ Merged the PR." when it was merged directly, "◆ Merge withheld: <reason>." as above, or "✗ could not merge the PR: <error>", after which the pull request still exists for a human to merge by hand.

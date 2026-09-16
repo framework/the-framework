@@ -20,9 +20,7 @@ The browser's side of the daemon's call surface: one module of typed stubs per g
 [10] preferences: The user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 [11] quota: The account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
 [12] quota boundary: The share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
-[13] Auto PM: The daemon's unattended product management: drain the agent queue, and refill it by running the routines.
-[14] sweep: A background job the daemon runs on its clock: Auto PM, the CI watch, the notification watchers, the sweep that reclaims checkouts, the branch-links sweep, the cloud scratch sweep, cloud work adoption.
-[15] device: Another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
+[13] device: Another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 
 ## Business logic — TL;DR
 
@@ -32,8 +30,8 @@ The browser's side of the daemon's call surface: one module of typed stubs per g
 - **The live event stream** (`events.ts`) - the subscription to one agent's events [7] as they are written, re-exported from the transport because a stream is not a call.
 - **Actions** (`control.ts`) - everything the user does to an agent or a project: steering (stop, pick [8], message, handoff), the bridge's answer and its browser, starting an agent, push, pull request and merge, removing a checkout or deleting an agent, opening a checkout in an app, and the ticket and agent queue [9] actions.
 - **Preferences** (`preferences.ts`) - reading, replacing or patching the preferences [10], a project's shared custom presets, the installed editors, and whether the Discord credentials are set and saving them.
-- **Quota and Auto PM** (`quota.ts`) - the quota [11] reading against the quota boundary [12], what Auto PM [13] last decided, and an Auto PM sweep [14] run on demand.
-- **Devices** (`devices.ts`) - whether each saved device [15] answers, checked by the daemon with the token the browser holds and never keeps.
+- **Quota** (`quota.ts`) - the quota [11] reading against the quota boundary [12].
+- **Devices** (`devices.ts`) - whether each saved device [13] answers, checked by the daemon with the token the browser holds and never keeps.
 
 ## Business logic
 

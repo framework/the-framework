@@ -1,6 +1,5 @@
 ## Priority 6
 
-- Write the plan: [Ship the bridge extension inside the framework package, so the bridge browser works from npx](tickets/2026-08-26_ship-bridge-extension-in-package.md)
 - [Landing page: New feature "Headless browser"](tickets/2026-07-26_landing-headless-browser.md)
 - [App instead of `localhost`?](tickets/2026-07-12_app-instead-of-localhost.md)
 

@@ -11,6 +11,7 @@ import { OnboardingChecklist } from './OnboardingChecklist.js'
 import { HotTickets } from './HotTickets.js'
 import { Agents } from './Agents.js'
 import { AiQueue } from './AiQueue.js'
+import { SchedulerCard } from './SchedulerCard.js'
 import { ScrollArea } from './ui/scroll-area.js'
 
 // The Overview landing page (#1139): a focused at-a-glance board — usage first, then what needs a
@@ -71,6 +72,9 @@ export function DashboardPage({
               onAgentStarted={onAgentStarted}
               onSelectProject={onSelectProject}
             />
+            {/* What runs while nobody is at the keyboard (#1774): each project's scheduler, below
+                the queue it works. */}
+            <SchedulerCard onSelectAgent={onSelectAgent} />
           </div>
         </div>
 

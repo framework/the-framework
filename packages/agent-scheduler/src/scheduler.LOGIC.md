@@ -21,7 +21,7 @@ The tool's process side: the tick [1] wired to the real project, the run's [2] d
 - **A run in this process** - the id given by the tick or minted now, the model given or the state's, marked already when the id was given, Claude Code with permissions bypassed and `AGENT_ID` in its environment.
 - **`start`** - the state on (and keep-alive when asked); a scheduler's process already alive is left as is; otherwise the tool's own executable spawned detached as `start --foreground`, its output to `.agent-scheduler/scheduler.log`, and its pid and start time written to the state.
 - **The loop** - a tick now and every minute, never two at once, a tick that throws logged as `tick failed: …` and the loop going on; a stop signal ends the loop after the tick in flight and clears the pid.
-- **`stop`** - the scheduler's process signalled when alive; the state off with no pid; agents in flight run to the end.
+- **`stop`** - the scheduler's process signalled when alive; the state off with no pid; agents in flight run to the end. Asked to stop unless keep-alive, it leaves a keep-alive scheduler as it is and says it kept it: the one reader of keep-alive.
 - **`status`** - the state, plus whether its pid is a live process.
 - **A live pid** - probed by signal 0 on this machine; a process that exists but belongs to another user counts as alive; a pid on another host is unknowable here.
 
@@ -85,7 +85,7 @@ See `## Context`.
 
 #### Business logic
 
-`stop` sends SIGINT to the state's pid when that process is alive (a process gone between the probe and the signal is ignored), then writes the state off with no pid and no start time. Runs in flight are their own processes and are not signalled: they run to the end.
+`stop` sends SIGINT to the state's pid when that process is alive (a process gone between the probe and the signal is ignored), then writes the state off with no pid and no start time, and answers it with `kept: false`. Runs in flight are their own processes and are not signalled: they run to the end. Asked to stop unless keep-alive (the line a dashboard runs when it closes), it first reads the state: keep-alive on means nothing is signalled and nothing written, and the state is answered as it is with `kept: true`; keep-alive off means the plain stop. A plain `stop` stops a keep-alive scheduler too: it is how a person turns the tool off.
 
 ### `status`
 

@@ -90,6 +90,13 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - Every command prints one JSON document on stdout, one line for a person on stderr, and
   exits 0 for a result, 1 for a refusal or a failure, 2 for a command line that cannot be
   read: the skills' contract, so a person and a dashboard read it the same way.
-- `start` is the only clock until The Framework's dashboard starts and stops the scheduler
-  through a hook: The Framework's daemon does not tick. Picked over the daemon calling the
-  tick during the transition, which would have made The Framework name the tool.
+- `start` is the only clock: The Framework's daemon does not tick. A dashboard that wants
+  the scheduler on while it is open runs `start` when it opens and `stop
+  --unless-keep-alive` when it closes, from a hook file of the user's that names the tool;
+  The Framework itself names no tool. Picked over the daemon calling the tick, which would
+  have made The Framework name the tool.
+- `stop --unless-keep-alive` is the one reader of keep-alive: it leaves a keep-alive
+  scheduler running and stops any other, so the line a dashboard runs when it closes
+  honours the user's keep-alive while a person's plain `stop` still stops. Picked over
+  `stop` reading keep-alive always (a person's stop must stop) and over a separate `close`
+  verb (one stop).

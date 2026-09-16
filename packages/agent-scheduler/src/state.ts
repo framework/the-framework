@@ -36,7 +36,7 @@ export interface TickRecord {
 export interface State {
   /** Whether ticks start agents. Off is the default: nothing runs until a person says so. */
   on: boolean
-  /** Whether the scheduler's process outlives whatever started it. Read by nobody yet: the hook that starts and stops the scheduler with a dashboard comes later. */
+  /** Whether the scheduler's process outlives whatever started it. Read by `stop --unless-keep-alive` only, the line a dashboard runs when it closes. */
   keepAlive: boolean
   /** The model every run starts on. */
   model: string

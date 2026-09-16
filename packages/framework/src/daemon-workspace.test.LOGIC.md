@@ -1,5 +1,6 @@
 What the tests cover, starting agents through the runtime against real git repositories:
 
+- **Adding a project runs its open hooks** - a project added while the daemon runs has the open lines of its `.the-framework/hooks.yml` run in that project before the answer comes back, the outcome logged, and its close lines not run.
 - **A start during shutdown** - a start that lands after the stop pass is refused with "shutting down" and no process is spawned; a stop that lands while a start is already under way makes the start refuse and take back what it had allocated: the checkout, its branch and the agent spec.
 - **A spec never outlives its start** - a process that dies before reading its spec leaves no spec on disk: the daemon removes it on exit, with the prompt and any device token it carried.
 - **Where an agent may land** - a repository whose checkout cannot be created refuses the start with "could not create a worktree for this run" and spawns nothing, instead of running the agent in the user's own checkout; a directory that is not a repository runs the agent in the project's checkout with no agent id, and the log says why ("is not a git repository, so it gets no worktree"); a checkout creation cut short by its time budget has its half-written directory removed, while any other failure leaves the directory alone.

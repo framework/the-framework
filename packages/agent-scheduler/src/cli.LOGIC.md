@@ -1,4 +1,4 @@
-The command line, `agent-scheduler <command>`: JSON on stdout, one line for a person on stderr, and the exit code says how it went, 0 for a result, 1 for a refusal or a failure, 2 for a command line that could not be read. The same contract as the skills' commands, so a person and a dashboard read it the same way. Seven commands: `tick`, `run <prompt> [--model <id>]`, `start [--keep-alive]`, `stop`, `status`, `model <id>`, `offset <points>`.
+The command line, `agent-scheduler <command>`: JSON on stdout, one line for a person on stderr, and the exit code says how it went, 0 for a result, 1 for a refusal or a failure, 2 for a command line that could not be read. The same contract as the skills' commands, so a person and a dashboard read it the same way. Seven commands: `tick`, `run <prompt> [--model <id>]`, `start [--keep-alive]`, `stop [--unless-keep-alive]`, `status`, `model <id>`, `offset <points>`.
 
 ## Context
 
@@ -18,7 +18,7 @@ The command line, `agent-scheduler <command>`: JSON on stdout, one line for a pe
 - **The project** - found from the working directory, from inside a checkout too; outside a git repository every command refuses `not-a-repo`, `not inside a git repository`.
 - **`tick`** - one tick of the project now, its decisions told on stderr, its record answered with `ok: true`.
 - **`run <prompt>`** - one run now, in this process, `--id`, `--command` and `--model` optional (the tick passes the first two), the outcome answered with `ok` true when the run is `done`.
-- **`start`, `stop`, `status`** - the state answered after each; `start --foreground` makes this process the scheduler's; `start --keep-alive` writes keep-alive on.
+- **`start`, `stop`, `status`** - the state answered after each; `start --foreground` makes this process the scheduler's; `start --keep-alive` writes keep-alive on; `stop --unless-keep-alive` leaves a keep-alive scheduler running, says so on stderr, and answers `kept: true`.
 - **`model <id>`, `offset <points>`** - the state's model or spend cushion written for this user and the state answered; `offset` with something that is not a number is a usage error, `<value> is not a number of percentage points`.
 
 ## Business logic
@@ -71,7 +71,7 @@ See `scheduler.ts`.
 
 #### Business logic
 
-`start` turns the scheduler on and answers the state [1] with the scheduler's pid; `--keep-alive` writes keep-alive on; `--foreground` runs the loop in this process, which is how the detached scheduler is started, and answers the state once stopped. `stop` turns it off, signals the scheduler's process, and answers the state. `status` answers the state plus `running`.
+`start` turns the scheduler on and answers the state [1] with the scheduler's pid; `--keep-alive` writes keep-alive on; `--foreground` runs the loop in this process, which is how the detached scheduler is started, and answers the state once stopped. `stop` turns it off, signals the scheduler's process, and answers the state with `kept: false`. `stop --unless-keep-alive` is the line a dashboard runs when it closes: when the state's keep-alive is on it changes nothing, prints `keep-alive is on, the scheduler keeps running` on stderr and answers the state as it is with `kept: true`; when keep-alive is off it is `stop`. `status` answers the state plus `running`.
 
 ### `model <id>`, `offset <points>`
 

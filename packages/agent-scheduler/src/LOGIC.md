@@ -35,7 +35,7 @@ The rules and the processes of `agent-scheduler`: the schedule [1] a person writ
 - **One run** (`run.ts`, `run.test.ts`) - marker, checkout, live log, the prompt once, the pull request, the record over the marker, the checkout reclaimed; a run with no checkout is recorded `failed`.
 - **The sweep** (`sweep.ts`, `sweep.test.ts`) - dead runs of this machine recorded and reclaimed; markers with nothing behind them ended; another machine's runs never touched.
 - **The tick** (`tick.ts`, `tick.test.ts`) - pull, sweep, then per command in order: the command exists, the check, due, the cap, the quota, the marker, the re-count, the spawn; every outcome's exact line.
-- **The processes** (`scheduler.ts`) - the tick wired to the real project, the detached run, `start`, `stop` and `status`, and the loop that ticks every minute.
+- **The processes** (`scheduler.ts`) - the tick wired to the real project, the detached run, `start`, `stop` (which leaves a keep-alive scheduler running when asked to) and `status`, and the loop that ticks every minute.
 - **The command line** (`cli.ts`, `cli.test.ts`) - the seven commands, JSON on stdout, a line on stderr, exit 0, 1 or 2, and the project found from inside a checkout.
 - **The entry point** (`index.ts`) - re-exports everything a program or a dashboard imports.
 - **A test helper** (`test-repo.ts`) - a throwaway project with an origin and an `agent-data` branch, for the tests.

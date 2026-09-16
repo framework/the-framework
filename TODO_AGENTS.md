@@ -2,7 +2,6 @@
 
 
 ## Priority 5
-- Write the plan: [An Actions agent is told two branch names](tickets/2026-08-28_actions-agent-two-branch-names.md)
 
 
 ## Priority 4

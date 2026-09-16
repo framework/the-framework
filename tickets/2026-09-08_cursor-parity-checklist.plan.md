@@ -1,6 +1,5 @@
 Effort: 3
 Uncertainty: 8
-Outdated: no
 
 # [Plan] Cursor parity checklist: what the framework covers, what is missing, what is skipped on purpose
 

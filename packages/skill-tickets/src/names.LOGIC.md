@@ -19,7 +19,7 @@ Fixes where tickets live on the `agent-data` branch [1] and how a ticket's plan 
 
 - **Where tickets live and how their siblings are named** - open tickets are `.md` files inside `tickets/` on the `agent-data` branch, each with an optional plan `<name>.plan.md` and claim `<name>.lock.md` beside it, plus one `meta.json`.
 - **The bare filename gate** - a name addresses a ticket only when it ends in `.md`, has no path separator, does not start with a dot, and is not a sibling.
-- **The path gate** - the path form of a ticket's name is exactly `tickets/<file>.md`, with nothing nested, hidden, relative, absolute or remote.
+- **The path gate** - the path form of a ticket's name is exactly `tickets/` followed by a name the bare filename gate accepts.
 - **Which queue entry names a ticket** - a queue entry names a ticket only through a markdown link whose target passes the path gate; any other entry is plain text.
 - **The priority a ticket earns on the queue** - a `Priority:` that is a whole number from 0 to 10 places the ticket in that section; anything else, or none, places it at 5.
 - **Which issue a ticket tracks** - the `GitHub:` header line yields `#<number>`, the number taken from the link's URL first and from a bare `#<number>` in the line otherwise.
@@ -54,7 +54,7 @@ A bare name is accepted as a ticket's filename only when all of the following ho
 
 #### Business logic
 
-A string names a ticket by path only when it starts with `tickets/` and what follows ends in `.md`, contains no further `/`, and does not start with a dot. A relative segment (`tickets/../secrets.md`), a nested file (`tickets/nested/deep.md`), a hidden file (`tickets/.hidden.md`), a non-markdown file (`tickets/notes.txt`), an absolute path, a URL, a file outside `tickets/` (`TODO_AGENTS.md`) and the bare directory (`tickets/`) all fail. The two gates refuse the same names in their two spellings: what the bare gate refuses bare, the path gate refuses under `tickets/`. This one gate serves both ends of a queue link: what a queue entry [3] is read as, and what a caller may record.
+A string names a ticket by path only when it starts with `tickets/` and what follows passes the bare filename gate. The path gate has no rule of its own, so the two spellings of a name are always answered alike: what the bare gate refuses bare, the path gate refuses under `tickets/`. A relative segment (`tickets/../secrets.md`), a nested file (`tickets/nested/deep.md`, `tickets/sub\x.md`), a hidden file (`tickets/.hidden.md`), a sibling (`tickets/x.plan.md`, `tickets/x.lock.md`), a non-markdown file (`tickets/notes.txt`), an absolute path, a URL, a file outside `tickets/` (`TODO_AGENTS.md`) and the bare directory (`tickets/`) all fail. This one gate serves both ends of a queue link: what a queue entry [3] is read as, and what a caller may record.
 
 ### Which queue entry names a ticket
 
@@ -64,7 +64,7 @@ A string names a ticket by path only when it starts with `tickets/` and what fol
 
 #### Business logic
 
-The ticket a queue entry names is the target of the first markdown link in the entry (the text between `](` and `)`, containing no whitespace and no `)`), and only when that target passes the path gate; the result is the `tickets/<file>` path. An entry with no link, a link to anything else (`[docs](README.md)`), a link that tries to leave the directory (`tickets/../../etc/passwd`), or a mention of a ticket outside a link (`Create tickets/2042-01-01_x.plan.md`) names no ticket: it is work with no ticket behind it.
+The ticket a queue entry names is the target of the first markdown link in the entry (the text between `](` and `)`, containing no whitespace and no `)`), and only when that target passes the path gate; the result is the `tickets/<file>` path. An entry with no link, a link to anything else (`[docs](README.md)`), a link that tries to leave the directory (`tickets/../../etc/passwd`), a link to a ticket's plan (`tickets/2042-01-01_x.plan.md`), or a mention of a ticket outside a link (`Create tickets/2042-01-01_x.plan.md`) names no ticket: it is work with no ticket behind it.
 
 ### The priority a ticket earns on the queue
 

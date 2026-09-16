@@ -9,6 +9,6 @@ What the tests cover, against a real daemon bound to a free port and, where git 
 - **One agent at a time without git** - in a directory that is not a repository, agents share the one checkout: the spawned process receives one JSON spec naming the prompt, the kind, the checkout and the options; a second start while the first is alive is refused as busy; once it exits a start is accepted again.
 - **What the spec carries** - a `research` start travels as its kind with its prompt; an empty prompt travels empty for the agent's process to default; a `prompt` start carries the prompt verbatim, never re-rendered.
 - **The fork-bomb guard** - a start whose entry script would be a test file is refused, with "test entry" named in the error.
-- **Steering through the control file** - a stop and a pick sent from the dashboard land in the project's `.the-framework/control.jsonl` as one entry each, the pick carrying the gate's id, the option chosen and who chose.
+- **Steering through the control file** - a message and a pick sent from the dashboard land in the project's `.the-framework/control.jsonl` as one entry each, the pick carrying the gate's id, the option chosen and who chose.
 - **Nesting** - a path counts as nested only when strictly inside another: not when equal, not the parent, not a sibling tree, not a name that merely shares a prefix.
 - **Registering the home project** - an activated directory nested inside a project already registered is not added as a second project; an activated directory that is not nested is added.

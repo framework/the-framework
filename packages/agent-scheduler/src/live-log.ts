@@ -14,7 +14,7 @@ import type { SchedulerMark } from './records.js'
  *
  * The meta is folded from the events the way the dashboard folds them: `session` names the
  * driver and the workspace, `intent` the prompt, `branch` the branch, `usage` adds to the cost,
- * `end` closes the run.
+ * `end` closes the run, `done`, `failed` or `stopped` (the dashboard's own flag on an end event).
  */
 
 /** The dashboard's directory, and the two files, as it names them. */
@@ -49,7 +49,7 @@ export type LiveEvent =
   | { kind: 'branch'; branch: string }
   | { kind: 'driver'; event: DriverEvent }
   | { kind: 'usage'; costUsd?: number; inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheCreationTokens: number; turns: number }
-  | { kind: 'end'; ok: boolean; detail?: string }
+  | { kind: 'end'; ok: boolean; stopped?: boolean; detail?: string }
 
 /** One event folded into the meta, the dashboard's rules. Pure. */
 export function foldEvent(meta: LiveMeta, event: LiveEvent, at: string): LiveMeta {
@@ -73,13 +73,18 @@ export function foldEvent(meta: LiveMeta, event: LiveEvent, at: string): LiveMet
       if (event.costUsd !== undefined) next.cost = (next.cost ?? 0) + event.costUsd
       break
     case 'end':
-      next.status = event.ok ? 'done' : 'failed'
+      next.status = endStatus(event)
       next.endedAt = at
       break
     default:
       break
   }
   return next
+}
+
+/** How an end event ends the run: `done`, `stopped` when a signal ended it, else `failed`. */
+function endStatus(event: LiveEvent & { kind: 'end' }): Exclude<RunStatus, 'running'> {
+  return event.ok ? 'done' : event.stopped ? 'stopped' : 'failed'
 }
 
 /**
@@ -98,7 +103,7 @@ export function toDiaryLine(event: LiveEvent): AnyDiaryLine {
       return event as unknown as AnyDiaryLine
     }
     case 'end':
-      return { kind: 'ended', status: event.ok ? 'done' : 'failed', ...(event.detail !== undefined ? { detail: event.detail } : {}) }
+      return { kind: 'ended', status: endStatus(event), ...(event.detail !== undefined ? { detail: event.detail } : {}) }
     case 'usage': {
       const { kind: _kind, costUsd, ...rest } = event
       return { kind: 'cost', ...(costUsd !== undefined ? { usd: costUsd } : {}), ...rest }

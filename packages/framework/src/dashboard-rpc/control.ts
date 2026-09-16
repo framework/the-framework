@@ -7,7 +7,8 @@ import { relayOr } from './relay-agent.js'
 import { planTicketPrompt } from '../tickets.js'
 import { isTicketFile, queuePriorityForTicket, releaseTicket, TICKETS_DIR } from '@gemstack/skill-tickets'
 import { QUEUE_FILE, queueAdd } from '@gemstack/skill-queue'
-import { findAgent, type AgentMeta } from '../store/index.js'
+import { hostname } from 'node:os'
+import { findAgent, isPidAlive, readLiveMeta, type AgentMeta } from '../store/index.js'
 import { pushBranch } from '@gemstack/agent-data'
 import { isSafeAgentId, worktreePath } from '@gemstack/skill-branches'
 import { withAgentLock } from '../agent-locks.js'
@@ -29,8 +30,8 @@ import type { Preferences } from '../registry.js'
 // The write side behind the new dashboard (#405): steering a live agent. The reverse of
 // the event stream — events flow run -> events.jsonl -> Channel -> browser; steering
 // flows browser -> here -> the agent's `.the-framework/control.jsonl` -> run, which tails that
-// file and aborts or resolves its gate. Same file-is-the-seam design as the daemon's legacy
-// onStop/onChoice (#344/#393). Each steering call takes the agent id (#749): an agent tails the
+// file and resolves its gate. Stop alone is a signal to the agent's process, not a file write.
+// Same file-is-the-seam design as the daemon's legacy onStop/onChoice (#344/#393). Each steering call takes the agent id (#749): an agent tails the
 // log inside its own worktree since #736, so the entry has to be written there. (Starting an agent needs a spawn + the daemon's busy guard, so `sendStart`
 // lands with the daemon-serves-the-bundle wiring, not here.)
 
@@ -48,10 +49,24 @@ async function appendControlFor(projectId: string, entry: ControlEntry, agentId?
   if (cwd) await appendControl(cwd, entry)
 }
 
-/** Stop a live agent (the Stop button): append a stop entry to the agent's control log. */
+/**
+ * Stop a live agent (the Stop button): SIGINT to the process the agent's own meta names, when it is
+ * this machine's and alive. The meta is the file the dashboard shows the agent from, and its pid is
+ * whoever runs the agent, this daemon's own child or another tool's process; the framework names
+ * none of them. Nothing else: an agent without a live pid here has nothing to stop. A stop is not a
+ * control-file entry, since only this daemon's own child reads that file.
+ */
 export async function sendStop(projectId: string, agentId?: string): Promise<void> {
   return relayOr(agentId, 'sendStop', [projectId, agentId], async () => {
-    await appendControlFor(projectId, { kind: 'stop' }, agentId)
+    const cwd = await resolveAgentPath(projectId, agentId)
+    if (!cwd) return
+    const meta = await readLiveMeta(cwd)
+    if (!meta || meta.status !== 'running' || meta.pid === undefined || meta.host !== hostname() || !isPidAlive(meta.pid)) return
+    try {
+      process.kill(meta.pid, 'SIGINT')
+    } catch {
+      // Gone between the probe and the signal.
+    }
   }, undefined)
 }
 

@@ -93,6 +93,11 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - The run records itself and reclaims its own checkout when the agent stops; the sweep on
   the tick catches what a dead process left, on this machine only. Agents in flight run to
   the end when the scheduler stops.
+- A run stops on SIGINT or SIGTERM to its process: the agent's process tree is ended, the
+  run is recorded `stopped`, the checkout reclaimed. The pid is in the live log, so a
+  dashboard's Stop is that signal. Picked over the run reading the dashboard's control file
+  (the tool would read a file of The Framework's shape), and over dying at once (the agent's
+  processes would outlive the run, and the sweep would record it `failed`).
 
 ## The command line
 - Every command prints one JSON document on stdout, one line for a person on stderr, and

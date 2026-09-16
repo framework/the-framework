@@ -31,12 +31,12 @@ test('appendControl + watchControl deliver entries in order', async () => {
   const seen: ControlEntry[] = []
   const watcher = watchControl(cwd, e => seen.push(e), 20)
   try {
-    await appendControl(cwd, { kind: 'stop' })
+    await appendControl(cwd, { kind: 'merge' })
     await appendControl(cwd, { kind: 'choice', id: 'plan-approval', pick: 'proceed', by: 'user' })
     await appendControl(cwd, { kind: 'choice', id: 'await-multiselect', pick: ['opt:0', 'opt:2'], by: 'auto' })
 
     assert.ok(await until(() => seen.length === 3), `saw ${seen.length} of 3 entries`)
-    assert.deepEqual(seen[0], { kind: 'stop' })
+    assert.deepEqual(seen[0], { kind: 'merge' })
     assert.deepEqual(seen[1], { kind: 'choice', id: 'plan-approval', pick: 'proceed', by: 'user' })
     assert.deepEqual(seen[2], { kind: 'choice', id: 'await-multiselect', pick: ['opt:0', 'opt:2'], by: 'auto' })
   } finally {
@@ -56,9 +56,9 @@ test('resetControl truncates so a previous run\'s picks never replay', async () 
     const seen: ControlEntry[] = []
     const watcher = watchControl(cwd, e => seen.push(e), 20)
     try {
-      await appendControl(cwd, { kind: 'stop' })
+      await appendControl(cwd, { kind: 'merge' })
       assert.ok(await until(() => seen.length === 1))
-      assert.deepEqual(seen, [{ kind: 'stop' }])
+      assert.deepEqual(seen, [{ kind: 'merge' }])
     } finally {
       watcher.close()
     }

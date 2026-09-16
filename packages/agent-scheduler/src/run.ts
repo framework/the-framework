@@ -14,9 +14,16 @@ import { prOfBranch, type GhRunner } from './pr.js'
  * the skills in its checkout. This process records the run and reclaims the checkout when the
  * agent stops; a run that dies is caught by the sweep on a later tick.
  *
+ * SIGINT or SIGTERM to this process stops the run: the agent's whole process tree is ended
+ * through the driver, the run is recorded `stopped`, the checkout reclaimed. That is what a
+ * dashboard's Stop sends, the pid being in the live log; nothing else steers a run.
+ *
  * One-shot: `agent-scheduler run <prompt>` needs no scheduler running. The tick spawns the same
  * thing with the marker already written and the id chosen.
  */
+
+/** The detail a stopped run's record carries. */
+export const STOPPED_DETAIL = 'stopped by a signal to its process'
 
 /** Filesystem-safe, time-ordered id from an ISO start: the shape the dashboard sorts runs by. */
 export function runIdFrom(startedAt: string): string {
@@ -118,10 +125,16 @@ export async function runCommand(repo: string, opts: RunOptions): Promise<RunOut
       }
     }
   }
+  // A signal stops the run: the first aborts the session, which ends the agent's process tree;
+  // further signals are ignored while the epilogue below records and reclaims.
+  const stop = new AbortController()
+  const onSignal = (): void => stop.abort()
+  process.on('SIGINT', onSignal)
+  process.on('SIGTERM', onSignal)
   let status: Exclude<RunStatus, 'running'> = 'done'
   let detail: string | undefined
   try {
-    const session = await opts.driver.start({ cwd: checkout.path, model: opts.model, onEvent })
+    const session = await opts.driver.start({ cwd: checkout.path, model: opts.model, onEvent, signal: stop.signal })
     try {
       await session.prompt(opts.prompt)
     } finally {
@@ -130,6 +143,13 @@ export async function runCommand(repo: string, opts: RunOptions): Promise<RunOut
   } catch (err) {
     status = 'failed'
     detail = errorMessage(err)
+  } finally {
+    process.off('SIGINT', onSignal)
+    process.off('SIGTERM', onSignal)
+  }
+  if (stop.signal.aborted) {
+    status = 'stopped'
+    detail = STOPPED_DETAIL
   }
 
   // Where the work ended up: the agent renames its branch itself, and the pull request it opened,
@@ -137,7 +157,7 @@ export async function runCommand(repo: string, opts: RunOptions): Promise<RunOut
   const branch = (await worktreeBranch(checkout.path, git).catch(() => undefined)) ?? checkout.branch
   if (branch !== live.meta.branch) await live.append({ kind: 'branch', branch })
   const pr = await prOfBranch(repo, branch, opts.gh)
-  const end: LiveEvent = { kind: 'end', ok: status === 'done', ...(detail !== undefined ? { detail } : {}) }
+  const end: LiveEvent = { kind: 'end', ok: status === 'done', ...(status === 'stopped' ? { stopped: true } : {}), ...(detail !== undefined ? { detail } : {}) }
   await live.append(end)
 
   const recorded = await recordRun(repo, toCard(live.meta, pr), live.diary(), logs)

@@ -32,7 +32,7 @@ The rules and the processes of `agent-scheduler`: the schedule [1] a person writ
 - **Run records as markers** (`records.ts`, `records.test.ts`) - a marker is a running card with the tool's mark, counted per command across machines; withdrawn when the cap was lost; overwritten by the record at the end.
 - **The live log** (`live-log.ts`) - the dashboard's two files in the checkout, hidden from git; events folded into the meta; the events as the diary and the meta as the card; closing a dead run's log from outside.
 - **The pull request** (`pr.ts`) - the pull request a branch has, read back with `gh`, or none.
-- **One run** (`run.ts`, `run.test.ts`) - marker, checkout, live log, the prompt once, the pull request, the record over the marker, the checkout reclaimed; a run with no checkout is recorded `failed`.
+- **One run** (`run.ts`, `run.test.ts`) - marker, checkout, live log, the prompt once, the pull request, the record over the marker, the checkout reclaimed; a run with no checkout is recorded `failed`; a signal to the run's process stops it, recorded `stopped`.
 - **The sweep** (`sweep.ts`, `sweep.test.ts`) - dead runs of this machine recorded and reclaimed; markers with nothing behind them ended; another machine's runs never touched.
 - **The tick** (`tick.ts`, `tick.test.ts`) - pull, sweep, then per command in order: the command exists, the interval since its last start, the check, due, the cap, the quota, the marker, the re-count, the spawn; every outcome's exact line.
 - **The processes** (`scheduler.ts`) - the tick wired to the real project, the detached run, `start`, `stop` (which leaves a keep-alive scheduler running when asked to) and `status`, and the loop that ticks every minute.

@@ -37,7 +37,7 @@ Implements the `the-framework` command: four options and no verbs, where the bar
 [25] turn: one prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
 [26] the built-in system prompt: the standing instructions every agent starts with (`prompts/system_prompt.md`); `SYSTEM.md` is the project's own instructions added on top.
 [27] pick: the answer to a gate: the option or options chosen, by the user or automatically.
-[28] stop: ending an agent before it finishes: the Stop button, Ctrl-C, or a pick marked to stop.
+[28] stop: ending an agent before it finishes: the Stop button or Ctrl-C (a signal, SIGINT or SIGTERM, to the agent's process), or a pick marked to stop.
 [29] settled: said of an agent whose work has stopped and which is waiting for the user: it is alive, takes messages, and does nothing until told.
 [30] ready for merge: the signal an agent emits when it believes its work is complete: it flips the agent's badge from building to ready and authorizes the handoff.
 [31] skill: one of the four capabilities an agent is taught — `branches`, `tickets`, `queue`, `logs` — each a package with the instructions the agent reads, a command run as `npx <skill>`, and an API the product calls.
@@ -216,7 +216,6 @@ A process that continues an existing agent [1], with a driver session [17] id to
 
 An agent is steerable when it has an agent id [16] and persistence is on, which is every agent the daemon spawns. For such an agent the control file [5] in the checkout [15] is reset first, since gate ids repeat across agents, and then tailed. Each entry does one thing:
 
-- A stop entry aborts the agent.
 - A message entry queues the text for live chat [7].
 - A handoff entry moves the armed handoff level to the level given and re-announces the armed state as an event, so the agent's record stays true for a tab opened mid-way. The checkboxes are pre-commitments: they may move the level at any moment up to the end of the agent.
 - A merge entry arms the full ladder, records that a human authorized the merge, and announces the armed state. Parked gates keep waiting: they are questions about the work itself, which merging does not answer. The agent still ends at its own natural end; the merge fires there.
@@ -232,7 +231,7 @@ When the control file cannot be reset or tailed, "control channel unavailable (<
 
 #### Business logic
 
-A gate parks, waiting for a pick [27] from the control file [5], only when the control file is tailed and the agent is attended; an unattended [20] agent keeps its control file for stops and messages but takes the recommended option at every gate (`agent.ts`). Each parked wait is held open by the keepalive of `gate-keepalive.ts`, so the process cannot exit while a gate or a message wait is pending. A stop [28], from Stop, Ctrl+C or a stop entry, answers every parked gate with "proceed" as an automatic pick and closes the message queue, so a stopped agent never hangs on a gate.
+A gate parks, waiting for a pick [27] from the control file [5], only when the control file is tailed and the agent is attended; an unattended [20] agent keeps its control file for messages but takes the recommended option at every gate (`agent.ts`). Each parked wait is held open by the keepalive of `gate-keepalive.ts`, so the process cannot exit while a gate or a message wait is pending. A stop [28], from Stop or Ctrl+C (both a signal to the process), answers every parked gate with "proceed" as an automatic pick and closes the message queue, so a stopped agent never hangs on a gate.
 
 ### Live chat
 

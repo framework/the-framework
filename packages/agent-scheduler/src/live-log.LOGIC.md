@@ -20,7 +20,7 @@ The live log [1] of a run [2], temporary: `agent.json` (the meta) and `events.js
 
 - **The meta** - the run's status, id, start and last-update times, pid, host, the prompt as its intent, and, as events arrive, the driver, the checkout, the model, the branch, the session id, the cost and the end; always with the tool's mark, which is how the sweep knows a checkout is this tool's.
 - **Opening** - the directory made in the checkout and hidden through the checkout's exclude file, since an untracked directory would keep the checkout dirty and a dirty checkout is never reclaimed; the meta written, the events file empty.
-- **Appending** - each event goes on the events file as one line and is folded into the meta: a session names the driver, the workspace and the model; a session update the session id; an intent the prompt; a branch the branch; usage adds to the cost; the end sets `done` or `failed` and the end time. Writes stay in order; a failed write never breaks the run.
+- **Appending** - each event goes on the events file as one line and is folded into the meta: a session names the driver, the workspace and the model; a session update the session id; an intent the prompt; a branch the branch; usage adds to the cost; the end sets `done`, `stopped` when the end says the run was stopped, else `failed`, and the end time. Writes stay in order; a failed write never breaks the run.
 - **The events as the diary, the meta as the card** - what the agent said, its result, the run's end and its cost become the `logs` skill's four kinds of diary line; every other event is written as it is, which is how the dashboard replays an archived run. The card takes the skill's fields off the meta and keeps the rest under `caller`, beside the tool's mark.
 - **Reading and closing from outside** - a checkout's meta is read only when it is this tool's (it carries the mark); the events are read up to the first line that does not parse; a dead run's end is appended to both files by the sweep, as its own process would have.
 
@@ -34,7 +34,7 @@ See `## Context`.
 
 #### Business logic
 
-The meta starts as `running`, with the run's id, its start time as the last update, the run's process pid, the host, the prompt as the intent, the kind `prompt`, and the tool's mark [5]. Every appended event updates the last-update time. A `session` event sets the driver, the workspace (the checkout's path) and the model; a `session-update` the session id (the agent's `claude --resume` handle); an `intent` the intent; a `branch` the branch; a `usage` event adds its cost to the running total when it prices the turn; an `end` event sets the status to `done` when ok and `failed` otherwise, and the end time. Driver events change nothing in the meta.
+The meta starts as `running`, with the run's id, its start time as the last update, the run's process pid, the host, the prompt as the intent, the kind `prompt`, and the tool's mark [5]. Every appended event updates the last-update time. A `session` event sets the driver, the workspace (the checkout's path) and the model; a `session-update` the session id (the agent's `claude --resume` handle); an `intent` the intent; a `branch` the branch; a `usage` event adds its cost to the running total when it prices the turn; an `end` event sets the status to `done` when ok, to `stopped` when it says the run was stopped (the dashboard's own flag on an end event), and to `failed` otherwise, and the end time. Driver events change nothing in the meta.
 
 ### Opening
 
@@ -64,7 +64,7 @@ An event is folded into the meta at once, appended to the events file as one JSO
 
 #### Business logic
 
-A driver event that is streamed text becomes a `said` line; a driver result becomes a `result` line with the result's fields; the end becomes an `ended` line with the status and, when there is one, the detail; a usage event becomes a `cost` line with the price in dollars when known and the token counts and turns; every other event (session, session update, intent, branch, tool use, …) is written as it is. The card [6] is built from the meta: id, start time, status, intent, and, when set, end time, driver, model, branch and cost as the skill's fields; the pull request when the run's process read one back; everything else on the meta (pid, host, kind, workspace, session id, last update) under `caller` beside the tool's mark, which stays `caller.scheduler`.
+A driver event that is streamed text becomes a `said` line; a driver result becomes a `result` line with the result's fields; the end becomes an `ended` line with the status (`done`, `stopped` or `failed`, as above) and, when there is one, the detail; a usage event becomes a `cost` line with the price in dollars when known and the token counts and turns; every other event (session, session update, intent, branch, tool use, …) is written as it is. The card [6] is built from the meta: id, start time, status, intent, and, when set, end time, driver, model, branch and cost as the skill's fields; the pull request when the run's process read one back; everything else on the meta (pid, host, kind, workspace, session id, last update) under `caller` beside the tool's mark, which stays `caller.scheduler`.
 
 ### Reading and closing from outside
 

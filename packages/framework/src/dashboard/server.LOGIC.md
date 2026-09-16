@@ -15,8 +15,7 @@ The daemon's one HTTP server on its port. It serves the built dashboard, mounts 
 [5] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
 [6] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 [7] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
-[8] Auto PM: the daemon's unattended product management: work the agent queue when the `agent-data` branch moves, and refill it by running the routines.
-[9] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
+[8] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
 
 ## Business logic — TL;DR
 
@@ -59,7 +58,7 @@ Every request is dispatched in this order:
 - A path under `/browser/` must pass the browser-origin guard, then goes to the browser preview proxy (`browser-proxy.ts`); a path the proxy does not recognize is served as the built dashboard instead.
 - Everything else is served from the built dashboard: the file when it exists, else the app shell (`static.ts`).
 
-The RPC surface acts through what the daemon wires into it, all of it required: the daemon's own start and add-project closures, the events source and the lookup for agents [5] relayed from a device [3], the preferences [6] store, the Discord credentials store, the quota [7] source, what Auto PM [8] last decided and a way to run it now, each project's current errors, and the daemon's own bridge browser. The mount is also told the bound host, so it can reject a rebound `Host`.
+The RPC surface acts through what the daemon wires into it, all of it required: the daemon's own start and add-project closures, the events source and the lookup for agents [5] relayed from a device [3], the preferences [6] store, the Discord credentials store, the quota [7] source, each project's current errors, and the daemon's own bridge browser. The mount is also told the bound host, so it can reject a rebound `Host`.
 
 ### The shared token on a non-loopback bind
 
@@ -93,7 +92,7 @@ Before the relay [2] endpoints and the browser preview proxy, a request is admit
 
 #### Context
 
-**User story**: the user turns the bridge on in Settings, and the Chrome extension on claude.ai reports the question a cloud session [9] is parked on; a web agent's process asks the daemon to have the extension create its cloud session.
+**User story**: the user turns the bridge on in Settings, and the Chrome extension on claude.ai reports the question a cloud session [8] is parked on; a web agent's process asks the daemon to have the extension create its cloud session.
 
 **Problem**: the bridge is the one route meant to be reached from another origin, so neither the same-origin check nor the shared-token guard can protect it. The shared-token guard's browser affordance, a redirect on `?token=`, is meaningless to an extension posting JSON; letting these routes past it costs nothing and skips a redirect they could not follow.
 

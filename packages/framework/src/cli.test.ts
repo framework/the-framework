@@ -223,13 +223,6 @@ test('runOnBeforeMergeable materializes the presets so the queued filePaths reso
   assert.ok(fs.files.has(join('/work/app', '.the-framework/presets/security_audit.md')))
 })
 
-test('a planning agent says so (#1327)', () => {
-  // What keeps a closing phrase in its pull request from closing the ticket's issue with the work
-  // still undone.
-  assert.equal(opts({ options: { planAgent: true } }).planAgent, true)
-  assert.equal(opts().planAgent, undefined)
-})
-
 test('transparent is unset by default (#625)', () => {
   assert.equal(opts().transparent, undefined) // unset, so the repo file decides (#841)
   assert.equal(opts({ options: { transparent: true } }).transparent, true)

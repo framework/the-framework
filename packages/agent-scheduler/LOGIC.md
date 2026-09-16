@@ -1,0 +1,45 @@
+The `agent-scheduler` package: a standalone tool, like `agent-driver`, that starts coding agents [1] on a schedule for one project. A person tracks the schedule [2], `agent-schedule.md` at the repository root, one line per command [3] saying when it is due and how many may run at once; the tool ticks [4] every minute, pulls the project's `agent-data` branch [5], sweeps [6] what earlier runs [7] left, and for every command that is due, under its cap [8] and within the account's quota [9], starts one agent in its own checkout [10] and records the run [11] on the branch, where every machine and the dashboard read it. The tool names no command of its own: the schedule is the only place a command is named, and `.claude/skills/<command>` in the project is what runs. `package.json` and the `tsconfig*.json` files configure the build and the test runner and carry no business logic; `dist/` and `dist-test/` are build output.
+
+## Context
+
+**User story**: the user writes `- work-queue: when \`npx queue\`, cap 1` in `agent-schedule.md`, commits it, and runs `agent-scheduler start`; from then on, whenever the project's agent queue holds an entry, one agent works it in its own checkout and opens a pull request, never two at once, and never past the share of the week's quota that has elapsed; the user reads why nothing started (`not due`, `cap reached (…)`, `quota: …`) in the state file or on a dashboard, changes the model or the spend cushion for their own machine, and runs `agent-scheduler stop` to turn it off while the agents in flight run to the end.
+
+**Business logic story**: the daemon of The Framework used to watch the branch and start agents on its own rules, in its own memory. This tool replaces that with files and small processes: the schedule is a tracked file a person writes; the tool's state [12] is an untracked JSON file under `.agent-scheduler/`, per user; a run in flight is a run record [11] on the `agent-data` branch with `status: running`, so two machines sharing the repository count the same runs against a cap; a run is one detached process of the tool's own, `agent-scheduler run`, that makes a checkout through the `branches` package, prompts Claude Code once through `agent-driver` with no system prompt (the command's skill file is the whole instruction, and the agent publishes its own work with the `branches` skill), then writes the run record and reclaims [13] the checkout; and the scheduler's process [14] is a loop of ticks that holds nothing a restart would lose. The spend-boundary rule is copied from The Framework rather than imported, because this tool depends on `agent-driver`, which reads the quota, and not on The Framework, which draws the panel.
+
+## Glossary
+
+[1] coding agent: the CLI doing the actual work: Claude Code or Codex. Here always Claude Code.
+[2] the schedule: `agent-schedule.md` at the repository root, tracked, written by a person: one list line per command, `- <command>: when \`<check>\`, cap <N>`. Every other line is the person's and is not read.
+[3] command: a `.claude/skills/<name>` folder tracked in the project, which the coding agent's harness expands from the slash command `/<name>`; a run's whole prompt is that slash command.
+[4] tick: one pass of the scheduler: pull the `agent-data` branch, sweep, then one decision per scheduled command, each decision one line in the state.
+[5] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
+[6] sweep: the pass on every tick that records and reclaims the runs of this machine whose process died, and only this machine's.
+[7] run: one agent this tool starts: a detached process of the tool's own (`agent-scheduler run`), a checkout, one prompt to the coding agent, and a run record when it ends. Its id is its start time, `2026-09-16T14-01-00-000Z`.
+[8] cap: how many runs of one command may be in flight at once, across every machine that shares the repository; 1 when the schedule line names none.
+[9] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
+[10] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
+[11] run record: the `logs` skill's record of a run on the `agent-data` branch: a card (`<id>.json`: what was asked, the branch, the pull request, how it ended, what it cost) and a diary (`<id>.jsonl`: what the agent said). Written twice, over the same file: as a marker before the agent exists, and with how it went when the run ends.
+[12] the state: `.agent-scheduler/state.json` at the repository root, per user, hidden from git through the repository's exclude file: on or off, keep-alive, the model, the spend cushion, the scheduler's pid, the last tick's decisions.
+[13] reclaim: removing a finished agent's checkout once its work is on the remote.
+[14] the scheduler's process: the tool's own process between `start` and `stop`, ticking every minute; the state holds its pid.
+
+## Business logic — TL;DR
+
+- **The executable** (`bin/`) - `agent-scheduler`, the one command line: `tick`, `run`, `start`, `stop`, `status`, `model`, `offset`; JSON on stdout, one line for a person on stderr, exit 0, 1 or 2.
+- **The rules and the processes** (`src/`) - the schedule's lines and the due rule, the state, the spend boundary, run records as markers counted across machines, the live log the dashboard reads, one run's life, the sweep, the tick's decisions, the scheduler's process and the command line; told in `src/LOGIC.md`.
+
+## Business logic
+
+### A scheduled run's life
+
+#### Context
+
+**User story**: see `## Context`.
+
+#### Business logic
+
+- A person tracks the schedule [2] and turns the tool on with `start`; the state [12] says `on` and the scheduler's process [14] ticks [4] every minute. `stop` says `off` and ends that process; the agents in flight are their own processes and run to the end.
+- A tick first pulls the `agent-data` branch [5] (a pull that fails ends the tick: a stale branch must start nothing), then sweeps [6], then, when the state is on and the schedule exists, decides per command [3] in the cheapest order: the project has the command; the check says due; the cap [8] is not reached, counted from the run records [11] saying `running` on the branch, whatever the machine; the quota [9] has headroom, read only when everything else says start. A command that passes gets a run record written as a marker, `status: running`, with the tool's mark (`caller.scheduler`: the command and this machine; the run's pid joins it once its process exists); the tool counts again, withdraws the marker if another machine's landed first past the cap, and otherwise spawns the run [7] as a detached process.
+- The run makes a checkout [10] through the `branches` package, keeps a live log in the checkout in the shape The Framework's dashboard reads, prompts Claude Code once with `/<command>` and lets the agent's own loop run to the end; the agent commits, names its branch and opens a pull request itself. The run then reads the pull request back off the branch, writes the run record over the marker with the card and the diary, and reclaims [13] the checkout under the `branches` rule: a dirty tree, or a branch not on the remote, keeps it.
+- On every tick the sweep records and reclaims what a run of this machine could not: a live log still `running` under a dead pid is recorded `failed`; one that ended but was never recorded is recorded as it ended; a marker of this machine with no checkout behind it is recorded `failed` with the spawn's stderr, else `stopped`. A running record from another machine is never touched: only that machine's sweep, or a person, changes it, and a machine that never comes back leaves its command capped on purpose.
+- Every decision of the tick is one line in the state (`started <id>`, `not due`, `cap reached (…)`, `quota: …`, `no such command in this project`, …), so a dashboard or a person reads why nothing started without a log.

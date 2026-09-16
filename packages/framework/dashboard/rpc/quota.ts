@@ -11,5 +11,3 @@ export type * from '../../src/dashboard-rpc/quota.js'
 // file's path; the transport addresses calls by name now, so the path carries no meaning.
 
 export const onQuota = rpc<typeof impl.onQuota>('onQuota')
-export const onAutoPm = rpc<typeof impl.onAutoPm>('onAutoPm')
-export const sendAutoPmSweep = rpc<typeof impl.sendAutoPmSweep>('sendAutoPmSweep')

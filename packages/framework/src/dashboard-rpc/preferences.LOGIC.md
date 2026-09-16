@@ -2,9 +2,9 @@ The Settings surface of the dashboard's calls: reading and saving the user's pre
 
 ## Context
 
-**User story**: on Settings [3] the user changes the driver [4], the model, the handoff [5] level, the theme, the notification toggles, the Auto PM [6] switches and the spend offset [7], saves custom presets [2] for themselves or for the whole team, picks an editor, and pastes a Discord webhook — all from the dashboard, without a daemon restart or a config file edit. Two tabs open at once do not undo each other's changes.
+**User story**: on Settings [3] the user changes the driver [4], the model, the handoff [5] level, the theme, the notification toggles, the switch that lets the daemon fix red pull requests on its own, and the spend offset [6], saves custom presets [2] for themselves or for the whole team, picks an editor, and pastes a Discord webhook — all from the dashboard, without a daemon restart or a config file edit. Two tabs open at once do not undo each other's changes.
 
-**Business logic story**: the preferences [1] are kept in the registry [8], the daemon-side file that also lists the projects, so they survive restarts with nothing stored in the browser. Every value is validated by the registry's rules (`registry.ts`) on its way in: a value of the wrong type is dropped, a choice outside its known set (the driver, the theme, the location [9], the handoff level) is dropped so the default applies, a number is rounded and clamped, free text is trimmed and length-capped, and a blank string or an empty list means "no choice".
+**Business logic story**: the preferences [1] are kept in the registry [7], the daemon-side file that also lists the projects, so they survive restarts with nothing stored in the browser. Every value is validated by the registry's rules (`registry.ts`) on its way in: a value of the wrong type is dropped, a choice outside its known set (the driver, the theme, the location [8], the handoff level) is dropped so the default applies, a number is rounded and clamped, free text is trimmed and length-capped, and a blank string or an empty list means "no choice".
 
 ## Glossary
 
@@ -13,15 +13,14 @@ The Settings surface of the dashboard's calls: reading and saving the user's pre
 [3] Settings: the settings page.
 [4] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later. The user's driver choice is `claude` or `codex`; the driver implementations are `claude-code`, `codex`, `github-actions`, `claude-web` and `fake`.
 [5] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it). "Handoff level" is a rung of that ladder.
-[6] Auto PM: the daemon's unattended product management: work the agent queue when the `agent-data` branch moves, and refill it by running the routines.
-[7] spend offset: the user's adjustment of the quota boundary, in percentage points of the week.
-[8] registry: `~/.the-framework.json`: where the user's preferences are kept, and which also lists the projects.
-[9] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
-[10] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
+[6] spend offset: the user's adjustment of the quota boundary, in percentage points of the week.
+[7] registry: `~/.the-framework.json`: where the user's preferences are kept, and which also lists the projects.
+[8] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
+[9] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
 
 ## Business logic — TL;DR
 
-- **Reading the preferences** - the stored preferences [1] as the registry [8] holds them; a failed read answers empty preferences rather than an error.
+- **Reading the preferences** - the stored preferences [1] as the registry [7] holds them; a failed read answers empty preferences rather than an error.
 - **Saving all preferences** - replaces the whole block after validation; a failed write answers the typed error "failed to save preferences" instead of failing the call.
 - **Patching: merge, then hand back the truth** - only the keys the caller changed are merged into what is stored, and the merged result comes back so the tab adopts it and converges.
 - **A project's shared custom presets** - the team's custom presets [2] live in the project's `.the-framework/custom-presets.json`, committed so they travel with the repository; an unknown project reads as none and refuses a save.
@@ -39,7 +38,7 @@ See `## Context`.
 
 #### Business logic
 
-The call answers the preferences [1] the registry [8] holds. When the registry cannot be read, it answers empty preferences — every setting at its default — rather than an error.
+The call answers the preferences [1] the registry [7] holds. When the registry cannot be read, it answers empty preferences — every setting at its default — rather than an error.
 
 ### Saving all preferences
 
@@ -49,7 +48,7 @@ See `## Context`.
 
 #### Business logic
 
-The call replaces the stored preferences [1] with the block it is given, validated by the registry's [8] rules. A write that fails answers a typed error, "failed to save preferences", rather than failing the call, so the dashboard shows the failure instead of losing the save to an error it cannot read.
+The call replaces the stored preferences [1] with the block it is given, validated by the registry's [7] rules. A write that fails answers a typed error, "failed to save preferences", rather than failing the call, so the dashboard shows the failure instead of losing the save to an error it cannot read.
 
 ### Patching: merge, then hand back the truth
 
@@ -59,13 +58,13 @@ The call replaces the stored preferences [1] with the block it is given, validat
 
 #### Business logic
 
-The call merges only the keys it is given into the stored preferences [1] and answers with what is now stored, so the caller adopts the truth it just wrote against and a stale tab converges instead of staying stale. Clearing a setting needs no special value: a blank string or an empty list is dropped by the registry's [8] validation, which is what absent means. A failed write answers the same typed error, "failed to save preferences".
+The call merges only the keys it is given into the stored preferences [1] and answers with what is now stored, so the caller adopts the truth it just wrote against and a stale tab converges instead of staying stale. Clearing a setting needs no special value: a blank string or an empty list is dropped by the registry's [7] validation, which is what absent means. A failed write answers the same typed error, "failed to save preferences".
 
 ### A project's shared custom presets
 
 #### Context
 
-**User story**: a team shares its custom presets [2] through the repository itself, so everyone who clones the project gets them, while the user's own custom presets stay in the registry [8].
+**User story**: a team shares its custom presets [2] through the repository itself, so everyone who clones the project gets them, while the user's own custom presets stay in the registry [7].
 
 #### Business logic
 
@@ -99,4 +98,4 @@ The call reports whether a Discord webhook is set, where each credential came fr
 
 #### Business logic
 
-The call takes a patch: a string sets the webhook, an explicit null clears it, and an absent key leaves it alone. It is write-only on purpose: there is no companion read, the value goes daemon-side, and the browser only ever learns that it is there through the channels read above. The daemon applies the save live, so the Discord bot connects and its watchers start on the save rather than at the next daemon start. A failed save answers "failed to save". The exposure is bounded by the guard the whole surface sits behind: on a non-loopback bind every route requires the shared token, and anyone through that guard can already start agents [10], which is strictly more than setting a webhook.
+The call takes a patch: a string sets the webhook, an explicit null clears it, and an absent key leaves it alone. It is write-only on purpose: there is no companion read, the value goes daemon-side, and the browser only ever learns that it is there through the channels read above. The daemon applies the save live, so the Discord bot connects and its watchers start on the save rather than at the next daemon start. A failed save answers "failed to save". The exposure is bounded by the guard the whole surface sits behind: on a non-loopback bind every route requires the shared token, and anyone through that guard can already start agents [9], which is strictly more than setting a webhook.

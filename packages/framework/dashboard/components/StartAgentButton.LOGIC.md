@@ -2,7 +2,7 @@ Every button in the dashboard that starts an agent [1], as one two-part offer: p
 
 ## Context
 
-**User story**: the user meets a start button somewhere in the dashboard — on a ticket, on a queue entry, on the routine work card — and wants that work run with a different model, or on another machine, or with a word changed in the prompt. Instead of leaving the page, changing preferences [5], coming back and hoping the button still means the same thing, the user opens the chevron and picks "Configure first, then run": the same prompt lands in the launcher [2] with every control beside it.
+**User story**: the user meets a start button somewhere in the dashboard — on a ticket, on a queue entry — and wants that work run with a different model, or on another machine, or with a word changed in the prompt. Instead of leaving the page, changing preferences [5], coming back and hoping the button still means the same thing, the user opens the chevron and picks "Configure first, then run": the same prompt lands in the launcher [2] with every control beside it.
 
 **Problem**: a start button spends an agent [1] on settings that live nowhere near it. Each surface solving that for itself would produce buttons that promise different things, and a copy of the promise is what lets one surface quietly stop keeping it. One control keeps the wording, the keyboard reachability and the "the chevron starts nothing" rule identical everywhere a start is offered.
 
@@ -14,7 +14,7 @@ Every button in the dashboard that starts an agent [1], as one two-part offer: p
 [4] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
 [5] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 [6] project home: a project's own page with the launcher (the Start form) and its composer (the prompt editor, also used for live chat).
-[7] fan-out: starting several agents at once, one per queue entry or one per ticket to plan.
+[7] fan-out: starting several agents at once, one per queue entry.
 
 ## Business logic — TL;DR
 

@@ -19,6 +19,7 @@ import {
 import { createCheckout, attachCheckout } from './checkout.js'
 import { reconcileBranchLinks } from './branch-links.js'
 import { reclaimWorktree, type ReclaimOutcome, type ReclaimRefusal } from './reclaim.js'
+import { publishCheckout, type PublishOutcome } from './publish.js'
 
 /**
  * The command line over the package (#1725): the same functions a daemon calls, for an agent
@@ -43,6 +44,8 @@ export const USAGE = `usage: branches <command>
   attach <id> <branch>         a checkout for agent <id>, on an existing branch
   name <name>                  rename this checkout's branch to agent-<name>; prints the name it got
   status [path]                the checkout's branch, whether it is clean, whether it is on the remote
+  publish --title <t> [--body <b>] [--merge] [--draft]
+                               push this checkout's branch and open its pull request; --merge lands it on green
   list [--sizes]               every agent checkout under .branches/
   remove <id> [--no-push]      reclaim agent <id>'s checkout, once the remote has everything it holds
   prune [--no-push]            remove, for every checkout
@@ -135,6 +138,21 @@ const COMMANDS: Record<string, Command> = {
     return { ok: true, path, ...(branch ? { branch } : {}), clean, onRemote }
   },
 
+  async publish(args, cwd, git) {
+    const { values } = parse(args, { title: { type: 'string' }, body: { type: 'string' }, merge: { type: 'boolean' }, draft: { type: 'boolean' } }, 0)
+    if (!values.title?.trim()) throw new Usage('--title is required: one line naming what the change does')
+    const checkout = await inRepo(() => checkoutRoot(cwd, git))
+    const outcome = await publishCheckout(checkout, {
+      title: values.title.trim(),
+      ...(values.body !== undefined ? { body: values.body } : {}),
+      ...(values.merge ? { merge: true } : {}),
+      ...(values.draft ? { draft: true } : {}),
+      git,
+    })
+    if (!outcome.ok) throw new Refused(outcome, publishRefusalLine(checkout, outcome))
+    return outcome
+  },
+
   async list(args, cwd, git) {
     const { values } = parse(args, { sizes: { type: 'boolean' } }, 0)
     const repo = await project(cwd, git)
@@ -209,6 +227,22 @@ function refusalLine(agentId: string, outcome: (ReclaimOutcome & { ok: false }) 
 
 const branchOf = (outcome: object): string => String((outcome as { branch?: string }).branch)
 const detailOf = (outcome: object): string | undefined => (outcome as { detail?: string }).detail
+
+/** Why a checkout was not published, as one line for a person. */
+function publishRefusalLine(checkout: string, outcome: PublishOutcome & { ok: false }): string {
+  switch (outcome.reason) {
+    case 'not-a-worktree':
+      return `${checkout} is not a git worktree`
+    case 'no-branch':
+      return `${checkout} is on no branch`
+    case 'dirty':
+      return `${outcome.branch} has uncommitted work; commit or delete it, then publish`
+    case 'push-failed':
+      return `${outcome.branch} could not be pushed: ${outcome.detail ?? 'the push did not land'}`
+    case 'pr-failed':
+      return `the pull request for ${outcome.branch} could not be opened: ${outcome.detail ?? 'gh failed'}`
+  }
+}
 
 const NAME_REFUSALS: Record<NameBranchRefusal, (name: string, checkout: string) => string> = {
   'invalid-name': name => `${name} is not a session name: use [a-z0-9-]+`,

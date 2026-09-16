@@ -185,19 +185,19 @@ test('both triage presets carry the one queue-only rule, and carry it whole (#16
 })
 
 test('each triage preset pins its own session name, and none carries a branch abort (#891/#892/#1659)', () => {
-  // The collision guard that makes these safe to fire on a schedule is the routine lock on the
-  // data branch (#1659), taken by the daemon before the start — not a branch the agent checks.
+  // A triage always lands on the same branch, and carries no check of its own against running
+  // twice — not a branch the agent checks.
   for (const preset of [presets.triageQuick, presets.triageConsensual]) {
     const out = preset.render()
     assert.match(out, new RegExp(`Always set <SESSION_NAME> to ${preset.name}`))
     assert.doesNotMatch(out, /already exists/)
   }
-  // Distinct session names, so their locks are distinct too.
+  // Distinct session names, so their branches are distinct too.
   assert.notEqual(presets.triageQuick.name, presets.triageConsensual.name)
 })
 
 test('neither ungated triage preset waits on a human (#891/#892 vs #698)', () => {
-  // They run unattended from the rotation, so an <AWAIT> would park the agent against nobody.
+  // They may be run unattended, so an <AWAIT> would park the agent against nobody.
   // The gated sibling is the one that legitimately has it.
   for (const out of [presets.triageQuick.render(), presets.triageConsensual.render()]) {
     assert.equal(out.includes('<AWAIT>'), false)

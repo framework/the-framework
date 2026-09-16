@@ -1,8 +1,8 @@
-Gives an agent [1] in a shell, and the user, the `branches` command over this package: `create`, `attach`, `name`, `status`, `list`, `remove` and `prune`, the same operations the daemon calls, so one implementation serves every surface. Every run prints one JSON document on stdout, at most one line for a person on stderr, and exits with a code that says how it went: 0 for a result, 1 for a refusal or a git failure, 2 for a command line that could not be read.
+Gives an agent [1] in a shell, and the user, the `branches` command over this package: `create`, `attach`, `name`, `status`, `publish`, `list`, `remove` and `prune`, the same operations the daemon calls, so one implementation serves every surface. Every run prints one JSON document on stdout, at most one line for a person on stderr, and exits with a code that says how it went: 0 for a result, 1 for a refusal or a git failure, 2 for a command line that could not be read.
 
 ## Context
 
-**User story**: an agent [1] runs `npx branches status` to learn its branch and whether its checkout [2] is clean, and `npx branches name <name>` to name its work, as its `branches` skill [3] instructs. The user, or the daemon on the user's behalf, runs `create`, `attach`, `list`, `remove` and `prune` from the project's checkout or from inside any agent's checkout. A program parsing stdout learns the outcome and its reason; a person reading stderr learns why in one line.
+**User story**: an agent [1] runs `npx branches status` to learn its branch and whether its checkout [2] is clean, `npx branches name <name>` to name its work, and `npx branches publish` to push it and open its pull request, as its `branches` skill [3] instructs. The user, or the daemon on the user's behalf, runs `create`, `attach`, `list`, `remove` and `prune` from the project's checkout or from inside any agent's checkout. A program parsing stdout learns the outcome and its reason; a person reading stderr learns why in one line.
 
 ## Glossary
 
@@ -21,13 +21,14 @@ Gives an agent [1] in a shell, and the user, the `branches` command over this pa
 
 - **One JSON document, one line, an exit code** - the result or the refusal on stdout, the reason for a person on stderr, exit 0 for a result and 1 for a refusal or a git failure.
 - **A command line that cannot be read** - an unknown command, an unknown flag or the wrong argument count prints the usage on stderr, nothing on stdout, and exits 2.
-- **Where a command acts** - `create`, `attach`, `list`, `remove` and `prune` act on the project found from the `.branches/` layout, even from inside a checkout; `name` and `status` act on the checkout the command runs in.
+- **Where a command acts** - `create`, `attach`, `list`, `remove` and `prune` act on the project found from the `.branches/` layout, even from inside a checkout; `name`, `status` and `publish` act on the checkout the command runs in.
 - **Outside a repository** - a command that needs one is refused as `not-a-repo`; only git's own "not a git repository" reads as that.
 - **An agent id is checked before anything runs** - `create`, `attach` and `remove` refuse an id outside the charset, or `data`, as `invalid-id`, before the repository is even looked for.
 - **`create`: a checkout for a new agent** - `.branches/agent-<id>` on the fresh branch `agent-<id>`, from `--base` or the project's head, fully set up.
 - **`attach`: a checkout for a continued agent** - `.branches/agent-<id>` on the branch named, taken as given, fully set up.
 - **`name`: the agent names its work** - the branch becomes `agent-<name>`, suffixed when taken, the name got is printed, and the branch links follow at once; four refusals.
 - **`status`: where the agent is and whether it may finish** - the checkout's path, its branch, whether it is clean and whether it is on the remote; refused for a directory git does not know as a worktree.
+- **`publish`: the agent hands off its own work** - `--title` is required; the branch is pushed, the pull request opened with the title and `--body`, `--merge` arms the merge on green, `--draft` opens a draft; a dirty tree, a push that did not land and a request gh refused are refusals with a line each (`publish.ts`).
 - **`list`: every checkout under `.branches/`** - a bare JSON array, one row per checkout directory, with its branch when git knows it and its size on request.
 - **`remove`: reclaim one checkout** - under the reclaim rule, pushing unless `--no-push`, with a line for each refusal and `no-checkout` for a missing one; the branch links follow at once.
 - **`prune`: reclaim every checkout** - `remove` for each checkout directory, reporting the removed and the skipped, never refusing as a whole.

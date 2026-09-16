@@ -64,7 +64,7 @@ The agent [1] analyzes the user's prompt before doing anything else, and:
 
 - When it is not clear what to do, for instance the scope or the prompt itself is unclear, the agent lists its interpretations sorted by plausibility, shows them as options and stops at a gate [4] for the user's pick [5].
 - When the scope is large, the agent writes a plan file named `PLAN_<session name>.agent.md`, shows it and stops at a gate: the plan is the document the card is about, and the user approves it or declines it.
-- When the scope is potentially very large, spanning many hours or days of work, the agent also considers adding follow-up tasks to the agent queue [9] and shows the new entries as a view [6]. Those entries are worked later: by the same agent's own loop over the queue when it is a build agent [14], or by the daemon's Auto PM.
+- When the scope is potentially very large, spanning many hours or days of work, the agent also considers adding follow-up tasks to the agent queue [9] and shows the new entries as a view [6]. Those entries are worked later: by the same agent's own loop over the queue when it is a build agent [14], or by an agent started with `/work-queue`.
 
 ### Name the work before the first change
 

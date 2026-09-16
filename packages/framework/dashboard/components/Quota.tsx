@@ -331,8 +331,8 @@ function WeekBar({
             </TooltipTrigger>
             <TooltipContent className="max-w-64">
               {enabled
-                ? 'Autonomous AI enabled means that agents will automatically work on tasks in the AI queue, and tasks will be automatically added to the AI queue.'
-                : "Autonomous AI disabled means that agents won't automatically start to work — every new agentic work is triggered by you manually."}
+                ? 'Autonomous AI enabled means that the daemon may start an agent on its own — today, a fix on a pull request whose checks fail — while the account is under the line.'
+                : "Autonomous AI disabled means that the daemon starts no agent on its own — every new agentic work is triggered by you manually."}
             </TooltipContent>
           </Tooltip>
         </div>

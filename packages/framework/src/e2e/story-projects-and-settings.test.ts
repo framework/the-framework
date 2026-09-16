@@ -6,7 +6,7 @@ import { makeWorld, waitFor } from './harness.js'
 import { onProjects, sendAddProject } from '../dashboard-rpc/projects.js'
 import { onGitStatus, onAgents, onDocs } from '../dashboard-rpc/reads.js'
 import { onPreferences, patchPreferences } from '../dashboard-rpc/preferences.js'
-import { onQuota, onAutoPm, sendAutoPmSweep } from '../dashboard-rpc/quota.js'
+import { onQuota } from '../dashboard-rpc/quota.js'
 import { sendStart } from '../dashboard-rpc/control.js'
 
 // The projects & settings stories (README.md): registering a repo, what the sidebar then shows,
@@ -103,7 +103,7 @@ test('settings written in the dashboard reach the next resumed run (#858/#1467)'
   }
 })
 
-test('the usage panel reads the daemon quota source, and the sweep button fires a sweep (#533/#1210)', async () => {
+test('the usage panel reads the daemon quota source (#533)', async () => {
   const world = await makeWorld()
   const rpc = world.rpc
   try {
@@ -119,21 +119,6 @@ test('the usage panel reads the daemon quota source, and the sweep button fires 
     const quota = await rpc(onQuota)()
     assert.equal(quota.windows.length, 1)
     assert.equal(quota.readAt, 123)
-
-    // The auto-PM line under the toggle: silent before the first sweep, then the report.
-    assert.equal(await rpc(onAutoPm)(), undefined)
-    world.autoPm.report = { nextSweepAt: 456, outcomes: [] }
-    assert.deepEqual(await rpc(onAutoPm)(), { nextSweepAt: 456, outcomes: [] })
-
-    // The "sweep now" button reaches the daemon's loop and reports the outcomes it recorded.
-    world.autoPm.report = {
-      nextSweepAt: 789,
-      outcomes: [{ projectId: 'p', path: '/p', started: false, message: 'the queue is empty' }],
-    }
-    const swept = await rpc(sendAutoPmSweep)({ only: 'work' })
-    assert.deepEqual(world.autoPm.sweeps, [{ only: 'work' }])
-    assert.equal(swept.ok, true)
-    assert.equal(swept.outcomes?.[0]?.message, 'the queue is empty')
   } finally {
     await world.close()
   }

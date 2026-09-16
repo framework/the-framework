@@ -19,7 +19,6 @@ Defines the options the user ticks for an agent [1] — one table of rows, with 
 [9] ready for merge: the signal an agent emits when it believes its work is complete: it flips the agent's badge from building to ready and authorizes the handoff.
 [10] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later. The user's driver choice is `claude` or `codex`.
 [11] transparent: an agent started with nothing of The Framework's — the raw coding agent.
-[12] routine: a preset the daemon fires on its own on a schedule.
 
 ## Business logic — TL;DR
 
@@ -76,7 +75,7 @@ The three publish rows are three views of one stored handoff [5] level, whose ru
 - "Open PR" writes `pr` when ticked and `push` when unticked.
 - "Auto-merge" writes `merge` when ticked and `pr` when unticked.
 
-Unticking therefore never leaves a merge armed with no pull request under it. When the user has stored no level at all, it is `pr`: an agent left alone pushes its branch and opens a draft pull request. This table is where a new agent's ladder comes from; a running agent's own action bar can still change the ladder for that one agent, and the routines [12] that merge their own work say so for themselves instead of through "Auto-merge".
+Unticking therefore never leaves a merge armed with no pull request under it. When the user has stored no level at all, it is `pr`: an agent left alone pushes its branch and opens a draft pull request. This table is where a new agent's ladder comes from; a running agent's own action bar can still change the ladder for that one agent.
 
 ### A rung is inert while the rung below it is off
 

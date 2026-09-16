@@ -15,9 +15,8 @@ Every fact the daemon reads from GitHub, and the one thing it writes there, goes
 [5] launcher: the Start form on project home, a project's own page.
 [6] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
 [7] CI watch: the sweep that merges the pull requests The Framework opened once their checks pass, and starts a fix agent when a check goes red.
-[8] routine: a job the daemon fires on its own — the queued work, update tickets, triage quick, triage consensual, plan tickets, maintenance — each switchable off and runnable on demand.
-[9] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
-[10] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds.
+[8] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
+[9] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds.
 
 ## Business logic — TL;DR
 
@@ -73,7 +72,7 @@ The dashboard's panels read this through the read-through cache in `cache.ts`, k
 
 #### Context
 
-**Problem**: GitHub's "the pull request for this branch" answers with the newest pull request for that branch name in any state, so an agent [1] whose prompt pins its branch name (a routine's [8] branch such as `the-framework/triage-quick`) would inherit a predecessor's merged pull request as its own. Keeping the whole history lets the next rule decide which entry, if any, belongs to the agent asking.
+**Problem**: GitHub's "the pull request for this branch" answers with the newest pull request for that branch name in any state, so an agent [1] whose prompt pins its branch name (a preset's pinned branch such as `the-framework/triage-quick`) would inherit a predecessor's merged pull request as its own. Keeping the whole history lets the next rule decide which entry, if any, belongs to the agent asking.
 
 #### Business logic
 
@@ -103,7 +102,7 @@ A merge is always a squash merge: an agent's branch is working history, not a st
 
 Only a refusal that means "auto-merge is not available here" leads to the fallback: GitHub's "auto merge is not allowed for this repository" (the repository setting is off), "clean status" (nothing blocks the pull request, and auto-merge is only for pull requests that cannot land yet), the `enablePullRequestAutoMerge` marker both of those carry, or a "protected branch" refusal, all matched loosely and case-insensitively so that a rephrasing on GitHub's side degrades to a reported failure, never a wrong merge. Any other refusal (a merge conflict, a permissions problem, a network failure) is reported as the outcome "failed" with GitHub's own words, and never retried as a direct merge, which would either fail again or land a pull request GitHub just said not to.
 
-The fallback depends on the policy the caller chose. Under the default policy, "merge now", right where a human just said "land it", the pull request is merged directly; success is "merged", and a direct merge that also fails reports that second refusal as "failed". Under the "watch" policy, the policy of the unattended [9] path, the pull request's check state (next section) decides: the pull request is merged directly only when every check has passed, and otherwise the outcome is "watched", meaning the daemon's CI watch [7] merges it on green. "No checks reported" does not merge now, because a check suite takes a few seconds to attach after a push and a just-opened pull request reads as check-less exactly then; the CI watch merges a genuinely check-less pull request after its own grace period. The refusal text never makes this decision, only the checks read does: "clean status" sounds like "nothing blocks it", but GitHub also says it for a pull request whose non-required checks are still running.
+The fallback depends on the policy the caller chose. Under the default policy, "merge now", right where a human just said "land it", the pull request is merged directly; success is "merged", and a direct merge that also fails reports that second refusal as "failed". Under the "watch" policy, the policy of the unattended [8] path, the pull request's check state (next section) decides: the pull request is merged directly only when every check has passed, and otherwise the outcome is "watched", meaning the daemon's CI watch [7] merges it on green. "No checks reported" does not merge now, because a check suite takes a few seconds to attach after a push and a just-opened pull request reads as check-less exactly then; the CI watch merges a genuinely check-less pull request after its own grace period. The refusal text never makes this decision, only the checks read does: "clean status" sounds like "nothing blocks it", but GitHub also says it for a pull request whose non-required checks are still running.
 
 Merging never throws: the caller reports the merge outcome alongside the handoff's, and a merge that could not happen must not turn a successful handoff into a failed one.
 
@@ -133,7 +132,7 @@ The setting is read from the repository's own record in the GitHub API. The answ
 
 #### Context
 
-**Business logic story**: the interventions [10] feed (`interventions.ts`) reads a project's open pull requests to announce the ones waiting for review, and remembers what it has already announced.
+**Business logic story**: the interventions [9] feed (`interventions.ts`) reads a project's open pull requests to announce the ones waiting for review, and remembers what it has already announced.
 
 #### Business logic
 

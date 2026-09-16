@@ -17,7 +17,6 @@ import { launchSharedBrowser, withBrowser, type SharedBrowser } from './browser.
 import { connectCdp, startBrowserStream, type BrowserStream } from './browser-stream.js'
 import { randomUUID } from 'node:crypto'
 import { formatFrameworkEvent, mergeWithheldWhy } from './terminal.js'
-import { defuseClosingKeywords } from './closing-keywords.js'
 import type { ParsedPullRequest } from './turn-gate.js'
 import { CLAUDE_CODE_SESSION_LINK } from './session-link.js'
 import { type AutoHandoffSkip, type ChoicePick, type ChoiceRequest, type FrameworkEvent, type MergeWithheldReason, type OnBeforeMergeableSkip } from './events.js'
@@ -197,8 +196,6 @@ export interface AgentOptions {
   model?: string | undefined
   /** Continue a finished agent's agent session (#720) — the prompt resumes that conversation (full prior context). Set by the dashboard when you message an agent that has ended. */
   resumeSession?: string | undefined
-  /** This agent plans a ticket rather than implementing it (#1327), so its pull request must not close the ticket's issue (#1334) — the plan's merge would close the issue with the work still undone. */
-  planAgent?: boolean
   /** No human is watching (#846), so choice gates take the recommended option. */
   unattended?: boolean
   scope: 'prototype' | 'full'
@@ -333,7 +330,6 @@ export function agentOptions(spec: AgentSpec, env: NodeJS.ProcessEnv = process.e
     ...(isAgentLocation(o.target) ? { target: o.target } : {}),
     ...(o.model?.trim() ? { model: o.model.trim() } : {}),
     ...(o.resumeSession?.trim() ? { resumeSession: o.resumeSession.trim() } : {}),
-    ...(o.planAgent ? { planAgent: true } : {}),
     ...(o.unattended ? { unattended: true } : {}),
     ...(defined(o.vanilla) ? { vanilla: o.vanilla } : {}),
     ...(defined(o.transparent) ? { transparent: o.transparent } : {}),
@@ -944,7 +940,7 @@ async function driveAgent(opts: AgentOptions, io: CliIO): Promise<number> {
   // Not tied to the gates (#846): an unattended agent leaves `requestChoice` unset so its gates
   // take the recommended option, but its control channel still carries Stop and the user's own
   // messages — "messages still work" is what the SPEC promises of it. Reading the queue off the
-  // gate switch dropped every message typed at a preset or routine agent, reported as queued.
+  // gate switch dropped every message typed at a preset agent, reported as queued.
   const chatQueue =
     isInteractive(opts) && control !== undefined
       ? {
@@ -1037,16 +1033,9 @@ async function driveAgent(opts: AgentOptions, io: CliIO): Promise<number> {
     // so it has no reason to run `gh pr create` itself and lose the title convention and the
     // recorded number along the way. The ticket's issue is the agent's to name (#1774): the
     // framework no longer knows which ticket a run implements.
-    //
-    // A plan agent's description is defused first: its PR lands the plan, not the work, so a
-    // closing phrase in it would close the ticket's issue on merge — which is exactly what
-    // happened on #1560.
     const written = journal.pullRequest()
-    // Both halves are defused, not just the body: since #1618 the title is the agent's prose too,
-    // and a closing phrase there would ride the squash-merge subject straight into the issue.
-    const defuse = (text: string | undefined) => (text && opts.planAgent ? defuseClosingKeywords(text) : text)
-    const prTitle = defuse(written?.title)
-    const description = defuse(written?.description)
+    const prTitle = written?.title
+    const description = written?.description
     const agent = {
       id: opts.agentId ?? '',
       branch,

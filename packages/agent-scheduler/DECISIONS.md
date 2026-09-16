@@ -1,0 +1,95 @@
+Non-obvious decisions only, grouped by business-logic flow. Anything not listed is left
+to the implementer's judgment. Flag conflicts instead of silently deviating. Keep
+outdated decisions (no history).
+
+A bullet is a person's pick, and says what it was picked over. What the code does belongs
+in LOGIC.md; a choice made while implementing is the implementer's judgment, not a
+decision. An AI proposes a bullet and asks; it never adds or rewrites one.
+
+## The tool
+- A tool, a package with a command line, like `agent-driver`; not a skill. It owns one
+  small process with a clock, and nothing else runs agents on a schedule. Picked over a
+  skill the agent would read, and over a job inside The Framework's daemon: the daemon
+  becomes a dashboard, a projection of files, and this is the thing that starts agents.
+- Standalone, beside `agent-driver`, not inside it. `agent-driver` depends on nothing; the
+  scheduler needs git for its checkouts and its records, and inside the driver every user
+  of the driver would get git and the skills with it. Either way was open; this one for
+  now.
+- The tool depends on `agent-driver` for the session and the quota reading, on the branches
+  package for the checkout and the reclaim, on the logs package for the records, and on
+  `agent-data` for the branch. It never depends on The Framework, and The Framework never
+  depends on it.
+- The tool names no skill and no command. What runs comes from the schedule file, and a
+  command runs only when `.claude/skills/<command>` exists in the project; else the state
+  says "no such command in this project". Picked over the tool linking a command's skill
+  into the checkout from a package: a project tracks its skills, and the tool reads the
+  project.
+- One scheduler per project, since the schedule is a file in the project and the state sits
+  beside it. Picked over one per machine reading a registry of projects: nothing
+  machine-wide is left for it to hold.
+
+## The two files
+- The schedule, `agent-schedule.md` at the repository root, tracked, written by a person:
+  one list line per command with its check and its cap. The check is a shell command run at
+  the repository root; due means it exits 0 and prints a JSON value that is not empty.
+  Picked over the tool reading the branch head (every commit was a start, most of them
+  empty), over the tool reading the queue (the tool would know a skill), and over a bare
+  clock (empty runs). A list line the parser cannot read is skipped and named, never
+  guessed.
+- The state, `.agent-scheduler/state.json`, untracked, per user, hidden through git's
+  exclude file the way `.branches/` is: on or off, keep-alive, the model, the spend cushion,
+  the scheduler's pid, the last tick and what it decided. Nothing the tool knows is only in
+  memory; a restart loses nothing.
+- Keep-alive, whether the scheduler outlives what started it, is per user, in the state
+  file. Picked over a line in the tracked schedule: in the schedule it would switch on the
+  next person's machine the first time they pull.
+- The model every run starts on is per user, in the state file, set with `model <id>`,
+  `opus` when unset. Picked over a line in the tracked schedule, so each person controls
+  what their own machine spends their quota on.
+
+## The tick
+- The checks in the cheapest order: the command exists, the check says due, the cap, then
+  the quota. The quota is read only when everything else says start, because the reading
+  spawns the agent's CLI and its usage fetch is refused upstream when asked too often.
+- The quota gate is The Framework's spend boundary, copied: a window in force may be used
+  only as far as the week has elapsed, plus the user's cushion, half a day when unset.
+  Picked over a plainer line (a window at 100% stands down): nothing would pace the week.
+  Copied rather than moved into `agent-driver`, which is not this tool's to change.
+- A run in flight is its run record, written on `agent-data` before the agent is spawned
+  with `status: running` and the tool's mark, and written again at the end over the same
+  file. Picked over a separate marker file the sweep would have to match up with a record:
+  one file for the run's whole life, and every machine counts the same records.
+- Two machines may mark for one command at once. The cap is the first `cap` records in
+  time order; a machine whose marker ranks past it withdraws the marker and does not spawn.
+  A push that fails twice is another machine getting there first: withdrawn, no spawn.
+- A running record from a machine that never comes back stays. Only the machine that wrote
+  it, or a person, changes it. Picked over ageing it out after a fixed time, which would
+  start a second agent beside a long run; a stuck command is fixed by hand.
+- The daily heartbeat and the transport retry The Framework's daemon had are dropped: a
+  failed run leaves its queue entry for the next tick.
+
+## The run
+- One process per run, one-shot: `run <prompt>` needs no scheduler running, and the tick
+  spawns the same thing with the id and the marker already made. Picked over the
+  scheduler holding pids: nothing to lose on a restart.
+- The run is a checkout from the branches package, a session from `agent-driver`, the
+  prompt once, and the agent's own loop to the end. No system prompt, no gates, no
+  steering: the command's skill file is the whole instruction. Picked over carrying The
+  Framework's run child over: its flow is the dashboard's, not a scheduled run's.
+- The agent publishes its own work through the branches skill; the run reads the pull
+  request back off the branch for the record. Picked over the run opening the request from
+  the branch's commits, and over the agent leaving a title and body in a file.
+- The run writes the live log The Framework's dashboard reads today, `.the-framework/agent.json`
+  and `events.jsonl` in the checkout, in the dashboard's shape, so a scheduled run shows
+  as it goes. Temporary, until `agent-driver` writes a live log of its own.
+- The run records itself and reclaims its own checkout when the agent stops; the sweep on
+  the tick catches what a dead process left, on this machine only. Agents in flight run to
+  the end when the scheduler stops.
+
+## The command line
+- Every command prints one JSON document on stdout, one line for a person on stderr, and
+  exits 0 for a result, 1 for a refusal or a failure, 2 for a command line that cannot be
+  read: the skills' contract, so a person and a dashboard read it the same way.
+- `start` is the only clock until The Framework's dashboard starts and stops the scheduler
+  through a hook: The Framework's daemon does not tick. Picked over the daemon calling the
+  tick during the transition, which would have made The Framework name the tool.

@@ -2,9 +2,9 @@ Holds the browser's view of the user's preferences [1]: loads them from the daem
 
 ## Context
 
-**User story**: the user flips a toggle in Settings [3] or on the launcher [4] — theme, driver, model, handoff [5], notifications, Auto PM [6] — and the whole dashboard reflects it at once, on this screen and on every other one. Reloading, or opening the dashboard in a second tab, shows the same values, because they live with the daemon and not with the browser. Opening a project whose repository commits a `the-framework.yml` shows that file's answers instead of the user's own for the settings it fixes.
+**User story**: the user flips a toggle in Settings [3] or on the launcher [4] — theme, driver, model, handoff [5], notifications — and the whole dashboard reflects it at once, on this screen and on every other one. Reloading, or opening the dashboard in a second tab, shows the same values, because they live with the daemon and not with the browser. Opening a project whose repository commits a `the-framework.yml` shows that file's answers instead of the user's own for the settings it fixes.
 
-**Problem**: preferences kept per browser cannot be acted on by the daemon, which starts unattended agents [7] with the same settings a user-started agent would get, and they diverge between two tabs and two browsers. Keeping them with the daemon makes them one value; this file is the browser's copy of that one value and the rules that keep the copy honest.
+**Problem**: preferences kept per browser cannot be acted on by the daemon, which starts unattended agents [6] with the same settings a user-started agent would get, and they diverge between two tabs and two browsers. Keeping them with the daemon makes them one value; this file is the browser's copy of that one value and the rules that keep the copy honest.
 
 ## Glossary
 
@@ -13,11 +13,10 @@ Holds the browser's view of the user's preferences [1]: loads them from the daem
 [3] Settings: the settings page.
 [4] launcher: the Start form on a project's own page.
 [5] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it).
-[6] Auto PM: the daemon's unattended product management: work the agent queue when the `agent-data` branch moves, and refill it by running the routines.
-[7] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
-[8] transparent: an agent started with nothing of The Framework's — the raw coding agent.
-[9] vanilla: an agent started without the built-in system prompt but with the signal protocols kept.
-[10] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds. The other is activity: an agent started or finished.
+[6] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
+[7] transparent: an agent started with nothing of The Framework's — the raw coding agent.
+[8] vanilla: an agent started without the built-in system prompt but with the signal protocols kept.
+[9] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds. The other is activity: an agent started or finished.
 
 ## Business logic — TL;DR
 
@@ -39,13 +38,13 @@ Holds the browser's view of the user's preferences [1]: loads them from the daem
 
 #### Context
 
-**User story**: a repository can commit its own answers in `the-framework.yml` [2] so that everyone who clones it starts agents [7] the same way, without each person setting it up. The user's own preferences [1] still decide everything that file does not fix.
+**User story**: a repository can commit its own answers in `the-framework.yml` [2] so that everyone who clones it starts agents [6] the same way, without each person setting it up. The user's own preferences [1] still decide everything that file does not fix.
 
 **Problem**: with more than one writable tier, a setting has more than one home, and the user cannot tell which copy a value was written to. One writable tier removes the question.
 
 #### Business logic
 
-A resolved setting is the user's own preferences [1] with the open project's committed `the-framework.yml` [2] laid on top, key by key: the repository's file wins for any key it sets, and the user's value stands everywhere else. The file may fix exactly three settings — whether agents [7] run transparent [8], whether they run vanilla [9], and the handoff [5] level. A project with no such file, and any screen with no project open, resolves to the user's own preferences alone.
+A resolved setting is the user's own preferences [1] with the open project's committed `the-framework.yml` [2] laid on top, key by key: the repository's file wins for any key it sets, and the user's value stands everywhere else. The file may fix exactly three settings — whether agents [6] run transparent [7], whether they run vanilla [8], and the handoff [5] level. A project with no such file, and any screen with no project open, resolves to the user's own preferences alone.
 
 Everything the dashboard writes goes to the user's own tier. The repository's file is changed by editing it in the repository, never from the dashboard.
 
@@ -67,7 +66,7 @@ Before the browser is running — while the page is being rendered ahead of time
 
 #### Context
 
-**Problem**: settings the daemon must act on cannot live in the browser. The daemon starts unattended agents [7] with the same driver, model, handoff [5] and Auto PM [6] settings the user picked in the dashboard, and it must read them without a browser being open.
+**Problem**: settings the daemon must act on cannot live in the browser. The daemon starts unattended agents [6] with the same driver, model and handoff [5] settings the user picked in the dashboard, and it must read them without a browser being open.
 
 #### Business logic
 
@@ -173,5 +172,5 @@ Unset means:
 
 - Browser delivery: on. The browser's own notification permission is still the real gate, which is handled in `notification-permission.ts`.
 - Discord delivery: off, because it reaches the user with no dashboard open. The daemon also needs a webhook configured — that is where to post, this is whether to.
-- The "Human Queue" category, an intervention [10]: on. It is the baseline The Framework leans on, so it fires until the user turns it off.
+- The "Human Queue" category, an intervention [9]: on. It is the baseline The Framework leans on, so it fires until the user turns it off.
 - The "New activity" category: off. It is loosely informative, so it is opt in.

@@ -347,8 +347,8 @@ export function TicketsPanel({
     if (outcome.ok) onAgentStarted?.(prompt, outcome.value.agentId)
   }
 
-  // Unattended (#1279): an update fired by a button is routine work, not a conversation — it
-  // ends at settle and its armed handoff fires, as when the sweep starts the same routine.
+  // Unattended (#1279): an update fired by a button is fired work, not a conversation — it
+  // ends at settle and its armed handoff fires.
   const updateFromGithub = () => startSession(UPDATE_TICKETS_PROMPT, 'The update could not be started.', { unattended: true })
   // Attended, unlike the imports above: a plan is written per-ticket for a human to read and act
   // on, so the session stays a conversation you land in and steer rather than one that settles and

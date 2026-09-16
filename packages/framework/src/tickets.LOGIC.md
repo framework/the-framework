@@ -5,7 +5,7 @@ Fixes the one wording of the ask for a ticket's plan, "Create tickets/<stem>.pla
 [1] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down. An item on it is a queue entry.
 [2] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
 [3] queue entry: an item on the agent queue.
-[4] the queued work: the routine that spends existing work: one agent started with `/work-queue` when the `agent-data` branch moved, which takes one task off the agent queue by composing the skills in its checkout.
+[4] the queued work: one agent started with `/work-queue`, which takes one task off the agent queue by composing the skills in its checkout.
 
 ## Business logic — TL;DR
 

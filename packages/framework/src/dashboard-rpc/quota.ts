@@ -1,5 +1,4 @@
-import { contextAutoPm, contextAutoPmSweep, contextQuota } from './context.js'
-import type { AutoPmOutcome, AutoPmReport, AutoPmOnly } from '../auto-pm.js'
+import { contextQuota } from './context.js'
 import type { QuotaView } from '../dashboard/quota.js'
 
 // The usage panel's read surface (#533): where the account's subscription quota stands, and where
@@ -16,64 +15,4 @@ function noReading(): QuotaView {
 /** Where the account's quota stands against its boundary. */
 export async function onQuota(): Promise<QuotaView> {
   return contextQuota().read().catch(() => noReading())
-}
-
-/**
- * What auto PM last decided (#1161), for the line under the panel's toggle. It sits beside
- * `onQuota` because it is the same panel and the same gate: auto PM spends against exactly the
- * boundary drawn above it.
- *
- * `undefined` when the loop has nothing to report yet, which the panel reads as "nothing to say"
- * rather than as an idle sweep — the distinction this whole read exists to make.
- */
-export async function onAutoPm(): Promise<AutoPmReport | undefined> {
-  try {
-    return contextAutoPm()()
-  } catch {
-    return undefined
-  }
-}
-
-/**
- * Sweep now rather than at the next interval (#1210). The loop already had this — it is what a
- * write that switches the preference on triggers (#1167) — but until now nothing could ask for
- * it directly, so the only way to fast-forward was to tick the box off and on again.
- *
- * The `autoPm` preference does not gate it: that preference is consent to spend quota *unasked*,
- * and this call is asking. So with auto-run off the daemon still sweeps once — every other
- * stand-down reason in force — and the schedule stays wherever the box says.
- *
- * Awaits the sweep and returns what it decided, one line per project (#1433): the click used to
- * be fire-and-forget, so two presses could show literally nothing — no loading state, no
- * outcome, and the stand-down reason recoverable only from the source. The outcomes are read
- * off the loop's own report once the tick resolves, so the card can say them without a poll
- * having to race the sweep. `false` means the sweep itself failed.
- *
- * `only` narrows the sweep to one routine's work (#1204): `'work'` starts an agent on the queued
- * work in every project (#1774), `'plan'` fans out on the open tickets — the sweep's to do, since a
- * plain start could only ever be one agent and would take no claim. `{ lock }` is the routine
- * holding that lock (#1643/#1659): one agent, but the sweep takes the lock before starting it,
- * which a plain start never did. `projectId` scopes it to the project the card has picked.
- */
-export async function sendAutoPmSweep(opts?: { only?: AutoPmOnly; projectId?: string }): Promise<{ ok: boolean; outcomes?: AutoPmOutcome[] }> {
-  const sweep = contextAutoPmSweep()
-  // The reporter is captured BEFORE the sweep is awaited. It had to be: the context was
-  // request-scoped and did not survive an await, so a post-await `contextAutoPm()` found nothing
-  // on every real request and the card fell back to "The sweep ran." — the very fallback this RPC
-  // exists to avoid. The context is wired once at start-up now (F3), so the order is no longer
-  // load-bearing; the captured closure needs no context to be called later either way.
-  const reporter = contextAutoPm()
-  try {
-    await sweep(opts)
-  } catch {
-    return { ok: false }
-  }
-  // The outcomes live on the loop's report — the same lines `onAutoPm` polls — read once the
-  // tick has resolved, so they describe the sweep this click fired.
-  try {
-    const report = reporter()
-    return { ok: true, ...(report ? { outcomes: report.outcomes } : {}) }
-  } catch {
-    return { ok: true }
-  }
 }

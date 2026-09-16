@@ -14,10 +14,9 @@
  */
 
 export type { AgentError, HandoffState, SessionInfo } from './agent-view.js'
-export type { AutoPmJob, AutoPmOutcome, AutoPmReport, AutoPmOnly } from './auto-pm.js'
 export type { FrameworkFileConfig } from './config.js'
 export type { ChoiceRequest, FrameworkEvent } from './events.js'
-export type { QuotaBoundaryStatus } from './quota-boundary.js'
+export type { QuotaBoundaryStatus, QuotaDecision } from './quota-boundary.js'
 export type { AgentLocation } from './agent-location.js'
 export type { CustomPreset, Preferences } from './registry.js'
 export type { DriverQuotaWindow } from 'agent-driver'

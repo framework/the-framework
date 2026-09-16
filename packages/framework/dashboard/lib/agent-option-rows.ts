@@ -124,8 +124,7 @@ export function agentOptionRows(preferences: Preferences): AgentOptionRows {
         : { disabled: true, disabledReason: 'nothing to open while Push branch is off' }),
     },
     // Default-off, unlike the row above (#1216): publishing a branch is reversible, landing it on
-    // the default branch is not. The routines that merge their own work (the queue drain) say so
-    // per job rather than through this box.
+    // the default branch is not.
     {
       key: 'merge',
       label: 'Auto-merge',

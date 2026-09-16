@@ -29,12 +29,12 @@ Carries out every action the user takes on an agent [1] or a project from the da
 [19] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
 [20] build agent / prompt agent: the two kinds of agent: a build works the agent queue after its opening exchange; a prompt agent runs one prompt and stops there.
 [21] preset: a canned prompt the user launches from the dashboard.
-[22] the queued work: the routine that spends existing work: one agent started with `/work-queue` when the `agent-data` branch moved, which takes one task off the agent queue by composing the skills in its checkout.
+[22] the queued work: one agent started with `/work-queue`, which takes one task off the agent queue by composing the skills in its checkout.
 [23] the Overview: the dashboard's cross-project page at `/`.
 [24] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
 [25] vanilla: an agent started without the built-in system prompt but with the signal protocols kept. transparent: an agent started with nothing of The Framework's — the raw coding agent.
 [26] run: only the `logs` skill's record of one agent on the `agent-data` branch: a card (what was asked, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said).
-[27] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
+[27] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [28] archive: the transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
 [29] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
 [30] ready for merge: the signal an agent emits when it believes its work is complete: it flips the agent's badge from building to ready and authorizes the handoff.
@@ -175,7 +175,7 @@ Same target rule ("unknown session"). For an agent that is still running, a merg
 
 #### Context
 
-**User story**: from a ticket, the user queues it so the next drain [22] works it, without spending an agent turn on appending one line.
+**User story**: from a ticket, the user queues it so the next queued work [22] takes it, without spending an agent turn on appending one line.
 
 **Problem**: the drain works the agent queue [7] front to back, so an entry appended at the end would wait behind everything; and an entry carrying only a title loses the ticket it came from the moment it is queued.
 

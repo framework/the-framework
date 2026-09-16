@@ -105,10 +105,9 @@ export interface Preferences {
    */
   notifyDiscord?: boolean
   /**
-   * Auto PM (#685): let the daemon start a PM agent by itself when the agent queue has run dry
-   * and there is plenty of budget left, so leftover subscription quota goes on the roadmap
-   * instead of expiring. **Absent = off**: it spends the user's allowance without being asked,
-   * so it is opt-in like {@link notifyDiscord} rather than a baseline.
+   * Let the daemon put an agent on a watched pull request whose checks fail (#1418), by itself,
+   * while there is quota left in the week. **Absent = off**: it spends the user's allowance
+   * without being asked, so it is opt-in like {@link notifyDiscord} rather than a baseline.
    */
   autoPm?: boolean
   /**
@@ -125,35 +124,6 @@ export interface Preferences {
    * claude.ai session on disk, neither of which should happen unasked. Needs {@link bridge}.
    */
   bridgeBrowser?: boolean
-  /**
-   * The routines {@link autoPm} must not fire, by {@link AutoPmJob.name} (#1209). Absent or empty
-   * = every routine runs, which is what the sweep did before this existed.
-   *
-   * Opted *out* rather than opted in, so the list only ever names exceptions: a routine added in a
-   * later version is on for everyone, instead of silently never running for whoever saved the
-   * setting before it shipped. It names routines rather than indexing them for the same reason
-   * {@link AutoPmJob.works} is a flag — a reorder must not move which one is switched off.
-   */
-  autoPmOptOut?: string[]
-  /**
-   * How many agents the routine may keep going at once on one project (#1204). Absent defaults to
-   * `DEFAULT_AUTO_PM_CONCURRENCY`, and the value is floored at one, with no upper bound.
-   *
-   * Only the draining routine fans out: it takes work *off* the queue, one pinned entry per agent,
-   * so several at once do disjoint work. The rotation invents work and each of its jobs rewrites
-   * the queue file, so it stays one agent per tick whatever this says.
-   */
-  autoPmConcurrency?: number
-  /**
-   * The project the Routine work card's "Run now" targets (#1647), by project id. Absent = the
-   * first registered project, which is what the card showed before this existed.
-   *
-   * A setting rather than card state, because the pick decides which repo spends quota and gets
-   * branches pushed, and card state forgot it on the most common navigation there is — open a
-   * run, come back — so the next click landed on the first project, the user's real one. An id
-   * that no longer names a registered project reads as absent.
-   */
-  autoPmProject?: string
   /**
    * How far the automatic-consumption limit sits from the quota boundary, in percentage points
    * (#960). Absent defaults to {@link DEFAULT_SPEND_OFFSET} — a half-day cushion ahead of the
@@ -180,7 +150,6 @@ export interface Preferences {
 export {
   MAX_SPEND_OFFSET,
   DEFAULT_SPEND_OFFSET,
-  DEFAULT_AUTO_PM_CONCURRENCY,
 } from './preference-defaults.js'
 
 /**
@@ -388,36 +357,7 @@ function sanitizePreferences(value: unknown): Preferences {
     preferences.autoSpendOffset = Math.round(Math.min(Math.max(offset, -MAX_SPEND_OFFSET), MAX_SPEND_OFFSET))
   const customPresets = sanitizeCustomPresets(input['customPresets'])
   if (customPresets.length) preferences.customPresets = customPresets
-  // `autoPmOptOut` (#1209) is a list of routine names, kept as free-form strings rather than
-  // checked against the catalog: this module is the storage layer and the catalog lives above it,
-  // and a name from a newer version must survive a downgrade rather than be erased by it. Empty
-  // is dropped like every other empty list — nothing opted out is exactly what absent means.
-  const optOut = sanitizeNameList(input['autoPmOptOut'])
-  if (optOut.length) preferences.autoPmOptOut = optOut
-  // `autoPmConcurrency` (#1204) is a count of agents, rounded like `autoSpendOffset` and floored
-  // at one: zero concurrent agents is what the `autoPm` switch already spells, and a hand-edited
-  // nought would otherwise wedge the routine with the switch still reading on. No upper bound —
-  // how many agents to run at once is the user's call, and the week's allowance paces them anyway.
-  const concurrency = input['autoPmConcurrency']
-  if (typeof concurrency === 'number' && Number.isFinite(concurrency))
-    preferences.autoPmConcurrency = Math.max(Math.round(concurrency), 1)
-  // `autoPmProject` (#1647) is a project id, kept as a bounded free-form string rather than checked
-  // against the project list for the reason the opt-out names are not checked against the
-  // catalog: the card validates it against the projects it shows, and an id of a project removed
-  // since simply falls back there. Empty is dropped, which is exactly what absent means.
-  const routineProject = input['autoPmProject']
-  if (typeof routineProject === 'string' && routineProject.trim()) preferences.autoPmProject = routineProject.trim().slice(0, 100)
   return preferences
-}
-
-/** Trimmed, de-duplicated, and bounded in both directions, so a hand-edited file cannot grow the object without limit. */
-function sanitizeNameList(value: unknown): string[] {
-  if (!Array.isArray(value)) return []
-  const names = value
-    .filter((entry): entry is string => typeof entry === 'string')
-    .map(entry => entry.trim().slice(0, 100))
-    .filter(Boolean)
-  return [...new Set(names)].slice(0, 50)
 }
 
 /**

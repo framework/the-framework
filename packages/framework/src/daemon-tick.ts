@@ -3,7 +3,7 @@ import { errorMessage } from './error-message.js'
 /**
  * The daemon's one background clock (E4).
  *
- * Every sweep used to own a timer: the CI watch on a minute, the worktree sweep and auto PM on ten,
+ * Every sweep used to own a timer: the CI watch on a minute, the worktree sweep on ten,
  * the session committer's debounce on thirty seconds, the two Discord watchers on a minute each.
  * Six intervals with six `setInterval`s, six unref calls and six overlap guards, and no single
  * place to look when the answer to "why is nothing happening" is that a sweep is not running.

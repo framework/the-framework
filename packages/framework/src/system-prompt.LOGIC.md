@@ -18,7 +18,7 @@ Composes the system channel every agent [1] starts with, and renders the user's 
 [8] vanilla: an agent started without the built-in system prompt but with the signal protocols kept.
 [9] transparent: an agent started with nothing of The Framework's — the raw coding agent.
 [10] coding agent: the CLI doing the actual work: Claude Code or Codex.
-[11] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
+[11] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [12] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down.
 [13] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
 [14] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.

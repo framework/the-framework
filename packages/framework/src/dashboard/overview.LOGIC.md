@@ -18,7 +18,7 @@ Builds the data behind the dashboard's cross-project Overview [1] and its shared
 [8] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
 [9] archive: the transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
 [10] the Claude web bridge (the bridge): the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session.
-[11] the queued work: the routine that spends existing work: one agent started with `/work-queue` when the `agent-data` branch moved, which takes one task off the agent queue by composing the skills in its checkout.
+[11] the queued work: one agent started with `/work-queue`, which takes one task off the agent queue by composing the skills in its checkout.
 [12] plan: a ticket's `.plan.md`: effort and uncertainty ratings and how to implement it.
 
 ## Business logic — TL;DR

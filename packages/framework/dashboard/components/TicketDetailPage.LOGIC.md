@@ -11,7 +11,7 @@ One ticket's own page: its whole markdown rather than the one line the list show
 [1] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down. The dashboard labels it "AI queue".
 [2] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
 [3] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
-[4] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
+[4] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [5] holder: who a claim names: the agent's id when the daemon started the agent, else the branch the `tickets` command ran on.
 [6] session name: the name an agent gives its own work; the dashboard labels the agent by it.
 

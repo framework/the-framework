@@ -68,7 +68,7 @@ test('browser is dropped for an agent that cannot use it (#801)', () => {
 })
 
 test("the repo's file beats your own settings (#842/#858)", () => {
-  // The path auto PM takes: merge the two tiers, then map the answer.
+  // The path a daemon-started agent takes: merge the two tiers, then map the answer.
   const resolved = { ...{ transparent: false, model: 'sonnet' }, ...preferencesFromFileConfig({ transparent: true }) }
   const options = agentOptionsFromPreferences(resolved)
   assert.equal(options.transparent, true)

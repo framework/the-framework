@@ -9,7 +9,7 @@ The layout gate: a tracked marker file, `.the-framework/LAYOUT`, records the nam
 [1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
 [2] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [3] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
-[4] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
+[4] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [5] event stream: everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout.
 [6] run: only the `logs` skill's record of one agent on the `agent-data` branch.
 

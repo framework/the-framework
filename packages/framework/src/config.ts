@@ -32,7 +32,7 @@ export interface FrameworkFileConfig {
    *
    * `merge` has to be asked for out loud: publishing a branch is reversible, landing it on the
    * default branch is not. Meant for work whose review already happened before the session — the
-   * quick-win and consensual routines merge what a plan the human could veto already settled.
+   * queued work merges what a plan the human could veto already settled.
    */
   handoff?: HandoffLevel
 }

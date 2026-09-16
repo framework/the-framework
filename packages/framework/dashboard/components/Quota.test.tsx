@@ -279,7 +279,7 @@ describe('Quota (#960)', () => {
     await openTooltip(screen.getByText('enabled', { selector: 'em' }).closest('span')!)
     expect(
       screen.getByText(
-        'Autonomous AI enabled means that agents will automatically work on tasks in the AI queue, and tasks will be automatically added to the AI queue.',
+        'Autonomous AI enabled means that the daemon may start an agent on its own — today, a fix on a pull request whose checks fail — while the account is under the line.',
       ),
     ).toBeTruthy()
   })
@@ -290,7 +290,7 @@ describe('Quota (#960)', () => {
     await openTooltip(screen.getByText('disabled', { selector: 'em' }).closest('span')!)
     expect(
       screen.getByText(
-        "Autonomous AI disabled means that agents won't automatically start to work — every new agentic work is triggered by you manually.",
+        "Autonomous AI disabled means that the daemon starts no agent on its own — every new agentic work is triggered by you manually."
       ),
     ).toBeTruthy()
   })

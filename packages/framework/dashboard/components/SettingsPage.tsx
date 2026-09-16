@@ -177,8 +177,8 @@ export function SettingsPage({
 
         <Section title="Automation">
           <ToggleRow
-            label="Auto PM"
-            description="Start queued work on its own while there is quota left in the week."
+            label="Fix red pull requests"
+            description="Put an agent on a watched pull request whose checks fail, on its own, while there is quota left in the week."
             checked={preferences.autoPm ?? false}
             onChange={next => updatePreferences({ autoPm: next })}
           />

@@ -111,8 +111,8 @@ export const presets = {
 
   /**
    * [Suggest tickets to work on] (#698): the gated sibling of the triage pair. It ends in
-   * `<AWAIT>`, so it is deliberately kept out of {@link AUTO_PM_JOBS} — firing it unattended
-   * would wedge an agent against a human who is not there.
+   * `<AWAIT>`, so it must not be fired unattended — that would wedge an agent against a human
+   * who is not there.
    */
   suggestTicketsToWorkOn: definePreset({ name: 'suggest-tickets-to-work-on', template: PRESETS_SUGGEST_TICKETS_TO_WORK_ON, label: 'Suggest tickets to work on', tooltip: 'Add tickets to queue (TODO_AGENTS.md)' }),
 
@@ -121,13 +121,11 @@ export const presets = {
    * matching one filter, and append them to `TODO_AGENTS.md` — how the queue refills itself from
    * the ticket backlog. The pair splits on cost, and the split is the point: both are consensual
    * (zero open questions, zero variability), so neither needs a human, and they differ only in
-   * whether the work is cheap. Keeping them apart lets the rotation queue the cheap batch and the
-   * significant batch on separate turns rather than in one indiscriminate sweep.
+   * whether the work is cheap. Keeping them apart lets a person queue the cheap batch and the
+   * significant batch separately rather than in one indiscriminate sweep.
    *
    * Each prompt pins its own `<SESSION_NAME>`, so a triage always lands on the same branch and is
-   * recognizable there. What makes them safe to fire on a schedule is the routine lock the daemon
-   * takes before starting one (`routine-locks.ts`), which holds across machines: a triage still in
-   * flight owns the lock, so the next firing stands down instead of triaging twice.
+   * recognizable there.
    *
    * Both end with the same rule (#1641): a triage only writes `TODO_AGENTS.md`, never a ticket's
    * code. It is one file, `prompts/triage_scope.md`, appended here rather than pasted into each
@@ -145,7 +143,7 @@ export type PresetKey = keyof typeof presets
  *
  * One list rather than a `launcher: true` flag on each row: membership and order are the same
  * decision, and a flag would have stated half of it while the order lived somewhere else. Every
- * preset is on it: the routine only the daemon fires is a skill file now (#1774), not a preset.
+ * preset is on it: working the agent queue is a skill file (#1774), not a preset.
  */
 export const LAUNCHER_PRESETS: readonly PresetDef[] = [
   presets.research,

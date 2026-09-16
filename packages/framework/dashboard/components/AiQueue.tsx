@@ -166,7 +166,7 @@ export function AiQueue({
                           value={fanOutCount(q.projectId)}
                           aria-label="How many agents to spin up"
                           onChange={event => {
-                            // Floored like the routine panel's concurrency box: a number input
+                            // Floored: a number input
                             // still hands back whatever was typed, and an emptied box is mid-edit
                             // rather than a count — `Number('')` is 0, and the floor would turn a
                             // cleared field into a saved 1.

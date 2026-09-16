@@ -1,6 +1,7 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { boundaryFromResetsAt, parseResetsAt, quotaBoundaryStatus, QUOTA_WEEK_MS } from './quota-boundary.js'
+import { boundaryFromResetsAt, parseResetsAt, quotaBoundaryStatus, quotaHeadroom, QUOTA_WEEK_MS, type QuotaBoundaryStatus } from './quota-boundary.js'
+import { DEFAULT_SPEND_OFFSET } from './preference-defaults.js'
 import type { DriverQuotaWindow } from 'agent-driver'
 
 const DAY = 24 * 60 * 60 * 1000
@@ -158,3 +159,46 @@ test('a limit dragged past either end of the week stops at the week (#960)', () 
   assert.equal(high.reached, null)
 })
 
+
+/** A reading where the account's week is `weekPercent` used, measured at `NOW` (~31.5% of the week elapsed). */
+function status(weekPercent: number): QuotaBoundaryStatus {
+  const boundary = quotaBoundaryStatus({ windows: [weekWindow(weekPercent)], now: NOW })
+  if (!boundary) throw new Error('the fixture week should be placeable')
+  return boundary
+}
+
+test('quotaHeadroom refuses to start when the quota cannot be read (#685)', () => {
+  // The inverse of the per-agent guard's fail-open (#519): that one must never STOP the user's
+  // own work, this one must never START work nobody asked for on an unknown budget.
+  const decision = quotaHeadroom(undefined)
+  assert.equal(decision.start, false)
+  assert.match(decision.start === false ? decision.reason : '', /could not be read/)
+})
+
+test('quotaHeadroom starts while the account is under the boundary (#879)', () => {
+  assert.deepEqual(quotaHeadroom(status(1)), { start: true })
+})
+
+test('quotaHeadroom stands down at the boundary, and says where it sits (#879)', () => {
+  // ~31.5% has elapsed of the week, so a week at 99% is well past it.
+  const decision = quotaHeadroom(status(99))
+  assert.equal(decision.start, false)
+  assert.match(decision.start === false ? decision.reason : '', /99% used, at or past day 3 of the week's 32%/)
+})
+
+test('quotaHeadroom names a fractional offset to one decimal, not fifteen digits (#960 Edit)', () => {
+  // The half-day default is 100/14 — the reason line should say "+7.1", not the raw double.
+  const boundary = quotaBoundaryStatus({ windows: [weekWindow(99)], now: NOW, limitOffset: DEFAULT_SPEND_OFFSET })
+  if (!boundary) throw new Error('the fixture week should be placeable')
+  const decision = quotaHeadroom(boundary)
+  assert.equal(decision.start, false)
+  assert.match(decision.start === false ? decision.reason : '', /your 39% limit \(\+7\.1 on the week's 32%\)/)
+})
+
+test('quotaHeadroom stands down the moment the boundary is met, not only when it is passed (#879)', () => {
+  // Reads the boundary's own actual value back, rather than assuming a day/7 fraction (#960 Edit):
+  // percent is the continuous elapsed share of the week, not a stepped one.
+  const boundaryPercent = status(0).boundary.percent
+  const decision = quotaHeadroom(status(boundaryPercent))
+  assert.equal(decision.start, false)
+})

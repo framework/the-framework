@@ -9,15 +9,14 @@ Lists one project's tickets as one-liner rows — priority, topics, who holds th
 ## Glossary
 
 [1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
-[2] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
+[2] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [3] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
 [4] holder: who a claim names: the agent's id when the daemon started the agent, else the branch the `tickets` command ran on.
 [5] session name: the name an agent gives its own work; its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
 [6] prompt agent: an agent that runs one prompt and stops there.
-[7] the queued work: the routine that spends existing work: one agent started with `/work-queue` when the `agent-data` branch moved, which takes one task off the agent queue by composing the skills in its checkout.
-[8] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles. The opposite is attended.
-[9] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: keep the work in its checkout, push its branch, also open a pull request, also merge it.
-[10] launcher: the Start form on a project's own page.
+[7] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles. The opposite is attended.
+[8] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: keep the work in its checkout, push its branch, also open a pull request, also merge it.
+[9] launcher: the Start form on a project's own page.
 
 ## Business logic — TL;DR
 
@@ -95,7 +94,7 @@ The two states are told apart by color and weight, not by the icon alone, so the
 
 The start column is a play button labeled "Start work on <title>", with the tooltip "Spin up an agent working on this ticket". It starts a prompt agent [6] on this project with the prompt "Work on tickets/<file>. Do not start any other ticket." — and nothing else: the agent claims the ticket itself through the `tickets` skill.
 
-That agent runs unattended [8]: one agent on one ticket is run the way the daemon runs the queued work [7], ending when its work settles and firing the handoff [9] it was armed with. A refusal reads "The work agent could not be started.".
+That agent runs unattended [7]: it ends when its work settles and fires the handoff [8] it was armed with. A refusal reads "The work agent could not be started.".
 
 When a start succeeds, the surrounding page is told what was asked and which agent was started, so it can take the user to the agent instead of leaving them on rows that have not changed yet.
 
@@ -103,11 +102,11 @@ When a start succeeds, the surrounding page is told what was asked and which age
 
 #### Context
 
-**Problem**: which coding agent runs, on which model, and where it runs are set in the launcher [10] and the dashboard's own settings, nowhere near this row. Without a way across, changing any of them means leaving the page, editing preferences, coming back, and hoping the button still means the same thing.
+**Problem**: which coding agent runs, on which model, and where it runs are set in the launcher [9] and the dashboard's own settings, nowhere near this row. Without a way across, changing any of them means leaving the page, editing preferences, coming back, and hoping the button still means the same thing.
 
 #### Business logic
 
-Every start on the panel — the work start, the plan start and the GitHub update — carries a chevron beside it offering "Configure first, then run": "Opens the launcher with this ticket's prompt, so you can set the model and where it runs." for the work start, and "Opens the launcher with the plan prompt, so you can set the model and where it runs." for the plan start. Choosing it leaves the same prompt waiting in this project's launcher [10] and takes the user there, starting nothing. The chevrons of every row name their own ticket ("Other ways to work on <title>", "Other ways to plan <title>").
+Every start on the panel — the work start, the plan start and the GitHub update — carries a chevron beside it offering "Configure first, then run": "Opens the launcher with this ticket's prompt, so you can set the model and where it runs." for the work start, and "Opens the launcher with the plan prompt, so you can set the model and where it runs." for the plan start. Choosing it leaves the same prompt waiting in this project's launcher [9] and takes the user there, starting nothing. The chevrons of every row name their own ticket ("Other ways to work on <title>", "Other ways to plan <title>").
 
 A chevron is never disabled by a start in flight, because it starts nothing: being unable to go and look at the settings while something else runs would defeat the offer.
 
@@ -121,7 +120,7 @@ A chevron is never disabled by a start in flight, because it starts nothing: bei
 
 Above the rows, one line states when the tickets last caught up with GitHub — "Updated from GitHub 3h ago", or "No record of an import yet" when nothing was ever imported — with the update button immediately beside it, rather than a panel's width away from the line it acts on. What that button offers and how it words itself is described in `UpdateTicketsButton.tsx`.
 
-The update runs unattended [8]: an import fired by a button is routine work rather than a conversation, so it ends when its work settles and fires its armed handoff [9], exactly as it does when the daemon starts the same routine on its own clock. A refusal reads "The update could not be started.".
+The update runs unattended [7]: an import fired by a button is a task rather than a conversation, so it ends when its work settles and fires its armed handoff [8]. A refusal reads "The update could not be started.".
 
 ### Nothing to show
 

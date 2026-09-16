@@ -117,8 +117,8 @@ export function StartAgentForm({
     if (busy) return
     setNote('Starting…')
     // A preset agent (`submitKind === 'prompt'`) is fired work, not a conversation: it runs
-    // unattended (#1279), ending at settle with its armed handoff firing, exactly as the same
-    // routine does when the auto-PM sweep starts it. A typed prompt keeps the stay-open chat.
+    // unattended (#1279), ending at settle with its armed handoff firing. A typed prompt keeps
+    // the stay-open chat.
     const result = await start(projectId, text, submitKind, submitKind === 'prompt' ? { ...options, unattended: true } : options)
     setNote(null)
     if (result) {

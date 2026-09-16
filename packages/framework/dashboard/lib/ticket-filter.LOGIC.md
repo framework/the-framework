@@ -11,7 +11,7 @@ Decides which tickets [1] the tickets page shows, in what order and under which 
 ## Glossary
 
 [1] ticket: a markdown file under `tickets/` on the `agent-data` branch (`<date>_<slug>.md`), with an optional plan (`.plan.md`) and claim (`.lock.md`).
-[2] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
+[2] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [3] project: a repository the user registered in the dashboard, identified by an id derived from its path.
 [4] facet: one of the filter toolbar's dimensions — the text search, priority, effort, uncertainty, topics, stage, project, and the "Not linked" switch.
 [5] plan: a ticket's `.plan.md`: effort and uncertainty ratings and how to implement it.

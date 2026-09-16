@@ -13,7 +13,7 @@ Serializes everything that changes one agent [1]'s checkout [2] inside the daemo
 [3] sweep: a background job the daemon runs on its clock.
 [4] reclaim: removing a finished agent's checkout once its work is on the remote.
 [5] run: only the `logs` skill's record of one agent on the `agent-data` branch: a card (what was asked, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said).
-[6] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
+[6] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [7] archive: the transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
 
 ## Business logic — TL;DR

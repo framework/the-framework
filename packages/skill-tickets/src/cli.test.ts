@@ -171,8 +171,12 @@ test('put writes a ticket, a plan or meta.json from stdin, never a lock; close r
     assert.equal(await git(['show', `${DATA_BRANCH}:tickets/2026-08-31_c.md`], bare), '# C\n')
     assert.equal((await git(['log', '-1', '--format=%s', DATA_BRANCH], bare)).trim(), 'put tickets/2026-08-31_c.md')
     assert.equal((await run(a!, ['put', 'tickets/2026-08-31_c.plan.md'], 'Effort: 2\n\n# [Plan] C\n')).code, 0, 'the tickets/ path form, as a queue entry links it')
+    assert.deepEqual((await run(a!, ['meta'])).json, {}, 'no import recorded yet reads as an empty object')
     assert.equal((await run(a!, ['put', 'meta.json'], '{"lastImportedAt":"2026-08-31T00:00:00.000Z"}')).code, 0)
     assert.equal(await git(['show', `${DATA_BRANCH}:tickets/meta.json`], bare), '{"lastImportedAt":"2026-08-31T00:00:00.000Z"}')
+    const meta = await run(a!, ['meta'])
+    assert.equal(meta.code, 0)
+    assert.deepEqual(meta.json, { lastImportedAt: '2026-08-31T00:00:00.000Z' })
     for (const bad of ['2026-08-31_c.lock.md', '../x.md', 'sub/x.md', 'x.txt']) {
       const refused = await run(a!, ['put', bad], 'x')
       assert.equal(refused.code, 1, bad)

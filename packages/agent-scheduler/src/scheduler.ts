@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { ClaudeCodeDriver, readClaudeQuota } from 'agent-driver'
 import { DATA_BRANCH, nodeGitRunner, pullFileBranch, type GitRunner } from '@gemstack/agent-data'
 import { CHECK_TIMEOUT_MS, SCHEDULER_LOG, TICK_MS } from './names.js'
-import { inFlight, withdrawMarker, writeMarker } from './records.js'
+import { inFlight, lastStart, withdrawMarker, writeMarker } from './records.js'
 import { runCommand, runIdFrom, type RunOutcome } from './run.js'
 import { readSchedule } from './schedule.js'
 import { readState, runStderrPath, stateDir, updateState, type State, type TickRecord } from './state.js'
@@ -51,6 +51,7 @@ export async function tickProject(repo: string, opts: { git?: GitRunner; log?: (
     sweep: () => sweep(repo, { host, isAlive: isPidAlive, now, git, log }),
     hasCommand: name => projectHasCommand(repo, name),
     check: shell => runCheck(repo, shell, CHECK_TIMEOUT_MS),
+    lastStart: command => lastStart(repo, command),
     inFlight: command => inFlight(repo, command),
     quota: () => readClaudeQuota({ cwd: repo }),
     mint: () => runIdFrom(now().toISOString()),

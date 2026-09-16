@@ -17,6 +17,32 @@ Some words a person wrote.
   assert.deepEqual(schedule.unreadable, [])
 })
 
+test('a line paces by time with `every`, alone or beside a check, the clauses in any order; a comma inside the check is the check\'s', () => {
+  const schedule = parseSchedule(`- triage-quick: every 6h
+- triage-consensual: every 7d, cap 2
+- update-tickets: every 1h, when \`gh issue list --search "a, b"\`
+- plan-tickets: cap 1, when \`npx tickets list\`, every 30m
+`)
+  assert.deepEqual(schedule.commands, [
+    { name: 'triage-quick', every: { ms: 6 * 3_600_000, text: '6h' }, cap: 1, line: 1 },
+    { name: 'triage-consensual', every: { ms: 7 * 86_400_000, text: '7d' }, cap: 2, line: 2 },
+    { name: 'update-tickets', when: 'gh issue list --search "a, b"', every: { ms: 3_600_000, text: '1h' }, cap: 1, line: 3 },
+    { name: 'plan-tickets', when: 'npx tickets list', every: { ms: 30 * 60_000, text: '30m' }, cap: 1, line: 4 },
+  ])
+  assert.deepEqual(schedule.unreadable, [])
+})
+
+test('an `every` the parser cannot read is unreadable: a unit it does not know, zero, a clause twice, a word it does not know', () => {
+  const schedule = parseSchedule(`- a: every 2w
+- b: every 0h
+- c: every 1h, every 2h
+- d: every 1h, always
+- e: every day
+`)
+  assert.deepEqual(schedule.commands, [])
+  assert.deepEqual(schedule.unreadable.map(u => u.line), [1, 2, 3, 4, 5])
+})
+
 test('a list line the parser cannot read is skipped and named with its line', () => {
   const schedule = parseSchedule(`- work-queue: when \`npx queue\`
 - Work Queue: every day

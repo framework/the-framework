@@ -1,8 +1,8 @@
-The schedule [1]: how `agent-schedule.md` is read into commands [2], each with its check [3] and its cap [4]; which lines are the person's and not read; how a line that cannot be read is named rather than silently skipped; what a check's output must say for a command to be due; and the prompt a command runs with.
+The schedule [1]: how `agent-schedule.md` is read into commands [2], each with its interval [5], its check [3] or both, and its cap [4]; which lines are the person's and not read; how a line that cannot be read is named rather than silently skipped; what a check's output must say for a command to be due; and the prompt a command runs with.
 
 ## Context
 
-**User story**: the user writes one line per command they want run unattended, `- work-queue: when \`npx queue\`, cap 1`, commits the file, and every machine sharing the repository runs the same schedule; a typo on one line stands down that one command and is named in the state, while the other lines still run.
+**User story**: the user writes one line per command they want run unattended, `- work-queue: when \`npx queue\`, cap 1` for work that is due while something is queued, `- triage-quick: every 6h` for a routine that runs at most that often, `- update-tickets: every 1h, when \`gh issue list …\`` for one that runs at most hourly and only when the tracker has news, commits the file, and every machine sharing the repository runs the same schedule; a typo on one line stands down that one command and is named in the state, while the other lines still run.
 
 **Business logic story**: the tool names no command of its own. This file is where a command's name enters the system, and `.claude/skills/<name>` in the project is what runs. The tick (`tick.ts`) runs the check and asks this file whether the output says due.
 
@@ -12,13 +12,14 @@ The schedule [1]: how `agent-schedule.md` is read into commands [2], each with i
 [2] command: a `.claude/skills/<name>` folder tracked in the project, which the coding agent's harness expands from the slash command `/<name>`.
 [3] check: the shell command a schedule line puts after `when`, run at the repository root on every tick; its output says whether the command is due.
 [4] cap: how many runs of one command may be in flight at once, across every machine that shares the repository; 1 when the line names none.
+[5] interval: the `every` clause of a schedule line: the least time since the command's last recorded start before it may start again.
 
 ## Business logic — TL;DR
 
-- **A schedule line** - `- <name>: when \`<check>\`, cap <N>`; the name is lowercase letters, digits and dashes; `, cap N` is optional and reads as 1 when absent or 0.
+- **A schedule line** - `- <name>:` then clauses in any order, each at most once: `every <N>m|h|d`, `when \`<check>\``, `cap <N>`; at least one of `every` and `when`; the name is lowercase letters, digits and dashes; a missing cap reads as 1, as does 0; an `every` of 0, an unknown unit, a clause twice or a word the parser does not know make the line unreadable.
 - **What is not read** - headings, blank lines, prose: anything not starting a list item is the person's.
 - **An unreadable list line** - kept aside with its line number and text; the tick names it as `line N` with `unreadable: <text>`.
-- **Due** - the check's output, parsed as JSON, is something other than empty; output that is not JSON is due when non-blank.
+- **Due** - the check's output, parsed as JSON, is something other than empty; output that is not JSON is due when non-blank. The interval [5] is the tick's to apply, from the run records; a line with both clauses starts only when both hold.
 - **The prompt** - a command's prompt is its slash command, `/<name>`.
 
 ## Business logic
@@ -31,7 +32,7 @@ See `## Context`.
 
 #### Business logic
 
-A list line, one starting with `- `, names one command: `- <name>: when \`<check>\`` with an optional `, cap <N>`. The name is one or more lowercase letters, digits and dashes, starting with a letter or a digit, the shape of a skill folder's name. The check is the text between the backticks, surrounding whitespace removed, a shell command line. The cap is the whole number after `cap`; a line naming none has a cap of 1, and a cap of 0 reads as 1, since zero would spell "never", which is the line being absent. Each command remembers the file's line number it came from, for a message. A file with no schedule at all (no `agent-schedule.md` at the repository root) is read as no schedule, which the tick reports as `no agent-schedule.md`.
+A list line, one starting with `- `, names one command: `- <name>:` followed by clauses separated by commas outside backticks, in any order, each at most once. The name is one or more lowercase letters, digits and dashes, starting with a letter or a digit, the shape of a skill folder's name. `every <N><unit>` is the interval [5], a whole number above zero and a unit of `m` (minutes), `h` (hours) or `d` (days), remembered as a duration and as written (`6h`) for the tick's line. `when \`<check>\`` is the check [3], the text between the backticks, surrounding whitespace removed, a shell command line; a comma inside the backticks belongs to the check. `cap <N>` is the cap [4]: a line naming none has a cap of 1, and a cap of 0 reads as 1, since zero would spell "never", which is the line being absent. A line needs at least one of `every` and `when`, else nothing says when it runs. An `every` of 0 is refused rather than read as "always", which is the clause being absent; an unknown unit (`2w`), a clause given twice, and a word the parser does not know (`always`, `every day`) each make the line unreadable. Each command remembers the file's line number it came from, for a message. A file with no schedule at all (no `agent-schedule.md` at the repository root) is read as no schedule, which the tick reports as `no agent-schedule.md`.
 
 ### What is not read
 
@@ -47,7 +48,7 @@ Only lines that start a list item (`- `) are read. Headings, blank lines and pro
 
 #### Context
 
-**Problem**: a typo (`- Work Queue: every day`, `- triage: cap 3` with no check, `- plan: when npx plan` with no backticks) must stand down that one command and say so, rather than silently doing nothing.
+**Problem**: a typo (`- Work Queue: every day`, `- triage: cap 3` with neither an interval nor a check, `- plan: when npx plan` with no backticks) must stand down that one command and say so, rather than silently doing nothing.
 
 #### Business logic
 

@@ -11,8 +11,8 @@ import type { State, TickDecision, TickRecord } from './state.js'
 
 /**
  * One tick (#1774): pull the branch, sweep, read the schedule, and for each command decide in
- * the cheapest order — does the project have the command, is it due, is its cap reached, is
- * there quota — then mark and spawn one run. Every decision is one line in the state, so a
+ * the cheapest order — does the project have the command, has its interval passed, is its check
+ * due, is its cap reached, is there quota — then mark and spawn one run. Every decision is one line in the state, so a
  * dashboard or a person reads why nothing started without a log.
  *
  * The quota is read only when everything else says start: a read spawns the agent's CLI and the
@@ -39,6 +39,8 @@ export interface TickDeps {
   sweep: () => Promise<unknown>
   hasCommand: (name: string) => Promise<boolean>
   check: (shell: string) => Promise<CheckResult>
+  /** When the command last started on any machine, ISO; nothing when it never did. */
+  lastStart: (command: string) => Promise<string | undefined>
   inFlight: (command: string) => Promise<RunCard[]>
   quota: () => Promise<DriverQuota>
   mint: () => string
@@ -71,14 +73,25 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
       decide('no such command in this project')
       continue
     }
-    const checked = await deps.check(command.when).catch((err): CheckResult => ({ ok: false, stdout: '', stderr: String(err) }))
-    if (!checked.ok) {
-      decide(`check failed: ${checked.stderr.trim().split('\n').at(-1) ?? ''}`)
-      continue
+    if (command.every) {
+      // The interval before the check: the records are on disk already, the check spawns a shell.
+      const last = await deps.lastStart(command.name)
+      const since = last === undefined ? undefined : deps.now().getTime() - Date.parse(last)
+      if (since !== undefined && since < command.every.ms) {
+        decide(`not due (last start ${age(since)} ago, every ${command.every.text})`)
+        continue
+      }
     }
-    if (!isDue(checked.stdout)) {
-      decide('not due')
-      continue
+    if (command.when !== undefined) {
+      const checked = await deps.check(command.when).catch((err): CheckResult => ({ ok: false, stdout: '', stderr: String(err) }))
+      if (!checked.ok) {
+        decide(`check failed: ${checked.stderr.trim().split('\n').at(-1) ?? ''}`)
+        continue
+      }
+      if (!isDue(checked.stdout)) {
+        decide('not due')
+        continue
+      }
     }
     const running = await deps.inFlight(command.name)
     if (running.length >= command.cap) {
@@ -119,6 +132,16 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
     }
   }
   return record
+}
+
+/** An age for a decision line: `less than a minute`, `12m`, `3h`, `2d`, floored. */
+function age(ms: number): string {
+  const minutes = Math.floor(ms / 60_000)
+  if (minutes < 1) return 'less than a minute'
+  if (minutes < 60) return `${minutes}m`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h`
+  return `${Math.floor(hours / 24)}d`
 }
 
 function describe(card: RunCard): string {

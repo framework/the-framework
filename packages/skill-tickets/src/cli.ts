@@ -2,7 +2,7 @@ import { parseArgs } from 'node:util'
 import { join } from 'node:path'
 import { checkoutRoot, gitReason, nodeBranchFileFs, nodeGitRunner, openBranchReader, writeFileBranchDetached, type BranchReader, type GitRunner, DATA_BRANCH } from '@gemstack/agent-data'
 import { isTicketFile, isTicketPath, META_FILE, TICKETS_DIR, ticketLockName, ticketPlanName, ticketStem } from './names.js'
-import { readTicket, readTickets, type TicketsFs } from './tickets.js'
+import { readTicket, readTickets, readTicketsMeta, type TicketsFs } from './tickets.js'
 import { applyClaims, applyRelease, claimMessage, lockHolder, releaseMessage } from './locks.js'
 import { holderOf } from './holder.js'
 
@@ -26,6 +26,7 @@ export const USAGE = `usage: tickets <command>
 
   list                               every open ticket, as one JSON array
   show <file>                        one ticket: its text, its plan, who holds it
+  meta                               when the tickets last caught up with the issue tracker
   put <file>                         write one file under tickets/ from stdin (a ticket, a plan, meta.json)
   close <file>                       remove a ticket with its plan and lock (not while someone else holds it)
   claim <file>                       claim a ticket before planning or working it
@@ -93,6 +94,12 @@ const COMMANDS: Record<string, Command> = {
     parse(args, {}, 0)
     const reader = await open(io.cwd, git)
     return readTickets(TICKETS_DIR, ticketsFsOver(reader))
+  },
+
+  async meta(args, io, git) {
+    parse(args, {}, 0)
+    const reader = await open(io.cwd, git)
+    return readTicketsMeta(TICKETS_DIR, ticketsFsOver(reader))
   },
 
   async show(args, io, git) {

@@ -1,0 +1,17 @@
+{
+  "name": "@gemstack/skill-update-tickets",
+  "version": "0.0.1",
+  "description": "The update-tickets command for coding agents: bring the project's tickets up to date with its issue tracker, unattended. A skill file only, no code.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/framework/the-framework.git",
+    "directory": "packages/skill-update-tickets"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "SKILL.md"
+  ]
+}

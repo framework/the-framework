@@ -202,6 +202,8 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
 
+  packages/skill-plan-tickets: {}
+
   packages/skill-queue:
     dependencies:
       '@gemstack/agent-data':
@@ -227,6 +229,12 @@ importers:
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
+
+  packages/skill-triage-consensual: {}
+
+  packages/skill-triage-quick: {}
+
+  packages/skill-update-tickets: {}
 
   packages/skill-work-queue: {}
 

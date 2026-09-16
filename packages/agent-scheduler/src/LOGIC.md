@@ -26,7 +26,7 @@ The rules and the processes of `agent-scheduler`: the schedule [1] a person writ
 ## Business logic — TL;DR
 
 - **The names** (`names.ts`) - the schedule file, the state directory and file, the commands directory, and the defaults: `opus`, a spend cushion of half a day, a cap of 1, a tick every minute, a check's budget of one minute.
-- **The schedule** (`schedule.ts`, `schedule.test.ts`) - which lines name a command [14], its check and its cap [11]; a line that cannot be read is named by its number; a check's output says due when it is non-empty JSON; a command's prompt is its slash command.
+- **The schedule** (`schedule.ts`, `schedule.test.ts`) - which lines name a command [14], its check, its interval (`every 6h`: at most that often, from the command's last recorded start) or both, and its cap [11]; a line that cannot be read is named by its number; a check's output says due when it is non-empty JSON; a command's prompt is its slash command.
 - **The state** (`state.ts`, `state.test.ts`) - the JSON file and its defaults, hidden from git on the first write, read as the default when missing or unreadable; where a spawned run's stderr lands.
 - **The spend boundary** (`quota-boundary.ts`, `quota-boundary.test.ts`) - the reset prose read as an instant, the elapsed share of the week, the windows in force, the limit the cushion moves, and the one line that says why a run may not start.
 - **Run records as markers** (`records.ts`, `records.test.ts`) - a marker is a running card with the tool's mark, counted per command across machines; withdrawn when the cap was lost; overwritten by the record at the end.
@@ -34,7 +34,7 @@ The rules and the processes of `agent-scheduler`: the schedule [1] a person writ
 - **The pull request** (`pr.ts`) - the pull request a branch has, read back with `gh`, or none.
 - **One run** (`run.ts`, `run.test.ts`) - marker, checkout, live log, the prompt once, the pull request, the record over the marker, the checkout reclaimed; a run with no checkout is recorded `failed`.
 - **The sweep** (`sweep.ts`, `sweep.test.ts`) - dead runs of this machine recorded and reclaimed; markers with nothing behind them ended; another machine's runs never touched.
-- **The tick** (`tick.ts`, `tick.test.ts`) - pull, sweep, then per command in order: the command exists, the check, due, the cap, the quota, the marker, the re-count, the spawn; every outcome's exact line.
+- **The tick** (`tick.ts`, `tick.test.ts`) - pull, sweep, then per command in order: the command exists, the interval since its last start, the check, due, the cap, the quota, the marker, the re-count, the spawn; every outcome's exact line.
 - **The processes** (`scheduler.ts`) - the tick wired to the real project, the detached run, `start`, `stop` (which leaves a keep-alive scheduler running when asked to) and `status`, and the loop that ticks every minute.
 - **The command line** (`cli.ts`, `cli.test.ts`) - the seven commands, JSON on stdout, a line on stderr, exit 0, 1 or 2, and the project found from inside a checkout.
 - **The entry point** (`index.ts`) - re-exports everything a program or a dashboard imports.

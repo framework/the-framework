@@ -1,6 +1,7 @@
 What the tests cover, with every reading injected (the wiring to a real project is `scheduler.ts`'s):
 
 - **A start** - a due command under its cap with quota to spare gets a running marker (the prompt `/<command>`, the state's model, the mark with the command and this host), is spawned with the same id, and the decision is `started <id>` with the run's id.
+- **An interval** - a command never started is due and its check decides; a start younger than the interval is `not due (last start 2h ago, every 6h)` (`1m` for a minute) with no check run and no marker written; a start older than the interval is due again.
 - **Off** - the pull and the sweep still run, no check runs, the note is `off`.
 - **A failed pull** - the note is `agent-data could not be pulled: <error>` and nothing is spawned.
 - **No schedule** - the note is `no agent-schedule.md`.

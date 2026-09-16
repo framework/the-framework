@@ -45,6 +45,7 @@ function deps(over: Partial<TickDeps> & { stateOver?: Partial<State>; md?: strin
       seen.checks.push(shell)
       return { ok: true, stdout: '["one entry"]', stderr: '' }
     },
+    lastStart: async () => undefined,
     inFlight: async command => [...cards, ...seen.markers].filter(c => c.status === 'running' && (c.caller?.['scheduler'] as { command: string }).command === command),
     quota: async () => quota(10),
     mint: () => `2026-09-16T14-01-00-00${ids++}Z`,
@@ -64,6 +65,29 @@ function deps(over: Partial<TickDeps> & { stateOver?: Partial<State>; md?: strin
   }
   return { deps: d, seen }
 }
+
+test('an interval: never started is due; a start inside the interval is not due, with the age and the interval, and runs no check; a start past it is due', async () => {
+  const md = '- triage-quick: every 6h\n- update-tickets: every 1h, when `gh issue list`\n'
+  const never = deps({ md })
+  const first = await tick(never.deps)
+  assert.deepEqual(first.decisions.map(d => d.outcome.replace(/ 2026.*$/, '')), ['started', 'started'])
+  assert.deepEqual(never.seen.checks, ['gh issue list'], 'the interval passed, so the check decided')
+
+  const starts: Record<string, string> = { 'triage-quick': '2026-09-16T11:30:00.000Z', 'update-tickets': '2026-09-16T13:59:30.000Z' }
+  const recent = deps({ md, lastStart: async command => starts[command] })
+  const second = await tick(recent.deps)
+  assert.deepEqual(second.decisions, [
+    { command: 'triage-quick', outcome: 'not due (last start 2h ago, every 6h)' },
+    { command: 'update-tickets', outcome: 'not due (last start 1m ago, every 1h)' },
+  ])
+  assert.deepEqual(recent.seen.checks, [], 'no check runs while the interval holds')
+  assert.equal(recent.seen.markers.length, 0)
+
+  const old = deps({ md, lastStart: async () => '2026-09-15T14:00:00.000Z' })
+  const third = await tick(old.deps)
+  assert.deepEqual(third.decisions.map(d => d.outcome.replace(/ 2026.*$/, '')), ['started', 'started'])
+  assert.deepEqual(old.seen.checks, ['gh issue list'])
+})
 
 test('a due command under its cap with quota to spare is marked on the branch, then spawned, and the state says so', async () => {
   const { deps: d, seen } = deps()

@@ -36,6 +36,8 @@ test('ticketFromQueueEntry reads the ticket a queued entry links back to', () =>
   // An entry that is just text is work with no ticket behind it — a plan ask included.
   assert.equal(ticketFromQueueEntry('Apply the maintainability preset'), undefined)
   assert.equal(ticketFromQueueEntry('Create tickets/2026-07-25_login.plan.md'), undefined)
+  // A link to a ticket's plan names no ticket: a plan is not a ticket.
+  assert.equal(ticketFromQueueEntry('[Plan it](tickets/2026-07-25_login.plan.md)'), undefined)
   assert.equal(ticketFromQueueEntry('see the [docs](README.md)'), undefined)
   // A traversal dressed as a link is refused at the same gate.
   assert.equal(ticketFromQueueEntry('[sneaky](tickets/../../etc/passwd)'), undefined)
@@ -43,16 +45,22 @@ test('ticketFromQueueEntry reads the ticket a queued entry links back to', () =>
 
 test('only a plain file inside tickets/ counts as a ticket path', () => {
   assert.equal(isTicketPath('tickets/2026-07-25_login.md'), true)
-  // A dot-prefixed name is refused in both spellings: `tickets/.hidden.md` here, `.hidden.md` bare.
-  for (const bad of ['tickets/../secrets.md', 'tickets/nested/deep.md', 'tickets/.hidden.md', 'tickets/notes.txt', '/etc/passwd', 'https://example.com/x.md', 'TODO_AGENTS.md', 'tickets/']) {
+  for (const bad of ['tickets/../secrets.md', 'tickets/nested/deep.md', 'tickets/.hidden.md', 'tickets/..md', 'tickets/sub\\x.md', 'tickets/2026-07-25_login.plan.md', 'tickets/2026-07-25_login.lock.md', 'tickets/notes.txt', '/etc/passwd', 'https://example.com/x.md', 'TODO_AGENTS.md', 'tickets/']) {
     assert.equal(isTicketPath(bad), false, `expected ${bad} to be rejected`)
   }
 })
 
 test('a bare ticket filename has no path segments, no leading dot and is not a sibling', () => {
   assert.equal(isTicketFile('2026-07-25_login.md'), true)
-  for (const bad of ['../login.md', 'sub/login.md', '/etc/passwd.md', '.hidden.md', '2026-07-25_login.plan.md', '2026-07-25_login.lock.md', 'meta.json']) {
+  for (const bad of ['../login.md', 'sub/login.md', '/etc/passwd.md', 'sub\\x.md', '.hidden.md', '..md', '2026-07-25_login.plan.md', '2026-07-25_login.lock.md', 'meta.json']) {
     assert.equal(isTicketFile(bad), false, `expected ${bad} to be rejected`)
+  }
+})
+
+test('a name is refused bare exactly when it is refused under tickets/', () => {
+  const names = ['2026-07-25_login.md', '.hidden.md', '..md', 'sub\\x.md', 'sub/x.md', 'a.plan.md', 'a.lock.md', 'meta.json', 'notes.txt', '']
+  for (const name of names) {
+    assert.equal(isTicketPath(`tickets/${name}`), isTicketFile(name), `the two spellings of ${JSON.stringify(name)} disagree`)
   }
 })
 

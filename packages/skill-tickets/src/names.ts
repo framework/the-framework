@@ -39,9 +39,7 @@ export function ticketLockName(file: string): string {
 /**
  * A bare ticket filename: a `.md` name with no path segments (so it cannot address another
  * directory), not starting with a dot, and not one of a ticket's own siblings. The gate every
- * filename that arrives from outside — a command's argument, a browser — goes through. The two
- * spellings of a name refuse the same ones: what this refuses bare, `isTicketPath` refuses under
- * `tickets/`.
+ * filename that arrives from outside — a command's argument, a browser — goes through.
  */
 export function isTicketFile(file: string): boolean {
   return /^[^./\\][^/\\]*\.md$/.test(file) && !SIBLING.test(file)
@@ -53,14 +51,12 @@ export function isSibling(file: string): boolean {
 }
 
 /**
- * Whether a string names a ticket by path: `tickets/<name>.md`, and nothing else. A relative
- * segment, an absolute path, a URL, a dotfile, or anything nested deeper all fail it. The one gate
- * for both ends of a queue link — what an entry is read as, and what a caller may record.
+ * Whether a string names a ticket by path: `tickets/` followed by a name `isTicketFile` accepts, and
+ * nothing else — so the two spellings of a name are refused alike. The one gate for both ends of a
+ * queue link: what an entry is read as, and what a caller may record.
  */
 export function isTicketPath(path: string): boolean {
-  if (!path.startsWith(`${TICKETS_DIR}/`)) return false
-  const file = path.slice(TICKETS_DIR.length + 1)
-  return file.endsWith('.md') && !file.includes('/') && !file.startsWith('.')
+  return path.startsWith(`${TICKETS_DIR}/`) && isTicketFile(path.slice(TICKETS_DIR.length + 1))
 }
 
 /**

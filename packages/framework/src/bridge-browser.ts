@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process'
-import { existsSync } from 'node:fs'
-import { mkdir, readlink } from 'node:fs/promises'
+import { readFileSync } from 'node:fs'
+import { cp, mkdir, readlink, rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Browser, detectBrowserPlatform, getInstalledBrowsers, install, resolveBuildId } from '@puppeteer/browsers'
@@ -62,14 +62,51 @@ export function bridgeBrowserLaunchArgs(port: number, profileDir: string): strin
   ]
 }
 
+/** The extension's name in its manifest: what tells its folder apart from any other `chrome-extension` folder. */
+const BRIDGE_EXTENSION_NAME = 'The Framework: Claude web bridge'
+
+/** Where the extension's files are, and whether that is a checkout, where they are edited in place. */
+export interface BridgeExtensionSource {
+  dir: string
+  checkout: boolean
+}
+
 /**
- * The extension's files: the checkout's `packages/chrome-extension`, next to this package.
- * Undefined outside a checkout — the extension is not part of the published package, so the
- * bridge browser is a checkout feature until the extension ships another way.
+ * The extension's files (#1720): the checkout's `packages/chrome-extension` next to this package,
+ * so an edit there reaches the browser through the extension's self-reload; else the copy the
+ * build puts in `dist/chrome-extension`, which is what an installed package has. A folder counts
+ * only when its manifest names the bridge extension. Undefined when neither is there.
+ * `moduleUrl` is this file's URL; tests point it elsewhere.
  */
-export function bridgeExtensionDir(): string | undefined {
-  const dir = fileURLToPath(new URL('../../chrome-extension/', import.meta.url))
-  return existsSync(join(dir, 'manifest.json')) ? dir : undefined
+export function bridgeExtensionSource(moduleUrl: string = import.meta.url): BridgeExtensionSource | undefined {
+  const checkout = fileURLToPath(new URL('../../chrome-extension/', moduleUrl))
+  if (isBridgeExtension(checkout)) return { dir: checkout, checkout: true }
+  const packaged = fileURLToPath(new URL('./chrome-extension/', moduleUrl))
+  if (isBridgeExtension(packaged)) return { dir: packaged, checkout: false }
+  return undefined
+}
+
+function isBridgeExtension(dir: string): boolean {
+  try {
+    return (JSON.parse(readFileSync(join(dir, 'manifest.json'), 'utf8')) as { name?: unknown }).name === BRIDGE_EXTENSION_NAME
+  } catch {
+    return false
+  }
+}
+
+/**
+ * The folder the extension is installed from. A checkout's folder as it is: its path is stable,
+ * and the self-reload picks up edits there. A package's copy is copied again into the bridge
+ * browser's own `extension` folder, overwriting it: Chrome derives an unpacked extension's id from
+ * its path, and npx puts each version of the package in a different folder, so installing from
+ * there would leave one dead extension in the profile per version.
+ */
+async function installableExtensionDir(source: BridgeExtensionSource, bridgeDir: string): Promise<string> {
+  if (source.checkout) return source.dir
+  const dir = join(bridgeDir, 'extension')
+  await rm(dir, { recursive: true, force: true })
+  await cp(source.dir, dir, { recursive: true })
+  return dir
 }
 
 /**
@@ -396,8 +433,8 @@ export interface BridgeBrowserOptions {
   token: string
   /** The bridge browser's directory: the profile and the binary live under it. */
   dir: string
-  /** The extension's files. Default: the checkout's `packages/chrome-extension`. */
-  extensionDir?: string | undefined
+  /** The extension's files. Default: `bridgeExtensionSource()`. */
+  extension?: BridgeExtensionSource | undefined
   /** Progress, one line at a time, for the dashboard to show while the launch runs. */
   report?: ((detail: string) => void) | undefined
 }
@@ -409,12 +446,13 @@ export interface BridgeBrowserOptions {
  */
 export async function startBridgeBrowser(opts: BridgeBrowserOptions, deps: BridgeBrowserDeps = bridgeBrowserDeps()): Promise<BridgeBrowser> {
   const report = opts.report ?? (() => {})
-  const extensionDir = opts.extensionDir ?? bridgeExtensionDir()
-  if (!extensionDir) throw new Error('the extension files are not beside this package (packages/chrome-extension): the bridge browser runs from a checkout')
+  const extension = opts.extension ?? bridgeExtensionSource()
+  if (!extension) throw new Error('the extension files are missing from this package (dist/chrome-extension)')
   const profileDir = join(opts.dir, 'profile')
   await mkdir(profileDir, { recursive: true })
   const binary = await deps.binary(join(opts.dir, 'chrome'), report)
   if (await freeProfile(profileDir, deps)) report('stopped a browser an earlier daemon left behind')
+  const extensionDir = await installableExtensionDir(extension, opts.dir)
 
   report('starting Chrome for Testing')
   const port = await deps.port()

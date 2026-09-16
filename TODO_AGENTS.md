@@ -2,7 +2,6 @@
 
 
 ## Priority 5
-- Write the plan: [Follow-ups from the DECISIONS.md and SKILL.md cold reads](tickets/2026-09-04_cold-read-follow-ups.md)
 - Write the plan: [An Actions agent is told two branch names](tickets/2026-08-28_actions-agent-two-branch-names.md)
 
 

@@ -41,7 +41,7 @@ Reads the turn signals [1] off a turn's [2] final message, the one place The Fra
 - **The pull request the agent asks for** - the last non-empty `open-pr` block, read like a commit message; its first line is the title only when it is 100 characters or shorter, else the whole block is the description.
 - **Reported errors** - every non-empty `error` block, in order, first line the headline and the rest the detail; an empty block is no error.
 - **Ready for merge** - a `ready-for-merge` block anywhere in the message, with or without a body.
-- **The gate the turn stops at** - the last usable `await-choices` block: a JSON object with at least one labeled option, ids synthesized when missing, the recommendation matched by id or label, a blank title replaced by "Which option?"; a malformed block is ignored.
+- **The gate the turn stops at** - `agent-driver`'s question, read by its parser: the last usable `await-choices` block, a JSON object with at least one labeled option, ids synthesized when missing, the recommendation matched by id or label, a blank title replaced by "Which option?"; a malformed block is ignored. The continuation prompt an answer resumes the agent with is `agent-driver`'s wording too.
 - **The await limit** - five gates per exchange, shared by every path that runs gates.
 - **Answering a gate, in fixed words** - one continuation wording resumes the agent with the pick; a stopping pick logs a message to the user, or, for a cloud session, tells the agent the user is taking over.
 - **One reader per span of turns** - views are emitted every turn they appear; an identical error is reported once; ready for merge fires once; the pull request is re-emitted only when it changes.
@@ -117,7 +117,7 @@ The signal is the presence of a `ready-for-merge` block anywhere in the message,
 
 #### Business logic
 
-The gate [6] is read from the last usable `await-choices` block of the message: the blocks are tried newest first, so a malformed last block falls back to a good earlier one rather than losing a good question to a bad one after it. A message with no usable block means the agent [3] simply finished, the common case, and the turn [2] flows straight through.
+The gate [6] is `agent-driver`'s question (its `question.ts`, the one parser every driver also reports the question through), read from the last usable `await-choices` block of the message: the blocks are tried newest first, so a malformed last block falls back to a good earlier one rather than losing a good question to a bad one after it. A message with no usable block means the agent [3] simply finished, the common case, and the turn [2] flows straight through.
 
 A block is usable when its body is a JSON object with an `options` list, and at least one option survives these rules:
 

@@ -28,6 +28,7 @@ Drives Claude Code as a driver [1]: each turn [2] is one non-interactive invocat
 
 ## Business logic — TL;DR
 
+- **The shared end of a turn, and the log** - the session attaches the log when the caller asked for one, so every event is recorded before the caller sees it; every turn ends the shared way (`inbox.ts`): the question reported, the inbox drained into further turns of the same session.
 - **Starting and prompting Claude Code** - every turn [2] spawns `claude` in print mode with streamed JSON output, in the driver session's [3] directory, with the prompt over standard input.
 - **Permission mode** - Claude Code runs with `acceptEdits` unless the driver [1] was configured with another mode, or told to skip permission checks altogether; the product itself chooses `bypassPermissions`.
 - **Framing becomes the system prompt** - the driver session's framing [10] and the turn's extra framing are appended to Claude Code's system prompt, except on a resumed turn, whose conversation already carries them.

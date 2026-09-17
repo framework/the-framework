@@ -185,6 +185,8 @@ function formatDriverEvent(event: DriverEvent): string {
       return `  ! agent error: ${event.message}`
     case 'notice':
       return `  ~ ${event.message}`
+    case 'question':
+      return `  ? ${truncate(event.question.title, 140)}`
   }
 }
 

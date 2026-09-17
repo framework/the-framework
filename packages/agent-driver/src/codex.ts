@@ -1,5 +1,7 @@
 import { execFile, spawn as nodeSpawn } from 'node:child_process'
 import { runCliSession, type AgentCliParser, type SpawnLike } from './cli-session.js'
+import { finishTurn } from './inbox.js'
+import { attachLog, type SessionLog } from './session-log.js'
 import { combineFraming, combineSignals, makeEmit, readWorkspaceFile } from './session-support.js'
 import type { Driver, DriverEvent, DriverPromptOptions, DriverSession, DriverStartOptions, DriverTurn, DriverUsage } from './types.js'
 
@@ -64,11 +66,16 @@ let sessionCounter = 0
 export class CodexSession implements DriverSession {
   readonly id: string
   readonly cwd: string
+  readonly log?: SessionLog
+  private readonly startOpts: DriverStartOptions
 
   constructor(
     private readonly config: CodexDriverOptions,
-    private readonly startOpts: DriverStartOptions,
+    startOpts: DriverStartOptions,
   ) {
+    const attached = attachLog(startOpts)
+    this.startOpts = attached.opts
+    if (attached.log) this.log = attached.log
     this.cwd = startOpts.cwd
     this.id = `codex-${++sessionCounter}`
   }
@@ -80,18 +87,20 @@ export class CodexSession implements DriverSession {
     const prompt = framing ? `${framing}\n\n${text}` : text
     // Resolved every turn, not at start: the agent may `git init` in turn 1.
     const gitDir = await gitCommonDir(this.cwd)
-    return runCliSession({
+    const emit = makeEmit(this.startOpts.onEvent, 'codex')
+    const turn = await runCliSession({
       bin: this.config.bin ?? 'codex',
       args: this.buildArgs(gitDir),
       cwd: this.cwd,
       env: this.config.env ?? process.env,
       prompt,
       spawn: this.config.spawn ?? (nodeSpawn as unknown as SpawnLike),
-      emit: makeEmit(this.startOpts.onEvent, 'codex'),
+      emit,
       signals: combineSignals(this.startOpts.signal, opts.signal),
       parser: new CodexJsonParser(),
       driver: 'codex',
     })
+    return finishTurn(this, turn, opts, emit)
   }
 
   readCode(path: string): Promise<string> {

@@ -27,10 +27,10 @@ Fixes the vocabulary of the driver [1] contract, in words: what every driver pro
 ## Business logic — TL;DR
 
 - **What a driver promises** - a stable implementation id, a way to start a driver session [2] bound to a directory, and optionally a way to read the account's quota [7].
-- **How a driver session is started** - with the directory the coding agent [8] reads and edits, the framing [10] every turn [3] carries, the model to pass through, a stop request [11] for the whole driver session, optionally the session id of an earlier driver session to continue, and a listener for progress events [4] that can never break the coding agent.
-- **One turn, one final message** - a prompt goes in with optional extra framing, a stop request for this turn only and a best-effort request to continue the previous turn; the final message, the session id and the usage [5] come out.
+- **How a driver session is started** - with the directory the coding agent [8] reads and edits, the framing [10] every turn [3] carries, the model to pass through, a stop request [11] for the whole driver session, optionally the session id of an earlier driver session to continue, optionally a log (a directory and the card to start it with, exposed on the driver session for the caller to patch and end), and a listener for progress events [4] that can never break the coding agent.
+- **One turn, one final message** - a prompt goes in with optional extra framing, a stop request for this turn only, a best-effort request to continue the previous turn and optionally an inbox path, whose waiting lines become further turns before the prompt resolves; the final message, the session id and the usage [5] of the last turn come out.
 - **Reading code and ending the driver session** - a driver [1] may let the caller read a file the coding agent produced; ending the driver session frees what it holds and may be repeated safely.
-- **Progress events are shown, never decided on** - eight kinds of progress event, each with what it carries, none of which a caller may gate on.
+- **Progress events are shown, never decided on** - nine kinds of progress event, each with what it carries, none of which a caller may gate on; the ninth is the question a turn ended on, parsed.
 - **Usage: what one turn spent** - token counts always, a price only when the coding agent prices its turns and never as zero.
 - **Rate limit: the per-turn traffic light** - whether the account may still spend against one window and when it resets, with unknown statuses and windows passed through rather than dropped.
 - **Quota: the share of each window used** - a reading is either available with its windows or unavailable with a reason, never an empty list that reads as nothing used.

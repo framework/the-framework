@@ -25,6 +25,7 @@ Drives Codex as a driver [1]: each turn [2] is one non-interactive invocation of
 
 ## Business logic — TL;DR
 
+- **The shared end of a turn, and the log** - the session attaches the log when the caller asked for one, so every event is recorded before the caller sees it; every turn ends the shared way (`inbox.ts`): the question reported, the inbox drained into further turns of the same session.
 - **Starting and prompting Codex** - every turn [2] spawns `codex` in its non-interactive mode with streamed JSON output, pointed at the driver session's [3] directory, with the prompt over standard input.
 - **Sandboxed to the directory** - Codex runs under its `workspace-write` sandbox unless the driver [1] was configured with `read-only` or `danger-full-access`; under `workspace-write` the directory's git repository data is writable too, so the coding agent [4] can commit; the flag that bypasses Codex's approvals and sandbox is never passed.
 - **Framing rides ahead of the prompt** - Codex has no system prompt flag, so the driver session's framing [10] and the turn's extra framing are placed in front of the prompt, as their own block.

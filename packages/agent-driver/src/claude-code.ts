@@ -5,6 +5,8 @@ import { dirname, join } from 'node:path'
 import { readClaudeQuota } from './claude-code-quota.js'
 import { combineFraming, combineSignals, makeEmit, readWorkspaceFile } from './session-support.js'
 import { runCliSession, type SpawnLike } from './cli-session.js'
+import { finishTurn } from './inbox.js'
+import { attachLog, type SessionLog } from './session-log.js'
 import type { Driver, DriverEvent, DriverPromptOptions, DriverQuota, DriverRateLimit, DriverSession, DriverStartOptions, DriverTurn, DriverUsage } from './types.js'
 
 /** Claude Code permission modes we pass through to the CLI. */
@@ -87,11 +89,16 @@ export class ClaudeCodeSession implements DriverSession {
    * conversation; resume keeps the id stable, so consecutive chat messages chain.
    */
   private lastSessionId: string | undefined
+  readonly log?: SessionLog
+  private readonly startOpts: DriverStartOptions
 
   constructor(
     private readonly config: ClaudeCodeDriverOptions,
-    private readonly startOpts: DriverStartOptions,
+    startOpts: DriverStartOptions,
   ) {
+    const attached = attachLog(startOpts)
+    this.startOpts = attached.opts
+    if (attached.log) this.log = attached.log
     this.cwd = startOpts.cwd
     this.id = `claude-code-${++sessionCounter}`
     // Resume a finished agent (#720): seeding lastSessionId makes the very first `resume` prompt
@@ -149,7 +156,7 @@ export class ClaudeCodeSession implements DriverSession {
     }
     // Track the agent's session so a later resume continues this exact conversation.
     if (turn.sessionId) this.lastSessionId = turn.sessionId
-    return turn
+    return finishTurn(this, turn, opts, emit)
   }
 
   readCode(path: string): Promise<string> {

@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto'
 import { StreamJsonParser } from './claude-code.js'
 import { readZip } from './actions-zip.js'
 import { combineFraming, makeEmit } from './session-support.js'
+import { finishTurn } from './inbox.js'
+import { attachLog, type SessionLog } from './session-log.js'
 import type { Driver, DriverEvent, DriverPromptOptions, DriverSession, DriverStartOptions, DriverTurn } from './types.js'
 
 /**
@@ -111,11 +113,16 @@ export class ActionsSession implements DriverSession {
   /** The agent's own session id, carried across turns so `resume` can continue it. */
   private lastSessionId: string | undefined
   private turnCounter = 0
+  readonly log?: SessionLog
+  private readonly startOpts: DriverStartOptions
 
   constructor(
     private readonly config: ActionsDriverOptions,
-    private readonly startOpts: DriverStartOptions,
+    startOpts: DriverStartOptions,
   ) {
+    const attached = attachLog(startOpts)
+    this.startOpts = attached.opts
+    if (attached.log) this.log = attached.log
     this.cwd = startOpts.cwd
     // The counter reads well in logs within one process; the random tag is what keeps the
     // correlation id unique across processes, since a caller may spawn a fresh one per run.
@@ -150,7 +157,7 @@ export class ActionsSession implements DriverSession {
     const turn = replayTranscript(artifact.execution, emit)
     if (turn.sessionId) this.lastSessionId = turn.sessionId
     emit({ type: 'result', text: turn.text, ...(turn.sessionId ? { sessionId: turn.sessionId } : {}), ...(turn.usage ? { usage: turn.usage } : {}) })
-    return turn
+    return finishTurn(this, turn, opts, emit)
   }
 
   /**

@@ -11,7 +11,7 @@ The driver [1] seam of The Framework: one contract under which a coding agent [2
 [1] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later. The user's driver choice is `claude` or `codex`; the driver implementations are `claude-code`, `codex`, `github-actions`, `claude-web` and `fake`.
 [2] coding agent: the CLI doing the actual work: Claude Code or Codex.
 [3] turn: one prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
-[4] progress event: what a driver reports while a turn runs, for a caller to show and never to decide on: the prompt sent, the session id, streamed text, a tool used, the final result, a rate limit reading, an error, a notice.
+[4] progress event: what a driver reports while a turn runs, for a caller to show and never to decide on: the prompt sent, the session id, streamed text, a tool used, the final result, a rate limit reading, an error, a notice, a question.
 [5] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
 [6] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
 [7] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
@@ -23,11 +23,17 @@ The driver [1] seam of The Framework: one contract under which a coding agent [2
 [13] stop request: the caller's signal that a driver session, or one turn of it, must end now; the product raises one when the user stops the agent.
 [14] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [15] live chat: the user's own messages to a running agent, each continuing the same driver session. One of them is a message.
+[17] question: the fenced `await-choices` block an agent ends a turn with when it will not decide alone: a title, options, a recommended one.
+[18] inbox: a file of lines from outside the agent, messages and answers, sent into the session when a turn ends.
+[19] log: the card and the diary of one driver session, two files in a run record's shape at a directory the caller gives.
 [16] correlation id: the id the `github-actions` driver makes up for one turn and hands the workflow, which echoes it into the run's display name and the artifact's name; it is the only way the driver finds its own run.
 
 ## Business logic — TL;DR
 
-- **The contract** (`types.ts`) - what every driver [1] promises, how a driver session [11] is started, what one turn [3] returns, the eight kinds of progress event [4], the three readings of spend (usage [9], rate limit [10], quota [8]), and which reasons for an empty quota reading are transient.
+- **The contract** (`types.ts`) - what every driver [1] promises, how a driver session [11] is started (with a log [19] when asked), what one turn [3] returns (draining an inbox [18] first when named), the nine kinds of progress event [4], the three readings of spend (usage [9], rate limit [10], quota [8]), and which reasons for an empty quota reading are transient.
+- **The question** (`question.ts`, `question.test.ts`) - the one parser of the block an agent ends a turn with when it asks [17], tolerant, and the continuation prompt an answer resumes the agent with.
+- **The inbox and the end of a turn** (`inbox.ts`, `inbox.test.ts`) - lines appended from outside are taken once, in order; at every turn's end the question is reported and the waiting lines become further turns of the same session, until none waits; then the prompt returns.
+- **The log** (`session-log.ts`) - the card and the diary in a run record's shape, written as events arrive, patched and ended by the caller.
 - **What every driver session shares** (`session-support.ts`) - reporting progress events without letting a listener break the coding agent [2], folding the driver session's stop request [13] and framing [12] with a turn's own, and reading a file out of the directory.
 - **One turn as one process** (`cli-session.ts`, `cli-session.test.ts`) - a local coding agent is spawned as its own process-group leader in the driver session's directory, fed the prompt over standard input, streamed line by line through the driver's parser, and judged on its exit code; a stop request terminates the whole tree, with a forced kill 5 seconds later.
 - **Reaping every process tree** (`child-registry.ts`) - every live process group is registered so a stop reaches the whole tree with one signal and a hard exit of The Framework still kills every tree on the way out.
@@ -39,7 +45,7 @@ The driver [1] seam of The Framework: one contract under which a coding agent [2
 - **The scripted fake** (`fake.ts`, `fake.test.ts`) - scripted or responder-driven turns with the same progress events as a real driver, no process and no model, for tests and offline demos.
 - **The entry point** (`index.ts`) - everything the product may import: the contract, the four drivers with their parsers, the quota reader and the pieces an outside driver builds on; the zip reader stays internal.
 - **A turn on this machine, end to end** - how a local driver's command line and parser, the shared process core, the isolated reporter and the process registry together carry one turn from prompt to exit code, and what a stop does to the process tree.
-- **Where the implementations differ** - how each implementation starts its coding agent, delivers framing, resumes a conversation, reports spend and quota, reads code back, and whose login it spends.
+- **Where the implementations differ** - how each implementation starts its coding agent, delivers framing, resumes a conversation, reports spend and quota, reads code back, and whose login it spends; the log, the question and the inbox they all share.
 
 ## Business logic
 
@@ -66,4 +72,5 @@ The Claude Code and Codex drivers [1] each supply only two things for a turn [3]
 - **Resuming a conversation**: Claude Code resumes its own conversation by session id on this machine, and retries once fresh when that conversation is gone; the GitHub Actions implementation hands the session id to the workflow to resume; Codex and the fake never resume, so a live chat [15] message to a Codex agent starts fresh.
 - **What is spent**: Claude Code reports tokens and a price; Codex reports tokens and no price, never zero; only Claude Code reports rate limit [10] readings, and only the `claude-code` implementation reads the account's quota [8]; Codex, the GitHub Actions implementation and the fake offer no quota reading rather than a made-up number.
 - **Where the code is read**: the local implementations and the fake read a file from the directory or the seeded files; the GitHub Actions implementation reads it from the branch the run pushed, because the runner is gone.
+- **What they share**: every implementation attaches the log [19] when the caller asked for one, so each event is recorded before the caller sees it, and ends every turn the same way: the question [17] reported, the inbox [18] drained.
 - **Whose login is spent**: Claude Code's and Codex's own logins on this machine, and the OAuth token the repository holds as a secret on a runner. In every case the caller never holds a model key.

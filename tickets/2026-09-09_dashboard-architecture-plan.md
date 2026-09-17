@@ -17,17 +17,26 @@ The plan for #1768: a dashboard that shows a page, card or control only for the 
   - Q7.4: one scheduler per project; machine-wide settings go (quota from agent-driver at each tick, cap per command in the schedule file).
   - Q7.5: closing the dashboard stops new starts only; running agents finish. The pid goes into `agent.json`.
   - Q7.6: `work-queue` tracked in the project first; the scheduler starts a command only if `.claude/skills/<command>` exists. A one-shot `run <prompt>` beside `tick`, `start`, `stop`, `status`. Heartbeat and transport retry dropped. Untracked per-user state in `.agent-scheduler/state.json`, keep-alive included. Runs in flight are marker files on `agent-data`, counted against the cap. The daemon's clock calls each project's `tick` during the transition.
+- **Q8, the launcher and the last of the daemon's own agent runner (comment of 09-17, for #1770):** one way to run an agent. The launcher starts scheduler runs; the daemon's child goes, and with it the busy guard, the worktree sweep, the branch links and the CI watch's merge half.
+  - Q8.1 B: the launcher is the project's commands (read off its skills directory, like Claude Code's `/` menu) plus a free-text box. Every start is one `agent-scheduler run`. The framework holds no preset text: the nine presets that are not commands become one command package each (an argument where they had a blank) or are dropped, one at a time; the two that end in a question end in a written result.
+  - Q8.2: a start goes through a `start` hook key. The prompt reaches the line as an environment variable; the run's id comes back on stdout (the JSON `run` prints). The framework still names no tool.
+  - Q8.3: every child-only feature is kept, placed by the four homes (skill words / tools / dashboard widgets / server): gates and chat are run actions over the Q8.4 transport; continue = a `run` resume option by session id; handoff and Merge = skill words, Merge on a finished run a branches-widget action; browser panel = a `run` option plus a run widget; Codex, web, Actions = `run --driver` (web's bridge stays with the server); devices stay open.
+  - Q8.4 A: agent-driver owns the session both ways: it writes the live log and reads an inbox at paths it is given (one line per message or answer); a gate is a session event when the turn ends in a question. The run widget writes the inbox.
+  - Q8.5: several agents per project at once. A person's start has no cap; the scheduler's own starts keep the per-command cap and the quota gate.
 
 ## Why it matters
 
 Labeled via #1768 as the highest priority: modularity (skip or *replace* a skill) beats UX paper cuts. It sets how every later skill and command plugs into the framework and the dashboard.
 
-## What comes next (Q7, replaces Q6.5)
+## What comes next (Q8 order)
 
-- Step 0: track `work-queue` in the project like #1778.
-- First PR: the `agent-scheduler` package (`tick`, `run`, `start`, `stop`, `status`), the two files, the per-run process on agent-driver and the branches package, the markers, the sweep. The tick pulls `agent-data` first and schedules only `work-queue`. The daemon's look, its gates and the `Daemon:` trailer go.
-- Then the hook API and the Scheduler card.
-- Later: the rest of the daemon clock (CI watch, Discord, worktree sweep, cloud sweeps, boot reconcile) becomes scheduled commands, scheduler jobs, or goes; agent-driver writes the live log; the four rotation jobs become command packages that take their own locks and claims; web runs and the bridge stay with the dashboard server.
+1. The transport in agent-driver (Q8.4 A): the inbox and the question event, beside the live log.
+2. `run` options on the scheduler: driver, browser, resume; the two paths handed to agent-driver.
+3. The hook `start` key in the framework.
+4. The launcher: commands off the skills directory and the text box, both through the hook; in the same PR the child goes, with the busy guard, the CI watch's merge half, the worktree sweep and the branch links, so no two paths coexist.
+5. The nine presets, one package each or dropped, one at a time. The CI watch's fix half as a `fix-ci` routine.
+
+Not in this step: the dashboard half of Q1-Q5 (run actions land in the framework's run page first and move with it), the Discord watchers, the cloud sweeps (the server's, Q7), devices.
 
 ## Open points
 
@@ -37,4 +46,4 @@ Labeled via #1768 as the highest priority: modularity (skip or *replace* a skill
 
 ## Source
 
-Imported from GitHub issue [framework/the-framework#1774](https://github.com/framework/the-framework/issues/1774), created 2026-09-09, no labels, 4 comments (last folded: 2026-09-16T13:46Z).
+Imported from GitHub issue [framework/the-framework#1774](https://github.com/framework/the-framework/issues/1774), created 2026-09-09, no labels, 5 comments (last folded: 2026-09-17T13:33Z).

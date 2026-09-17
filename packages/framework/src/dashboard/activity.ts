@@ -97,7 +97,7 @@ export async function buildActivity(
 export function activityLine(item: Activity): string {
   const what = item.title ?? 'a session'
   if (item.kind === 'started') return `▶️ started: ${what}`
-  const mark = item.status === 'failed' ? '❌' : item.status === 'stopped' ? '⏹️' : '✅'
+  const mark = item.status === 'failed' ? '❌' : item.status === 'stopped' ? '⏹️' : item.status === 'waiting' ? '❓' : '✅'
   return `${mark} finished: ${what}`
 }
 

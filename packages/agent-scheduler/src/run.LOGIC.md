@@ -1,10 +1,10 @@
-One run [1]: a checkout [2] from the `branches` package, a session from `agent-driver`, the prompt once, and the agent's own loop to the end. No system prompt, no gates, no steering: the command's skill file is the whole instruction, and the agent publishes its own work through the skills in its checkout. This process records the run over its marker [3] and reclaims [4] the checkout when the agent stops; a signal to this process (SIGINT or SIGTERM: what a dashboard's Stop sends, the pid being in the live log [5]) stops the run, recorded `stopped`; a run whose process dies is caught by the sweep on a later tick. One-shot: `agent-scheduler run <prompt>` needs no scheduler running, and the tick spawns the same thing with the marker already written and the id chosen.
+One run [1]: a checkout [2] from the `branches` package, a session from `agent-driver`, the prompt once, and the agent's own loop to the end. No system prompt, no gates, no steering: the command's skill file is the whole instruction, and the agent publishes its own work through the skills in its checkout. The session keeps the run's live record [5] itself; this process adds its mark [6], the pid and the host, records the run over its marker [3] when the agent stops, and reclaims [4] the checkout. What reaches the agent from outside comes through the session's inbox [8]; a run whose last turn asked a question ends `waiting`, keeps its checkout, and the answer resumes it: the same run, the same record, continued. A signal to this process (SIGINT or SIGTERM: what a dashboard's Stop sends, the pid being on the live card) stops the run, recorded `stopped`; a run whose process dies is caught by the sweep on a later tick. One-shot: `agent-scheduler run <prompt>` needs no scheduler running, and the tick spawns the same thing with the marker already written and the id chosen.
 
 ## Context
 
-**User story**: the user sees the run on the dashboard as it works, on its own branch; when the agent ends, the run's record on the `agent-data` branch says how it went, which branch and pull request hold the work and what it cost, with what the agent said; the checkout is gone unless something in it is not on the remote yet.
+**User story**: the user sees the run on the dashboard as it works, on its own branch; when the agent ends, the run's record on the `agent-data` branch says how it went, which branch and pull request hold the work and what it cost, with what the agent said; the checkout is gone unless something in it is not on the remote yet. When the agent stops to ask, the run reads `waiting` with the question, and the user's answer picks the same run up where it stopped.
 
-**Business logic story**: the tick (`tick.ts`) writes the marker and spawns this as a detached process with the id and the command (`scheduler.ts`); a person runs it from a shell with any prompt, and then the run marks itself. The checkout is made and reclaimed by the `branches` package's rules; the record is written by the `logs` package's; the coding agent is a driver from `agent-driver`, Claude Code with permissions bypassed and the run's id in its environment as `AGENT_ID`, so a ticket it claims names the run.
+**Business logic story**: the tick (`tick.ts`) writes the marker and spawns this as a detached process with the id and the command (`scheduler.ts`); a person runs it from a shell with any prompt, and then the run marks itself; a person resumes an ended run with `run --resume`. The checkout is made and reclaimed by the `branches` package's rules; the record is written by the `logs` package's; the coding agent is a driver [7] from `agent-driver`, Claude Code with permissions bypassed and the run's id in its environment as `AGENT_ID`, so a ticket it claims names the run; the live record, the inbox and the question are `agent-driver`'s contract.
 
 ## Glossary
 
@@ -12,19 +12,23 @@ One run [1]: a checkout [2] from the `branches` package, a session from `agent-d
 [2] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [3] marker: a run record written before the agent exists: `status: running`, the tool's mark, an empty diary.
 [4] reclaim: removing a finished agent's checkout once its work is on the remote.
-[5] live log: `agent.json` and `events.jsonl` under `.the-framework/` in a run's checkout, in the shape The Framework's dashboard reads.
+[5] live record: the card `<id>.json` and the diary `<id>.jsonl` under `.the-framework/` in a run's checkout, the same two files as the run record, written by the session as the agent works (`live-card.ts`).
 [6] the tool's mark: `caller.scheduler` on a card: the command the run was started for, the machine that started it, and the run's process on that machine while it runs.
-[7] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does.
+[7] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later.
+[8] inbox: `.the-framework/inbox.jsonl` in the checkout: the lines from outside the agent, messages and answers, the session sends into the conversation when a turn ends.
+[9] question: the block an agent ends a turn with when it will not decide alone, with its options and a recommended one; `agent-driver`'s contract.
 
 ## Business logic — TL;DR
 
 - **The id, the command and the mark** - the id is given by the tick or minted from the start time; the command is given by the tick or the prompt's first word without its slash; the mark names the command, this host and this process.
 - **The marker** - a person's run writes its own marker; the tick's run was marked before it was spawned and does not mark itself again.
 - **The checkout** - made through the `branches` package for the run's id, on the birth branch `agent-<id>`; without one there is no run: the record is written `failed` with `could not create a checkout: …` over the marker, and the outcome says `no checkout`.
-- **The live log and the prompt** - the live log opened in the checkout with a session, an intent and a branch event; the driver started in the checkout on the run's model, prompted once with the prompt, its events appended as they stream, usage summed across turns; a driver that throws makes the run `failed` with the error as the detail.
+- **The session and the prompt** - the driver started in the checkout on the run's model with the live record's directory and the card's starting fields (the prompt as the intent, the driver, the model, the birth branch, and under `caller` the mark, the pid, the host and the checkout as the workspace); prompted once with the prompt and the inbox path; the session writes the live record as it streams; a driver that throws makes the run `failed` with the error as the detail.
 - **A stop** - SIGINT or SIGTERM to the run's process aborts the session, which ends the agent's whole process tree; the run is `stopped` with the detail `stopped by a signal to its process`, and the record and the reclaim run as for any other end.
-- **The record** - the branch read back from the checkout (the agent renames it itself), the pull request read back off that branch, the end appended, and the card and diary written over the marker.
+- **A question** - when the last turn ended on a question [9] and nothing waited in the inbox, the run ends `waiting`: recorded so, its checkout kept for the answer, the outcome's checkout reason `waiting`.
+- **The record** - the branch read back from the checkout (the agent renames it itself) and the pull request read back off that branch are patched onto the live card, the session's log ended with the status and the detail, and the two files copied onto the branch unchanged, over the marker, same id.
 - **The reclaim** - the checkout reclaimed under the `branches` rule, pushing on the way; a dirty tree or a branch that could not be pushed keeps it, with the reason in the outcome, and the sweep tries again on a later tick.
+- **A resume** - an ended run of this tool's continues as the same run: its record is written `running` again with this process's mark, the kept checkout is reused or one is attached to the run's branch, the session starts by the session id the record carries, the diary goes on from where it stopped, and the prompt is the user's text or the continuation of the question the run ended on with the given answer; then the session, the record and the reclaim as above.
 
 ## Business logic
 
@@ -56,9 +60,9 @@ See `## Context`.
 
 #### Business logic
 
-The checkout [2] is made by the `branches` package for the run's id: a worktree under `.branches/` on the birth branch `agent-<id>`, with everything an agent needs. When that fails, there is no run: the card is written `failed` with the end time, the diary one `ended` line whose detail is `could not create a checkout: <the error>`, and the outcome is `failed` with the same detail and a checkout that was not reclaimed for the reason `no checkout`.
+The checkout [2] is made by the `branches` package for the run's id: a worktree under `.branches/` on the birth branch `agent-<id>`, with everything an agent needs. When that fails, there is no run: the card is written `failed` with the end time, the diary one `ended` line whose detail is `could not create a checkout: <the error>`, and the outcome is `failed` with the same detail and a checkout that was not reclaimed for the reason `no checkout`. The live record's directory is hidden from git through the checkout's exclude file, since an untracked directory would keep the checkout dirty and a dirty checkout is never reclaimed.
 
-### The live log and the prompt
+### The session and the prompt
 
 #### Context
 
@@ -66,7 +70,7 @@ See `## Context`.
 
 #### Business logic
 
-The live log [5] is opened in the checkout, `running` under this process's pid and host, with the prompt as the intent and the mark; three events follow at once: the session (the driver's id, the checkout as the workspace, whether the driver is the fake, the model), the intent, and the birth branch. The driver [7] is then started in the checkout on the run's model and prompted once with the prompt; every event it streams is appended as a driver event; a session event, or a result carrying a session id, appends the session id; a result carrying usage counts one turn, adds its tokens to the run's totals and appends a usage event with the price when the driver gives one. The agent's own loop runs to the end; nothing here steers it. The driver session is disposed afterwards whatever happened. A driver that throws, on start or on the prompt (`claude: not logged in`), makes the run's status `failed` with the error's message as the detail; otherwise the status is `done`, whether or not the agent committed anything.
+The driver [7] is started in the checkout on the run's model, with a stop signal, the live record's [5] directory and the card's starting fields: the run's id and start time, the prompt as the intent, the driver's id, the model, the birth branch, and under `caller` the mark, the pid, the host, the kind `prompt` and the checkout's path as the workspace. It is prompted once with the prompt and the inbox [8] path; the session writes the live record as the agent streams, sends every line waiting in the inbox when a turn ends as a further turn, and resolves with the last turn. The agent's own loop runs to the end; nothing here steers it. The driver session is disposed afterwards whatever happened. A driver that throws, on start or on the prompt (`claude: not logged in`), makes the run's status `failed` with the error's message as the detail; otherwise the status is `done`, whether or not the agent committed anything.
 
 ### A stop
 
@@ -74,11 +78,23 @@ The live log [5] is opened in the checkout, `running` under this process's pid a
 
 **User story**: the user presses Stop on the dashboard, where the run shows like any other agent; the agent's processes end within seconds, the run reads `stopped` with what the agent had said until then, and its checkout is gone unless it holds work not on the remote.
 
-**Problem**: a dashboard steers its own agents through a file of its own; this tool reads no such file. The pid in the live log [5] is what a dashboard has of a run, and a signal is what a pid takes.
+**Problem**: a dashboard steers its own agents through a file of its own; this tool reads no such file. The pid on the live card is what a dashboard has of a run, and a signal is what a pid takes.
 
 #### Business logic
 
 SIGINT or SIGTERM to the run's process, from a dashboard's Stop or a person's shell, aborts the driver [7] session: the driver ends the agent's whole process tree. The run's status is then `stopped`, whatever the driver answered or threw, with the detail `stopped by a signal to its process`. Further signals are ignored while the record and the reclaim below run. Nothing else stops or steers a run.
+
+### A question
+
+#### Context
+
+**User story**: the agent has written a plan and wants it signed off; the run reads `waiting` on the dashboard with the question and its options; the user's answer, hours later, picks the run up where it stopped.
+
+**Problem**: no process waits for an answer that may never come, and the checkout has to be there when it comes.
+
+#### Business logic
+
+When the run was not stopped and the last turn's final message ends on a question [9], the run's status is `waiting`. It is recorded so (below), and its checkout is kept on purpose: the outcome says the checkout was not reclaimed for the reason `waiting`. The question itself is the last `question` line of the diary; the answer resumes the run.
 
 ### The record
 
@@ -88,7 +104,7 @@ SIGINT or SIGTERM to the run's process, from a dashboard's Stop or a person's sh
 
 #### Business logic
 
-The branch is read back from the checkout, the birth branch when it cannot be read; when it differs from the one the live log has, a branch event is appended. The pull request is read back off that branch (`pr.ts`), or none. The end is appended: ok when the status is `done`, flagged stopped when the status is `stopped`, with the detail when there is one. The card is built from the live log's meta with the pull request, and written with the diary over the marker, same id; a record that could not even be committed is logged as `the run's record could not be written: …`.
+The branch is read back from the checkout, the birth branch when it cannot be read. The pull request is read back off that branch (`pr.ts`), or none. Both are patched onto the live card; the session's log is ended with the status and, when there is one, the detail, which appends the `ended` line and sets the card's status and end time. Once every write has landed, the card and the diary are read back from the checkout and written onto the branch unchanged, over the marker, same id; a record that could not even be committed is logged as `the run's record could not be written: …`. When the session never opened (the driver threw on start), the card is the starting one with the status and the end time, and the diary one `ended` line.
 
 ### The reclaim
 
@@ -98,4 +114,16 @@ See `## Context`.
 
 #### Business logic
 
-The checkout is reclaimed [4] by the `branches` package with pushing allowed and the birth branch named, so a branch that held nothing goes with the checkout and a renamed branch reaches origin on the way. The outcome answers the id, the status, the branch, the pull request when there is one, the cost when the driver priced the turns, whether the checkout was reclaimed and, when it was not, the `branches` package's reason with its detail (`dirty`, `not-on-remote: …`), and the detail of a failure. A kept checkout is the sweep's to try again.
+A `waiting` run keeps its checkout and answers at once. Otherwise the checkout is reclaimed [4] by the `branches` package with pushing allowed and the birth branch named, so a branch that held nothing goes with the checkout and a renamed branch reaches origin on the way. The outcome answers the id, the status, the branch, the pull request when there is one, the cost off the card, whether the checkout was reclaimed and, when it was not, the `branches` package's reason with its detail (`dirty`, `not-on-remote: …`), and the detail of a failure. A kept checkout is the sweep's to try again.
+
+### A resume
+
+#### Context
+
+**User story**: the user answers the question a run stopped on, or types one more thing to an agent that ended; the same run continues, on the same branch, in the same conversation, and its record reads as one run from its first start to its last end.
+
+**Problem**: the run's process is gone; what remains is the record, the branch, the session id the coding agent named, and, for a waiting run, its checkout.
+
+#### Business logic
+
+`resumeRun` takes the run's id and the user's text, or the answer to the question. The record is read off the branch: no record, a record still `running`, or one without the tool's mark [6] is an error. The prompt is the text, or, for an answer, the continuation prompt `agent-driver` words from the last `question` line's title and the answer. The branch is the record's, or the birth branch when the record names none. The checkout is the run's own when it is still there, else a new one attached to that branch. The record is written `running` again, over the ended one, with this process's mark, pid, host and workspace, so every reader sees the run in flight; the record's diary is written into the checkout first, so the session's log continues it rather than starting empty. The session starts with the session id the record carries under `caller`, when there is one, and is prompted with the resume flag; from there the run is the same as a fresh one: the live record, a stop, a question, the record and the reclaim. The outcome's id is the run's id.

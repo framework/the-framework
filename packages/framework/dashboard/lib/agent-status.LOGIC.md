@@ -1,4 +1,4 @@
-Picks the one word an agent's [1] status pill shows, out of its event stream [2]: "failed", "stopped", "publishing…", "ready for merge", "building…" or "finished", together with the colored dot and the text tone drawn beside it. While the agent has said nothing worth a pill, there is no pill at all. The words are exclusive and ranked, so one agent is in exactly one state everywhere it appears.
+Picks the one word an agent's [1] status pill shows, out of its event stream [2]: "failed", "stopped", "waiting for an answer", "publishing…", "ready for merge", "building…" or "finished", together with the colored dot and the text tone drawn beside it. While the agent has said nothing worth a pill, there is no pill at all. The words are exclusive and ranked, so one agent is in exactly one state everywhere it appears.
 
 ## Context
 
@@ -33,7 +33,7 @@ Picks the one word an agent's [1] status pill shows, out of its event stream [2]
 
 #### Business logic
 
-There is no pill while all of the following hold: the agent [1] has not given its work a session name [5], has not signaled ready for merge [3], has not failed, and was not stopped [4]. Any one of the four is enough for a pill to appear.
+There is no pill while all of the following hold: the agent [1] has not given its work a session name [5], has not signaled ready for merge [3], has not failed, was not stopped [4], and does not wait on an answer. Any one of the five is enough for a pill to appear.
 
 ### One agent, one word, ranked
 

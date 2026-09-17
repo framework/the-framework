@@ -4,7 +4,7 @@
 // or a disk.
 
 /** How a run stands: still going, or how it ended. */
-export type RunStatus = 'running' | 'done' | 'stopped' | 'failed'
+export type RunStatus = 'running' | 'done' | 'stopped' | 'failed' | 'waiting'
 
 /**
  * The card: what was asked, where the work went, how it ended, what it cost. The package's
@@ -56,7 +56,7 @@ export type DiaryLine =
 /** Any line of a diary: a JSON object with a `kind`, the package's or the writer's. */
 export type AnyDiaryLine = { kind: string } & Record<string, unknown>
 
-const STATUSES: readonly RunStatus[] = ['running', 'done', 'stopped', 'failed']
+const STATUSES: readonly RunStatus[] = ['running', 'done', 'stopped', 'failed', 'waiting']
 
 function isStatus(value: unknown): value is RunStatus {
   return typeof value === 'string' && (STATUSES as readonly string[]).includes(value)

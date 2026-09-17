@@ -47,7 +47,7 @@ A ticket, or a queue entry that links one, may have been worked before. A `stopp
 }
 ```
 
-`status` is `running`, `done`, `stopped` or `failed`. `cost` is in US dollars. Every field but `id`, `startedAt` and `status` is absent when unknown. The program that wrote the card may keep its own bookkeeping under one more key, `caller`; the command never prints it.
+`status` is `running`, `done`, `stopped`, `failed` or `waiting` (ended on a question the agent asked, until it is answered). `cost` is in US dollars. Every field but `id`, `startedAt` and `status` is absent when unknown. The program that wrote the card may keep its own bookkeeping under one more key, `caller`; the command never prints it.
 
 ## The diary
 

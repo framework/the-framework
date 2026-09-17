@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import type { FrameworkEvent } from '../events.js'
 import type { AgentMeta } from './agent-store.js'
-import { diaryOf, eventsOf, fromRunCard, toRunCard } from './run-record.js'
+import { diaryOf, eventsOf, fromDiaryLine, fromRunCard, toRunCard } from './run-record.js'
 
 test('the meta round-trips through the skill\'s card: eleven fields on top, the rest under caller (#1769)', () => {
   const meta: AgentMeta = {
@@ -58,4 +58,22 @@ test('the events round-trip through the diary: four kinds mapped, every other li
   assert.deepEqual(diary[8], { kind: 'ended', status: 'stopped', detail: 'its process died' })
   assert.deepEqual(diary[9], { kind: 'ended', status: 'failed', detail: 'API 500' })
   assert.deepEqual(eventsOf(diary), events)
+})
+
+test('a diary agent-driver\'s own log wrote reads back as the framework\'s events: driver lines, the session id, the question as a gate, a waiting end (#1774)', () => {
+  assert.deepEqual(fromDiaryLine({ kind: 'start', prompt: '/work-queue' }), { kind: 'driver', event: { type: 'start', prompt: '/work-queue' } })
+  assert.deepEqual(fromDiaryLine({ kind: 'action', label: 'Bash' }), { kind: 'driver', event: { type: 'action', label: 'Bash' } })
+  assert.deepEqual(fromDiaryLine({ kind: 'notice', message: 'retried' }), { kind: 'driver', event: { type: 'notice', message: 'retried' } })
+  assert.deepEqual(fromDiaryLine({ kind: 'session', sessionId: 's-1' }), { kind: 'session-update', sessionId: 's-1' })
+  // The framework's own session event, written by its run child, still reads as itself.
+  assert.deepEqual(fromDiaryLine({ kind: 'session', driver: 'claude-code', workspace: '/w', fake: false }), { kind: 'session', driver: 'claude-code', workspace: '/w', fake: false })
+  assert.deepEqual(fromDiaryLine({ kind: 'question', title: 'Ship it?', options: [{ id: 'opt:0', label: 'Approve' }, { id: 'opt:1', label: 'Decline', stop: true }], recommended: 'opt:0' }), {
+    kind: 'choice',
+    id: 'await-choices',
+    title: 'Ship it?',
+    options: [{ id: 'opt:0', label: 'Approve' }, { id: 'opt:1', label: 'Decline', stop: true }],
+    recommended: 'opt:0',
+  })
+  assert.deepEqual(fromDiaryLine({ kind: 'ended', status: 'waiting' }), { kind: 'end', ok: false, waiting: true })
+  assert.deepEqual(fromDiaryLine({ kind: 'ended', status: 'stopped', detail: 'by hand' }), { kind: 'end', ok: false, stopped: true, detail: 'by hand' })
 })

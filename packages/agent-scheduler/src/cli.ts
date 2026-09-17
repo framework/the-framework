@@ -1,7 +1,7 @@
 import { parseArgs } from 'node:util'
 import { checkoutRoot, nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
 import { projectRoot } from '@gemstack/skill-branches'
-import { runProject, schedulerStatus, startScheduler, stopScheduler, tickProject } from './scheduler.js'
+import { resumeProject, runProject, schedulerStatus, startScheduler, stopScheduler, tickProject } from './scheduler.js'
 import { updateState } from './state.js'
 
 /**
@@ -14,6 +14,8 @@ export const USAGE = `usage: agent-scheduler <command>
 
   tick                          pull agent-data, sweep, read agent-schedule.md, start what is due
   run <prompt> [--model <id>]   one run of <prompt> in its own checkout, now, recorded; needs no scheduler
+  run --resume <id> [<text>] [--answer <label>]
+                                continue an ended run: the same record, its session resumed; the text as the next prompt, or the answer to the question it ended on
   start [--keep-alive]          the scheduler on, ticking every minute in its own process
   stop [--unless-keep-alive]    the scheduler off; runs in flight go to the end; with the flag a keep-alive scheduler is left running
   status                        the state file, and whether the scheduler's process is alive
@@ -77,16 +79,28 @@ const COMMANDS: Record<string, Command> = {
   },
 
   async run(args, io, git) {
-    const { positionals, values } = parse(args, { id: { type: 'string' }, command: { type: 'string' }, model: { type: 'string' } }, 1)
+    const { positionals, values } = parse(args, { id: { type: 'string' }, command: { type: 'string' }, model: { type: 'string' }, resume: { type: 'string' }, answer: { type: 'string' } }, 0, 1)
     const repo = await project(io.cwd, git)
+    if (values.resume !== undefined) {
+      if (positionals[0] === undefined && values.answer === undefined) throw new Usage('a text or --answer is needed to resume a run')
+      const outcome = await resumeProject(repo, {
+        id: values.resume,
+        ...(positionals[0] !== undefined ? { text: positionals[0] } : {}),
+        ...(values.answer !== undefined ? { answer: values.answer } : {}),
+        ...(values.model !== undefined ? { model: values.model } : {}),
+        log: io.stderr,
+      })
+      return { ok: outcome.status === 'done' || outcome.status === 'waiting', ...outcome }
+    }
+    if (positionals[0] === undefined) throw new Usage('expected 1 argument(s), got 0')
     const outcome = await runProject(repo, {
-      prompt: positionals[0]!,
+      prompt: positionals[0],
       ...(values.id !== undefined ? { id: values.id } : {}),
       ...(values.command !== undefined ? { command: values.command } : {}),
       ...(values.model !== undefined ? { model: values.model } : {}),
       log: io.stderr,
     })
-    return { ok: outcome.status === 'done', ...outcome }
+    return { ok: outcome.status === 'done' || outcome.status === 'waiting', ...outcome }
   },
 
   async start(args, io, git) {

@@ -7,7 +7,7 @@ import { ClaudeCodeDriver, readClaudeQuota } from 'agent-driver'
 import { DATA_BRANCH, nodeGitRunner, pullFileBranch, type GitRunner } from '@gemstack/agent-data'
 import { CHECK_TIMEOUT_MS, SCHEDULER_LOG, TICK_MS } from './names.js'
 import { inFlight, lastStart, withdrawMarker, writeMarker } from './records.js'
-import { runCommand, runIdFrom, type RunOutcome } from './run.js'
+import { resumeRun, runCommand, runIdFrom, type RunOutcome } from './run.js'
 import { readSchedule } from './schedule.js'
 import { readState, runStderrPath, stateDir, updateState, withoutPid, type State, type TickRecord } from './state.js'
 import { sweep } from './sweep.js'
@@ -99,10 +99,26 @@ export async function runProject(repo: string, opts: { prompt: string; id?: stri
     marked: opts.id !== undefined,
     ...(opts.command !== undefined ? { command: opts.command } : {}),
     model,
-    // The agent's id in its environment, so the claim it makes names the run (the tickets skill reads `AGENT_ID`).
-    driver: new ClaudeCodeDriver({ permissionMode: 'bypassPermissions', env: { ...process.env, [AGENT_ID_ENV]: id } }),
+    driver: claudeCodeFor(id),
     ...(opts.log ? { log: opts.log } : {}),
   })
+}
+
+/** Continue an ended run of the real project on Claude Code, in this process: the user's text, or the answer to the question it ended on. */
+export async function resumeProject(repo: string, opts: { id: string; text?: string; answer?: string; model?: string; log?: (line: string) => void }): Promise<RunOutcome> {
+  return resumeRun(repo, {
+    id: opts.id,
+    ...(opts.text !== undefined ? { text: opts.text } : {}),
+    ...(opts.answer !== undefined ? { answer: opts.answer } : {}),
+    ...(opts.model !== undefined ? { model: opts.model } : {}),
+    driver: claudeCodeFor(opts.id),
+    ...(opts.log ? { log: opts.log } : {}),
+  })
+}
+
+/** Claude Code with permissions bypassed, and the run's id in the agent's environment, so the claim it makes names the run (the tickets skill reads `AGENT_ID`). */
+function claudeCodeFor(id: string): ClaudeCodeDriver {
+  return new ClaudeCodeDriver({ permissionMode: 'bypassPermissions', env: { ...process.env, [AGENT_ID_ENV]: id } })
 }
 
 /** `start`: the state on, and the scheduler's own process ticking until `stop`, unless this process is it. */

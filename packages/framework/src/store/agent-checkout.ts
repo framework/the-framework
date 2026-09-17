@@ -43,14 +43,26 @@ export async function resolveAgentCheckout(projectCwd: string, agentId: string |
  * {@link resolveAgentCheckout}'s root fallback, where the project's own state is the sane
  * thing to act on.
  */
+/**
+ * The live journal in a checkout: the framework's own `events.jsonl`, or, for a run another tool
+ * started (#1774), the diary agent-driver's log keeps beside its card, `<id>.jsonl`, whose lines
+ * the tail turns into events.
+ */
+async function liveJournal(checkout: string, agentId: string): Promise<string> {
+  const own = join(checkout, THE_FRAMEWORK_DIR, EVENTS_FILE)
+  if (await nodeFs().exists(own)) return own
+  const diary = join(checkout, THE_FRAMEWORK_DIR, `${agentId}.jsonl`)
+  return (await nodeFs().exists(diary)) ? diary : own
+}
+
 export async function resolveAgentEventsPath(projectCwd: string, agentId: string | undefined): Promise<string> {
   const rootJournal = join(projectCwd, THE_FRAMEWORK_DIR, EVENTS_FILE)
   if (!agentId || !isSafeAgentId(agentId)) return rootJournal
   const live = await readLiveMetas(projectCwd).catch(() => [])
   const running = live.find(agent => agent.id === agentId)?.cwd
-  if (running) return join(running, THE_FRAMEWORK_DIR, EVENTS_FILE)
+  if (running) return liveJournal(running, agentId)
   const path = worktreePath(projectCwd, agentId)
-  if (await nodeFs().isDirectory(path)) return join(path, THE_FRAMEWORK_DIR, EVENTS_FILE)
+  if (await nodeFs().isDirectory(path)) return liveJournal(path, agentId)
   const [, archivedEvents] = await archivedAgentPaths(projectCwd, agentId)
   return archivedEvents ?? rootJournal
 }

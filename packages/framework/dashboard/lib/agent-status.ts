@@ -19,14 +19,16 @@ export type AgentStatusPill = { dot: string; label: string; tone: string }
 export function agentStatusPill(events: FrameworkEvent[]): AgentStatusPill | null {
   const progress = agentProgress(events)
   const outcome = agentOutcome(events)
-  const failed = outcome !== undefined && !outcome.ok && !outcome.stopped
+  const failed = outcome !== undefined && !outcome.ok && !outcome.stopped && !outcome.waiting
   const stopped = outcome?.stopped === true
+  const waiting = outcome?.waiting === true
   // Nothing to say yet: an agent that has not named itself, reached a state, or ended.
-  if (!progress.sessionName && !progress.readyForMerge && !failed && !stopped) return null
+  if (!progress.sessionName && !progress.readyForMerge && !failed && !stopped && !waiting) return null
   if (failed) {
     return { dot: 'bg-danger', label: outcome?.detail ? `failed — ${outcome.detail}` : 'failed', tone: 'text-danger' }
   }
   if (stopped) return { dot: 'bg-warning', label: 'stopped', tone: 'text-warning' }
+  if (waiting) return { dot: 'bg-warning', label: 'waiting for an answer', tone: 'text-warning' }
   // Ended clean, handoff armed, no `handoff` report yet (#1431): the epilogue is still
   // pushing/opening the PR/merging. An ending-side state like failed/stopped, so it sits above
   // the on-the-way "ready for merge" (#948) — during this window the publishing, the merge

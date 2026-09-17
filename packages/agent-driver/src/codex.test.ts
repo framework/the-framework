@@ -197,6 +197,29 @@ test('CodexDriver prepends the framing, since Codex has no system-prompt flag (#
   assert.equal(stdin, 'You are careful.\n\nAlso: be brief.\n\ndo the thing')
 })
 
+test('CodexDriver continues its conversation on a resume prompt, and only then', async () => {
+  const seen: Array<{ args: readonly string[]; stdin: string }> = []
+  const driver = new CodexDriver({ spawn: fakeSpawn(REAL_RUN, (args, stdin) => seen.push({ args, stdin })) })
+  const session = await driver.start({ cwd: '/ws', system: 'FRAMING', model: 'gpt-5' })
+  await session.prompt('build it', { resume: true })
+  await session.prompt('and the tests?', { resume: true })
+  await session.prompt('something new')
+  const id = '019f660b-bf69-7d62-a96c-34aad1f083db'
+  assert.deepEqual([...seen[0]!.args].slice(0, 2), ['exec', '--json'], 'no turn yet: nothing to resume, a fresh conversation')
+  assert.deepEqual([...seen[1]!.args], ['exec', 'resume', id, '-', '--json', '--skip-git-repo-check', '-c', 'sandbox_mode="workspace-write"', '-m', 'gpt-5'])
+  assert.equal(seen[1]!.stdin, 'and the tests?', 'the resumed conversation already carries its framing')
+  assert.equal(seen[0]!.stdin, 'FRAMING\n\nbuild it')
+  assert.deepEqual([...seen[2]!.args].slice(0, 2), ['exec', '--json'], 'a prompt that does not ask to resume starts fresh')
+})
+
+test('CodexDriver resumes the conversation a session was started for, under the sandbox given', async () => {
+  let seen: readonly string[] = []
+  const driver = new CodexDriver({ sandbox: 'danger-full-access', spawn: fakeSpawn(REAL_RUN, args => (seen = args)) })
+  const session = await driver.start({ cwd: '/ws', resumeSessionId: 'thread-1' })
+  await session.prompt('go on', { resume: true })
+  assert.deepEqual([...seen], ['exec', 'resume', 'thread-1', '-', '--json', '--skip-git-repo-check', '-c', 'sandbox_mode="danger-full-access"'])
+})
+
 test('CodexDriver passes the model through (#539)', async () => {
   let seen: readonly string[] = []
   const driver = new CodexDriver({ spawn: fakeSpawn(REAL_RUN, args => (seen = args)) })

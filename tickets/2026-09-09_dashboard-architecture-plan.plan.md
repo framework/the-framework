@@ -1,5 +1,6 @@
 Effort: 6
 Uncertainty: 6
+Outdated: yes
 
 # [Plan] Dashboard architecture: the plan and six questions
 

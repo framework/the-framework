@@ -1,3 +1,6 @@
+import type { Question } from './question.js'
+import type { SessionLog, SessionLogOptions } from './session-log.js'
+
 /**
  * The **driver** seam: the one abstraction a coding-agent CLI is wrapped behind.
  * A driver treats the CLI (Claude Code, Codex) as a **black box**: hand it a
@@ -67,6 +70,12 @@ export interface DriverStartOptions {
    */
   resumeSessionId?: string
   /**
+   * Keep the session's log, two files in a run record's shape at this directory, written as the
+   * agent works (`session-log.ts`). The session exposes it as {@link DriverSession.log} for the
+   * caller to patch and to end.
+   */
+  log?: SessionLogOptions
+  /**
    * Observe the agent's *own* progress as it works. Black-box granularity: we
    * forward these for visibility (a UI) but never branch control flow
    * on them. Isolated: a throwing callback must not break the agent.
@@ -91,6 +100,8 @@ export interface DriverSession {
    * whose workspace is not host-readable may omit it and rely on a runner.
    */
   readCode?(path: string): Promise<string>
+  /** The session's log, when {@link DriverStartOptions.log} asked for one. */
+  readonly log?: SessionLog
   /** Tear the session down (kill the process, free resources). Idempotent. */
   dispose(): Promise<void>
 }
@@ -109,6 +120,13 @@ export interface DriverPromptOptions {
    * by the Claude Code driver via `--resume <sessionId>`.
    */
   resume?: boolean
+  /**
+   * The inbox, a file of lines from outside the agent (`inbox.ts`): when the turn ends, every
+   * line waiting there is sent as a further prompt of the same session, in order, until the file
+   * is empty; then this prompt resolves with the last turn. Nothing waits for a line that has not
+   * come: a later line is for a new session resumed by its id.
+   */
+  inbox?: string
 }
 
 /** The outcome of one {@link DriverSession.prompt} turn. */
@@ -286,3 +304,5 @@ export type DriverEvent =
   | { type: 'error'; message: string }
   /** Something the driver worked around, worth telling the user about (#778). */
   | { type: 'notice'; message: string }
+  /** The turn ended on a question the agent will not decide alone: its `await-choices` block, parsed (`question.ts`). */
+  | { type: 'question'; question: Question }

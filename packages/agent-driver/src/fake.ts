@@ -1,5 +1,7 @@
 import type { Driver, DriverEvent, DriverPromptOptions, DriverSession, DriverStartOptions, DriverTurn, DriverUsage } from './types.js'
 import { makeEmit } from './session-support.js'
+import { finishTurn } from './inbox.js'
+import { attachLog, type SessionLog } from './session-log.js'
 
 /** One scripted turn the {@link FakeDriver} replays. */
 export interface FakeTurn {
@@ -53,12 +55,17 @@ export class FakeDriverSession implements DriverSession {
   readonly cwd: string
   /** Every prompt this session received, in order. */
   readonly prompts: string[] = []
+  readonly log?: SessionLog
+  private readonly startOpts: DriverStartOptions
   private index = 0
 
   constructor(
     private readonly config: FakeDriverOptions,
-    private readonly startOpts: DriverStartOptions,
+    startOpts: DriverStartOptions,
   ) {
+    const attached = attachLog(startOpts)
+    this.startOpts = attached.opts
+    if (attached.log) this.log = attached.log
     this.id = config.sessionId ?? 'fake-session'
     this.cwd = startOpts.cwd
   }
@@ -76,7 +83,7 @@ export class FakeDriverSession implements DriverSession {
     if (turn.text) this.emit({ type: 'text', text: turn.text })
     this.emit({ type: 'result', text: turn.text, sessionId: this.id, ...(turn.usage ? { usage: turn.usage } : {}) })
 
-    return Promise.resolve({ text: turn.text, sessionId: this.id, ...(turn.usage ? { usage: turn.usage } : {}) })
+    return finishTurn(this, { text: turn.text, sessionId: this.id, ...(turn.usage ? { usage: turn.usage } : {}) }, opts, e => this.emit(e))
   }
 
   readCode(path: string): Promise<string> {

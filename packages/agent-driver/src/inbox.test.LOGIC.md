@@ -1,0 +1,5 @@
+What the tests cover, through the fake driver, on disk:
+
+- **The inbox** - lines appended are taken once, in order; a torn line and an unknown kind are skipped; a taken inbox is gone until the next line; no inbox is no lines.
+- **A question and the drain** - a turn ending on the question block is reported as one `question` event with its title and recommended id; the answer and the message waiting in the inbox become the next two prompts of the same session, the answer as the continuation prompt; the prompt resolves with the last turn and nothing waits.
+- **The log** - the card and the diary in the record shape: intent, driver, the caller's mark with the session id added, the cost summed from a priced turn, the branch patched by the caller, the status and the end time set by the end; the diary lines in order, `start`, `action`, `said`, `result`, `cost`, then the second turn's lines, the `question`, and `ended`.

@@ -34,7 +34,7 @@ Renders an agent's [1] event stream [2] in a terminal, one human-readable line p
 - **Why a merge was withheld** - "the session never signalled ready-for-merge", the same words the CLI prints.
 - **Why a handoff or the extra turn was skipped** - every reason as a sentence in the reader's terms.
 - **Usage** - the spend in dollars over the turns, or the tokens when no price was reported, never a zero that reads as free.
-- **The driver's own events** - the prompt, the text, the actions, the turn boundary, quota warnings only when the quota is tight, errors and notices.
+- **The driver's own events** - the prompt, the text, the actions, the turn boundary, quota warnings only when the quota is tight, errors, notices, and the question a turn ended on.
 - **The end** - "✓ finished", "■ stopped", or "✗ failed" with the detail.
 
 ## Business logic
@@ -120,7 +120,7 @@ With a price, usage prints "spend: $<cost, four decimals> over <n> turn(s)". Wit
 
 #### Business logic
 
-A turn starts with "› prompt: <the prompt, flattened and cut to 140 characters>" and ends with "‹ turn complete". The coding agent's text prints flattened and cut to 100 characters, each action as "· <label>", an error as "! agent error: <message>", and a notice as "~ <message>". A session id the driver reports mid-stream prints as "session <id>" so a stray one reads as what it is. The quota [14] is quiet on the happy path: "✗ quota exhausted (<window>), resets <time>" when a request was rejected, "! quota running low (<window>), resets <time>" when the coding agent warns, and otherwise "· quota <status> (<window>), resets <time>", the time as an ISO timestamp.
+A turn starts with "› prompt: <the prompt, flattened and cut to 140 characters>" and ends with "‹ turn complete". The coding agent's text prints flattened and cut to 100 characters, each action as "· <label>", an error as "! agent error: <message>", a notice as "~ <message>", and the question a turn ended on as "? <its title, cut to 140 characters>". A session id the driver reports mid-stream prints as "session <id>" so a stray one reads as what it is. The quota [14] is quiet on the happy path: "✗ quota exhausted (<window>), resets <time>" when a request was rejected, "! quota running low (<window>), resets <time>" when the coding agent warns, and otherwise "· quota <status> (<window>), resets <time>", the time as an ISO timestamp.
 
 ### The end
 

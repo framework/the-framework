@@ -1,3 +1,4 @@
+import { continuationPrompt, parseQuestion, type Question, type QuestionOption } from 'agent-driver'
 import type { FrameworkEvent } from './events.js'
 import { PROTOCOLS_BROWSER, PROTOCOLS_AWAIT, PROTOCOLS_HANDS_OFF, PROTOCOLS_SIGNAL } from './prompts.generated.js'
 import type { ChoicesOption } from './await-gate.js'
@@ -42,49 +43,11 @@ export const BROWSER_PROTOCOL = PROTOCOLS_BROWSER
  */
 export const SIGNAL_PROTOCOL = PROTOCOLS_SIGNAL
 
-/** One option of an await gate: what the user picks between. */
-export interface AwaitOption {
-  /** Stable id the pick is posted back against; synthesized from position when the agent names none. */
-  id: string
-  /** The option as shown to the user. */
-  label: string
-  /** An optional one-liner under the label. */
-  detail?: string
-  /** Starts checked. Only meaningful on a {@link ParsedAwaitGate.multi} gate. */
-  default?: boolean
-  /**
-   * Picking this ends the session rather than resuming the agent with it (#358).
-   *
-   * Some answers are not instructions to carry on, they are "stop, I will take it from here" —
-   * declining a plan being the one that matters, because the user's next move is fresh
-   * instructions and building on a plan they rejected is the single worst thing to do with the
-   * interval. Which answers those are is a property of the question, so the agent marks them,
-   * rather than the framework inferring it from a gate kind that no longer exists.
-   */
-  stop?: boolean
-}
+/** One option of an await gate: what the user picks between. The shape is agent-driver's question option. */
+export type AwaitOption = QuestionOption
 
-/**
- * A question the agent stopped to ask, parsed from an `await-choices` block (#337).
- *
- * There were four of these — a single choice, a multi-select, a plan approval, and handing over a
- * browser — each with its own tag, parser, resolution branch and dashboard card, for what is one
- * question with N options every time. Approve/Decline is two options; "handled it / could not" is
- * two options; a plan approval is that pair with a file attached. Collapsing them means the agent
- * learns one block instead of four, and a new kind of question needs no new code at all.
- */
-export interface ParsedAwaitGate {
-  /** The question shown above the options. */
-  title: string
-  /** The options to pick between (at least one, or the gate does not parse). */
-  options: AwaitOption[]
-  /** The option to default to, which autopilot accepts, when the agent named one. */
-  recommended?: string
-  /** Any number of options may be picked rather than exactly one, each starting checked per its `default`. */
-  multi?: boolean
-  /** A markdown file the question is about (a plan under approval); the doc sidebar renders it. */
-  file?: string
-}
+/** A question the agent stopped to ask, parsed from an `await-choices` block (#337). The shape is agent-driver's question. */
+export type ParsedAwaitGate = Question
 
 /**
  * How many times the agent may stop to ask, and be resumed, before an agent stops honoring
@@ -93,21 +56,9 @@ export interface ParsedAwaitGate {
  */
 export const MAX_AWAIT_ROUNDS = 5
 
-/**
- * The prompt that resumes the agent after the user answers a gate. One wording for
- * every path that runs gates (a direct prompt, a build): the agent
- * already knows what it is working on from the session, so the clause that used to
- * vary per caller ("Continue" / "Continue the backlog entry" / "Continue building X")
- * carried no distinct meaning to it. One constant so a reword lands everywhere at once
- * instead of one path and not the others (#570).
- *
- * No "do not ask again" tail: a capable agent does not re-ask a settled question on
- * its own, so spelling it out is babysitting we leave off until an agent shows it is
- * needed (#570 review).
- */
-export function continuationPrompt(question: string, answer: string): string {
-  return `You paused to ask: "${question}". The user chose: ${answer}. Continue with that decision.`
-}
+// The continuation prompt is agent-driver's: one wording for every caller that resumes an agent
+// after its question was answered.
+export { continuationPrompt }
 
 /**
  * What a session that cannot simply be ended is told when the user picks a `stop` option (#358,
@@ -262,72 +213,13 @@ function blocks(text: string, tag: string): string[] {
   return [...text.matchAll(re)].map(m => m[1] ?? '')
 }
 
-/** Parse an await block's JSON body to a record, or `undefined` — the shared first step of
- * every gate parser (it was written out three times). */
-function parseRecord(body: string): Record<string, unknown> | undefined {
-  let raw: unknown
-  try {
-    raw = JSON.parse(body)
-  } catch {
-    return undefined
-  }
-  if (typeof raw !== 'object' || raw === null) return undefined
-  return raw as Record<string, unknown>
-}
-
-/** Read a trimmed string field, or `''`. */
-const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '')
 
 /**
- * Parse the await gate a turn ended on (#337), from the last usable `await-choices` block in its
- * text. Returns `undefined` when the agent just finished — the common case, so a normal build
- * flows straight through.
- *
- * Tolerant by design, because a bad parse must never crash a build: ids are synthesized from
- * position when the agent names none, a label-less option is dropped, a blank title falls back,
- * `recommended` may be given as a label or an id, and a malformed block is ignored. A block whose
- * options all fall away is not a gate — the agent carries on rather than parking on an empty question.
+ * Parse the await gate a turn ended on (#337): agent-driver's question parser, which every driver
+ * also reports as a `question` event. Returns `undefined` when the agent just finished.
  */
 export function parseAwaitGate(text: string): ParsedAwaitGate | undefined {
-  // Latest first, so the newest question wins — falling back to an earlier one when the agent's
-  // last block is malformed, rather than losing a good question to a bad one after it.
-  for (const body of blocks(text, 'await-choices').reverse()) {
-    const gate = parseGateBody(body)
-    if (gate) return gate
-  }
-  return undefined
-}
-
-/** Parse one `await-choices` body, or `undefined` when there is nothing pickable in it. */
-function parseGateBody(body: string): ParsedAwaitGate | undefined {
-  const record = parseRecord(body)
-  if (!record || !Array.isArray(record.options)) return undefined
-
-  const options: AwaitOption[] = []
-  ;(record.options as Record<string, unknown>[]).forEach((o, i) => {
-    const label = str(o?.label)
-    if (!label) return
-    const detail = str(o?.detail)
-    options.push({
-      id: str(o?.id) || `opt:${i}`,
-      label,
-      ...(detail ? { detail } : {}),
-      ...(o?.default === true ? { default: true } : {}),
-      ...(o?.stop === true ? { stop: true } : {}),
-    })
-  })
-  if (options.length === 0) return undefined
-
-  const named = str(record.recommended)
-  const recommended = named ? (options.find(o => o.id === named) ?? options.find(o => o.label === named))?.id : undefined
-  const file = str(record.file)
-  return {
-    title: str(record.title) || 'Which option?',
-    options,
-    ...(recommended ? { recommended } : {}),
-    ...(record.multi === true ? { multi: true } : {}),
-    ...(file ? { file } : {}),
-  }
+  return parseQuestion(text)
 }
 
 /**

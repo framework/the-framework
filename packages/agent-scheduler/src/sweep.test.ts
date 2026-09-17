@@ -2,26 +2,36 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { mkdir, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { logCardFile, logDiaryFile } from 'agent-driver'
 import { createCheckout, worktreePath } from '@gemstack/skill-branches'
-import { findRun, readDiary } from '@gemstack/skill-logs'
-import { LiveLog, readLiveMeta, type LiveMeta } from './live-log.js'
+import { findRun, readDiary, type RunCard } from '@gemstack/skill-logs'
+import { liveDir, readLiveCard } from './live-card.js'
 import { markerCard, writeMarker } from './records.js'
 import { runStderrPath, writeState, DEFAULT_STATE } from './state.js'
 import { sweep } from './sweep.js'
 import { git, removeRepo, testRepo } from './test-repo.js'
 
-// The belt: what a dead run's process left is recorded and reclaimed, on this machine only.
+// The sweep on real checkouts: the live card and diary as agent-driver's log leaves them, and the
+// markers on the branch. The agent is never run.
 
 const NOW = new Date('2026-09-16T14:30:00.000Z')
 
-async function liveRun(repo: string, id: string, host: string, pid: number): Promise<LiveMeta> {
+/** A checkout with a live card and diary, as a run's session leaves them while it works. */
+async function liveRun(repo: string, id: string, host: string, pid: number, status: RunCard['status'] = 'running'): Promise<RunCard> {
   const checkout = await createCheckout(repo, { agentId: id })
-  const meta: LiveMeta = { status: 'running', id, startedAt: '2026-09-16T14:01:00.000Z', updatedAt: '2026-09-16T14:01:00.000Z', pid, host, intent: '/work-queue', kind: 'prompt', scheduler: { command: 'work-queue', host, pid } }
-  const log = await LiveLog.open(checkout.path, meta)
-  await log.append({ kind: 'intent', text: '/work-queue' })
-  await log.append({ kind: 'driver', event: { type: 'text', text: 'working…' } })
-  await writeMarker(repo, markerCard({ id, startedAt: meta.startedAt, prompt: '/work-queue', driver: 'fake', model: 'opus', mark: meta.scheduler }))
-  return meta
+  const mark = { command: 'work-queue', host, pid }
+  const card: RunCard = { id, startedAt: '2026-09-16T14:01:00.000Z', status, intent: '/work-queue', driver: 'fake', model: 'opus', caller: { scheduler: mark, pid, host, kind: 'prompt' } }
+  if (status !== 'running') card.endedAt = '2026-09-16T14:20:00.000Z'
+  const dir = liveDir(checkout.path)
+  await mkdir(dir, { recursive: true })
+  await writeFile(join(dir, logCardFile(id)), JSON.stringify(card, null, 2) + '\n')
+  const lines = [{ kind: 'start', prompt: '/work-queue' }, { kind: 'said', text: 'working…' }, ...(status !== 'running' ? [{ kind: 'ended', status }] : [])]
+  await writeFile(join(dir, logDiaryFile(id)), lines.map(l => JSON.stringify(l) + '\n').join(''))
+  await git(['config', 'core.excludesFile', '/dev/null'], checkout.path).catch(() => {})
+  const { excludeFromGit } = await import('@gemstack/agent-data')
+  await excludeFromGit(checkout.path, '/.the-framework').catch(() => {})
+  await writeMarker(repo, markerCard({ id, startedAt: card.startedAt, prompt: '/work-queue', driver: 'fake', model: 'opus', mark }))
+  return card
 }
 
 test('a running checkout under a dead pid on this machine is ended, recorded failed with what it said, and reclaimed', async () => {
@@ -40,26 +50,26 @@ test('a running checkout under a dead pid on this machine is ended, recorded fai
     const diary = (await readDiary(repo, 'dead'))!
     assert.deepEqual(diary.find(l => l.kind === 'said'), { kind: 'said', text: 'working…' })
     assert.deepEqual(diary.at(-1), { kind: 'ended', status: 'failed', detail: 'its process died before the run ended' })
-    // The live one and the other machine's are left as they are.
-    assert.equal((await readLiveMeta(worktreePath(repo, 'alive')))?.status, 'running')
-    assert.equal((await readLiveMeta(worktreePath(repo, 'elsewhere')))?.status, 'running')
+    assert.equal((await readLiveCard(worktreePath(repo, 'alive'), 'alive'))?.status, 'running')
+    assert.equal((await readLiveCard(worktreePath(repo, 'elsewhere'), 'elsewhere'))?.status, 'running')
     assert.equal((await findRun(repo, 'elsewhere'))?.status, 'running')
   } finally {
     await removeRepo(repo)
   }
 })
 
-test('a run that ended but whose process died before the record: recorded as it ended, reclaimed', async () => {
+test('a run that ended but whose process died before the record: recorded as it ended, reclaimed; a waiting run is recorded and kept', async () => {
   const repo = await testRepo()
   try {
-    const meta = await liveRun(repo, 'ended', 'this-box', 999_999)
-    const checkout = worktreePath(repo, 'ended')
-    const log = await LiveLog.open(checkout, meta)
-    await log.append({ kind: 'end', ok: true })
+    await liveRun(repo, 'ended', 'this-box', 999_999, 'done')
+    await liveRun(repo, 'asked', 'this-box', 999_999, 'waiting')
     const result = await sweep(repo, { host: 'this-box', isAlive: () => false, now: () => NOW })
-    assert.deepEqual(result.recorded, [{ id: 'ended', status: 'done' }])
+    assert.deepEqual(result.recorded.sort((a, b) => a.id.localeCompare(b.id)), [{ id: 'asked', status: 'waiting' }, { id: 'ended', status: 'done' }])
     assert.equal((await findRun(repo, 'ended'))?.status, 'done')
     assert.deepEqual(result.reclaimed, ['ended'])
+    assert.deepEqual(result.kept, [{ id: 'asked', reason: 'waiting' }])
+    assert.equal((await findRun(repo, 'asked'))?.status, 'waiting')
+    assert.equal(await stat(worktreePath(repo, 'asked')).then(() => true, () => false), true, 'the answer resumes the run there')
   } finally {
     await removeRepo(repo)
   }

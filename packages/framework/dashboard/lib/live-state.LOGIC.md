@@ -35,7 +35,7 @@ Derives an agent's [1] current state from its event stream [2], as pure folds ov
 - **Views** - one entry per view id, in first-seen order; showing a view again updates it in place.
 - **Still going** - the current segment has streamed something and holds no `end` yet; an empty stream is not going.
 - **Settled on the user** - true from a `settled` event until the next turn starts or the agent ends.
-- **How it ended** - the current segment's `end`: success or failure, whether the user stopped it, and its detail; nothing while the segment has no end.
+- **How it ended** - the current segment's `end`: success or failure, whether the user stopped it, whether it waits on an answer, and its detail; nothing while the segment has no end.
 - **Publishing** - the current segment ended clean and has no handoff report yet, and the latest arming anywhere in the stream has push on.
 - **Publishing, from the status snapshot** - the same window read off the snapshot for lists: status done, push armed, no handoff report recorded.
 - **The GitHub Actions run link** - the latest progress line reading `run <url>`; absent for every other agent.

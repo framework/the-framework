@@ -327,4 +327,4 @@ export type FrameworkEvent =
    * non-error case where the user interrupted it (the dashboard Stop button /
    * Ctrl+C), so a surface can show "stopped" rather than "failed".
    */
-  | { kind: 'end'; ok: boolean; stopped?: boolean; detail?: string }
+  | { kind: 'end'; ok: boolean; stopped?: boolean; waiting?: boolean; detail?: string }

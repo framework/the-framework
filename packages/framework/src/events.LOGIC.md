@@ -50,7 +50,7 @@ Fixes the vocabulary of the event stream [1]: every kind of event an agent [2] c
 - **The on-before-mergeable outcome** - the follow-up queued its prompts, queued them without finishing cleanly, or declined for one of five reasons; it is silent when the option was off.
 - **The handoff outcome** - the handoff is done (pushed, a pull request, how the merge went), skipped for one of nine reasons that are not faults, or failed at the push or at the pull request.
 - **How a merge went, and why it is withheld** - GitHub's own auto-merge is preferred, a direct merge is the fallback, the CI watch takes a pull request whose checks are pending, a failed merge never fails the handoff, and a merge is withheld when the agent never said it was ready or its own to-do list is still open.
-- **Settled, spend and the end** - the agent says when it is parked on the user, reports its cumulative usage after every turn that reports it, and ends as done, stopped or failed.
+- **Settled, spend and the end** - the agent says when it is parked on the user, reports its cumulative usage after every turn that reports it, and ends as done, stopped, failed, or waiting on an answer to the question it asked.
 
 ## Business logic
 

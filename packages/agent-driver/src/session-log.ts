@@ -10,7 +10,7 @@ import type { DriverEvent } from './types.js'
  * The shape is data, stated here, so that a runner and a dashboard agree on it without either
  * importing the other.
  *
- * The card: `id`, `startedAt`, `status` (`running` until ended), `endedAt`, `intent`, `driver`,
+ * The card: `id`, `startedAt`, `status` (`running` until ended, then `done`, `stopped`, `failed` or `waiting`), `endedAt`, `intent`, `driver`,
  * `model`, `branch`, `pr`, `cost` (dollars, summed from the turns that priced themselves), and
  * `caller`, one key for whatever the caller wants kept (its own mark, the pid, the session id).
  *
@@ -20,8 +20,8 @@ import type { DriverEvent } from './types.js'
  * `notice`).
  */
 
-/** How the run ended. */
-export type LogEndStatus = 'done' | 'stopped' | 'failed'
+/** How the run ended: finished, stopped, failed, or waiting on an answer to the question its last turn asked. */
+export type LogEndStatus = 'done' | 'stopped' | 'failed' | 'waiting'
 
 /** What the card holds; every field but `id` is optional and the caller's to give or patch. */
 export interface LogCard {
@@ -40,6 +40,11 @@ export interface LogCard {
 export interface SessionLogOptions {
   dir: string
   card: LogCard
+  /**
+   * The files are there already, from an earlier session of the same run: the diary is kept and
+   * appended to, and the card is rewritten `running`. Without it the diary starts empty.
+   */
+  continue?: boolean
 }
 
 /** A card as written. */
@@ -67,6 +72,7 @@ export class SessionLog {
   constructor(
     private readonly dir: string,
     card: LogCard,
+    private readonly continued = false,
     private readonly clock: () => string = () => new Date().toISOString(),
   ) {
     this.card = { ...card, startedAt: card.startedAt ?? this.clock(), status: 'running' }
@@ -82,12 +88,12 @@ export class SessionLog {
     return join(this.dir, logDiaryFile(this.card.id))
   }
 
-  /** Make the directory and write the card and an empty diary. Called by the driver when the session starts. */
+  /** Make the directory and write the card and, unless continuing an earlier session's log, an empty diary. Called by the driver when the session starts. */
   open(): Promise<void> {
     this.opened = true
     return this.queue(async () => {
       await mkdir(this.dir, { recursive: true })
-      await writeFile(this.diaryPath, '')
+      if (!this.continued) await writeFile(this.diaryPath, '')
       await this.writeCard()
     })
   }
@@ -165,7 +171,7 @@ export function diaryLine(event: DriverEvent): { kind: string } & Record<string,
  */
 export function attachLog<O extends { onEvent?: (event: DriverEvent) => void; log?: SessionLogOptions }>(opts: O): { opts: O; log?: SessionLog } {
   if (!opts.log) return { opts }
-  const log = new SessionLog(opts.log.dir, opts.log.card)
+  const log = new SessionLog(opts.log.dir, opts.log.card, opts.log.continue === true)
   void log.open()
   const onEvent = opts.onEvent
   return {

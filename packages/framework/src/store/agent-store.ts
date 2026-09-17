@@ -3,9 +3,9 @@ import { join } from 'node:path'
 import { hostname } from 'node:os'
 import type { AutoHandoffSkip, FrameworkEvent } from '../events.js'
 import { nodeFs } from '../node-fs.js'
-import { isSafeAgentId, worktreeDirEntries } from '@gemstack/skill-branches'
+import { agentBranchName, isSafeAgentId, worktreeDirEntries } from '@gemstack/skill-branches'
 import { THE_FRAMEWORK_DIR } from '../framework-dir.js'
-import { findRun, listRuns, readDiary, runFiles, writeRun, type LogsDeps, type LogsFunnel } from '@gemstack/skill-logs'
+import { findRun, listRuns, parseRunCard, readDiary, runFiles, writeRun, type LogsDeps, type LogsFunnel } from '@gemstack/skill-logs'
 import { eventsOf, fromRunCard, toDiaryLine, toRunCard } from './run-record.js'
 import { agentIdFromStartedAt, startedAtFromAgentId } from '../agent-id.js'
 
@@ -40,7 +40,7 @@ export const ARCHIVE_DIR = 'agents'
 export { agentIdFromStartedAt, startedAtFromAgentId }
 
 /** How an agent ended (or that it is still going). */
-export type AgentStatus = 'running' | 'done' | 'stopped' | 'failed'
+export type AgentStatus = 'running' | 'done' | 'stopped' | 'failed' | 'waiting'
 
 /**
  * A queryable snapshot of the agent, derived entirely from the event log. Lets the
@@ -348,7 +348,7 @@ export function applyEventToMeta(meta: AgentMeta, event: FrameworkEvent, at: str
       if (event.costUsd !== undefined) next.cost = (next.cost ?? 0) + event.costUsd
       break
     case 'end':
-      next.status = event.ok ? 'done' : event.stopped ? 'stopped' : 'failed'
+      next.status = event.ok ? 'done' : event.stopped ? 'stopped' : event.waiting ? 'waiting' : 'failed'
       next.endedAt = at
       delete next.pendingChoice // a finished run is not awaiting anything
       delete next.settledAt // nor is it waiting on you
@@ -986,10 +986,27 @@ export async function readLiveMeta(
 ): Promise<AgentMeta | undefined> {
   const dir = join(cwd, THE_FRAMEWORK_DIR)
   const meta = await readMetaFile(fs, join(dir, META_FILE))
-  if (!meta) return undefined
+  if (!meta) return readLiveCardMeta(cwd, fs)
   // Only a provably dead owner heals here — 'unknown' (no pid / another host) is left alone.
   if (ownerLiveness(meta, isAlive) === 'dead') return stopAndArchiveLive(fs, dir, meta)
   return meta
+}
+
+/**
+ * A run whose live record is a card, `<id>.json` under the checkout's `.the-framework/`, the
+ * shape agent-driver's log writes for a run another tool started (#1774): read as the meta the
+ * card unfolds to, `running` or not. Never healed here: the tool that started the run sweeps
+ * its own dead runs. The id is the checkout's, `agent-<id>`; the project root holds no card.
+ */
+async function readLiveCardMeta(cwd: string, fs: StoreFs): Promise<AgentMeta | undefined> {
+  const name = cwd.split('/').pop() ?? ''
+  const prefix = agentBranchName('')
+  if (!name.startsWith(prefix)) return undefined
+  const id = name.slice(prefix.length)
+  const path = join(cwd, THE_FRAMEWORK_DIR, `${id}.json`)
+  if (!(await fs.exists(path))) return undefined
+  const card = parseRunCard(await fs.read(path).catch(() => ''))
+  return card ? fromRunCard(card) : undefined
 }
 
 /**

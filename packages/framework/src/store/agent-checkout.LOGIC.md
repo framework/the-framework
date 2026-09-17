@@ -20,7 +20,7 @@ Decides which checkout [1] an agent id [2] addresses, and which event stream [3]
 ## Business logic — TL;DR
 
 - **The checkout an agent id resolves to** - the live agent's [4] own checkout [1], else the checkout directory named for the id when it exists, else the project root.
-- **The event stream a tail follows** - the same order, except that where the checkout resolution would fall back to the project root, an ended agent's recorded event stream [3] wins; the root's own event stream is the last resort.
+- **The event stream a tail follows** - inside a checkout, the framework's own `events.jsonl`, or, when a run another tool started keeps a card and a diary there instead, the diary `<id>.jsonl`, whose lines the tail reads as events; otherwise the same order, except that where the checkout resolution would fall back to the project root, an ended agent's recorded event stream [3] wins; the root's own event stream is the last resort.
 
 ## Business logic
 

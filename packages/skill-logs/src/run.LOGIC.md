@@ -24,7 +24,7 @@ Fixes what a run [1] is on the `agent-data` branch [2]: the card [3], `<id>.json
 ## Business logic — TL;DR
 
 - **The card's fields** - eleven plain fields are the skill's; everything else the recording program keeps sits under one key, `caller`, stored as given and never read.
-- **How a run stands** - `running`, `done`, `stopped` or `failed`, and nothing else.
+- **How a run stands** - `running`, `done`, `stopped`, `failed` or `waiting`, and nothing else.
 - **A run id is a safe file name** - letters, digits, `-` and `_` only, so an id can never climb out of a directory; the card is `<id>.json`, the diary `<id>.jsonl`.
 - **A person's directory from a git email** - `agents/<who>/` is the email the recording repository commits as, lowercased and made safe; `anonymous` when unusable.
 - **Reading a card back** - a card is kept only with an id, a start and a status; every other field is kept only in its right shape, and anything unknown is dropped.
@@ -56,7 +56,7 @@ See `## Context`.
 
 #### Business logic
 
-A run's [1] status is one of `running`, still going; `done`, ended well; `stopped`, ended before it finished; or `failed`. Any other value is not a status, and a card [3] carrying one is not a card.
+A run's [1] status is one of `running`, still going; `done`, ended well; `stopped`, ended before it finished; `failed`; or `waiting`, ended on a question the agent asked, until the answer resumes it. Any other value is not a status, and a card [3] carrying one is not a card.
 
 ### A run id is a safe file name
 
@@ -116,7 +116,7 @@ The diary [4] is one JSON object per line, in the order things happened, each wi
 
 #### Business logic
 
-Four kinds of line are the agent's [6], and the skill knows only those: `said`, something the agent said, with a `text`; `result`, the agent's final answer for a turn [9], with a `text`; `ended`, how the run [1] ended, with a `status` that is `done`, `stopped` or `failed` (never `running`) and an optional `detail` text; and `cost`, what a stretch of the run cost, with an optional `usd` number. A line of one of these kinds whose required fields are missing or of the wrong type is not the agent's line. A line may carry more fields than its kind needs; they pass through untouched. Every line of another kind is the recording program's [5] own: stored, never read by the skill, and left out of what the agent is shown.
+Four kinds of line are the agent's [6], and the skill knows only those: `said`, something the agent said, with a `text`; `result`, the agent's final answer for a turn [9], with a `text`; `ended`, how the run [1] ended, with a `status` that is `done`, `stopped`, `failed` or `waiting` (never `running`) and an optional `detail` text; and `cost`, what a stretch of the run cost, with an optional `usd` number. A line of one of these kinds whose required fields are missing or of the wrong type is not the agent's line. A line may carry more fields than its kind needs; they pass through untouched. Every line of another kind is the recording program's [5] own: stored, never read by the skill, and left out of what the agent is shown.
 
 ### The two late facts
 

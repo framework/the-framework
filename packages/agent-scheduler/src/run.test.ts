@@ -2,54 +2,72 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { readFile, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { FakeDriver, type Driver, type DriverSession, type DriverStartOptions } from 'agent-driver'
+import { appendInbox, FakeDriver, type Driver, type DriverSession, type DriverStartOptions, type FakeDriverSession } from 'agent-driver'
 import { worktreePath } from '@gemstack/skill-branches'
 import { findRun, readDiary } from '@gemstack/skill-logs'
-import { readLiveMeta } from './live-log.js'
-import { runCommand, STOPPED_DETAIL } from './run.js'
+import { inboxPath, readLiveCard } from './live-card.js'
+import { resumeRun, runCommand, STOPPED_DETAIL } from './run.js'
 import { git, removeRepo, testRepo } from './test-repo.js'
 
 // One run end to end on a real repository, with the agent faked: the marker, the checkout, the
-// live log in the dashboard's shape, the record with what the agent said and cost, the reclaim.
+// live card the session keeps, the record with what the agent said and cost, the reclaim; a run
+// that ends on a question, kept and resumed with the answer.
 
 const NOW = new Date('2026-09-16T14:01:00.000Z')
+
+
+/** A fake session with something done before each prompt: the spread of a class instance loses its methods, so the wrapper is explicit. */
+function wrap(fake: FakeDriverSession, before: (text: string) => Promise<void>): DriverSession & { prompts: string[] } {
+  return {
+    id: fake.id,
+    cwd: fake.cwd,
+    prompts: fake.prompts,
+    ...(fake.log ? { log: fake.log } : {}),
+    prompt: async (text, opts) => {
+      await before(text)
+      return fake.prompt(text, opts)
+    },
+    dispose: () => fake.dispose(),
+  }
+}
+
+const QUESTION = 'Plan written.\n\n```await-choices\n{ "title": "Ship it?", "options": [{ "label": "Approve" }, { "label": "Decline", "stop": true }], "recommended": "Approve" }\n```\n'
 
 /** An agent that commits one file on a branch it names itself, the way a real one does. */
 function committingDriver(): Driver {
   return {
     id: 'fake',
-    start: async (opts: DriverStartOptions): Promise<DriverSession> => ({
-      id: 'fake-1',
-      cwd: opts.cwd,
-      prompt: async text => {
-        opts.onEvent?.({ type: 'start', prompt: text })
+    start: async (opts: DriverStartOptions): Promise<DriverSession> => {
+      const fake = await new FakeDriver({
+        respond: () => ({ text: 'Fixed it and committed.', usage: { costUsd: 0.5, inputTokens: 10, outputTokens: 5, cacheReadTokens: 0, cacheCreationTokens: 0 } }),
+        sessionId: 's-1',
+      }).start(opts)
+      return wrap(fake, async () => {
         await git(['config', 'user.email', 'agent@example.com'], opts.cwd)
         await git(['config', 'user.name', 'agent'], opts.cwd)
         await git(['branch', '-m', 'agent-fix-it'], opts.cwd)
         await writeFile(join(opts.cwd, 'fixed.txt'), 'fixed\n')
         await git(['add', '-A'], opts.cwd)
         await git(['commit', '-q', '-m', 'Fix it'], opts.cwd)
-        opts.onEvent?.({ type: 'text', text: 'Fixed it and committed.' })
-        opts.onEvent?.({ type: 'result', text: 'Fixed it and committed.', sessionId: 's-1', usage: { costUsd: 0.5, inputTokens: 10, outputTokens: 5, cacheReadTokens: 0, cacheCreationTokens: 0 } })
-        return { text: 'Fixed it and committed.', sessionId: 's-1' }
-      },
-      dispose: async () => {},
-    }),
+      })
+    },
   }
 }
 
-test('a run: marker, checkout, live log, the prompt once, the record, the checkout reclaimed once the branch is on origin', async () => {
+test('a run: marker, checkout, the live card, the prompt once, the record, the checkout reclaimed once the branch is on origin', async () => {
   const repo = await testRepo()
   try {
-    const seen: { id: string; meta?: unknown } = { id: '' }
+    const seen: { cwd: string; card?: unknown } = { cwd: '' }
     const driver = committingDriver()
     const wrapped: Driver = {
       id: driver.id,
       start: async opts => {
-        // Mid-run: the live log is what the dashboard reads, running under this pid.
-        seen.id = opts.cwd
-        seen.meta = await readLiveMeta(opts.cwd)
-        return driver.start(opts)
+        const session = await driver.start(opts)
+        // Mid-run: the live card is what the dashboard reads, running under this pid.
+        await session.log?.settled()
+        seen.cwd = opts.cwd
+        seen.card = await readLiveCard(opts.cwd, '2026-09-16T14-01-00-000Z')
+        return session
       },
     }
     const gh = async (args: string[]) => {
@@ -64,30 +82,29 @@ test('a run: marker, checkout, live log, the prompt once, the record, the checko
     assert.equal(outcome.cost, 0.5)
     assert.deepEqual(outcome.checkout, { reclaimed: true })
 
-    const meta = seen.meta as Record<string, unknown>
-    assert.equal(seen.id, worktreePath(repo, outcome.id))
-    assert.equal(meta['status'], 'running')
-    assert.equal(meta['pid'], 4242)
-    assert.equal(meta['host'], 'this-box')
-    assert.equal(meta['intent'], '/work-queue')
-    assert.equal(meta['branch'], 'agent-2026-09-16T14-01-00-000Z')
-    assert.equal(meta['kind'], 'prompt')
-    assert.deepEqual(meta['scheduler'], { command: 'work-queue', host: 'this-box', pid: 4242 })
+    const card = seen.card as Record<string, unknown>
+    assert.equal(seen.cwd, worktreePath(repo, outcome.id))
+    assert.equal(card['status'], 'running')
+    assert.equal(card['intent'], '/work-queue')
+    assert.equal(card['branch'], 'agent-2026-09-16T14-01-00-000Z')
+    assert.deepEqual(card['caller'], { scheduler: { command: 'work-queue', host: 'this-box', pid: 4242 }, pid: 4242, host: 'this-box', kind: 'prompt', workspace: seen.cwd })
 
     // The checkout went: the branch reached origin, the record is the only trace.
     assert.equal(await stat(worktreePath(repo, outcome.id)).then(() => true, () => false), false)
     assert.equal((await git(['rev-parse', '--verify', 'refs/remotes/origin/agent-fix-it'], repo)).trim().length, 40)
-    const card = await findRun(repo, outcome.id)
-    assert.equal(card?.status, 'done')
-    assert.equal(card?.branch, 'agent-fix-it')
-    assert.equal(card?.cost, 0.5)
-    assert.equal(card?.model, 'opus')
-    assert.equal(card?.driver, 'fake')
-    assert.deepEqual(card?.caller?.['scheduler'], { command: 'work-queue', host: 'this-box', pid: 4242 })
+    const recorded = await findRun(repo, outcome.id)
+    assert.equal(recorded?.status, 'done')
+    assert.equal(recorded?.branch, 'agent-fix-it')
+    assert.deepEqual(recorded?.pr, { number: 12, url: 'https://github.com/x/y/pull/12' })
+    assert.equal(recorded?.cost, 0.5)
+    assert.equal(recorded?.model, 'opus')
+    assert.equal(recorded?.driver, 'fake')
+    assert.equal(recorded?.caller?.['sessionId'], 's-1')
+    assert.deepEqual(recorded?.caller?.['scheduler'], { command: 'work-queue', host: 'this-box', pid: 4242 })
     const diary = (await readDiary(repo, outcome.id))!
-    assert.deepEqual(diary.map(line => line.kind), ['session', 'intent', 'branch', 'driver', 'said', 'result', 'session-update', 'cost', 'branch', 'ended'])
+    assert.deepEqual(diary.map(line => line.kind), ['start', 'said', 'result', 'cost', 'ended'])
     assert.deepEqual(diary.find(l => l.kind === 'said'), { kind: 'said', text: 'Fixed it and committed.' })
-    assert.deepEqual(diary.find(l => l.kind === 'ended'), { kind: 'ended', status: 'done' })
+    assert.deepEqual(diary.at(-1), { kind: 'ended', status: 'done' })
   } finally {
     await removeRepo(repo)
   }
@@ -119,15 +136,12 @@ test('the tick\'s run does not mark itself again, and a dirty tree keeps the che
   try {
     const messy: Driver = {
       id: 'fake',
-      start: async opts => ({
-        id: 'x',
-        cwd: opts.cwd,
-        prompt: async () => {
+      start: async opts => {
+        const fake = await new FakeDriver({ turns: [{ text: 'left a mess' }] }).start(opts)
+        return wrap(fake, async () => {
           await writeFile(join(opts.cwd, 'scratch.txt'), 'uncommitted\n')
-          return { text: 'left a mess' }
-        },
-        dispose: async () => {},
-      }),
+        })
+      },
     }
     const outcome = await runCommand(repo, { prompt: '/work-queue', id: 'given-id', marked: true, model: 'opus', driver: messy, now: () => NOW, gh: async () => '[]' })
     assert.equal(outcome.id, 'given-id')
@@ -149,24 +163,28 @@ test('a signal to the run\'s process stops it: the session aborted, the run reco
     // An agent that works until told to stop, the way agent-driver ends a session on its signal.
     const patient: Driver = {
       id: 'fake',
-      start: async (opts: DriverStartOptions): Promise<DriverSession> => ({
-        id: 'x',
-        cwd: opts.cwd,
-        prompt: async () => {
-          opts.onEvent?.({ type: 'text', text: 'Working…' })
-          prompted()
-          // A bound wait: nothing else holds the event loop open while the signal is in flight.
-          await new Promise<void>((_, reject) => {
-            const timer = setTimeout(() => reject(new Error('no signal within 5s')), 5000)
-            opts.signal!.addEventListener('abort', () => {
-              clearTimeout(timer)
-              reject(new Error('fake prompt aborted'))
-            }, { once: true })
-          })
-          return { text: '' }
-        },
-        dispose: async () => {},
-      }),
+      start: async (opts: DriverStartOptions): Promise<DriverSession> => {
+        const fake = await new FakeDriver({ turns: [{ text: 'Working…' }] }).start(opts)
+        return {
+          id: fake.id,
+          cwd: fake.cwd,
+          ...(fake.log ? { log: fake.log } : {}),
+          prompt: async (text, promptOpts) => {
+            const turn = await fake.prompt(text, promptOpts)
+            prompted()
+            // A bound wait: nothing else holds the event loop open while the signal is in flight.
+            await new Promise<void>((_, reject) => {
+              const timer = setTimeout(() => reject(new Error('no signal within 5s')), 5000)
+              opts.signal!.addEventListener('abort', () => {
+                clearTimeout(timer)
+                reject(new Error('fake prompt aborted'))
+              }, { once: true })
+            })
+            return turn
+          },
+          dispose: () => fake.dispose(),
+        }
+      },
     }
     const running = runCommand(repo, { prompt: '/work-queue', model: 'opus', driver: patient, now: () => NOW, gh: async () => '[]' })
     await started
@@ -180,6 +198,73 @@ test('a signal to the run\'s process stops it: the session aborted, the run reco
     const diary = (await readDiary(repo, outcome.id))!
     assert.deepEqual(diary.find(l => l.kind === 'said'), { kind: 'said', text: 'Working…' })
     assert.deepEqual(diary.at(-1), { kind: 'ended', status: 'stopped', detail: STOPPED_DETAIL })
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test('a run whose last turn asked ends waiting and keeps its checkout; the answer resumes the same run, which then ends done and reclaimed', async () => {
+  const repo = await testRepo()
+  try {
+    // First session: the agent asks. Second session, resumed by the recorded id: it finishes.
+    const asking = new FakeDriver({ turns: [{ text: QUESTION }], sessionId: 's-ask' })
+    const first = await runCommand(repo, { prompt: '/work-queue', model: 'opus', driver: asking, host: 'this-box', pid: 4242, now: () => NOW, gh: async () => '[]' })
+    assert.equal(first.status, 'waiting')
+    assert.deepEqual(first.checkout, { reclaimed: false, reason: 'waiting' })
+    assert.equal(await stat(worktreePath(repo, first.id)).then(() => true, () => false), true, 'the checkout waits for the answer')
+    const waiting = await findRun(repo, first.id)
+    assert.equal(waiting?.status, 'waiting')
+    assert.equal(waiting?.caller?.['sessionId'], 's-ask')
+    const before = (await readDiary(repo, first.id))!
+    assert.deepEqual(before.map(l => l.kind), ['start', 'said', 'result', 'question', 'ended'])
+    assert.deepEqual(before.at(-1), { kind: 'ended', status: 'waiting' })
+
+    // A message written to the inbox before the turn ended would have been drained; here nothing waited.
+    assert.equal(await stat(inboxPath(worktreePath(repo, first.id))).then(() => true, () => false), false)
+
+    let resumedWith: string | undefined
+    const finishing: Driver = {
+      id: 'fake',
+      start: async opts => {
+        resumedWith = opts.resumeSessionId
+        return new FakeDriver({ turns: [{ text: 'Shipped.' }], sessionId: 's-ask' }).start(opts)
+      },
+    }
+    const second = await resumeRun(repo, { id: first.id, answer: 'Approve', driver: finishing, host: 'this-box', pid: 4243, now: () => new Date(NOW.getTime() + 3_600_000), gh: async () => '[]' })
+    assert.equal(resumedWith, 's-ask', 'the session resumes by the id the record carries')
+    assert.equal(second.id, first.id, 'the same run')
+    assert.equal(second.status, 'done')
+    assert.deepEqual(second.checkout, { reclaimed: true })
+    const done = await findRun(repo, first.id)
+    assert.equal(done?.status, 'done')
+    assert.equal(done?.startedAt, NOW.toISOString(), 'the start is the original one')
+    const after = (await readDiary(repo, first.id))!
+    assert.deepEqual(after.map(l => l.kind), ['start', 'said', 'result', 'question', 'ended', 'start', 'said', 'result', 'ended'], 'the diary goes on from where it stopped')
+    assert.deepEqual(after.at(-1), { kind: 'ended', status: 'done' })
+    const resumePrompt = after.find((l, i) => l.kind === 'start' && i > 4)
+    assert.equal(resumePrompt?.['prompt'], 'You paused to ask: "Ship it?". The user chose: Approve. Continue with that decision.')
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test('a line already in the inbox when the turn ends becomes the next turn of the same run', async () => {
+  const repo = await testRepo()
+  try {
+    const chatty: Driver = {
+      id: 'fake',
+      start: async opts => {
+        const fake = await new FakeDriver({ turns: [{ text: 'First turn done.' }, { text: 'Second turn done.' }] }).start(opts)
+        return wrap(fake, async () => {
+          if (fake.prompts.length === 0) await appendInbox(inboxPath(opts.cwd), { kind: 'message', text: 'also add a test' })
+        })
+      },
+    }
+    const outcome = await runCommand(repo, { prompt: '/work-queue', model: 'opus', driver: chatty, now: () => NOW, gh: async () => '[]' })
+    assert.equal(outcome.status, 'done')
+    const diary = (await readDiary(repo, outcome.id))!
+    assert.deepEqual(diary.filter(l => l.kind === 'start').map(l => l['prompt']), ['/work-queue', 'also add a test'])
+    assert.deepEqual(diary.filter(l => l.kind === 'said').map(l => l['text']), ['First turn done.', 'Second turn done.'])
   } finally {
     await removeRepo(repo)
   }

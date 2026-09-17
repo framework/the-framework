@@ -1,6 +1,6 @@
 import type { DriverEvent } from 'agent-driver'
 import type { AnyDiaryLine, RunCard } from '@gemstack/skill-logs'
-import type { FrameworkEvent } from '../events.js'
+import type { ChoiceOption, FrameworkEvent } from '../events.js'
 import type { AgentMeta } from './agent-store.js'
 
 /**
@@ -78,8 +78,34 @@ export function fromDiaryLine(line: AnyDiaryLine): FrameworkEvent {
         kind: 'end',
         ok: line['status'] === 'done',
         ...(line['status'] === 'stopped' ? { stopped: true } : {}),
+        ...(line['status'] === 'waiting' ? { waiting: true } : {}),
         ...(typeof line['detail'] === 'string' ? { detail: line['detail'] } : {}),
       }
+    // The lines agent-driver's own log writes (its `session-log.ts`): a driver event per kind, the
+    // agent's session id, and the question a turn ended on as the gate the dashboard shows.
+    case 'start':
+    case 'action':
+    case 'rate-limit':
+    case 'error':
+    case 'notice': {
+      const { kind, ...rest } = line
+      return { kind: 'driver', event: { type: kind, ...rest } as DriverEvent }
+    }
+    case 'session':
+      if (typeof line['sessionId'] === 'string' && line['driver'] === undefined) return { kind: 'session-update', sessionId: line['sessionId'] }
+      return line as unknown as FrameworkEvent
+    case 'question': {
+      const { kind: _kind, title, options, recommended, multi, file } = line
+      return {
+        kind: 'choice',
+        id: 'await-choices',
+        title: String(title ?? 'Which option?'),
+        options: Array.isArray(options) ? (options as ChoiceOption[]) : [],
+        ...(typeof recommended === 'string' ? { recommended } : {}),
+        ...(multi === true ? { multi: true } : {}),
+        ...(typeof file === 'string' ? { file } : {}),
+      } as FrameworkEvent
+    }
     case 'cost': {
       const { kind: _kind, usd, ...rest } = line
       return { kind: 'usage', ...(usd !== undefined ? { costUsd: usd } : {}), ...rest } as FrameworkEvent

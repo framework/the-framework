@@ -105,6 +105,8 @@ export function agentSettled(events: readonly FrameworkEvent[]): boolean {
 export interface AgentOutcome {
   ok: boolean
   stopped: boolean
+  /** The agent ended on a question and waits for the answer to resume it. */
+  waiting?: boolean
   detail?: string
 }
 
@@ -120,7 +122,7 @@ export function agentOutcome(events: readonly FrameworkEvent[]): AgentOutcome | 
   // no end in the newest segment yet, and "undefined while it is still going" is the truth.
   const end = currentAgentEvents(events).find(event => event.kind === 'end')
   if (!end || end.kind !== 'end') return undefined
-  return { ok: end.ok, stopped: end.stopped === true, ...(end.detail !== undefined ? { detail: end.detail } : {}) }
+  return { ok: end.ok, stopped: end.stopped === true, ...(end.waiting === true ? { waiting: true } : {}), ...(end.detail !== undefined ? { detail: end.detail } : {}) }
 }
 
 /**

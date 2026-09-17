@@ -28,6 +28,7 @@ Maps The Framework's status snapshot [1] and event stream [2] onto the `logs` sk
 
 - **The card: the skill's fields on top, the rest under `caller`** - eleven fields of the status snapshot [1] are the card's own; every other fact rides under the card's one `caller` key.
 - **Back from a card** - `caller` is unfolded into the status snapshot, and the card's own fields win over anything of the same name under `caller`.
+- **The lines another tool's session writes** - a diary kept by `agent-driver`'s own log (a run the scheduler started) is read back too: its `start`, `action`, `rate-limit`, `error` and `notice` lines become driver events; its `session` line, the agent's session id alone, becomes a session update; its `question` line becomes the gate the agent view shows, with the id `await-choices`; an `ended` line saying `waiting` becomes an end that says so.
 - **The diary: four kinds of line are the skill's** - what the agent said, its result, how it ended and what it cost become the skill's four kinds; every other event is written as it is, under its own kind, and read back the same way.
 
 ## Business logic

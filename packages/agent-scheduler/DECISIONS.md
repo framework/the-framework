@@ -87,9 +87,15 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - The agent publishes its own work through the branches skill; the run reads the pull
   request back off the branch for the record. Picked over the run opening the request from
   the branch's commits, and over the agent leaving a title and body in a file.
-- The run writes the live log The Framework's dashboard reads today, `.the-framework/agent.json`
-  and `events.jsonl` in the checkout, in the dashboard's shape, so a scheduled run shows
-  as it goes. Temporary, until `agent-driver` writes a live log of its own.
+- The live record is agent-driver's log, written in the run record's shape, and the run
+  copies the two files onto the branch unchanged. Picked over the tool's own live log in
+  the dashboard's shape, converted at the end: one shape, one file, no temporary label.
+- A run ends `waiting` when its last turn asked and nothing waited in the inbox: recorded
+  so, its checkout kept for the answer. The answer, or a text, resumes the same run: the
+  same id, the same record, the same branch, the session resumed by the id the record
+  carries, the diary continued. Picked over a new run per answer (two records for one
+  piece of work, and the first left waiting for ever) and over a process that waits for
+  the answer (nothing waits; state in files).
 - The run records itself and reclaims its own checkout when the agent stops; the sweep on
   the tick catches what a dead process left, on this machine only. Agents in flight run to
   the end when the scheduler stops.

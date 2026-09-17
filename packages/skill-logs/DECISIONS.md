@@ -28,6 +28,9 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   Owning the writer's whole record, renamed field by field, was rejected: a program's
   private fields would become a standalone package's public API. Under semver these
   fields are the branch's public API: a change to them is a major.
+- A fifth status, `waiting`: the run ended on a question the agent asked and waits for the
+  answer to resume it. A status rather than a field on the card, because every reader
+  filters on the status and a waiting run is neither running nor done.
 - The diary is JSON lines. The package knows four kinds — `said`, `result`, `ended`,
   `cost` — and skips every other line a writer adds. A writer maps its own events onto
   the four; the package never learns them. A line may carry more fields than its kind

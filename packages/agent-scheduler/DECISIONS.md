@@ -108,6 +108,11 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   --unless-keep-alive` when it closes, from a hook file of the user's that names the tool;
   The Framework itself names no tool. Picked over the daemon calling the tick, which would
   have made The Framework name the tool.
+- A stop waits for the tick in flight, and that tick starts nothing more: the readings are
+  where a tick spends its seconds, and a person who said stop gets no new agent. The ending
+  scheduler clears only its own pid from the state, since a dashboard's close hook stops one
+  scheduler and its open hook starts the next before the first is over. Picked over killing
+  the tick mid-flight, which could leave a marker half written.
 - `stop --unless-keep-alive` is the one reader of keep-alive: it leaves a keep-alive
   scheduler running and stops any other, so the line a dashboard runs when it closes
   honours the user's keep-alive while a person's plain `stop` still stops. Picked over

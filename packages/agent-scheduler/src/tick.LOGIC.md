@@ -24,7 +24,7 @@ One tick [1]: pull the `agent-data` branch [2], sweep [3], read the schedule [4]
 
 - **Before any decision** - the branch is pulled; a pull that fails ends the tick with the note `agent-data could not be pulled: <error>`, since a stale branch must start nothing; the sweep runs; a state that is off ends the tick with the note `off`; no schedule file ends it with `no agent-schedule.md`.
 - **Unreadable lines** - each is one decision under `line <N>` with `unreadable: <text>`.
-- **Per command, in order** - `no such command in this project`; for a line with an interval, `not due (last start <age> ago, every <interval>)` while the command's last recorded start on any machine is younger than the interval, and no check runs; for a line with a check, `check failed: <last line of stderr>` or `not due`; `cap reached (<N> in flight: <id> on <host>, …)`; `quota: <reason>`; then the marker, the re-count, and `started <id>` or `could not start: <error>`.
+- **Per command, in order** - `no such command in this project`; for a line with an interval, `not due (last start <age> ago, every <interval>)` while the command's last recorded start on any machine is younger than the interval, and no check runs; for a line with a check, `check failed: <last line of stderr>` or `not due`; `cap reached (<N> in flight: <id> on <host>, …)`; `quota: <reason>`; `not started: the scheduler was stopped` when a stop came in during the readings; then the marker, the re-count, and `started <id>` or `could not start: <error>`.
 - **Two machines** - a marker whose push was rejected twice is withdrawn: `another machine got there first: <error>`; a marker that landed but ranks past the cap among the in-flight ids in time order is withdrawn: `cap reached (…)` naming the others.
 - **The project has a command** - its `.claude/skills/<name>` is a directory, tracked file or link; a name outside lowercase letters, digits and dashes never matches.
 - **The check** - run through `sh -c` at the repository root within its budget; its exit code, stdout and stderr are what the tick reads.
@@ -66,9 +66,10 @@ When the line carries an interval, the command's last start on any machine is re
 3. The check's output says due, by `schedule.ts`'s rule, or the outcome is `not due`.
 4. The command's runs in flight, the running markers on the branch on any machine, are counted; at or past the cap, the outcome is `cap reached (<count> in flight: <id> on <host>, <id> on <host>)`, each run named by its id and the host that started it (the id alone when the host is unknown).
 5. The quota is read, once per tick and only now, and measured against the spend boundary with the state's model and spend cushion; a reading that fails or is not available counts as unknown. No headroom gives `quota: <the headroom rule's reason>`, and every later command of this tick sees the same answer without a second read.
-6. A run id is minted from the clock, the prompt is `/<command>`, and a marker [10] is written: a running card with the prompt, the driver's id, the state's model, and the mark naming the command and this host (no pid: the run's process does not exist yet).
-7. The re-count, below.
-8. The run is spawned detached with the id, the command, the prompt and the model; the outcome is `started <id>` and the decision carries the id as its `run`; a spawn that throws gives `could not start: <the error>`, and the marker stays for the sweep to end on the next tick.
+6. The scheduler has not been told to stop while the readings above ran, or the outcome is `not started: the scheduler was stopped`: a stopped scheduler starts nothing, and the readings are where a tick spends its seconds.
+7. A run id is minted from the clock, the prompt is `/<command>`, and a marker [10] is written: a running card with the prompt, the driver's id, the state's model, and the mark naming the command and this host (no pid: the run's process does not exist yet).
+8. The re-count, below.
+9. The run is spawned detached with the id, the command, the prompt and the model; the outcome is `started <id>` and the decision carries the id as its `run`; a spawn that throws gives `could not start: <the error>`, and the marker stays for the sweep to end on the next tick.
 
 ### Two machines
 

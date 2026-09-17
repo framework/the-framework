@@ -9,7 +9,7 @@ import { CHECK_TIMEOUT_MS, SCHEDULER_LOG, TICK_MS } from './names.js'
 import { inFlight, lastStart, withdrawMarker, writeMarker } from './records.js'
 import { runCommand, runIdFrom, type RunOutcome } from './run.js'
 import { readSchedule } from './schedule.js'
-import { readState, runStderrPath, stateDir, updateState, type State, type TickRecord } from './state.js'
+import { readState, runStderrPath, stateDir, updateState, withoutPid, type State, type TickRecord } from './state.js'
 import { sweep } from './sweep.js'
 import { projectHasCommand, runCheck, tick } from './tick.js'
 
@@ -36,7 +36,7 @@ export function isPidAlive(pid: number): boolean {
 }
 
 /** One tick of the real project, and the state written with what it decided. */
-export async function tickProject(repo: string, opts: { git?: GitRunner; log?: (line: string) => void; now?: () => Date } = {}): Promise<TickRecord> {
+export async function tickProject(repo: string, opts: { git?: GitRunner; log?: (line: string) => void; now?: () => Date; stopped?: () => boolean } = {}): Promise<TickRecord> {
   const git = opts.git ?? nodeGitRunner()
   const log = opts.log ?? (() => {})
   const now = opts.now ?? (() => new Date())
@@ -59,6 +59,7 @@ export async function tickProject(repo: string, opts: { git?: GitRunner; log?: (
     withdrawMarker: id => withdrawMarker(repo, id),
     spawn: run => spawnRun(repo, run),
     driver: 'claude-code',
+    ...(opts.stopped ? { stopped: opts.stopped } : {}),
     log,
   })
   await updateState(repo, s => ({ ...s, lastTick: record }), git)
@@ -125,13 +126,18 @@ export async function startScheduler(repo: string, opts: { foreground?: boolean;
   return updateState(repo, s => ({ ...s, pid: child.pid!, startedAt: new Date().toISOString() }))
 }
 
-/** The scheduler's process: a tick now and every interval, until SIGINT or SIGTERM. */
+/**
+ * The scheduler's process: a tick now and every interval, until SIGINT or SIGTERM. The stop waits
+ * for the tick in flight, which starts nothing more once the stop is in; and it clears only this
+ * process's pid from the state: a dashboard's close hook stops this scheduler and its open hook
+ * starts the next one before this tick is over, and that one's pid must stay.
+ */
 async function loop(repo: string, everyMs: number, log: (line: string) => void): Promise<void> {
   await updateState(repo, s => ({ ...s, pid: process.pid, startedAt: new Date().toISOString() }))
   let stopped = false
   let inflight: Promise<unknown> = Promise.resolve()
   const once = (): void => {
-    inflight = inflight.then(() => tickProject(repo, { log })).catch(err => log(`[agent-scheduler] tick failed: ${err instanceof Error ? err.message : String(err)}`))
+    inflight = inflight.then(() => tickProject(repo, { log, stopped: () => stopped })).catch(err => log(`[agent-scheduler] tick failed: ${err instanceof Error ? err.message : String(err)}`))
   }
   const timer = setInterval(once, everyMs)
   once()
@@ -146,10 +152,7 @@ async function loop(repo: string, everyMs: number, log: (line: string) => void):
     process.once('SIGTERM', stop)
   })
   await inflight
-  await updateState(repo, s => {
-    const { pid: _pid, startedAt: _startedAt, ...rest } = s
-    return rest
-  })
+  await updateState(repo, s => withoutPid(s, process.pid))
 }
 
 /**

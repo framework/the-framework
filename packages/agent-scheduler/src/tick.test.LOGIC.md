@@ -10,3 +10,4 @@ What the tests cover, with every reading injected (the wiring to a real project 
 - **Two machines** - a marker ranked past the cap by an earlier id that landed meanwhile is withdrawn with `cap reached (…)` naming the other; with a cap of two the marker within the cap keeps its place; a marker whose push failed twice is withdrawn with `another machine got there first: …` and nothing spawned.
 - **Unreadable schedule lines** - named as `line N` with `unreadable: …` while the readable command still starts.
 - **One quota read per tick** - two commands start on one reading.
+- **A stop during the tick** - a tick told the scheduler was stopped writes no marker and spawns nothing, with the line `not started: the scheduler was stopped`; the readings before it still ran.

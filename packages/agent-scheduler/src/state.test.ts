@@ -4,7 +4,7 @@ import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { nodeGitRunner } from '@gemstack/agent-data'
-import { DEFAULT_STATE, readState, statePath, updateState, writeState } from './state.js'
+import { DEFAULT_STATE, readState, statePath, updateState, writeState, type State } from './state.js'
 import { STATE_DIR } from './names.js'
 
 const git = nodeGitRunner()
@@ -52,4 +52,13 @@ test('a state file that does not parse reads as the default rather than stopping
   } finally {
     await rm(root, { recursive: true, force: true })
   }
+})
+
+test('a scheduler ending clears its own pid only: a pid another scheduler wrote meanwhile stays', async () => {
+  const { withoutPid } = await import('./state.js')
+  const mine: State = { ...DEFAULT_STATE, on: true, pid: 100, startedAt: '2026-01-01T00:00:00.000Z' }
+  assert.deepEqual(withoutPid(mine, 100), { ...DEFAULT_STATE, on: true })
+  const theirs: State = { ...mine, pid: 200 }
+  assert.deepEqual(withoutPid(theirs, 100), theirs, 'the next scheduler keeps its pid')
+  assert.deepEqual(withoutPid({ ...DEFAULT_STATE, on: true }, 100), { ...DEFAULT_STATE, on: true })
 })

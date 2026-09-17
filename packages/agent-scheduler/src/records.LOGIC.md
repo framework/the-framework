@@ -16,7 +16,7 @@ A run in flight is a run record [1]: the `logs` skill's card on the project's `a
 
 ## Business logic — TL;DR
 
-- **The marker** - a card with the run's id, its start time, `status: running`, the prompt as the intent, the driver, the model and the tool's mark, written to the branch with an empty diary; the write says whether it reached origin.
+- **The marker** - a card with the run's id, its start time, `status: running`, the prompt as the intent, the driver, the model when the run has one and the tool's mark, written to the branch with an empty diary; the write says whether it reached origin.
 - **In flight** - the running cards of one command on the branch, whatever the machine; a running card without the tool's mark, a dashboard's own run for instance, is not counted.
 - **The last start** - the newest start time among one command's cards on the branch, whatever the machine and whatever became of the run, for the schedule's interval; nothing when the command never started.
 - **Withdrawing** - a marker whose tick lost the cap is deleted from the branch, so no record says running for a run that never was.
@@ -32,7 +32,7 @@ See `## Context`.
 
 #### Business logic
 
-Before a run's process exists, its card is written to the `agent-data` branch [2] by the `logs` package: the run's id, its start time, `status: running`, the prompt as what was asked, the driver's id, the model, and the tool's mark [3] under `caller.scheduler`, with an empty diary. The write is one commit pushed straight to the branch, and its outcome says whether the commit reached origin: only a pushed marker is one another machine can see.
+Before a run's process exists, its card is written to the `agent-data` branch [2] by the `logs` package: the run's id, its start time, `status: running`, the prompt as what was asked, the driver's id, the model when the run has one, and the tool's mark [3] under `caller.scheduler`, with an empty diary. The write is one commit pushed straight to the branch, and its outcome says whether the commit reached origin: only a pushed marker is one another machine can see.
 
 ### In flight
 

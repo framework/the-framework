@@ -4,7 +4,7 @@ The tool's process side: the tick [1] wired to the real project, the run's [2] d
 
 **User story**: the user runs `agent-scheduler start` once and closes the terminal; a small process of the tool's own keeps ticking, each run is a further process that outlives the tick that started it, and `agent-scheduler stop` ends the scheduler while the agents in flight run to the end; `agent-scheduler run "/work-queue"` starts one run right now with no scheduler at all.
 
-**Business logic story**: the tick's decisions are `tick.ts`'s, one run is `run.ts`'s, the sweep is `sweep.ts`'s; this file gives them the real project: this machine's host name, the `agent-data` package's pull, the `logs` package's markers, `agent-driver`'s quota reader and Claude Code driver, and the state file. The processes it spawns are this same executable, `bin/agent-scheduler`.
+**Business logic story**: the tick's decisions are `tick.ts`'s, one run is `run.ts`'s, the sweep is `sweep.ts`'s; this file gives them the real project: this machine's host name, the `agent-data` package's pull, the `logs` package's markers, `agent-driver`'s quota reader and its Claude Code and Codex drivers, and the state file. The processes it spawns are this same executable, `bin/agent-scheduler`.
 
 ## Glossary
 
@@ -17,9 +17,11 @@ The tool's process side: the tick [1] wired to the real project, the run's [2] d
 ## Business logic — TL;DR
 
 - **A tick of the real project** - the state and the schedule read, the tick decided with this host, the `agent-data` pull, the sweep with a real pid probe, the command's folder, the check with a one-minute budget, the branch's markers and each command's last start, Claude Code's quota, ids from the clock, the driver `claude-code`; the record written to the state as `lastTick` and told line by line on the log (`[agent-scheduler] tick <time>: <note>`, `[agent-scheduler]   <command>: <outcome>`).
-- **The detached run** - `agent-scheduler run <prompt> --id <id> --command <command> --model <model>`, detached from the tick, stdin and stdout dropped, stderr to `.agent-scheduler/runs/<id>.stderr`, the run's id in its environment as `AGENT_ID`.
-- **A detached start on demand** - `run --detach <prompt>`: the marker written and the run's process spawned the way the tick does it, the id answered at once; the command is the prompt's first word, so the run counts against that command's cap.
-- **A run in this process** - the id given by the tick or minted now, the model given or the state's, marked already when the id was given, Claude Code with permissions bypassed and `AGENT_ID` in its environment.
+- **The detached run** - `agent-scheduler run <prompt> --id <id> --command <command>`, with `--model <model>` and `--driver <name>` when the run has them, detached from the tick, stdin and stdout dropped, stderr to `.agent-scheduler/runs/<id>.stderr`, the run's id in its environment as `AGENT_ID`.
+- **A detached start on demand** - `run --detach <prompt>`: the marker written and the run's process spawned the way the tick does it, the id answered at once; the command is the prompt's first word, so the run counts against that command's cap; the coding agent is Claude Code unless `--driver codex`, and the marker names it.
+- **A run in this process** - the id given by the tick or minted now, marked already when the id was given, on Claude Code or, with `--driver codex`, on Codex; a resumed run on the coding agent its record names.
+- **Either coding agent, unrestricted** - Claude Code with permissions bypassed, Codex with full access, `AGENT_ID` in the agent's environment: whichever coding agent the person picks, it pushes its branch and opens its pull request itself.
+- **The model** - the one given; else, on Claude Code, the state's; a Codex run with none given names none, and Codex starts on its own default.
 - **`start`** - the state on (and keep-alive when asked); a scheduler's process already alive is left as is; otherwise the tool's own executable spawned detached as `start --foreground`, its output to `.agent-scheduler/scheduler.log`, and its pid and start time written to the state.
 - **The loop** - a tick now and every minute, never two at once, a tick that throws logged as `tick failed: …` and the loop going on; a stop signal ends the loop after the tick in flight, which starts nothing more, and clears the pid when it is still this process's.
 - **`stop`** - the scheduler's process signalled when alive; the state off with no pid; agents in flight run to the end. Asked to stop unless keep-alive, it leaves a keep-alive scheduler as it is and says it kept it: the one reader of keep-alive.
@@ -46,7 +48,7 @@ The state and the schedule are read from the repository. The tick decides with: 
 
 #### Business logic
 
-The run is the tool's own executable started as a detached process with `run <prompt> --id <id> --command <command> --model <model>`, the repository as its working directory, no stdin, stdout dropped, stderr appended to `.agent-scheduler/runs/<id>.stderr`, and the run's id as `AGENT_ID` in its environment. The tick waits only until the process has spawned; a spawn that fails is the tick's `could not start: …`.
+The run is the tool's own executable started as a detached process with `run <prompt> --id <id> --command <command>`, then `--model <model>` when the run has a model and `--driver <name>` when it has a coding agent named (left out, the run's own defaults apply), the repository as its working directory, no stdin, stdout dropped, stderr appended to `.agent-scheduler/runs/<id>.stderr`, and the run's id as `AGENT_ID` in its environment. The tick waits only until the process has spawned; a spawn that fails is the tick's `could not start: …`.
 
 ### A detached start on demand
 
@@ -58,7 +60,7 @@ The run is the tool's own executable started as a detached process with `run <pr
 
 #### Business logic
 
-`run --detach <prompt>` mints the id from the clock, takes the command from the prompt's first word without its slash (`/work-queue now` → `work-queue`; a plain prompt's first word otherwise) and the model from the option or the state, writes the marker on the branch with the tool's mark naming the command and this host (no pid: the process does not exist yet; a marker that could not even be committed is logged), spawns the run's process exactly as the tick does, with the id, and answers the id, the command and the model. The run's process, given its id, does not mark itself again.
+`run --detach <prompt>` mints the id from the clock, takes the command from the prompt's first word without its slash (`/work-queue now` → `work-queue`; a plain prompt's first word otherwise), the coding agent from `--driver` (Claude Code when absent) and the model by the rule below, writes the marker on the branch, naming the coding agent, with the tool's mark naming the command and this host (no pid: the process does not exist yet; a marker that could not even be committed is logged), spawns the run's process exactly as the tick does, with the id, the coding agent and the model, and answers the id, the command, the driver and, when the run has one, the model. The run's process, given its id, does not mark itself again.
 
 ### A run in this process
 
@@ -68,7 +70,29 @@ See `run.ts`.
 
 #### Business logic
 
-The tick's run comes with its id, its command and its model, and its marker already on the branch, so it does not mark itself. A person's run (`agent-scheduler run <prompt>`) mints its id from now, takes the state's model unless `--model` says otherwise, and marks itself. Either way the coding agent is Claude Code through `agent-driver`, with permissions bypassed (an unattended run can answer no prompt) and the run's id as `AGENT_ID` in its environment, which the tickets skill reads as the claiming agent's id.
+The tick's run comes with its id, its command and its model, and its marker already on the branch, so it does not mark itself. A person's run (`agent-scheduler run <prompt>`) mints its id from now and marks itself. The coding agent is Claude Code through `agent-driver`, or Codex when `--driver codex` was given. A resumed run (`run --resume`) is on the coding agent its record names, because the session it resumes is that coding agent's; a record naming one this package cannot start is refused.
+
+### Either coding agent, unrestricted
+
+#### Context
+
+**User story**: the user picks Claude Code or Codex for a run, on the command line or in a dashboard's launcher, and gets the same thing from either: the agent does the work, pushes its branch and opens its pull request.
+
+**Problem**: Codex's default sandbox lets the agent write in its checkout only, which is enough when something outside the sandbox publishes the work. Here nothing does: the agent publishes itself.
+
+#### Business logic
+
+Claude Code is started with permissions bypassed (an unattended run can answer no prompt). Codex is started with full access instead of its default sandbox. Both get the run's id as `AGENT_ID` in their environment, which the tickets skill reads as the claiming agent's id. `agent-driver`'s own default for Codex stays the workspace-only sandbox; only `agent-scheduler` passes the wider setting.
+
+### The model
+
+#### Context
+
+**Problem**: the state's model (`agent-scheduler model <id>`) is a Claude model; handed to Codex it would fail the run at its start.
+
+#### Business logic
+
+A model given with `--model` is passed to either coding agent. With none given, a Claude Code run takes the state's model; a Codex run names no model, on its card and to Codex, and Codex starts on its own default. A resumed run takes the given model, else the one its record carries, else none.
 
 ### `start`
 

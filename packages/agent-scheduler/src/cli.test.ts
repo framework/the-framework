@@ -61,6 +61,13 @@ test('usage errors exit 2 with the usage on stderr and nothing on stdout; outsid
       assert.equal(bad.out, undefined)
       assert.match(bad.err, /usage: agent-scheduler/)
     }
+    // A driver this tool cannot start, and a driver named for a run that already has one.
+    const unknown = await run(repo, 'run', 'Read the docs', '--driver', 'pi')
+    assert.equal(unknown.code, 2)
+    assert.match(unknown.err, /unknown driver "pi"; the drivers are claude-code and codex/)
+    const renamed = await run(repo, 'run', '--resume', '2026-09-17T20-00-00-000Z', 'go on', '--driver', 'codex')
+    assert.equal(renamed.code, 2)
+    assert.match(renamed.err, /--resume takes no --driver/)
     const outside = await run(elsewhere, 'status')
     assert.equal(outside.code, 1)
     assert.deepEqual(outside.out, { ok: false, reason: 'not-a-repo' })

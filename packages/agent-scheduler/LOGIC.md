@@ -25,7 +25,7 @@ The `agent-scheduler` package: a standalone tool, like `agent-driver`, that star
 
 ## Business logic — TL;DR
 
-- **The executable** (`bin/`) - `agent-scheduler`, the one command line: `tick`, `run`, `start`, `stop [--unless-keep-alive]`, `status`, `model`, `offset`; JSON on stdout, one line for a person on stderr, exit 0, 1 or 2.
+- **The executable** (`bin/`) - `agent-scheduler`, the one command line: `tick`, `run` (also `--detach` and `--resume`), `start`, `stop [--unless-keep-alive]`, `status`, `model`, `offset`; JSON on stdout, one line for a person on stderr, exit 0, 1 or 2.
 - **The rules and the processes** (`src/`) - the schedule's lines and the due rule, the state, the spend boundary, run records as markers counted across machines, the live record the dashboard reads, one run's life and its resume, the sweep, the tick's decisions, the scheduler's process and the command line; told in `src/LOGIC.md`.
 
 ## Business logic

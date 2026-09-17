@@ -80,6 +80,9 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - One process per run, one-shot: `run <prompt>` needs no scheduler running, and the tick
   spawns the same thing with the id and the marker already made. Picked over the
   scheduler holding pids: nothing to lose on a restart.
+- `run --detach` writes the marker and spawns the run's process the way the tick does,
+  answering the id at once: the line a dashboard's start hook runs. Picked over the
+  dashboard spawning the run's process itself, which would name the tool and hold a pid.
 - The run is a checkout from the branches package, a session from `agent-driver`, the
   prompt once, and the agent's own loop to the end. No system prompt, no gates, no
   steering: the command's skill file is the whole instruction. Picked over carrying The

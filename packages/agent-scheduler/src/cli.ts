@@ -1,7 +1,7 @@
 import { parseArgs } from 'node:util'
 import { checkoutRoot, nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
 import { projectRoot } from '@gemstack/skill-branches'
-import { resumeProject, runProject, schedulerStatus, startScheduler, stopScheduler, tickProject } from './scheduler.js'
+import { detachRun, resumeProject, runProject, schedulerStatus, startScheduler, stopScheduler, tickProject } from './scheduler.js'
 import { updateState } from './state.js'
 
 /**
@@ -14,6 +14,7 @@ export const USAGE = `usage: agent-scheduler <command>
 
   tick                          pull agent-data, sweep, read agent-schedule.md, start what is due
   run <prompt> [--model <id>]   one run of <prompt> in its own checkout, now, recorded; needs no scheduler
+  run --detach <prompt>         the same run in its own process, answered at once with its id: what a dashboard's start hook runs
   run --resume <id> [<text>] [--answer <label>]
                                 continue an ended run: the same record, its session resumed; the text as the next prompt, or the answer to the question it ended on
   start [--keep-alive]          the scheduler on, ticking every minute in its own process
@@ -79,8 +80,14 @@ const COMMANDS: Record<string, Command> = {
   },
 
   async run(args, io, git) {
-    const { positionals, values } = parse(args, { id: { type: 'string' }, command: { type: 'string' }, model: { type: 'string' }, resume: { type: 'string' }, answer: { type: 'string' } }, 0, 1)
+    const { positionals, values } = parse(args, { id: { type: 'string' }, command: { type: 'string' }, model: { type: 'string' }, resume: { type: 'string' }, answer: { type: 'string' }, detach: { type: 'boolean' } }, 0, 1)
     const repo = await project(io.cwd, git)
+    if (values.detach) {
+      if (positionals[0] === undefined) throw new Usage('expected 1 argument(s), got 0')
+      if (values.resume !== undefined || values.id !== undefined) throw new Usage('--detach takes a prompt only')
+      const started = await detachRun(repo, { prompt: positionals[0], ...(values.model !== undefined ? { model: values.model } : {}), log: io.stderr })
+      return { ok: true, detached: true, ...started }
+    }
     if (values.resume !== undefined) {
       if (positionals[0] === undefined && values.answer === undefined) throw new Usage('a text or --answer is needed to resume a run')
       const outcome = await resumeProject(repo, {

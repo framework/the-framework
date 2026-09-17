@@ -18,6 +18,7 @@ The tool's process side: the tick [1] wired to the real project, the run's [2] d
 
 - **A tick of the real project** - the state and the schedule read, the tick decided with this host, the `agent-data` pull, the sweep with a real pid probe, the command's folder, the check with a one-minute budget, the branch's markers and each command's last start, Claude Code's quota, ids from the clock, the driver `claude-code`; the record written to the state as `lastTick` and told line by line on the log (`[agent-scheduler] tick <time>: <note>`, `[agent-scheduler]   <command>: <outcome>`).
 - **The detached run** - `agent-scheduler run <prompt> --id <id> --command <command> --model <model>`, detached from the tick, stdin and stdout dropped, stderr to `.agent-scheduler/runs/<id>.stderr`, the run's id in its environment as `AGENT_ID`.
+- **A detached start on demand** - `run --detach <prompt>`: the marker written and the run's process spawned the way the tick does it, the id answered at once; the command is the prompt's first word, so the run counts against that command's cap.
 - **A run in this process** - the id given by the tick or minted now, the model given or the state's, marked already when the id was given, Claude Code with permissions bypassed and `AGENT_ID` in its environment.
 - **`start`** - the state on (and keep-alive when asked); a scheduler's process already alive is left as is; otherwise the tool's own executable spawned detached as `start --foreground`, its output to `.agent-scheduler/scheduler.log`, and its pid and start time written to the state.
 - **The loop** - a tick now and every minute, never two at once, a tick that throws logged as `tick failed: …` and the loop going on; a stop signal ends the loop after the tick in flight, which starts nothing more, and clears the pid when it is still this process's.
@@ -46,6 +47,18 @@ The state and the schedule are read from the repository. The tick decides with: 
 #### Business logic
 
 The run is the tool's own executable started as a detached process with `run <prompt> --id <id> --command <command> --model <model>`, the repository as its working directory, no stdin, stdout dropped, stderr appended to `.agent-scheduler/runs/<id>.stderr`, and the run's id as `AGENT_ID` in its environment. The tick waits only until the process has spawned; a spawn that fails is the tick's `could not start: …`.
+
+### A detached start on demand
+
+#### Context
+
+**User story**: the user presses Start on a dashboard, or types `agent-scheduler run --detach "/triage-quick"`, and gets the run's id back at once while the agent works in its own process; the dashboard shows the run from its live record like a scheduled one.
+
+**Problem**: `run <prompt>` answers only when the agent has ended; a dashboard's start hook needs the id now, and must not hold a process for the run's whole life.
+
+#### Business logic
+
+`run --detach <prompt>` mints the id from the clock, takes the command from the prompt's first word without its slash (`/work-queue now` → `work-queue`; a plain prompt's first word otherwise) and the model from the option or the state, writes the marker on the branch with the tool's mark naming the command and this host (no pid: the process does not exist yet; a marker that could not even be committed is logged), spawns the run's process exactly as the tick does, with the id, and answers the id, the command and the model. The run's process, given its id, does not mark itself again.
 
 ### A run in this process
 

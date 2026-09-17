@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { ClaudeCodeDriver, readClaudeQuota } from 'agent-driver'
 import { DATA_BRANCH, nodeGitRunner, pullFileBranch, type GitRunner } from '@gemstack/agent-data'
 import { CHECK_TIMEOUT_MS, SCHEDULER_LOG, TICK_MS } from './names.js'
-import { inFlight, lastStart, withdrawMarker, writeMarker } from './records.js'
+import { inFlight, lastStart, markerCard, withdrawMarker, writeMarker } from './records.js'
 import { resumeRun, runCommand, runIdFrom, type RunOutcome } from './run.js'
 import { readSchedule } from './schedule.js'
 import { readState, runStderrPath, stateDir, updateState, withoutPid, type State, type TickRecord } from './state.js'
@@ -84,6 +84,27 @@ export async function spawnRun(repo: string, run: { id: string; command: string;
     child.once('spawn', resolve)
     child.once('error', reject)
   })
+}
+
+/**
+ * A run started the way the tick starts one, and answered at once: the marker written on the
+ * branch, the run's process spawned detached, the id returned. What a dashboard's start hook
+ * runs: it needs the id back now, not when the agent ends. The command is the prompt's first
+ * word without its slash, so the run counts against that command's cap like a scheduled one.
+ */
+export async function detachRun(
+  repo: string,
+  opts: { prompt: string; model?: string; now?: () => Date; log?: (line: string) => void },
+  deps: { spawn?: typeof spawnRun; host?: string } = {},
+): Promise<{ id: string; command: string; model: string }> {
+  const now = opts.now ?? (() => new Date())
+  const id = runIdFrom(now().toISOString())
+  const command = opts.prompt.replace(/^\//, '').split(/\s+/)[0] || opts.prompt
+  const model = opts.model ?? (await readState(repo)).model
+  const marked = await writeMarker(repo, markerCard({ id, startedAt: now().toISOString(), prompt: opts.prompt, driver: 'claude-code', model, mark: { command, host: deps.host ?? hostname() } }))
+  if (!marked.ok && !marked.committed) opts.log?.(`[agent-scheduler] the run's record could not be written: ${marked.error}`)
+  await (deps.spawn ?? spawnRun)(repo, { id, command, prompt: opts.prompt, model })
+  return { id, command, model }
 }
 
 /**

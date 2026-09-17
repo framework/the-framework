@@ -40,6 +40,11 @@ export function runIdFrom(startedAt: string): string {
   return startedAt.replace(/[:.]/g, '-')
 }
 
+/** The model as a card or a session takes it: named, or left out so the tool starts on its own default. */
+function modelOf(model: string | undefined): { model?: string } {
+  return model !== undefined ? { model } : {}
+}
+
 export interface RunOptions {
   /** What the agent is told, usually a slash command. */
   prompt: string
@@ -49,7 +54,8 @@ export interface RunOptions {
   marked?: boolean
   /** The command the run is for, as the schedule names it; the prompt's own name when absent. */
   command?: string
-  model: string
+  /** The model the session starts on; the tool's own default when absent. */
+  model?: string
   driver: Driver
   host?: string
   pid?: number
@@ -86,7 +92,7 @@ export async function runCommand(repo: string, opts: RunOptions): Promise<RunOut
 
   // A person's run marks itself; the tick's run was marked before it was spawned.
   if (!opts.marked) {
-    const marked = await writeMarker(repo, markerCard({ id, startedAt, prompt: opts.prompt, driver: opts.driver.id, model: opts.model, mark }), logs)
+    const marked = await writeMarker(repo, markerCard({ id, startedAt, prompt: opts.prompt, driver: opts.driver.id, ...modelOf(opts.model), mark }), logs)
     if (!marked.ok && !marked.committed) log(`[agent-scheduler] the run's record could not be written: ${marked.error}`)
   }
 
@@ -97,17 +103,17 @@ export async function runCommand(repo: string, opts: RunOptions): Promise<RunOut
     checkout = await createCheckout(repo, { agentId: id }, git)
   } catch (err) {
     const detail = `could not create a checkout: ${errorMessage(err)}`
-    await recordRun(repo, { ...markerCard({ id, startedAt, prompt: opts.prompt, driver: opts.driver.id, model: opts.model, mark }), status: 'failed', endedAt: clock() }, [{ kind: 'ended', status: 'failed', detail }], logs)
+    await recordRun(repo, { ...markerCard({ id, startedAt, prompt: opts.prompt, driver: opts.driver.id, ...modelOf(opts.model), mark }), status: 'failed', endedAt: clock() }, [{ kind: 'ended', status: 'failed', detail }], logs)
     return { id, status: 'failed', checkout: { reclaimed: false, reason: 'no checkout' }, detail }
   }
 
   return session(repo, {
     id,
     checkout,
-    card: { id, startedAt, status: 'running', intent: opts.prompt, driver: opts.driver.id, model: opts.model, branch: checkout.branch, caller: { scheduler: mark, pid, host, kind: 'prompt', workspace: checkout.path } },
+    card: { id, startedAt, status: 'running', intent: opts.prompt, driver: opts.driver.id, ...modelOf(opts.model), branch: checkout.branch, caller: { scheduler: mark, pid, host, kind: 'prompt', workspace: checkout.path } },
     prompt: opts.prompt,
     driver: opts.driver,
-    model: opts.model,
+    ...modelOf(opts.model),
     continued: false,
     git,
     ...(opts.gh ? { gh: opts.gh } : {}),
@@ -188,7 +194,7 @@ export async function resumeRun(repo: string, opts: ResumeOptions): Promise<RunO
     priorDiary: diary,
     prompt,
     driver: opts.driver,
-    model: opts.model ?? card.model ?? 'opus',
+    ...modelOf(opts.model ?? card.model),
     continued: true,
     ...(sessionId !== undefined ? { resumeSessionId: sessionId } : {}),
     git,
@@ -207,7 +213,7 @@ interface SessionRun {
   priorDiary?: AnyDiaryLine[]
   prompt: string
   driver: Driver
-  model: string
+  model?: string
   continued: boolean
   resumeSessionId?: string
   git: GitRunner
@@ -242,7 +248,7 @@ async function session(repo: string, run: SessionRun): Promise<RunOutcome> {
   try {
     driverSession = await run.driver.start({
       cwd: run.checkout.path,
-      model: run.model,
+      ...(run.model !== undefined ? { model: run.model } : {}),
       signal: stop.signal,
       ...(run.resumeSessionId !== undefined ? { resumeSessionId: run.resumeSessionId } : {}),
       log: { dir, card: { id: run.id, ...startCard }, continue: run.continued },

@@ -3,10 +3,12 @@ import { closeSync, mkdirSync, openSync } from 'node:fs'
 import { hostname } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { ClaudeCodeDriver, readClaudeQuota } from 'agent-driver'
+import { ClaudeCodeDriver, CodexDriver, readClaudeQuota, type Driver } from 'agent-driver'
+import { findRun } from '@gemstack/skill-logs'
 import { DATA_BRANCH, nodeGitRunner, pullFileBranch, type GitRunner } from '@gemstack/agent-data'
 import { CHECK_TIMEOUT_MS, SCHEDULER_LOG, TICK_MS } from './names.js'
 import { inFlight, lastStart, markerCard, withdrawMarker, writeMarker } from './records.js'
+import type { GhRunner } from './pr.js'
 import { resumeRun, runCommand, runIdFrom, type RunOutcome } from './run.js'
 import { readSchedule } from './schedule.js'
 import { readState, runStderrPath, stateDir, updateState, withoutPid, type State, type TickRecord } from './state.js'
@@ -24,6 +26,14 @@ const BIN = fileURLToPath(new URL('../bin/agent-scheduler', import.meta.url))
 
 /** The environment name the tickets skill reads the claiming agent's id from. */
 export const AGENT_ID_ENV = 'AGENT_ID'
+
+/** The coding agents a run can be on, by the name the run's record carries. */
+export const DRIVER_NAMES = ['claude-code', 'codex'] as const
+export type DriverName = (typeof DRIVER_NAMES)[number]
+
+export function isDriverName(name: string): name is DriverName {
+  return (DRIVER_NAMES as readonly string[]).includes(name)
+}
 
 /** Whether `pid` is a live process on this host. A pid on another host is unknowable here. */
 export function isPidAlive(pid: number): boolean {
@@ -67,12 +77,20 @@ export async function tickProject(repo: string, opts: { git?: GitRunner; log?: (
   return record
 }
 
+/** The command line of a spawned run: the model and the coding agent named only when the run has them, so the run's own defaults apply otherwise. */
+export function runArgs(run: { id: string; command: string; prompt: string; model?: string; driver?: DriverName }): string[] {
+  const args = ['run', run.prompt, '--id', run.id, '--command', run.command]
+  if (run.model !== undefined) args.push('--model', run.model)
+  if (run.driver !== undefined) args.push('--driver', run.driver)
+  return args
+}
+
 /** The run's process, detached from the tick that started it: `agent-scheduler run <prompt> --id <id>`, its stderr kept. */
-export async function spawnRun(repo: string, run: { id: string; command: string; prompt: string; model: string }): Promise<void> {
+export async function spawnRun(repo: string, run: { id: string; command: string; prompt: string; model?: string; driver?: DriverName }): Promise<void> {
   const stderrPath = runStderrPath(repo, run.id)
   mkdirSync(dirname(stderrPath), { recursive: true })
   const fd = openSync(stderrPath, 'a')
-  const child = spawn(process.execPath, [BIN, 'run', run.prompt, '--id', run.id, '--command', run.command, '--model', run.model], {
+  const child = spawn(process.execPath, [BIN, ...runArgs(run)], {
     cwd: repo,
     detached: true,
     stdio: ['ignore', 'ignore', fd],
@@ -94,52 +112,88 @@ export async function spawnRun(repo: string, run: { id: string; command: string;
  */
 export async function detachRun(
   repo: string,
-  opts: { prompt: string; model?: string; now?: () => Date; log?: (line: string) => void },
+  opts: { prompt: string; model?: string; driver?: DriverName; now?: () => Date; log?: (line: string) => void },
   deps: { spawn?: typeof spawnRun; host?: string } = {},
-): Promise<{ id: string; command: string; model: string }> {
+): Promise<{ id: string; command: string; driver: DriverName; model?: string }> {
   const now = opts.now ?? (() => new Date())
   const id = runIdFrom(now().toISOString())
   const command = opts.prompt.replace(/^\//, '').split(/\s+/)[0] || opts.prompt
-  const model = opts.model ?? (await readState(repo)).model
-  const marked = await writeMarker(repo, markerCard({ id, startedAt: now().toISOString(), prompt: opts.prompt, driver: 'claude-code', model, mark: { command, host: deps.host ?? hostname() } }))
+  const driver = opts.driver ?? 'claude-code'
+  const model = await modelFor(repo, driver, opts.model)
+  const marked = await writeMarker(repo, markerCard({ id, startedAt: now().toISOString(), prompt: opts.prompt, driver, ...(model !== undefined ? { model } : {}), mark: { command, host: deps.host ?? hostname() } }))
   if (!marked.ok && !marked.committed) opts.log?.(`[agent-scheduler] the run's record could not be written: ${marked.error}`)
-  await (deps.spawn ?? spawnRun)(repo, { id, command, prompt: opts.prompt, model })
-  return { id, command, model }
+  await (deps.spawn ?? spawnRun)(repo, { id, command, prompt: opts.prompt, driver, ...(model !== undefined ? { model } : {}) })
+  return { id, command, driver, ...(model !== undefined ? { model } : {}) }
 }
 
 /**
- * A run of the real project on Claude Code, in this process. The tick's run comes with its id
- * and its marker already on the branch; a person's run mints its id here and marks itself.
+ * A run of the real project, in this process, on the coding agent named (Claude Code when none is). The
+ * tick's run comes with its id and its marker already on the branch; a person's run mints its
+ * id here and marks itself.
  */
-export async function runProject(repo: string, opts: { prompt: string; id?: string; command?: string; model?: string; log?: (line: string) => void }): Promise<RunOutcome> {
+export async function runProject(repo: string, opts: { prompt: string; id?: string; command?: string; model?: string; driver?: DriverName; log?: (line: string) => void }): Promise<RunOutcome> {
   const id = opts.id ?? runIdFrom(new Date().toISOString())
-  const model = opts.model ?? (await readState(repo)).model
+  const driver = opts.driver ?? 'claude-code'
+  const model = await modelFor(repo, driver, opts.model)
   return runCommand(repo, {
     prompt: opts.prompt,
     id,
     marked: opts.id !== undefined,
     ...(opts.command !== undefined ? { command: opts.command } : {}),
-    model,
-    driver: claudeCodeFor(id),
+    ...(model !== undefined ? { model } : {}),
+    driver: driverFor(driver, id),
     ...(opts.log ? { log: opts.log } : {}),
   })
 }
 
-/** Continue an ended run of the real project on Claude Code, in this process: the user's text, or the answer to the question it ended on. */
-export async function resumeProject(repo: string, opts: { id: string; text?: string; answer?: string; model?: string; log?: (line: string) => void }): Promise<RunOutcome> {
+/**
+ * Continue an ended run of the real project, in this process: the user's text, or the answer to
+ * the question it ended on. The coding agent is the one the run's record names: the session
+ * to resume is its own.
+ */
+export async function resumeProject(
+  repo: string,
+  opts: { id: string; text?: string; answer?: string; model?: string; log?: (line: string) => void },
+  deps: { driverFor?: typeof driverFor; gh?: GhRunner } = {},
+): Promise<RunOutcome> {
+  const card = await findRun(repo, opts.id)
+  const recorded = card?.driver ?? 'claude-code'
+  if (!isDriverName(recorded)) throw new Error(`run ${opts.id} is on ${recorded}, which agent-scheduler cannot start`)
   return resumeRun(repo, {
     id: opts.id,
     ...(opts.text !== undefined ? { text: opts.text } : {}),
     ...(opts.answer !== undefined ? { answer: opts.answer } : {}),
     ...(opts.model !== undefined ? { model: opts.model } : {}),
-    driver: claudeCodeFor(opts.id),
+    driver: (deps.driverFor ?? driverFor)(recorded, opts.id),
+    ...(deps.gh ? { gh: deps.gh } : {}),
     ...(opts.log ? { log: opts.log } : {}),
   })
 }
 
-/** Claude Code with permissions bypassed, and the run's id in the agent's environment, so the claim it makes names the run (the tickets skill reads `AGENT_ID`). */
-function claudeCodeFor(id: string): ClaudeCodeDriver {
-  return new ClaudeCodeDriver({ permissionMode: 'bypassPermissions', env: { ...process.env, [AGENT_ID_ENV]: id } })
+/**
+ * The coding agent a run is on, unrestricted either way: Claude Code with permissions bypassed, Codex
+ * with full access. The run's agent pushes its branch and opens its pull request itself, which
+ * Codex's default sandbox (the workspace only) does not allow. The run's id is in the agent's
+ * environment, so the claim it makes names the run (the tickets skill reads `AGENT_ID`).
+ */
+export function driverFor(name: DriverName, id: string): Driver {
+  const env = { ...process.env, [AGENT_ID_ENV]: id }
+  switch (name) {
+    case 'claude-code':
+      return new ClaudeCodeDriver({ permissionMode: 'bypassPermissions', env })
+    case 'codex':
+      return new CodexDriver({ sandbox: 'danger-full-access', env })
+  }
+}
+
+/**
+ * The model a run starts on: the one given; else, on Claude Code, the one this user's state
+ * names. The state's model is a Claude model, so a Codex run with none given names none and
+ * Codex starts on its own default.
+ */
+async function modelFor(repo: string, driver: DriverName, given: string | undefined): Promise<string | undefined> {
+  if (given !== undefined) return given
+  return driver === 'claude-code' ? (await readState(repo)).model : undefined
 }
 
 /** `start`: the state on, and the scheduler's own process ticking until `stop`, unless this process is it. */

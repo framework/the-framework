@@ -99,6 +99,15 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   carries, the diary continued. Picked over a new run per answer (two records for one
   piece of work, and the first left waiting for ever) and over a process that waits for
   the answer (nothing waits; state in files).
+- A run is on Claude Code, or on Codex with `run --driver codex`. The person picks.
+- Either coding agent does the same: it works, pushes its branch and opens its pull request
+  itself. For that, neither may be restricted: Claude Code runs with permissions bypassed,
+  Codex with full access. Codex's default lets it write only in its checkout, so it could
+  not push. Picked over a restricted Codex with agent-scheduler pushing for it: a run would
+  then end in two different ways, and agent-scheduler would do the agent's work.
+- A resumed run is on the coding agent its record names.
+- The model in the state file is a Claude model. A Codex run gets a model only when
+  `--model` is typed; else Codex uses its own default.
 - The run records itself and reclaims its own checkout when the agent stops; the sweep on
   the tick catches what a dead process left, on this machine only. Agents in flight run to
   the end when the scheduler stops.

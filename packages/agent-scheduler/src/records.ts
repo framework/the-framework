@@ -49,14 +49,14 @@ export async function inFlight(repo: string, command: string, deps: LogsDeps = {
 }
 
 /** The card a run starts with. */
-export function markerCard(run: { id: string; startedAt: string; prompt: string; driver: string; model: string; mark: SchedulerMark }): RunCard {
+export function markerCard(run: { id: string; startedAt: string; prompt: string; driver: string; model?: string; mark: SchedulerMark }): RunCard {
   return {
     id: run.id,
     startedAt: run.startedAt,
     status: 'running',
     intent: run.prompt,
     driver: run.driver,
-    model: run.model,
+    ...(run.model !== undefined ? { model: run.model } : {}),
     caller: { scheduler: run.mark },
   }
 }

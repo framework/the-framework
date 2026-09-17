@@ -62,12 +62,22 @@ export class CodexDriver implements Driver {
 
 let sessionCounter = 0
 
-/** One workspace-bound Codex session. `prompt` is a fresh CLI invocation. */
+/**
+ * One workspace-bound Codex session. Every `prompt` is its own CLI invocation: a fresh
+ * conversation (`codex exec`), or, for a `resume` prompt, the session's conversation continued
+ * (`codex exec resume <id>`).
+ */
 export class CodexSession implements DriverSession {
   readonly id: string
   readonly cwd: string
   readonly log?: SessionLog
   private readonly startOpts: DriverStartOptions
+  /**
+   * The conversation a `resume` prompt continues: the one the session was started to resume,
+   * then the one the last turn reported. Codex keeps the id across a resume, so consecutive
+   * messages chain.
+   */
+  private lastSessionId: string | undefined
 
   constructor(
     private readonly config: CodexDriverOptions,
@@ -78,19 +88,22 @@ export class CodexSession implements DriverSession {
     if (attached.log) this.log = attached.log
     this.cwd = startOpts.cwd
     this.id = `codex-${++sessionCounter}`
+    this.lastSessionId = startOpts.resumeSessionId
   }
 
   async prompt(text: string, opts: DriverPromptOptions = {}): Promise<DriverTurn> {
     // Codex takes no system-prompt flag, so the framing rides in front of the
     // prompt. Blank-line separated, so it reads as its own block.
-    const framing = combineFraming(this.startOpts.system, opts.system)
+    // A resumed conversation already carries its framing; sending it again only repeats it.
+    const resumeId = opts.resume ? this.lastSessionId : undefined
+    const framing = resumeId === undefined ? combineFraming(this.startOpts.system, opts.system) : ''
     const prompt = framing ? `${framing}\n\n${text}` : text
     // Resolved every turn, not at start: the agent may `git init` in turn 1.
     const gitDir = await gitCommonDir(this.cwd)
     const emit = makeEmit(this.startOpts.onEvent, 'codex')
     const turn = await runCliSession({
       bin: this.config.bin ?? 'codex',
-      args: this.buildArgs(gitDir),
+      args: this.buildArgs(gitDir, resumeId),
       cwd: this.cwd,
       env: this.config.env ?? process.env,
       prompt,
@@ -100,6 +113,7 @@ export class CodexSession implements DriverSession {
       parser: new CodexJsonParser(),
       driver: 'codex',
     })
+    if (turn.sessionId) this.lastSessionId = turn.sessionId
     return finishTurn(this, turn, opts, emit)
   }
 
@@ -112,12 +126,17 @@ export class CodexSession implements DriverSession {
     return Promise.resolve()
   }
 
-  private buildArgs(gitDir: string | undefined): string[] {
+  private buildArgs(gitDir: string | undefined, resumeId?: string): string[] {
     // No prompt argument: it goes over stdin, so a long one never hits the
     // arg-length limit. `--skip-git-repo-check` because Codex otherwise refuses
     // to run outside a git repo, and a workspace may legitimately not be one yet.
     const sandbox = this.config.sandbox ?? 'workspace-write'
-    const args = ['exec', '--json', '--skip-git-repo-check', '--sandbox', sandbox, '-C', this.cwd]
+    // `exec resume` takes neither `--sandbox` nor `-C` (codex-cli 0.144.4): the sandbox goes in
+    // as the config value the flag sets, the directory is the process's own, and `-` is the
+    // prompt read from stdin, which the id before it would otherwise be taken for.
+    const args = resumeId
+      ? ['exec', 'resume', resumeId, '-', '--json', '--skip-git-repo-check', '-c', `sandbox_mode=${JSON.stringify(sandbox)}`]
+      : ['exec', '--json', '--skip-git-repo-check', '--sandbox', sandbox, '-C', this.cwd]
     // `workspace-write` keeps a `.git/` directory at the workspace root read-only,
     // so in a plain checkout (not a worktree) the agent's commit fails on
     // `.git/index.lock` (verified on codex-cli 0.144.4, #1747). The git dir is made

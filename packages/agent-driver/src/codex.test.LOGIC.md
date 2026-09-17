@@ -7,6 +7,7 @@ What the tests cover, against the streamed output of a real Codex run:
 - **A writable git directory** - in a freshly initialized git repository, the repository's absolute `.git` path is passed to Codex as a writable path under `workspace-write`, and no writable path is passed under `read-only`.
 - **The prompt over standard input** - the prompt is fed to Codex over standard input and never appears as a command-line argument.
 - **Framing ahead of the prompt** - the driver session's framing, then the turn's extra framing, then the prompt, as blank-line separated blocks.
+- **Continuing the conversation** - a turn asked to continue with no turn before it starts fresh; the next one resumes the thread id the first reported, with the sandbox as a configuration value, the model, and the prompt alone with no framing; a turn not asked to continue starts fresh again; a driver session started with an earlier session id resumes that one, under the sandbox the driver was configured with.
 - **Model pass-through** - the model the caller names reaches Codex's command line.
 - **No quota reading** - the driver offers no quota reading rather than a made-up number.
 - **A failed turn** - a non-zero exit fails the turn even though text streamed first.

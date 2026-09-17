@@ -1,4 +1,4 @@
-Drives Codex as a driver [1]: each turn [2] is one non-interactive invocation of the `codex` command in the driver session's [3] directory, whose streamed JSON output is read for the coding agent's [4] messages, the kinds of work items it starts, its thread id and its token usage [5], and whose last message is the turn's answer. Codex has no system prompt flag, prices nothing, is never resumed by this driver and reports no quota [6]. Its implementation id is `codex`.
+Drives Codex as a driver [1]: each turn [2] is one non-interactive invocation of the `codex` command in the driver session's [3] directory, whose streamed JSON output is read for the coding agent's [4] messages, the kinds of work items it starts, its thread id and its token usage [5], and whose last message is the turn's answer. Codex has no system prompt flag, prices nothing and reports no quota [6]; a turn asked to continue the driver session's conversation resumes it by its thread id. Its implementation id is `codex`.
 
 ## Context
 
@@ -30,7 +30,7 @@ Drives Codex as a driver [1]: each turn [2] is one non-interactive invocation of
 - **Sandboxed to the directory** - Codex runs under its `workspace-write` sandbox unless the driver [1] was configured with `read-only` or `danger-full-access`; under `workspace-write` the directory's git repository data is writable too, so the coding agent [4] can commit; the flag that bypasses Codex's approvals and sandbox is never passed.
 - **Framing rides ahead of the prompt** - Codex has no system prompt flag, so the driver session's framing [10] and the turn's extra framing are placed in front of the prompt, as their own block.
 - **Model pass-through** - the model the caller names is passed to Codex as is; without one, Codex's own default runs.
-- **Every turn starts fresh** - the driver never resumes a Codex conversation: a request to continue the previous turn, and an earlier session id to continue, are ignored and the turn runs fresh.
+- **Continuing the conversation** - a turn asked to continue resumes the driver session's [3] Codex conversation by its thread id: the one the driver session was started to continue, then the one the last turn reported; a turn not asked to, or with no conversation yet, starts fresh.
 - **What is read off the streamed output** - the thread id as the session id, each completed message as streamed text with the last one as the turn's answer, and each started work item as a tool use named by its kind, with everything else ignored.
 - **Usage: tokens, never a price** - Codex's token counts are reported with the cached part split out of its inclusive input total, and no price, never zero.
 - **No quota reading** - the driver reports no quota [6] at all rather than a made-up number.
@@ -68,7 +68,7 @@ Under `workspace-write`, Codex keeps a `.git` directory at the root of the direc
 
 #### Business logic
 
-The driver session's [3] framing [10] and the turn's [2] extra framing are joined as separate paragraphs, blank-line separated, and placed in front of the prompt with a blank line between the framing and the prompt, so the same words reach Codex as one block ahead of the task. A turn with no framing at all sends the prompt alone. Because every turn starts fresh (see "Every turn starts fresh"), the framing is sent on every turn.
+The driver session's [3] framing [10] and the turn's [2] extra framing are joined as separate paragraphs, blank-line separated, and placed in front of the prompt with a blank line between the framing and the prompt, so the same words reach Codex as one block ahead of the task. A turn with no framing at all sends the prompt alone. A turn that continues the conversation (see "Continuing the conversation") sends the prompt alone: the conversation already carries the framing, and sending it again would only repeat it.
 
 ### Model pass-through
 
@@ -80,15 +80,17 @@ The driver session's [3] framing [10] and the turn's [2] extra framing are joine
 
 When the caller names a model, it is passed to Codex as is (`-m <id>`); the driver [1] neither validates nor substitutes it. Without one, Codex runs whatever model it defaults to.
 
-### Every turn starts fresh
+### Continuing the conversation
 
 #### Context
 
-**Business logic story**: the driver [1] contract makes continuing a conversation best effort: a driver that cannot resume runs a fresh turn [2] instead. A live chat [11] message to a Codex agent [7] therefore reaches Codex without the earlier turns' context.
+**User story**: the user answers a Codex agent's [7] question, or sends it a message (live chat [11]), and the agent goes on with everything it did before in mind, as a Claude Code agent does.
+
+**Business logic story**: a caller asks a turn [2] to continue the previous one (the inbox does, for every waiting line, and so does a runner resuming an ended run), and may start a driver session [3] with an earlier session id to continue. Codex keeps its conversations itself and continues one by its thread id (`codex exec resume <thread id>`).
 
 #### Business logic
 
-Each turn [2] is a fresh invocation of Codex. The caller's request to continue the previous turn is ignored, and so is an earlier session id the driver session [3] was started with; neither is passed to Codex. The thread id Codex announces is still reported as the turn's session id, so the caller can record it, but this driver [1] never uses it to resume.
+The driver session [3] remembers one thread id: the earlier session id it was started with, if any, then the thread id each turn [2] reports, which Codex keeps the same across a continued conversation. A turn asked to continue, when a thread id is known, invokes Codex's resume of that thread instead of a fresh run: JSON output and the skipped git repository check as always, the prompt over standard input, the model passed when the caller named one, and the writable git repository data under `workspace-write`. Codex's resume takes neither the sandbox flag nor the directory flag, so the sandbox is passed as the configuration value that flag sets, and the directory is the process's working directory. A turn not asked to continue, and a turn asked to when no thread id is known yet, starts a fresh conversation. A resume Codex refuses fails the turn with Codex's own message; nothing is retried fresh.
 
 ### What is read off the streamed output
 

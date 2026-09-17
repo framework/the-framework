@@ -20,7 +20,7 @@ The tool's process side: the tick [1] wired to the real project, the run's [2] d
 - **The detached run** - `agent-scheduler run <prompt> --id <id> --command <command> --model <model>`, detached from the tick, stdin and stdout dropped, stderr to `.agent-scheduler/runs/<id>.stderr`, the run's id in its environment as `AGENT_ID`.
 - **A run in this process** - the id given by the tick or minted now, the model given or the state's, marked already when the id was given, Claude Code with permissions bypassed and `AGENT_ID` in its environment.
 - **`start`** - the state on (and keep-alive when asked); a scheduler's process already alive is left as is; otherwise the tool's own executable spawned detached as `start --foreground`, its output to `.agent-scheduler/scheduler.log`, and its pid and start time written to the state.
-- **The loop** - a tick now and every minute, never two at once, a tick that throws logged as `tick failed: …` and the loop going on; a stop signal ends the loop after the tick in flight and clears the pid.
+- **The loop** - a tick now and every minute, never two at once, a tick that throws logged as `tick failed: …` and the loop going on; a stop signal ends the loop after the tick in flight, which starts nothing more, and clears the pid when it is still this process's.
 - **`stop`** - the scheduler's process signalled when alive; the state off with no pid; agents in flight run to the end. Asked to stop unless keep-alive, it leaves a keep-alive scheduler as it is and says it kept it: the one reader of keep-alive.
 - **`status`** - the state, plus whether its pid is a live process.
 - **A live pid** - probed by signal 0 on this machine; a process that exists but belongs to another user counts as alive; a pid on another host is unknowable here.
@@ -75,7 +75,7 @@ See `## Context`.
 
 #### Business logic
 
-The scheduler's process first writes its own pid and start time to the state. It ticks at once and then every interval (one minute); ticks queue behind each other, so two never run at once, and a tick that throws is logged as `[agent-scheduler] tick failed: <message>` without ending the loop. A SIGINT or SIGTERM stops the clock, waits for the tick in flight, removes the pid and the start time from the state and ends the process; the state's `on` is left as it was, so a `stop` says off and a killed scheduler stays on for the next `start`.
+The scheduler's process first writes its own pid and start time to the state. It ticks at once and then every interval (one minute); ticks queue behind each other, so two never run at once, and a tick that throws is logged as `[agent-scheduler] tick failed: <message>` without ending the loop. A SIGINT or SIGTERM stops the clock and waits for the tick in flight; that tick is told the scheduler was stopped, so it starts nothing more (its decision lines say `not started: the scheduler was stopped`). The pid and the start time are then removed from the state only when the pid is still this process's: a dashboard's close hook stops this scheduler and its open hook starts the next one before this tick is over, and the next one's pid stays. The process ends; the state's `on` is left as it was, so a `stop` says off and a killed scheduler stays on for the next `start`.
 
 ### `stop`
 

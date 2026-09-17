@@ -12,6 +12,7 @@ The state [1]: one JSON file under `.agent-scheduler/` at the repository root, w
 
 ## Business logic — TL;DR
 
+- **A scheduler ending clears only its own pid** - the pid and the start time are removed only when the pid is the ending process's; a pid the next scheduler wrote meanwhile stays.
 - **What the state holds** - `on`, `keepAlive`, `model`, `spendOffset`, the scheduler's `pid` and `startedAt` while its process runs, and `lastTick`: when, one decision per command (`command`, `outcome`, `run` when one started), and a `note` when the tick decided nothing.
 - **The defaults** - off, no keep-alive, `opus`, a spend cushion of 100/14 points; a missing file, and a file that does not parse, read as the defaults with nothing else, so a corrupt state never stops a tick.
 - **Writing** - every write creates the directory and `runs/`, hides `/.agent-scheduler` through the exclude file (best-effort: a repository whose exclude file cannot be written still has a scheduler), and writes the whole file; an edit is one read, one change, one write.
@@ -27,6 +28,16 @@ See `## Context`.
 #### Business logic
 
 `on`: whether ticks start agents; off by default, so nothing runs until a person says so. `keepAlive`: whether the scheduler's process outlives whatever started it; written by `start --keep-alive` and read by `stop --unless-keep-alive` only, the line a dashboard runs when it closes. `model`: the model every run starts on. `spendOffset`: how far past the spend boundary a run may still start, in percentage points. `pid` and `startedAt`: the scheduler's own process and when it started, present only while `start` has one running. `lastTick`: the last tick's ISO time, its decisions, one per command with the command's name, one outcome line for a person (`started <id>`, `not due`, `not due (last start 2h ago, every 6h)`, `cap reached (…)`, `quota: …`, …) and the run's id when one was started, and a `note` when the tick decided nothing (`off`, `no agent-schedule.md`, `agent-data could not be pulled: …`).
+
+### A scheduler ending clears only its own pid
+
+#### Context
+
+**Problem**: a dashboard's close hook stops the scheduler and its open hook starts the next one; the first still finishes its tick in flight, and its final write of the state came after the next one's pid was written, wiping it: `status` then said no scheduler ran while one ticked, `stop` could not stop it, and the next `start` spawned a second one.
+
+#### Business logic
+
+Removing a scheduler's process from the state takes the process's pid: when the state names that pid, the pid and the start time are removed; when it names another, or none, the state is unchanged.
 
 ### The defaults
 

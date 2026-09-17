@@ -50,6 +50,8 @@ export interface TickDeps {
   spawn: (run: { id: string; command: string; prompt: string; model: string }) => Promise<void>
   /** The driver's id, for the marker's card. */
   driver: string
+  /** Whether the scheduler was told to stop while this tick runs: then nothing more is started. */
+  stopped?: () => boolean
   log?: (line: string) => void
 }
 
@@ -102,6 +104,11 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
     quota ??= quotaHeadroom(await boundary(deps))
     if (!quota.start) {
       decide(`quota: ${quota.reason}`)
+      continue
+    }
+    // The stop may have come in during the readings above: a stopped scheduler starts nothing.
+    if (deps.stopped?.()) {
+      decide('not started: the scheduler was stopped')
       continue
     }
     const id = deps.mint()

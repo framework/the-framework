@@ -205,3 +205,12 @@ test('the quota is read once per tick, however many commands start', async () =>
   assert.equal(seen.spawned.length, 2)
   assert.equal(reads, 1)
 })
+
+test('a stop that came in during the tick starts nothing: no marker, no spawn, the decision says so', async () => {
+  const { deps: d, seen } = deps({ stopped: () => true })
+  const record = await tick(d)
+  assert.deepEqual(record.decisions, [{ command: 'work-queue', outcome: 'not started: the scheduler was stopped' }])
+  assert.equal(seen.markers.length, 0)
+  assert.equal(seen.spawned.length, 0)
+  assert.deepEqual(seen.checks, ['npx queue'], 'the readings before it still ran')
+})

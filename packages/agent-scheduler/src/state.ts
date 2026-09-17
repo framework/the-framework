@@ -86,6 +86,17 @@ export async function writeState(repo: string, state: State, git: GitRunner = no
   await writeFile(statePath(repo), JSON.stringify(state, null, 2) + '\n')
 }
 
+/**
+ * The state without the scheduler's process, when that process is `pid`; unchanged otherwise. A
+ * scheduler ending must not clear a pid another scheduler wrote meanwhile: a dashboard's close
+ * hook stops one and its open hook starts the next while the first still finishes its tick.
+ */
+export function withoutPid(state: State, pid: number): State {
+  if (state.pid !== pid) return state
+  const { pid: _pid, startedAt: _startedAt, ...rest } = state
+  return rest
+}
+
 /** Read, change, write: one edit of the state. */
 export async function updateState(repo: string, change: (state: State) => State, git?: GitRunner): Promise<State> {
   const next = change(await readState(repo))

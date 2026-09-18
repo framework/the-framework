@@ -188,10 +188,13 @@ export class CodexJsonParser implements AgentCliParser {
     if (typeof obj !== 'object' || obj === null) return []
     const type = obj['type']
 
+    // Announced at once, like Claude Code's: a turn that is stopped or fails before its result
+    // must not take the id, the handle a later `exec resume` needs, with it.
     if (type === 'thread.started') {
       const id = obj['thread_id']
-      if (typeof id === 'string') this.sessionId = id
-      return []
+      if (typeof id !== 'string') return []
+      this.sessionId = id
+      return [{ type: 'session', sessionId: id }]
     }
 
     if (type === 'turn.completed') {

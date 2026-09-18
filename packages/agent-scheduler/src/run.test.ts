@@ -6,6 +6,7 @@ import { appendInbox, FakeDriver, type Driver, type DriverSession, type DriverSt
 import { worktreePath } from '@gemstack/skill-branches'
 import { findRun, readDiary } from '@gemstack/skill-logs'
 import { inboxPath, readLiveCard } from './live-card.js'
+import { acquireRunLock, releaseRunLock } from './run-lock.js'
 import { resumeRun, runCommand, STOPPED_DETAIL } from './run.js'
 import { git, removeRepo, testRepo } from './test-repo.js'
 
@@ -265,6 +266,72 @@ test('a line already in the inbox when the turn ends becomes the next turn of th
     const diary = (await readDiary(repo, outcome.id))!
     assert.deepEqual(diary.filter(l => l.kind === 'start').map(l => l['prompt']), ['/work-queue', 'also add a test'])
     assert.deepEqual(diary.filter(l => l.kind === 'said').map(l => l['text']), ['First turn done.', 'Second turn done.'])
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test('a line written after the last turn took the inbox, while the card still said running, is sent by the same process before the run ends', async () => {
+  const repo = await testRepo()
+  try {
+    const driver = new FakeDriver({ turns: [{ text: 'First turn done.' }, { text: 'Late line handled.' }] })
+    let cwd = ''
+    const recording: Driver = { id: 'fake', start: async opts => ((cwd = opts.cwd), driver.start(opts)) }
+    // The pull request is read after the last turn and before the card says ended: the moment a
+    // dashboard still sees the run working and hands it a line.
+    let calls = 0
+    const gh = async () => {
+      if (calls++ === 0) await appendInbox(inboxPath(cwd), { kind: 'message', text: 'one more thing' })
+      return '[]'
+    }
+    const outcome = await runCommand(repo, { prompt: '/work-queue', model: 'opus', driver: recording, now: () => NOW, gh })
+    assert.equal(outcome.status, 'done')
+    assert.deepEqual(outcome.checkout, { reclaimed: true })
+    const diary = (await readDiary(repo, outcome.id))!
+    assert.deepEqual(diary.map(l => l.kind), ['start', 'said', 'result', 'ended', 'start', 'said', 'result', 'ended'])
+    assert.deepEqual(diary.filter(l => l.kind === 'start').map(l => l['prompt']), ['/work-queue', 'one more thing'])
+    assert.equal((await findRun(repo, outcome.id))?.status, 'done')
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test('a signal that comes while the run records and reclaims is ignored: the run ends as it ended', async () => {
+  const repo = await testRepo()
+  try {
+    // Without its handler, this signal would end this test's own process.
+    const gh = async () => {
+      process.kill(process.pid, 'SIGINT')
+      await new Promise(resolve => setTimeout(resolve, 50))
+      return '[]'
+    }
+    const outcome = await runCommand(repo, { prompt: '/work-queue', model: 'opus', driver: new FakeDriver({ turns: [{ text: 'Done.' }] }), now: () => NOW, gh })
+    assert.equal(outcome.status, 'done')
+    assert.deepEqual(outcome.checkout, { reclaimed: true })
+    assert.equal((await findRun(repo, outcome.id))?.status, 'done')
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test('a resume waits while another process of the run holds its lock, then reads the run as that one left it', async () => {
+  const repo = await testRepo()
+  try {
+    const first = await runCommand(repo, { prompt: '/work-queue', model: 'opus', driver: new FakeDriver({ turns: [{ text: QUESTION }], sessionId: 's-ask' }), now: () => NOW, gh: async () => '[]' })
+    assert.equal(first.status, 'waiting')
+    // The run's own process, or an earlier resume, still at work.
+    const alive = new Set([777])
+    await acquireRunLock(repo, first.id, { pid: 777, isAlive: pid => alive.has(pid) })
+    let started = false
+    const finishing: Driver = { id: 'fake', start: async opts => ((started = true), new FakeDriver({ turns: [{ text: 'Shipped.' }] }).start(opts)) }
+    const resuming = resumeRun(repo, { id: first.id, answer: 'Approve', driver: finishing, pid: 778, isAlive: pid => alive.has(pid), now: () => NOW, gh: async () => '[]' })
+    await new Promise(resolve => setTimeout(resolve, 1200))
+    assert.equal(started, false, 'the resume waits for the holder')
+    assert.equal((await findRun(repo, first.id))?.status, 'waiting')
+    await releaseRunLock(repo, first.id, 777)
+    const second = await resuming
+    assert.equal(started, true)
+    assert.equal(second.status, 'done')
   } finally {
     await removeRepo(repo)
   }

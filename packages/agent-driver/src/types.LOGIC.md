@@ -27,7 +27,7 @@ Fixes the vocabulary of the driver [1] contract, in words: what every driver pro
 ## Business logic — TL;DR
 
 - **What a driver promises** - a stable implementation id, a way to start a driver session [2] bound to a directory, and optionally a way to read the account's quota [7].
-- **How a driver session is started** - with the directory the coding agent [8] reads and edits, the framing [10] every turn [3] carries, the model to pass through, a stop request [11] for the whole driver session, optionally the session id of an earlier driver session to continue, optionally a log (a directory and the card to start it with, exposed on the driver session for the caller to patch and end), and a listener for progress events [4] that can never break the coding agent.
+- **How a driver session is started** - with the directory the coding agent [8] reads and edits, the framing [10] every turn [3] carries, the model to pass through, a stop request [11] for the whole driver session, optionally the session id of an earlier driver session to continue, optionally a log (a directory and the card to start it with, exposed on the driver session for the caller to patch, end and reopen), and a listener for progress events [4] that can never break the coding agent.
 - **One turn, one final message** - a prompt goes in with optional extra framing, a stop request for this turn only, a best-effort request to continue the previous turn and optionally an inbox path, whose waiting lines become further turns before the prompt resolves; the final message, the session id and the usage [5] of the last turn come out.
 - **Reading code and ending the driver session** - a driver [1] may let the caller read a file the coding agent produced; ending the driver session frees what it holds and may be repeated safely.
 - **Progress events are shown, never decided on** - nine kinds of progress event, each with what it carries, none of which a caller may gate on; the ninth is the question a turn ended on, parsed.
@@ -78,7 +78,7 @@ A turn [3] sends one prompt to the coding agent [8], lets the coding agent's own
 
 - Extra framing [10] for this turn only, appended after the driver session's [2] framing.
 - A stop request [11] for this turn only.
-- A request to continue the coding agent's previous turn instead of starting fresh, so that a live chat [12] message lands in the ongoing conversation with its full context. It is best effort: a driver that cannot resume, or has no previous turn yet, runs a fresh turn, which is the normal case. The Claude Code driver honors it (`claude-code.ts`).
+- A request to continue the coding agent's previous turn instead of starting fresh, so that a live chat [12] message lands in the ongoing conversation with its full context. It is best effort: a driver that cannot resume, or has no previous turn yet, runs a fresh turn, which is the normal case. The Claude Code, Codex and GitHub Actions drivers honor it (`claude-code.ts`, `codex.ts`, `actions.ts`); the fake does not.
 
 A turn answers with the coding agent's final message as text, the coding agent's session id when it exposes one (the handle the dashboard links to and the driver later resumes), and the turn's usage [5] when the coding agent reports one. A driver's own id for the driver session is distinct from that session id.
 

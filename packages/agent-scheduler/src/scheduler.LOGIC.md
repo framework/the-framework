@@ -13,12 +13,13 @@ The tool's process side: the tick [1] wired to the real project, the run's [2] d
 [3] the scheduler's process: the tool's own process between `start` and `stop`, ticking every minute; the state holds its pid.
 [4] the state: `.agent-scheduler/state.json` at the repository root, per user: on or off, keep-alive, the model, the spend cushion, the scheduler's pid, the last tick's decisions.
 [5] marker: a run record written before the agent exists: `status: running`, the tool's mark, an empty diary.
+[6] the run's lock: `.agent-scheduler/runs/<id>.lock` at the repository root, holding the pid of the one process of the run at work on it; a pid that is not a live process holds nothing (`run-lock.ts`).
 
 ## Business logic — TL;DR
 
 - **A tick of the real project** - the state and the schedule read, the tick decided with this host, the `agent-data` pull, the sweep with a real pid probe, the command's folder, the check with a one-minute budget, the branch's markers and each command's last start, Claude Code's quota, ids from the clock, the driver `claude-code`; the record written to the state as `lastTick` and told line by line on the log (`[agent-scheduler] tick <time>: <note>`, `[agent-scheduler]   <command>: <outcome>`).
-- **The detached run** - `agent-scheduler run <prompt> --id <id> --command <command>`, with `--model <model>` and `--driver <name>` when the run has them, detached from the tick, stdin and stdout dropped, stderr to `.agent-scheduler/runs/<id>.stderr`, the run's id in its environment as `AGENT_ID`.
-- **A detached start on demand** - `run --detach <prompt>`: the marker written and the run's process spawned the way the tick does it, the id answered at once; the command is the prompt's first word, so the run counts against that command's cap; the coding agent is Claude Code unless `--driver codex`, and the marker names it.
+- **The detached run** - the run's lock [6] taken by the spawning process, then `agent-scheduler run <prompt> --id <id> --command <command>`, with `--model <model>` and `--driver <name>` when the run has them, detached from the tick, stdin and stdout dropped, stderr to `.agent-scheduler/runs/<id>.stderr`, the run's id in its environment as `AGENT_ID`, and the lock handed to the spawned process; a spawn that fails lets the lock go.
+- **A detached start on demand** - `run --detach <prompt>`: the run's lock taken, the marker written and the run's process spawned the way the tick does it, the id answered at once, the lock let go when the marker or the spawn throws; the command is the prompt's first word, so the run counts against that command's cap; the coding agent is Claude Code unless `--driver codex`, and the marker names it.
 - **A detached continuation on demand** - `run --detach --resume <id>`: the run's process spawned to continue it, its id answered at once; the line a dashboard's resume hook runs. A run the project has no record of is refused there and then.
 - **A run in this process** - the id given by the tick or minted now, marked already when the id was given, on Claude Code or, with `--driver codex`, on Codex; a resumed run on the coding agent its record names.
 - **Either coding agent, unrestricted** - Claude Code with permissions bypassed, Codex with full access, `AGENT_ID` in the agent's environment: whichever coding agent the person picks, it pushes its branch and opens its pull request itself.
@@ -27,7 +28,6 @@ The tool's process side: the tick [1] wired to the real project, the run's [2] d
 - **The loop** - a tick now and every minute, never two at once, a tick that throws logged as `tick failed: …` and the loop going on; a stop signal ends the loop after the tick in flight, which starts nothing more, and clears the pid when it is still this process's.
 - **`stop`** - the scheduler's process signalled when alive; the state off with no pid; agents in flight run to the end. Asked to stop unless keep-alive, it leaves a keep-alive scheduler as it is and says it kept it: the one reader of keep-alive.
 - **`status`** - the state, plus whether its pid is a live process.
-- **A live pid** - probed by signal 0 on this machine; a process that exists but belongs to another user counts as alive; a pid on another host is unknowable here.
 
 ## Business logic
 
@@ -39,7 +39,7 @@ See `## Context`.
 
 #### Business logic
 
-The state and the schedule are read from the repository. The tick decides with: this machine's host name; the `agent-data` package's pull of the branch; the sweep with this host and the live-pid probe; whether `.claude/skills/<name>` is a directory; the check run through the shell with a one-minute budget; the command's markers [5] on the branch; Claude Code's quota read by `agent-driver` in the repository; ids minted from the clock; the marker written to and withdrawn from the branch; the detached run; and the driver id `claude-code` on the marker's card. The tick's record is written to the state as `lastTick`, and told on the log one line per decision.
+The state and the schedule are read from the repository. The tick decides with: this machine's host name; the `agent-data` package's pull of the branch; the sweep with this host and the live-pid probe (`run-lock.ts`); whether `.claude/skills/<name>` is a directory; the check run through the shell with a one-minute budget; the command's markers [5] on the branch; Claude Code's quota read by `agent-driver` in the repository; ids minted from the clock; the marker written to and withdrawn from the branch; the detached run; and the driver id `claude-code` on the marker's card. The tick's record is written to the state as `lastTick`, and told on the log one line per decision.
 
 ### The detached run
 
@@ -49,7 +49,7 @@ The state and the schedule are read from the repository. The tick decides with: 
 
 #### Business logic
 
-The run is the tool's own executable started as a detached process with `run <prompt> --id <id> --command <command>`, then `--model <model>` when the run has a model and `--driver <name>` when it has a coding agent named (left out, the run's own defaults apply), the repository as its working directory, no stdin, stdout dropped, stderr appended to `.agent-scheduler/runs/<id>.stderr`, and the run's id as `AGENT_ID` in its environment. The tick waits only until the process has spawned; a spawn that fails is the tick's `could not start: …`.
+The spawning process first takes the run's lock [6] with its own pid, waiting while another live process holds it, so that from before the run's process exists a sweep reads the run as held rather than gone. The run is the tool's own executable started as a detached process with `run <prompt> --id <id> --command <command>`, then `--model <model>` when the run has a model and `--driver <name>` when it has a coding agent named (left out, the run's own defaults apply), the repository as its working directory, no stdin, stdout dropped, stderr appended to `.agent-scheduler/runs/<id>.stderr`, and the run's id as `AGENT_ID` in its environment. The tick waits only until the process has spawned; the lock is then handed to the spawned process's pid, which finds it its own when it takes it and holds it for the run's life. A spawn that fails lets the lock go and is the tick's `could not start: …`.
 
 ### A detached start on demand
 
@@ -61,7 +61,7 @@ The run is the tool's own executable started as a detached process with `run <pr
 
 #### Business logic
 
-`run --detach <prompt>` mints the id from the clock, takes the command from the prompt's first word without its slash (`/work-queue now` → `work-queue`; a plain prompt's first word otherwise), the coding agent from `--driver` (Claude Code when absent) and the model by the rule below, writes the marker on the branch, naming the coding agent, with the tool's mark naming the command and this host (no pid: the process does not exist yet; a marker that could not even be committed is logged), spawns the run's process exactly as the tick does, with the id, the coding agent and the model, and answers the id, the command, the driver and, when the run has one, the model. The run's process, given its id, does not mark itself again.
+`run --detach <prompt>` mints the id from the clock, takes the command from the prompt's first word without its slash (`/work-queue now` → `work-queue`; a plain prompt's first word otherwise), the coding agent from `--driver` (Claude Code when absent) and the model by the rule below, takes the run's lock [6] with its own pid before anything is written, so that a scheduler's sweep reading the marker before the run's process has its checkout sees the run held, writes the marker on the branch, naming the coding agent, with the tool's mark naming the command and this host (no pid: the process does not exist yet, and the lock is what says the run lives; a marker that could not even be committed is logged), spawns the run's process exactly as the tick does, handing it the lock, with the id, the coding agent and the model, and answers the id, the command, the driver and, when the run has one, the model. When the marker's write or the spawn throws, the lock is let go and the error stands. The run's process, given its id, does not mark itself again.
 
 Continuing an ended run has the same shape: `run --detach --resume <id>`, with the user's text or their `--answer`, spawns the run's process to continue that run and answers its id at once — what a dashboard's resume hook runs, for the same reason its start hook runs the detached start. One thing is decided before anything is spawned: a run this project has no record of is refused while someone is still listening, since everything after the spawn is the resumed run's own record and nobody would read a failure there. The run's process does the rest — the checkout it kept or a fresh one on its branch, the session resumed, the diary continued.
 

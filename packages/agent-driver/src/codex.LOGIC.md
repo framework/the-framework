@@ -31,7 +31,7 @@ Drives Codex as a driver [1]: each turn [2] is one non-interactive invocation of
 - **Framing rides ahead of the prompt** - Codex has no system prompt flag, so the driver session's framing [10] and the turn's extra framing are placed in front of the prompt, as their own block.
 - **Model pass-through** - the model the caller names is passed to Codex as is; without one, Codex's own default runs.
 - **Continuing the conversation** - a turn asked to continue resumes the driver session's [3] Codex conversation by its thread id: the one the driver session was started to continue, then the one the last turn reported; a turn not asked to, or with no conversation yet, starts fresh.
-- **What is read off the streamed output** - the thread id as the session id, each completed message as streamed text with the last one as the turn's answer, and each started work item as a tool use named by its kind, with everything else ignored.
+- **What is read off the streamed output** - the thread id as the session id, announced at once as a `session` progress event, each completed message as streamed text with the last one as the turn's answer, and each started work item as a tool use named by its kind, with everything else ignored.
 - **Usage: tokens, never a price** - Codex's token counts are reported with the cached part split out of its inclusive input total, and no price, never zero.
 - **No quota reading** - the driver reports no quota [6] at all rather than a made-up number.
 - **Ending the driver session** - nothing is freed; each turn's process is already gone when the turn ends.
@@ -102,7 +102,7 @@ The driver session [3] remembers one thread id: the earlier session id it was st
 
 Codex streams one JSON object per line. A line that is not JSON, such as a banner, an empty line, or a JSON value that is not an object, is noise and is ignored. From each object:
 
-- The line announcing the thread carries the thread id, which becomes the turn's [2] session id in the turn's answer. It is not reported as a `session` progress event [12] while the turn runs: the id only surfaces with the result, so a turn that never settles leaves no id behind.
+- The line announcing the thread carries the thread id, which becomes the turn's [2] session id in the turn's answer. It is also reported at once as a `session` progress event [12], ahead of everything else the turn streams, as Claude Code's is: a turn that is stopped or fails before its result still leaves the id behind (on the log, when the caller asked for one), the handle a later resume of the conversation needs. The driver session [3] itself still takes the thread id to continue only from a turn that completed.
 - Each completed message from the coding agent [4] yields one `text` progress event. Codex narrates in several messages, the last of which is its answer, so every message is streamed and the last one stands as the turn's final message. A turn in which Codex sent no message answers with an empty final message.
 - Each work item Codex starts, of whatever kind, yields one `action` progress event carrying the item's kind only, such as `file_change`, never its arguments: the seam is the code and the outcome, not the tool calls.
 - The line closing the turn carries the usage [5] (see "Usage: tokens, never a price").

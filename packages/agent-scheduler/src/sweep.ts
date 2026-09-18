@@ -2,7 +2,8 @@ import { readFile, stat } from 'node:fs/promises'
 import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
 import { agentBranchName, reclaimWorktree, worktreeDirEntries, worktreePath } from '@gemstack/skill-branches'
 import { listRuns, type LogsDeps, type RunCard } from '@gemstack/skill-logs'
-import { endLiveCard, liveMark, readLiveCard, readLiveDiary } from './live-card.js'
+import { endLiveCard, readLiveCard, readLiveDiary } from './live-card.js'
+import { lockHolder } from './run-lock.js'
 import { recordRun, schedulerMark } from './records.js'
 import { runStderrPath } from './state.js'
 
@@ -17,6 +18,9 @@ import { runStderrPath } from './state.js'
  * and reclaimed again; a run that ended `waiting` keeps its checkout for the answer. A running
  * card on the branch from this machine with no checkout behind it is a run that never started:
  * `failed` with the stderr the spawn left, else `stopped`.
+ *
+ * A run whose lock a live process holds is that process's: it is booting, working, recording,
+ * reclaiming, or resuming, and the sweep does not touch it.
  */
 
 export interface SweepDeps {
@@ -45,11 +49,11 @@ export async function sweep(repo: string, deps: SweepDeps): Promise<SweepResult>
   // Checkouts first: the live card is the truth about a run this machine started.
   for (const entry of await worktreeDirEntries(repo).catch(() => [])) {
     let card = await readLiveCard(entry.path, entry.agentId)
-    const mark = card && liveMark(card)
+    const mark = card && schedulerMark(card)
     if (!card || !mark || mark.host !== deps.host) continue
     seen.add(card.id)
+    if (await lockHolder(repo, card.id, deps.isAlive)) continue
     if (card.status === 'running') {
-      if (mark.pid !== undefined && deps.isAlive(mark.pid)) continue
       card = await endLiveCard(entry.path, card, 'failed', 'its process died before the run ended', now().toISOString())
     }
     const diary = await readLiveDiary(entry.path, card.id)
@@ -69,10 +73,7 @@ export async function sweep(repo: string, deps: SweepDeps): Promise<SweepResult>
     if (card.status !== 'running' || seen.has(card.id)) continue
     const mark = schedulerMark(card)
     if (!mark || mark.host !== deps.host) continue
-    if (mark.pid !== undefined && deps.isAlive(mark.pid) && !(await checkoutExists(repo, card.id))) {
-      // Spawned and still booting: its checkout is not there yet. Left for the next tick.
-      continue
-    }
+    if (await lockHolder(repo, card.id, deps.isAlive)) continue
     if (await checkoutExists(repo, card.id)) continue // a checkout with no live card yet: the run is opening it
     const stderr = (await readFile(runStderrPath(repo, card.id), 'utf8').catch(() => '')).trim()
     const ended = stderr ? failedStart(card, stderr, now()) : gone(card, now())

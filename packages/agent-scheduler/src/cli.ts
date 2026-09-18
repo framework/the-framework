@@ -1,7 +1,7 @@
 import { parseArgs } from 'node:util'
 import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
 import { projectRoot } from '@gemstack/skill-branches'
-import { DRIVER_NAMES, detachResume, detachRun, isDriverName, resumeProject, runProject, schedulerStatus, startScheduler, stopScheduler, tickProject } from './scheduler.js'
+import { DRIVER_NAMES, detachResume, detachRun, isDriverName, readyToRun, resumeProject, runProject, schedulerStatus, startScheduler, stopScheduler, tickProject } from './scheduler.js'
 import { updateState } from './state.js'
 
 /**
@@ -19,6 +19,8 @@ export const USAGE = `usage: agent-scheduler <command>
   run --resume <id> [<text>] [--answer <label>]
                                 continue an ended run: the same record, its session resumed; the text as the next prompt, or the answer to the question it ended on
   run --detach --resume <id> …  the same continuing in its own process, answered at once: what a dashboard's resume hook runs
+  check [--driver <claude-code|codex>]
+                                whether a run can start here: the coding agent's CLI installed and logged in, gh too; what a dashboard's check hook runs
   start [--keep-alive]          the scheduler on, ticking every minute in its own process
   stop [--unless-keep-alive]    the scheduler off; runs in flight go to the end; with the flag a keep-alive scheduler is left running
   status                        the state file, and whether the scheduler's process is alive
@@ -91,6 +93,12 @@ const COMMANDS: Record<string, Command> = {
       if (values.id !== undefined || values.command !== undefined) throw new Usage('--resume takes no --id or --command: a run continues under its own')
       if (positionals[0] === undefined && values.answer === undefined) throw new Usage('a text or --answer is needed to resume a run')
     }
+    // A person's run is refused before it spends a checkout when its coding agent cannot start;
+    // the tick asks the same before it marks, and a resumed run's agent already ran once here.
+    if (values.resume === undefined && values.id === undefined) {
+      const ready = await readyToRun(driver ?? 'claude-code')
+      if (ready.problems.length > 0) throw new Refused({ ok: false, reason: 'not-ready', ...ready }, ready.problems.join(' '))
+    }
     if (values.detach && values.resume !== undefined) {
       const resumed = await detachResume(repo, {
         id: values.resume,
@@ -126,6 +134,14 @@ const COMMANDS: Record<string, Command> = {
       log: io.stderr,
     })
     return { ok: outcome.status === 'done' || outcome.status === 'waiting', ...outcome }
+  },
+
+  async check(args, io, git) {
+    const { values } = parse(args, { driver: { type: 'string' } }, 0)
+    const driver = values.driver ?? 'claude-code'
+    if (!isDriverName(driver)) throw new Usage(`unknown driver "${driver}"; the drivers are ${DRIVER_NAMES.join(' and ')}`)
+    await project(io.cwd, git)
+    return { ok: true, ...(await readyToRun(driver)) }
   },
 
   async start(args, io, git) {

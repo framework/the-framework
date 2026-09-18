@@ -1,6 +1,6 @@
 import { contextAddProject, contextProjectErrors, contextProjects, resolveProjectPath } from './context.js'
 import { readProjectCommands, type ProjectCommand } from '../project-commands.js'
-import { readProjectHooks } from '../project-hooks.js'
+import { readProjectHooks, runCheckHook, type StartReadiness } from '../project-hooks.js'
 import { pickDirectory, type PickDirectoryResult } from '../pick-directory.js'
 import type { ProjectSummary } from '../dashboard/projects.js'
 import type { AddProjectResult, OnboardingSuggestion } from '../dashboard/types.js'
@@ -72,4 +72,19 @@ export async function onCommands(projectId: string): Promise<ProjectLauncher | n
   if (!cwd) return null
   const [commands, hooks] = await Promise.all([readProjectCommands(cwd), readProjectHooks(cwd)])
   return { commands, startHook: hooks.start !== undefined }
+}
+
+/**
+ * What would stop a run in this project before it spends a checkout, said in the launcher before
+ * the Start: the project's `check` hook, given the coding agent picked. A missing CLI or a
+ * logged-out one is a problem the run itself would refuse on; a warning is said and blocks nothing.
+ * A check line that fails is said as a warning: it is a broken check, not a reason to stop.
+ * `null` for an unknown project or one without a check hook: nothing to say.
+ */
+export async function onStartCheck(projectId: string, driver?: string): Promise<StartReadiness | null> {
+  const cwd = await resolveProjectPath(projectId)
+  if (!cwd) return null
+  const checked = await runCheckHook(cwd, driver !== undefined ? { driver } : {})
+  if (checked.ok) return { problems: checked.problems, warnings: checked.warnings }
+  return checked.noHook ? null : { problems: [], warnings: [checked.error] }
 }

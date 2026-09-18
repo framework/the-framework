@@ -1,6 +1,6 @@
 import { stat } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { DriverQuota } from 'agent-driver'
+import type { DriverQuota, DriverReadiness } from 'agent-driver'
 import type { FileBranchWrite } from '@gemstack/agent-data'
 import type { RunCard } from '@gemstack/skill-logs'
 import { COMMANDS_DIR } from './names.js'
@@ -12,7 +12,7 @@ import type { State, TickDecision, TickRecord } from './state.js'
 /**
  * One tick (#1774): pull the branch, sweep, read the schedule, and for each command decide in
  * the cheapest order — does the project have the command, has its interval passed, is its check
- * due, is its cap reached, is there quota — then mark and spawn one run. Every decision is one line in the state, so a
+ * due, is its cap reached, can the coding agent start at all, is there quota — then mark and spawn one run. Every decision is one line in the state, so a
  * dashboard or a person reads why nothing started without a log.
  *
  * The quota is read only when everything else says start: a read spawns the agent's CLI and the
@@ -42,6 +42,8 @@ export interface TickDeps {
   /** When the command last started on any machine, ISO; nothing when it never did. */
   lastStart: (command: string) => Promise<string | undefined>
   inFlight: (command: string) => Promise<RunCard[]>
+  /** Whether the coding agent's CLI can start a session: a missing or logged-out one starts nothing. */
+  ready: () => Promise<DriverReadiness>
   quota: () => Promise<DriverQuota>
   mint: () => string
   writeMarker: (card: RunCard) => Promise<FileBranchWrite>
@@ -66,6 +68,7 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
 
   for (const { line, text } of deps.schedule.unreadable) record.decisions.push({ command: `line ${line}`, outcome: `unreadable: ${text}` })
 
+  let readiness: DriverReadiness | undefined
   let quota: Awaited<ReturnType<typeof quotaHeadroom>> | undefined
   for (const command of deps.schedule.commands) {
     const decide = (outcome: string, run?: string): void => {
@@ -100,7 +103,12 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
       decide(`cap reached (${running.length} in flight: ${running.map(describe).join(', ')})`)
       continue
     }
-    // Read once per tick, and only now.
+    // Both read once per tick, and only now: each spawns the agent's CLI.
+    readiness ??= await deps.ready()
+    if (readiness.problems.length > 0) {
+      decide(`not ready: ${readiness.problems.join(' ')}`)
+      continue
+    }
     quota ??= quotaHeadroom(await boundary(deps))
     if (!quota.start) {
       decide(`quota: ${quota.reason}`)

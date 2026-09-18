@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { mkdtemp, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { PROJECT_HOOKS_FILE, parseProjectHooks, readProjectHooks, runOffsetHook, runProjectHooks, runResumeHook, runStartHook } from './project-hooks.js'
+import { PROJECT_HOOKS_FILE, parseProjectHooks, readProjectHooks, runCheckHook, runOffsetHook, runProjectHooks, runResumeHook, runStartHook } from './project-hooks.js'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 
 // The hooks file and the runner (#1774), for real: `sh -c` in a throwaway project, the lines
@@ -24,8 +24,8 @@ test('the file: open and close lists of shell lines; missing means none; the wro
   })
   assert.deepEqual(parseProjectHooks('open:\n  - echo one\n  - echo two\n'), { open: ['echo one', 'echo two'], close: [] })
   assert.deepEqual(parseProjectHooks('open:\nclose:\n'), { open: [], close: [] })
-  assert.throws(() => parseProjectHooks('- echo hi\n'), /hooks\.yml must be a YAML map; the keys are open, close, start, resume and offset/)
-  assert.throws(() => parseProjectHooks('opne:\n  - echo hi\n'), /unknown key "opne"; the keys are open, close, start, resume and offset/)
+  assert.throws(() => parseProjectHooks('- echo hi\n'), /hooks\.yml must be a YAML map; the keys are open, close, start, resume, check and offset/)
+  assert.throws(() => parseProjectHooks('opne:\n  - echo hi\n'), /unknown key "opne"; the keys are open, close, start, resume, check and offset/)
   assert.throws(() => parseProjectHooks('open: echo hi\n'), /"open" must be a list of shell lines/)
   assert.throws(() => parseProjectHooks('close:\n  - 3\n'), /"close" must be a list of shell lines/)
   assert.deepEqual(parseProjectHooks('start: npx agent-scheduler run --detach "$PROMPT"\nresume:\n'), { open: [], close: [], start: 'npx agent-scheduler run --detach "$PROMPT"' })
@@ -153,5 +153,21 @@ test('the offset line gets the points; no line, a failing line and a broken file
     assert.ok(!said.ok && !('noHook' in said) && /^ignoring .*hooks\.yml/.test(said.error), JSON.stringify(said))
   } finally {
     for (const dir of [cwd, none, failing, broken]) await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('the check line gets the picked agent and answers its problems and warnings; no line, a failing line and a wrong answer are each an answer in words', async () => {
+  const cwd = await project(`check: 'printf "{\\"problems\\":[\\"%s is missing\\"],\\"warnings\\":[]}" "\${DRIVER:-default}"'\n`)
+  const none = await project('start: echo hi\n')
+  const failing = await project('check: echo "not inside a git repository" >&2; exit 1\n')
+  const mute = await project('check: echo "{}"\n')
+  try {
+    assert.deepEqual(await runCheckHook(cwd, { driver: 'codex' }), { ok: true, problems: ['codex is missing'], warnings: [] })
+    assert.deepEqual(await runCheckHook(cwd, {}), { ok: true, problems: ['default is missing'], warnings: [] })
+    assert.deepEqual(await runCheckHook(none, {}), { ok: false, error: 'this project has no check hook', noHook: true })
+    assert.deepEqual(await runCheckHook(failing, {}), { ok: false, error: 'the check hook: not inside a git repository' })
+    assert.deepEqual(await runCheckHook(mute, {}), { ok: false, error: 'the check hook: it answered no problems and warnings' })
+  } finally {
+    for (const dir of [cwd, none, failing, mute]) await rm(dir, { recursive: true, force: true })
   }
 })

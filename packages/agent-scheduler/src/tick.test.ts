@@ -47,6 +47,7 @@ function deps(over: Partial<TickDeps> & { stateOver?: Partial<State>; md?: strin
     },
     lastStart: async () => undefined,
     inFlight: async command => [...cards, ...seen.markers].filter(c => c.status === 'running' && (c.caller?.['scheduler'] as { command: string }).command === command),
+    ready: async () => ({ problems: [], warnings: [] }),
     quota: async () => quota(10),
     mint: () => `2026-09-16T14-01-00-00${ids++}Z`,
     writeMarker: async card => {
@@ -148,6 +149,27 @@ test('the checks in order: no such command, check failed, not due, cap reached, 
   assert.equal(decisions.length, 1)
   assert.match(decisions[0]!.outcome, /^quota: Current week \(all models\) is 90% used, at or past day 4 of the week's \d+%$/)
   assert.deepEqual(spent.seen.spawned, [])
+})
+
+test('a coding agent that cannot start starts nothing: said once per tick, before the quota is read, and nothing is marked', async () => {
+  let reads = 0
+  let quotaRead = false
+  const { deps: d, seen } = deps({
+    md: '- a: when `x`\n- b: when `y`\n',
+    ready: async () => { reads++; return { problems: ['`claude` is not logged in. Run `claude auth login`, then start again.'], warnings: [] } },
+    quota: async () => { quotaRead = true; return quota(10) },
+  })
+  assert.deepEqual((await tick(d)).decisions, [
+    { command: 'a', outcome: 'not ready: `claude` is not logged in. Run `claude auth login`, then start again.' },
+    { command: 'b', outcome: 'not ready: `claude` is not logged in. Run `claude auth login`, then start again.' },
+  ])
+  assert.equal(reads, 1)
+  assert.equal(quotaRead, false)
+  assert.deepEqual(seen.markers, [])
+
+  const capped = deps({ inFlightCards: [running('2026-09-16T13-00-00-000Z', 'work-queue')], ready: async () => { reads++; return { problems: [], warnings: [] } } })
+  await tick(capped.deps)
+  assert.equal(reads, 1, 'the agent is asked only when everything cheaper says start')
 })
 
 test("an unreadable quota stands the tick down: not knowing is not 'nothing used'", async () => {

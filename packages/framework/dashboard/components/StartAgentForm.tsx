@@ -1,15 +1,19 @@
 import { useRef, useState } from 'react'
+import { onStartCheck } from '../rpc/projects.js'
 import { usePreferences } from '../lib/preferences.js'
 import { useConnectionProfiles } from '../lib/profiles.js'
 import { useSelectedRemoteDeviceId } from '../lib/remote-target.js'
 import { startPicks, useStartAgent } from '../lib/use-start-agent.js'
 import { useProjectLauncher } from '../lib/use-project-launcher.js'
+import { useLoaded } from '../lib/use-async.js'
 import { Composer, type ComposerHandle } from './Composer.js'
 
 // Start a run in the selected project (#405, #1774): a free-text box, where `/` lists the project's
 // commands, and Start, which is the project's own start hook (posted over `sendStart`). The editor +
 // control row are the shared Composer (#721); this form owns the submit.
 // A project without a start hook cannot start a run from here, and the form says how to add one.
+// What would stop the run (a coding agent not installed or logged out) is said before the Start,
+// from the project's check hook.
 export function StartAgentForm({
   projectId,
   onAgentStarted,
@@ -34,6 +38,11 @@ export function StartAgentForm({
   const selectedDeviceId = useSelectedRemoteDeviceId()
   const remoteDevice = selectedDeviceId ? profiles.find(p => p.id === selectedDeviceId) : undefined
   const noStartHook = launcher !== null && !launcher.startHook && !remoteDevice
+
+  // Re-read when the pick changes: `claude` being logged in says nothing about `codex`. A device
+  // runs on its own machine, so this one's CLIs say nothing about it.
+  const driver = preferences.driver
+  const readiness = useLoaded(remoteDevice ? null : () => onStartCheck(projectId, driver), null, [projectId, driver, remoteDevice === undefined])
 
   const submit = async (text: string) => {
     if (busy) return
@@ -79,6 +88,16 @@ export function StartAgentForm({
       {/* Feedback right where the action is (#948). */}
       {error && <p role="alert" className="mt-2 text-xs text-danger">{error}</p>}
       {note && !error && <p role="status" className="mt-2 text-xs text-muted-foreground">{note}</p>}
+      {readiness?.problems.map(problem => (
+        <p key={problem} role="alert" className="mt-2 text-xs text-danger">
+          {problem}
+        </p>
+      ))}
+      {readiness?.warnings.map(warning => (
+        <p key={warning} role="alert" className="mt-2 text-xs text-warning">
+          {warning}
+        </p>
+      ))}
       {noStartHook && (
         <p role="alert" className="mt-2 text-xs text-danger">
           This project has no start hook. Add a <code className="font-mono">start:</code> line to{' '}

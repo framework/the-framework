@@ -4,7 +4,7 @@ The tool's process side: the tick [1] wired to the real project, the run's [2] d
 
 **User story**: the user runs `agent-scheduler start` once and closes the terminal; a small process of the tool's own keeps ticking, each run is a further process that outlives the tick that started it, and `agent-scheduler stop` ends the scheduler while the agents in flight run to the end; `agent-scheduler run "/work-queue"` starts one run right now with no scheduler at all.
 
-**Business logic story**: the tick's decisions are `tick.ts`'s, one run is `run.ts`'s, the sweep is `sweep.ts`'s; this file gives them the real project: this machine's host name, the `agent-data` package's pull, the `logs` package's markers, `agent-driver`'s quota reader and its Claude Code and Codex drivers, and the state file. The processes it spawns are this same executable, `bin/agent-scheduler`.
+**Business logic story**: the tick's decisions are `tick.ts`'s, one run is `run.ts`'s, the sweep is `sweep.ts`'s; this file gives them the real project: this machine's host name, the `agent-data` package's pull, the `logs` package's markers, `agent-driver`'s quota reader, its readiness check and its Claude Code and Codex drivers, and the state file. The processes it spawns are this same executable, `bin/agent-scheduler`.
 
 ## Glossary
 
@@ -17,8 +17,9 @@ The tool's process side: the tick [1] wired to the real project, the run's [2] d
 
 ## Business logic — TL;DR
 
-- **A tick of the real project** - the state and the schedule read, the tick decided with this host, the `agent-data` pull, the sweep with a real pid probe, the command's folder, the check with a one-minute budget, the branch's markers and each command's last start, Claude Code's quota, ids from the clock, the driver `claude-code`; the record written to the state as `lastTick` and told line by line on the log (`[agent-scheduler] tick <time>: <note>`, `[agent-scheduler]   <command>: <outcome>`).
+- **A tick of the real project** - the state and the schedule read, the tick decided with this host, the `agent-data` pull, the sweep with a real pid probe, the command's folder, the check with a one-minute budget, the branch's markers and each command's last start, whether Claude Code can start here, Claude Code's quota, ids from the clock, the driver `claude-code`; the record written to the state as `lastTick` and told line by line on the log (`[agent-scheduler] tick <time>: <note>`, `[agent-scheduler]   <command>: <outcome>`).
 - **The detached run** - the run's lock [6] taken by the spawning process, then `agent-scheduler run <prompt> --id <id> --command <command>`, with `--model <model>` and `--driver <name>` when the run has them, detached from the tick, stdin and stdout dropped, stderr to `.agent-scheduler/runs/<id>.stderr`, the run's id in its environment as `AGENT_ID`, and the lock handed to the spawned process; a spawn that fails lets the lock go.
+- **Can a run start here** - the coding agent's readiness from `agent-driver` (its CLI installed and logged in: a problem when not), plus two warnings of this tool's own: `gh` not found, or `gh` not logged in; what the `check` command answers, and what a person's run and the tick refuse on.
 - **A detached start on demand** - `run --detach <prompt>`: the run's lock taken, the marker written and the run's process spawned the way the tick does it, the id answered at once, the lock let go when the marker or the spawn throws; the command is the prompt's first word, so the run counts against that command's cap; the coding agent is Claude Code unless `--driver codex`, and the marker names it.
 - **A detached continuation on demand** - `run --detach --resume <id>`: the run's process spawned to continue it, its id answered at once; the line a dashboard's resume hook runs. A run the project has no record of is refused there and then.
 - **A run in this process** - the id given by the tick or minted now, marked already when the id was given, on Claude Code or, with `--driver codex`, on Codex; a resumed run on the coding agent its record names.
@@ -39,7 +40,19 @@ See `## Context`.
 
 #### Business logic
 
-The state and the schedule are read from the repository. The tick decides with: this machine's host name; the `agent-data` package's pull of the branch; the sweep with this host and the live-pid probe (`run-lock.ts`); whether `.claude/skills/<name>` is a directory; the check run through the shell with a one-minute budget; the command's markers [5] on the branch; Claude Code's quota read by `agent-driver` in the repository; ids minted from the clock; the marker written to and withdrawn from the branch; the detached run; and the driver id `claude-code` on the marker's card. The tick's record is written to the state as `lastTick`, and told on the log one line per decision.
+The state and the schedule are read from the repository. The tick decides with: this machine's host name; the `agent-data` package's pull of the branch; the sweep with this host and the live-pid probe (`run-lock.ts`); whether `.claude/skills/<name>` is a directory; the check run through the shell with a one-minute budget; the command's markers [5] on the branch; whether Claude Code can start on this machine (below); Claude Code's quota read by `agent-driver` in the repository; ids minted from the clock; the marker written to and withdrawn from the branch; the detached run; and the driver id `claude-code` on the marker's card. The tick's record is written to the state as `lastTick`, and told on the log one line per decision.
+
+### Can a run start here
+
+#### Context
+
+**User story**: the user picks Claude Code or Codex in a dashboard's launcher, and a missing or logged-out CLI is said under the prompt box before the Start (the project's check hook runs `agent-scheduler check`); a missing or logged-out `gh` is said too, as a warning.
+
+**Problem**: a run on a coding agent whose CLI is missing or logged out takes a checkout and a marker, then dies before its first turn; the check costs about a second, the dead run a branch.
+
+#### Business logic
+
+The answer is `agent-driver`'s readiness for the coding agent named (problems: its CLI not found, or not logged in; a warning: running as root), with this tool's `gh` warnings added. `gh` is asked `--version`; when that fails the warning is "`gh` not found — the run's agent cannot open its pull request, and its record will name none. Install the GitHub CLI (https://cli.github.com) and run `gh auth login`." When `gh` is there it is asked `auth status`, and a non-zero exit is the warning "`gh` is not logged in — the run's agent cannot open its pull request, and its record will name none. Run `gh auth login`." A `gh` answer is a warning, never a problem: the agent opens its own pull request with `gh` and the run reads the number back, but the work itself needs no `gh`. The tick asks it for Claude Code, the coding agent every scheduled run is on.
 
 ### The detached run
 

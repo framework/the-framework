@@ -6,6 +6,7 @@ What the tests cover, with every reading injected (the wiring to a real project 
 - **A failed pull** - the note is `agent-data could not be pulled: <error>` and nothing is spawned.
 - **No schedule** - the note is `no agent-schedule.md`.
 - **The order of the checks** - `no such command in this project` runs no check; `check failed: <last stderr line>`; `not due`; `cap reached (1 in flight: <id> on <host>)` without reading the quota or writing a marker; `quota: <window> is 90% used, at or past day 4 of the week's N%` with nothing spawned.
+- **A coding agent that cannot start** - with two due commands, each decision is `not ready: <the problem>`, the readiness is read once, the quota is not read and no marker is written; a command at its cap is decided before the readiness is read.
 - **An unreadable quota** - `quota: the quota could not be read, so there is no way to tell what is spare`.
 - **Two machines** - a marker ranked past the cap by an earlier id that landed meanwhile is withdrawn with `cap reached (…)` naming the other; with a cap of two the marker within the cap keeps its place; a marker whose push failed twice is withdrawn with `another machine got there first: …` and nothing spawned.
 - **Unreadable schedule lines** - named as `line N` with `unreadable: …` while the readable command still starts.

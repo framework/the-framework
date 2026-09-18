@@ -1,11 +1,14 @@
 import { useRef, useState } from 'react'
-import { onStartCheck } from '../rpc/projects.js'
+import { onProjects, onStartCheck } from '../rpc/projects.js'
+import type { ProjectSummary } from '../../src/index.js'
 import { usePreferences } from '../lib/preferences.js'
 import { useConnectionProfiles } from '../lib/profiles.js'
 import { useSelectedRemoteDeviceId } from '../lib/remote-target.js'
 import { startPicks, useStartAgent } from '../lib/use-start-agent.js'
 import { useProjectLauncher } from '../lib/use-project-launcher.js'
 import { useLoaded } from '../lib/use-async.js'
+import { promptWithContext } from '../lib/use-context-set.js'
+import { ContextMenu } from './ContextMenu.js'
 import { Composer, type ComposerHandle } from './Composer.js'
 
 // Start a run in the selected project (#405, #1774): a free-text box, where `/` lists the project's
@@ -15,16 +18,30 @@ import { Composer, type ComposerHandle } from './Composer.js'
 // the scheduler's `init` writes its lines, or a person writes a `start:` line of their own.
 // What would stop the run (a coding agent not installed or logged out) is said before the Start,
 // from the project's check hook.
+// The Context picker (#439/#314) narrows the run's focus to other projects and to files: the
+// picked paths ride the prompt as one `Context:` line at its end.
 export function StartAgentForm({
   projectId,
   onAgentStarted,
   files,
+  context,
+  addContext,
+  removeContext,
+  toggleContext,
 }: {
   projectId: string
   /** `runsOn` names the device a remote agent executes on (#1067), for the "runs on <device>" marker. */
   onAgentStarted?: ((intent: string, agentId: string, runsOn?: string) => void) | undefined
   /** The project's files for the `#` picker (#504), owned by the shell. */
   files: string[]
+  /** The Context set, shared with the right rail's file tree (#492), owned by the shell. */
+  context: Set<string>
+  /** Add a path to the Context (from an `@`/`#` mention). */
+  addContext: (path: string) => void
+  /** Drop a path from the Context when its `@`/`#` chip leaves the editor (#948). */
+  removeContext: (path: string) => void
+  /** Toggle a path in the Context (a project's checkbox, a file's cross). */
+  toggleContext: (path: string) => void
 }) {
   const [note, setNote] = useState<string | null>(null)
   const { busy, error, reset, start } = useStartAgent()
@@ -45,10 +62,25 @@ export function StartAgentForm({
   const driver = preferences.driver
   const readiness = useLoaded(remoteDevice ? null : () => onStartCheck(projectId, driver), null, [projectId, driver, remoteDevice === undefined])
 
+  // The Context mixes whole projects (registered paths) and single files (relative paths): the
+  // files are listed to be removed, and each kind is counted in the picker's summary. The current
+  // project is the run's own checkout, so only the other projects are offered (#665).
+  const projects = useLoaded<ProjectSummary[]>(onProjects, [], [])
+  const projectPaths = new Set(projects.map(p => p.path))
+  const contextFiles = [...context].filter(path => !projectPaths.has(path))
+  const otherProjects = projects.filter(p => p.id !== projectId)
+  const pickedProjects = otherProjects.filter(p => context.has(p.path)).length
+  const contextSummary = [
+    pickedProjects > 0 ? `${pickedProjects} project${pickedProjects > 1 ? 's' : ''}` : null,
+    contextFiles.length > 0 ? `${contextFiles.length} file${contextFiles.length > 1 ? 's' : ''}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+
   const submit = async (text: string) => {
     if (busy) return
     setNote('Starting…')
-    const result = await start(projectId, text, {
+    const result = await start(projectId, promptWithContext(text, context), {
       ...startPicks(preferences),
       ...(remoteDevice ? { remote: { url: remoteDevice.url, token: remoteDevice.token, label: remoteDevice.label } } : {}),
     })
@@ -73,6 +105,18 @@ export function StartAgentForm({
       <Composer
         ref={composerRef}
         files={files}
+        addContext={addContext}
+        removeContext={removeContext}
+        contextControl={
+          <ContextMenu
+            otherProjects={otherProjects}
+            context={context}
+            contextFiles={contextFiles}
+            summary={contextSummary}
+            busy={busy}
+            onToggle={toggleContext}
+          />
+        }
         onSubmit={submit}
         onPromptChange={value => {
           if (!value.trim() && note) setNote(null)

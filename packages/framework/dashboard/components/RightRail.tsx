@@ -18,7 +18,7 @@ type Tab = 'files' | 'views' | 'docs'
 // History had one too, rendering a committed markdown re-narration of what the event log already
 // holds exactly (B3); the sessions themselves are the history now.
 const TABS: Record<Tab, { label: string; help: string }> = {
-  files: { label: 'Files', help: 'The project’s files, with what the session changed — hover one to preview it.' },
+  files: { label: 'Files', help: 'The project’s files, with what the session changed — hover one to preview it, click one to add it to the next run’s Context.' },
   views: { label: 'Views', help: 'Documents the agent pushed up during the session — a plan, a summary, a writeup.' },
   docs: { label: 'Docs', help: 'The PLAN/TODO markdown files at the root of the workspace.' },
 }
@@ -32,6 +32,8 @@ export function RightRail({
   agentId: agentId,
   views,
   files,
+  context,
+  toggleContext,
   docsInMain = false,
 }: {
   projectId: string | null
@@ -40,6 +42,10 @@ export function RightRail({
   views: AgentView[]
   /** The project's files for the Files tab tree (#492); empty on the relay. */
   files: string[]
+  /** The Context set, shared with the launcher (#504). */
+  context: Set<string>
+  /** Toggle a file path in the Context. */
+  toggleContext: (path: string) => void
   /**
    * The launcher renders Docs in its main column (#1455 item 2), so while it is the main view the
    * rail must not repeat it: the tab is withheld and the poll skipped. A session view passes false
@@ -95,7 +101,10 @@ export function RightRail({
   // The remembered tab may have just lost its content (the last doc deleted, a gate resolved), so
   // fall back to the first one that still exists rather than rendering an empty panel.
   const active: Tab = tabs.includes(tab) ? tab : tabs[0]!
-  const count = (t: Tab) => (t === 'views' ? views.length : 0)
+  // The Files badge counts only picked files, not whole projects (#661): the shared Context also
+  // holds project paths (from the launcher's project checkboxes), which aren't in `files`.
+  const pickedFiles = files.filter(f => context.has(f)).length
+  const count = (t: Tab) => (t === 'views' ? views.length : t === 'files' ? pickedFiles : 0)
 
   return (
     <aside
@@ -133,7 +142,7 @@ export function RightRail({
           directly under the last row rather than at the foot of an empty column. */}
       <div className="flex min-h-0 flex-col overflow-hidden">
         {active === 'files' && hasFiles ? (
-          <FileTree projectId={projectId} agentId={agentId} files={files} />
+          <FileTree projectId={projectId} agentId={agentId} files={files} selected={context} onToggle={toggleContext} />
         ) : active === 'views' && hasViews ? (
           <ViewsRail views={views} />
         ) : (

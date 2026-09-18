@@ -25,6 +25,7 @@ import { useDocumentTitle } from './lib/document-title.js'
 import { useWorking } from './lib/use-working.js'
 import { useFavicon } from './lib/favicon.js'
 import { useDaemonHealth } from './lib/use-daemon-health.js'
+import { useContextSet } from './lib/use-context-set.js'
 import { TriangleAlert } from 'lucide-react'
 
 /** Stable, so `files` keeps one identity while no project is selected. */
@@ -68,6 +69,18 @@ export function App() {
   // mark where it runs and degrade the panels that are local-only. Undefined for a local agent.
   const [agentStart, setAgentStart] = useState<{ tick: number; intent: string; id: string | null; runsOn?: string }>({ tick: 0, intent: '', id: null })
   const { agents: agents, reload, loaded: agentsLoaded } = useAgents(projectId)
+
+  // The Context set lives in the shell (#492/#504) so the two surfaces that feed it share one
+  // source of truth: the launcher's `@`/`#` chips and Context picker, and the right rail's file tree.
+  const { context, add: addContext, remove: removeContext, toggle: toggleContext, reset: resetContext } = useContextSet()
+
+  // The picked Context is one project's, so changing projects starts fresh. Keyed off the route
+  // rather than the click, because Back/Forward change projects too.
+  useEffect(() => {
+    resetContext()
+    // `resetContext` is a fresh closure each render; the project is the trigger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId])
 
   // The selected project's files (git ls-files), handed to both the `#` picker and the tree.
   // Empty when no project (no checkout). Scoped to the selected session's
@@ -132,6 +145,8 @@ export function App() {
     // the moment a message resumed an ended session; a continuation keeps the feed instead.
     const continued = startedId === agentId && inProject === projectId
     setAgentStart(prev => ({ tick: continued ? prev.tick : prev.tick + 1, intent, id: startedId, ...(runsOn ? { runsOn } : {}) }))
+    // The picked Context went with that run; the next launch starts from a clean focus (#948).
+    resetContext()
     // Go to the run we just started — a real history entry, so Back returns to where you launched
     // from. Its row does not exist yet; the main pane shows it live on the strength of the id.
     go({ projectId: inProject, agentId: startedId })
@@ -161,9 +176,11 @@ export function App() {
   }
 
   // "New" in the sidebar: start a fresh session in a named project (the sidebar decides which —
-  // the current one, the only one, or a picked one).
+  // the current one, the only one, or a picked one). resetContext explicitly, since staying in the
+  // same project would not trip the project-change effect above.
   const newAgentInProject = (id: string) => {
     go({ projectId: id, agentId: null })
+    resetContext()
   }
 
   // The Overview dashboard (#471): no project selected.
@@ -271,6 +288,10 @@ export function App() {
           events={events}
           onAgentStarted={onAgentStarted}
           files={files}
+          context={context}
+          addContext={addContext}
+          removeContext={removeContext}
+          toggleContext={toggleContext}
           onOpenAgent={selectAgentInProject}
           errors={project?.errors}
         />
@@ -370,6 +391,8 @@ export function App() {
             agentId={agentId}
             views={views}
             files={files}
+            context={context}
+            toggleContext={toggleContext}
             // The launcher shows Docs/History in its main column (#1455 items 2/3): exactly when
             // renderMain resolves to ProjectHome — a project selected, no run
             // one), on the default view. Session views keep the full rail.

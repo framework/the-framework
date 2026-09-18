@@ -1,5 +1,5 @@
 import { useMemo, useState, type ElementType, type ReactNode } from 'react'
-import { FileIcon, FolderIcon, FolderOpenIcon } from 'lucide-react'
+import { Check, FileIcon, FolderIcon, FolderOpenIcon } from 'lucide-react'
 import { onProjectFileStatus } from '../rpc/reads.js'
 import { usePolled } from '../lib/use-async.js'
 import { cn } from '../lib/utils.js'
@@ -110,11 +110,17 @@ export function FileTree({
   projectId,
   agentId: agentId,
   files,
+  selected,
+  onToggle,
 }: {
   projectId: string
   /** The selected agent, so the dots describe its worktree and not the project root (#815). */
   agentId?: string | null | undefined
   files: string[]
+  /** The Context set: a file in it shows ticked. */
+  selected: Set<string>
+  /** Tick or untick a file in the Context. */
+  onToggle: (path: string) => void
 }) {
   const [query, setQuery] = useState('')
 
@@ -164,15 +170,20 @@ export function FileTree({
         .sort((a, b) => a.localeCompare(b))
         .map(path => {
           const name = path.slice(path.lastIndexOf('/') + 1)
+          const isOn = selected.has(path)
           const git = status[path]
           // No `title`: the hover preview card already leads with the full path, and a native
           // tooltip on top of it is the slow system one the dashboard no longer uses (#1149).
           const item = (
-            <div className="w-full rounded-lg hover:bg-accent">
-              <Row icon={FileIcon} gitStatus={git} badge="letter">
+            <button
+              type="button"
+              onClick={() => onToggle(path)}
+              className={cn('w-full rounded-lg text-start hover:bg-accent', isOn && 'text-primary')}
+            >
+              <Row icon={isOn ? Check : FileIcon} gitStatus={git} badge="letter">
                 {name}
               </Row>
-            </div>
+            </button>
           )
           // Every file previews on hover: a changed one shows its diff (#816), an unchanged one
           // its contents (#828). `git` picks which read the card makes, so the tree's own status

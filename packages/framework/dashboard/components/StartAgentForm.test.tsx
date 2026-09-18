@@ -5,7 +5,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 // unmocked one reaches for `/_rpc/<name>`, and there is no daemon behind jsdom to answer.
 const onCommands = vi.hoisted(() => vi.fn())
 const onStartCheck = vi.hoisted(() => vi.fn())
-vi.mock('../rpc/projects.js', () => ({ onCommands, onStartCheck }))
+const onProjects = vi.hoisted(() => vi.fn(async () => [] as unknown[]))
+vi.mock('../rpc/projects.js', () => ({ onCommands, onStartCheck, onProjects }))
 
 // Mutable so a test can pick the coding agent and the model; reset after each.
 const prefs = vi.hoisted(() => ({ current: {} as Record<string, unknown> }))
@@ -55,7 +56,8 @@ afterEach(() => {
 })
 
 const COMMANDS = [{ name: 'work-queue', description: 'Work the agent queue' }]
-const props = { projectId: 'p1', files: [] }
+const noop = () => {}
+const props = { projectId: 'p1', files: [], context: new Set<string>(), addContext: noop, removeContext: noop, toggleContext: noop }
 
 describe('StartAgentForm (#1774)', () => {
   test('the project\'s commands are no buttons: they are in the box\'s `/` list, and nothing starts', async () => {
@@ -128,5 +130,13 @@ describe('StartAgentForm (#1774)', () => {
     expect(problem!.className).toContain('text-danger')
     expect(warning!.className).toContain('text-warning')
     expect((screen.getByText('submit-typed') as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  test('the picked Context rides the prompt as one line at its end, after the command\'s own words', async () => {
+    onCommands.mockResolvedValue({ commands: [], startHook: true })
+    start.mockResolvedValue({ agentId: 'r1' })
+    render(<StartAgentForm {...props} context={new Set(['/repos/other', 'src/app.ts'])} />)
+    fireEvent.click(screen.getByText('submit-typed'))
+    await waitFor(() => expect(start).toHaveBeenCalledWith('p1', 'do the thing\n\nContext: /repos/other, src/app.ts', {}))
   })
 })

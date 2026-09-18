@@ -15,7 +15,8 @@ import type { CommandEntry } from './CommandsMenu.js'
 // The rich prompt editor (#470): a Tiptap surface that replaces the plain textarea. `/` opens
 // the project's commands and the saved prompts, `@` the registered projects, `#` the project's
 // files. A project or a file is inserted as a chip that serializes back to plain text, so the
-// prompt over the wire is what it reads as. Markdown is live (StarterKit shortcuts) and
+// prompt over the wire is what it reads as, and it also adds the project's path or the file to
+// the Context (#439/#504); deleting the chip takes it out again. Markdown is live (StarterKit shortcuts) and
 // round-trips via tiptap-markdown. Text flows out via onChange, and the handle only clears,
 // focuses and loads.
 
@@ -33,6 +34,13 @@ interface PromptEditorProps {
   /** A command or a saved prompt picked from the `/` menu. `replaced` says whether a typed draft
    *  was overwritten — undo brings it back, and the form's note says so. */
   onPreset?: (label: string, replaced: boolean) => void
+  /** A project referenced via `@`, so the form can add its path to the Context. */
+  onMentionProject?: (path: string) => void
+  /** A file referenced via `#`, so the form can add its repo-relative path to the Context. */
+  onMentionFile?: (relPath: string) => void
+  /** An `@`/`#` chip left the editor (deleted, or replaced by a loaded text): undo the Context
+   *  entry it added, so the prompt and the Context cannot diverge (#948). */
+  onMentionRemoved?: (path: string) => void
   projects: ProjectSummary[]
   /** The current project's files, repo-relative, for the `#` picker (#504). */
   files?: string[]
@@ -84,7 +92,7 @@ function applyTemplate(editor: Editor, text: string): void {
 }
 
 export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(function PromptEditor(
-  { onChange, onSubmit, onPreset, projects, files = [], commands, customPresets = [], projectPresets = [], onNewPreset, disabled = false, placeholder = 'Describe what to do…  ( / commands · @ projects · # files )', initialText, compact = false },
+  { onChange, onSubmit, onPreset, onMentionProject, onMentionFile, onMentionRemoved, projects, files = [], commands, customPresets = [], projectPresets = [], onNewPreset, disabled = false, placeholder = 'Describe what to do…  ( / commands · @ projects · # files )', initialText, compact = false },
   ref,
 ) {
   const [isEmpty, setIsEmpty] = useState(true)
@@ -97,6 +105,9 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
   const projectPresetsRef = useRef(projectPresets)
   const onNewPresetRef = useRef(onNewPreset)
   const onPresetRef = useRef(onPreset)
+  const onMentionProjectRef = useRef(onMentionProject)
+  const onMentionFileRef = useRef(onMentionFile)
+  const onMentionRemovedRef = useRef(onMentionRemoved)
   const onChangeRef = useRef(onChange)
   const onSubmitRef = useRef(onSubmit)
   useEffect(() => {
@@ -107,9 +118,36 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
     projectPresetsRef.current = projectPresets
     onNewPresetRef.current = onNewPreset
     onPresetRef.current = onPreset
+    onMentionProjectRef.current = onMentionProject
+    onMentionFileRef.current = onMentionFile
+    onMentionRemovedRef.current = onMentionRemoved
     onChangeRef.current = onChange
     onSubmitRef.current = onSubmit
   })
+
+  // The `@`/`#` chips currently in the doc, as their serialized texts. Deleting a chip must also
+  // undo the Context entry it added (#948): the chip was the only visible sign of it, so a
+  // chipless prompt silently carrying it was a lie. Compared on every doc change; additions are
+  // the pickers' own callbacks.
+  const mentionsRef = useRef<Set<string>>(new Set())
+  const syncMentions = (ed: Editor): void => {
+    const now = new Set<string>()
+    ed.state.doc.descendants(node => {
+      if (node.type.name === 'token' && (node.attrs.kind === 'project' || node.attrs.kind === 'file')) now.add(String(node.attrs.text))
+      return true
+    })
+    for (const gone of mentionsRef.current) {
+      if (now.has(gone)) continue
+      if (gone.startsWith('#')) {
+        onMentionRemovedRef.current?.(gone.slice(1))
+      } else if (gone.startsWith('@')) {
+        // A project chip carries its name; the Context holds its path.
+        const project = projectsRef.current.find(p => p.name === gone.slice(1))
+        if (project) onMentionRemovedRef.current?.(project.path)
+      }
+    }
+    mentionsRef.current = now
+  }
 
   // Load a template into the live editor and sync the derived state (the empty flag + the
   // markdown out). Takes the editor as an argument so the `/` menu — whose closures are built
@@ -120,6 +158,8 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
   const loadTemplateInto = (ed: Editor, text: string): boolean => {
     const replaced = !ed.isEmpty
     applyTemplate(ed, text)
+    // setContent emits no update, so the chips are reconciled here too.
+    syncMentions(ed)
     setIsEmpty(ed.isEmpty)
     onChangeRef.current(ed.storage.markdown.getMarkdown())
     return replaced
@@ -209,11 +249,14 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
             .map(p => ({ id: `project:${p.id}`, label: `@${p.name}`, hint: 'project', group: 'Projects' })),
         onSelect: (item, { editor: ed, range }) => {
           const project = projectsRef.current.find(p => `project:${p.id}` === item.id)
-          if (project) insertToken(ed, range, { kind: 'project', label: `@${project.name}`, text: `@${project.name}` })
+          if (project) {
+            insertToken(ed, range, { kind: 'project', label: `@${project.name}`, text: `@${project.name}` })
+            onMentionProjectRef.current?.(project.path)
+          }
         },
       }),
       // `#` — files: the finer-grained sibling of `@` (#504). Type to filter the project's
-      // files (git ls-files); picking one writes its path into the prompt.
+      // files (git ls-files); picking one writes its path into the prompt and adds it to the Context.
       makeTrigger({
         char: '#',
         key: 'hash',
@@ -226,6 +269,7 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
         onSelect: (item, { editor: ed, range }) => {
           const rel = item.id.slice('file:'.length)
           insertToken(ed, range, { kind: 'file', label: `#${rel}`, text: `#${rel}` })
+          onMentionFileRef.current?.(rel)
         },
       }),
     ],
@@ -260,6 +304,7 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
       },
     },
     onUpdate: ({ editor: ed }) => {
+      syncMentions(ed)
       setIsEmpty(ed.isEmpty)
       onChangeRef.current(ed.storage.markdown.getMarkdown())
     },
@@ -268,6 +313,7 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
   useImperativeHandle(ref, () => ({
     clear: () => {
       editor?.commands.clearContent()
+      if (editor) syncMentions(editor)
       setIsEmpty(true)
       onChangeRef.current('')
     },

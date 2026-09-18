@@ -25,6 +25,10 @@ export function ProjectHome({
   events,
   onAgentStarted,
   files,
+  context,
+  addContext,
+  removeContext,
+  toggleContext,
   onOpenAgent,
   errors,
 }: {
@@ -33,6 +37,11 @@ export function ProjectHome({
   /** Carries the started agent's id through to the shell; dropping it is what #1169 was. */
   onAgentStarted?: ((intent: string, agentId: string, runsOn?: string) => void) | undefined
   files: string[]
+  /** The Context set and its edits, owned by the shell and shared with the file tree (#492). */
+  context: Set<string>
+  addContext: (path: string) => void
+  removeContext: (path: string) => void
+  toggleContext: (path: string) => void
   /** Jump into a parked session (#1455 item 4) — possibly another project's. */
   onOpenAgent: (projectId: string, agentId: string) => void
   /** What the daemon currently finds wrong with the project (#1500), off the shell's project list. */
@@ -44,7 +53,15 @@ export function ProjectHome({
       {/* Above the start form, because an agent started on a project whose agent-data branch cannot
           reach origin (#1599) works from stale tickets and a queue nobody else will see. */}
       <ProjectErrorBanner errors={errors} />
-      <StartAgentForm projectId={projectId} onAgentStarted={onAgentStarted} files={files} />
+      <StartAgentForm
+        projectId={projectId}
+        onAgentStarted={onAgentStarted}
+        files={files}
+        context={context}
+        addContext={addContext}
+        removeContext={removeContext}
+        toggleContext={toggleContext}
+      />
       {events.length > 0 && <AgentOverview events={events} />}
       <OpenQuestions onOpenAgent={onOpenAgent} />
       <ProjectDocs projectId={projectId} />

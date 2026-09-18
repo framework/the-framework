@@ -2,7 +2,7 @@ The dashboard's right rail: a narrow column beside the main pane holding up to t
 
 ## Context
 
-**User story**: while an agent [2] works, the user watches what it produces without leaving the page — the plan it wrote up, the files it changed. All of that lives to the right of the conversation, one click away and never in the way.
+**User story**: while an agent [2] works, the user watches what it produces without leaving the page — the plan it wrote up, the files it changed. All of that lives to the right of the conversation, one click away and never in the way. On a project's home the same file tree is where the user clicks the files the next agent should focus on.
 
 **Problem**: a tab that can only say "nothing yet" teaches the user that the feature is broken. A rail that reorders or jumps while the user is reading it does the same. So the tabs are decided by what exists, and the rail moves the user's attention exactly once: for the first view an agent pushes.
 
@@ -13,6 +13,7 @@ The dashboard's right rail: a narrow column beside the main pane holding up to t
 [4] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [7] gate: a question with options an agent's turn ended on: the agent ends waiting for the answer, the dashboard shows the question as a card, and the answer resumes the agent.
 [8] project home: a project's own page with the launcher (the Start form) and its composer (the prompt editor, also used to say something to an agent).
+[9] Context: the set of paths the user picked to focus an agent on: other registered projects, by their absolute path, and files of the current project, by their path relative to the repository's root. The agent can still reach everything; the Context only says where to look.
 
 ## Business logic — TL;DR
 
@@ -21,7 +22,7 @@ The dashboard's right rail: a narrow column beside the main pane holding up to t
 - **Which panel opens by itself** - the first view [1] an agent [2] pushes brings the rail to it; otherwise the rail rests on the files, or on the documents when there are none; once the user picks a tab by hand, nothing moves it again.
 - **A panel that loses its content hands over** - when the open panel stops existing the rail falls back to the first one that still does, rather than showing an empty column.
 - **The documents are read on a poll, and yield to the launcher** - the project's `PLAN`/`TODO` documents are re-read every few seconds, and are withheld entirely while the project home [8] shows them in its main column.
-- **Counts on the tabs** - "Views" carries the number of views [1]; no other tab carries a count.
+- **Counts on the tabs** - "Views" carries the number of views [1] and "Files" the number of files picked into the Context [9]; "Docs" carries none.
 
 ## Business logic
 
@@ -35,7 +36,7 @@ See `## Context`.
 
 The rail offers at most three tabs, always in this order, each with a one-line explanation on hover:
 
-- "Files" — "The project’s files, with what the session changed — hover one to preview it." Shown when the project has files to list. The tree is scoped to the selected agent's [2] own checkout [4] when an agent is selected, so it shows that agent's working copy rather than the user's.
+- "Files" — "The project’s files, with what the session changed — hover one to preview it, click one to add it to the next run’s Context." Shown when the project has files to list. The tree is scoped to the selected agent's [2] own checkout [4] when an agent is selected, so it shows that agent's working copy rather than the user's. The rail is handed the Context [9] the shell keeps: the tree shows which files are picked, and a click toggles one (`FileTree.tsx`).
 - "Views" — "Documents the agent pushed up during the session — a plan, a summary, a writeup." Shown once the selected agent has pushed at least one view [1]. The views arrive on the agent's live event stream.
 - "Docs" — "The PLAN/TODO markdown files at the root of the workspace."
 
@@ -89,9 +90,10 @@ The "Docs" tab is hidden only once the rail knows there is nothing to show: whil
 
 #### Context
 
-**User story**: an agent [2] pushing views [1] should say how many there are to read.
+**User story**: an agent [2] pushing views [1] should say how many there are to read; files picked into the Context [9] should be counted where they were picked.
 
 #### Business logic
 
 - "Views" carries a badge with the number of views [1] the selected agent has pushed.
-- The other tabs carry no badge, and a count of zero is not shown.
+- "Files" carries a badge with the number of the project's listed files that are in the Context. The Context also holds other projects' paths, picked in the launcher; those are not files of this tree and are not counted.
+- "Docs" carries no badge, and a count of zero is not shown.

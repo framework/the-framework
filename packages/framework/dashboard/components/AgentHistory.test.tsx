@@ -45,42 +45,30 @@ describe('AgentHistory (#785)', () => {
     expect(container.querySelector('.animate-pulse')).toBeTruthy()
   })
 
-  test('a run parked on the user reads as waiting and stops animating', () => {
-    // The build settled and it is waiting for a message: same live process, different meaning.
+  test('a run that ended on its question reads as waiting, with the still dot', () => {
+    // It asked and waits for the answer: its dot stays, still, where a working run's pulses.
     const { container } = renderRail(
-      <AgentHistory projectId="p1" agents={[agent({ settledAt: '2026-07-19T16:06:21.000Z' })]} selectedAgentId={null} onSelect={() => {}} />,
+      <AgentHistory projectId="p1" agents={[agent({ status: 'waiting' })]} selectedAgentId={null} onSelect={() => {}} />,
     )
     expect(screen.getByText('waiting')).toBeTruthy()
     expect(screen.queryByText('running')).toBeNull()
     expect(container.querySelector('.animate-pulse')).toBeNull()
+    expect(container.querySelector('.rounded-full.bg-muted-foreground')).toBeTruthy()
   })
 
-  test('an ended run armed to publish reads as publishing… until the handoff report folds in (#1455)', () => {
-    const publishing = agent({ status: 'done', handoff: { push: true, pr: true } })
+  test('an ended run the daemon marks publishing reads as publishing… (#1455)', () => {
     const { container } = renderRail(
-      <AgentHistory projectId="p1" agents={[publishing]} selectedAgentId={null} onSelect={() => {}} />,
+      <AgentHistory projectId="p1" agents={[agent({ status: 'done', publishing: true })]} selectedAgentId={null} onSelect={() => {}} />,
     )
     expect(screen.getByText('publishing…')).toBeTruthy()
     expect(screen.queryByText('done')).toBeNull()
     expect(container.querySelector('.animate-pulse')).toBeTruthy()
   })
 
-  test('a run whose handoff reported reads as plain done, armed or not (#1455)', () => {
-    // Once the report lands the epilogue's window is closed, whichever way it went — and an agent
-    // that never armed a push had no window to begin with.
-    renderRail(
-      <AgentHistory
-        projectId="p1"
-        agents={[
-          agent({ id: 'run-1', status: 'done', handoff: { push: true, pr: true }, handoffReport: 'done' }),
-          agent({ id: 'run-2', status: 'done', handoff: { push: false, pr: false } }),
-        ]}
-        selectedAgentId={null}
-        onSelect={() => {}}
-      />,
-    )
+  test('an ended run without the mark reads as plain done (#1455)', () => {
+    renderRail(<AgentHistory projectId="p1" agents={[agent({ status: 'done' })]} selectedAgentId={null} onSelect={() => {}} />)
     expect(screen.queryByText('publishing…')).toBeNull()
-    expect(screen.getAllByText('done').length).toBe(2)
+    expect(screen.getByText('done')).toBeTruthy()
   })
 
   test('a session selected before its row lands highlights the starting row (#784)', () => {
@@ -147,20 +135,6 @@ describe('AgentHistory (#785)', () => {
       </SidebarProvider>,
     )
     expect([...container.querySelectorAll('button')].some(row => row.textContent?.includes('starting…'))).toBe(true)
-  })
-
-  test('a finished run is finished, never waiting', () => {
-    // settledAt is cleared on `end`, but a stale one must not relabel a terminal status.
-    renderRail(
-      <AgentHistory
-        projectId="p1"
-        agents={[agent({ status: 'done', settledAt: '2026-07-19T16:06:21.000Z' })]}
-        selectedAgentId={null}
-        onSelect={() => {}}
-      />,
-    )
-    expect(screen.getByText('done')).toBeTruthy()
-    expect(screen.queryByText('waiting')).toBeNull()
   })
 })
 

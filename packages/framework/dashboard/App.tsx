@@ -299,6 +299,7 @@ export function App() {
         agentId={agentId}
         events={events}
         live={selectedAgent.status === 'running'}
+        card={selectedAgent}
         label={agentLabel(selectedAgent)}
         projectName={projectName}
         files={files}
@@ -306,7 +307,6 @@ export function App() {
         target={selectedAgent.target}
         remoteLabel={selectedAgent.remoteLabel}
         onAgentStarted={onAgentStarted}
-       
         onDeleted={() => {
           // Its view is about to point at a session that no longer exists; go home and refresh
           // the rail so the row is gone (#1032).

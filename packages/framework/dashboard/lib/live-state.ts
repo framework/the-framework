@@ -1,4 +1,4 @@
-import type { FrameworkEvent, ChoiceRequest, AgentMeta } from '../../src/index.js'
+import type { FrameworkEvent, ChoiceRequest } from '../../src/index.js'
 
 // Live-run state derived from the event stream — kept pure so it can be driven and
 // tested on its own, away from React. The dashboard is a projection of the diary the
@@ -45,29 +45,6 @@ export function isAgentActive(events: readonly FrameworkEvent[]): boolean {
   return current.length > 0 && !current.some(event => event.kind === 'end')
 }
 
-/**
- * Whether the agent has stopped working and parked on you (#785), rather than the agent's process
- * having exited.
- *
- * The two are not the same and the difference is the whole of #1173. A settled session stays
- * alive as a conversation (#714) so it can take your next message, which means its status is
- * still `running` long after the agent has finished. Anything that asks "is there anything more
- * coming?" — whether to offer the handoff, whether to read the branch — has to ask this rather
- * than whether the process is up, or a session that is plainly done offers nothing to do with it.
- *
- * A new turn un-settles it, the same rule the agent's own meta folds (`settled` sets it, a driver
- * `start` clears it), so this is that rule read off the stream rather than a second opinion.
- */
-export function agentSettled(events: readonly FrameworkEvent[]): boolean {
-  let settled = false
-  for (const event of events) {
-    if (event.kind === 'settled') settled = true
-    else if (event.kind === 'driver' && event.event.type === 'start') settled = false
-    else if (event.kind === 'end') settled = false // it ended outright; `live` already says so
-  }
-  return settled
-}
-
 /** How an agent ended, off its single `end` event. */
 export interface AgentOutcome {
   ok: boolean
@@ -90,47 +67,6 @@ export function agentOutcome(events: readonly FrameworkEvent[]): AgentOutcome | 
   const end = currentAgentEvents(events).find(event => event.kind === 'end')
   if (!end || end.kind !== 'end') return undefined
   return { ok: end.ok, stopped: end.stopped === true, ...(end.waiting === true ? { waiting: true } : {}), ...(end.detail !== undefined ? { detail: end.detail } : {}) }
-}
-
-/**
- * Whether the agent has ended clean and its armed handoff has not reported back yet (#1431):
- * the seconds after `end` while the epilogue is still pushing the branch, opening the PR,
- * merging. The pill said "finished" through that window, which reads as done-with-nothing-
- * coming while the PR link is moments away.
- *
- * The window is the CURRENT segment's: open after its clean `end`, closed by its `handoff`
- * event (every handoff reports — done, skipped, or failed). A resumed session's earlier
- * segment carries its own `handoff`, which must not hide the new window (#1450), so the
- * closing check does not look past the segment boundary. Arming, though, is run-level
- * config, not segment state — the latest `handoff-armed` wins wherever it sits in the feed.
- * And it must be a real arming event with the push rung on: treating the absent-means-armed
- * default as armed would leave archives from before the handoff mechanism "publishing…"
- * for ever.
- */
-export function isPublishing(events: readonly FrameworkEvent[]): boolean {
-  const current = currentAgentEvents(events)
-  const end = current.find(event => event.kind === 'end')
-  if (end?.kind !== 'end' || !end.ok) return false
-  if (current.some(event => event.kind === 'handoff')) return false
-  let armedPush: boolean | undefined
-  for (const event of events) {
-    if (event.kind === 'handoff-armed') armedPush = event.push
-  }
-  return armedPush === true
-}
-
-/**
- * {@link isPublishing}, but off an agent's meta snapshot instead of its event log — for the list
- * surfaces (the Recent-sessions rail) that only ever hold a {@link AgentMeta} (#1455). The rail
- * said "done" while the session's own pill still said "publishing…": `status` flips to `done`
- * the moment `end` lands, and the report reaches the meta only when the handoff answers, so
- * between the two a list could not know the epilogue was still pushing.
- *
- * `handoff.push` must be affirmatively on, the same rule as the event-side check: nothing to
- * wait for when the epilogue was never armed to push.
- */
-export function isMetaPublishing(meta: AgentMeta): boolean {
-  return meta.status === 'done' && meta.handoff?.push === true && meta.handoffReport === undefined
 }
 
 /**

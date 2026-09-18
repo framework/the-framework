@@ -1,5 +1,5 @@
-import { join } from 'node:path'
-import type { AutoHandoffSkip, FrameworkEvent } from '../events.js'
+import { join, resolve } from 'node:path'
+import type { FrameworkEvent } from '../events.js'
 import { nodeFs } from '../node-fs.js'
 import { agentBranchName, isSafeAgentId, worktreeDirEntries } from '@gemstack/skill-branches'
 import { THE_FRAMEWORK_DIR } from '../framework-dir.js'
@@ -50,9 +50,10 @@ export interface AgentMeta {
   /** The link shown to jump into the live agent session. */
   sessionLink?: string
   /**
-   * The branch the agent's work is on: folded from `branch` events as the agent observes it (#1277),
-   * and corrected at teardown while the worktree still exists (#799). The session name is this
-   * branch minus its prefix (#1725) — read off it by every surface, never stored beside it.
+   * The branch the agent's work is on: the card's, and for a run with a checkout the branch that
+   * checkout has checked out right now, since the agent renames its branch itself while the card
+   * learns the new name only when the run ends. The session name is this branch minus its prefix
+   * (#1725) — read off it by every surface, never stored beside it.
    *
    * Not reliably derivable instead of recorded: a clean agent loses its checkout, and the agent
    * renames its branch itself (#1725), so the run-id branch is not guaranteed to be the one
@@ -72,8 +73,6 @@ export interface AgentMeta {
    * re-derived from branch names and timestamps by every surface that wants it.
    */
   pr?: { number: number; url: string }
-  /** Whether the agent signalled `setReadyForMerge()` (#326): building (false/absent) vs ready (true). */
-  readyForMerge?: boolean
   /**
    * What this session's end-of-session handoff is armed to do (#1102): push its branch, and open
    * a draft PR for it. Both start on.
@@ -88,23 +87,6 @@ export interface AgentMeta {
    * #1382, which the reader treats as off.
    */
   handoff?: { push: boolean; pr: boolean; merge?: boolean }
-  /**
-   * How the end-of-session handoff reported back (#1455), folded from the `handoff` event.
-   *
-   * What lets a list surface — which reads meta, not the event log — tell "ended, still
-   * publishing" from "ended, published": between a clean `end` and this field, an armed agent's
-   * epilogue is still pushing / opening the PR, exactly the window the session pill calls
-   * "publishing…" (#1431). Absent until the event lands, which is what a list reads as "still going".
-   */
-  handoffReport?: 'done' | 'skipped' | 'failed'
-  /**
-   * Why a skipped handoff skipped (#1583), folded from the same `handoff` event as
-   * {@link handoffReport}. What lets the daemon tell "published elsewhere" from "ended with
-   * nothing to hand off": a drain that settles with `no-commits` will never run the PR that
-   * lifts its ticket lock, so the sweep releases the claim it minted. On the meta because the
-   * sweep reads metas, not event logs. Absent on non-skipped handoffs and on older records.
-   */
-  handoffSkip?: AutoHandoffSkip
   /**
    * How the handoff's merge half went (#1418), folded from the `handoff` event's `merge` field.
    *
@@ -122,15 +104,6 @@ export interface AgentMeta {
    */
   pendingChoice?: { id: string; title: string }
   /**
-   * When the agent settled and parked on the user (#785), or absent while the agent is working.
-   *
-   * Deliberately not a {@link AgentStatus} value: the agent IS still live while it waits (its
-   * process is alive, it still takes messages, it still holds the project), and a dozen readers
-   * key "live" off `status === 'running'`. This is the orthogonal fact — working, or waiting on
-   * you — which `status` cannot carry because it only changes when the agent ends.
-   */
-  settledAt?: string
-  /**
    * The browser bridge holds a question this run's cloud session is parked on (#1668). Not stored:
    * the daemon annotates a web run's record on the way to the dashboard, the way a relayed run's
    * label is, because the bridge store is in memory and the archive on disk knows nothing of it.
@@ -143,6 +116,13 @@ export interface AgentMeta {
    * it is.
    */
   otherHost?: boolean
+  /**
+   * The run ended clean and its process is still alive on this host: the tool that runs it is
+   * still recording it and pushing its branch, the window every surface says "publishing…" for.
+   * Not stored: annotated on the way to the dashboard like {@link otherHost}, since only this
+   * machine can ask whether the process is alive.
+   */
+  publishing?: boolean
   /**
    * The loopback port the agent's browser preview is listening on (#813), or absent when the agent
    * has no browser. What lets the daemon proxy the pane: the port is allocated per agent and the
@@ -256,7 +236,8 @@ function checkoutAgentId(cwd: string): string | undefined {
 /**
  * The run a checkout holds, off its live card, `<id>.json` under the checkout's `.the-framework/`:
  * the shape agent-driver's log writes, read as the meta the card unfolds to, `running` or not (a
- * run that ended waiting on a question keeps its checkout). `undefined` when there is none.
+ * run that ended waiting on a question keeps its checkout), with the branch the checkout is on
+ * now. `undefined` when there is none.
  * Never healed here: the tool that started the run sweeps its own dead runs.
  */
 export async function readLiveMeta(cwd: string, fs: StoreFs = nodeStoreFs()): Promise<AgentMeta | undefined> {
@@ -265,7 +246,20 @@ export async function readLiveMeta(cwd: string, fs: StoreFs = nodeStoreFs()): Pr
   const path = join(cwd, THE_FRAMEWORK_DIR, `${id}.json`)
   if (!(await fs.exists(path))) return undefined
   const card = parseRunCard(await fs.read(path).catch(() => ''))
-  return card ? fromRunCard(card) : undefined
+  if (!card) return undefined
+  const branch = await checkoutBranch(cwd, fs)
+  return fromRunCard(branch ? { ...card, branch } : card)
+}
+
+/**
+ * The branch a checkout has checked out, off its git files: a worktree's `.git` file names the
+ * worktree's git directory, whose `HEAD` names the branch. `undefined` when either cannot be read
+ * or the checkout is on no branch.
+ */
+async function checkoutBranch(cwd: string, fs: StoreFs): Promise<string | undefined> {
+  const gitdir = /^gitdir: (.+)$/m.exec(await fs.read(join(cwd, '.git')).catch(() => ''))?.[1]?.trim()
+  if (!gitdir) return undefined
+  return /^ref: refs\/heads\/(.+)$/m.exec(await fs.read(join(resolve(cwd, gitdir), 'HEAD')).catch(() => ''))?.[1]?.trim()
 }
 
 /** A run with a checkout, plus that checkout (#738): where to read the run's git and file status from. */

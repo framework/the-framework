@@ -1,89 +1,79 @@
 import { describe, expect, test } from 'vitest'
 import type { FrameworkEvent } from '../../src/index.js'
-import { agentStatusPill } from './agent-status.js'
+import { agentStatusPill, type AgentCardFacts } from './agent-status.js'
 
-const named = { kind: 'branch', branch: 'agent-relay-smoke-test', sessionName: 'relay-smoke-test' } as FrameworkEvent
-const readyForMerge = { kind: 'ready-for-merge' } as FrameworkEvent
+const said = { kind: 'driver', event: { type: 'text', text: 'working' } } as FrameworkEvent
 const ended = (over: Record<string, unknown>) => ({ kind: 'end', ...over }) as FrameworkEvent
-const armedPush = { kind: 'handoff-armed', push: true, pr: true } as FrameworkEvent
-const handoffDone = { kind: 'handoff', outcome: 'done', pushed: true } as FrameworkEvent
+const pr = { number: 7, url: 'https://github.com/o/r/pull/7' }
+const card = (over: Partial<AgentCardFacts> = {}): AgentCardFacts => ({ status: 'done', ...over })
 
 describe('agentStatusPill', () => {
-  test('says nothing until the run has', () => {
+  test('says nothing with no line and no card', () => {
     expect(agentStatusPill([])).toBeNull()
-    expect(agentStatusPill([{ kind: 'log', message: 'working' } as FrameworkEvent])).toBeNull()
   })
 
   test('pulses while the run is live, settles when it ends', () => {
-    expect(agentStatusPill([named])).toMatchObject({ label: 'building…' })
-    expect(agentStatusPill([named, ended({ ok: true })])).toMatchObject({ label: 'finished' })
+    expect(agentStatusPill([said])).toMatchObject({ label: 'building…' })
+    expect(agentStatusPill([said, ended({ ok: true })])).toMatchObject({ label: 'finished' })
   })
 
-  test('ready for merge, once the run signals it', () => {
-    expect(agentStatusPill([named, readyForMerge, ended({ ok: true })])).toMatchObject({ label: 'ready for merge' })
+  test('a card alone says the run builds, before its first line lands', () => {
+    expect(agentStatusPill([], card({ status: 'running' }))).toMatchObject({ label: 'building…' })
   })
 
-  // The states are exclusive by construction — one agent, one word. These two hold the facts at the
-  // same time (the agent said ready-for-merge, then was stopped / then failed), and how it ENDED
-  // wins: the green would otherwise be a lie about an agent that did not get there (#948).
-  test('stopped outranks an earlier ready-for-merge', () => {
-    expect(agentStatusPill([named, readyForMerge, ended({ ok: false, stopped: true })])).toMatchObject({ label: 'stopped' })
+  test('ready for merge, once the run ended clean with a pull request on its card', () => {
+    expect(agentStatusPill([said, ended({ ok: true })], card({ pr }))).toMatchObject({ label: 'ready for merge' })
+    // Still working, the pull request of an earlier leg is not the word yet.
+    expect(agentStatusPill([said], card({ status: 'running', pr }))).toMatchObject({ label: 'building…' })
   })
 
-  test('failed outranks an earlier ready-for-merge, and carries the reason', () => {
-    expect(agentStatusPill([named, readyForMerge, ended({ ok: false, detail: 'exit 1' })])).toMatchObject({
+  // The states are exclusive by construction — one agent, one word. How the run ENDED wins over a
+  // pull request it opened on the way: the green would otherwise be a lie (#948).
+  test('stopped outranks a pull request', () => {
+    expect(agentStatusPill([said, ended({ ok: false, stopped: true })], card({ status: 'stopped', pr }))).toMatchObject({ label: 'stopped' })
+  })
+
+  test('failed outranks a pull request, and carries the reason', () => {
+    expect(agentStatusPill([said, ended({ ok: false, detail: 'exit 1' })], card({ status: 'failed', pr }))).toMatchObject({
       label: 'failed — exit 1',
     })
   })
 
-  test('publishing… between a clean end and the handoff report, when armed to push (#1431)', () => {
-    expect(agentStatusPill([armedPush, named, ended({ ok: true })])).toMatchObject({ label: 'publishing…' })
-    expect(agentStatusPill([armedPush, named, ended({ ok: true }), handoffDone])).toMatchObject({ label: 'finished' })
+  test('publishing… while the daemon marks the ended run publishing, above ready for merge (#1431)', () => {
+    const endedClean = [said, ended({ ok: true })]
+    expect(agentStatusPill(endedClean, card({ publishing: true }))).toMatchObject({ label: 'publishing…' })
+    expect(agentStatusPill(endedClean, card({ publishing: true, pr }))).toMatchObject({ label: 'publishing…' })
+    expect(agentStatusPill(endedClean, card({ pr }))).toMatchObject({ label: 'ready for merge' })
+    expect(agentStatusPill(endedClean, card())).toMatchObject({ label: 'finished' })
   })
 
-  test('publishing outranks ready-for-merge — the merge itself is part of the handoff still running (#1431)', () => {
-    const armedMerge = { kind: 'handoff-armed', push: true, pr: true, merge: true } as FrameworkEvent
-    const agent = [armedMerge, named, readyForMerge, ended({ ok: true })]
-    expect(agentStatusPill(agent)).toMatchObject({ label: 'publishing…' })
-    expect(agentStatusPill([...agent, handoffDone])).toMatchObject({ label: 'ready for merge' })
-  })
-
-  test('no publishing window when disarmed, never armed, or not cleanly ended (#1431)', () => {
-    const disarmed = { kind: 'handoff-armed', push: false, pr: false } as FrameworkEvent
-    expect(agentStatusPill([disarmed, named, ended({ ok: true })])).toMatchObject({ label: 'finished' })
-    // No arming event at all: an archive from before the handoff mechanism must not read as
-    // forever-publishing — absent-means-armed defaults do not open the window.
-    expect(agentStatusPill([named, ended({ ok: true })])).toMatchObject({ label: 'finished' })
-    expect(agentStatusPill([armedPush, named, ended({ ok: false, stopped: true })])).toMatchObject({ label: 'stopped' })
-  })
-
-  test("a resumed run publishes again — the old segment's handoff does not hide the new window (#1450)", () => {
-    const firstSegment = [armedPush, named, ended({ ok: true }), handoffDone]
-    const resumed = [...firstSegment, { kind: 'session' } as FrameworkEvent]
-    expect(agentStatusPill(resumed)).toMatchObject({ label: 'building…' })
-    expect(agentStatusPill([...resumed, ended({ ok: true })])).toMatchObject({ label: 'publishing…' })
-    expect(agentStatusPill([...resumed, ended({ ok: true }), handoffDone])).toMatchObject({ label: 'finished' })
+  test('the feed says how the current leg ended, the card when the feed has no ending', () => {
+    // The feed is ahead of the 2 s runs poll: a leg that just ended is ended, whatever the card says yet.
+    expect(agentStatusPill([said, ended({ ok: false, stopped: true })], card({ status: 'running' }))).toMatchObject({ label: 'stopped' })
+    // No feed yet: the card's ending is the pill.
+    expect(agentStatusPill([], card({ status: 'failed' }))).toMatchObject({ label: 'failed' })
+    expect(agentStatusPill([], card({ status: 'waiting' }))).toMatchObject({ label: 'waiting for an answer' })
+    expect(agentStatusPill([], card({ pr }))).toMatchObject({ label: 'ready for merge' })
+    // A diary whose process died before its last line: the card's ending still settles the pill.
+    expect(agentStatusPill([said], card({ status: 'failed' }))).toMatchObject({ label: 'failed' })
   })
 
   test('a resumed session builds again — the stopped segment does not hold the pill (#762)', () => {
     // A resume appends a second `session` boundary to the same journal; the yellow "stopped"
     // stuck to a live agent because first-end-wins outranked everything that followed.
-    const resumed = [named, ended({ ok: false, stopped: true }), { kind: 'session' } as FrameworkEvent]
+    const resumed = [said, ended({ ok: false, stopped: true }), { kind: 'session' } as FrameworkEvent]
     expect(agentStatusPill(resumed)).toMatchObject({ label: 'building…' })
     expect(agentStatusPill([...resumed, ended({ ok: true })])).toMatchObject({ label: 'finished' })
   })
 
   // A run that asked ends on its question (#1774): not failed, not finished, waiting on you.
   test('a run that ended on its question says it waits for an answer, not that it failed', () => {
-    const pill = agentStatusPill([named, ended({ ok: false, waiting: true })])
-    expect(pill).toMatchObject({ label: 'waiting for an answer', tone: 'text-warning' })
-    // Nameless too: waiting alone is worth a pill.
-    expect(agentStatusPill([ended({ ok: false, waiting: true })])).toMatchObject({ label: 'waiting for an answer' })
+    expect(agentStatusPill([said, ended({ ok: false, waiting: true })])).toMatchObject({ label: 'waiting for an answer', tone: 'text-warning' })
   })
 
   test('answered, the same run builds again: the leg it waited in is behind it', () => {
     const next = { kind: 'driver', event: { type: 'text', text: 'On it.' } } as FrameworkEvent
-    const answered = [named, ended({ ok: false, waiting: true }), next]
+    const answered = [said, ended({ ok: false, waiting: true }), next]
     expect(agentStatusPill(answered)).toMatchObject({ label: 'building…' })
     expect(agentStatusPill([...answered, ended({ ok: true })])).toMatchObject({ label: 'finished' })
   })

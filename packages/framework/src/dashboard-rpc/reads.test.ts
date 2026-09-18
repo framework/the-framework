@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { onProjectFiles, onPlanAgent, onProjectFileStatus, onAgentWorktree, onSchedulers, markCloudWaiting, markOtherHost } from './reads.js'
+import { onProjectFiles, onPlanAgent, onProjectFileStatus, onAgentWorktree, onSchedulers, markCloudWaiting, markOtherHost, markPublishing } from './reads.js'
 import { bridgeQuestions, resetBridgeQuestions } from '../dashboard/bridge-store.js'
 import type { AgentMeta } from '../store/index.js'
 import { provideTestContext } from './test-context.js'
@@ -54,4 +54,20 @@ test('a run another machine\'s daemon started is handed to the dashboard as from
   assert.equal(markOtherHost(run('suleiman-mbp'), 'suleiman-mbp').otherHost, undefined)
   // A record from before the host field was written says nothing about where it ran.
   assert.equal(markOtherHost(run(), 'suleiman-mbp').otherHost, undefined)
+})
+
+test('a run that ended clean while its process is still alive on this host is handed to the dashboard as publishing', () => {
+  const run = (over: Partial<AgentMeta> = {}): AgentMeta => ({ status: 'done', id: 'r', startedAt: '', updatedAt: '', pid: 42, host: 'suleiman-mbp', ...over }) as AgentMeta
+  const alive = (pid: number) => pid === 42
+  assert.equal(markPublishing(run(), 'suleiman-mbp', alive).publishing, true)
+  // The process is gone: recorded and pushed, nothing more is coming.
+  assert.equal(markPublishing(run({ pid: 43 }), 'suleiman-mbp', alive).publishing, undefined)
+  // Still working, or ended any other way: not publishing.
+  for (const status of ['running', 'waiting', 'stopped', 'failed'] as const) {
+    assert.equal(markPublishing(run({ status }), 'suleiman-mbp', alive).publishing, undefined, status)
+  }
+  // A pid is only this host's to probe; a run with no recorded process says nothing.
+  assert.equal(markPublishing(run({ host: 'rom-thinkpad-x280' }), 'suleiman-mbp', alive).publishing, undefined)
+  const { pid: _pid, ...noPid } = run()
+  assert.equal(markPublishing(noPid as AgentMeta, 'suleiman-mbp', alive).publishing, undefined)
 })

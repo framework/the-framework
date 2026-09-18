@@ -59,6 +59,9 @@ test('a diary agent-driver\'s own log wrote reads back as the framework\'s event
   assert.deepEqual(fromDiaryLine({ kind: 'start', prompt: '/work-queue' }), { kind: 'driver', event: { type: 'start', prompt: '/work-queue' } })
   assert.deepEqual(fromDiaryLine({ kind: 'action', label: 'Bash' }), { kind: 'driver', event: { type: 'action', label: 'Bash' } })
   assert.deepEqual(fromDiaryLine({ kind: 'notice', message: 'retried' }), { kind: 'driver', event: { type: 'notice', message: 'retried' } })
+  assert.deepEqual(fromDiaryLine({ kind: 'error', message: 'claude exited with code 1' }), { kind: 'driver', event: { type: 'error', message: 'claude exited with code 1' } })
+  // An `error` block of a run recorded before the daemon stopped running agents is the agent's own report, not a driver's.
+  assert.deepEqual(fromDiaryLine({ kind: 'error', headline: 'gh is not logged in', detail: 'ran gh auth status' }), { kind: 'error', headline: 'gh is not logged in', detail: 'ran gh auth status' })
   assert.deepEqual(fromDiaryLine({ kind: 'session', sessionId: 's-1' }), { kind: 'session-update', sessionId: 's-1' })
   // The framework's own session event, written by its run child, still reads as itself.
   assert.deepEqual(fromDiaryLine({ kind: 'session', driver: 'claude-code', workspace: '/w', fake: false }), { kind: 'session', driver: 'claude-code', workspace: '/w', fake: false })

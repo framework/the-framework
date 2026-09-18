@@ -13,7 +13,7 @@ What the daemon does for a project: starting an agent [1] through the project's 
 [3] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
 [4] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 [5] card / diary: an agent's record in the `logs` skill's two shapes: the card `<id>.json` (what was asked, the branch, the pull request, how it ended, what it cost) and the diary `<id>.jsonl` (what the agent said, one line per event). While the agent has a checkout they sit under the checkout's `.the-framework/`, written by the tool that runs it; a finished agent's are on the `agent-data` branch.
-[6] hooks: the shell lines a project's own `.the-framework/hooks.yml` names: `open` and `close` lists run when the dashboard opens and closes, and the `start`, `resume` and `offset` lines.
+[6] hooks: the shell lines a project's own `.the-framework/hooks.yml` names: `open` and `close` lists run when the dashboard opens and closes, and the `start`, `resume`, `check`, `offset` and `switch` lines.
 [7] home project: the directory the daemon was started in; a request that names no project, or names its id, addresses it without a registry lookup.
 
 ## Business logic — TL;DR

@@ -2,6 +2,10 @@ import { useState, type ReactNode } from 'react'
 import { DRIVERS, DRIVER_LABELS, MAX_SPEND_OFFSET } from '../../src/client.js'
 import { useQuota } from '../lib/quota.js'
 import { useSpendOffset } from './Quota.js'
+import { onSchedulers } from '../rpc/reads.js'
+import { sendScheduleSwitch } from '../rpc/projects.js'
+import { usePolled } from '../lib/use-async.js'
+import type { ProjectScheduler, SchedulerCommand } from '../../src/index.js'
 import { useDetectedEditors } from '../lib/editors.js'
 import { usePreferences, updatePreferences, themePreference, type ThemePreference } from '../lib/preferences.js'
 import { useNotificationPermission } from '../lib/notification-permission.js'
@@ -25,7 +29,8 @@ import { cn } from '../lib/utils.js'
 // points at, so the checklist lives here too and is not dismissible.
 //
 // Everything here writes your own settings, the same on every project: what is a project's own
-// (how a run is started) lives in that project's hooks file, not here.
+// (how a run is started) lives in that project's hooks file, not here. The Automation section's
+// schedule switches are this machine's too, written through each project's `switch` hook.
 
 export function SettingsPage({
   onAgentStarted,
@@ -398,8 +403,62 @@ function SpendOffsetSection() {
           The offset was not saved: {error}
         </p>
       )}
+      <ScheduleSwitchRows />
     </Section>
   )
+}
+
+const NO_SCHEDULERS: ProjectScheduler[] = []
+
+/**
+ * Run on a schedule: one switch per command of each project's schedule (`agent-schedule.md`), as
+ * the project's scheduler last read it. On means the scheduler starts the command on this machine
+ * when it is due; the switch is this machine's, written through the project's `switch` hook, and
+ * what the schedule line says is the default. A project whose scheduler has not ticked yet lists
+ * nothing.
+ */
+function ScheduleSwitchRows() {
+  const { value: rows, reload } = usePolled(onSchedulers, NO_SCHEDULERS, 5000, [])
+  const [saving, setSaving] = useState<string | undefined>()
+  const [error, setError] = useState<string | undefined>()
+  const flip = (projectId: string, command: string, on: boolean): void => {
+    const key = `${projectId}/${command}`
+    setSaving(key)
+    setError(undefined)
+    void sendScheduleSwitch(projectId, command, on).then(result => {
+      setSaving(current => (current === key ? undefined : current))
+      if (!result.ok) setError(`/${command}: ${result.error}`)
+      reload()
+    })
+  }
+  return (
+    <>
+      {rows.flatMap(row =>
+        row.commands.map(command => (
+          <ToggleRow
+            key={`${row.projectId}/${command.command}`}
+            label={`Run /${command.command} on a schedule`}
+            description={`${row.projectName} · ${pace(command)}. On this machine only; agent-schedule.md sets the default.`}
+            checked={command.on}
+            disabled={saving === `${row.projectId}/${command.command}`}
+            onChange={next => flip(row.projectId, command.command, next)}
+          />
+        )),
+      )}
+      {error && (
+        <p role="alert" className="text-xs text-danger">
+          The switch was not saved: {error}
+        </p>
+      )}
+    </>
+  )
+}
+
+/** How often a scheduled command runs, in words: its interval, its check, or both. */
+export function pace(command: SchedulerCommand): string {
+  if (command.every && command.when) return `every ${command.every} at most, when its check finds work`
+  if (command.every) return `every ${command.every}`
+  return 'when its check finds work'
 }
 
 function NumberRow({

@@ -9,7 +9,8 @@ import type { ProjectSummary } from './projects.js'
 //
 // Forgiving like every other read here: a missing, unreadable or malformed file reads as not set
 // up, and a field that is not what the file promises reads as absent. The one thing added on the
-// way out is whether the scheduler's process is alive, which only the operating system knows.
+// way out is whether the scheduler's process is alive, which only the operating system knows; and
+// each scheduled command's switch on this machine folded into the list the last tick recorded.
 
 /** The file the scheduler keeps its state in, at the project's root; per user, hidden from git by the tool. */
 export const SCHEDULER_STATE_FILE = '.agent-scheduler/state.json'
@@ -31,6 +32,17 @@ export interface SchedulerTick {
   note?: string
 }
 
+/** One command of the project's schedule, as the scheduler's last tick read it, with this machine's switch. */
+export interface SchedulerCommand {
+  command: string
+  /** How often at most, as written (`1d`). */
+  every?: string
+  /** The check, when the line has one. */
+  when?: string
+  /** Whether it runs on this machine: the machine's switch, else what the line says. */
+  on: boolean
+}
+
 /** A project's scheduler as the card shows it. */
 export interface SchedulerState {
   /** Whether the state file exists and parses: a project without it has no scheduler set up. */
@@ -46,6 +58,8 @@ export interface SchedulerState {
   /** How far past the quota boundary this project's unattended runs may start, in percentage points. */
   spendOffset?: number
   lastTick?: SchedulerTick
+  /** The schedule's commands with their switches; empty until the scheduler has ticked once with a schedule. */
+  commands: SchedulerCommand[]
 }
 
 export interface ProjectScheduler extends SchedulerState {
@@ -53,7 +67,7 @@ export interface ProjectScheduler extends SchedulerState {
   projectName: string
 }
 
-const NOT_SET_UP: SchedulerState = { present: false, on: false, keepAlive: false, running: false }
+const NOT_SET_UP: SchedulerState = { present: false, on: false, keepAlive: false, running: false, commands: [] }
 
 /**
  * Read one project's scheduler state. `isAlive` is the process probe; injectable so a test can
@@ -76,6 +90,11 @@ export async function readSchedulerState(cwd: string, isAlive: (pid: number) => 
   const state = parsed as Record<string, unknown>
   const pid = typeof state['pid'] === 'number' ? state['pid'] : undefined
   const tick = lastTick(state['lastTick'])
+  const switches = state['switches'] && typeof state['switches'] === 'object' ? (state['switches'] as Record<string, unknown>) : {}
+  const commands = scheduleLines(state['lastTick']).map(line => {
+    const switched = switches[line.command]
+    return { ...line, on: typeof switched === 'boolean' ? switched : line.on }
+  })
   return {
     present: true,
     on: state['on'] === true,
@@ -84,7 +103,27 @@ export async function readSchedulerState(cwd: string, isAlive: (pid: number) => 
     ...(typeof state['model'] === 'string' ? { model: state['model'] } : {}),
     ...(typeof state['spendOffset'] === 'number' && Number.isFinite(state['spendOffset']) ? { spendOffset: state['spendOffset'] } : {}),
     ...(tick ? { lastTick: tick } : {}),
+    commands,
   }
+}
+
+/** The schedule the last tick recorded, each line as written; a line not of the promised shape is left out. */
+function scheduleLines(value: unknown): SchedulerCommand[] {
+  const schedule = value && typeof value === 'object' ? (value as Record<string, unknown>)['schedule'] : undefined
+  if (!Array.isArray(schedule)) return []
+  const lines: SchedulerCommand[] = []
+  for (const item of schedule as unknown[]) {
+    if (!item || typeof item !== 'object') continue
+    const l = item as Record<string, unknown>
+    if (typeof l['command'] !== 'string' || typeof l['on'] !== 'boolean') continue
+    lines.push({
+      command: l['command'],
+      ...(typeof l['every'] === 'string' ? { every: l['every'] } : {}),
+      ...(typeof l['when'] === 'string' ? { when: l['when'] } : {}),
+      on: l['on'],
+    })
+  }
+  return lines
 }
 
 /** The last tick, kept only when it has the shape the file promises. */

@@ -1,4 +1,4 @@
-Everything the dashboard asks the daemon about projects [1]: the list of registered projects with whatever the daemon currently finds wrong with each, adding a new one (opening the machine's own folder dialog, then installing and registering the chosen folder), the folder the onboarding offers as a first project, and what the launcher [2] offers for a project: its commands [3], whether an agent can be started there at all, and what would stop an agent before it is started.
+Everything the dashboard asks the daemon about projects [1]: the list of registered projects with whatever the daemon currently finds wrong with each, adding a new one (opening the machine's own folder dialog, then installing and registering the chosen folder), the folder the onboarding offers as a first project, and what the launcher [2] offers for a project: its commands [3], whether an agent can be started there at all, and what would stop an agent before it is started; and switching one of the project's scheduled commands on or off on this machine, through the project's switch hook [9].
 
 ## Context
 
@@ -16,6 +16,8 @@ Everything the dashboard asks the daemon about projects [1]: the list of registe
 [6] sweep: a background job the daemon runs on its clock: the data sync, the notification watchers, the cloud scratch sweep, cloud work adoption.
 [7] start hook: the one shell line under `start` in a project's `.the-framework/hooks.yml`, which the daemon runs when the user presses Start.
 [8] check hook: the one shell line under `check` in a project's `.the-framework/hooks.yml`, which the daemon runs when the launcher asks what would stop an agent; it answers a list of problems and a list of warnings.
+[9] switch hook: the one shell line under `switch` in a project's `.the-framework/hooks.yml`, which the daemon runs with a scheduled command's name and `on` or `off` when the user sets that command's schedule switch [10].
+[10] schedule switch: a person's choice, on one machine, whether a scheduled command (a line of the project's `agent-schedule.md`) runs there; the project's scheduler keeps it in its state file, and the schedule line is the default where nobody switched the command.
 
 ## Business logic — TL;DR
 
@@ -25,6 +27,7 @@ Everything the dashboard asks the daemon about projects [1]: the list of registe
 - **The onboarding's first suggestion** - the directory the daemon was started in is offered as the first project, together with whether it is already registered.
 - **What the launcher offers** - the project's commands [3], read off its skills folders, and whether its hooks file has a start hook [7]; an unknown project answers nothing.
 - **What would stop an agent** - the project's check hook [8], run with the coding agent the user picked: its problems and its warnings; a check hook that fails is one warning; no check hook, or an unknown project, answers nothing.
+- **A schedule switch** - the project's switch hook [9], run with the command and `on` or `off`: done, or the error in words; a project with no switch hook, and an unknown project, are each an error.
 
 ## Business logic
 
@@ -97,3 +100,15 @@ For a given project [1] the daemon answers two things, read fresh each time: the
 #### Business logic
 
 For a given project [1] and, when the user picked one, a coding agent, the daemon runs the project's check hook [8] (`project-hooks.ts`), the pick in `DRIVER`, and answers its two lists: the problems and the warnings. A check hook that fails, hangs, answers something else, or sits in a hooks file that is refused, is answered as no problem and one warning, its error in words ("the check hook: <what it said>"): a broken check is worth saying, not a reason to stop. A project with no check hook, and a project id that names no registered project, answer nothing at all: there is nothing to say.
+
+### A schedule switch
+
+#### Context
+
+**User story**: in Settings → Automation the user checks "Run /post-merge-cleanup on a schedule" for a project, and that project's scheduler starts the command on this machine when it is due; unchecking it stops the scheduler starting it here. The rows come from the scheduler's state (`../dashboard/scheduler-state.ts`).
+
+**Problem**: the daemon names no tool; the schedule switch [10] lives in the scheduler's own state, which only the project's line knows how to write.
+
+#### Business logic
+
+For a given project [1], a scheduled command's name and on or off, the daemon runs the project's switch hook [9] (`project-hooks.ts`), with the name in `COMMAND` and `on` or `off` in `SWITCH`, and answers done when it exits 0. Otherwise it answers an error in words: "unknown project" for a project id that names no registered project; "this project has no switch hook in .the-framework/hooks.yml" when the hooks file has no `switch` line; otherwise the hook's own error ("the switch hook: <what it said>", or the reason a broken hooks file was ignored).

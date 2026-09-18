@@ -55,7 +55,7 @@ test('usage errors exit 2 with the usage on stderr and nothing on stdout; outsid
   const repo = await testRepo()
   const elsewhere = await mkdtemp(join(tmpdir(), 'not-a-repo-'))
   try {
-    for (const argv of [[], ['nope'], ['model'], ['offset', 'many'], ['status', 'extra'], ['check', 'extra'], ['init', 'extra']]) {
+    for (const argv of [[], ['nope'], ['model'], ['offset', 'many'], ['status', 'extra'], ['check', 'extra'], ['init', 'extra'], ['switch', 'work-queue'], ['switch', 'work-queue', 'maybe']]) {
       const bad = await run(repo, ...argv)
       assert.equal(bad.code, 2, argv.join(' '))
       assert.equal(bad.out, undefined)
@@ -114,6 +114,33 @@ test('stop --unless-keep-alive leaves a keep-alive scheduler running, and stops 
     const plain = await run(repo, 'stop')
     assert.equal((plain.out as { on: boolean; kept: boolean }).on, false)
     assert.equal((plain.out as { kept: boolean }).kept, false)
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test('switch writes this machine\'s switch for a scheduled command; a command with no line, or no schedule, is refused', async () => {
+  const repo = await testRepo()
+  try {
+    const none = await run(repo, 'switch', 'post-merge-cleanup', 'on')
+    assert.equal(none.code, 1)
+    assert.deepEqual(none.out, { ok: false, reason: 'no-schedule' })
+
+    await writeFile(join(repo, 'agent-schedule.md'), '- work-queue: when `npx queue`\n- post-merge-cleanup: every 1d, off\n')
+    const on = await run(repo, 'switch', 'post-merge-cleanup', 'on')
+    assert.equal(on.code, 0)
+    assert.deepEqual((on.out as { switches: unknown }).switches, { 'post-merge-cleanup': true })
+    await run(repo, 'switch', 'work-queue', 'off')
+    assert.deepEqual((await readState(repo)).switches, { 'post-merge-cleanup': true, 'work-queue': false })
+    // Back to what the lines say: nothing kept.
+    await run(repo, 'switch', 'post-merge-cleanup', 'off')
+    await run(repo, 'switch', 'work-queue', 'on')
+    assert.equal((await readState(repo)).switches, undefined)
+
+    const unknown = await run(repo, 'switch', 'triage-quick', 'on')
+    assert.equal(unknown.code, 1)
+    assert.deepEqual(unknown.out, { ok: false, reason: 'not-scheduled', command: 'triage-quick' })
+    assert.equal(unknown.err, 'agent-schedule.md has no line for triage-quick')
   } finally {
     await removeRepo(repo)
   }

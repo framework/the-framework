@@ -136,3 +136,8 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   honours the user's keep-alive while a person's plain `stop` still stops. Picked over
   `stop` reading keep-alive always (a person's stop must stop) and over a separate `close`
   verb (one stop).
+- `run --detach --resume <id>` continues an ended run in its own process and answers its
+  id at once: the line a dashboard's resume hook runs, the sibling of `run --detach`. A
+  run this project has no record of is refused while someone is still listening; anything
+  after that is the resumed run's own record. Picked over the hook running the resume in
+  the foreground, which would hold the dashboard's request open for the whole turn.

@@ -1,0 +1,17 @@
+{
+  "name": "@gemstack/skill-suggest-tickets-to-work-on",
+  "version": "0.0.1",
+  "description": "The suggest-tickets-to-work-on command for coding agents: pick and rank the tickets worth working on next, each with the priority it should get on the agent queue. Changes nothing. A skill file only, no code.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/framework/the-framework.git",
+    "directory": "packages/skill-suggest-tickets-to-work-on"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "SKILL.md"
+  ]
+}

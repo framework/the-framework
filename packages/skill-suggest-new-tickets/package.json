@@ -1,0 +1,17 @@
+{
+  "name": "@gemstack/skill-suggest-new-tickets",
+  "version": "0.0.1",
+  "description": "The suggest-new-tickets command for coding agents: suggest new tickets for the project, and write each one in the project's ticket format. A skill file only, no code.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/framework/the-framework.git",
+    "directory": "packages/skill-suggest-new-tickets"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "SKILL.md"
+  ]
+}

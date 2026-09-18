@@ -213,6 +213,8 @@ importers:
 
   packages/skill-plan-tickets: {}
 
+  packages/skill-post-merge-cleanup: {}
+
   packages/skill-queue:
     dependencies:
       '@gemstack/agent-data':

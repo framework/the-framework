@@ -1,0 +1,17 @@
+{
+  "name": "@gemstack/skill-post-merge-cleanup",
+  "version": "0.0.1",
+  "description": "The post-merge-cleanup command for coding agents: after work is merged, queue a maintainability refactor and a security audit of the changes that need one, and bring the project's knowledge files up to date in a pull request a person reviews. A skill file only, no code.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/framework/the-framework.git",
+    "directory": "packages/skill-post-merge-cleanup"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "SKILL.md"
+  ]
+}

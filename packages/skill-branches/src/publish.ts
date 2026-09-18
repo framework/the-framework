@@ -1,5 +1,6 @@
 import { nodeGitRunner, pushBranch, type GitRunner } from '@gemstack/agent-data'
 import { currentBranch, isWorktreeRoot, projectRoot, worktreeClean } from './worktree.js'
+import { spawnMergeWatch } from './merge-watch.js'
 
 /**
  * Publishing a checkout (#1774): the agent's own last step. Push the branch, open its pull
@@ -9,6 +10,10 @@ import { currentBranch, isWorktreeRoot, projectRoot, worktreeClean } from './wor
  *
  * A branch that already has an open pull request gets no second one: the request is reported as
  * it is, and only the push and the merge arming happen.
+ *
+ * The merge is GitHub's auto-merge where the repository allows it. Where it does not, this tool's
+ * own watcher waits for the checks and merges (`merge-watch.ts`); where the request is already
+ * green, GitHub will not arm anything and the request is merged at once.
  */
 
 /** A `gh` runner: the standard output of one invocation; rejects with gh's own line on failure. */
@@ -34,6 +39,8 @@ export interface PublishOptions {
   body?: string
   /** Arm the merge: the request lands on its own once its checks pass. */
   merge?: boolean
+  /** Start the merge watcher for a request (default {@link spawnMergeWatch}). For tests. */
+  watch?: (repo: string, number: number) => Promise<void>
   /** Open the request as a draft. Not with `merge`: a draft cannot be merged. */
   draft?: boolean
   git?: GitRunner
@@ -60,8 +67,12 @@ export type PublishOutcome =
       pr: { number: number; url: string }
       /** Whether the request was open already. */
       existing: boolean
-      /** How the merge arming went, when asked for. */
-      merge?: { outcome: 'auto-armed' } | { outcome: 'failed'; error: string }
+      /**
+       * How the merge arming went, when asked for: GitHub's auto-merge armed, merged at once (the
+       * request was already green), or this tool's watcher started (the repository does not
+       * allow auto-merge).
+       */
+      merge?: { outcome: 'auto-armed' | 'merged' | 'watching' } | { outcome: 'failed'; error: string }
     }
   | { ok: false; reason: 'not-a-worktree' | 'no-branch' }
   | { ok: false; reason: 'dirty' | 'push-failed' | 'pr-failed'; branch: string; detail?: string }
@@ -96,15 +107,38 @@ export async function publishCheckout(path: string, opts: PublishOptions): Promi
   }
 
   const outcome: PublishOutcome = { ok: true, branch, pr, existing }
-  if (opts.merge) {
-    try {
-      await gh(['pr', 'merge', String(pr.number), '--squash', '--auto'], path)
-      outcome.merge = { outcome: 'auto-armed' }
-    } catch (err) {
-      outcome.merge = { outcome: 'failed', error: errorMessage(err) }
-    }
-  }
+  if (opts.merge) outcome.merge = await armMerge(repo, pr.number, gh, opts.watch ?? spawnMergeWatch)
   return outcome
+}
+
+/**
+ * GitHub's words for "auto-merge is not allowed in this repository" and for "this request is
+ * already green, so there is nothing to wait for". Matched loosely on purpose: a rephrase on
+ * GitHub's side lands in `failed`, said out loud, never in a wrong merge.
+ */
+const AUTO_MERGE_OFF = /auto[- ]?merge is not allowed/i
+const ALREADY_GREEN = /clean status/i
+
+async function armMerge(repo: string, number: number, gh: GhRunner, watch: (repo: string, number: number) => Promise<void>): Promise<NonNullable<(PublishOutcome & { ok: true })['merge']>> {
+  try {
+    await gh(['pr', 'merge', String(number), '--squash', '--auto'], repo)
+    return { outcome: 'auto-armed' }
+  } catch (err) {
+    const refusal = errorMessage(err)
+    try {
+      if (ALREADY_GREEN.test(refusal)) {
+        await gh(['pr', 'merge', String(number), '--squash'], repo)
+        return { outcome: 'merged' }
+      }
+      if (AUTO_MERGE_OFF.test(refusal)) {
+        await watch(repo, number)
+        return { outcome: 'watching' }
+      }
+    } catch (next) {
+      return { outcome: 'failed', error: errorMessage(next) }
+    }
+    return { outcome: 'failed', error: refusal }
+  }
 }
 
 /** The open pull request of a branch, or `undefined`. */

@@ -1,6 +1,7 @@
 What the tests cover for publishing a checkout, against real git with a bare `origin` and a faked `gh` that records what it is asked:
 
 - **The happy path** - the branch reaches `origin` before the request; the request is opened with `--head`, the title and the body given, ready rather than draft when the merge is armed; the merge is armed by squash; a second publish of the same branch reuses the open request and opens no second one.
+- **Where GitHub will not arm auto-merge** - a "clean status" refusal merges the request at once by squash; an "is not allowed" refusal starts the merge watcher for the request's number and merges nothing directly; any other refusal is the outcome `failed` with gh's line.
 - **Clean first** - a checkout with an untracked file is refused as `dirty` before gh is asked anything and before any push; once committed, `--draft` opens a draft.
 - **Refusals with the detail** - a remote that cannot be reached is `push-failed`; a request gh refuses is `pr-failed` with gh's line.
 - **The command line** - `publish` without `--title` is a usage error, exit 2, naming the flag.

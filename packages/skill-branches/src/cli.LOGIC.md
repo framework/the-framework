@@ -1,4 +1,4 @@
-Gives an agent [1] in a shell, and the user, the `branches` command over this package: `create`, `attach`, `name`, `status`, `publish`, `list`, `remove` and `prune`, the same operations the scheduler and the dashboard's server call as a library, so one implementation serves every surface. Every run prints one JSON document on stdout, at most one line for a person on stderr, and exits with a code that says how it went: 0 for a result, 1 for a refusal or a git failure, 2 for a command line that could not be read.
+Gives an agent [1] in a shell, and the user, the `branches` command over this package: `create`, `attach`, `name`, `status`, `publish`, `merge-on-green`, `list`, `remove` and `prune`, the same operations the scheduler and the dashboard's server call as a library, so one implementation serves every surface. Every run prints one JSON document on stdout, at most one line for a person on stderr, and exits with a code that says how it went: 0 for a result, 1 for a refusal or a git failure, 2 for a command line that could not be read.
 
 ## Context
 
@@ -28,7 +28,7 @@ Gives an agent [1] in a shell, and the user, the `branches` command over this pa
 - **`attach`: a checkout for a continued agent** - `.branches/agent-<id>` on the branch named, taken as given, fully set up.
 - **`name`: the agent names its work** - the branch becomes `agent-<name>`, suffixed when taken, the name got is printed, and the branch links follow at once; four refusals.
 - **`status`: where the agent is and whether it may finish** - the checkout's path, its branch, whether it is clean and whether it is on the remote; refused for a directory git does not know as a worktree.
-- **`publish`: the agent hands off its own work** - `--title` is required; the branch is pushed, the pull request opened with the title and `--body`, `--merge` arms the merge on green, `--draft` opens a draft; a dirty tree, a push that did not land and a request gh refused are refusals with a line each (`publish.ts`).
+- **`publish`: the agent hands off its own work** - `--title` is required; the branch is pushed, the pull request opened with the title and `--body`, `--merge` arms the merge on green (GitHub's auto-merge, a direct merge of a request already green, or the merge watcher where the repository has no auto-merge), `--draft` opens a draft; a dirty tree, a push that did not land and a request gh refused are refusals with a line each (`publish.ts`).
 - **`list`: every checkout under `.branches/`** - a bare JSON array, one row per checkout directory, with its branch when git knows it and its size on request.
 - **`remove`: reclaim one checkout** - under the reclaim rule, pushing unless `--no-push`, with a line for each refusal and `no-checkout` for a missing one; the branch links follow at once.
 - **`prune`: reclaim every checkout** - `remove` for each checkout directory, reporting the removed and the skipped, never refusing as a whole.
@@ -124,6 +124,16 @@ See `## Context`.
 #### Business logic
 
 `status [path]` reports on the checkout [2] the command runs in, or on the checkout root given: `{"ok": true, "path": …, "branch": …, "clean": …, "onRemote": …}`. `path` is the checkout's root. `branch` is the branch checked out, absent when the head is detached. `clean` is true when nothing is uncommitted and nothing is untracked; ignored files do not count (`worktree.ts`). `onRemote` is true when the branch's tip is the tip of `origin/<branch>` or an ancestor of it, read from the local remote-tracking refs (`worktree.ts`), and false when there is no branch. A path that is not a worktree root [7] is refused as `not-a-worktree` ("<path> is not a git worktree"), the path in the refusal: a directory left under `.branches/` that git does not know is never reported as being on the user's branch. Given a path, the command answers about that directory even outside a repository: `not-a-worktree`, not `not-a-repo`. A status git cannot read is `git-failed`, never a clean checkout.
+
+### `merge-on-green`: wait for a request's checks, then merge
+
+#### Context
+
+**User story**: an agent publishes with `--merge` in a repository that does not allow GitHub's auto-merge; the request merges once its checks pass all the same, with no one watching it. A person can run the same command for any open request.
+
+#### Business logic
+
+`merge-on-green <number>` takes one pull request number; anything that is not a positive whole number is a usage error, exit 2. It acts on the project found from the working directory, runs the merge watcher (`merge-watch.ts`) for that request until it ends, says each read on stderr, and answers the watcher's outcome with the number, `ok` true only when it merged. `publish --merge` starts it as its own detached process, its output in `.branches/merge-on-green/<number>.log`.
 
 ### `list`: every checkout under `.branches/`
 

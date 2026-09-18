@@ -21,15 +21,17 @@ export interface SchedulerMark {
   host: string
   /** The run's process on that machine, while it runs. */
   pid?: number
+  /** The prompt a fresh agent is given once the run ends done with a pull request, the run's id after it (`run --then`). */
+  then?: string
 }
 
 /** The mark a card carries, or `undefined` for a run this tool did not start. */
 export function schedulerMark(card: RunCard): SchedulerMark | undefined {
   const mark = card.caller?.['scheduler']
   if (!mark || typeof mark !== 'object') return undefined
-  const { command, host, pid } = mark as Record<string, unknown>
+  const { command, host, pid, then } = mark as Record<string, unknown>
   if (typeof command !== 'string' || typeof host !== 'string') return undefined
-  return { command, host, ...(typeof pid === 'number' ? { pid } : {}) }
+  return { command, host, ...(typeof pid === 'number' ? { pid } : {}), ...(typeof then === 'string' ? { then } : {}) }
 }
 
 /** When one command last started, on any machine, whatever became of the run; nothing when it never did. */

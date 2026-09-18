@@ -10,7 +10,7 @@ A run in flight is a run record [1]: the `logs` skill's card on the project's `a
 
 [1] run record: the `logs` skill's record of a run on the `agent-data` branch: a card (`<id>.json`) and a diary (`<id>.jsonl`). Written twice, over the same file: as a marker before the agent exists, and with how it went when the run ends.
 [2] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
-[3] the tool's mark: `caller.scheduler` on a card: `command`, the command the run was started for; `host`, the machine that started it; `pid`, the run's process on that machine while it runs, when known.
+[3] the tool's mark: `caller.scheduler` on a card: `command`, the command the run was started for; `host`, the machine that started it; `pid`, the run's process on that machine while it runs, when known; `then`, the follow-up's prompt, when the run names one (`run --then`: once the run ends done with a pull request, a fresh run on its branch gets that prompt and the run's id, `run.ts`).
 [4] cap: how many runs of one command may be in flight at once, across every machine that shares the repository.
 [5] marker: a run record written before the agent exists: `status: running`, the tool's mark, an empty diary.
 
@@ -42,7 +42,7 @@ See `## Context`.
 
 #### Business logic
 
-The runs of one command in flight are the cards on the branch whose status is `running` and whose tool's mark names that command, on any machine. A running card with no mark, or a mark this tool cannot read (no `command` and `host` strings), is somebody else's run and is not counted.
+The runs of one command in flight are the cards on the branch whose status is `running` and whose tool's mark names that command, on any machine. A running card with no mark, or a mark this tool cannot read (no `command` and `host` strings), is somebody else's run and is not counted. Reading a mark keeps `pid` only when it is a number and `then` only when it is a string.
 
 ### Withdrawing
 

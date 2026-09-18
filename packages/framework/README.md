@@ -41,7 +41,7 @@ agent is running **one shell line the project itself names** — its `start` hoo
 project's own `.the-framework/hooks.yml`:
 
 ```yaml
-start: npx agent-scheduler run --detach "$PROMPT" ${DRIVER:+--driver "$DRIVER"}
+start: npx agent-scheduler run --detach "$PROMPT" ${DRIVER:+--driver "$DRIVER"} ${MODEL:+--model "$MODEL"} ${THEN:+--then "$THEN"}
 resume: npx agent-scheduler run --detach --resume "$RUN_ID" ${TEXT:+"$TEXT"} ${ANSWER:+--answer "$ANSWER"}
 check: npx agent-scheduler check ${DRIVER:+--driver "$DRIVER"}
 offset: npx agent-scheduler offset -- "$POINTS"
@@ -52,6 +52,12 @@ document whose `id` names the agent it began. From there the agent belongs to wh
 line started. A project with no `start` line cannot start an agent from the dashboard, and the
 dashboard says so. `npx agent-scheduler init`, run in the project, writes the lines above (and
 the scheduler's `open` and `close` lines) into the file, keeping any line already there.
+
+The launcher's **Post-merge cleanup** box, shown where the project has the
+`post-merge-cleanup` command, puts `/post-merge-cleanup` in `THEN`: once the agent ends done
+with a pull request, the scheduler starts a fresh agent on its branch with that command and the
+first agent's id, and holds the pull request's merge until that one is done. Its default is
+Settings → Agent → Post-merge cleanup, which the box writes too.
 
 The `check` line is what the launcher runs before a Start, with the picked coding agent in
 `DRIVER`: it answers one JSON document with `problems` (a coding agent not installed or logged

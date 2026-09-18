@@ -70,8 +70,8 @@ export const Composer = forwardRef<ComposerHandle, {
   addContext?: ((path: string) => void) | undefined
   /** Drop a path from the Context when its `@`/`#` chip leaves the editor (#948). */
   removeContext?: ((path: string) => void) | undefined
-  /** A control the launcher hangs at the start of the control row (#1046): the Context picker. */
-  contextControl?: ReactNode
+  /** The controls the launcher hangs at the start of the control row (#1046): the Context picker and the post-merge cleanup box. */
+  launcherControls?: ReactNode
   /** Run the composed text. */
   onSubmit: (text: string) => void | Promise<void>
   /** Mirror the live prompt out, so the launcher can drive its note. */
@@ -101,7 +101,7 @@ export const Composer = forwardRef<ComposerHandle, {
    *  without one the slot keeps its collapse-when-empty behavior for the launcher. */
   idleControl?: ReactNode
 }>(function Composer(
-  { files, addContext, removeContext, contextControl, onSubmit, onPromptChange, onPreset, busy, submitLabel, submitBusyLabel, placeholder, compact = false, showDriverModel = true, inAgent = false, canSubmit = true, idleControl },
+  { files, addContext, removeContext, launcherControls, onSubmit, onPromptChange, onPreset, busy, submitLabel, submitBusyLabel, placeholder, compact = false, showDriverModel = true, inAgent = false, canSubmit = true, idleControl },
   ref,
 ) {
   const [prompt, setPrompt] = useState('')
@@ -334,7 +334,7 @@ export const Composer = forwardRef<ComposerHandle, {
             start, the agent+model select, the "Run on" pick and submit clustered at the end. */}
         <div className="flex flex-wrap items-center gap-1.5 px-2 pb-2">
           {commandsEl}
-          {contextControl}
+          {launcherControls}
           <div className="ml-auto flex items-center gap-1.5">
             {driverModelEl}
             {runOnEl}

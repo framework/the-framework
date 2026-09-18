@@ -28,7 +28,7 @@ The instructions every agent [1] reads as its `branches` skill [2]: its work goe
 - **In a plain clone, make an `agent-<name>` branch with git** - before the first change, and another name when that one exists locally or on `origin`.
 - **Commit as you go** - nothing is committed for the agent.
 - **Finish only clean** - `status` must report `"clean": true`; commit or delete what was added, and when what remains is not the agent's, say so and finish.
-- **Publish** - once clean, `npx branches publish --title … --body …` pushes the branch and opens the pull request; `--merge` when the work may land on its own, `--draft` for a request a person looks at first; a branch with an open request gets no second one.
+- **Publish** - once clean, `npx branches publish --title … --body …` pushes the branch and opens the pull request; `--merge` when the work may land on its own (answered `auto-armed`, `merged`, `watching`, or `held` when more work comes on the branch after the agent), `--draft` for a request a person looks at first; a branch with an open request gets no second one.
 
 ## Business logic
 
@@ -130,4 +130,4 @@ Before finishing, the agent [1] runs `npx branches status` again, and it must re
 
 #### Business logic
 
-Once clean, and unless whoever started it said they publish for it, the agent [1] runs `npx branches publish` with `--title`, one line naming what the change does, and `--body`, what changed and why. The command pushes the branch, opens the pull request and prints it in `pr`. The agent adds `--merge` when the work may land on its own, and the request then merges once its checks pass; `--draft` for a request a person should look at first. A branch that already has an open request gets no second one. A checkout that is not clean is refused as `dirty`: the agent commits or deletes first.
+Once clean, and unless whoever started it said they publish for it, the agent [1] runs `npx branches publish` with `--title`, one line naming what the change does, and `--body`, what changed and why. The command pushes the branch, opens the pull request and prints it in `pr`. The agent adds `--merge` when the work may land on its own, and the request then merges once its checks pass, also where the repository does not allow auto-merge: `merge` in the answer says `auto-armed`, `merged` or `watching`. The agent is also told that `merge` may say `held`: whoever started it has more work coming on its branch, and the merge is armed for it once that is done. `--draft` for a request a person should look at first. A branch that already has an open request gets no second one. A checkout that is not clean is refused as `dirty`: the agent commits or deletes first.

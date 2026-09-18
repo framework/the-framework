@@ -5,7 +5,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { nodeGitRunner } from '@gemstack/agent-data'
 import { createCheckout } from './checkout.js'
-import { publishCheckout, type GhRunner } from './publish.js'
+import { publishCheckout, releaseMerge, type GhRunner } from './publish.js'
+import { holdMerge, MERGE_HELD_NOTE } from './merge-hold.js'
 import { runCli } from './cli.js'
 
 // Publishing is the agent's own step now (#1774): push, pull request, merge arming, on a clean
@@ -107,6 +108,87 @@ test('where GitHub will not arm auto-merge: an already green request is merged a
       assert.deepEqual(direct, (expected as { outcome: string }).outcome === 'merged' ? [['pr', 'merge', '7', '--squash']] : [], 'only a green request is merged directly')
       assert.deepEqual(watched, (expected as { outcome: string }).outcome === 'watching' ? [7] : [])
     }
+  } finally {
+    await rm(join(repo, '..'), { recursive: true, force: true, maxRetries: 10 })
+  }
+})
+
+/** A gh holding one request's state and body, recording every call. */
+function heldGh(number: number): { gh: GhRunner; calls: string[][]; pr: { open: boolean; state: string; body: string } } {
+  const calls: string[][] = []
+  const pr = { open: false, state: 'OPEN', body: '' }
+  const url = `https://github.com/o/r/pull/${number}`
+  const gh: GhRunner = async args => {
+    calls.push(args)
+    if (args[1] === 'list') return JSON.stringify(pr.open ? [{ number, url }] : [])
+    if (args[1] === 'create') {
+      pr.open = true
+      pr.body = args[args.indexOf('--body') + 1]!
+      return `${url}\n`
+    }
+    if (args[1] === 'view') return JSON.stringify({ state: pr.state, body: pr.body })
+    if (args[1] === 'edit') {
+      pr.body = args[args.indexOf('--body') + 1]!
+      return ''
+    }
+    if (args[1] === 'merge') return ''
+    throw new Error(`unexpected gh ${args.join(' ')}`)
+  }
+  return { gh, calls, pr }
+}
+
+test('under a hold, publish --merge opens the request, arms nothing, and says so in the body; the release arms it and takes the line out', async () => {
+  const repo = await repoWithOrigin()
+  try {
+    const { path } = await createCheckout(repo, { agentId: 'h1' })
+    await holdMerge(path, git)
+    await commitWork(path)
+    const { gh, calls, pr } = heldGh(9)
+    const outcome = await publishCheckout(path, { title: 'Held', body: 'Does a thing.', merge: true, gh })
+    assert.deepEqual(outcome, { ok: true, branch: 'agent-h1', pr: { number: 9, url: 'https://github.com/o/r/pull/9' }, existing: false, merge: { outcome: 'held' } })
+    assert.equal(calls.filter(c => c[1] === 'merge').length, 0, 'nothing is armed under a hold')
+    assert.equal(pr.body, `Does a thing.\n\n${MERGE_HELD_NOTE}`)
+    assert.equal((await git(['status', '--porcelain'], path)).trim(), '', 'the hold is out of git\'s sight')
+
+    // A publish without --merge under the hold is a plain publish: no merge was wanted.
+    const plain = await publishCheckout(path, { title: 'x', gh })
+    assert.equal(plain.ok && plain.merge, undefined)
+
+    // The checkout goes; the record of the wanted merge stays with the project.
+    await git(['worktree', 'remove', '--force', path], repo)
+    calls.length = 0
+    const released = await releaseMerge(repo, 9, { gh })
+    assert.deepEqual(released, { outcome: 'auto-armed' })
+    assert.deepEqual(calls.map(c => c.slice(0, 2)), [['pr', 'view'], ['pr', 'merge'], ['pr', 'edit']])
+    assert.equal(pr.body, 'Does a thing.', 'the held line left the body')
+    assert.deepEqual(await releaseMerge(repo, 9, { gh }), { outcome: 'not-held' }, 'a release happens once')
+  } finally {
+    await rm(join(repo, '..'), { recursive: true, force: true, maxRetries: 10 })
+  }
+})
+
+test('a held merge on a request already open gains the line once; a release of a closed request drops the record; a failed arming keeps it', async () => {
+  const repo = await repoWithOrigin()
+  try {
+    const { path } = await createCheckout(repo, { agentId: 'h2' })
+    await commitWork(path)
+    const { gh, pr } = heldGh(5)
+    await publishCheckout(path, { title: 'Open first', body: 'Body.', gh })
+    await holdMerge(path, git)
+    const held = await publishCheckout(path, { title: 'x', merge: true, gh })
+    assert.equal(held.ok && held.merge?.outcome, 'held')
+    await publishCheckout(path, { title: 'x', merge: true, gh })
+    assert.equal(pr.body, `Body.\n\n${MERGE_HELD_NOTE}`, 'the line is added once')
+
+    const refusing: GhRunner = async args => {
+      if (args[1] === 'merge') throw new Error('GraphQL: Resource not accessible by integration')
+      return gh(args, repo)
+    }
+    assert.deepEqual(await releaseMerge(repo, 5, { gh: refusing }), { outcome: 'failed', error: 'GraphQL: Resource not accessible by integration' })
+    assert.equal(pr.body, `Body.\n\n${MERGE_HELD_NOTE}`, 'a failed arming leaves the request saying it is held')
+    pr.state = 'MERGED'
+    assert.deepEqual(await releaseMerge(repo, 5, { gh }), { outcome: 'closed', state: 'MERGED' }, 'the failed arming kept the record')
+    assert.deepEqual(await releaseMerge(repo, 5, { gh }), { outcome: 'not-held' })
   } finally {
     await rm(join(repo, '..'), { recursive: true, force: true, maxRetries: 10 })
   }

@@ -31,7 +31,7 @@ The Settings page: every preference [1] the user can set, on one page, each chan
 - **One page, one destination** - every control but the spend offset and the schedule switches reads and writes the user's own preferences, applied at once and saved in the background.
 - **The Onboarding checklist stays on this page** - it sits above every section, cannot be dismissed here, and its two navigating steps lead to an agent's page or a project's launcher.
 - **Appearance: theme and editor** - "Theme" follows the system by default; "Editor" offers "Auto-detect" plus the editors found on the daemon's machine.
-- **Agent: which coding agent, which model** - "Agent" (Claude Code by default) and "Model" (empty means the coding agent's own default); both are handed to a project's start hook [8] with every start.
+- **Agent: which coding agent, which model, and post-merge cleanup** - "Agent" (Claude Code by default) and "Model" (empty means the coding agent's own default), both handed to a project's start hook [8] with every start; "Post-merge cleanup" (off by default), the default of the launcher's box of that name.
 - **Devices, after "Agent"** - the saved devices follow directly, because a device is the other place an agent can run.
 - **Notifications: how they reach you, and what about** - two delivery rows ("Browser", "Discord") and two category rows ("Human Queue", "New activity"), each showing both the preference and whether delivery can happen, with Discord's setup one button away.
 - **Automation: the spend offset** - "Spend offset" is the number the usage panel's handle moves, from −50 to 50 percentage points, read off the projects' schedulers and written through every project's offset hook [20]; a write that fails says why.
@@ -74,7 +74,7 @@ The "Appearance" section has two rows:
 - "Theme" ("Follow the system, or pin light or dark."): "System", "Light" or "Dark". With nothing stored the theme is "System": the dashboard follows the operating system's light or dark choice.
 - "Editor" ("Which editor “Open in editor” launches."): "Auto-detect" followed by one entry per editor found installed on the daemon's machine, read once from the daemon. When none is detected, for example on a daemon serving a host with no local checkout, the list holds "Auto-detect" alone and the row stays usable. Choosing "Auto-detect" clears the stored editor, so the daemon picks the editor itself.
 
-### Agent: which coding agent, which model
+### Agent: which coding agent, which model, and post-merge cleanup
 
 #### Context
 
@@ -82,10 +82,11 @@ The "Appearance" section has two rows:
 
 #### Business logic
 
-The "Agent" section has two rows:
+The "Agent" section has three rows:
 
 - "Agent" ("Which coding agent runs the work."): "Claude Code" or "Codex". With nothing stored the row shows "Claude Code", and a start sends no coding agent at all, so the project's start hook [8] applies its own default.
 - "Model" ("Passed through to the agent. Empty uses the agent's own default."): free text, with the placeholder "the agent's default". The value is handed to the start hook as the model to run on; left empty, nothing is handed over and the coding agent uses its own default.
+- "Post-merge cleanup" ("The launcher's box, ticked by default: once a run ends with a pull request, a fresh agent runs /post-merge-cleanup on its branch before it merges. In projects with that command."): a switch, off when nothing is stored. It is the same preference the launcher's "Post-merge cleanup" box shows and writes (`StartAgentForm.tsx`): flipping either changes the other. It changes a start only from the launcher, in a project that has the `post-merge-cleanup` command, with no device picked in "Run on".
 
 Where an agent runs is not a setting: it is picked per start in the launcher's "Run on" (`RunOnMenu.tsx`).
 

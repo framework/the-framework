@@ -10,7 +10,8 @@ vi.mock('../rpc/projects.js', () => ({ onCommands, onStartCheck, onProjects }))
 
 // Mutable so a test can pick the coding agent and the model; reset after each.
 const prefs = vi.hoisted(() => ({ current: {} as Record<string, unknown> }))
-vi.mock('../lib/preferences.js', () => ({ usePreferences: () => prefs.current }))
+const updatePreferences = vi.hoisted(() => vi.fn())
+vi.mock('../lib/preferences.js', () => ({ usePreferences: () => prefs.current, updatePreferences }))
 const device = vi.hoisted(() => ({ current: null as null | { id: string; url: string; token: string; label: string } }))
 vi.mock('../lib/profiles.js', () => ({ useConnectionProfiles: () => (device.current ? [device.current] : []) }))
 vi.mock('../lib/remote-target.js', () => ({ useSelectedRemoteDeviceId: () => device.current?.id ?? null }))
@@ -21,8 +22,8 @@ vi.mock('../lib/use-start-agent.js', async () => ({
   useStartAgent: () => ({ busy: false, error: null, reset: vi.fn(), start }),
 }))
 
-// The Composer is exercised by its own tests; here it hands back a typed submit and shows
-// whether the form lets it submit at all.
+// The Composer is exercised by its own tests; here it hands back a typed submit, shows whether
+// the form lets it submit at all, and renders the launcher's controls.
 vi.mock('./Composer.js', async () => {
   const { forwardRef, useImperativeHandle } = await import('react')
   const Composer = forwardRef((props: any, ref: any) => {
@@ -31,9 +32,12 @@ vi.mock('./Composer.js', async () => {
       focus: () => {},
     }))
     return (
-      <button type="button" disabled={!props.canSubmit} onClick={() => props.onSubmit('do the thing')}>
-        submit-typed
-      </button>
+      <>
+        {props.launcherControls}
+        <button type="button" disabled={!props.canSubmit} onClick={() => props.onSubmit('do the thing')}>
+          submit-typed
+        </button>
+      </>
     )
   })
   return { Composer }
@@ -51,6 +55,7 @@ afterEach(() => {
   start.mockReset()
   onCommands.mockReset()
   onStartCheck.mockReset()
+  updatePreferences.mockReset()
   prefs.current = {}
   device.current = null
 })
@@ -77,6 +82,42 @@ describe('StartAgentForm (#1774)', () => {
     fireEvent.click(screen.getByText('submit-typed'))
     await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith('do the thing', 'r1', undefined))
     expect(start).toHaveBeenCalledWith('p1', 'do the thing', { driver: 'codex', model: 'gpt-5' })
+  })
+
+  test('a project with the post-merge-cleanup command shows the box; ticked, the start carries the command as the follow-up', async () => {
+    onCommands.mockResolvedValue({ commands: [...COMMANDS, { name: 'post-merge-cleanup' }], startHook: true })
+    prefs.current = { postMergeCleanup: true }
+    start.mockResolvedValue({ agentId: 'r1' })
+    render(<StartAgentForm {...props} />)
+    const box = await screen.findByRole('checkbox', { name: 'Post-merge cleanup' })
+    expect(box.getAttribute('aria-checked')).toBe('true')
+    fireEvent.click(screen.getByText('submit-typed'))
+    await waitFor(() => expect(start).toHaveBeenCalledWith('p1', 'do the thing', { then: '/post-merge-cleanup' }))
+
+    // The box writes the saved setting, the one Settings shows: every next run's default.
+    fireEvent.click(box)
+    expect(updatePreferences).toHaveBeenCalledWith({ postMergeCleanup: false })
+  })
+
+  test('without the command there is no box, and a saved setting sends nothing; unticked, nothing either', async () => {
+    onCommands.mockResolvedValue({ commands: COMMANDS, startHook: true })
+    prefs.current = { postMergeCleanup: true }
+    start.mockResolvedValue({ agentId: 'r1' })
+    render(<StartAgentForm {...props} />)
+    await waitFor(() => expect(onCommands).toHaveBeenCalled())
+    expect(screen.queryByRole('checkbox', { name: 'Post-merge cleanup' })).toBeNull()
+    fireEvent.click(screen.getByText('submit-typed'))
+    await waitFor(() => expect(start).toHaveBeenCalledWith('p1', 'do the thing', {}))
+    cleanup()
+
+    start.mockClear()
+    onCommands.mockResolvedValue({ commands: [{ name: 'post-merge-cleanup' }], startHook: true })
+    prefs.current = {}
+    render(<StartAgentForm {...props} />)
+    const box = await screen.findByRole('checkbox', { name: 'Post-merge cleanup' })
+    expect(box.getAttribute('aria-checked')).toBe('false')
+    fireEvent.click(screen.getByText('submit-typed'))
+    await waitFor(() => expect(start).toHaveBeenCalledWith('p1', 'do the thing', {}))
   })
 
   test('no pick made: neither is sent, so the hook decides', async () => {

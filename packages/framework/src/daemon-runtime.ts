@@ -106,6 +106,7 @@ export function createProjectRuntime({ cwd, env }: ProjectRuntimeOptions): Proje
       prompt,
       ...(options.driver !== undefined ? { driver: options.driver } : {}),
       ...(options.model !== undefined ? { model: options.model } : {}),
+      ...(options.then !== undefined ? { then: options.then } : {}),
     })
     return started.ok ? { ok: true, agentId: started.id } : { ok: false, error: started.error }
   }

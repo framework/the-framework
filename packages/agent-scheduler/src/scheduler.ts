@@ -89,12 +89,24 @@ export async function readyToRun(driver: DriverName, deps: { probe?: CliProbe; i
   return ready
 }
 
-/** The command line of a spawned run: the model and the coding agent named only when the run has them, so the run's own defaults apply otherwise. */
-export function runArgs(run: { id: string; command: string; prompt: string; model?: string; driver?: DriverName }): string[] {
+/** The command line of a spawned run: the model, the coding agent and the follow-up named only when the run has them, so the run's own defaults apply otherwise. */
+export function runArgs(run: SpawnedRun): string[] {
   const args = ['run', run.prompt, '--id', run.id, '--command', run.command]
   if (run.model !== undefined) args.push('--model', run.model)
   if (run.driver !== undefined) args.push('--driver', run.driver)
+  if (run.then !== undefined) args.push('--then', run.then)
   return args
+}
+
+/** A run the tick or a detached start spawns in its own process. */
+export interface SpawnedRun {
+  id: string
+  command: string
+  prompt: string
+  model?: string
+  driver?: DriverName
+  /** The follow-up's prompt (`run --then`); a person's start only. */
+  then?: string
 }
 
 /** The command line of a spawned resume: the text as the argument, or the answer. */
@@ -111,7 +123,7 @@ export function resumeArgs(run: { id: string; text?: string; answer?: string; mo
  * its stderr kept. The run's lock is taken here before the process exists and handed to it once it
  * does, so the sweep never finds the run with neither a lock nor a checkout while it boots.
  */
-export async function spawnRun(repo: string, run: { id: string; command: string; prompt: string; model?: string; driver?: DriverName }): Promise<void> {
+export async function spawnRun(repo: string, run: SpawnedRun): Promise<void> {
   await acquireRunLock(repo, run.id, { pid: process.pid, isAlive: isPidAlive })
   try {
     const child = await spawnDetached(repo, run.id, runArgs(run))
@@ -155,7 +167,7 @@ async function spawnDetached(repo: string, id: string, args: string[]): Promise<
  */
 export async function detachRun(
   repo: string,
-  opts: { prompt: string; model?: string; driver?: DriverName; now?: () => Date; log?: (line: string) => void },
+  opts: { prompt: string; model?: string; driver?: DriverName; then?: string; now?: () => Date; log?: (line: string) => void },
   deps: { spawn?: typeof spawnRun; host?: string } = {},
 ): Promise<{ id: string; command: string; driver: DriverName; model?: string }> {
   const now = opts.now ?? (() => new Date())
@@ -167,9 +179,10 @@ export async function detachRun(
   // the run's process has its checkout sees the run held, not gone.
   await acquireRunLock(repo, id, { pid: process.pid, isAlive: isPidAlive })
   try {
-    const marked = await writeMarker(repo, markerCard({ id, startedAt: now().toISOString(), prompt: opts.prompt, driver, ...(model !== undefined ? { model } : {}), mark: { command, host: deps.host ?? hostname() } }))
+    const then = opts.then !== undefined ? { then: opts.then } : {}
+    const marked = await writeMarker(repo, markerCard({ id, startedAt: now().toISOString(), prompt: opts.prompt, driver, ...(model !== undefined ? { model } : {}), mark: { command, host: deps.host ?? hostname(), ...then } }))
     if (!marked.ok && !marked.committed) opts.log?.(`[agent-scheduler] the run's record could not be written: ${marked.error}`)
-    await (deps.spawn ?? spawnRun)(repo, { id, command, prompt: opts.prompt, driver, ...(model !== undefined ? { model } : {}) })
+    await (deps.spawn ?? spawnRun)(repo, { id, command, prompt: opts.prompt, driver, ...(model !== undefined ? { model } : {}), ...then })
   } catch (err) {
     await releaseRunLock(repo, id, process.pid)
     throw err
@@ -195,9 +208,9 @@ export async function detachResume(
 /**
  * A run of the real project, in this process, on the coding agent named (Claude Code when none is). The
  * tick's run comes with its id and its marker already on the branch; a person's run mints its
- * id here and marks itself.
+ * id here and marks itself. A follow-up it names runs on the same coding agent.
  */
-export async function runProject(repo: string, opts: { prompt: string; id?: string; command?: string; model?: string; driver?: DriverName; log?: (line: string) => void }): Promise<RunOutcome> {
+export async function runProject(repo: string, opts: { prompt: string; id?: string; command?: string; model?: string; driver?: DriverName; then?: string; log?: (line: string) => void }): Promise<RunOutcome> {
   const id = opts.id ?? runIdFrom(new Date().toISOString())
   const driver = opts.driver ?? 'claude-code'
   const model = await modelFor(repo, driver, opts.model)
@@ -208,6 +221,7 @@ export async function runProject(repo: string, opts: { prompt: string; id?: stri
     ...(opts.command !== undefined ? { command: opts.command } : {}),
     ...(model !== undefined ? { model } : {}),
     driver: driverFor(driver, id),
+    ...(opts.then !== undefined ? { then: opts.then, nextDriver: (next: string) => driverFor(driver, next) } : {}),
     ...(opts.log ? { log: opts.log } : {}),
   })
 }
@@ -231,6 +245,7 @@ export async function resumeProject(
     ...(opts.answer !== undefined ? { answer: opts.answer } : {}),
     ...(opts.model !== undefined ? { model: opts.model } : {}),
     driver: (deps.driverFor ?? driverFor)(recorded, opts.id),
+    nextDriver: next => (deps.driverFor ?? driverFor)(recorded, next),
     ...(deps.gh ? { gh: deps.gh } : {}),
     ...(opts.log ? { log: opts.log } : {}),
   })

@@ -134,11 +134,13 @@ export async function runProjectHooks(cwd: string, kind: HookKind, opts: RunHook
   }
 }
 
-/** What a `start` line is given: the prompt, and the coding agent and model when the person picked them. */
+/** What a `start` line is given: the prompt, the coding agent and model when the person picked them, and the follow-up when there is one. */
 export interface StartHookInput {
   prompt: string
   driver?: string
   model?: string
+  /** A fresh agent's prompt once the run ends done with a pull request; the merge waits for it. */
+  then?: string
 }
 
 /** What a `resume` line is given: the run, and the person's text or their answer to the question it ended on. */
@@ -148,13 +150,15 @@ export type RunHookResult = { ok: true; id: string } | { ok: false; error: strin
 
 /**
  * Run the project's `start` line: the prompt in `PROMPT`, the picks in `DRIVER` and `MODEL` when
- * made. The line answers one JSON document on stdout whose `id` names the run it started.
+ * made, the follow-up in `THEN` when there is one. The line answers one JSON document on stdout
+ * whose `id` names the run it started.
  */
 export function runStartHook(cwd: string, input: StartHookInput, opts: Omit<RunHooksOptions, 'log'> = {}): Promise<RunHookResult> {
   return runRunHook(cwd, 'start', {
     PROMPT: input.prompt,
     ...(input.driver !== undefined ? { DRIVER: input.driver } : {}),
     ...(input.model !== undefined ? { MODEL: input.model } : {}),
+    ...(input.then !== undefined ? { THEN: input.then } : {}),
   }, opts)
 }
 

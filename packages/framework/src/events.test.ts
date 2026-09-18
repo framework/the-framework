@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { pickedIds } from './events.js'
+import { pickedIds, type OnBeforeMergeableSkip } from './events.js'
 import { formatFrameworkEvent } from './terminal.js'
 
 test('pickedIds normalizes a single id or a subset to a list (#332)', () => {
@@ -24,6 +24,29 @@ test('formatFrameworkEvent renders a multi-select choice as a checklist (#332)',
   assert.equal(line, '? Pick problems to deep-dive\n    [x] auth flow\n    [ ] routing')
 })
 
+test('formatFrameworkEvent says the armed line as what will happen, merge included (#1382)', () => {
+  // A merge-armed agent opens a ready PR and lands it by itself — the line must own that, not say
+  // "draft PR" about an agent that is configured to merge to main unattended.
+  assert.equal(
+    formatFrameworkEvent({ kind: 'handoff-armed', push: true, pr: true, merge: true }),
+    '  when this ends: push the branch, open a PR, and merge it',
+  )
+  assert.equal(
+    formatFrameworkEvent({ kind: 'handoff-armed', push: true, pr: true, merge: false }),
+    '  when this ends: push the branch and open a draft PR',
+  )
+  // A pre-#1382 event has no merge field and must keep its old line.
+  assert.equal(
+    formatFrameworkEvent({ kind: 'handoff-armed', push: true, pr: true }),
+    '  when this ends: push the branch and open a draft PR',
+  )
+  // Merge without a PR cannot happen at fire time; the line never promises it.
+  assert.equal(
+    formatFrameworkEvent({ kind: 'handoff-armed', push: true, pr: false, merge: true }),
+    '  when this ends: push the branch',
+  )
+})
+
 test('formatFrameworkEvent renders a single-select choice with the recommended mark (#304)', () => {
   const line = formatFrameworkEvent({
     kind: 'choice',
@@ -38,12 +61,31 @@ test('formatFrameworkEvent renders a single-select choice with the recommended m
   assert.equal(line, '? Approve this plan?\n    ● Proceed: Vike\n    ○ Use Next.js instead')
 })
 
+test('formatFrameworkEvent renders a resolved subset, and (none) when empty (#332)', () => {
+  assert.equal(
+    formatFrameworkEvent({ kind: 'choice-resolved', id: 'ms', picked: ['p0', 'p2'], by: 'user' }),
+    '  ✓ chose p0, p2 (user)',
+  )
+  assert.equal(
+    formatFrameworkEvent({ kind: 'choice-resolved', id: 'ms', picked: [], by: 'auto' }),
+    '  ✓ chose (none) (auto)',
+  )
+  assert.equal(
+    formatFrameworkEvent({ kind: 'choice-resolved', id: 'plan', picked: 'proceed', by: 'user' }),
+    '  ✓ chose proceed (user)',
+  )
+})
+
 test('formatFrameworkEvent renders a session-update line', () => {
   assert.equal(formatFrameworkEvent({ kind: 'session-update', sessionId: 'abc123' }), '  session abc123')
   assert.equal(
     formatFrameworkEvent({ kind: 'session-update', sessionId: 'abc123', sessionLink: 'https://x.dev/s/abc123' }),
     '  session abc123 — https://x.dev/s/abc123',
   )
+})
+
+test('formatFrameworkEvent renders a system-prompt line by length (#343)', () => {
+  assert.equal(formatFrameworkEvent({ kind: 'system-prompt', text: 'abcde' }), '  system prompt sent (5 chars)')
 })
 
 test('formatFrameworkEvent shows a preview of the driver prompt, not just "prompt sent" (#476)', () => {
@@ -95,3 +137,43 @@ test('formats the rate-limit line by how much the quota actually matters (#517)'
   assert.ok(line('allowed').includes(new Date(at).toISOString()))
 })
 
+test('formatFrameworkEvent renders every post-merge cleanup outcome, naming the skip reason (#835)', () => {
+  assert.match(formatFrameworkEvent({ kind: 'on-before-mergeable', outcome: 'queued' })!, /^✓ post-merge cleanup: quality follow-ups queued$/)
+  assert.match(formatFrameworkEvent({ kind: 'on-before-mergeable', outcome: 'incomplete' })!, /! post-merge cleanup: queueing did not complete cleanly/)
+  const skipped = (reason: OnBeforeMergeableSkip) =>
+    formatFrameworkEvent({ kind: 'on-before-mergeable', outcome: 'skipped', reason })!
+  assert.match(skipped('not-ready-for-merge'), /skipped: the session never signalled ready-for-merge/)
+  assert.match(skipped('run-stopped'), /skipped: the run was stopped/)
+  assert.match(skipped('fake-run'), /skipped: this was a fake run/)
+  assert.match(skipped('no-session-name'), /skipped: the session was never named/)
+  assert.match(skipped('no-bin-path'), /skipped: the framework binary path is unknown/)
+})
+
+test('formatFrameworkEvent gives the merge half of a handoff its own line, withheld included (#1363)', () => {
+  // After "auto-merge was on", silence about the merge reads as "it merged" — every outcome is said.
+  assert.equal(
+    formatFrameworkEvent({ kind: 'handoff', outcome: 'done', pushed: true, url: 'https://x/pr/1', merge: { outcome: 'merged' } }),
+    '✓ opened https://x/pr/1\n✓ merged the PR',
+  )
+  assert.match(
+    formatFrameworkEvent({ kind: 'handoff', outcome: 'done', pushed: true, merge: { outcome: 'auto-armed' } })!,
+    /auto-merge armed: the PR lands when its checks pass/,
+  )
+  assert.match(
+    formatFrameworkEvent({ kind: 'handoff', outcome: 'done', pushed: true, merge: { outcome: 'failed', error: 'checks red' } })!,
+    /! could not merge the PR: checks red/,
+  )
+  // The gate (#1363): armed but not authorized. The reason travels in the reader's terms.
+  assert.match(
+    formatFrameworkEvent({ kind: 'handoff', outcome: 'done', pushed: true, merge: { outcome: 'withheld', reason: 'not-ready-for-merge' } })!,
+    /~ merge withheld: the session never signalled ready-for-merge/,
+  )
+  // No merge half: the line stays exactly what it was.
+  assert.equal(formatFrameworkEvent({ kind: 'handoff', outcome: 'done', pushed: true }), '✓ branch pushed')
+  // A landed PR is not "the branch already has a pull request" (#1512): the reader was told their
+  // work was blocked when it had in fact arrived.
+  assert.match(
+    formatFrameworkEvent({ kind: 'handoff', outcome: 'skipped', reason: 'already-landed' })!,
+    /handoff skipped: the branch's pull request already landed everything the session did/,
+  )
+})

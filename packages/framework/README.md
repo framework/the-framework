@@ -43,12 +43,19 @@ project's own `.the-framework/hooks.yml`:
 ```yaml
 start: npx agent-scheduler run --detach "$PROMPT" ${DRIVER:+--driver "$DRIVER"}
 resume: npx agent-scheduler run --detach --resume "$RUN_ID" ${TEXT:+"$TEXT"} ${ANSWER:+--answer "$ANSWER"}
+offset: npx agent-scheduler offset -- "$POINTS"
 ```
 
 The line is given the prompt and the user's picks in its environment, and answers one JSON
 document whose `id` names the agent it began. From there the agent belongs to whatever that
 line started. A project with no `start` line cannot start an agent from the dashboard, and the
 dashboard says so.
+
+The `offset` line is how the usage panel's slider (and Settings → Automation → Spend offset)
+reaches the scheduler: it runs in every project that has it, with the percentage points in
+`POINTS` — how far past the quota boundary the project's scheduler may start unattended work.
+The panel reads the value back from the schedulers' own state. The `--` keeps a negative value
+from being read as an option.
 
 The dashboard is a **projection of the agent's own files**. The agent's tool keeps the
 agent's card (`<id>.json`) and diary (`<id>.jsonl`) under `.the-framework/` in the agent's

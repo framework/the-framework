@@ -4,3 +4,4 @@ Covered:
 - A question stays open, whole, through the end of an agent that ended waiting on it, whatever cost line sits between.
 - A question closes when the agent goes on after it, and a later question opens again.
 - An agent that ends for good (stopped, or done) takes its question with it.
+- A recorded resolution closes the question it names, and no other.

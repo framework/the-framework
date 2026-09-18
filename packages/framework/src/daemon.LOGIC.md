@@ -21,7 +21,8 @@ Runs The Framework's one daemon per machine, in the foreground: it binds the das
 [11] pick: the answer to a question: the option or options the user chose.
 [15] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 [17] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
-[18] hooks: the shell lines a project's own `.the-framework/hooks.yml` names: the `open` and `close` lists, run in the project by the daemon when the dashboard opens and closes, and the `start` and `resume` lines, run when the user starts an agent or continues an ended one; per user, since the file is ignored by git.
+[18] hooks: the shell lines a project's own `.the-framework/hooks.yml` names: the `open` and `close` lists, run in the project by the daemon when the dashboard opens and closes, and the `start`, `resume` and `offset` lines, run when the user starts an agent, continues an ended one, or sets the spend offset [19]; per user, since the file is ignored by git.
+[19] spend offset: the user's adjustment of the quota boundary, in percentage points of the week: how far past it unattended work (an agent the scheduler started rather than a person) may start. Each project's scheduler holds its own, as `spendOffset` in its state file `.agent-scheduler/state.json`.
 
 ## Business logic — TL;DR
 
@@ -77,7 +78,7 @@ The daemon starts no agent at boot, and repairs none: it reads an agent's card [
 
 #### Business logic
 
-The hooks [18] are the project's own: the rules for the file and for running a line are in `project-hooks.ts`. Once the dashboard listens and its URL is reported, the daemon runs the open hooks of every registered project, one project after another, each in that project's root, so a slow line delays the background sweeps [2] at most, never the URL. A project added from the dashboard while the daemon runs gets its open hooks run at that moment (the rule is in `daemon-runtime.ts`), since the boot never saw it. At shutdown, once the sweeps are quiesced, the close hooks of every registered project run the same way. The `start` and `resume` lines are not run here: they run on the user's click (`daemon-runtime.ts`, `dashboard/run-inbox.ts`). Every line's outcome is logged as "[framework] open hook (<project>): <line>: exit <code>" (or "timed out after 60s", or "could not start: <why>"), and what the line said on stderr is logged under it. A project without the file has no hooks and nothing is logged for it.
+The hooks [18] are the project's own: the rules for the file and for running a line are in `project-hooks.ts`. Once the dashboard listens and its URL is reported, the daemon runs the open hooks of every registered project, one project after another, each in that project's root, so a slow line delays the background sweeps [2] at most, never the URL. A project added from the dashboard while the daemon runs gets its open hooks run at that moment (the rule is in `daemon-runtime.ts`), since the boot never saw it. At shutdown, once the sweeps are quiesced, the close hooks of every registered project run the same way. The `start`, `resume` and `offset` lines are not run here: they run on the user's click (`daemon-runtime.ts`, `dashboard/run-inbox.ts`, `dashboard-rpc/quota.ts`). Every line's outcome is logged as "[framework] open hook (<project>): <line>: exit <code>" (or "timed out after 60s", or "could not start: <why>"), and what the line said on stderr is logged under it. A project without the file has no hooks and nothing is logged for it.
 
 ### What the dashboard is wired to
 
@@ -90,7 +91,7 @@ The hooks [18] are the project's own: the rules for the file and for running a l
 The daemon hands the HTTP server:
 
 - The runtime's actions (`daemon-runtime.ts`): starting an agent [1] through the project's start hook [18], adding a project, the events of an agent this daemon is relaying, the reads and steering of an agent running on a device [9], and the relay [8] endpoints through which another machine's daemon runs, reads and steers an agent here.
-- One quota [7] source: a single reader that polls for the whole life of the daemon, behind the dashboard's usage panel. The daemon stops that reader itself at shutdown, because a broken install serves errors without ever taking ownership of it.
+- One quota [7] source: a single reader that polls for the whole life of the daemon, behind the dashboard's usage panel. The line it draws unattended work stopping at uses the spend offset [19] of the registered projects' schedulers, read off their state files on every read, the loosest one any of them holds (`dashboard/scheduler-state.ts`); with none, the default in `dashboard/quota.ts`. The daemon stops that reader itself at shutdown, because a broken install serves errors without ever taking ownership of it.
 - The per-project error state that the sweeps write and the dashboard lists.
 - The Discord credential store: a credential saved from the dashboard is written to the registry, and this daemon's own Discord watchers are then rebuilt against it, so the bot connects without a restart.
 - The preferences store, with a listener on what each write switches: a write that switches the bridge browser [3] on launches it, and one that switches it off closes it.

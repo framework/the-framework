@@ -1,10 +1,10 @@
-The Settings page: every preference [1] the user can set, on one page, each change applied the moment it is made and saved to the daemon in the background, with the Onboarding checklist kept at the top. Everything written here goes to the user's own preferences, so a value on this page always means "my default, everywhere".
+The Settings page: every preference [1] the user can set, on one page, each change applied the moment it is made and saved to the daemon in the background, with the Onboarding checklist kept at the top, plus the spend offset [19], which is not a preference. Everything else written here goes to the user's own preferences, so a value on this page always means "my default, everywhere"; the spend offset goes to every project's scheduler, the one place it is kept.
 
 ## Context
 
 **User story**: the user opens Settings (the address `/settings`) to look up or change a setting without hunting through the header's menus, and follows the Overview's [2] hint that the onboarding can be resumed on the settings page. The heading is "Settings" and the line under it reads "Your defaults, everywhere."
 
-**Business logic story**: the same preferences feed the launcher on a project home [3], the notifications bell and the daemon's sweeps [4]. This page is the one surface that lists all of them, so what it shows must match what those surfaces act on.
+**Business logic story**: the same preferences feed the launcher on a project home [3], the notifications bell and the daemon's sweeps [4]. This page is the one surface that lists all of them, so what it shows must match what those surfaces act on. The spend offset [19] is the usage panel's handle as a number, read and written exactly as the handle does.
 
 ## Glossary
 
@@ -21,15 +21,18 @@ The Settings page: every preference [1] the user can set, on one page, each chan
 [16] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds. The other is activity: an agent started or finished.
 [17] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
 [18] the Claude web bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge token is the secret the extension presents; the bridge browser is the Chrome for Testing the daemon runs for it.
+[19] spend offset: the user's adjustment of the quota boundary, in percentage points of the week: how far past it unattended work (an agent the scheduler started rather than a person) may start. Each project's scheduler holds its own, as `spendOffset` in its state file; the quota boundary is the share of the quota week that may be spent by now, rising with the clock.
+[20] offset hook: the one shell line under `offset` in a project's `.the-framework/hooks.yml`, given the spend offset in `POINTS`; for example `npx agent-scheduler offset -- "$POINTS"`.
 
 ## Business logic — TL;DR
 
-- **One page, one destination** - every control reads and writes the user's own preferences, applied at once and saved in the background.
+- **One page, one destination** - every control but the spend offset reads and writes the user's own preferences, applied at once and saved in the background.
 - **The Onboarding checklist stays on this page** - it sits above every section, cannot be dismissed here, and its two navigating steps lead to an agent's page or a project's launcher.
 - **Appearance: theme and editor** - "Theme" follows the system by default; "Editor" offers "Auto-detect" plus the editors found on the daemon's machine.
 - **Agent: which coding agent, which model** - "Agent" (Claude Code by default) and "Model" (empty means the coding agent's own default); both are handed to a project's start hook [8] with every start.
 - **Devices, after "Agent"** - the saved devices follow directly, because a device is the other place an agent can run.
 - **Notifications: how they reach you, and what about** - two delivery rows ("Browser", "Discord") and two category rows ("Human Queue", "New activity"), each showing both the preference and whether delivery can happen, with Discord's setup one button away.
+- **Automation: the spend offset** - "Spend offset" is the number the usage panel's handle moves, from −50 to 50 percentage points, read off the projects' schedulers and written through every project's offset hook [20]; a write that fails says why.
 - **Claude web: the bridge, and which browser does its work** - "Browser bridge" is off by default; while on, one exclusive choice decides whether the daemon runs the bridge browser or the user's own Chrome does the work, each option carrying its own setup.
 - **A list with nothing to pick is not shown** - a drop-down row with no choices is left out rather than rendered empty.
 
@@ -43,7 +46,7 @@ The Settings page: every preference [1] the user can set, on one page, each chan
 
 #### Business logic
 
-Every control on the page reads and writes the user's own preferences [1], which the daemon keeps in the registry file `~/.the-framework.json`. The page belongs to no project. A change takes effect on the page the instant it is made and is saved to the daemon in the background; a failed save is not reported, and a value another tab changed is adopted when the daemon answers (the write rules are in `lib/preferences.ts`).
+Every control on the page but one reads and writes the user's own preferences [1], which the daemon keeps in the registry file `~/.the-framework.json`. The exception is the spend offset [19], which is kept by each project's scheduler and nowhere else (see "Automation: the spend offset"). The page belongs to no project. A change takes effect on the page the instant it is made and is saved to the daemon in the background; a failed save is not reported, and a value another tab changed is adopted when the daemon answers (the write rules are in `lib/preferences.ts`).
 
 ### The Onboarding checklist stays on this page
 
@@ -109,6 +112,16 @@ The "Notifications" section has four rows. Two say how a notification reaches th
 - "Discord": off when nothing is stored. Its description depends on whether the daemon has a Discord webhook: "Deliver to Discord, so notifications reach you with no dashboard open." when it has one, "Not configured — no webhook is set on the daemon" when it has none. Until the daemon has answered which channels it can deliver on, the row reads as configured rather than lighting up "not configured" on a page still loading. The checkbox can be ticked either way: the webhook is where to post, the toggle is whether to. A button beside the checkbox opens the Discord webhook dialog (`DiscordDialogs.tsx`); it is labeled "Webhook" when a webhook is already set and "Set up" otherwise. Saving in that dialog re-reads the daemon's channels for every reader at once, so this row, the Onboarding checklist above it and the bell agree immediately.
 - "Human Queue" ("An agent awaiting your answer, or a PR ready to review."): the intervention [16] category; on when nothing is stored.
 - "New activity" ("Also ping when an agent starts or finishes."): the activity category; off when nothing is stored.
+
+### Automation: the spend offset
+
+#### Context
+
+**User story**: the user wants unattended work to spend exactly so far ahead of the week's pace, and types the number rather than dragging the usage panel's handle to it.
+
+#### Business logic
+
+The "Automation" section, right after "Notifications", has one row, "Spend offset" ("How far each project's scheduler may start work past the quota boundary, in percentage points (max 50). Negative holds it back; positive lets it borrow from the days ahead. Set through each project's offset hook."): a number box bounded to −50 and 50. It shows the spend offset [19] the usage panel's reading carries (the loosest one any project's scheduler holds, or the half-day default of about 7.1 when none names one), rounded to one decimal; before the first reading it shows the default. A typed value is rounded to whole points and clamped to −50..50, the same bound as the handle; an empty or non-numeric entry counts as 0. The value is kept on the page until the reading catches up with it, and written once it has rested for half a second, through the same daemon call the handle uses, which runs every registered project's offset hook [20]. A write that fails shows, under the row, as an alert: "The offset was not saved: <why>" (for example "no project has an offset hook in .the-framework/hooks.yml"), and the box goes back to the value the schedulers held. The rules for reading, holding and writing the value are the usage panel's own (`Quota.tsx`).
 
 ### Claude web: the bridge, and which browser does its work
 

@@ -7,8 +7,8 @@ import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 
 /**
  * A project's hooks (#1774): the shell lines a project's own `.the-framework/hooks.yml` names to
- * run when the dashboard opens and when it closes, and the two lines that start a run and
- * continue one. The daemon names no tool: it runs whatever the file says, in the project. Per
+ * run when the dashboard opens and when it closes, the two lines that start a run and continue
+ * one, and the line that sets how far past the quota boundary unattended work may go. The daemon names no tool: it runs whatever the file says, in the project. Per
  * user, since `.the-framework/` is ignored: a hook is this machine's, and a teammate's pull
  * changes nothing.
  *
@@ -27,20 +27,28 @@ export const HOOK_TIMEOUT_MS = 60_000
 export type HookKind = 'open' | 'close'
 
 /**
- * The two lines a person's click runs: `start` begins a run from a prompt, `resume` continues an
- * ended one with a text or an answer. One line each, since each answers one document on stdout.
+ * The two lines a person's click runs to start or continue a run: `start` begins a run from a
+ * prompt, `resume` continues an ended one with a text or an answer. One line each, since each
+ * answers one document on stdout.
  */
 export type RunHookKind = 'start' | 'resume'
+
+/**
+ * The lines a person's click runs, one shell line each: the two run lines, and `offset`, which
+ * sets how far past the quota boundary the project's unattended work may go.
+ */
+type OneLineHookKind = RunHookKind | 'offset'
 
 export interface ProjectHooks {
   open: string[]
   close: string[]
   start?: string
   resume?: string
+  offset?: string
 }
 
 const HOOK_KINDS: readonly HookKind[] = ['open', 'close']
-const RUN_HOOK_KINDS: readonly RunHookKind[] = ['start', 'resume']
+const ONE_LINE_HOOK_KINDS: readonly OneLineHookKind[] = ['start', 'resume', 'offset']
 
 /**
  * Read a project's hooks. A missing file is no hooks. A file that cannot be parsed or has the
@@ -63,7 +71,7 @@ export async function readProjectHooks(cwd: string, onWarn?: (message: string) =
 
 /**
  * Parse the hooks file: a YAML map whose keys are `open` and `close`, each a list of shell lines,
- * and `start` and `resume`, each one shell line. An empty document is no hooks. Anything else throws, so the reader can warn: a wrong key is
+ * and `start`, `resume` and `offset`, each one shell line. An empty document is no hooks. Anything else throws, so the reader can warn: a wrong key is
  * refused rather than ignored, because a misspelled `open` would otherwise be a hook that
  * silently never runs.
  */
@@ -77,14 +85,14 @@ export function parseProjectHooks(raw: string, source = PROJECT_HOOKS_FILE): Pro
   }
   const hooks: ProjectHooks = { open: [], close: [] }
   if (data == null) return hooks
-  if (typeof data !== 'object' || Array.isArray(data)) throw new Error(`${source} must be a YAML map; the keys are open, close, start and resume`)
+  if (typeof data !== 'object' || Array.isArray(data)) throw new Error(`${source} must be a YAML map; the keys are open, close, start, resume and offset`)
   for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
-    const isRunHook = (RUN_HOOK_KINDS as readonly string[]).includes(key)
-    if (!isRunHook && !(HOOK_KINDS as readonly string[]).includes(key)) throw new Error(`${source}: unknown key "${key}"; the keys are open, close, start and resume`)
+    const isOneLine = (ONE_LINE_HOOK_KINDS as readonly string[]).includes(key)
+    if (!isOneLine && !(HOOK_KINDS as readonly string[]).includes(key)) throw new Error(`${source}: unknown key "${key}"; the keys are open, close, start, resume and offset`)
     if (value == null) continue
-    if (isRunHook) {
+    if (isOneLine) {
       if (typeof value !== 'string' || value.trim() === '') throw new Error(`${source}: "${key}" must be one shell line`)
-      hooks[key as RunHookKind] = value.trim()
+      hooks[key as OneLineHookKind] = value.trim()
       continue
     }
     if (!Array.isArray(value) || !value.every(line => typeof line === 'string' && line.trim() !== '')) {
@@ -171,6 +179,25 @@ async function runRunHook(cwd: string, kind: RunHookKind, vars: Record<string, s
   // The tool's one line for a person is its last on stderr; without one, how the line ended.
   const lastSaid = outcome.stderr.split('\n').map(s => s.trim()).filter(Boolean).at(-1)
   return { ok: false, error: `the ${kind} hook: ${lastSaid ?? (outcome.summary === 'exit 0' ? 'it answered no run id' : outcome.summary)}` }
+}
+
+/** How an `offset` line went; `noHook` when the project's file names no such line. */
+export type OffsetHookResult = { ok: true } | { ok: false; error: string; noHook?: true }
+
+/**
+ * Run the project's `offset` line: the percentage points in `POINTS`, how far past the quota
+ * boundary the project's unattended work may go. Exit 0 is done; the line answers nothing else.
+ */
+export async function runOffsetHook(cwd: string, points: number, opts: Omit<RunHooksOptions, 'log'> = {}): Promise<OffsetHookResult> {
+  let broken: string | undefined
+  const hooks = await readProjectHooks(cwd, message => {
+    broken = message
+  })
+  if (hooks.offset === undefined) return broken ? { ok: false, error: broken } : { ok: false, error: 'this project has no offset hook', noHook: true }
+  const outcome = await runLine(cwd, hooks.offset, opts.timeoutMs ?? HOOK_TIMEOUT_MS, { ...(opts.env ?? process.env), POINTS: String(points) })
+  if (outcome.summary === 'exit 0') return { ok: true }
+  const lastSaid = outcome.stderr.split('\n').map(s => s.trim()).filter(Boolean).at(-1)
+  return { ok: false, error: `the offset hook: ${lastSaid ?? outcome.summary}` }
 }
 
 /** One line through the shell: how it ended, in words, what it said on stderr, and its stdout when asked for. */

@@ -33,8 +33,8 @@ vi.mock('./AgentComposer.js', () => ({ AgentComposer: () => null }))
 
 const { AgentView } = await import('./AgentView.js')
 
-const LIVE_EVENTS = [{ kind: 'session-update', sessionId: 'the channel delivered this line' }] as FrameworkEvent[]
-const ARCHIVED = [{ kind: 'session-update', sessionId: 'the archive delivered this line' }] as FrameworkEvent[]
+const LIVE_EVENTS = [{ kind: 'log', message: 'the channel delivered this line' }] as FrameworkEvent[]
+const ARCHIVED = [{ kind: 'log', message: 'the archive delivered this line' }] as FrameworkEvent[]
 
 const view = (over: Partial<Parameters<typeof AgentView>[0]> = {}) => (
   <AgentView projectId="p1" agentId="run-1" events={LIVE_EVENTS} live={false} files={[]} {...over} />
@@ -82,37 +82,37 @@ describe('AgentView event source (#1026/#1383)', () => {
     const resumed = [
       ...ARCHIVED,
       { kind: 'session', driver: 'claude-code', workspace: '/w' },
-      { kind: 'session-update', sessionId: 'the resumed leg streamed this line' },
+      { kind: 'log', message: 'the resumed leg streamed this line' },
     ] as FrameworkEvent[]
     render(view({ events: resumed }))
     await waitFor(() => expect(screen.getByText(/the resumed leg streamed this line/)).toBeTruthy())
   })
 
   test("a foreign journal's events never beat this run's archive, however long (#1460)", async () => {
-    // A channel whose first line is not the archive's is some other run's diary. "The channel knows
-    // more" must not let that longer foreign feed replace the archive.
+    // The live channel is not guaranteed to be this agent's journal: an ended agent whose worktree is
+    // gone resolves to the project ROOT journal server-side, which holds whatever root run wrote
+    // it last. "The channel knows more" must not let that longer foreign feed replace the archive.
     onAgent.mockResolvedValue(ARCHIVED)
     const foreign = [
-      { kind: 'session-update', sessionId: 'a different run wrote this line' },
+      { kind: 'log', message: 'a different run wrote this line' },
       { kind: 'session', driver: 'claude-code', workspace: '/w' },
-      { kind: 'session-update', sessionId: 'and its newest segment never ended' },
+      { kind: 'log', message: 'and its newest segment never ended' },
     ] as FrameworkEvent[]
     render(view({ events: foreign }))
     await waitFor(() => expect(screen.getByText(/the archive delivered this line/)).toBeTruthy())
     expect(screen.queryByText(/a different run wrote this line/)).toBeNull()
   })
 
-  test('an archive that catches up takes back over, bringing the lines only it holds (#1460)', async () => {
-    // A line written after the checkout's diary went away only lands in the archive, so once the
-    // feed outgrows the copy on screen the archive is re-read, and the re-read is how that line
-    // reaches the screen without a manual refresh.
+  test('an archive that catches up takes back over, bringing the epilogue events with it (#1460)', async () => {
+    // A clean agent's `handoff` only ever lands in the archive — the worktree journal dies with the
+    // teardown — so once the feed outgrows the copy on screen the archive is re-read, and the
+    // re-read is how the PR line reaches the screen without a manual refresh.
     const ahead = [...ARCHIVED, { kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'end', ok: true }] as FrameworkEvent[]
-    const usage = { kind: 'usage', costUsd: 0.5, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, turns: 1 }
-    const full = [...ahead, usage] as FrameworkEvent[]
+    const full = [...ahead, { kind: 'handoff', outcome: 'done', pushed: true }] as FrameworkEvent[]
     onAgent.mockResolvedValueOnce(ARCHIVED).mockResolvedValue(full)
     render(view({ events: ahead }))
     await waitFor(() => expect(onAgent.mock.calls.length).toBeGreaterThanOrEqual(2))
-    await waitFor(() => expect(screen.getByText(/spend: \$0\.5000/)).toBeTruthy())
+    await waitFor(() => expect(screen.getByText(/branch pushed/)).toBeTruthy())
   })
 })
 

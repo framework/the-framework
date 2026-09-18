@@ -1,9 +1,19 @@
 /**
- * The quota boundary (#879): how much of the account's week may have been spent by now, if the
- * week is to be spent evenly — the pro-rated share of the week's allowance that has elapsed,
- * rising continuously with the clock rather than once a day (#960 Edit). There is nothing to
- * configure: the boundary is derived from the account's own week, which the agent reports. The
- * dashboard's usage bar draws it as the mark consumption is compared against.
+ * The quota boundary (#879): how much of the account's week The Framework may
+ * have spent by now.
+ *
+ * The whole policy is one line — the boundary is the pro-rated share of the week's allowance that
+ * has elapsed, rising continuously with the clock rather than once a day (#960 Edit) — and it
+ * replaces the configurable limits of #519. There is nothing to configure: the boundary is derived
+ * from the account's own week, which the agent reports.
+ *
+ * Two properties fall out of it, and they are the point:
+ * - Nothing is left on the floor. The boundary rises on its own and reaches the full allowance
+ *   exactly as the week resets, so a quiet week still gets spent rather than expiring.
+ * - Low-priority work cannot starve high-priority work. Work the user asks for
+ *   borrows against the days still to come; unattended work stands down once it
+ *   passes the boundary, by default a half-day cushion beyond it (#960 Edit) —
+ *   see {@link QuotaLimit}.
  */
 
 import type { DriverQuotaWindow } from 'agent-driver'
@@ -130,15 +140,93 @@ export function boundaryFromResetsAt(resetsAt: number, now: number): QuotaBounda
   return { startsAt, resetsAt, day, percent: (elapsedMs / QUOTA_WEEK_MS) * 100 }
 }
 
+/** One quota window measured against the boundary. */
+export interface BoundaryWindow {
+  /** The window's own label, as the agent phrased it. */
+  label: string
+  /** How much of it is gone, 0-100. */
+  percentUsed: number
+  /** Whether it has reached the limit in force. */
+  reached: boolean
+}
+
 /**
- * Where the boundary sits in the account's week (#879), read off the week's own window.
+ * The line unattended work actually stops at (#960).
  *
- * `undefined` when there is no week in the reading, or when its reset cannot be placed. That is
- * "we do not know where the week is", never a boundary of zero.
+ * The boundary is the policy; this is the policy plus whatever the user asked for with the
+ * slider. They are separate values because the panel draws both: moving your own limit should
+ * not silently redraw the boundary it is measured against.
  */
-export function weekBoundary(windows: DriverQuotaWindow[], now: number): QuotaBoundary | undefined {
-  const week = windows.find(w => w.kind === 'week')
+export interface QuotaLimit {
+  /** Where the limit sits, 0-100. */
+  percent: number
+  /** How far it is from the boundary, in percentage points. `0` is the default policy. */
+  offset: number
+}
+
+/** Where the account stands against its boundary. */
+export interface QuotaBoundaryStatus {
+  boundary: QuotaBoundary
+  /** The line in force, which is the boundary unless the user moved it (#960). */
+  limit: QuotaLimit
+  /** The windows in force: the account's week, plus the selected model's own week when we can tell which it is. */
+  windows: BoundaryWindow[]
+  /** The window that has reached the limit, or `null` while there is room. */
+  reached: BoundaryWindow | null
+}
+
+/** The model name a `week-model` window is about, e.g. `Current week (Fable)` -> `fable`. */
+function windowModel(label: string): string | undefined {
+  return /\(([^)]+)\)/.exec(label)?.[1]?.trim().toLowerCase()
+}
+
+/**
+ * Measure the account's windows against the boundary (#879).
+ *
+ * Both weekly windows bind at once — the account's week and, per Rom's edit, the
+ * selected model's own week — so each is measured against the same boundary and
+ * whichever reaches it first is the one that stops the work. The model's window
+ * is only included when we can tell which model it belongs to; an unrecognized
+ * one is left out rather than allowed to stop work for a model nobody selected.
+ *
+ * `undefined` when there is no reading, or when the week's reset cannot be
+ * placed. That is "we do not know", and each caller decides what to do with it:
+ * the per-agent guard carries on, unattended work stands down.
+ */
+export function quotaBoundaryStatus(input: {
+  windows: DriverQuotaWindow[]
+  now: number
+  /** The model the work will run on, e.g. `claude-fable-5`. Its own week joins the gate when given. */
+  model?: string
+  /**
+   * How far the automatic-consumption limit sits from the boundary, in percentage points (#960).
+   * Omitted or `0` is the spend-boundary policy (#879): the limit *is* the boundary.
+   */
+  limitOffset?: number
+}): QuotaBoundaryStatus | undefined {
+  const week = input.windows.find(w => w.kind === 'week')
   if (!week?.resetsAtText) return undefined
-  const resetsAt = parseResetsAt(week.resetsAtText, now)
-  return resetsAt === undefined ? undefined : boundaryFromResetsAt(resetsAt, now)
+  const resetsAt = parseResetsAt(week.resetsAtText, input.now)
+  if (resetsAt === undefined) return undefined
+  const boundary = boundaryFromResetsAt(resetsAt, input.now)
+
+  const model = input.model?.toLowerCase()
+  const inForce = input.windows.filter(w => {
+    if (w.kind === 'week') return true
+    if (w.kind !== 'week-model' || !model) return false
+    const name = windowModel(w.label)
+    return name !== undefined && model.includes(name)
+  })
+
+  // Clamped, so a limit dragged past either end of the week stops at the week rather than
+  // becoming unreachable (which would read as "never stop") or negative (as "always stopped").
+  const offset = input.limitOffset ?? 0
+  const limit: QuotaLimit = { percent: Math.min(Math.max(boundary.percent + offset, 0), 100), offset }
+
+  const windows = inForce.map(w => ({
+    label: w.label,
+    percentUsed: w.percentUsed,
+    reached: w.percentUsed >= limit.percent,
+  }))
+  return { boundary, limit, windows, reached: windows.find(w => w.reached) ?? null }
 }

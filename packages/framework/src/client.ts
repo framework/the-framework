@@ -7,7 +7,14 @@ export { formatFrameworkEvent } from './terminal.js'
 export { formatBytes } from './format-bytes.js'
 export { errorMessage } from './error-message.js'
 export { pickedIds } from './events.js'
-export { sessionInfo, type SessionInfo } from './agent-view.js'
+export {
+  sessionInfo,
+  agentProgress,
+  agentErrors,
+  type SessionInfo,
+  type AgentProgress,
+  type AgentError,
+} from './agent-view.js'
 // Which questions a run still waits on: one rule for the run page and the daemon's own reads.
 export { pendingChoices } from './open-choices.js'
 // The plan ask for one ticket (#685) — pure string work from an import-free module — shared with
@@ -22,7 +29,7 @@ export { interventionKey, activityKey } from './dashboard/keys.js'
 // GitHub reach take an empty backlog for a real one. Pure, and its only import is a type.
 export { SeenTracker } from './dashboard/keyed-watcher.js'
 export type { ProjectionRead } from './dashboard/projects.js'
-export { NOTIFICATION_DEFAULTS, notifies, notifyMethodEnabled, notifyCategoryEnabled, type NotifyMethod, type NotifyCategory } from './preference-defaults.js'
+export { NOTIFICATION_DEFAULTS, MAX_SPEND_OFFSET, DEFAULT_SPEND_OFFSET, notifies, notifyMethodEnabled, notifyCategoryEnabled, type NotifyMethod, type NotifyCategory } from './preference-defaults.js'
 // The Discord credential rules (#1095): the same precedence and validation the daemon enforces,
 // so the setup dialog rejects a malformed token before the round trip instead of guessing at it.
 export {

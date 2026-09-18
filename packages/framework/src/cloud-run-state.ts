@@ -19,14 +19,15 @@ export const CLOUD_SESSION_WINDOW_MS = 12 * 60 * 60 * 1000
  * What the cloud side of a web run is doing.
  *
  * - `waiting`: the browser bridge holds a question the session is parked on
+ * - `merged`: the session's work was adopted (#1601) and its pull request merged by the framework
  * - `in-cloud`: no pull request yet and the run is inside the session window, so it may still be working
  * - `done`: its pull request exists — the work landed, and the PR badge carries its live state — or the
  *   window passed with nothing adopted: the session finished or never pushed
  */
-export type CloudRunState = 'waiting' | 'in-cloud' | 'done'
+export type CloudRunState = 'waiting' | 'merged' | 'in-cloud' | 'done'
 
 /** The fields of a run's record the projection reads. */
-export type CloudRunFacts = Pick<AgentMeta, 'target' | 'status' | 'startedAt' | 'pr' | 'cloudWaiting'>
+export type CloudRunFacts = Pick<AgentMeta, 'target' | 'status' | 'startedAt' | 'pr' | 'mergeOutcome' | 'cloudWaiting'>
 
 /**
  * The cloud state of a web run whose local half is over, or undefined for any other run — a
@@ -35,6 +36,7 @@ export type CloudRunFacts = Pick<AgentMeta, 'target' | 'status' | 'startedAt' | 
 export function cloudRunState(meta: CloudRunFacts, now: number): CloudRunState | undefined {
   if (meta.target !== 'web' || meta.status !== 'done') return undefined
   if (meta.cloudWaiting) return 'waiting'
+  if (meta.mergeOutcome === 'merged') return 'merged'
   // A recorded pull request's state is not on the record — it is read live wherever the PR badge
   // shows — so the row says only that the run is over, exactly as a local run with a PR does.
   if (meta.pr) return 'done'

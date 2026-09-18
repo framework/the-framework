@@ -1,5 +1,7 @@
 import { useState, type ReactNode } from 'react'
-import { DRIVERS, DRIVER_LABELS } from '../../src/client.js'
+import { DRIVERS, DRIVER_LABELS, MAX_SPEND_OFFSET } from '../../src/client.js'
+import { useQuota } from '../lib/quota.js'
+import { useSpendOffset } from './Quota.js'
 import { useDetectedEditors } from '../lib/editors.js'
 import { usePreferences, updatePreferences, themePreference, type ThemePreference } from '../lib/preferences.js'
 import { useNotificationPermission } from '../lib/notification-permission.js'
@@ -145,6 +147,8 @@ export function SettingsPage({
             onChange={next => updatePreferences({ notifyNewActivity: next })}
           />
         </Section>
+
+        <SpendOffsetSection />
 
         <Section
           title="Claude web"
@@ -365,6 +369,69 @@ function TextRow({
           onChange={e => onChange(e.target.value)}
           aria-label={label}
           className="w-48 rounded-md border border-border bg-background px-2 py-1 text-sm"
+        />
+      }
+    />
+  )
+}
+
+/**
+ * The spend offset as a number (#960): the same value the usage panel's slider moves, read off the
+ * projects' schedulers and written through their `offset` hooks. Bounded to the same
+ * ±MAX_SPEND_OFFSET the slider uses; the value shown is the one in force, to one decimal.
+ */
+function SpendOffsetSection() {
+  const view = useQuota()
+  const [offset, setOffset, error] = useSpendOffset(view?.boundary?.limit.offset)
+  return (
+    <Section title="Automation">
+      <NumberRow
+        label="Spend offset"
+        description={`How far each project's scheduler may start work past the quota boundary, in percentage points (max ${MAX_SPEND_OFFSET}). Negative holds it back; positive lets it borrow from the days ahead. Set through each project's offset hook.`}
+        value={Math.round(offset * 10) / 10}
+        min={-MAX_SPEND_OFFSET}
+        max={MAX_SPEND_OFFSET}
+        onChange={setOffset}
+      />
+      {error && (
+        <p role="alert" className="text-xs text-danger">
+          The offset was not saved: {error}
+        </p>
+      )}
+    </Section>
+  )
+}
+
+function NumberRow({
+  label,
+  description,
+  value,
+  min,
+  max,
+  onChange,
+}: {
+  label: string
+  description: string
+  value: number
+  min: number
+  max: number
+  onChange: (next: number) => void
+}) {
+  return (
+    <Row
+      label={label}
+      description={description}
+      control={
+        <input
+          type="number"
+          value={value}
+          min={min}
+          max={max}
+          // Clamped here as well as on the input: `min`/`max` only constrain the spinner, so a typed
+          // value still has to be held to the slider's range (#960).
+          onChange={e => onChange(Math.min(Math.max(Math.round(Number(e.target.value) || 0), min), max))}
+          aria-label={label}
+          className="w-24 rounded-md border border-border bg-background px-2 py-1 text-sm"
         />
       }
     />

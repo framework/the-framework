@@ -100,11 +100,11 @@ describe('useLiveEvents stream loss (#948)', () => {
 // `session` hid the whole pre-resume transcript for as long as the agent was live. The project-root
 // fallback still slices: that subscription genuinely spans run boundaries.
 describe('useLiveEvents run scoping', () => {
-  const log = (message: string) => ({ kind: 'session-update', sessionId: message })
+  const log = (message: string) => ({ kind: 'log', message })
 
   function FeedProbe({ projectId, agentId: agentId }: { projectId: string | null; agentId?: string | null }) {
     const { events } = useLiveEvents(projectId, agentId)
-    return <span data-testid="feed">{events.map(e => (e.kind === 'session-update' ? e.sessionId : e.kind)).join(',')}</span>
+    return <span data-testid="feed">{events.map(e => (e.kind === 'log' ? e.message : e.kind)).join(',')}</span>
   }
   const feed = () => screen.getByTestId('feed').textContent
 
@@ -136,11 +136,11 @@ describe('useLiveEvents run scoping', () => {
 // the feed sat empty until the replay caught up. A reconnect now buffers the replay and swaps
 // atomically on the server's stream-sync marker (or a grace deadline for sources that send none).
 describe('useLiveEvents reconnect keeps the feed (#1383)', () => {
-  const log = (message: string) => ({ kind: 'session-update', sessionId: message })
+  const log = (message: string) => ({ kind: 'log', message })
 
   function FeedProbe({ projectId, agentId: agentId }: { projectId: string | null; agentId?: string | null }) {
     const { events } = useLiveEvents(projectId, agentId)
-    return <span data-testid="feed">{events.map(e => (e.kind === 'session-update' ? e.sessionId : e.kind)).join(',')}</span>
+    return <span data-testid="feed">{events.map(e => (e.kind === 'log' ? e.message : e.kind)).join(',')}</span>
   }
   const feed = () => screen.getByTestId('feed').textContent
 

@@ -5,4 +5,5 @@ What the tests cover:
 - **An unreadable start time** - an agent whose recorded start time is not a date reads "done", never "in cloud" forever.
 - **Parked on a human wins** - an agent whose cloud session the bridge reports as holding an unanswered question reads "waiting", even when it already has a pull request and even when it started three windows ago.
 - **A recorded pull request** - an agent with a pull request reads "done", the same word a finished local agent with a pull request shows, because the pull request's live state is not on the record.
-- **Still at work** - "in cloud" and "waiting" count as an agent still at work; "done" and having no cloud word do not.
+- **Merged** - an agent whose pull request was merged reads "merged", including long past the cloud session window; any other merge outcome, such as a merge withheld, leaves the word at "done".
+- **Still at work** - "in cloud" and "waiting" count as an agent still at work; "merged", "done" and having no cloud word do not.

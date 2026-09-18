@@ -70,3 +70,21 @@ export function notifyCategoryEnabled(preferences: Preferences, category: Notify
 export function notifies(preferences: Preferences, method: NotifyMethod, category: NotifyCategory): boolean {
   return notifyMethodEnabled(preferences, method) && notifyCategoryEnabled(preferences, category)
 }
+
+/**
+ * How far either way the automatic-consumption slider reaches, in percentage points (#960).
+ *
+ * Here because the browser clamps to it, in the usage panel's slider and in Settings, and the
+ * daemon's quota source falls back to the default below: one number both sides import.
+ */
+export const MAX_SPEND_OFFSET = 50
+
+/**
+ * Where the slider sits before anyone has touched it, in percentage points (#960 Edit): half a
+ * day's worth of the week's allowance, ahead of the boundary.
+ *
+ * Landing exactly on the boundary reads as generous on paper but stops unattended work the moment
+ * the account is precisely on pace, which is normal jitter rather than overspending. A half-day
+ * cushion gives it room to breathe without meaningfully loosening the spend-boundary policy (#879).
+ */
+export const DEFAULT_SPEND_OFFSET = 100 / (7 * 2)

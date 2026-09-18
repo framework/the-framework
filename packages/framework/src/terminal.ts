@@ -1,5 +1,5 @@
 import type { DriverEvent, DriverRateLimit } from 'agent-driver'
-import type { ChoiceOption, FrameworkEvent } from './events.js'
+import { pickedIds, type AutoHandoffSkip, type AutoMergeOutcome, type ChoiceOption, type FrameworkEvent, type MergeWithheldReason, type OnBeforeMergeableSkip } from './events.js'
 
 // The terminal surface for the agent's event stream: render one {@link FrameworkEvent} as one
 // human-readable line. This is the CLI's counterpart to the dashboard's read-model
@@ -15,6 +15,62 @@ export function formatFrameworkEvent(event: FrameworkEvent): string {
       }`
     case 'session-update':
       return `  session ${event.sessionId}${event.sessionLink ? ` — ${event.sessionLink}` : ''}`
+    case 'system-prompt':
+      return `  system prompt sent (${event.text.length} chars)`
+    case 'browser-stream':
+      return `◆ browser preview: http://127.0.0.1:${event.port}/stream`
+    case 'browser':
+      return `◆ browser: ${event.url}`
+    case 'log':
+      return `  ${event.message}`
+    case 'error':
+      return `✗ ${event.headline}${event.detail ? `\n    ${event.detail.replace(/\n/g, '\n    ')}` : ''}`
+    case 'view':
+      return `▶ view: ${event.title}`
+    case 'ready-for-merge':
+      return `✓ ready for merge`
+    case 'open-pr':
+      return `  pull request written${event.title ? `: ${event.title}` : ''}`
+    case 'settled':
+      return `◆ done for now — waiting for your next message`
+    case 'branch':
+      return `  branch: ${event.branch}`
+    case 'cloud-anchor':
+      return `  hand-off anchor: ${event.sha.slice(0, 7)}`
+    case 'pull-request':
+      return `  pull request: #${event.number}`
+    case 'on-before-mergeable':
+      switch (event.outcome) {
+        case 'queued':
+          return `✓ post-merge cleanup: quality follow-ups queued`
+        case 'incomplete':
+          return `  ! post-merge cleanup: queueing did not complete cleanly`
+        case 'skipped':
+          return `  ~ post-merge cleanup skipped: ${skipReason(event.reason)}`
+      }
+    case 'handoff-armed': {
+      // Said as what will happen, not as two flags: the line is read once, at a glance.
+      // A merge-armed agent's PR is opened ready, not draft, and lands by itself — the line must say
+      // so (#1382): merging unattended is the one consequence a reader cannot be left to infer.
+      if (event.pr && event.merge) return `  when this ends: push the branch, open a PR, and merge it`
+      if (event.pr) return `  when this ends: push the branch and open a draft PR`
+      if (event.push) return `  when this ends: push the branch`
+      return `  when this ends: nothing — push and PR are both off`
+    }
+    case 'handoff': {
+      // The merge half rides the same event (#1216) and gets its own line: after "auto-merge
+      // was on", silence about the merge reads as "it merged" (#1363), so every outcome —
+      // armed, merged, withheld, failed — is said.
+      const merge = event.outcome !== 'failed' && event.merge ? `\n${mergeLine(event.merge)}` : ''
+      switch (event.outcome) {
+        case 'done':
+          return (event.url ? `✓ opened ${event.url}` : `✓ branch pushed`) + merge
+        case 'skipped':
+          return `  ~ handoff skipped: ${handoffSkipReason(event.reason)}` + merge
+        case 'failed':
+          return `  ! could not ${event.step === 'pr' ? 'open the PR' : 'push the branch'}: ${event.error}`
+      }
+    }
     case 'usage': {
       const turns = `over ${event.turns} turn${event.turns === 1 ? '' : 's'}`
       // No price to show: report the tokens the agent *did* report, rather than a
@@ -31,13 +87,84 @@ export function formatFrameworkEvent(event: FrameworkEvent): string {
       const opts = event.options.map(o => `    ${mark(o)} ${o.label}`).join('\n')
       return `? ${event.title}\n${opts}`
     }
+    case 'choice-resolved':
+      return `  ✓ chose ${pickedIds(event.picked).join(', ') || '(none)'} (${event.by})`
     case 'driver':
       return formatDriverEvent(event.event)
+    case 'intent':
+      return `▶ "${truncate(event.text)}"`
     case 'end':
       if (event.ok) return '✓ finished'
       if (event.stopped) return '■ stopped'
       if (event.waiting) return '? waiting for an answer'
       return `✗ failed: ${event.detail ?? 'unknown error'}`
+  }
+}
+
+/** One line for the merge half of a handoff (#1216/#1363), matching the CLI's own wording. */
+function mergeLine(merge: AutoMergeOutcome): string {
+  switch (merge.outcome) {
+    case 'auto-armed':
+      return '✓ auto-merge armed: the PR lands when its checks pass'
+    case 'watched':
+      return '✓ merge on green: the daemon merges the PR when its checks pass'
+    case 'merged':
+      return '✓ merged the PR'
+    case 'withheld':
+      return `  ~ merge withheld: ${mergeWithheldWhy(merge.reason)}`
+    case 'failed':
+      return `  ! could not merge the PR: ${merge.error}`
+  }
+}
+
+/**
+ * Say why an armed merge was withheld (#1363) in the reader's terms. Exported for the CLI's
+ * own stdout line, so the two surfaces cannot drift.
+ */
+export function mergeWithheldWhy(reason: MergeWithheldReason): string {
+  switch (reason) {
+    case 'not-ready-for-merge':
+      return 'the session never signalled ready-for-merge'
+  }
+}
+
+/** Say why the post-merge cleanup declined in the reader's terms, not the guard's (#835). */
+function skipReason(reason: OnBeforeMergeableSkip): string {
+  switch (reason) {
+    case 'not-ready-for-merge':
+      return 'the session never signalled ready-for-merge'
+    case 'run-stopped':
+      return 'the run was stopped'
+    case 'fake-run':
+      return 'this was a fake run'
+    case 'no-session-name':
+      return 'the session was never named'
+    case 'no-bin-path':
+      return 'the framework binary path is unknown'
+  }
+}
+
+/** Why the end-of-session handoff did nothing (#1102), as a reason rather than a code. */
+function handoffSkipReason(reason: AutoHandoffSkip): string {
+  switch (reason) {
+    case 'not-armed':
+      return 'push and PR are both off for this session'
+    case 'branch-gone':
+      return 'the branch no longer exists'
+    case 'no-commits':
+      return 'the session committed nothing'
+    case 'no-remote':
+      return 'this repo has no remote to push to'
+    case 'already-open':
+      return 'the branch already has a pull request'
+    case 'already-landed':
+      return "the branch's pull request already landed everything the session did"
+    case 'already-pushed':
+      return 'the branch is already on the remote'
+    case 'run-stopped':
+      return 'the run was stopped'
+    case 'fake-run':
+      return 'this was a fake run'
   }
 }
 

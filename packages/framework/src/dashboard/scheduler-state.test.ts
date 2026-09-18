@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { SCHEDULER_STATE_FILE, collectSchedulers, readSchedulerState } from './scheduler-state.js'
+import { SCHEDULER_STATE_FILE, collectSchedulers, loosestSpendOffset, readSchedulerState } from './scheduler-state.js'
 import type { ProjectSummary } from './projects.js'
 
 // The scheduler card's read (#1774): the state file as the tool writes it, and every way it can
@@ -40,6 +40,7 @@ test('the state file as the scheduler writes it reads as the card shows it, with
       keepAlive: false,
       running: true,
       model: 'opus',
+      spendOffset: 7.142857142857143,
       lastTick: { at: '2026-09-16T17:45:55.452Z', decisions: [{ command: 'work-queue', outcome: 'started 2026-09-16T16-47-27-780Z', run: '2026-09-16T16-47-27-780Z' }] },
     })
     assert.deepEqual(probed, [16393])
@@ -90,4 +91,12 @@ test('collectSchedulers gives one row per registered project, in registry order,
     { projectId: 'b', projectName: 'b', ...NOT_SET_UP },
     { projectId: 'c', projectName: 'c', present: true, on: false, keepAlive: false, running: false, model: 'opus' },
   ])
+})
+
+test('the usage panel draws the loosest spend offset the schedulers hold; none named is none', () => {
+  const state = (spendOffset?: number) => ({ ...NOT_SET_UP, present: true, ...(spendOffset !== undefined ? { spendOffset } : {}) })
+  assert.equal(loosestSpendOffset([state(-5), state(12), state()]), 12)
+  assert.equal(loosestSpendOffset([state(-5)]), -5)
+  assert.equal(loosestSpendOffset([state(), NOT_SET_UP]), undefined)
+  assert.equal(loosestSpendOffset([]), undefined)
 })

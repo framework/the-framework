@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { weekDays, quotaTone, paceDeviationMs, consumedQuotaMs, paceSharePercent } from './quota-bar.js'
+import { weekDays, quotaTone, limitPercent, projectedRange, paceDeviationMs, consumedQuotaMs, paceSharePercent } from './quota-bar.js'
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 
@@ -98,6 +98,22 @@ describe('paceDeviationMs', () => {
   test('reads negative when behind pace', () => {
     // Two sevenths of the week behind is two days, the other way.
     expect(paceDeviationMs(20 - (2 * 100) / 7, 20, WEEK_MS)).toBeCloseTo((-2 * WEEK_MS) / 7, 5)
+  })
+})
+
+describe('projectedRange', () => {
+  // The bar's second, dimmer segment: the room between what's used and where unattended work is
+  // allowed to stop.
+  test('spans from what is used to the limit, when there is room left', () => {
+    expect(projectedRange(20, 57)).toEqual({ start: 20, end: 57 })
+  })
+
+  test('is empty once the limit has already been reached or passed, not negative-width', () => {
+    expect(projectedRange(80, 57)).toEqual({ start: 80, end: 80 })
+  })
+
+  test('clamps both ends to the bar itself', () => {
+    expect(projectedRange(-10, 130)).toEqual({ start: 0, end: 100 })
   })
 })
 

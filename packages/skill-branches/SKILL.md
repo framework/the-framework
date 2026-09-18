@@ -57,4 +57,4 @@ Once clean, unless whoever started you said they publish for you:
 npx branches publish --title "<one line naming what the change does>" --body "<what changed, and why>"
 ```
 
-It pushes your branch, opens the pull request, and prints it in `pr`. Add `--merge` when the work may land on its own: the request then merges once its checks pass. Add `--draft` for a request a person should look at first. A branch that already has an open request gets no second one. `clean` false is refused as `dirty`: commit or delete first.
+It pushes your branch, opens the pull request, and prints it in `pr`. Add `--merge` when the work may land on its own: the request then merges once its checks pass, also where the repository does not allow auto-merge (`merge` in the answer says `auto-armed`, `merged` or `watching`). Add `--draft` for a request a person should look at first. A branch that already has an open request gets no second one. `clean` false is refused as `dirty`: commit or delete first.

@@ -19,7 +19,8 @@ import {
 import { createCheckout, attachCheckout } from './checkout.js'
 import { reconcileBranchLinks } from './branch-links.js'
 import { reclaimWorktree, type ReclaimOutcome, type ReclaimRefusal } from './reclaim.js'
-import { publishCheckout, type PublishOutcome } from './publish.js'
+import { nodeGhRunner, publishCheckout, type PublishOutcome } from './publish.js'
+import { watchAndMerge } from './merge-watch.js'
 
 /**
  * The command line over the package (#1725): the same functions a caller's code calls, for an agent
@@ -46,6 +47,7 @@ export const USAGE = `usage: branches <command>
   status [path]                the checkout's branch, whether it is clean, whether it is on the remote
   publish --title <t> [--body <b>] [--merge] [--draft]
                                push this checkout's branch and open its pull request; --merge lands it on green
+  merge-on-green <number>      wait for pull request <number>'s checks and merge it once they pass; what --merge starts where the repository has no auto-merge
   list [--sizes]               every agent checkout under .branches/
   remove <id> [--no-push]      reclaim agent <id>'s checkout, once the remote has everything it holds
   prune [--no-push]            remove, for every checkout
@@ -151,6 +153,15 @@ const COMMANDS: Record<string, Command> = {
     })
     if (!outcome.ok) throw new Refused(outcome, publishRefusalLine(checkout, outcome))
     return outcome
+  },
+
+  async 'merge-on-green'(args, cwd, git) {
+    const { positionals } = parse(args, {}, 1)
+    const number = Number(positionals[0])
+    if (!Number.isInteger(number) || number <= 0) throw new Usage(`${positionals[0]} is not a pull request number`)
+    const repo = await project(cwd, git)
+    const outcome = await watchAndMerge(repo, number, { gh: nodeGhRunner(), log: line => console.error(line) })
+    return { ok: outcome.outcome === 'merged', number, ...outcome }
   },
 
   async list(args, cwd, git) {

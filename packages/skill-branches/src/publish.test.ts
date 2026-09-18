@@ -75,6 +75,43 @@ test('publish: the branch is pushed, a pull request opened with the given words,
   }
 })
 
+test('where GitHub will not arm auto-merge: an already green request is merged at once, a repository without auto-merge gets the watcher, any other refusal is said', async () => {
+  const repo = await repoWithOrigin()
+  try {
+    const { path } = await createCheckout(repo, { agentId: 'a5' })
+    await commitWork(path)
+    const cases: [string, unknown][] = [
+      ['GraphQL: Pull request is in clean status (enablePullRequestAutoMerge)', { outcome: 'merged' }],
+      ['GraphQL: Pull request Auto merge is not allowed for this repository (enablePullRequestAutoMerge)', { outcome: 'watching' }],
+      ['GraphQL: Resource not accessible by integration', { outcome: 'failed', error: 'GraphQL: Resource not accessible by integration' }],
+    ]
+    for (const [refusal, expected] of cases) {
+      const calls: string[][] = []
+      const watched: number[] = []
+      const outcome = await publishCheckout(path, {
+        title: 'x',
+        merge: true,
+        watch: async (_repo, number) => {
+          watched.push(number)
+        },
+        gh: async args => {
+          calls.push(args)
+          if (args[1] === 'list') return JSON.stringify([{ number: 7, url: 'https://github.com/o/r/pull/7' }])
+          if (args[1] === 'merge' && args.includes('--auto')) throw new Error(refusal)
+          return ''
+        },
+      })
+      assert.ok(outcome.ok)
+      assert.deepEqual(outcome.merge, expected, refusal)
+      const direct = calls.filter(c => c[1] === 'merge' && !c.includes('--auto'))
+      assert.deepEqual(direct, (expected as { outcome: string }).outcome === 'merged' ? [['pr', 'merge', '7', '--squash']] : [], 'only a green request is merged directly')
+      assert.deepEqual(watched, (expected as { outcome: string }).outcome === 'watching' ? [7] : [])
+    }
+  } finally {
+    await rm(join(repo, '..'), { recursive: true, force: true, maxRetries: 10 })
+  }
+})
+
 test('publish refuses a dirty tree before pushing anything, and a draft is a draft unless the merge is armed', async () => {
   const repo = await repoWithOrigin()
   try {

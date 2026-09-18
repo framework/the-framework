@@ -7,7 +7,7 @@ Decides who a ticket claim [1] names — the holder [2] — from where the `tick
 ## Glossary
 
 [1] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
-[2] holder: who a claim names: the agent's id when the daemon started the agent, else the branch the `tickets` command ran on.
+[2] holder: who a claim names: the agent's id when the program that started the agent set it in `AGENT_ID` (the scheduler does), else the branch the `tickets` command ran on.
 
 ## Business logic — TL;DR
 

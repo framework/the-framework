@@ -19,7 +19,7 @@ Keeps, in the daemon's memory, everything the Claude web bridge [1] reports and 
 [4] hands-off: said of an agent whose work leaves this machine, so its first prompt is the whole agent: an agent whose location is `web`.
 [5] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [6] gate: a question with options an agent's turn ended on: the agent ends waiting for the answer, the dashboard shows the question as a card, and the answer resumes the agent.
-[7] pick: the answer to a gate: the option or options chosen, by the user or automatically.
+[7] pick: the answer to a gate: the option or options the user chose.
 [8] open question: a question nobody has answered yet, as the dashboard lists them across projects.
 [9] the Overview: the dashboard's cross-project page at `/`.
 [10] Driver tab: the extension's one pinned tab that reads claude.ai's session list, visits sessions and types answers.

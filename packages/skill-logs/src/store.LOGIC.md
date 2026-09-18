@@ -4,20 +4,20 @@ The recording program's [1] side of the runs [2]: reads and writes of `agents/<w
 
 **User story**: an agent's [8] run is on the branch, pushed, the moment the agent ends, so the user opens its page from another machine, a wiped laptop loses nothing, and every later agent's `npx logs` sees it; the user's own branches never carry the record.
 
-**Business logic story**: the daemon records a run when an agent ends, later patches the branch the work landed on and the pull request onto its card, deletes the run when it removes the agent's records, and lists runs and reads diaries for its pages; a run a dead daemon left marked `running` is recorded again, ended, by the next daemon that notices.
+**Business logic story**: the scheduler records a run when an agent ends; the product later patches the branch the work landed on and the pull request onto its card, deletes the run when it removes the agent's records, and lists runs and reads diaries for its pages; a run whose process died while marked `running` is recorded again, ended, by the scheduler's next sweep on that machine.
 
 **Problem**: a run written but not committed would be swept into the next unrelated commit, or reset away, by the checkout's write cycle; a run recorded twice under two people would exist twice.
 
 ## Glossary
 
-[1] recording program: the program that ran an agent and records its run when the agent ends; in the product, the daemon.
+[1] recording program: the program that ran an agent and records its run when the agent ends; in the product, the scheduler (`agent-scheduler`).
 [2] run: the `logs` skill's record of one agent on the `agent-data` branch: a card and a diary. Never the unit of work.
 [3] card: the run's `<id>.json`: what was asked, the ticket, the branch, the pull request, how it ended, what it cost.
 [4] diary: the run's `<id>.jsonl`: what the agent said.
-[5] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks. Born as an orphan, written through one sync → commit → push cycle.
+[5] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs. Born as an orphan, written through one sync → commit → push cycle.
 [6] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch. Also "the `agent-data` branch's checkout".
 [7] write cycle: one write to the branch through its persistent checkout: sync with origin, apply the change, commit, push; the change is re-applied when the push loses a race.
-[8] agent: the unit of work: one task worked by a coding agent under The Framework's control, in its own checkout, on its own branch, streaming events, handed off when it ends.
+[8] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 
 ## Business logic — TL;DR
 
@@ -74,7 +74,7 @@ A run [2] is recorded as its card [3] and its diary [4], written together and co
 
 #### Context
 
-**Business logic story**: the branch the work landed on and the pull request are known after the run's process is gone; the daemon patches them onto the card when it opens the pull request or adopts an agent's [8] cloud work.
+**Business logic story**: the branch the work landed on and the pull request are known after the run's process is gone; the product patches them onto the card when it adopts a `web` agent's [8] cloud work.
 
 #### Business logic
 

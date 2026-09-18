@@ -90,7 +90,7 @@ export function bridgeSend(sessionId: string): (pick: string | string[]) => Prom
 /**
  * The question the session is parked on, once the browser bridge has reported one (#1237),
  * rendered as the gate it is (#1554): the same panel a local agent's question gets, posting
- * through the bridge instead of the control log. The link out stays as the manual path for
+ * through the bridge instead of the path a local agent's answer takes. The link out stays as the manual path for
  * whoever prefers to answer over there.
  */
 function ParkedQuestion({

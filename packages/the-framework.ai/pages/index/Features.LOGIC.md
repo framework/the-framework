@@ -1,4 +1,4 @@
-The "Features" chapter: nine cards, each a feature the site claims, with a one-sentence explanation. None of the cards is marked "Coming soon".
+The "Features" chapter: eight cards, each a feature the site claims, with a one-sentence explanation. None of the cards is marked "Coming soon".
 
 ## Glossary
 
@@ -11,7 +11,6 @@ The "Features" chapter: nine cards, each a feature the site claims, with a one-s
 - **"Optimal quota usage"** - The Framework drives AI autonomy so that unused quota [2] stops going to waste: maximum daily usage while keeping enough quota space for manual prompts.
 - **"Bring your own prompts"** - favorite prompts can be saved and quickly re-used, shared with teammates or kept personal.
 - **"Dashboard"** - shows the pro-rata usage quota, the current AI agents, the queued AI tasks, the queue of required reviews, "hot" tickets, and more.
-- **"Headless browser"** - The Framework launches a headless Chromium that agents [1] fully control (DOM, console, network and screenshots via Chrome MCP), with no AI browser extension needed; the user can watch it live and take over on login walls.
 - **"Notifications"** - browser and/or Discord notifications when AI is finished or needs the user.
 - **"Claude Code Web"** - agents can be orchestrated through Claude Code Web for 0% local CPU usage.
 - **"Swarm of local computers"** - agents can be orchestrated across multiple local computers.

@@ -10,7 +10,7 @@ Puts the `branches` skill, this package's `SKILL.md`, where each coding agent [1
 
 [1] coding agent: the CLI doing the actual work: Claude Code or Codex.
 [2] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
-[3] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[3] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 
 ## Business logic — TL;DR
 
@@ -55,7 +55,7 @@ When anything already exists at a link's path (a directory, a file, or a link of
 
 #### Context
 
-**Problem**: a project whose repository does not commit its skills has no other way to give an agent [3] the `tickets`, `queue` and `logs` skills; the daemon names them when it makes a checkout. The command line offers no way to name them.
+**Problem**: a project whose repository does not commit its skills has no other way to give an agent [3] the `tickets`, `queue` and `logs` skills; a caller of the library can name them when it makes a checkout; the scheduler names none. The command line offers no way to name them.
 
 #### Business logic
 

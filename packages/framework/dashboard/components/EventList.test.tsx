@@ -80,11 +80,6 @@ describe('EventList row colour', () => {
     expect(row.className).toContain('text-danger')
   })
 
-  test('an error the agent reported itself renders in red (#1500)', () => {
-    render(<EventList events={[{ kind: 'error', headline: 'gh is not logged in' }]} stick={false} />)
-    expect(screen.getByText(/gh is not logged in/).className).toContain('text-danger')
-  })
-
   test('a failed run renders in red (#1199)', () => {
     render(<EventList events={[{ kind: 'end', ok: false, detail: 'exited 1' }]} stick={false} />)
     expect(screen.getByText(/failed: exited 1/).className).toContain('text-danger')
@@ -93,6 +88,13 @@ describe('EventList row colour', () => {
   test('a stopped run is not an error, so it is not red (#1199)', () => {
     render(<EventList events={[{ kind: 'end', ok: false, stopped: true }]} stick={false} />)
     expect(screen.getByText(/stopped/).className).not.toContain('text-danger')
+  })
+
+  test('a run waiting on its question is not a failure: it says so, and is not red (#1774)', () => {
+    render(<EventList events={[{ kind: 'end', ok: false, waiting: true }]} stick={false} />)
+    const row = screen.getByText(/waiting for an answer/)
+    expect(row.className).not.toContain('text-danger')
+    expect(screen.queryByText(/failed/)).toBeNull()
   })
 
   test('a finished run is not red (#1199)', () => {
@@ -130,21 +132,17 @@ describe('EventList badge tones', () => {
     expect(screen.getByText('end').className).toContain('text-danger')
   })
 
-  test('a pushed view badge is primary', () => {
-    render(<EventList events={[{ kind: 'view', id: 'v1', title: 'Plan', markdown: '# p' }]} stick={false} />)
-    expect(screen.getByText('view').className).toContain('text-primary')
-  })
 })
 
-// The prompt opens the log (#1170): it is emitted after `session` and `system-prompt`, so the one
-// line the reader wrote used to sit under a char-count summary of a prompt they did not write.
+// The prompt opens the log (#1170): it can be emitted after other rows, and the one line the
+// reader wrote belongs on top.
 describe('EventList prompt placement', () => {
   const rowText = () => Array.from(document.querySelectorAll('[data-message-id]')).map(n => n.textContent ?? '')
 
-  test('the first prompt is hoisted above the session and system-prompt rows (#1170)', () => {
+  test('the first prompt is hoisted above the rows before it (#1170)', () => {
     const events: FrameworkEvent[] = [
       { kind: 'session', driver: 'claude-code', workspace: '/repo', fake: false },
-      { kind: 'system-prompt', text: 'you are a careful engineer' },
+      { kind: 'session-update', sessionId: 'sess-1' },
       { kind: 'driver', event: { type: 'start', prompt: 'add a search box' } },
       { kind: 'driver', event: { type: 'text', text: 'done' } },
     ]
@@ -154,7 +152,7 @@ describe('EventList prompt placement', () => {
 
   test('a later turn stays where it happened, in the conversation (#1170)', () => {
     const events: FrameworkEvent[] = [
-      { kind: 'system-prompt', text: 'you are a careful engineer' },
+      { kind: 'session-update', sessionId: 'sess-1' },
       { kind: 'driver', event: { type: 'start', prompt: 'first question' } },
       { kind: 'driver', event: { type: 'text', text: 'first answer' } },
       { kind: 'driver', event: { type: 'start', prompt: 'second question' } },
@@ -168,17 +166,16 @@ describe('EventList prompt placement', () => {
 
   test('a log with no prompt at all is left alone (#1170)', () => {
     const events: FrameworkEvent[] = [
-      { kind: 'system-prompt', text: 'you are a careful engineer' },
+      { kind: 'session-update', sessionId: 'sess-1' },
       { kind: 'driver', event: { type: 'text', text: 'resumed reply' } },
     ]
     render(<EventList events={events} stick={false} />)
-    expect(rowText()[0]).toContain('system prompt sent')
+    expect(rowText()[0]).toContain('session sess-1')
   })
 })
 
 // A transcript entry that represents an interaction IS the interaction (#1455 item 6): with a
-// projectId, an open `choice` row renders the same ChoicePanel the rail used to hold, and a
-// resolved one collapses to the AnsweredChoice ✓ card.
+// projectId, an open `choice` row renders the same ChoicePanel the rail used to hold.
 describe('EventList inline choice rows (#1455 item 6)', () => {
   const gate = (id = 'gate-1'): FrameworkEvent => ({
     kind: 'choice',
@@ -190,7 +187,6 @@ describe('EventList inline choice rows (#1455 item 6)', () => {
     ],
     recommended: 'work',
   })
-  const resolved = (id = 'gate-1'): FrameworkEvent => ({ kind: 'choice-resolved', id, picked: 'work', by: 'user' })
 
   test('an open gate renders the interactive panel, and a pick posts against the run', () => {
     render(<EventList events={[gate()]} stick={false} projectId="p1" agentId="r1" />)
@@ -202,23 +198,6 @@ describe('EventList inline choice rows (#1455 item 6)', () => {
     render(<EventList events={[gate()]} stick={false} />)
     expect(screen.queryByRole('button', { name: /Work on it/ })).toBeNull()
     expect(screen.getByText(/Start the next backlog item\?/)).toBeTruthy()
-  })
-
-  test('a resolved gate collapses to a ✓ line and hides its "chose" row', () => {
-    render(<EventList events={[gate(), resolved()]} stick={false} projectId="p1" agentId="r1" />)
-    const line = screen.getByRole('button', { name: /Start the next backlog item\?/ })
-    expect(line.getAttribute('aria-expanded')).toBe('false')
-    // The card says it better than the "✓ chose" formatter line, which is hidden with it there.
-    expect(screen.queryByText(/chose/)).toBeNull()
-    // And the gate is no longer answerable.
-    expect(screen.queryByRole('region', { name: 'Start the next backlog item?' })).toBeNull()
-  })
-
-  test('the collapsed line expands to what was picked', () => {
-    render(<EventList events={[gate(), resolved()]} stick={false} projectId="p1" agentId="r1" />)
-    fireEvent.click(screen.getByRole('button', { name: /Start the next backlog item\?/ }))
-    expect(screen.getByText('Work on it')).toBeTruthy()
-    expect(screen.getByText('Stop the loop')).toBeTruthy()
   })
 
   test('a gate closed by end without an answer stays text — its audience is gone (#1359)', () => {
@@ -254,11 +233,6 @@ describe('EventList row wash (#1508)', () => {
       <EventList events={[{ kind: 'driver', event: { type: 'start', prompt: 'add a search box' } }]} stick={false} />,
     )
     expect(container.querySelector('[class*="bg-info/10"]')).toBeTruthy()
-  })
-
-  test('an agent-reported error gets the red wash too (#1500)', () => {
-    const { container } = render(<EventList events={[{ kind: 'error', headline: 'push rejected' }]} stick={false} />)
-    expect(container.querySelector('[class*="bg-danger/10"]')).toBeTruthy()
   })
 
   test('a failure gets the red wash', () => {

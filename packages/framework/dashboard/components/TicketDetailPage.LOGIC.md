@@ -12,7 +12,7 @@ One ticket's own page: its whole markdown rather than the one line the list show
 [2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [3] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
 [4] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
-[5] holder: who a claim names: the agent's id when the daemon started the agent, else the branch the `tickets` command ran on.
+[5] holder: who a claim names: the agent's id when the tool that started the agent put it in the agent's environment, else the branch the `tickets` command ran on.
 [6] session name: the name an agent gives its own work; the dashboard labels the agent by it.
 
 ## Business logic — TL;DR
@@ -54,7 +54,7 @@ The claim badge reads "claimed" in the warning color, followed by the holder [5]
 
 #### Context
 
-**User story**: the user has read the ticket and wants it worked, but not right now: it goes on the agent queue [1], where the daemon's own unattended work or the user picks it up later.
+**User story**: the user has read the ticket and wants it worked, but not right now: it goes on the agent queue [1], where the scheduler's unattended work or the user picks it up later.
 
 #### Business logic
 

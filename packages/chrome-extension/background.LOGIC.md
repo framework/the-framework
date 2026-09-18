@@ -4,7 +4,7 @@ Runs the extension's worker [1], the half of the Claude web bridge [2] that hold
 
 **User story**:
 - A hands-off [10] agent [11] runs in a cloud session [5]. When the session stops to ask, the user sees the question in the dashboard within about a minute, answers it there, and the answer [6] is typed into the session without the user opening claude.ai.
-- The user starts a hands-off agent, and within about a minute its cloud session exists on claude.ai and the dashboard shows the session link.
+- The user starts a hands-off agent, and within about a minute its cloud session exists on claude.ai and the dashboard shows the session link. Nothing starts one today: web runs left the dashboard's launcher.
 - The user opens the extension's options page and reads what the last cycle [4] did, or why the bridge is doing nothing.
 
 **Problem**:
@@ -24,7 +24,7 @@ Runs the extension's worker [1], the half of the Claude web bridge [2] that hold
 [8] Driver tab: the extension's one pinned tab that reads claude.ai's session list, visits sessions and types answers.
 [9] content script: the script the extension injects into every claude.ai page; it shares the page with claude.ai and holds nothing secret.
 [10] hands-off: said of an agent whose work leaves this machine, so its first prompt is the whole agent: an agent whose location is `web`.
-[11] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[11] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [12] question block: the JSON object with a `title` and `options` that an agent writes into its final message when it stops at a gate; claude.ai renders it as a code block in the session's transcript.
 [13] transcript mirror: the copy of a cloud session's transcript the content script sends to the daemon, one entry per conversation turn keyed by the turn's position.
 [14] overlay: the full-page cover the content script draws over the Driver tab, titled "The Framework Driver".

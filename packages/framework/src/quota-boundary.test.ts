@@ -1,7 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { boundaryFromResetsAt, parseResetsAt, quotaBoundaryStatus, QUOTA_WEEK_MS, type QuotaBoundaryStatus } from './quota-boundary.js'
-import { DEFAULT_SPEND_OFFSET } from './preference-defaults.js'
+import { boundaryFromResetsAt, parseResetsAt, weekBoundary, QUOTA_WEEK_MS } from './quota-boundary.js'
 import type { DriverQuotaWindow } from 'agent-driver'
 
 const DAY = 24 * 60 * 60 * 1000
@@ -86,84 +85,18 @@ test('a week already over reads as its last day, not as day eight', () => {
   assert.equal(boundaryFromResetsAt(resetsAt, NOW).day, 7)
 })
 
-test('measures the account week against the boundary', () => {
+test('places the boundary off the account week, whatever else the reading holds', () => {
   // Reset in 5 days => 2 days 5 hours elapsed => day 3, ~31.5% allowed continuously (#960 Edit).
-  const status = quotaBoundaryStatus({ windows: [weekWindow(16)], now: NOW })
-  assert.ok(status)
-  assert.equal(status.boundary.day, 3)
-  assert.equal(status.reached, null)
-
-  const spent = quotaBoundaryStatus({ windows: [weekWindow(50)], now: NOW })
-  assert.equal(spent?.reached?.label, 'Current week (all models)')
-})
-
-test('the selected model\'s own week binds too, and only that model\'s', () => {
-  const fable: DriverQuotaWindow = { label: 'Current week (Fable)', kind: 'week-model', percentUsed: 90 }
-  const opus: DriverQuotaWindow = { label: 'Current week (Opus)', kind: 'week-model', percentUsed: 95 }
-
-  const onFable = quotaBoundaryStatus({ windows: [weekWindow(10), fable, opus], now: NOW, model: 'claude-fable-5' })
-  assert.equal(onFable?.windows.length, 2)
-  assert.equal(onFable?.reached?.label, 'Current week (Fable)')
-
-  // A spent Fable week must not stop work on another model.
-  const onSonnet = quotaBoundaryStatus({ windows: [weekWindow(10), fable, opus], now: NOW, model: 'claude-sonnet-5' })
-  assert.equal(onSonnet?.windows.length, 1)
-  assert.equal(onSonnet?.reached, null)
-
-  // With no model to match, only the account's own week is in force.
-  const noModel = quotaBoundaryStatus({ windows: [weekWindow(10), fable], now: NOW })
-  assert.equal(noModel?.windows.length, 1)
+  const fable: DriverQuotaWindow = { label: 'Current week (Fable)', kind: 'week-model', percentUsed: 100, resetsAtText: 'Jul 21 at 7am (UTC)' }
+  const boundary = weekBoundary([fable, weekWindow(16)], NOW)
+  assert.equal(boundary?.day, 3)
+  assert.deepEqual(boundary, boundaryFromResetsAt(Date.UTC(2026, 6, 25, 7, 0), NOW))
 })
 
 test('reports nothing when the week cannot be placed', () => {
-  assert.equal(quotaBoundaryStatus({ windows: [], now: NOW }), undefined)
+  assert.equal(weekBoundary([], NOW), undefined)
   // A week window with no reset prose: the percentage alone says nothing about
   // where in the week we are.
-  assert.equal(quotaBoundaryStatus({ windows: [{ label: 'Current week (all models)', kind: 'week', percentUsed: 16 }], now: NOW }), undefined)
-  assert.equal(quotaBoundaryStatus({ windows: [weekWindow(16, 'later')], now: NOW }), undefined)
+  assert.equal(weekBoundary([{ label: 'Current week (all models)', kind: 'week', percentUsed: 16 }], NOW), undefined)
+  assert.equal(weekBoundary([weekWindow(16, 'later')], NOW), undefined)
 })
-
-test('the limit is the boundary until the user moves it (#960)', () => {
-  const status = quotaBoundaryStatus({ windows: [weekWindow(16)], now: NOW })!
-  assert.equal(status.limit.offset, 0)
-  assert.equal(status.limit.percent, status.boundary.percent)
-})
-
-test('the slider moves the line work stops at, without moving the boundary (#960)', () => {
-  // 16% used against a boundary that has not reached it yet: room to spare.
-  const base = quotaBoundaryStatus({ windows: [weekWindow(16)], now: NOW })!
-  assert.equal(base.reached, null)
-
-  // Pulled back below what is already spent, the same reading is now over the line. The boundary
-  // itself is untouched — that is the whole reason limit and boundary are separate values.
-  const strict = quotaBoundaryStatus({ windows: [weekWindow(16)], now: NOW, limitOffset: -base.boundary.percent })!
-  assert.equal(strict.boundary.percent, base.boundary.percent)
-  assert.equal(strict.limit.percent, 0)
-  assert.equal(strict.limit.offset, -base.boundary.percent)
-  assert.equal(strict.reached?.percentUsed, 16)
-
-  // Pushed forward, an account that had reached the boundary gets room again.
-  const spent = quotaBoundaryStatus({ windows: [weekWindow(50)], now: NOW })!
-  assert.notEqual(spent.reached, null)
-  const lenient = quotaBoundaryStatus({ windows: [weekWindow(50)], now: NOW, limitOffset: 40 })!
-  assert.equal(lenient.reached, null)
-})
-
-test('a limit dragged past either end of the week stops at the week (#960)', () => {
-  // Unclamped, a negative limit would read as "always stopped" and one over 100 as "never stops".
-  const low = quotaBoundaryStatus({ windows: [weekWindow(0)], now: NOW, limitOffset: -500 })!
-  assert.equal(low.limit.percent, 0)
-  const high = quotaBoundaryStatus({ windows: [weekWindow(99)], now: NOW, limitOffset: 500 })!
-  assert.equal(high.limit.percent, 100)
-  // 99% used is still under a limit pinned at the top of the week, so work may still run.
-  assert.equal(high.reached, null)
-})
-
-
-/** A reading where the account's week is `weekPercent` used, measured at `NOW` (~31.5% of the week elapsed). */
-function status(weekPercent: number): QuotaBoundaryStatus {
-  const boundary = quotaBoundaryStatus({ windows: [weekWindow(weekPercent)], now: NOW })
-  if (!boundary) throw new Error('the fixture week should be placeable')
-  return boundary
-}
-

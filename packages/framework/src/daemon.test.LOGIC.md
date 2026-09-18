@@ -1,6 +1,5 @@
 What the tests cover, against a real daemon bound to a free port:
 
-- **Tailing a JSONL file** - only the lines appended since the last read are delivered; a file that does not exist yet delivers nothing and is not an error; a torn trailing line is held back until its newline arrives; a file rewritten to the very same length is read again from the top.
 - **Process liveness** - the running process counts as alive and an unused process id as dead.
 - **Serving and shutting down** - the dashboard comes up on `127.0.0.1` on the port asked for, reports its process id and URL, and serves the dashboard's shell at that URL; when the shutdown signal fires the daemon exits and the port is free again; a directory with no `.the-framework/` yet is enough to come up in.
 - **The projects' hooks** - a project whose `.the-framework/hooks.yml` names open and close lines has every open line run in the project, in order, once the dashboard has reported its URL, a line that exits non-zero not stopping the next; its close line runs at shutdown; each line's outcome is logged with the project's name, the line and its exit code.

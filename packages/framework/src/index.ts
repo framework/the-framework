@@ -13,9 +13,9 @@
  * ends where its consumers end, so a name nothing renders cannot quietly live on in it.
  */
 
-export type { AgentError, SessionInfo } from './agent-view.js'
+export type { SessionInfo } from './agent-view.js'
 export type { ChoiceRequest, FrameworkEvent } from './events.js'
-export type { QuotaBoundaryStatus } from './quota-boundary.js'
+export type { QuotaBoundary } from './quota-boundary.js'
 export type { CustomPreset, Preferences } from './registry.js'
 export type { DriverQuotaWindow } from 'agent-driver'
 export type { AgentMeta, AgentStatus } from './store/agent-store.js'

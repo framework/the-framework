@@ -85,7 +85,7 @@ export function AgentActionsMenu({
   // keepPrevious: hold the last repo URL while a new project's loads, so the item does not flicker.
   const githubUrl = useLoaded<string | null>(() => onGithubUrl(projectId), null, [projectId], true)
 
-  const { busy, error, reset, run } = useAction()
+  const { busy, error, run } = useAction()
 
   // A landed Stop stays "Stopping…" until the end event flips `active`, so it can't be re-fired.
   const [stopRequested, setStopRequested] = useState(false)

@@ -174,7 +174,7 @@ interface RelayedAgent {
  * run's lifetime.
  *
  * The `targets` map outlives the event pump (#1067 slice 2): a finished remote agent's post-run reads,
- * push and open-PR still have to reach the device after its event stream has ended, so the device
+ * open-PR and merge still have to reach the device after its event stream has ended, so the device
  * target is kept until {@link dispose} clears it, not dropped when the stream closes.
  *
  * The `metas` map (#1077) holds a local {@link AgentMeta} stub per relayed agent so `onAgents` can show a

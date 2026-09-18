@@ -4,7 +4,7 @@ import { cn } from '../../lib/utils.js'
 import { ScrollArea } from './scroll-area.js'
 
 // The shadcn "base" popover (Base UI, not Radix) — the floating panel for rich content a menu can't
-// hold, like the Enhanced System Prompt's checkboxes + prompt preview (#1046). Same surface as the
+// hold, like a ticket filter facet's panel. Same surface as the
 // dropdown menu (border + card + shadow on the Popup, the body scrolls through our ScrollArea), and
 // the trigger stays lit while open via `data-popup-open`, matching the menus.
 

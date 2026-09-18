@@ -6,7 +6,7 @@ Runs in every claude.ai page as the extension's content script [1]: it finds the
 - A hands-off [9] agent's [10] cloud session [3] stops at a gate [11]; the user sees the question in the dashboard, as the same card a local agent's gate gets, with the same options, defaults and recommendation.
 - The user answers in the dashboard; the answer [7] is typed into the session and submitted, and the dashboard reports it as sent, or as failed with why.
 - The user reads the session's transcript in the dashboard while the session works.
-- The user starts a hands-off agent and its cloud session appears on claude.ai, bound to the project's repository, on the agent's branch, on the model the user chose.
+- The user starts a hands-off agent and its cloud session appears on claude.ai, bound to the project's repository, on the agent's branch, on the model the user chose. Nothing starts one today: web runs left the dashboard's launcher.
 - The user sets the bridge up with the bridge browser [12] and signs in to claude.ai once in its window, on the very tab the extension drives.
 
 **Problem**:
@@ -25,12 +25,11 @@ Runs in every claude.ai page as the extension's content script [1]: it finds the
 [7] answer: the text the daemon composes from a pick for the extension to type into the cloud session; it is queued in the dashboard until a Driver tab collects it, then marked sent or failed as the extension reports.
 [8] overlay: the full-page cover the content script draws over the Driver tab, titled "The Framework Driver".
 [9] hands-off: said of an agent whose work leaves this machine, so its first prompt is the whole agent: an agent whose location is `web`.
-[10] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[10] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [11] gate: a question with options at which an agent stops and waits for an answer: it emits the question in its turn's final message, the dashboard shows it as a card, and the answer re-prompts the agent.
 [12] bridge browser: the Chrome for Testing the daemon runs for it.
 [13] bridge token: the secret the extension presents.
 [14] survey: one read of a claude.ai page by the content script: it looks for the question block, mirrors the transcript and redraws what it shows.
-[15] the built-in system prompt: the standing instructions every agent starts with (`prompts/system_prompt.md`).
 [16] pick: the answer to a gate: the option or options chosen, by the user or automatically.
 [17] transcript mirror: the copy of a cloud session's transcript the content script sends to the daemon, one entry per conversation turn keyed by the turn's position.
 [18] session request: the daemon's request that the extension create a cloud session on claude.ai for a hands-off agent: a repository, a branch, a prompt and optionally a model; queued on the daemon, claimed by the worker that reads it, and reported back as created or failed.
@@ -70,7 +69,7 @@ The content script [1] runs on every `https://claude.ai/*` page, in the top fram
 
 #### Context
 
-**Business logic story**: an agent [10] that stops at a gate [11] writes, in its final message, a JSON object with a title and options, as the protocol in the built-in system prompt [15] states; on claude.ai it renders as a code block somewhere in the session's transcript, with prose around it.
+**Business logic story**: an agent [10] that stops at a gate [11] writes, in its final message, a JSON object with a title and options, as the question protocol of `agent-driver` (`packages/agent-driver/src/question.ts`) defines it; on claude.ai it renders as a code block somewhere in the session's transcript, with prose around it.
 
 #### Business logic
 

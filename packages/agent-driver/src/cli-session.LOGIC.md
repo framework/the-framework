@@ -13,7 +13,7 @@ Runs one turn [1] of a coding agent [2] as one operating-system process, whichev
 [3] driver session: the coding agent's own conversation for one agent, which the driver can resume by its session id.
 [4] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later.
 [5] progress event: what a driver reports while a turn runs, for a caller to show and never to decide on: the prompt sent, the session id, streamed text, a tool used, the final result, a rate limit reading, an error, a notice.
-[6] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[6] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [7] stop request: the caller's signal that a driver session, or one turn of it, must end now; the product raises one when the user stops the agent.
 [8] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 

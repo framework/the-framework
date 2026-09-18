@@ -1,5 +1,5 @@
 import { useMemo, useState, type ElementType, type ReactNode } from 'react'
-import { Check, FileIcon, FolderIcon, FolderOpenIcon } from 'lucide-react'
+import { FileIcon, FolderIcon, FolderOpenIcon } from 'lucide-react'
 import { onProjectFileStatus } from '../rpc/reads.js'
 import { usePolled } from '../lib/use-async.js'
 import { cn } from '../lib/utils.js'
@@ -53,9 +53,8 @@ function Row({ icon: Icon, gitStatus, badge, className, children }: {
 const EMPTY_STATUS: Record<string, FileGitStatus> = {}
 
 // The project panel's file tree (#492): a lazy, collapsible tree built from the flat
-// `git ls-files` list (onProjectFiles, shared with the `#` picker #504). It is a file-level
-// CONTEXT PICKER, not an editor — clicking a file toggles it in the agent Context, the same
-// set the `#` chips and the whole-repo Context selector feed. With no files, it renders nothing.
+// `git ls-files` list (onProjectFiles, shared with the `#` picker #504). It is a viewer, not an
+// editor: hovering a file previews it. With no files, it renders nothing.
 //
 // Folders are native `<details>`: open/closed state, keyboard operation and the disclosure
 // semantics come from the browser. This used to be 1,225 lines of vendored animate-ui — a copied

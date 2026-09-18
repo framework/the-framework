@@ -2,21 +2,18 @@ The Settings surface of the dashboard's calls: reading and saving the user's pre
 
 ## Context
 
-**User story**: on Settings [3] the user changes the driver [4], the model, the handoff [5] level, the theme, the notification toggles, the switch that lets the daemon fix red pull requests on its own, and the spend offset [6], saves custom presets [2] for themselves or for the whole team, picks an editor, and pastes a Discord webhook — all from the dashboard, without a daemon restart or a config file edit. Two tabs open at once do not undo each other's changes.
+**User story**: on Settings [3] the user changes the driver [4], the model, the theme, the notification toggles and the browser bridge switches, saves custom presets [2] for themselves or for the whole team, picks an editor, and pastes a Discord webhook — all from the dashboard, without a daemon restart or a config file edit. Two tabs open at once do not undo each other's changes.
 
-**Business logic story**: the preferences [1] are kept in the registry [7], the daemon-side file that also lists the projects, so they survive restarts with nothing stored in the browser. Every value is validated by the registry's rules (`registry.ts`) on its way in: a value of the wrong type is dropped, a choice outside its known set (the driver, the theme, the location [8], the handoff level) is dropped so the default applies, a number is rounded and clamped, free text is trimmed and length-capped, and a blank string or an empty list means "no choice".
+**Business logic story**: the preferences [1] are kept in the registry [7], the daemon-side file that also lists the projects, so they survive restarts with nothing stored in the browser. Every value is validated by the registry's rules (`registry.ts`) on its way in: a value of the wrong type is dropped, a choice outside its known set (the driver, the theme) is dropped so the default applies, free text is trimmed and length-capped, and a blank string or an empty list means "no choice".
 
 ## Glossary
 
 [1] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
-[2] custom preset: a preset the user saved: a prompt with an id and a label, shown beside the built-in presets.
+[2] custom preset: a prompt the user saved, with an id and a label, listed as a saved prompt in the launcher's Commands menu beside the project's commands.
 [3] Settings: the settings page.
-[4] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later. The user's driver choice is `claude-code` or `codex`; the driver implementations are `claude-code`, `codex`, `github-actions`, `claude-web` and `fake`.
-[5] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it). "Handoff level" is a rung of that ladder.
-[6] spend offset: the user's adjustment of the quota boundary, in percentage points of the week.
+[4] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later. The user's driver choice is `claude-code` or `codex`.
 [7] registry: `~/.the-framework.json`: where the user's preferences are kept, and which also lists the projects.
-[8] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
-[9] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps. Started from the dashboard by the user, or by the daemon.
+[9] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 
 ## Business logic — TL;DR
 

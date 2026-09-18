@@ -1,17 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import type { WorkspaceDoc } from '../../src/index.js'
 import { DocsPanel } from './DocsPanel.js'
-import { ViewsRail } from './ViewsRail.js'
 import { FileTree } from './FileTree.js'
-import type { AgentView } from '../lib/live-state.js'
-import { Badge } from './ui/badge.js'
 import { Button } from './ui/button.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import { cn } from '../lib/utils.js'
 import { usePolled } from '../lib/use-async.js'
 import { onDocs } from '../rpc/reads.js'
 
-type Tab = 'files' | 'views' | 'docs'
+type Tab = 'files' | 'docs'
 
 // Choices had a tab here (#440) until the gates moved inline into the transcript (#1455
 // items 6/7) — a question is answered where it was asked, so the rail has no panel for them.
@@ -19,25 +16,21 @@ type Tab = 'files' | 'views' | 'docs'
 // holds exactly (B3); the sessions themselves are the history now.
 const TABS: Record<Tab, { label: string; help: string }> = {
   files: { label: 'Files', help: 'The project’s files, with what the session changed — hover one to preview it.' },
-  views: { label: 'Views', help: 'Documents the agent pushed up during the session — a plan, a summary, a writeup.' },
   docs: { label: 'Docs', help: 'The PLAN/TODO markdown files at the root of the workspace.' },
 }
 
-// The right sidebar (#314 third rail): the ad-hoc markdown views the agent pushes (#441) and
-// the surfaced docs (PLAN/TODO). Views come from the live event stream, passed down from the
-// shell; docs are an RPC read of the selected project. The rail jumps to a fresh first view; choice gates live inline in the
-// transcript now (#1455 items 6/7), so nothing here pulls focus for them.
+// The right sidebar (#314 third rail): the project's files and the surfaced docs (PLAN/TODO). Docs
+// are an RPC read of the selected project; choice gates live inline in the transcript (#1455 items
+// 6/7), so nothing here pulls focus for them.
 export function RightRail({
   projectId,
   agentId: agentId,
-  views,
   files,
   docsInMain = false,
 }: {
   projectId: string | null
   /** The selected agent: scopes the file tree to its worktree (#815). */
   agentId?: string | null | undefined
-  views: AgentView[]
   /** The project's files for the Files tab tree (#492); empty on the relay. */
   files: string[]
   /**
@@ -58,44 +51,32 @@ export function RightRail({
   const hasDocs = !docsInMain && (!docsLoaded || docs.length > 0)
 
   const [tab, setTab] = useState<Tab>('docs')
-  // Once the user picks a tab, stop auto-defaulting (#695/U22) — only a genuinely new choice
-  // gate or the first view may still pull focus after that.
+  // Once the user picks a tab, stop auto-defaulting (#695/U22).
   const touched = useRef(false)
   const pickTab = (t: Tab) => {
     touched.current = true
     setTab(t)
   }
-  const hasViews = views.length > 0
   const hasFiles = files.length > 0
 
-  // Only pull the rail for something genuinely new (#695/U22): the first view. A second view or
-  // a Files flip no longer yanks the tab you're reading, and an explicit pick is never overridden
-  // by the browse default. (A fresh choice gate used to pull focus too — the gates are inline in
-  // the transcript now, #1455 items 6/7.)
-  const sawView = useRef(false)
+  // The browse default: Files when there are any, else Docs. An explicit pick is never overridden.
   useEffect(() => {
-    const firstView = hasViews && !sawView.current
-    sawView.current = sawView.current || hasViews
-
-    if (firstView) setTab('views')
-    else if (!touched.current && !hasViews) setTab(hasFiles ? 'files' : 'docs')
-  }, [hasViews, hasFiles])
+    if (!touched.current) setTab(hasFiles ? 'files' : 'docs')
+  }, [hasFiles])
 
   if (!projectId) return null
 
-  // Files first (#492): the project peek surface, before the agent's own choices/views/docs/log.
+  // Files first (#492): the project peek surface, before the docs.
   // Every tab is earned by content (#1146): a tab that can only say "nothing yet" is one the rail
   // does not offer, and a rail with no tabs left is not shown at all.
   const tabs: Tab[] = [
     ...(hasFiles ? ['files' as const] : []),
-    ...(hasViews ? ['views' as const] : []),
     ...(hasDocs ? ['docs' as const] : []),
   ]
   if (tabs.length === 0) return null
   // The remembered tab may have just lost its content (the last doc deleted, a gate resolved), so
   // fall back to the first one that still exists rather than rendering an empty panel.
   const active: Tab = tabs.includes(tab) ? tab : tabs[0]!
-  const count = (t: Tab) => (t === 'views' ? views.length : 0)
 
   return (
     <aside
@@ -121,7 +102,6 @@ export function RightRail({
               }
             >
               {TABS[t].label}
-              {count(t) > 0 && <Badge className="border-primary/40 text-primary">{count(t)}</Badge>}
             </TooltipTrigger>
             <TooltipContent className="max-w-64">{TABS[t].help}</TooltipContent>
           </Tooltip>
@@ -134,8 +114,6 @@ export function RightRail({
       <div className="flex min-h-0 flex-col overflow-hidden">
         {active === 'files' && hasFiles ? (
           <FileTree projectId={projectId} agentId={agentId} files={files} />
-        ) : active === 'views' && hasViews ? (
-          <ViewsRail views={views} />
         ) : (
           <DocsPanel docs={docs} loaded={docsLoaded} />
         )}

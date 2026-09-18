@@ -5,7 +5,6 @@ import { DRIVER_LABELS, driverFromImpl, cloudRunState, type CloudRunState } from
 import { Button, buttonVariants } from './ui/button.js'
 import { Badge } from './ui/badge.js'
 import { cn } from '../lib/utils.js'
-import { isMetaPublishing } from '../lib/live-state.js'
 import { formatRelative } from '../lib/format-date.js'
 import { STATUS_TONE } from '../lib/status-tone.js'
 import { agentLabel } from '../lib/agent-label.js'
@@ -245,14 +244,12 @@ export function AgentHistory({
                   <SidebarMenuItem key={row.key}>
                     <AgentHistoryRow
                       status={row.agent.status}
-                      publishing={isMetaPublishing(row.agent)}
                       intent={agentLabel(row.agent)}
                       driver={row.agent.driver}
                       // On the Overview the project is what tells the rows apart, so it leads the meta
                       // line; a project's own rail already knows its project, so it shows just the time.
                       subtitle={row.project ? `${row.project} · ${formatRelative(row.agent.startedAt)}` : formatRelative(row.agent.startedAt)}
                       active={row.active}
-                      waiting={row.agent.settledAt !== undefined}
                       remote={row.agent.target === 'remote'}
                       cloud={row.agent.target === 'web'}
                       {...(row.agent.otherHost && row.agent.host ? { startedOn: row.agent.host } : {})}
@@ -523,8 +520,8 @@ function NewButton({
   )
 }
 
-// One agent row: a pulsing dot + RUNNING badge for a working agent, a still dot + WAITING for one
-// parked on the user (#785), else the terminal-status badge.
+// One agent row: a pulsing dot + RUNNING badge for a working agent, a still dot + WAITING for a web
+// run whose cloud session is parked on the user (#1668), else the status badge.
 function AgentHistoryRow({
   status,
   intent,
@@ -533,8 +530,6 @@ function AgentHistoryRow({
   onClick,
   driver,
   dim = false,
-  waiting = false,
-  publishing = false,
   remote = false,
   cloud = false,
   cloudState,
@@ -549,11 +544,6 @@ function AgentHistoryRow({
   active: boolean
   onClick: () => void
   dim?: boolean
-  /** Live, but parked on the user rather than working (#785). */
-  waiting?: boolean
-  /** Ended clean, armed handoff not reported yet (#1455): the row must not say "done" while the
-   *  session's own pill says "publishing…" — the epilogue is still pushing / opening the PR. */
-  publishing?: boolean
   /** Runs on a connected device (#1067): the row gets a device glyph next to the agent logo. */
   remote?: boolean
   /** A Claude Code cloud session (#1263): the row gets a cloud glyph beside the agent logo. */
@@ -565,20 +555,15 @@ function AgentHistoryRow({
   /** The machine whose daemon started the run, when that is another machine (#1648): a glyph names it. */
   startedOn?: string | undefined
 }) {
-  // Only a live agent can be waiting on you; a finished one is just finished — except a web run
-  // whose cloud session the bridge reports as parked (#1668).
-  const parked = (waiting && status === 'running') || cloudState === 'waiting'
+  // A web run whose cloud session the bridge reports as parked (#1668).
+  const parked = cloudState === 'waiting'
   const picked = driverFromImpl(driver)
   // A web agent's local process ends at the hand-off by design, so its `done` is about this
   // machine, not the session (#1264): the cloud side keeps working and opens its own PR. Saying
   // "done" under ten working cloud agents is the lie the demo would put on camera — and "in cloud"
-  // over a run whose PR merged two days ago is the opposite lie (#1668), so the word comes from
-  // what is known of the session: waiting, in cloud, merged, or finally done.
+  // over a run long finished is the opposite lie (#1668), so the word comes from what is known of
+  // the session: waiting, in cloud, or finally done.
   const inCloud = cloudState === 'in-cloud'
-  const cloudWord = cloudState === 'merged' ? 'merged' : undefined
-  // "In cloud" outranks "publishing…": a web agent's local half is over either way, and the cloud
-  // side owns its own push/PR, so the cloud word is the truer one for that row.
-  const publishingNow = publishing && !cloud
   // The title only fades + carries a tooltip when it actually overflows the fixed-width rail; a
   // short one shows plainly. Measured here since CSS cannot tell. The rail width is fixed, so
   // intent is the only thing that changes the answer.
@@ -605,16 +590,13 @@ function AgentHistoryRow({
       <span className="flex w-full items-center gap-2 px-2">
         {/* The dot means "the agent is working", so a run parked on you gets a still one (#785):
             it used to pulse identically whether it was mid-edit or had been idle for an hour. */}
-        {/* The publishing dot pulses green like the session pill's (#1431), so the two surfaces
-            describe the same window the same way. */}
         {/* `parked` alone covers the cloud-side wait: its local status is done, but the SPEC's
             "waiting" always comes with the still dot, wherever the session is parked. */}
         {(status === 'running' || parked) && (
           <span className={cn('inline-block h-2 w-2 shrink-0 rounded-full', parked ? 'bg-muted-foreground' : 'animate-pulse bg-primary')} />
         )}
-        {publishingNow && <span className="inline-block h-2 w-2 shrink-0 animate-pulse rounded-full bg-success" />}
-        <Badge className={cn('shrink-0 border-transparent px-0 text-[10px] uppercase', parked || publishingNow ? 'text-muted-foreground' : inCloud ? 'text-primary' : cloudWord ? 'text-success' : STATUS_TONE[status])}>
-          {parked ? 'waiting' : inCloud ? 'in cloud' : cloudWord ? cloudWord : publishingNow ? 'publishing…' : status}
+        <Badge className={cn('shrink-0 border-transparent px-0 text-[10px] uppercase', parked ? 'text-muted-foreground' : inCloud ? 'text-primary' : STATUS_TONE[status])}>
+          {parked ? 'waiting' : inCloud ? 'in cloud' : status}
         </Badge>
         <span className="truncate text-xs font-normal text-muted-foreground">{subtitle}</span>
         {/* Right cluster: a device glyph when the run is relayed to a connected device (#1067),

@@ -3,10 +3,9 @@
  * no timer of its own, one turn per `tick()` call from the daemon's single clock, and a `stop()`
  * that takes effect between projects.
  *
- * Five services walk the projects this way — the merged-worktree sweep (#1036), the CI watch
- * (#1418), the branch-links pass (#1580), the cloud scratch-ref sweep (#1547) and cloud work
+ * Two services walk the projects this way — the cloud scratch-ref sweep (#1547) and cloud work
  * adoption (#1601). They differ only in what they do to one project; the walking, the overlap
- * rule and the stop flag were written out five times before this.
+ * rule and the stop flag are written out once here.
  */
 
 /** A running background pass, in the shape the daemon's services are wired as. */

@@ -2,7 +2,7 @@ The local daemon's half of the relay [1]: running an agent [2] on a saved device
 
 ## Context
 
-**User story**: the user saves another machine's daemon by URL and token as a device [3], then picks it in the launcher [4]. The agent [2] runs on that machine while its events render in this dashboard like a local agent's; the device's status dot in Settings says whether it is reachable; and the agent's diff, push and pull request still work from here after it ends.
+**User story**: the user saves another machine's daemon by URL and token as a device [3], then picks it in the launcher [4]. The agent [2] runs on that machine while its events render in this dashboard like a local agent's; the device's status dot in Settings says whether it is reachable; and the agent's diff and pull request still work from here after it ends.
 
 **Problem**: the browser must never call the device cross-origin, and the device's token must never leave the two daemons. So the local daemon makes every request, authenticating the way a daemon does: the token as the `fw_daemon` cookie with no `Origin` header, which the device's guard admits without the browser-only redirect, and which its same-origin check does not even see on these routes.
 
@@ -13,14 +13,14 @@ The local daemon's half of the relay [1]: running an agent [2] on a saved device
 [3] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 [4] launcher: the Start form on a project's own page.
 [5] event stream: everything an agent does, one event per line of the agent's diary — the file `<id>.jsonl` the tool that runs the agent writes under `.the-framework/` in the agent's checkout, copied onto the `agent-data` branch when the agent ends. Every surface (dashboard, terminal, replay) is a projection of it.
-[6] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local`, `push`, `pr`, `merge`.
+[6] handoff: what becomes of an agent's work once the agent has ended: its branch pushed, a pull request opened for it, the pull request merged. The agent does it itself; on a finished agent's page the "Open PR" and "Merge" buttons do it by hand.
 
 ## Business logic — TL;DR
 
 - **Checking that a device is reachable** - a ping with the token as the cookie, answered within 3 seconds with any success status, means reachable; anything else means not.
 - **Starting the agent on the device** - the prompt and the options are posted to the device with a 15-second budget, and the device's own answer is the start's result, a refusal or an unreachable device included.
 - **Streaming the agent's events back** - the device's events arrive one JSON line at a time and are forwarded as they complete; a rotated token or a dropped transport ends the stream cleanly as "done".
-- **Forwarding an agent-scoped call to the device** - a read, diff, handoff, push or pull request for a relayed agent runs on the device, with a 60-second budget, and fails like a failed local read would.
+- **Forwarding an agent-scoped call to the device** - a read, diff, handoff read, pull request or merge for a relayed agent runs on the device, with a 60-second budget, and fails like a failed local read would.
 - **The register of relayed agents** - one local live stream and one local list row per relayed agent, the row folded from the events so it mirrors the device, the device kept known past the stream's end until the daemon shuts down.
 
 ## Business logic
@@ -59,11 +59,11 @@ The daemon fetches the device's [3] relay [1] events for the agent [2], authenti
 
 #### Context
 
-**User story**: after a relayed agent [2] ends, the user still opens its diff, pushes its branch or opens its pull request from this dashboard; the work is on the device [3], so that is where the call must run.
+**User story**: after a relayed agent [2] ends, the user still opens its diff, opens its pull request or merges it from this dashboard; the work is on the device [3], so that is where the call must run.
 
 #### Business logic
 
-An agent-scoped call for a relayed agent, whether a read, a diff, a handoff [6], a push or a pull request, is posted to the device's [3] relay [1] call endpoint with its name and arguments, authenticated with the cookie, with a 60-second budget because a push or a pull request runs over the network on the device. The device's result is returned as the call's result. A refused call ("the device refused the request (<status>)") or an unreachable device fails the call, so the caller falls back to its own empty or error shape, the same way it does for a failed local read. Which calls the device accepts is decided on the device (`relay-endpoints.ts`).
+An agent-scoped call for a relayed agent, whether a read, a diff, a handoff [6] read, a pull request or a merge, is posted to the device's [3] relay [1] call endpoint with its name and arguments, authenticated with the cookie, with a 60-second budget because a push or a pull request runs over the network on the device. The device's result is returned as the call's result. A refused call ("the device refused the request (<status>)") or an unreachable device fails the call, so the caller falls back to its own empty or error shape, the same way it does for a failed local read. Which calls the device accepts is decided on the device (`relay-endpoints.ts`).
 
 ### The register of relayed agents
 
@@ -71,7 +71,7 @@ An agent-scoped call for a relayed agent, whether a read, a diff, a handoff [6],
 
 **User story**: a relayed agent [2] appears in its project's agent list, opens like a local agent, keeps its status current as the device reports it, and is still there after the user reloads the dashboard.
 
-**Problem**: a finished relayed agent's later reads, push and pull request must still reach the device [3] after its events have stopped flowing, so knowing where the agent runs has to outlive the event stream [5].
+**Problem**: a finished relayed agent's later reads, pull request and merge must still reach the device [3] after its events have stopped flowing, so knowing where the agent runs has to outlive the event stream [5].
 
 #### Business logic
 

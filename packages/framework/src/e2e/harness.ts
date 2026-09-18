@@ -159,7 +159,7 @@ export async function makeWorld(): Promise<StoryWorld> {
     discord: registryDiscordCredentialsStore(),
     // The story sets one view; both questions are answered off it, since a story that cares about
     // the model's own week states that window in the view it sets (#1619).
-    quota: { read: async () => quota.view, boundaryFor: async () => quota.view.boundary, stop: () => {} },
+    quota: { read: async () => quota.view, stop: () => {} },
     projectErrors: () => [],
     bridgeBrowser: { status: async () => ({ state: 'off' as const }), start: async () => {}, stop: async () => {}, act: async () => {} },
   }

@@ -11,7 +11,7 @@ Answers everything the dashboard reads about a project or an agent [1]: the agen
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. The Framework starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
 [2] the Overview: the dashboard's cross-project page at `/`. project home: a project's own page with the launcher (the Start form) and its composer. agent view: one agent's page.
 [3] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
-[4] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it).
+[4] handoff: what becomes of an agent's work once the agent has ended: its branch pushed, a pull request opened for it, the pull request merged. The agent does it itself; on a finished agent's page the "Open PR" and "Merge" buttons do it by hand.
 [5] the Claude web bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge token is the secret the extension presents; the bridge browser is the Chrome for Testing the daemon runs for it; the Driver tab is the extension's one pinned tab that reads claude.ai's session list, visits sessions and types answers.
 [6] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
 [7] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
@@ -26,7 +26,7 @@ Answers everything the dashboard reads about a project or an agent [1]: the agen
 [17] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds. The other is activity: an agent started or finished.
 [18] open question: a question nobody has answered yet, as the dashboard lists them across projects.
 [19] gate: a question with options an agent's turn ended on: the agent ends waiting for the answer, the dashboard shows the question as a card, and the answer resumes the agent.
-[21] pick: the answer to a gate: the option or options chosen, by the user or automatically.
+[21] pick: the answer to a gate: the option or options the user chose.
 [22] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 
 ## Business logic — TL;DR
@@ -104,7 +104,7 @@ The answer is the ids of the checkouts still on disk under the project's `.branc
 
 **User story**: an agent's action bar says which checkout the agent has, on which branch, whether it holds uncommitted changes, how much disk the checkout takes once the agent is done, and which pull request its branch has.
 
-**Problem**: the git status bar reads the project, so without this an agent's own branch was visible nowhere, and a retained checkout was a name in a list with no size and no way in. And an agent on a branch that successive agents reuse (a preset's pinned branch such as `the-framework/triage-quick`) must not wear a predecessor's merged pull request as its own.
+**Problem**: the git status bar reads the project, so without this an agent's own branch was visible nowhere, and a retained checkout was a name in a list with no size and no way in. And an agent on a branch name an earlier agent already used must not wear a predecessor's merged pull request as its own.
 
 #### Business logic
 

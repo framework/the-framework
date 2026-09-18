@@ -1,11 +1,9 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { mkdtemp, writeFile, appendFile, rm, mkdir, readFile, realpath } from 'node:fs/promises'
+import { mkdtemp, writeFile, rm, mkdir, readFile, realpath } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
-import type { FrameworkEvent } from './events.js'
 import {
-  EventTailer,
   isProcessAlive,
   runDaemon,
   registerHomeProject,
@@ -59,11 +57,6 @@ const homeId = (cwd: string): string => projectId(resolve(cwd))
 const sendStart = (url: string, cwd: string, prompt: string, options: Record<string, string> = {}): Promise<StartResult> =>
   callRpc(url, 'sendStart', [homeId(cwd), prompt, options]) as Promise<StartResult>
 
-/** A log the tailer follows; any JSONL file does. */
-const EVENTS_FILE = 'events.jsonl'
-
-const logEvent = (message: string): FrameworkEvent => ({ kind: 'log', message })
-const line = (message: string): string => JSON.stringify(logEvent(message)) + '\n'
 const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms))
 
 /** Fake an activated workspace: the install-written ignore file is the activation marker (#1600). */
@@ -85,70 +78,6 @@ async function configEnv(cwd: string): Promise<NodeJS.ProcessEnv> {
   await mkdir(dir, { recursive: true })
   return { XDG_CONFIG_HOME: dir }
 }
-
-test('EventTailer dispatches only events appended since the last pull', async () => {
-  const cwd = await tmpWorkspace()
-  const path = join(cwd, THE_FRAMEWORK_DIR, EVENTS_FILE)
-  try {
-    const seen: string[] = []
-    const tailer = new EventTailer(path, e => e.kind === 'log' && seen.push(e.message))
-
-    await tailer.pull() // file absent -> no throw, nothing seen
-    assert.deepEqual(seen, [])
-
-    await writeFile(path, line('one') + line('two'))
-    await tailer.pull()
-    assert.deepEqual(seen, ['one', 'two'])
-
-    await appendFile(path, line('three'))
-    await tailer.pull()
-    assert.deepEqual(seen, ['one', 'two', 'three']) // only the new line was re-read
-  } finally {
-    await rm(cwd, { recursive: true, force: true })
-  }
-})
-
-test('EventTailer buffers a torn trailing line until its newline arrives', async () => {
-  const cwd = await tmpWorkspace()
-  const path = join(cwd, THE_FRAMEWORK_DIR, EVENTS_FILE)
-  try {
-    const seen: string[] = []
-    const tailer = new EventTailer(path, e => e.kind === 'log' && seen.push(e.message))
-
-    const full = line('complete')
-    await writeFile(path, full + '{"kind":"log","mess') // half a second line
-    await tailer.pull()
-    assert.deepEqual(seen, ['complete']) // the fragment is held back
-
-    await appendFile(path, 'age":"rest"}\n')
-    await tailer.pull()
-    assert.deepEqual(seen, ['complete', 'rest'])
-  } finally {
-    await rm(cwd, { recursive: true, force: true })
-  }
-})
-
-test('EventTailer resets when the log is truncated by a fresh run', async () => {
-  const cwd = await tmpWorkspace()
-  const path = join(cwd, THE_FRAMEWORK_DIR, EVENTS_FILE)
-  try {
-    const seen: string[] = []
-    const tailer = new EventTailer(path, e => e.kind === 'log' && seen.push(e.message))
-
-    await writeFile(path, line('old-run'))
-    await tailer.pull()
-    assert.deepEqual(seen, ['old-run'])
-
-    // Truncate + rewrite to the SAME byte length (both lines are 35 bytes), so this is
-    // caught by the mtime check, not by the shrink check.
-    await sleep(20) // let mtime advance past the read above
-    await writeFile(path, line('new-run'))
-    await tailer.pull()
-    assert.deepEqual(seen, ['old-run', 'new-run'])
-  } finally {
-    await rm(cwd, { recursive: true, force: true })
-  }
-})
 
 test('isProcessAlive is true for this process and false for a dead pid', () => {
   assert.equal(isProcessAlive(process.pid), true)

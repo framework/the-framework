@@ -1,7 +1,6 @@
 import { cliRunner, type CliRunner } from '../cli-exec.js'
 import { cachedRead, invalidate, type Cached } from './cache.js'
 import { errorMessage } from '../error-message.js'
-import type { AutoMergeOutcome } from '../events.js'
 
 /**
  * The `gh` CLI, in one place: the two JSON reads the dashboard makes and the runner its write
@@ -79,9 +78,8 @@ const PR_VIEW_FIELDS = 'number,url,state,title,createdAt,headRefOid'
  * than passed through, so a future `--json` addition cannot leak into what callers store.
  *
  * Every optional field {@link LinkedPr} declares must be both asked for and copied out here, or it
- * is silently absent for every caller of this path. `createdAt` was neither, and the CI watch reads
- * it to decide whether a check-less PR has outlived the window a check suite takes to attach — with
- * the field missing, that age is unknowable and such a PR could never be merged at all.
+ * is silently absent for every caller of this path. `createdAt` was once neither, and it is what
+ * tells an agent's own PR from a predecessor's on the same branch name ({@link pickAgentPr}).
  */
 export async function ghPrView(cwd: string, branch?: string, gh: GhRunner = readGh): Promise<LinkedPr | undefined> {
   const args = ['pr', 'view', ...(branch ? [branch] : []), '--json', PR_VIEW_FIELDS]
@@ -170,40 +168,27 @@ function linkedPrs(prs: LinkedPr[]): LinkedPr[] {
 const DIRECT_MERGE_FALLBACK = /auto[- ]?merge is not allowed|clean status|enablePullRequestAutoMerge|protected branch/i
 
 /**
- * How {@link ghMergePr} answers GitHub refusing to arm auto-merge. `merge-now` (the default, and
- * everything before #1418) merges directly: right where a human just said "land it". `watch`
- * merges directly only when the PR's checks have already passed, and otherwise answers `watched`
- * — the daemon's CI watch merges it on green. That is the auto path's mode, because the direct
- * fallback there is precisely the lands-before-CI hazard (#1406): a repo without GitHub
- * auto-merge saw every armed PR merged seconds after opening, before its first check ran.
+ * How a merge went (#1216). `auto-armed` is the preferred outcome: GitHub's
+ * own auto-merge takes the PR, so it lands when its checks pass rather than before them. `merged`
+ * is the fallback where the repo does not allow auto-merge and the PR was merged directly.
  */
-export interface MergePrOptions {
-  whenUnarmed?: 'merge-now' | 'watch'
-}
+export type MergeOutcome = { outcome: 'auto-armed' | 'merged' } | { outcome: 'failed'; error: string }
 
 /**
- * Merge a PR the handoff just opened (#1216): GitHub auto-merge first, so the PR lands when its
- * checks pass rather than before them; where the repo does not allow auto-merge, merged directly
- * or handed to the daemon's CI watch, per {@link MergePrOptions.whenUnarmed} (#1418). Squash in
- * all forms — a session's branch is working history, not a story worth preserving.
+ * Merge a PR (#1216): GitHub auto-merge first, so the PR lands when its checks pass rather than
+ * before them; merged directly where the repo does not allow auto-merge. Squash in both forms — a
+ * session's branch is working history, not a story worth preserving.
  *
- * Never throws: the caller reports the outcome alongside the handoff's, and a merge that could
- * not happen must not turn a successful handoff into a failed one.
+ * Never throws: the caller reports the outcome, and a merge that could not happen is an answer.
  */
-export async function ghMergePr(
-  cwd: string,
-  number: number,
-  gh: GhRunner = nodeGhRunner(),
-  opts: MergePrOptions = {},
-): Promise<AutoMergeOutcome> {
+export async function ghMergePr(cwd: string, number: number, gh: GhRunner = nodeGhRunner()): Promise<MergeOutcome> {
   try {
     await gh(['pr', 'merge', String(number), '--squash', '--auto'], cwd)
     return { outcome: 'auto-armed' }
   } catch (err) {
     const refusal = errorMessage(err)
-    // A draft cannot be merged or auto-merged. The armed handoff opens its PR ready, but the
-    // already-open path can find a draft a *previous* run left behind — mark it ready and try
-    // once more, because an armed merge is the statement that its review already happened.
+    // A draft cannot be merged or auto-merged: mark it ready and try once more, because asking
+    // for the merge is the statement that its review already happened.
     if (/draft/i.test(refusal)) {
       try {
         await gh(['pr', 'ready', String(number)], cwd)
@@ -212,33 +197,16 @@ export async function ghMergePr(
       } catch (retry) {
         const readyRefusal = errorMessage(retry)
         if (!DIRECT_MERGE_FALLBACK.test(readyRefusal)) return { outcome: 'failed', error: readyRefusal }
-        return fallbackMerge(cwd, number, gh, opts)
+        return directMerge(cwd, number, gh)
       }
     }
     if (!DIRECT_MERGE_FALLBACK.test(refusal)) return { outcome: 'failed', error: refusal }
-    return fallbackMerge(cwd, number, gh, opts)
+    return directMerge(cwd, number, gh)
   }
 }
 
-/**
- * What happens once GitHub has refused to arm the merge: directly, or — in `watch` mode with
- * checks still outstanding — deferred to the daemon's CI watch (#1418).
- *
- * The checks read decides, not the refusal text: `clean status` sounds like "nothing blocks this
- * PR" but GitHub says it for a PR whose *non-required* checks are still running, which is the
- * #1406 window. Only `passing` merges now; `none` does not, because a check suite takes a few
- * seconds to attach after the push and a just-opened PR reads as check-less exactly then — the
- * watch merges a genuinely check-less PR after its grace period instead.
- */
-async function fallbackMerge(cwd: string, number: number, gh: GhRunner, opts: MergePrOptions): Promise<AutoMergeOutcome> {
-  if (opts.whenUnarmed !== 'watch') return directMerge(cwd, number, gh)
-  const ci = await ghPrCiStatus(cwd, number, gh)
-  if (ci.checks === 'passing') return directMerge(cwd, number, gh)
-  return { outcome: 'watched' }
-}
-
-/** The direct-merge half of {@link ghMergePr}, shared by its two ways of getting there. */
-async function directMerge(cwd: string, number: number, gh: GhRunner): Promise<AutoMergeOutcome> {
+/** The direct merge {@link ghMergePr} falls back to where GitHub will not arm auto-merge. */
+async function directMerge(cwd: string, number: number, gh: GhRunner): Promise<MergeOutcome> {
   try {
     await gh(['pr', 'merge', String(number), '--squash'], cwd)
     return { outcome: 'merged' }
@@ -246,72 +214,6 @@ async function directMerge(cwd: string, number: number, gh: GhRunner): Promise<A
     return { outcome: 'failed', error: errorMessage(direct) }
   }
 }
-
-/** Where a PR's CI stands (#1418), summarised to the one question the merge path asks. */
-export interface PrCiStatus {
-  /**
-   * `passing`: every check has concluded and none failed — the PR may land. `failing`: at least
-   * one concluded check failed, whatever the rest are doing — red now, and more green later will
-   * not unsay it. `pending`: something is still running and nothing has failed yet. `none`: no
-   * checks reported — either the repo has no CI, or the suite has not attached yet (they take a
-   * few seconds after a push), which is why callers treat it with a grace period rather than as
-   * green. Also the answer when `gh` itself could not say: acting on an unreadable status must
-   * never merge anything.
-   */
-  checks: 'passing' | 'failing' | 'pending' | 'none'
-  /** The names of the failed checks, for the CI-fix agent's prompt. */
-  failed: string[]
-  /** The PR's head commit, so a fix attempt can be recorded against the state it saw. */
-  headSha?: string
-  /** The PR's head branch, where a CI fix must land. Rides this read because it is the same `gh` call. */
-  branch?: string
-}
-
-/**
- * A PR's combined check state (#1418): GitHub Actions check runs and classic commit statuses,
- * both of which `statusCheckRollup` carries.
- *
- * Skipped and neutral conclusions count as passing, matching how GitHub's own merge box treats
- * them; everything else that concluded non-successfully counts as failed — a cancelled or
- * timed-out check is not evidence the work is good, and the merge this feeds exists to stop
- * unverified work landing (#1406).
- */
-export async function ghPrCiStatus(cwd: string, number: number, gh: GhRunner = readGh): Promise<PrCiStatus> {
-  interface RollupEntry {
-    // Check runs carry name/status/conclusion; classic commit statuses carry context/state.
-    name?: string
-    status?: string
-    conclusion?: string
-    context?: string
-    state?: string
-  }
-  let parsed: { statusCheckRollup?: RollupEntry[]; headRefOid?: string; headRefName?: string }
-  try {
-    parsed = JSON.parse(
-      await gh(['pr', 'view', String(number), '--json', 'statusCheckRollup,headRefOid,headRefName'], cwd),
-    ) as typeof parsed
-  } catch {
-    return { checks: 'none', failed: [] }
-  }
-  const rollup = Array.isArray(parsed.statusCheckRollup) ? parsed.statusCheckRollup : []
-  const headSha = typeof parsed.headRefOid === 'string' ? parsed.headRefOid : undefined
-  const branch = typeof parsed.headRefName === 'string' ? parsed.headRefName : undefined
-  const head = { ...(headSha ? { headSha } : {}), ...(branch ? { branch } : {}) }
-  if (rollup.length === 0) return { checks: 'none', failed: [], ...head }
-  const passing = /^(SUCCESS|NEUTRAL|SKIPPED)$/
-  let pending = false
-  const failed: string[] = []
-  for (const entry of rollup) {
-    // A classic status has no `status` field: its `state` is both progress and verdict.
-    const verdict = entry.conclusion ?? entry.state ?? ''
-    const done = entry.status ? entry.status === 'COMPLETED' : verdict !== 'PENDING'
-    if (!done) pending = true
-    else if (!passing.test(verdict)) failed.push(entry.name ?? entry.context ?? 'unnamed check')
-  }
-  const checks = failed.length > 0 ? 'failing' : pending ? 'pending' : 'passing'
-  return { checks, failed, ...head }
-}
-
 
 /** The cached form of {@link ghPrsForBranch}, shared through the same read-through cache (#1028). */
 export async function cachedPrsForBranch(cwd: string, branch: string): Promise<Cached<LinkedPr[]>> {

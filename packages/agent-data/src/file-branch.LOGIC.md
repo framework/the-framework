@@ -4,16 +4,16 @@ Implements a branch of the project's repository used as a file store: files that
 
 **User story**: an agent [4] runs `npx tickets`, `npx queue` or `npx logs` from its own checkout [2], on the user's machine or in a cloud session [5], and sees the tickets, the agent queue [6] and the runs [7] every other machine pushed; the daemon's own records are on the remote a moment after they are written; the user's own branches and tracked files never change, and the user never sees a diff.
 
-**Business logic story**: every skill package and the product's routine locks hand this module a change to apply to a directory and a commit message; this module owns the branch, its checkout, syncing, committing, pushing, and reading. "origin's copy of the branch" below means what the repository last fetched of the branch from its `origin` remote.
+**Business logic story**: every skill package hands this module a change to apply to a directory and a commit message; this module owns the branch, its checkout, syncing, committing, pushing, and reading. "origin's copy of the branch" below means what the repository last fetched of the branch from its `origin` remote.
 
 **Problem**: several machines and cloud sessions write one branch with no coordinator. A stale commit force-fitted onto the branch would erase another writer's change, a change left half written in the checkout would ride the next unrelated commit, and a hung git call would hold the daemon.
 
 ## Glossary
 
-[1] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks. Born as an orphan, written through one sync → commit → push cycle.
+[1] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs. Born as an orphan, written through one sync → commit → push cycle.
 [2] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch. Also "the `agent-data` branch's checkout".
 [3] write cycle: one write to the branch through its persistent checkout: sync with origin, apply the caller's change, commit, push; the change is re-applied when the push loses a race.
-[4] agent: the unit of work: one task worked by a coding agent under The Framework's control, in its own checkout, on its own branch, streaming events, handed off when it ends.
+[4] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [5] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
 [6] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down.
 [7] run: the `logs` skill's record of one agent on the `agent-data` branch: a card and a diary. Never the unit of work.

@@ -4,15 +4,15 @@ The `tickets` command: the six operations an agent [1], or a person in a shell, 
 
 **User story**: an agent [1] working in its own checkout [2] on a code branch lists the open tickets, shows one, claims it before planning or working it, writes a plan or an updated ticket, releases the ticket when its part is done, and closes it once the work is merged; the user can do the same from a shell. The agent's checkout holds no copy of the `agent-data` branch [3], so the command reaches the branch through origin, and what it changes is visible to every other machine at once.
 
-**Business logic story**: the rows come from `tickets.ts`, the filename gates from `names.ts`, the claim [4] and release rules from `locks.ts`, the holder [5] from `holder.ts`; the branch reader and the detached writer, including a rejected push re-applied on origin's new tip, are the `agent-data` package's. The persistent checkout the daemon keeps (`store.ts`) is never touched by the command.
+**Business logic story**: the rows come from `tickets.ts`, the filename gates from `names.ts`, the claim [4] and release rules from `locks.ts`, the holder [5] from `holder.ts`; the branch reader and the detached writer, including a rejected push re-applied on origin's new tip, are the `agent-data` package's. The persistent checkout a long-lived caller keeps (`store.ts`) is never touched by the command.
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch. The user's own working copy is "the user's checkout".
-[3] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
+[3] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [4] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
-[5] holder: who a claim names: the agent's id when the daemon started the agent, else the branch the `tickets` command ran on.
+[5] holder: who a claim names: the agent's id when the program that started the agent set it in `AGENT_ID` (the scheduler does), else the branch the `tickets` command ran on.
 [6] queue entry: an item on the agent queue, `TODO_AGENTS.md` on the `agent-data` branch.
 
 ## Business logic — TL;DR
@@ -34,7 +34,7 @@ The `tickets` command: the six operations an agent [1], or a person in a shell, 
 
 #### Context
 
-**Problem**: the same output is read by two readers at once, a program parsing it (an agent, the daemon) and a person watching the shell; each needs its own channel, and the exit code has to tell a rule saying no from a broken environment.
+**Problem**: the same output is read by two readers at once, a program parsing it (an agent, a caller's code) and a person watching the shell; each needs its own channel, and the exit code has to tell a rule saying no from a broken environment.
 
 #### Business logic
 
@@ -96,7 +96,7 @@ See `## Context`.
 
 #### Context
 
-**User story**: an agent [1] drafts a ticket or a plan in a file and writes it to the branch with `npx tickets put <file> < draft.md`; the daemon's issue import refreshes tickets the same way and stamps `meta.json`.
+**User story**: an agent [1] drafts a ticket or a plan in a file and writes it to the branch with `npx tickets put <file> < draft.md`.
 
 #### Business logic
 

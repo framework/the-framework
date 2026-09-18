@@ -2,15 +2,15 @@ Reads what an agent's [1] branch holds once its work has stopped — the commits
 
 ## Context
 
-**User story**: an agent finishes or settles [3], and its page offers the one step that moves the work forward: "Open PR" when the branch has commits and a remote, "Merge PR" once a pull request exists. While that step runs the button says what it is doing ("Opening PR…", "Merging…"), and when it fails the reason is shown instead of the button silently doing nothing. The summary above the button says what the branch holds, and expanding it lists the commits and files.
+**User story**: an agent ends, or ends waiting [3] on a question, and its page offers the one step that moves the work forward: "Open PR" when the branch has commits and a remote, "Merge PR" once a pull request exists. While that step runs the button says what it is doing ("Opening PR…", "Merging…"), and when it fails the reason is shown instead of the button silently doing nothing. The summary above the button says what the branch holds, and expanding it lists the commits and files.
 
 **Problem**: the same facts are needed in two places at once — the summary line and the actions in the action bar, and the commits and files the bar expands. Read separately they disagree with each other and cost twice the traffic.
 
 ## Glossary
 
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
-[2] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it).
-[3] settled: said of an agent whose work has stopped and which is waiting for the user: it is alive, takes messages, and does nothing until told.
+[2] handoff: what becomes of an agent's work once the agent has ended: its branch pushed, a pull request opened for it, the pull request merged. The agent does it itself; on a finished agent's page the "Open PR" and "Merge" buttons do it by hand.
+[3] waiting: how an agent that ended on a question reads: not working, its checkout kept, resumed by the answer or by the user's next message.
 [4] project: a repository the user registered in the dashboard, identified by an id derived from its path.
 
 ## Business logic — TL;DR
@@ -19,7 +19,7 @@ Reads what an agent's [1] branch holds once its work has stopped — the commits
 - **Polled, because the branch changes behind the dashboard's back** - every 15 seconds at rest, every second while the pull request lookup has not answered.
 - **The last answer stays on screen** - a failed read, and the change of polling cadence, never blank the summary.
 - **One step at a time, and it says which one** - the step in flight is named, so the button reads as pushing, opening or merging rather than silently greying out.
-- **A step that succeeds re-reads the branch at once** - the offer becomes the next step in the ladder without waiting for the next poll.
+- **A step that succeeds re-reads the branch at once** - the offer becomes the next step without waiting for the next poll.
 - **A step that fails reports why** - the reason from the daemon, or the wording the button supplies.
 - **"Not read yet" is distinguishable from "nothing there"** - an empty branch state is never flashed before the first answer lands.
 
@@ -33,13 +33,13 @@ Reads what an agent's [1] branch holds once its work has stopped — the commits
 
 #### Business logic
 
-The branch is read only while the agent's work has stopped: an agent that has ended, and an agent that has settled [3] on the user, both count, since a parked agent's branch is finished work. While the agent is working nothing is read at all and no handoff is offered. Nothing is read either when no agent is selected.
+The branch is read only while the agent is not running: an agent that has ended counts, and so does one waiting [3] on a question, since its branch is finished work until it is resumed. While the agent is working nothing is read at all and no handoff is offered. Nothing is read either when no agent is selected.
 
 ### Polled, because the branch changes behind the dashboard's back
 
 #### Context
 
-**Problem**: the branch does not only change from this page. A push or a pull request opened from a terminal, and the pull request the daemon itself opens, both change what is left to offer, and the page has no way to be told.
+**Problem**: the branch does not only change from this page. A push or a pull request opened from a terminal, and the pull request the agent opens itself, all change what is left to offer, and the page has no way to be told.
 
 #### Business logic
 
@@ -73,7 +73,7 @@ Three steps can be carried out from here: pushing the branch, opening the pull r
 
 #### Business logic
 
-A step that succeeds triggers an immediate re-read of the branch, so what is offered next is the next rung of the handoff [2] ladder. A step that fails does not.
+A step that succeeds triggers an immediate re-read of the branch, so what is offered next is the next step of the handoff [2]. A step that fails does not.
 
 ### A step that fails reports why
 

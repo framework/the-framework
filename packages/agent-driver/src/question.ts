@@ -1,7 +1,7 @@
 /**
  * A question the agent stopped to ask: the one block an agent ends a turn with when it will not
  * decide alone. The block is the contract between an agent and whoever shows the question,
- * a dashboard's card or a runner taking the recommended option unattended; this module is its
+ * a dashboard's card, with the recommended option preselected; this module is its
  * one parser, so the agent learns one shape and every driver reports it the same way.
  *
  * The block, fenced and tagged `await-choices`, is JSON:

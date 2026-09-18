@@ -1,6 +1,5 @@
-import type { AgentLocation } from '../agent-location.js'
 import { join } from 'node:path'
-import type { AutoHandoffSkip, FrameworkEvent } from '../events.js'
+import type { FrameworkEvent } from '../events.js'
 import { nodeFs } from '../node-fs.js'
 import { agentBranchName, isSafeAgentId, worktreeDirEntries } from '@gemstack/skill-branches'
 import { THE_FRAMEWORK_DIR } from '../framework-dir.js'
@@ -40,7 +39,7 @@ export interface AgentMeta {
   pid?: number
   /** The host the owning {@link pid} lives on, so a pid probe only trusts a match (#716). */
   host?: string
-  /** What this session was asked for (from the `intent` event). */
+  /** What this session was asked for. */
   intent?: string
   /** The wrapped agent (from the `session` event). */
   driver?: string
@@ -51,8 +50,7 @@ export interface AgentMeta {
   /** The link shown to jump into the live agent session. */
   sessionLink?: string
   /**
-   * The branch the agent's work is on: folded from `branch` events as the agent observes it (#1277),
-   * and corrected at teardown while the worktree still exists (#799). The session name is this
+   * The branch the agent's work is on, as the run's record names it. The session name is this
    * branch minus its prefix (#1725) — read off it by every surface, never stored beside it.
    *
    * Not reliably derivable instead of recorded: a clean agent loses its checkout, and the agent
@@ -62,7 +60,7 @@ export interface AgentMeta {
   branch?: string
   /**
    * The hand-off anchor a cloud run pushed for its session to clone at (#1601): an empty commit
-   * unique to this run, folded from the `cloud-anchor` event. The session works on a `claude/*`
+   * unique to this run, as the run's record names it. The session works on a `claude/*`
    * branch of the cloud's own naming, and this is the ancestor by which the daemon's adoption
    * pass recognizes which of origin's `claude/*` heads is this run's. Absent on non-web runs
    * and on web runs whose pre-hand-off push failed.
@@ -73,64 +71,14 @@ export interface AgentMeta {
    * re-derived from branch names and timestamps by every surface that wants it.
    */
   pr?: { number: number; url: string }
-  /** Whether the agent signalled `setReadyForMerge()` (#326): building (false/absent) vs ready (true). */
-  readyForMerge?: boolean
   /**
    * What this session's end-of-session handoff is armed to do (#1102): push its branch, and open
    * a draft PR for it. Both start on.
    *
-   * On the meta because the checkboxes that show it live in a different process from the agent that
-   * obeys it, and a tab opened after the agent started has no event history to fold — the same
-   * reason {@link browserStreamPort} is here. Absent means an older agent, which the reader treats
-   * as armed, matching what that agent will actually do.
-   *
-   * `merge` mirrors the auto-merge arming (#1216, #1382) — display-only, like the rest of this
-   * field: the agent merges off its own config, never off the meta. Absent on records from before
-   * #1382, which the reader treats as off.
+   * Read by the web run adoption pass (`cloud-work.ts`): an adopted branch gets its draft PR opened
+   * only when `pr` is not off. Absent means armed.
    */
   handoff?: { push: boolean; pr: boolean; merge?: boolean }
-  /**
-   * How the end-of-session handoff reported back (#1455), folded from the `handoff` event.
-   *
-   * What lets a list surface — which reads meta, not the event log — tell "ended, still
-   * publishing" from "ended, published": between a clean `end` and this field, an armed agent's
-   * epilogue is still pushing / opening the PR, exactly the window the session pill calls
-   * "publishing…" (#1431). Absent until the event lands, which is what a list reads as "still going".
-   */
-  handoffReport?: 'done' | 'skipped' | 'failed'
-  /**
-   * Why a skipped handoff skipped (#1583), folded from the same `handoff` event as
-   * {@link handoffReport}. What lets the daemon tell "published elsewhere" from "ended with
-   * nothing to hand off": a drain that settles with `no-commits` will never run the PR that
-   * lifts its ticket lock, so the sweep releases the claim it minted. On the meta because the
-   * sweep reads metas, not event logs. Absent on non-skipped handoffs and on older records.
-   */
-  handoffSkip?: AutoHandoffSkip
-  /**
-   * How the handoff's merge half went (#1418), folded from the `handoff` event's `merge` field.
-   *
-   * What the daemon's CI watch scans for: `watched` is a PR waiting for green that *this* side
-   * must merge (the repo could not arm GitHub auto-merge), `auto-armed` one GitHub will land by
-   * itself but whose checks going red is still ours to notice. On the meta because the watch
-   * reads metas, not event logs, and must survive both the agent's process and the daemon's.
-   * Absent on runs from before this field, and on every agent whose handoff had no merge to report.
-   */
-  mergeOutcome?: 'auto-armed' | 'merged' | 'watched' | 'withheld' | 'failed'
-  /**
-   * The choice gate the agent is currently parked on (#636): set when a `choice` event fires and
-   * cleared when its `choice-resolved` (or the agent's `end`) arrives. Present means the agent is
-   * paused waiting for the user's answer — the second "needs you" source after open PRs (#624).
-   */
-  pendingChoice?: { id: string; title: string }
-  /**
-   * When the agent settled and parked on the user (#785), or absent while the agent is working.
-   *
-   * Deliberately not a {@link AgentStatus} value: the agent IS still live while it waits (its
-   * process is alive, it still takes messages, it still holds the project), and a dozen readers
-   * key "live" off `status === 'running'`. This is the orthogonal fact — working, or waiting on
-   * you — which `status` cannot carry because it only changes when the agent ends.
-   */
-  settledAt?: string
   /**
    * The browser bridge holds a question this run's cloud session is parked on (#1668). Not stored:
    * the daemon annotates a web run's record on the way to the dashboard, the way a relayed run's
@@ -144,12 +92,6 @@ export interface AgentMeta {
    * it is.
    */
   otherHost?: boolean
-  /**
-   * The loopback port the agent's browser preview is listening on (#813), or absent when the agent
-   * has no browser. What lets the daemon proxy the pane: the port is allocated per agent and the
-   * dashboard is a different process, so meta is the only place it can learn it.
-   */
-  browserStreamPort?: number
   /**
    * Where this run executes (#1050/#1053/#610): `actions` for a GitHub Actions run, `web` for a
    * Claude Code cloud session, `remote` when relayed to a connected device (#1067), absent for a

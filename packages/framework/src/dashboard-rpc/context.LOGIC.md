@@ -7,10 +7,10 @@ Gives every call the dashboard makes the daemon's own capabilities, wired once w
 ## Glossary
 
 [1] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
-[2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps. Started from the dashboard by the user, or by the daemon.
+[2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [3] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 [4] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
-[5] sweep: a background job the daemon runs on its clock: the CI watch, the notification watchers, the sweep that reclaims checkouts, the branch-links sweep, the cloud scratch sweep, cloud work adoption.
+[5] sweep: a background job the daemon runs on its clock: the data sync, the notification watchers, the cloud scratch sweep, cloud work adoption. None of them starts an agent.
 [6] the Claude web bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge browser is the Chrome for Testing the daemon runs for it.
 [7] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
 [8] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
@@ -30,7 +30,7 @@ Gives every call the dashboard makes the daemon's own capabilities, wired once w
 
 #### Context
 
-**Problem**: the calls need things only the daemon has: its start (with the guard against starting the same work twice), the ability to install and register a repository, the live quota [4] reading, the errors its sweeps [5] found, its bridge browser [6]. There is exactly one host serving the dashboard and it has all of them, so a call never has to cope with "this capability is not available here".
+**Problem**: the calls need things only the daemon has: its start (the project's start hook, or the start forwarded to a device), the ability to install and register a repository, the live quota [4] reading, the errors its sweeps [5] found, its bridge browser [6]. There is exactly one host serving the dashboard and it has all of them, so a call never has to cope with "this capability is not available here".
 
 #### Business logic
 

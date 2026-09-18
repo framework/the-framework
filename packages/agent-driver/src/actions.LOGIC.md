@@ -14,7 +14,7 @@ Drives Claude Code on a GitHub Actions runner as a driver [1]: each turn [2] dis
 [2] turn: one prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
 [3] correlation id: the id the driver makes up for one turn and hands the workflow, which echoes it into the run's display name and the artifact's name; it is the only way the driver finds its own run, since dispatching a workflow answers with no run id.
 [4] progress event: what a driver reports while a turn runs, for a caller to show and never to decide on: the prompt sent, the session id, streamed text, a tool used, the final result, a rate limit reading, an error, a notice.
-[5] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[5] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [6] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
 [7] live chat: the user's own messages to a running agent, each continuing the same driver session. One of them is a message.
 [8] driver session: the coding agent's own conversation for one agent, which the driver can resume by its session id.
@@ -28,7 +28,7 @@ Drives Claude Code on a GitHub Actions runner as a driver [1]: each turn [2] dis
 
 - **The shared end of a turn, and the log** - the session attaches the log when the caller asked for one, so every event is recorded before the caller sees it; every turn ends the shared way (`inbox.ts`): the question reported, the inbox drained into further turns of the same session.
 - **One turn is one workflow run** - a turn [2] dispatches the workflow with the framing [9] placed ahead of the prompt, the correlation id [3], the run branch, and the model and session id when there are any, on the branch the previous run pushed or else the configured ref or `main`.
-- **The correlation id** - `<driver session id>-turn-<n>`, where the driver session [8] id carries a random tag so two daemons, or two processes of one daemon, never match each other's runs.
+- **The correlation id** - `<driver session id>-turn-<n>`, where the driver session [8] id carries a random tag so two callers, or two processes of one caller, never match each other's runs.
 - **Only ids reach the runner's shell** - a model id or session id containing anything but letters, digits, dots, underscores, colons and hyphens is refused before dispatch; the prompt is a workflow input and never goes through a shell.
 - **Waiting for the run** - the workflow's recent runs are polled every 5 seconds for one whose display name contains the correlation id; the run's link is reported once as an action; a run that concludes with anything but success fails the turn, naming the run; the wait gives up after 1 hour; a stop request [10] ends the wait, not the run.
 - **Reading the transcript back** - the run's artifact named after the correlation id is downloaded as a zip and read for `execution.json` and `meta.json`; a run without an artifact or without a transcript fails the turn.
@@ -57,7 +57,7 @@ A turn [2] first reports a `start` progress event [4] carrying the prompt it sen
 
 #### Context
 
-**Problem**: dispatching a workflow answers with nothing, so the driver [1] cannot be told which run is its own. The daemon starts a fresh process per agent [5], and a counter alone would restart at one in each, so two agents would both look for a run named after the same first turn [2] and one could latch onto the other's run.
+**Problem**: dispatching a workflow answers with nothing, so the driver [1] cannot be told which run is its own. A caller may start a fresh process per agent [5], and a counter alone would restart at one in each, so two agents would both look for a run named after the same first turn [2] and one could latch onto the other's run.
 
 #### Business logic
 

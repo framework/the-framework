@@ -2,24 +2,22 @@ Claims a ticket for one holder [1] at a time and releases it again: the claim [2
 
 ## Context
 
-**User story**: the daemon starts several agents [4] at once on tickets, a fan-out [5], one per ticket to plan or one per queue entry to work, and each agent may only work a ticket nobody else holds. An agent runs `npx tickets claim <file>` and is told whether the ticket is now its own or someone else's. When the plan or the work is done, the holder [1] releases the ticket, or closing the ticket lifts the claim [2] with it.
+**User story**: several agents [4] work tickets at once, on this machine or others, and each agent may only work a ticket nobody else holds. An agent runs `npx tickets claim <file>` and is told whether the ticket is now its own or someone else's. When the plan or the work is done, the holder [1] releases the ticket, or closing the ticket lifts the claim [2] with it.
 
 **Problem**: the holder may be on another machine, or in a cloud session [6] whose local process is gone, so the guard cannot be anyone's memory: it has to be a file where every reader already looks, on the `agent-data` branch [3].
 
 ## Glossary
 
-[1] holder: who a claim names: the agent's id when the daemon started the agent, else the branch the `tickets` command ran on.
+[1] holder: who a claim names: the agent's id when the program that started the agent set it in `AGENT_ID` (the scheduler does), else the branch the `tickets` command ran on.
 [2] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
-[3] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
-[4] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
-[5] fan-out: starting several agents at once, one per queue entry or one per ticket to plan.
+[3] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
+[4] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [6] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
-[7] drain: starting an agent on the agent queue's first open entry — the half of Auto PM that spends existing work.
 
 ## Business logic — TL;DR
 
 - **The claim is one line in a file beside the ticket** - `tickets/<stem>.lock.md` holds `CLAIMED: <holder>` and nothing else; a file whose first text is not such a line names no holder, yet still claims.
-- **A claim never expires** - it lifts only when the ticket is closed, when its holder releases it, when a person removes it by hand, or when the daemon frees a claim it made for an agent it knows ended with nothing.
+- **A claim never expires** - it lifts only when the ticket is closed, when its holder releases it, or when a person removes it by hand, on the branch or from the dashboard.
 - **Claiming to plan or to implement** - a claim made to write a plan skips a ticket that already has one; a claim made to implement takes a planned ticket, and only someone else's claim stands in its way.
 - **A batch re-judged, never double-claimed** - an existing claim naming the same holder counts as the batch's own claim; anyone else's, or one that does not parse, keeps the ticket out of the batch; re-applying the batch gives the same answer.
 - **How claims land** - one commit for the whole batch; a batch that could not commit claims nothing and says why; a batch committed but not pushed keeps its claims and logs the gap.
@@ -46,13 +44,13 @@ A ticket's claim [2] is the file `tickets/<stem>.lock.md`, `<stem>` being the ti
 
 #### Business logic
 
-There is no timed release. A claim [2] lifts only when the ticket is closed together with its plan and claim (the `close` command in `cli.ts`), when its holder [1] releases it, when a person removes the file by hand on the branch, or when the daemon frees a claim it made for an agent [4] it knows ended with nothing, naming that holder so it never frees anyone else's.
+There is no timed release. A claim [2] lifts only when the ticket is closed together with its plan and claim (the `close` command in `cli.ts`), when its holder [1] releases it, or when a person removes it by hand: the file on the branch, or the dashboard's release, which frees whoever holds it.
 
 ### Claiming to plan or to implement
 
 #### Context
 
-**Business logic story**: the daemon claims tickets in batches for the agents [4] it is about to start: a fan-out [5] to write plans, one agent per ticket to plan, or a drain [7], one agent per queue entry that links a ticket, to implement. The `tickets claim` command always claims to implement (the rules in `cli.ts`).
+**Business logic story**: a caller that starts agents [4] can claim tickets in batches for them, to write plans or to implement; no program in the repository does. The `tickets claim` command always claims to implement (the rules in `cli.ts`).
 
 #### Business logic
 
@@ -82,7 +80,7 @@ The whole batch lands as one commit on the `agent-data` branch [3], pushed, name
 
 #### Context
 
-**User story**: a holder [1] is done with the plan or the work and lifts its claim [2] before stopping; the daemon frees the claim it made for an agent [4] that ended with nothing.
+**User story**: a holder [1] is done with the plan or the work and lifts its claim [2] before stopping; a person frees the claim of an agent [4] that ended without releasing it from the dashboard, whoever holds it.
 
 #### Business logic
 

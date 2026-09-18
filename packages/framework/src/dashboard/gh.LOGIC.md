@@ -1,8 +1,8 @@
-Every fact the daemon reads from GitHub, and the one thing it writes there, goes through the `gh` CLI in this one place: the pull request linked to an agent's [1] branch, every pull request a branch name has ever had, a pull request's check state, whether the repository allows GitHub auto-merge, a checkout's [2] open pull requests, the GitHub token an agent on a GitHub Actions runner authenticates with, and merging a pull request. Reads are capped at 8 seconds and, with two deliberate exceptions, answer "nothing" instead of failing when `gh` is not installed, logged out or cannot reach GitHub; the reads the dashboard polls are served through the read-through cache described in `cache.ts`.
+Every fact the daemon reads from GitHub, and the one thing it writes there, goes through the `gh` CLI in this one place: the pull request linked to an agent's [1] branch, every pull request a branch name has ever had, a checkout's [2] open pull requests, and merging a pull request. Reads are capped at 8 seconds and, with two deliberate exceptions, answer "nothing" instead of failing when `gh` is not installed, logged out or cannot reach GitHub; the reads the dashboard polls are served through the read-through cache described in `cache.ts`.
 
 ## Context
 
-**User story**: the user opens an agent [1] in the dashboard and sees its pull request's number and state in the git status bar and in the handoff [3] summary of the agent view [4]; the "needs you" feed lists pull requests waiting for review; the launcher [5] warns when the repository does not allow auto-merge; and an agent ending at handoff level `merge` lands its pull request once its checks pass. All of it works with nothing more than a `gh` that is logged in, and none of it breaks a page when `gh` is missing.
+**User story**: the user opens an agent [1] in the dashboard and sees its pull request's number and state in the git status bar and in the handoff [3] summary of the agent view [4]; the "needs you" feed lists pull requests waiting for review; and the "Merge" button on a finished agent lands its pull request once its checks pass. All of it works with nothing more than a `gh` that is logged in, and none of it breaks a page when `gh` is missing.
 
 **Problem**: two unknowns look alike and must not be confused. "There is no pull request" and "GitHub could not be asked" are the same to a panel that only renders, but different to a caller about to open a pull request (it would open a second one) and to the feed that remembers what it has already announced (it would announce every open pull request again). Each read therefore picks, deliberately, which of the two it answers on failure.
 
@@ -10,12 +10,9 @@ Every fact the daemon reads from GitHub, and the one thing it writes there, goes
 
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
-[3] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it).
+[3] handoff: what becomes of an agent's work once the agent has ended: its branch pushed, a pull request opened for it, the pull request merged. The agent does it itself; on a finished agent's page the "Open PR" and "Merge" buttons do it by hand.
 [4] agent view: one agent's page.
-[5] launcher: the Start form on project home, a project's own page.
-[6] CI watch: the sweep that merges the pull requests The Framework opened once their checks pass, and starts a fix agent when a check goes red.
-[7] unattended: said of an agent nobody is watching: one the scheduler started rather than a person. It is not answered any faster: a question it ends on waits for a human like any other.
-[8] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds.
+[5] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds.
 
 ## Business logic — TL;DR
 
@@ -23,8 +20,7 @@ Every fact the daemon reads from GitHub, and the one thing it writes there, goes
 - **The pull request linked to a branch** - the pull request `gh` links to a named branch or to the checkout's current branch, with its number, URL, state, title, creation time and head commit, cached per checkout and branch and forgotten after an action that changes it.
 - **Every pull request a branch name has ever had** - up to 20 pull requests in any state, newest first, an empty list when `gh` cannot answer, except for the caller about to open a pull request, for whom a failed listing is a failure.
 - **Which pull request is the agent's own** - an open pull request always; a closed or merged one only when created after the agent started, the oldest such, or the newest for the caller asking what last landed.
-- **Merging a pull request** - arm GitHub auto-merge with a squash, ready a draft and retry, fall back to a direct merge or to the CI watch only on the refusals that mean "auto-merge is not available here", report every other refusal, never throw.
-- **A pull request's check state** - "passing", "failing", "pending" or "none", over check runs and classic statuses alike, with the failed checks named; unreadable is "none", never green.
+- **Merging a pull request** - arm GitHub auto-merge with a squash, ready a draft and retry, fall back to a direct merge only on the refusals that mean "auto-merge is not available here", report every other refusal, never throw.
 - **A checkout's open pull requests** - up to 50 open pull requests with their draft flag and head branch; a `gh` that cannot answer fails the read instead of reading as "no pull requests".
 
 ## Business logic
@@ -33,11 +29,11 @@ Every fact the daemon reads from GitHub, and the one thing it writes there, goes
 
 #### Context
 
-**Problem**: every read here feeds a panel that renders whatever it got, so "`gh` is not installed" must cost a page load nothing; a write action is something the user or a handoff [3] is waiting on, and its failure must be explained in GitHub's own words.
+**Problem**: every read here feeds a panel that renders whatever it got, so "`gh` is not installed" must cost a page load nothing; a write action is something the user is waiting on, and its failure must be explained in GitHub's own words.
 
 #### Business logic
 
-A read runs `gh` with an 8-second cap. When `gh` is not installed, not logged in, has no remote to talk to, cannot reach GitHub, outruns the cap, or answers with something that is not JSON, the read answers its "nothing" value: no linked pull request, an empty list, no checks, an unknown setting. Two reads are exceptions and fail loudly instead, because their callers must tell "none" from "could not tell": the pull request history read by a caller about to open a pull request, and the list of a checkout's [2] open pull requests, both described below.
+A read runs `gh` with an 8-second cap. When `gh` is not installed, not logged in, has no remote to talk to, cannot reach GitHub, outruns the cap, or answers with something that is not JSON, the read answers its "nothing" value: no linked pull request, an empty list. Two reads are exceptions and fail loudly instead, because their callers must tell "none" from "could not tell": the pull request history read by a caller about to open a pull request, and the list of a checkout's [2] open pull requests, both described below.
 
 A write action runs `gh` with a 60-second cap, since it talks to the network and to git while the user waits on a button they pressed. When it fails, the error is `gh`'s own message ("not logged in", "no default remote") rather than a generic failure; a `gh` that outruns its cap fails as a timeout, by the runner's rule in `cli-exec.ts`. The write runner defined here is also what the handoff's [3] own `gh` actions (pushing, opening a pull request, in `agent-handoff.ts`) run on.
 
@@ -49,7 +45,7 @@ See `## Context`.
 
 #### Business logic
 
-For a named branch, or for whatever branch the checkout [2] is currently on when none is named, the read answers the pull request `gh` links to that branch: its number, URL, state as GitHub reports it (`OPEN`, `MERGED` or `CLOSED`), title, creation time, and the head commit it covers. The creation time tells one agent's [1] pull request from a predecessor's and lets the CI watch [6] judge how long a check-less pull request has waited for its checks to attach; the head commit tells "the pull request already landed everything" from "the agent kept working after it merged". A field `gh` did not answer with is absent rather than empty, so "unknown" is never mistaken for "has none". Only these fields are kept: whatever else `gh` may add to its answer never leaks into what callers store. When there is no pull request, or `gh` could not be asked, the answer is "no pull request".
+For a named branch, or for whatever branch the checkout [2] is currently on when none is named, the read answers the pull request `gh` links to that branch: its number, URL, state as GitHub reports it (`OPEN`, `MERGED` or `CLOSED`), title, creation time, and the head commit it covers. The creation time tells one agent's [1] pull request from a predecessor's; the head commit tells "the pull request already landed everything" from "the agent kept working after it merged". A field `gh` did not answer with is absent rather than empty, so "unknown" is never mistaken for "has none". Only these fields are kept: whatever else `gh` may add to its answer never leaks into what callers store. When there is no pull request, or `gh` could not be asked, the answer is "no pull request".
 
 A caller looking up a finished agent's pull request always names the branch: the agent's checkout may already be gone, so "the current branch" would silently be the project's own branch, not the agent's.
 
@@ -59,7 +55,7 @@ The dashboard's panels read this through the read-through cache in `cache.ts`, k
 
 #### Context
 
-**Problem**: GitHub's "the pull request for this branch" answers with the newest pull request for that branch name in any state, so an agent [1] whose prompt pins its branch name (a preset's pinned branch such as `the-framework/triage-quick`) would inherit a predecessor's merged pull request as its own. Keeping the whole history lets the next rule decide which entry, if any, belongs to the agent asking.
+**Problem**: GitHub's "the pull request for this branch" answers with the newest pull request for that branch name in any state, so an agent [1] on a branch name an earlier agent already used would inherit a predecessor's merged pull request as its own. Keeping the whole history lets the next rule decide which entry, if any, belongs to the agent asking.
 
 #### Business logic
 
@@ -81,35 +77,23 @@ One caller asks the opposite question: not "which pull request did this agent op
 
 #### Context
 
-**User story**: an agent [1] whose handoff [3] level is `merge` lands its pull request when the checks pass, not before them. A repository that does not allow GitHub auto-merge must not see every armed pull request merged seconds after opening, before its first check runs.
+**User story**: the user presses "Merge" on a finished agent [1]: the pull request lands when its checks pass, not before them, and where the repository does not allow GitHub auto-merge it lands right away, because a human just said "land it".
 
 #### Business logic
 
-A merge is always a squash merge: an agent's branch is working history, not a story worth preserving. The first attempt arms GitHub auto-merge, so the pull request lands when its checks pass; success is the outcome "auto-armed". When GitHub refuses because the pull request is a draft (one a previous agent's handoff left behind, since an armed handoff opens its own pull request ready), the pull request is marked ready and arming is tried once more: an armed merge is the statement that its review already happened.
+A merge is always a squash merge: an agent's branch is working history, not a story worth preserving. The first attempt arms GitHub auto-merge, so the pull request lands when its checks pass; success is the outcome "auto-armed". When GitHub refuses because the pull request is a draft, the pull request is marked ready and arming is tried once more: asking for the merge is the statement that its review already happened.
 
 Only a refusal that means "auto-merge is not available here" leads to the fallback: GitHub's "auto merge is not allowed for this repository" (the repository setting is off), "clean status" (nothing blocks the pull request, and auto-merge is only for pull requests that cannot land yet), the `enablePullRequestAutoMerge` marker both of those carry, or a "protected branch" refusal, all matched loosely and case-insensitively so that a rephrasing on GitHub's side degrades to a reported failure, never a wrong merge. Any other refusal (a merge conflict, a permissions problem, a network failure) is reported as the outcome "failed" with GitHub's own words, and never retried as a direct merge, which would either fail again or land a pull request GitHub just said not to.
 
-The fallback depends on the policy the caller chose. Under the default policy, "merge now", right where a human just said "land it", the pull request is merged directly; success is "merged", and a direct merge that also fails reports that second refusal as "failed". Under the "watch" policy, the policy of the unattended [7] path, the pull request's check state (next section) decides: the pull request is merged directly only when every check has passed, and otherwise the outcome is "watched", meaning the daemon's CI watch [6] merges it on green. "No checks reported" does not merge now, because a check suite takes a few seconds to attach after a push and a just-opened pull request reads as check-less exactly then; the CI watch merges a genuinely check-less pull request after its own grace period. The refusal text never makes this decision, only the checks read does: "clean status" sounds like "nothing blocks it", but GitHub also says it for a pull request whose non-required checks are still running.
+The fallback merges the pull request directly; success is "merged", and a direct merge that also fails reports that second refusal as "failed".
 
-Merging never throws: the caller reports the merge outcome alongside the handoff's, and a merge that could not happen must not turn a successful handoff into a failed one.
-
-### A pull request's check state
-
-#### Context
-
-**Business logic story**: the fallback merge above and the CI watch [6] both ask one question of a pull request: may it land, is it red, or is it still running?
-
-#### Business logic
-
-A pull request's checks are read as one combined state covering both GitHub Actions check runs and classic commit statuses. "passing": every check has concluded and none failed; skipped and neutral conclusions count as passing, as GitHub's own merge box treats them. "failing": at least one concluded check did not succeed, whatever the rest are doing; a cancelled or timed-out check counts as failed too, since it is not evidence the work is good, and red now is not unsaid by more green later. "pending": something is still running and nothing has failed yet. "none": no checks reported, which means either the repository has no CI or the suite has not attached yet, which is why callers treat it with a grace period rather than as green. "none" is also the answer when `gh` could not say, because acting on an unreadable status must never merge anything.
-
-A check run is concluded once its status is completed. A classic status has no separate progress: its state is both progress and verdict, and it is concluded unless that state is pending. Alongside the state, the read names the failed checks (a check run by its name, a classic status by its context, or "unnamed check") for the fix agent's prompt, and reports the pull request's head commit and head branch, so a fix attempt can be recorded against the state it saw and the fix lands on the right branch.
+Merging never throws: the caller reports the outcome, and a merge that could not happen is an answer, not an error.
 
 ### A checkout's open pull requests
 
 #### Context
 
-**Business logic story**: the interventions [8] feed (`interventions.ts`) reads a project's open pull requests to announce the ones waiting for review, and remembers what it has already announced.
+**Business logic story**: the interventions [5] feed (`interventions.ts`) reads a project's open pull requests to announce the ones waiting for review, and remembers what it has already announced.
 
 #### Business logic
 

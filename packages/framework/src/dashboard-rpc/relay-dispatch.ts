@@ -10,7 +10,7 @@ import { sendStop, sendChoice, sendMessage, sendOpenPullRequest, sendMerge } fro
 // registered at daemon start). They run with no browser request behind them, which is sound because
 // the one thing they read off the context here — is this agent relayed onward? — defaults to no,
 // and on the device that is the truth: the agent is local here, so forwarding it again would loop.
-// Whitelist only: start/preview/delete stay OFF it.
+// Whitelist only: start/delete/remove-worktree stay OFF it.
 
 type RelayFn = (...args: unknown[]) => Promise<unknown>
 // Null-prototype, like RPC_HANDLERS (R1): the key is a request-controlled string, so a plain object

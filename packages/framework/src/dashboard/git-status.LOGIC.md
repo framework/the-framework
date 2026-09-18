@@ -41,7 +41,7 @@ For a project's own checkout [2], the pull request is the one linked to the curr
 
 #### Context
 
-**Problem**: the plain lookup answers the newest pull request for the branch in any state, so an agent [1] on a reused pinned branch (a preset's pinned branch such as `the-framework/triage-quick`) would wear a predecessor's merged pull request as its own badge.
+**Problem**: the plain lookup answers the newest pull request for the branch in any state, so an agent [1] on a branch name an earlier agent already used would wear a predecessor's merged pull request as its own badge.
 
 #### Business logic
 

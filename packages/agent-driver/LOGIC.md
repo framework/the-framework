@@ -12,7 +12,7 @@ The `agent-driver` package is how The Framework works a repository without ever 
 [2] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later. The user's driver choice is `claude` or `codex`; the driver implementations are `claude-code`, `codex`, `github-actions`, `claude-web` and `fake`.
 [3] turn: one prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
 [4] progress event: what a driver reports while a turn runs, for a caller to show and never to decide on: the prompt sent, the session id, streamed text, a tool used, the final result, a rate limit reading, an error, a notice.
-[5] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[5] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [6] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
 [7] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
 

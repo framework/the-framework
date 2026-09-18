@@ -48,7 +48,7 @@ See `## Context`.
 The section is titled "Waiting on you · <count of open questions>". Cards scroll inside their own area, capped at 70% of the viewport's height. Each open card has:
 
 - A header button (tooltip "Open this session") showing the agent's [3] label — its session name [5], else the first line of its intent cut at 80 characters, else its agent id — and the project's name, with "Open session →" on the right. Clicking it opens that agent's agent view [6], switching project when the agent belongs to another project.
-- The gate [2] card itself (`ChoicePanel.tsx`: the question, its options, the recommended one). Nothing here is ever accepted automatically, whatever the autopilot preference says: the hub shows every parked gate at once, and answering them all would be a mass auto-accept.
+- The gate [2] card itself (`ChoicePanel.tsx`: the question, its options, the recommended one). Nothing here is ever accepted automatically: every gate waits for a person's pick.
 
 ### Answering
 

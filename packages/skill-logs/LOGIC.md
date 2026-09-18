@@ -1,4 +1,4 @@
-The `logs` skill: the record of every run [1] agents [2] made on a project, kept on the `agent-data` branch [3] and never on a code branch, read by agents with the `logs` command. A run is two files under `agents/<who>/`: the card [4], `<id>.json`, and the diary [5], `<id>.jsonl`. Two callers meet the package: the command an agent runs, which only reads, off origin's copy of the branch from any clone; and the recording program [6] (the daemon), which keeps the branch checked out under `.branches/agent-data`, records each run through this package when the agent ends, patches the branch and the pull request onto it later, deletes it with the agent's records, and reads runs back for its pages. The package ships the executable (`bin/`), the library (`src/`) and `SKILL.md`, the agent's instructions. `package.json` and the `tsconfig*.json` files configure the build and carry no business logic; `DECISIONS.md` records the human decisions behind the package.
+The `logs` skill: the record of every run [1] agents [2] made on a project, kept on the `agent-data` branch [3] and never on a code branch, read by agents with the `logs` command. A run is two files under `agents/<who>/`: the card [4], `<id>.json`, and the diary [5], `<id>.jsonl`. Three callers meet the package: the command an agent runs, which only reads, off origin's copy of the branch from any clone; the recording program [6] (the scheduler), which records each run through this package, in the branch's checkout under `.branches/agent-data`, when the agent ends; and the product (`packages/framework`), which patches the branch and the pull request onto a run later, deletes it with the agent's records, and reads runs back for its pages. The package ships the executable (`bin/`), the library (`src/`) and `SKILL.md`, the agent's instructions. `package.json` and the `tsconfig*.json` files configure the build and carry no business logic; `DECISIONS.md` records the human decisions behind the package.
 
 ## Context
 
@@ -7,11 +7,11 @@ The `logs` skill: the record of every run [1] agents [2] made on a project, kept
 ## Glossary
 
 [1] run: the `logs` skill's record of one agent on the `agent-data` branch: a card and a diary. Never the unit of work.
-[2] agent: the unit of work: one task worked by a coding agent under The Framework's control, in its own checkout, on its own branch, streaming events, handed off when it ends.
-[3] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
+[2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
+[3] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [4] card: the run's `<id>.json`: what was asked, the ticket, the branch, the pull request, how it ended, what it cost.
 [5] diary: the run's `<id>.jsonl`: what the agent said.
-[6] recording program: the program that ran an agent and records its run when the agent ends; in the product, the daemon.
+[6] recording program: the program that ran an agent and records its run when the agent ends; in the product, the scheduler (`agent-scheduler`).
 
 ## Business logic — TL;DR
 

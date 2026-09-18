@@ -29,8 +29,8 @@ export const SKILL_DIR = join(dirname(fileURLToPath(import.meta.url)), '..')
  * A skill to link into a checkout: its name (the directory a harness lists it under) and the
  * directory holding its `SKILL.md`.
  *
- * A caller names the skills it ships itself and wants in every checkout it makes — the daemon's
- * routine skills, which live with the daemon and not in the repository. A skill a project uses
+ * A caller names the skills it ships itself and wants in every checkout it makes, skills that
+ * live with the caller and not in the repository. A skill a project uses
  * is the project's own tracked `.claude/skills/<name>`, in every worktree by itself.
  */
 export interface SkillLink {

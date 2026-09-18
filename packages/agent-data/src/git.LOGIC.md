@@ -2,14 +2,14 @@ Runs git for the whole product: one runner executes `git` in a directory, resolv
 
 ## Context
 
-**User story**: the dashboard stays responsive and the daemon keeps starting agents [1] on a large repository: a `git worktree add` that writes every tracked file, or a `git push` that uploads a packfile, gets the minutes it needs, while a stuck read fails within seconds instead of freezing a sweep [2]; when a push fails, the user sees git's own reason ("fatal: …") rather than an echoed command line.
+**User story**: the dashboard stays responsive and the scheduler keeps starting agents [1] on a large repository: a `git worktree add` that writes every tracked file, or a `git push` that uploads a packfile, gets the minutes it needs, while a stuck read fails within seconds instead of freezing a sweep [2]; when a push fails, the user sees git's own reason ("fatal: …") rather than an echoed command line.
 
 **Problem**: one flat budget for every git call is wrong in both directions. A read that hangs holds its caller for the whole budget, so the budget must stay short; a whole-checkout [3] write or an upload killed on a short budget may have half happened, so those must get far longer.
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent under The Framework's control, in its own checkout, on its own branch, streaming events, handed off when it ends.
-[2] sweep: a background job the daemon runs on its clock: Auto PM, the CI watch, the notification watchers, the sweep that reclaims checkouts, the branch-links sweep, the cloud scratch sweep, cloud work adoption.
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
+[2] sweep: a background job the daemon runs on its clock: the data sync, the notification watchers, the cloud scratch sweep, cloud work adoption. None of them starts an agent.
 [3] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch. Also "the `agent-data` branch's checkout".
 
 ## Business logic — TL;DR

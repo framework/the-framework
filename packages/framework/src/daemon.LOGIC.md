@@ -1,10 +1,10 @@
-Runs The Framework's one daemon per machine, in the foreground: it binds the dashboard on a port and host, decides whether a shared token guards it, registers the directory it was started in as a project, runs each project's open hooks [19] once the dashboard listens, wires the dashboard to the runtime that starts agents [1] through a project's start hook and to the sweeps [2] that work in the background, runs the bridge browser [3] when asked, and on Ctrl-C runs each project's close hooks [19] and closes all of it. The daemon runs no agent itself. It also fixes the event-typed name of the tail on a JSONL log (the tailing rules are in `jsonl-tail.ts`) and the "strictly inside" test the home project registration relies on.
+Runs The Framework's one daemon per machine, in the foreground: it binds the dashboard on a port and host, decides whether a shared token guards it, registers the directory it was started in as a project, runs each project's open hooks [18] once the dashboard listens, wires the dashboard to the runtime that starts agents [1] through a project's start hook and to the sweeps [2] that work in the background, runs the bridge browser [3] when asked, and on Ctrl-C runs each project's close hooks [18] and closes all of it. The daemon runs no agent itself. It also fixes the "strictly inside" test the home project registration relies on.
 
 ## Context
 
 **User story**: the user runs `the-framework` inside a repository and the dashboard comes up at `http://127.0.0.1:4200`; that repository is a project of the dashboard from then on. Ctrl-C closes the dashboard, and there is no way to leave the daemon running detached; an agent [1] in flight is not the daemon's process and goes on to its end. Started with `--host` on an address other than loopback, the dashboard is reachable from the network, and the URL the user has to open carries a token.
 
-**Business logic story**: the daemon owns no agent and no agent's state. The tool that runs an agent keeps the agent's card and diary [4] in the agent's checkout [5], and the dashboard is a projection of those files; what the user says to an agent goes the other way through the agent's inbox [6], or through the project's resume hook once the agent has ended. The daemon therefore serves files, runs the projects' hooks [19] and runs the sweeps [2]. The rules for starting an agent live in `daemon-runtime.ts`, for writing to one in `dashboard/run-inbox.ts`, the sweeps in `daemon-services.ts`, the HTTP server and its request guard in `dashboard/server.ts`.
+**Business logic story**: the daemon owns no agent and no agent's state. The tool that runs an agent keeps the agent's card and diary [4] in the agent's checkout [5], and the dashboard is a projection of those files; what the user says to an agent goes the other way through the agent's inbox [6], or through the project's resume hook once the agent has ended. The daemon therefore serves files, runs the projects' hooks [18] and runs the sweeps [2]. The rules for starting an agent live in `daemon-runtime.ts`, for writing to one in `dashboard/run-inbox.ts`, the sweeps in `daemon-services.ts`, the HTTP server and its request guard in `dashboard/server.ts`.
 
 ## Glossary
 
@@ -19,17 +19,16 @@ Runs The Framework's one daemon per machine, in the foreground: it binds the das
 [9] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 [10] question: what an agent's turn ended on, asking the user to choose between options; a cloud session's question reaches the dashboard through the bridge.
 [11] pick: the answer to a question: the option or options the user chose.
-[15] spend offset: the user's adjustment of the quota boundary, in percentage points of the week.
-[16] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
-[18] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
-[19] hooks: the shell lines a project's own `.the-framework/hooks.yml` names: the `open` and `close` lists, run in the project by the daemon when the dashboard opens and closes, and the `start` and `resume` lines, run when the user starts an agent or continues an ended one; per user, since the file is ignored by git.
+[15] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
+[17] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
+[18] hooks: the shell lines a project's own `.the-framework/hooks.yml` names: the `open` and `close` lists, run in the project by the daemon when the dashboard opens and closes, and the `start` and `resume` lines, run when the user starts an agent or continues an ended one; per user, since the file is ignored by git.
 
 ## Business logic — TL;DR
 
 - **Port, host and the shared token** - the dashboard binds `127.0.0.1:4200` unless told otherwise; a loopback bind needs no secret, any other bind creates or reuses the shared token and every request without it is refused.
 - **The home project** - the directory the daemon starts in gets its `.the-framework/` directory up front and, when it is activated, joins the Projects list, unless it lies inside a project already registered.
 - **Nothing is repaired or resumed at boot** - the daemon runs no agent [1], so it has none to recover: an agent whose process died is its own tool's to sweep.
-- **The projects' hooks** - once the dashboard listens, every registered project's open hooks [19] run, one project after another; at shutdown, once the sweeps are quiesced, every registered project's close hooks run; the daemon names no tool, and a hook that fails, hangs or is missing never stops the daemon.
+- **The projects' hooks** - once the dashboard listens, every registered project's open hooks [18] run, one project after another; at shutdown, once the sweeps are quiesced, every registered project's close hooks run; the daemon names no tool, and a hook that fails, hangs or is missing never stops the daemon.
 - **What the dashboard is wired to** - the runtime's Start, the quota [7] source the usage panel draws, the per-project error state the sweeps [2] write, the relay [8] endpoints for devices [9], Discord credentials that take effect on save, and preference writes that act the moment they switch the bridge browser [3].
 - **The bridge and its browser** - the bridge [3] is on only when its preference was on at boot, reuses the shared token as its secret, and its browser launches in the background once the dashboard listens if the user asked for it; the Driver tab's session list is gathered across every project.
 - **Foreground only, and the order of shutdown** - the daemon runs until Ctrl-C; then the sweeps stop, the projects' close hooks run, and the quota source, the bridge browser, the runtime and the HTTP server follow; agents in flight are left to end on their own; a start that fails after the port is bound releases the port.
@@ -62,7 +61,7 @@ The directory the daemon is started in is its home project. Its `.the-framework/
 
 #### Context
 
-**Business logic story**: the daemon runs no agent [1]. An agent is the process of the tool the project's start hook [19] names, and that tool records its own agents and sweeps the ones whose process died.
+**Business logic story**: the daemon runs no agent [1]. An agent is the process of the tool the project's start hook [18] names, and that tool records its own agents and sweeps the ones whose process died.
 
 #### Business logic
 
@@ -78,7 +77,7 @@ The daemon starts no agent at boot, and repairs none: it reads an agent's card [
 
 #### Business logic
 
-The hooks [19] are the project's own: the rules for the file and for running a line are in `project-hooks.ts`. Once the dashboard listens and its URL is reported, the daemon runs the open hooks of every registered project, one project after another, each in that project's root, so a slow line delays the background sweeps [2] at most, never the URL. A project added from the dashboard while the daemon runs gets its open hooks run at that moment (the rule is in `daemon-runtime.ts`), since the boot never saw it. At shutdown, once the sweeps are quiesced, the close hooks of every registered project run the same way. The `start` and `resume` lines are not run here: they run on the user's click (`daemon-runtime.ts`, `dashboard/run-inbox.ts`). Every line's outcome is logged as "[framework] open hook (<project>): <line>: exit <code>" (or "timed out after 60s", or "could not start: <why>"), and what the line said on stderr is logged under it. A project without the file has no hooks and nothing is logged for it.
+The hooks [18] are the project's own: the rules for the file and for running a line are in `project-hooks.ts`. Once the dashboard listens and its URL is reported, the daemon runs the open hooks of every registered project, one project after another, each in that project's root, so a slow line delays the background sweeps [2] at most, never the URL. A project added from the dashboard while the daemon runs gets its open hooks run at that moment (the rule is in `daemon-runtime.ts`), since the boot never saw it. At shutdown, once the sweeps are quiesced, the close hooks of every registered project run the same way. The `start` and `resume` lines are not run here: they run on the user's click (`daemon-runtime.ts`, `dashboard/run-inbox.ts`). Every line's outcome is logged as "[framework] open hook (<project>): <line>: exit <code>" (or "timed out after 60s", or "could not start: <why>"), and what the line said on stderr is logged under it. A project without the file has no hooks and nothing is logged for it.
 
 ### What the dashboard is wired to
 
@@ -90,8 +89,8 @@ The hooks [19] are the project's own: the rules for the file and for running a l
 
 The daemon hands the HTTP server:
 
-- The runtime's actions (`daemon-runtime.ts`): starting an agent [1] through the project's start hook [19], adding a project, the events of an agent this daemon is relaying, the reads and steering of an agent running on a device [9], and the relay [8] endpoints through which another machine's daemon runs, reads and steers an agent here.
-- One quota [7] source: a single reader that polls for the whole life of the daemon, behind the dashboard's usage panel; the spend offset [15] it applies is read from the preferences [16]. The daemon stops that reader itself at shutdown, because a broken install serves errors without ever taking ownership of it.
+- The runtime's actions (`daemon-runtime.ts`): starting an agent [1] through the project's start hook [18], adding a project, the events of an agent this daemon is relaying, the reads and steering of an agent running on a device [9], and the relay [8] endpoints through which another machine's daemon runs, reads and steers an agent here.
+- One quota [7] source: a single reader that polls for the whole life of the daemon, behind the dashboard's usage panel. The daemon stops that reader itself at shutdown, because a broken install serves errors without ever taking ownership of it.
 - The per-project error state that the sweeps write and the dashboard lists.
 - The Discord credential store: a credential saved from the dashboard is written to the registry, and this daemon's own Discord watchers are then rebuilt against it, so the bot connects without a restart.
 - The preferences store, with a listener on what each write switches: a write that switches the bridge browser [3] on launches it, and one that switches it off closes it.
@@ -101,13 +100,13 @@ The daemon hands the HTTP server:
 
 #### Context
 
-**User story**: the user runs an agent whose location is `web` and answers the question its cloud session [18] is parked on from the dashboard. The bridge [3] carries that question in and the pick [11] back. The user switches the bridge, and the daemon's own browser for it, on and off from Settings.
+**User story**: the user runs an agent whose location is `web` and answers the question its cloud session [17] is parked on from the dashboard. The bridge [3] carries that question in and the pick [11] back. The user switches the bridge, and the daemon's own browser for it, on and off from Settings.
 
 **Problem**: the bridge opens the daemon's one route reachable from another origin, and its browser's first launch downloads Chrome.
 
 #### Business logic
 
-The bridge is opt-in: the browser bridge preference [16] as it stands at boot decides. When it is on, the bridge token is the same shared token that guards a network bind, created and persisted now if it does not exist yet, even on a loopback bind; a second secret would be one more thing to rotate and leak without narrowing anything. When it is off, the HTTP server gets no bridge token and the bridge's routes are absent. A preference flipped while the daemon runs takes effect at the next start.
+The bridge is opt-in: the browser bridge preference [15] as it stands at boot decides. When it is on, the bridge token is the same shared token that guards a network bind, created and persisted now if it does not exist yet, even on a loopback bind; a second secret would be one more thing to rotate and leak without narrowing anything. When it is off, the HTTP server gets no bridge token and the bridge's routes are absent. A preference flipped while the daemon runs takes effect at the next start.
 
 The bridge browser is the daemon's own Chrome for Testing with the extension installed, so a `web` agent needs no user's Chrome open. It is launched only once the dashboard listens, because the extension is told the daemon's address, and only when the bridge browser preference is on; the launch runs in the background so the dashboard never waits on the download. A launch asked for while the bridge has no token fails with a message that names the fix: "the browser bridge was switched on after the dashboard started — restart the dashboard, and the browser launches on its own" when the bridge preference is on now, or "turn the browser bridge on, then restart the dashboard" when it is off. One browser runs at a time; a browser the user quits is reported stopped and not relaunched; the rest of its lifecycle is in `bridge-browser.ts`.
 
@@ -125,6 +124,6 @@ The cloud sessions the Driver tab serves are gathered across every registered pr
 
 The daemon runs until it receives SIGINT or SIGTERM (Ctrl-C), or, in tests, until the caller's signal fires. There is no detached mode, so there is no liveness record, no machine-wide state file, and no second process to find, reuse or stop.
 
-Shutdown proceeds in this order. The sweeps are quiesced first, which resolves once the turn in flight has finished. Then every registered project's close hooks [19] run. No agent is stopped: none is the daemon's process. Then the quota [7] reader is stopped, the bridge browser closed, the runtime disposed, and the HTTP server closed.
+Shutdown proceeds in this order. The sweeps are quiesced first, which resolves once the turn in flight has finished. Then every registered project's close hooks [18] run. No agent is stopped: none is the daemon's process. Then the quota [7] reader is stopped, the bridge browser closed, the runtime disposed, and the HTTP server closed.
 
 When startup fails after the port is bound, the HTTP server is closed before the failure is reported, so the process does not stay alive holding the port.

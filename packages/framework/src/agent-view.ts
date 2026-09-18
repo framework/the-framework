@@ -1,69 +1,20 @@
 import { sessionNameOf } from '@gemstack/skill-branches/branch-names'
 import type { FrameworkEvent } from './events.js'
 
-// Derived agent state for the dashboard's overview cards (#431): the production-grade
-// loop status, the deploy plan, and the live session link — each a pure projection of
-// the same FrameworkEvent stream the log renders, so the live dashboard and a past-agent
-// replay show the identical summary. Kept here (not in the dashboard) so it is
-// unit-tested against the real event shapes. The bootstrap phase (checklist/deploy)
-// carries the structured data; we surface it as cards.
-
-/** The agent's lifecycle progress (#326): the session name it chose and whether it is ready for merge. */
-export interface AgentProgress {
-  /** The session name, read off the agent's `agent-<name>` branch (#1725), once the agent named it. */
-  sessionName?: string
-  /** True once the agent signalled `setReadyForMerge()`: building (false) -> ready (true). */
-  readyForMerge: boolean
-}
-
-/**
- * The agent's lifecycle progress (#326): the session name its latest observed branch carries and
- * whether a `ready-for-merge` has fired. Drives the dashboard status label + dot (orange building,
- * green ready). Always returns a value — an untouched agent is `{ readyForMerge: false }`.
- */
-export function agentProgress(events: readonly FrameworkEvent[]): AgentProgress {
-  let sessionName: string | undefined
-  let readyForMerge = false
-  for (const event of events) {
-    if (event.kind === 'branch') sessionName = event.sessionName
-    else if (event.kind === 'ready-for-merge') readyForMerge = true
-  }
-  return { ...(sessionName ? { sessionName } : {}), readyForMerge }
-}
+// Derived agent state for the dashboard (#431): the session name a view carries, and the live
+// session link — a pure projection of the same FrameworkEvent stream the log renders, so the live
+// dashboard and a past-agent replay show the identical summary. Kept here (not in the dashboard)
+// so it is unit-tested against the real event shapes.
 
 /**
  * The `sessionName` a derived view carries (#1725): the name the agent's branch carries, as a
  * field that is present only when there is one — so a view of an unnamed agent has no name,
  * rather than a name that is `undefined`. The one spelling behind every view built from an
- * agent's record; a view built from the event stream reads the name off the `branch` event.
+ * agent's record.
  */
 export function sessionNameField(branch: string | undefined, agentId: string): { sessionName?: string } {
   const sessionName = sessionNameOf(branch, agentId)
   return sessionName ? { sessionName } : {}
-}
-
-/** One error the agent reported through an `error` block (#1500). */
-export interface AgentError {
-  /** What is wrong, in one line. */
-  headline: string
-  /** What it ran and what that said, when the agent wrote any. */
-  detail?: string
-}
-
-/**
- * Every error the agent reported (#1500), oldest first — the count the dashboard shows on the
- * session, and the latest headline it shows beside it.
- *
- * A fold over the log rather than state of its own: an error is an event that happened, so the
- * list only ever grows, and reopening a finished agent shows exactly what it showed while it ran.
- */
-export function agentErrors(events: readonly FrameworkEvent[]): AgentError[] {
-  const errors: AgentError[] = []
-  for (const event of events) {
-    if (event.kind !== 'error') continue
-    errors.push({ headline: event.headline, ...(event.detail ? { detail: event.detail } : {}) })
-  }
-  return errors
 }
 
 /** The wrapped agent session (#431): its id and a deep link, when one is known. */
@@ -76,7 +27,7 @@ export interface SessionInfo {
    * The directory the agent ran in (#1195), from the opening `session` event.
    *
    * Taken from the event rather than the filesystem on purpose: an agent that finishes cleanly has
-   * its worktree removed (`tearDownWorktree`), so the event is the only surviving record of where
+   * its checkout reclaimed by the tool that runs it, so the event is the only surviving record of where
    * the session lived — and that path is exactly what `claude --resume` needs to find it again.
    */
   workspace?: string

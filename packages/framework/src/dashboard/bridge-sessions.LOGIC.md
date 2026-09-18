@@ -2,7 +2,7 @@ Decides which cloud sessions [1] the Claude web bridge's [2] Driver tab [3] shou
 
 ## Context
 
-**User story**: the user starts an agent [4] whose location [6] is `web` and does not watch claude.ai; the extension's Driver tab visits the sessions the daemon names, so a question the session parks on shows up in the dashboard, and the pick [5] the user makes there is typed back.
+**User story**: an agent [4] whose location [6] is `web` runs (the launcher starts none today) and the user does not watch claude.ai; the extension's Driver tab visits the sessions the daemon names, so a question the session parks on shows up in the dashboard, and the pick [5] the user makes there is typed back.
 
 **Business logic story**: the daemon answers the extension's request for the sessions to serve with this rule, over the agents of every registered project (`../daemon.ts`); the bridge store (`bridge-store.ts`) says which sessions hold a queued pick; the daemon's bridge endpoints carry the list to the extension (`bridge-endpoints.ts`).
 
@@ -12,7 +12,7 @@ Decides which cloud sessions [1] the Claude web bridge's [2] Driver tab [3] shou
 [2] the Claude web bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session.
 [3] Driver tab: the extension's one pinned tab that reads claude.ai's session list, visits sessions and types answers.
 [4] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
-[5] pick: the answer to a gate: the option or options chosen, by the user or automatically.
+[5] pick: the answer to a gate: the option or options the user chose.
 [6] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
 [7] hands-off: said of an agent whose work leaves this machine, so its first prompt is the whole agent: an agent whose location is `web`.
 

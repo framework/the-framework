@@ -8,10 +8,10 @@ The `queue` command: the three operations an agent [1], or a person in a shell, 
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch. The user's own working copy is "the user's checkout".
 [3] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down.
-[4] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
+[4] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [5] queue entry: an item on the agent queue.
 
 ## Business logic — TL;DR
@@ -28,7 +28,7 @@ The `queue` command: the three operations an agent [1], or a person in a shell, 
 
 #### Context
 
-**Problem**: the same output is read by two readers at once, a program parsing it (an agent, the daemon) and a person watching the shell; each needs its own channel, and the exit code has to tell a rule saying no from a broken environment.
+**Problem**: the same output is read by two readers at once, a program parsing it (an agent, a caller's code) and a person watching the shell; each needs its own channel, and the exit code has to tell a rule saying no from a broken environment.
 
 #### Business logic
 

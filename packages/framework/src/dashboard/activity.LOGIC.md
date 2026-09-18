@@ -11,8 +11,8 @@ Builds the activity [1] feed, the cross-project list of agents [2] that started 
 [1] activity: an agent started or finished — one of the two notification feeds; the other is intervention: something that needs a human.
 [2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [3] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds.
-[4] sweep: a background job the daemon runs on its clock: the CI watch, the notification watchers, the sweep that reclaims checkouts, the branch-links sweep, the cloud scratch sweep, cloud work adoption.
-[5] stop: ending an agent before it finishes: the Stop button, Ctrl-C, or a pick marked to stop.
+[4] sweep: a background job the daemon runs on its clock: the data sync, the notification watchers, the cloud scratch sweep, cloud work adoption. None of them starts an agent.
+[5] stop: ending an agent before it finishes: the Stop button or Ctrl-C.
 
 ## Business logic — TL;DR
 

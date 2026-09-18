@@ -6,7 +6,7 @@ Fixes the shape of a question a cloud session [1] is parked on, as the Claude we
 [2] the Claude web bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session.
 [3] gate: a question with options an agent's turn ended on: the agent ends waiting for the answer, the dashboard shows the question as a card, and the answer resumes the agent.
 [4] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
-[5] pick: the answer to a gate: the option or options chosen, by the user or automatically.
+[5] pick: the answer to a gate: the option or options the user chose.
 
 ## Business logic — TL;DR
 

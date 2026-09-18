@@ -124,7 +124,7 @@ describe('answering from the dashboard (#1237)', () => {
     state: 'queued' as const,
   }
 
-  test('one click answers, through the bridge rather than the control log (#1554)', async () => {
+  test('one click answers, through the bridge rather than the local answer path (#1554)', async () => {
     onBridgeQuestion.mockResolvedValue(QUESTION)
     render(<CloudAgentNotice target="web" events={[handOff()]} projectId="p" agentId="a" />)
     fireEvent.click(await screen.findByRole('button', { name: /Cross-project only/i }))

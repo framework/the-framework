@@ -30,20 +30,6 @@ export interface OnboardingSuggestion {
 }
 
 /**
- * Whether the picked driver's CLI can start an agent (#1326), as the launcher needs to hear it:
- * what is wrong and what fixes it, never what is right. Both lists are already written for a
- * human, so the warning renders them rather than mapping codes to copy.
- */
-export interface DriverReady {
-  /** False when a Start would die before the session exists. */
-  ok: boolean
-  /** Blocking problems, each naming its own fix. Empty when {@link ok}. */
-  problems: string[]
-  /** Non-blocking warnings, chiefly running as root, which breaks every agent identically. */
-  warnings: string[]
-}
-
-/**
  * What a Start carries besides its prompt (#1774): the person's picks, handed to the project's
  * `start` hook line as `DRIVER` and `MODEL`. Absent leaves each to the tool the line names.
  */
@@ -67,18 +53,6 @@ export interface StartAgentOptions {
 
 /** The outcome of a Start attempt (#345): the id of the run the project's start hook began, or why there is none. */
 export type StartAgentResult = { ok: true; agentId: string } | { ok: false; error: string }
-
-/** The outcome of a Preview attempt (#475): the live URL, or why not. */
-export type PreviewResult =
-  | { ok: true; url: string; command: string }
-  | { ok: false; error: string }
-
-/** Whether a project's Preview is running, and where (#475). */
-export interface PreviewStatus {
-  running: boolean
-  url?: string
-  command?: string
-}
 
 /**
  * Where a session is working (#798): the checkout, its branch, and what it is holding. Read by

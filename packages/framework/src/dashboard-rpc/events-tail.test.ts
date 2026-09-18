@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import type { FrameworkEvent } from '../events.js'
 import { tailEvents, tailAgentEvents } from './events-tail.js'
 
-const line = (message: string): string => JSON.stringify({ kind: 'log', message } satisfies FrameworkEvent) + '\n'
+const line = (message: string): string => JSON.stringify({ kind: 'session-update', sessionId: message } satisfies FrameworkEvent) + '\n'
 const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms))
 
 async function tmpWorkspace(): Promise<string> {
@@ -18,7 +18,7 @@ test('tailEvents seeds with what is already logged, then follows appends', async
   const path = join(cwd, 'events.jsonl')
   await writeFile(path, line('first'))
   const seen: string[] = []
-  const stop = tailEvents<FrameworkEvent>(path, e => void (e.kind === 'log' && seen.push(e.message)))
+  const stop = tailEvents<FrameworkEvent>(path, e => void (e.kind === 'session-update' && seen.push(e.sessionId)))
   try {
     await sleep(150)
     assert.deepEqual(seen, ['first'])
@@ -43,7 +43,7 @@ test('tailEvents resets when a fresh run rewrites the log to the same length (#5
   assert.equal(Buffer.byteLength(line('old-run')), Buffer.byteLength(line('new-run')))
   await writeFile(path, line('old-run'))
   const seen: string[] = []
-  const stop = tailEvents<FrameworkEvent>(path, e => void (e.kind === 'log' && seen.push(e.message)))
+  const stop = tailEvents<FrameworkEvent>(path, e => void (e.kind === 'session-update' && seen.push(e.sessionId)))
   try {
     await sleep(150)
     assert.deepEqual(seen, ['old-run'])
@@ -62,7 +62,7 @@ test('tailEvents stops pulling once stopped, and skips malformed lines', async (
   const path = join(cwd, 'events.jsonl')
   await writeFile(path, line('kept') + 'not json at all\n')
   const seen: string[] = []
-  const stop = tailEvents<FrameworkEvent>(path, e => void (e.kind === 'log' && seen.push(e.message)))
+  const stop = tailEvents<FrameworkEvent>(path, e => void (e.kind === 'session-update' && seen.push(e.sessionId)))
   try {
     await sleep(150)
     assert.deepEqual(seen, ['kept']) // the malformed line never breaks the stream
@@ -82,7 +82,7 @@ test('tailEvents reports the replay boundary after the backlog, before any follo
   const order: string[] = []
   const stop = tailEvents<FrameworkEvent>(
     path,
-    e => void (e.kind === 'log' && order.push(e.message)),
+    e => void (e.kind === 'session-update' && order.push(e.sessionId)),
     () => order.push('<sync>'),
   )
   try {
@@ -104,7 +104,7 @@ test('tailEvents reports the replay boundary even when the log does not exist ye
   const order: string[] = []
   const stop = tailEvents<FrameworkEvent>(
     path,
-    e => void (e.kind === 'log' && order.push(e.message)),
+    e => void (e.kind === 'session-update' && order.push(e.sessionId)),
     () => order.push('<sync>'),
   )
   try {
@@ -133,7 +133,7 @@ test('tailAgentEvents follows the journal into the archive: missed lines arrive 
   const { rename } = await import('node:fs/promises')
   const stop = tailAgentEvents<FrameworkEvent>(
     async () => ((await import('node:fs')).existsSync(live) ? live : archive),
-    e => void (e.kind === 'log' && seen.push(e.message)),
+    e => void (e.kind === 'session-update' && seen.push(e.sessionId)),
     () => sync++,
   )
   try {
@@ -164,7 +164,7 @@ test('tailAgentEvents does not replay a fully-consumed journal after the move', 
   const { copyFile, rm: rmFile } = await import('node:fs/promises')
   const stop = tailAgentEvents<FrameworkEvent>(
     async () => ((await import('node:fs')).existsSync(live) ? live : archive),
-    e => void (e.kind === 'log' && seen.push(e.message)),
+    e => void (e.kind === 'session-update' && seen.push(e.sessionId)),
   )
   try {
     await sleep(200)
@@ -196,7 +196,7 @@ test('tailAgentEvents stays put while the resolver has no better answer', async 
     // resolver answers undefined (a deleted session resolves like this forever), and the tail
     // must idle rather than hop somewhere wrong — then catch up once the archive appears.
     async () => ((await import('node:fs')).existsSync(live) ? live : archiveVisible ? archive : undefined),
-    e => void (e.kind === 'log' && seen.push(e.message)),
+    e => void (e.kind === 'session-update' && seen.push(e.sessionId)),
   )
   try {
     await sleep(200)
@@ -223,7 +223,7 @@ test('tailAgentEvents finds a diary it never saw at its first home: a short run,
   const { existsSync } = await import('node:fs')
   const stop = tailAgentEvents<FrameworkEvent>(
     async () => (existsSync(recorded) ? recorded : checkout),
-    e => void (e.kind === 'log' && seen.push(e.message)),
+    e => void (e.kind === 'session-update' && seen.push(e.sessionId)),
     () => sync++,
   )
   try {

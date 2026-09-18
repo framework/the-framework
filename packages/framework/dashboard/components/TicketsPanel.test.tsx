@@ -270,7 +270,7 @@ describe('TicketsPanel (#697/#1144)', () => {
 
   test('the empty state offers exactly one update button, without the stamp row (#1501)', async () => {
     render(<TicketsPanel projectId="p1" tickets={[]} loaded onOpen={() => {}} onSelectProject={() => {}} />)
-    // One button, one preset: the stamp row and its sibling button belong to the filled panel.
+    // One button, one command: the stamp row and its sibling button belong to the filled panel.
     expect((await screen.findAllByRole('button', { name: 'Update from GitHub' })).length).toBe(1)
     expect(screen.queryByText(/No record of an import yet/i)).toBeNull()
   })
@@ -324,7 +324,7 @@ describe('TicketsPanel (#697/#1144)', () => {
     expect(screen.queryByRole('button', { name: 'Other ways to plan Do the thing' })).toBeNull()
   })
 
-  test("the update's Configure first carries the update preset, from either state (#1501)", async () => {
+  test("the update's Configure first carries the update command, from either state (#1501)", async () => {
     const selected: string[] = []
     // The filled panel's stamp row.
     render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onOpen={() => {}} onSelectProject={id => selected.push(id)} />)
@@ -332,7 +332,7 @@ describe('TicketsPanel (#697/#1144)', () => {
     await waitFor(() => expect(selected).toEqual(['p1']))
     expect(takePendingDraft()).toBe('/update-tickets')
     cleanup()
-    // And the empty panel's own button, which offers the same preset under the same label.
+    // And the empty panel's own button, which offers the same command under the same label.
     render(<TicketsPanel projectId="p1" tickets={[]} loaded onOpen={() => {}} onSelectProject={id => selected.push(id)} />)
     await configureFirst('Other ways to update from GitHub')
     await waitFor(() => expect(selected).toEqual(['p1', 'p1']))

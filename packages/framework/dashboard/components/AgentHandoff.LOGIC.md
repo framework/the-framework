@@ -33,7 +33,7 @@ Nothing is shown until the read of the branch has answered. Then, in the bar, mu
 
 - "branch gone" when the branch no longer exists (deleted, or never created). A gone branch and a never-pushed branch are different facts and the verdict tells them apart.
 - When the branch carries no commit the base branch does not already have: "merged" when the branch is merged into the base, otherwise "no changes". A merged branch also reads as empty, since all its commits are on the base, but "merged" and "no changes" are opposite verdicts and only one of them is true.
-- Otherwise the counts: "<N> commit" or "<N> commits", a middle dot, "<N> file" or "<N> files", and the lines added and removed. When the branch is on the remote at the same commit and no pull request is linked to it, "· pushed" follows: whether the work is on the remote is the first handoff [1] question. The pull request itself is not repeated here, because the bar already links it.
+- Otherwise the counts: "<N> commit" or "<N> commits", a middle dot, "<N> file" or "<N> files", and the lines added and removed. When the branch is on the remote at the same commit and no pull request is linked to it, "· pushed" follows: whether the work is on the remote is the first question about its next step [1]. The pull request itself is not repeated here, because the bar already links it.
 
 ### The next step, or why there is none
 

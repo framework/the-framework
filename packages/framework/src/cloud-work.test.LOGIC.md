@@ -1,7 +1,7 @@
 What the tests cover, mostly against a scripted git and once against real repositories (a bare origin, the daemon's checkout, and a separate clone standing in for the cloud machine):
 
 - **Adopting the matched branch** - the `claude/*` head descending from the agent's cloud anchor is recorded as the agent's branch, together with the pull request the session opened for it, and no second pull request is opened.
-- **The armed draft pull request** - an agent armed for a pull request the session never opened gets a draft opened and recorded, and the adoption says it was opened; an agent not armed for one gets its branch recorded and nothing opened; a head that is only the anchor gets its branch recorded but no pull request, since the session pushed nothing beyond the handoff.
+- **The armed draft pull request** - an agent armed for a pull request the session never opened gets a draft opened and recorded, and the adoption says it was opened; an agent not armed for one gets its branch recorded and nothing opened; a head that is only the anchor gets its branch recorded but no pull request, since the session pushed nothing beyond the anchor.
 - **Unprovable matches wait** - no head descending from the anchor, or two, adopts nothing and records nothing; this is the normal waiting state, not a failure.
 - **Agents outside the pass** - a local agent, a running one, one with no anchor recorded, one already adopted with its pull request recorded, one adopted and not armed for a pull request, and one started more than 48 hours ago are not asked about, and with nothing waiting no fetch happens at all.
 - **Only the window is read** - the agent records are requested only from 48 hours before now, so an old history costs no reads.

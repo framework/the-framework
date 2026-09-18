@@ -15,9 +15,6 @@ let cache: NotifyChannels | null = null
 let inFlight: Promise<void> | null = null
 const listeners = new Set<() => void>()
 
-/** Nothing configured, nothing storable: what a host reports before the first read lands. */
-const EMPTY: NotifyChannels = { discordWebhook: false, sources: {}, editable: false }
-
 function notify(): void {
   for (const listener of listeners) listener()
 }
@@ -65,6 +62,3 @@ export function useNotifyChannels(): NotifyChannels | null {
     () => null,
   )
 }
-
-/** The empty reading, for a caller that needs a value rather than a null. */
-export { EMPTY as NO_NOTIFY_CHANNELS }

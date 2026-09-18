@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import type { AgentView } from '../lib/live-state.js'
 
 // The rail reads its content panels itself now (#1146), so it can tell an empty one from a full
 // one. Stub the reads: the default project has docs and a log, so every tab is earned and the
@@ -21,34 +20,19 @@ beforeEach(() => {
 
 afterEach(cleanup)
 
-const view: AgentView = { id: 'v1', title: 'Plan', markdown: '# hello' } as AgentView
-
 const baseProps = {
   projectId: 'p1',
   agentId: 'r1',
-  views: [],
-  files: [],
+  files: [] as string[],
 }
 
-// The rail holds one fixed width for every tab: switching to a pushed view no longer widens it
-// (the per-tab wide mode from #862 was dropped so the tabs read as one stable column).
+// The rail holds one fixed width for every tab (the per-tab wide mode from #862 was dropped so the
+// tabs read as one stable column).
 describe('RightRail width', () => {
   const rail = (container: HTMLElement) => container.querySelector('aside')!
 
   test('a list-shaped tab holds the fixed width', () => {
     const { container } = render(<RightRail {...baseProps} />)
-    expect(rail(container).className).toContain('w-[22rem]')
-  })
-
-  test('a pushed view keeps the same width — no expand', () => {
-    const { container } = render(<RightRail {...baseProps} views={[view]} />)
-    // The first view pulls the rail to the Views tab on its own, but the width does not change.
-    expect(rail(container).className).toContain('w-[22rem]')
-  })
-
-  test('the width is unchanged after switching away from a view', () => {
-    const { container } = render(<RightRail {...baseProps} views={[view]} />)
-    fireEvent.click(screen.getByRole('tab', { name: /docs/i }))
     expect(rail(container).className).toContain('w-[22rem]')
   })
 
@@ -115,12 +99,12 @@ describe('RightRail empty panels (#1146)', () => {
     expect(container.querySelector('aside')).toBeNull()
   })
 
-  test('a live surface keeps the rail even when every read comes back empty', async () => {
+  test('files keep the rail even when the docs read comes back empty', async () => {
     onDocs.mockResolvedValue([])
-    const { container } = render(<RightRail {...baseProps} views={[view]} />)
+    const { container } = render(<RightRail {...baseProps} files={['a.ts']} />)
     await settle()
     expect(container.querySelector('aside')).toBeTruthy()
-    expect(screen.getByRole('tab', { name: /views/i })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: /files/i })).toBeTruthy()
   })
 
   test('the tabs hold while the first read is still out, so switching projects does not blink', () => {
@@ -131,15 +115,15 @@ describe('RightRail empty panels (#1146)', () => {
   })
 
   test('the open tab losing its content falls back to one that still has some', async () => {
-    const { rerender } = render(<RightRail {...baseProps} views={[view]} />)
+    const { rerender } = render(<RightRail {...baseProps} files={['a.ts']} />)
     await settle()
-    // Picked by hand, so nothing auto-defaults away from it; then the agent ends and the views
-    // go with it, leaving the remembered tab pointing at something that is no longer there.
-    fireEvent.click(screen.getByRole('tab', { name: /views/i }))
-    expect(screen.getByRole('tab', { name: /views/i }).getAttribute('aria-selected')).toBe('true')
-    rerender(<RightRail {...baseProps} views={[]} />)
+    // Picked by hand, so nothing auto-defaults away from it; then the files go, leaving the
+    // remembered tab pointing at something that is no longer there.
+    fireEvent.click(screen.getByRole('tab', { name: /files/i }))
+    expect(screen.getByRole('tab', { name: /files/i }).getAttribute('aria-selected')).toBe('true')
+    rerender(<RightRail {...baseProps} files={[]} />)
     await settle()
-    expect(screen.queryByRole('tab', { name: /views/i })).toBeNull()
+    expect(screen.queryByRole('tab', { name: /files/i })).toBeNull()
     // Not an empty panel: the rail falls back to the first tab that still has content.
     expect(screen.getByRole('tab', { name: /docs/i }).getAttribute('aria-selected')).toBe('true')
   })

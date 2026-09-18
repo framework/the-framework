@@ -2,7 +2,7 @@ Decides which `PLAN` and `TODO` documents the dashboard's sidebar shows beside a
 
 ## Context
 
-**User story**: while an agent [1] works, the user reads its plan and its own to-do list in the sidebar without opening the checkout [4]: the built-in system prompt [5] has the agent write `PLAN_<name>.agent.md` (the plan for now) and `TODO_<name>.agent.md` (what it still intends to do) at the project's root, and the project's own `PLAN.md` and the agent queue [2] are the flat fallbacks.
+**User story**: while an agent [1] works, the user reads its plan and its own to-do list in the sidebar without opening the checkout [4]: an agent writes `PLAN_<name>.agent.md` (the plan for now) and `TODO_<name>.agent.md` (what it still intends to do) at the project's root when the project's own skills tell it to, as the built-in system prompt [5] once told every agent, and the project's own `PLAN.md` and the agent queue [2] are the flat fallbacks.
 
 ## Glossary
 

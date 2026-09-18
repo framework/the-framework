@@ -1,8 +1,8 @@
-Keeps a recent reading of the account's quota [1] on hand for the daemon: reads it through the driver [2] every five minutes while reads succeed, immediately when polling starts and on demand after a turn [3] settles, backs off on a failure that describes only this attempt while keeping the last good reading, and gives up for good on a failure that describes the account or the install, discarding that reading so nothing misrepresents the account.
+Keeps a recent reading of the account's quota [1] on hand for the daemon: reads it through the driver [2] every five minutes while reads succeed, immediately when polling starts and whenever a caller asks, backs off on a failure that describes only this attempt while keeping the last good reading, and gives up for good on a failure that describes the account or the install, discarding that reading so nothing misrepresents the account.
 
 ## Context
 
-**User story**: the dashboard's quota panel shows how much of the session window and the quota week is used, and unattended [4] work is started or stood down against the quota boundary [5]; both work from this one retained reading instead of asking the coding agent [6] every time. A blip in the coding agent's own usage fetch never blanks the panel.
+**User story**: the dashboard's quota panel shows how much of the session window and the quota week is used, against the quota boundary [5], from this one retained reading instead of asking the coding agent [6] every time. A blip in the coding agent's own usage fetch never blanks the panel.
 
 **Problem**: a reading spawns the whole coding agent, which takes about five seconds, and the coding agent's usage fetch is refused upstream when asked too often, with a penalty window minutes long: an eager retry loop would keep the number permanently unavailable, the opposite of the goal. The boundary moves over days, so a sample every five minutes resolves it comfortably. A quota bar going empty reads as "nothing used", the one thing this feature must never imply.
 
@@ -11,7 +11,6 @@ Keeps a recent reading of the account's quota [1] on hand for the daemon: reads 
 [1] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
 [2] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later.
 [3] turn: one prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
-[4] unattended: said of an agent nobody is watching: one the scheduler started rather than a person. It is not answered any faster: a question it ends on waits for a human like any other.
 [5] quota boundary: the share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
 [6] coding agent: the CLI doing the actual work: Claude Code or Codex.
 
@@ -21,7 +20,7 @@ Keeps a recent reading of the account's quota [1] on hand for the daemon: reads 
 - **Every five minutes while healthy, starting now** - the first read happens the moment polling starts rather than five minutes later, then one read every five minutes; a read is never waited on and never holds the daemon open.
 - **A transient failure keeps the reading and backs off** - a refused or failed fetch, a timeout, an answer in an unrecognized shape, or a driver error keeps the last good reading, notes the failure time, and doubles the gap before the next read, up to thirty minutes; the next good reading resets the gap to five minutes.
 - **An authoritative failure discards it and stops** - no coding agent installed, or an account with no subscription quota, drops the last good reading and ends polling for good.
-- **Reading on demand** - a read can be asked for at any moment, such as right after a turn settles, and folds into the same state as a scheduled one.
+- **Reading on demand** - a read can be asked for at any moment and folds into the same state as a scheduled one; the daemon itself asks for none, since it runs no turns.
 
 ## Business logic
 
@@ -69,7 +68,7 @@ A failure that describes the setup is authoritative: the coding agent is not ins
 
 #### Context
 
-**User story**: a turn [3] has just settled and the panel should reflect what it cost without waiting up to five minutes.
+**User story**: a caller that knows the quota just moved, a turn [3] having settled, wants the panel to reflect it without waiting up to five minutes. The daemon runs no turns, so it never asks; the scheduled reads are all it takes.
 
 #### Business logic
 

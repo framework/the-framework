@@ -104,7 +104,7 @@ describe('AgentActionsMenu (#toolbar-menu)', () => {
 })
 
 describe('the live-session action: Stop', () => {
-  const liveEvents = [{ kind: 'log', message: 'working' }] as never
+  const liveEvents = [{ kind: 'session-update', sessionId: 'working' }] as never
 
   test('a live session offers Stop, and no Merge: a run that is working publishes its own work', async () => {
     render(<AgentActionsMenu projectId="p1" agentId="run-1" events={liveEvents} onDeleted={vi.fn()} />)
@@ -114,7 +114,7 @@ describe('the live-session action: Stop', () => {
   })
 
   test('an ended session offers no Stop', async () => {
-    const ended = [{ kind: 'log', message: 'working' }, { kind: 'end', ok: true }] as never
+    const ended = [{ kind: 'session-update', sessionId: 'working' }, { kind: 'end', ok: true }] as never
     render(<AgentActionsMenu projectId="p1" agentId="run-1" events={ended} onDeleted={vi.fn()} />)
     openMenu()
     await waitFor(() => expect(screen.getByText('Open in editor')).toBeTruthy())

@@ -4,7 +4,7 @@ import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { nodeGitRunner, withFileBranch, DATA_BRANCH } from '@gemstack/agent-data'
-import { appendQueueEntry, insertQueueEntry, parseQueueEntries, queueAdd, queueDone, readQueue, readQueueEntries, removeQueueEntry } from './queue.js'
+import { appendQueueEntry, insertQueueEntry, parseQueueEntries, queueAdd, readQueue, removeQueueEntry } from './queue.js'
 import { QUEUE_FILE } from './names.js'
 
 test('parseQueueEntries reads open list items and skips checked, blank and prose lines', () => {
@@ -85,30 +85,26 @@ async function repo(): Promise<string> {
   return path
 }
 
-test('queueAdd and queueDone edit the queue on the branch, from the project and from an agent worktree', async () => {
+test('queueAdd edits the queue on the branch, from the project and from an agent worktree', async () => {
   const root = await repo()
+  const entries = async (cwd: string) => parseQueueEntries((await readQueue(cwd)) ?? '')
   try {
-    assert.deepEqual(await readQueueEntries(root), [])
+    assert.equal(await readQueue(root), undefined)
     assert.deepEqual(await queueAdd(root, 'ranked', 5), { ok: true, changed: true })
     assert.equal((await queueAdd(root, 'unranked')).ok, true)
-    assert.deepEqual(await readQueueEntries(root), ['ranked', 'unranked'])
+    assert.deepEqual(await entries(root), ['ranked', 'unranked'])
     // From an agent's worktree: the project root is resolved, the edit lands on the same branch.
     const wt = join(root, '.branches', 'agent-x')
     await git(['worktree', 'add', wt, '-b', 'agent-x'], root)
     assert.equal((await queueAdd(wt, 'from the worktree', 9)).ok, true)
-    assert.deepEqual(await readQueueEntries(wt), ['from the worktree', 'ranked', 'unranked'])
-    assert.deepEqual(await queueDone(wt, 'ranked'), { ok: true, changed: true })
-    assert.deepEqual(parseQueueEntries((await git(['show', `${DATA_BRANCH}:${QUEUE_FILE}`], root))), ['from the worktree', 'unranked'])
-    assert.match(await git(['log', '--format=%s', DATA_BRANCH], root), /queue done: ranked\n.*queue add: from the worktree/)
-    // Done means deleted, not checked off.
-    assert.ok(!(await readQueue(root))!.includes('[x]'))
-    // An entry already gone is a no-op that still lands, changing nothing.
-    assert.deepEqual(await queueDone(root, 'ranked'), { ok: true, changed: false })
+    assert.deepEqual(await entries(wt), ['from the worktree', 'ranked', 'unranked'])
+    assert.deepEqual(parseQueueEntries((await git(['show', `${DATA_BRANCH}:${QUEUE_FILE}`], root))), ['from the worktree', 'ranked', 'unranked'])
+    assert.match(await git(['log', '--format=%s', DATA_BRANCH], root), /queue add: from the worktree\n.*queue add: unranked/)
     // The pure parser and the git read agree on the seam every writer uses.
     await withFileBranch(root, DATA_BRANCH, 'by hand', async dir => {
       await writeFile(join(dir, QUEUE_FILE), '## Priority 3\n\n- [ ] by hand\n')
     })
-    assert.deepEqual(await readQueueEntries(root), ['by hand'])
+    assert.deepEqual(await entries(root), ['by hand'])
   } finally {
     await rm(root, RETRIED_RM)
   }

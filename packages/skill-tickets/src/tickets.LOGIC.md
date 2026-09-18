@@ -1,4 +1,4 @@
-Reads tickets off the `tickets/` directory of the `agent-data` branch [1] into rows: what the head of each ticket's markdown says about itself (title, summary, priority, topics, GitHub link, pull request link, date) plus what the plan and the claim [2] beside it add (planned, locked, holder [3], effort, uncertainty). The same reader serves the `tickets` command's `list` and `show` and the daemon, which serves the dashboard's ticket rows and runs the routines, whether the directory is a checkout on disk or a tree read straight off the branch without a checkout; it also reads `tickets/meta.json`, the stamp of the last issue import.
+Reads tickets off the `tickets/` directory of the `agent-data` branch [1] into rows: what the head of each ticket's markdown says about itself (title, summary, priority, topics, GitHub link, pull request link, date) plus what the plan and the claim [2] beside it add (planned, locked, holder [3], effort, uncertainty). The same reader serves the `tickets` command's `list` and `show` and the daemon, which serves the dashboard's ticket rows, whether the directory is a checkout on disk or a tree read straight off the branch without a checkout; it also reads `tickets/meta.json`, the stamp of the last issue import.
 
 ## Context
 
@@ -8,10 +8,10 @@ Reads tickets off the `tickets/` directory of the `agent-data` branch [1] into r
 
 ## Glossary
 
-[1] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
+[1] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [2] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
-[3] holder: who a claim names: the agent's id when the daemon started the agent, else the branch the `tickets` command ran on.
-[4] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[3] holder: who a claim names: the agent's id when the program that started the agent set it in `AGENT_ID` (the scheduler does), else the branch the `tickets` command ran on.
+[4] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [5] sibling: a ticket's plan file (`<name>.plan.md`) or claim file (`<name>.lock.md`), written about the ticket and never a ticket of its own.
 [6] key block: the `key: value` lines above a ticket's or a plan's `# ` heading, where `Priority:`, `Topics:`, `GitHub:`, `PR:`, `Effort:` and `Uncertainty:` are read from.
 
@@ -124,7 +124,7 @@ A single ticket is read by its bare filename, only when the name passes the bare
 
 #### Context
 
-**Business logic story**: the daemon imports the project's issues as tickets with code of its own and stamps `tickets/meta.json` with the moment the import began, so the next import can ask only for what changed since. No `tickets` command reads the stamp; only the importing daemon does.
+**Business logic story**: an import of the project's issues as tickets stamps `tickets/meta.json` with the moment it began, so the next import can ask only for what changed since. No program in the repository writes the stamp any more, and no `tickets` command reads it; the product reads it to show when the tickets were last updated from GitHub.
 
 #### Business logic
 

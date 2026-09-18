@@ -7,7 +7,6 @@ import {
   onAllTickets,
   onHotTickets,
   onQueue,
-  onAgents,
 } from '../dashboard-rpc/reads.js'
 import { sendQueueTicket } from '../dashboard-rpc/control.js'
 

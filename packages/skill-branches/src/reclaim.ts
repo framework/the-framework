@@ -12,7 +12,7 @@ import {
 
 /**
  * Reclaiming a checkout (#752/#737): the one implementation behind every surface that removes
- * one — a daemon's sweep and teardown, a dashboard's Remove button, an agent's own CLI.
+ * one — a scheduler at a run's end and in its sweep, a dashboard's Remove button, the CLI.
  *
  * **One rule: only what is on the remote may go.** The checkout is removed only once the remote
  * has everything it holds: a clean tree, a pushed tip. Every deletion is therefore recoverable,

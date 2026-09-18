@@ -11,7 +11,7 @@ Lists one project's tickets as one-liner rows — priority, topics, who holds th
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [3] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
-[4] holder: who a claim names: the agent's id when the daemon started the agent, else the branch the `tickets` command ran on.
+[4] holder: who a claim names: the agent's id when the tool that started the agent put it in the agent's environment, else the branch the `tickets` command ran on.
 [5] session name: the name an agent gives its own work; its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
 [9] launcher: the Start form on a project's own page.
 

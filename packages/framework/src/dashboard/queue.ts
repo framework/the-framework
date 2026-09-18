@@ -26,8 +26,8 @@ export interface ProjectQueue {
 
 // A markdown list item (`-`, `*`, or `1.`), any leading indent. Deliberately the same rule the
 // agents read the queue by — the `queue` skill's own parser — because
-// the queue's readers must agree on what an entry is, or the card says "Nothing queued" while the
-// sweep drains the same file (#1296).
+// the queue's readers must agree on what an entry is, or the card says "Nothing queued" while an
+// agent works the same file (#1296).
 const LIST_ITEM = /^\s*(?:[-*]|\d+\.)\s+(.*\S)\s*$/
 // A GitHub-style task checkbox at the start of an item's text: `[ ]` open, `[x]` done.
 const CHECKBOX = /^\[([ xX])\]\s*(.*)$/

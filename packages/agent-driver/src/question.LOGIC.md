@@ -1,8 +1,8 @@
-The question [1]: the one block an agent [2] ends a turn [3] with when it will not decide alone, and its one parser. Every driver [4] reports the question a turn ended on the same way, so a dashboard shows one card and a runner takes the recommended option unattended, whichever coding agent is behind the driver. The words that teach an agent when to ask are the caller's (a skill file, a system prompt); this file says what a question is.
+The question [1]: the one block an agent [2] ends a turn [3] with when it will not decide alone, and its one parser. Every driver [4] reports the question a turn ended on the same way, so a dashboard shows one card whichever coding agent is behind the driver. The words that teach an agent when to ask are the caller's (a skill file, a system prompt); this file says what a question is.
 
 ## Context
 
-**User story**: the agent has written a plan and wants it signed off, or hit a login wall in its browser, or sees two ways to go; it ends its turn with the question and its options; the dashboard shows it as a card with the recommended option preselected; nobody there means the recommended option is taken.
+**User story**: the agent has written a plan and wants it signed off, or sees two ways to go; it ends its turn with the question and its options; the dashboard shows it as a card with the recommended option preselected; nobody there means the question waits for an answer.
 
 **Business logic story**: the driver session (`inbox.ts`, at every turn's end) runs the parser over the turn's final message and reports the result as the `question` progress event [5]; the log (`session-log.ts`) writes it as a diary line; the answer comes back through the inbox [6] as a continuation prompt whose wording is this file's.
 

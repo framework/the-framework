@@ -15,10 +15,6 @@ Keeps the one file The Framework owns for the user, the registry [1] at `~/.the-
 [5] the bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge token is the secret the extension presents; the bridge browser is the Chrome for Testing the daemon runs for it.
 [6] the Overview: the dashboard's cross-project page at `/`.
 [7] coding agent: the CLI doing the actual work: Claude Code or Codex.
-[8] spend offset: the user's adjustment of the quota boundary, in percentage points of the week.
-[9] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
-[10] unattended: said of an agent nobody is watching: one the scheduler started rather than a person. It is not answered any faster: a question it ends on waits for a human like any other.
-[11] quota boundary: the share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
 
 ## Business logic — TL;DR
 
@@ -28,7 +24,6 @@ Keeps the one file The Framework owns for the user, the registry [1] at `~/.the-
 - **Reading forgivingly** - a missing, unreadable or malformed file reads as an empty registry, and every value read is validated.
 - **The on/off preferences** - each kept only as a true or false, each with its own meaning when absent.
 - **The choice preferences** - the model, the driver, the editor and the theme, each constrained to the values the dashboard offers.
-- **The number preference** - the spend offset, clamped to the slider's reach.
 - **The list preference** - the custom presets, trimmed, bounded and cleared when empty.
 - **Unknown keys are dropped, never migrated** - a key this version does not know is dropped on read and never written back.
 - **Saving preferences: replace or patch** - a save replaces the block, a patch merges only the keys it names; blank clears; the dashboard's store tells the daemon which keys were written.
@@ -108,16 +103,6 @@ Each of these keys of the preferences [2] is kept only when its value is a true 
 - `driver`: `claude-code` or `codex`; anything else is dropped, the old name `claude` included. Absent means the project's start hook decides.
 - `editor`: the command "Open in editor" runs (`code`, `cursor`, `zed`, ...), trimmed and cut to 100 characters; blank is dropped. Absent means the `FRAMEWORK_EDITOR` environment variable, then `code`.
 - `theme`: `system`, `light` or `dark`; anything else is dropped. Absent means `system`, following the operating system.
-
-### The number preference
-
-#### Context
-
-**Problem**: a hand-edited number must not put a limit where the dashboard's own control could not.
-
-#### Business logic
-
-- `autoSpendOffset`, the spend offset [8]: a finite number, rounded to a whole number and clamped between -50 and 50 percentage points; anything else is dropped. Absent means about 7.1 points, a half day's share of the quota [9] week (100 divided by 14): unattended [10] work then starts a little ahead of the quota boundary [11] instead of exactly on it, where normal jitter would stop it. Negative holds unattended work back further; positive lets it borrow from the days still to come. It is an offset rather than an absolute percentage so the limit travels with the boundary as the week goes on.
 
 ### The list preference
 

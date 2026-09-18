@@ -10,8 +10,8 @@ import { worktreeDirEntries, worktreeBranch, type WorktreeDirEntry } from './wor
 // checkout by its name, and a rename costs a link, never moving a checkout under a live agent
 // (the #1589 review's call).
 //
-// A daemon reconciles on its clock and after each worktree it allocates: derive the wanted
-// links from the checkouts on disk, add what is missing, drop only our own stale links.
+// Reconciled after each checkout is made and after each change through the command line: derive
+// the wanted links from the checkouts on disk, add what is missing, drop only our own stale links.
 
 /** The filesystem the reconcile needs; `node:fs/promises` in production. */
 export interface LinksFs {

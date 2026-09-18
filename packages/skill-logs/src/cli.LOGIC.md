@@ -10,12 +10,12 @@ The `logs` command line: the reads an agent [1] (or a person) makes in a shell, 
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent under The Framework's control, in its own checkout, on its own branch, streaming events, handed off when it ends.
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] run: the `logs` skill's record of one agent on the `agent-data` branch: a card and a diary. Never the unit of work.
-[3] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
+[3] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [4] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch. Also "the `agent-data` branch's checkout".
 [5] diary: the run's `<id>.jsonl`: what the agent said.
-[6] recording program: the program that ran an agent and records its run when the agent ends; in the product, the daemon.
+[6] recording program: the program that ran an agent and records its run when the agent ends; in the product, the scheduler (`agent-scheduler`).
 [7] card: the run's `<id>.json`: what was asked, the ticket, the branch, the pull request, how it ended, what it cost.
 [8] queue entry: an item on the agent queue, `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down.
 

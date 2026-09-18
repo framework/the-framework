@@ -30,8 +30,6 @@ export interface ActiveAgent {
   updatedAt?: string
   /** The session name the agent chose (#326), when it set one. */
   sessionName?: string
-  /** Whether the agent signalled `setReadyForMerge()` (#326): drives the building/ready dot. */
-  readyForMerge?: boolean
   /**
    * A web run at work on its cloud side (#1668): in its session, or parked on a question the
    * bridge reported. Its local half is over, so it is not a live agent — it is listed because the
@@ -276,7 +274,6 @@ export async function buildOverview(projects: ProjectSummary[], deps: OverviewDe
     ...(meta.intent ? { intent: meta.intent } : {}),
     ...(meta.updatedAt ? { updatedAt: meta.updatedAt } : {}),
     ...sessionNameField(meta.branch, meta.id),
-    ...(meta.readyForMerge ? { readyForMerge: true } : {}),
     // Another machine's daemon started it (#1648): the shared data branch shows its runs here too.
     ...(meta.host !== undefined && meta.host !== thisHost ? { host: meta.host } : {}),
 

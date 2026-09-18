@@ -1,6 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import type { Preferences } from '../../src/index.js'
-import { DRIVERS, DRIVER_LABELS, MAX_SPEND_OFFSET, DEFAULT_SPEND_OFFSET } from '../../src/client.js'
+import { DRIVERS, DRIVER_LABELS } from '../../src/client.js'
 import { useDetectedEditors } from '../lib/editors.js'
 import { usePreferences, updatePreferences, themePreference, type ThemePreference } from '../lib/preferences.js'
 import { useNotificationPermission } from '../lib/notification-permission.js'
@@ -144,22 +143,6 @@ export function SettingsPage({
             description="Also ping when an agent starts or finishes."
             checked={preferences.notifyNewActivity ?? false}
             onChange={next => updatePreferences({ notifyNewActivity: next })}
-          />
-        </Section>
-
-        <Section title="Automation">
-          {/* Bounded to the same ±MAX_SPEND_OFFSET the slider and the sanitizer use (#960). Without
-              it a typed 9999 was clamped to 50 on save while the box kept showing 9999.
-              An untouched preference shows the real default in force — the half-day cushion
-              (#960 Edit), to one decimal — not a 0 the daemon isn't using. A saved value is an
-              integer, so the rounding only ever trims the default. */}
-          <NumberRow
-            label="Spend offset"
-            description={`How far unattended work sits from the quota boundary, in percentage points (max ${MAX_SPEND_OFFSET}). Negative holds it back; positive lets it borrow from the days ahead.`}
-            value={Math.round((preferences.autoSpendOffset ?? DEFAULT_SPEND_OFFSET) * 10) / 10}
-            min={-MAX_SPEND_OFFSET}
-            max={MAX_SPEND_OFFSET}
-            onChange={value => updatePreferences({ autoSpendOffset: value })}
           />
         </Section>
 
@@ -382,42 +365,6 @@ function TextRow({
           onChange={e => onChange(e.target.value)}
           aria-label={label}
           className="w-48 rounded-md border border-border bg-background px-2 py-1 text-sm"
-        />
-      }
-    />
-  )
-}
-
-function NumberRow({
-  label,
-  description,
-  value,
-  min,
-  max,
-  onChange,
-}: {
-  label: string
-  description: string
-  value: number
-  min: number
-  max: number
-  onChange: (next: number) => void
-}) {
-  return (
-    <Row
-      label={label}
-      description={description}
-      control={
-        <input
-          type="number"
-          value={value}
-          min={min}
-          max={max}
-          // Clamped here as well as on the input: `min`/`max` only constrain the spinner, so a typed
-          // value still has to be held to the range the sanitizer will enforce anyway (#960).
-          onChange={e => onChange(Math.min(Math.max(Math.round(Number(e.target.value) || 0), min), max))}
-          aria-label={label}
-          className="w-24 rounded-md border border-border bg-background px-2 py-1 text-sm"
         />
       }
     />

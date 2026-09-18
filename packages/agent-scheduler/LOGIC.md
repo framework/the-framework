@@ -12,7 +12,7 @@ The `agent-scheduler` package: a standalone tool, like `agent-driver`, that star
 [2] the schedule: `agent-schedule.md` at the repository root, tracked, written by a person: one list line per command, `- <command>: when \`<check>\`, cap <N>`. Every other line is the person's and is not read.
 [3] command: a `.claude/skills/<name>` folder tracked in the project, which the coding agent's harness expands from the slash command `/<name>`; a run's whole prompt is that slash command.
 [4] tick: one pass of the scheduler: pull the `agent-data` branch, sweep, then one decision per scheduled command, each decision one line in the state.
-[5] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
+[5] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [6] sweep: the pass on every tick that records and reclaims the runs of this machine whose process died, and only this machine's.
 [7] run: one agent this tool starts: a detached process of the tool's own (`agent-scheduler run`), a checkout, one prompt to the coding agent, and a run record when it ends. Its id is its start time, `2026-09-16T14-01-00-000Z`.
 [8] cap: how many runs of one command may be in flight at once, across every machine that shares the repository; 1 when the schedule line names none.

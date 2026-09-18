@@ -20,8 +20,3 @@ test('a run that ends for good takes its question with it: nobody would read the
   assert.deepEqual(pendingChoices([ASK, { kind: 'end', ok: false, stopped: true }]), [])
   assert.deepEqual(pendingChoices([ASK, { kind: 'end', ok: true }]), [])
 })
-
-test('a recorded resolution closes the question it names, in a run from before the inbox', () => {
-  assert.deepEqual(pendingChoices([ASK, { kind: 'choice-resolved', id: 'await-choices', picked: 'a', by: 'user' }]), [])
-  assert.equal(pendingChoices([ASK, { kind: 'choice-resolved', id: 'another', picked: 'a', by: 'user' }]).length, 1)
-})

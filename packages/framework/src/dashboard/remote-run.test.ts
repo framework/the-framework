@@ -114,13 +114,13 @@ test('pingRemote is false when the device is unreachable (#1072)', async () => {
 test('streamRemoteEvents parses ndjson lines in order and ends when the body closes (#1067)', async () => {
   const srv = await server((_req, res) => {
     res.writeHead(200, { 'content-type': 'application/x-ndjson' })
-    res.write(`${JSON.stringify({ kind: 'log', message: 'a' })}\n`)
-    res.write(`${JSON.stringify({ kind: 'log', message: 'b' })}\n`)
+    res.write(`${JSON.stringify({ kind: 'session-update', sessionId: 'a' })}\n`)
+    res.write(`${JSON.stringify({ kind: 'session-update', sessionId: 'b' })}\n`)
     res.end()
   })
   try {
     const { events, ended } = await drain({ url: srv.url, token: 't' }, 'r1')
-    assert.deepEqual(events.map(e => (e as { message?: string }).message), ['a', 'b'])
+    assert.deepEqual(events.map(e => (e as { sessionId?: string }).sessionId), ['a', 'b'])
     assert.equal(ended, true)
   } finally {
     await srv.close()
@@ -128,7 +128,7 @@ test('streamRemoteEvents parses ndjson lines in order and ends when the body clo
 })
 
 test('a line split across two chunks is reassembled, not dropped (#1067)', async () => {
-  const line = `${JSON.stringify({ kind: 'log', message: 'split' })}\n`
+  const line = `${JSON.stringify({ kind: 'session-update', sessionId: 'split' })}\n`
   const srv = await server(async (_req, res) => {
     res.writeHead(200, { 'content-type': 'application/x-ndjson' })
     res.write(line.slice(0, 10)) // half a JSON line
@@ -138,7 +138,7 @@ test('a line split across two chunks is reassembled, not dropped (#1067)', async
   })
   try {
     const { events } = await drain({ url: srv.url, token: 't' }, 'r1')
-    assert.deepEqual(events.map(e => (e as { message?: string }).message), ['split'])
+    assert.deepEqual(events.map(e => (e as { sessionId?: string }).sessionId), ['split'])
   } finally {
     await srv.close()
   }
@@ -161,7 +161,7 @@ test('a 401 from the remote (rotated token) surfaces as a clean stream-end, no e
 test('RelayedAgents feeds a run stream from the device and drops its token when the stream ends (#1067)', async () => {
   const srv = await server((_req, res) => {
     res.writeHead(200, { 'content-type': 'application/x-ndjson' })
-    res.write(`${JSON.stringify({ kind: 'log', message: 'hi' })}\n`)
+    res.write(`${JSON.stringify({ kind: 'session-update', sessionId: 'hi' })}\n`)
     res.end()
   })
   try {
@@ -171,7 +171,7 @@ test('RelayedAgents feeds a run stream from the device and drops its token when 
     assert.ok(stream)
     const got: FrameworkEvent[] = []
     for await (const e of stream!) got.push(e) // replays, then ends when the device closes the body
-    assert.deepEqual(got.map(e => (e as { message?: string }).message), ['hi'])
+    assert.deepEqual(got.map(e => (e as { sessionId?: string }).sessionId), ['hi'])
     assert.equal(agents.get('r1'), undefined) // dropped: the token no longer lives here
   } finally {
     await srv.close()
@@ -257,7 +257,7 @@ test('RelayedAgents.list surfaces a relayed run as a remote row, scoped to its p
 async function relayEndStatus(endEvent: FrameworkEvent | null): Promise<string | undefined> {
   const srv = await server((_req, res) => {
     res.writeHead(200, { 'content-type': 'application/x-ndjson' })
-    res.write(`${JSON.stringify({ kind: 'log', message: 'working' })}\n`)
+    res.write(`${JSON.stringify({ kind: 'session-update', sessionId: 'working' })}\n`)
     if (endEvent) res.write(`${JSON.stringify(endEvent)}\n`)
     res.end()
   })
@@ -300,7 +300,7 @@ test('dispose clears the relayed run list and its device target (#1077)', async 
 test('RelayedAgents.target outlives the event stream and dispose clears it (#1067 slice 2)', async () => {
   const srv = await server((_req, res) => {
     res.writeHead(200, { 'content-type': 'application/x-ndjson' })
-    res.write(`${JSON.stringify({ kind: 'log', message: 'hi' })}\n`)
+    res.write(`${JSON.stringify({ kind: 'session-update', sessionId: 'hi' })}\n`)
     res.end()
   })
   try {

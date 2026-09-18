@@ -1,6 +1,5 @@
 import { mkdir } from 'node:fs/promises'
 import { join, relative, isAbsolute } from 'node:path'
-import type { FrameworkEvent } from './events.js'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import { startDashboard, type Dashboard } from './dashboard/index.js'
 import { createProjectRuntime } from './daemon-runtime.js'
@@ -11,7 +10,6 @@ import { resolveDashboardBundle } from './dashboard/bundle.js'
 import { isActivated } from './project.js'
 import { addProject, ensureDaemonToken, listProjects, nodeRegistryFs, readPreferences, registryPreferencesStore, type Preferences } from './registry.js'
 import { registryDiscordCredentialsStore } from './discord-credentials-store.js'
-import { JsonlTailer } from './jsonl-tail.js'
 import { isLoopbackHost } from './loopback-host.js'
 import { bridgeSessionsFrom } from './dashboard/bridge-sessions.js'
 import { bridgeQuestions } from './dashboard/bridge-store.js'
@@ -90,12 +88,6 @@ export async function registerHomeProject(cwd: string, env: NodeJS.ProcessEnv = 
 /** True when a process with this id is still running (best-effort, signal 0). The store's
  * {@link isPidAlive} under the daemon's historical public name -- the two were byte-identical. */
 export { isPidAlive as isProcessAlive } from './store/index.js'
-
-/**
- * Tails an append-only log of {@link FrameworkEvent} lines. The generic tailing lives in
- * {@link JsonlTailer}; this keeps the event-typed name the daemon (and public API) always had.
- */
-export class EventTailer extends JsonlTailer<FrameworkEvent> {}
 
 /** Options for {@link runDaemon}. */
 export interface RunDaemonOptions {

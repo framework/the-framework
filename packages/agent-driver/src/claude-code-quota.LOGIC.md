@@ -10,7 +10,7 @@ Reads where the account's quota [1] stands by asking Claude Code for its own usa
 
 [1] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
 [2] quota boundary: the share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
-[3] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[3] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [4] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later.
 [5] coding agent: the CLI doing the actual work: Claude Code or Codex.
 [6] stop request: the caller's signal that a driver session, or one turn of it, must end now; the product raises one when the user stops the agent.

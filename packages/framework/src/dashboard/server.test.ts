@@ -360,8 +360,8 @@ async function relayDashboard(opts: { token?: string | undefined } = { token: TO
     return { ok: true, agentId: 'srv-run' }
   }
   const events: FrameworkEvent[] = [
-    { kind: 'log', message: 'e1' } as FrameworkEvent,
-    { kind: 'log', message: 'e2' } as FrameworkEvent,
+    { kind: 'session-update', sessionId: 'e1' } as FrameworkEvent,
+    { kind: 'session-update', sessionId: 'e2' } as FrameworkEvent,
   ]
   const tailEvents = (_agentId: string, onEvent: (event: FrameworkEvent) => void): (() => void) => {
     for (const e of events) onEvent(e)
@@ -418,7 +418,7 @@ test('/_relay/events needs the cookie and streams the run\'s events as ndjson (#
 
     const streamed = await readNdjson(`${base}/_relay/events?run=srv-run`, `fw_daemon=${TOKEN}`, 2)
     assert.equal(streamed.status, 200)
-    assert.deepEqual(streamed.lines.map(l => (l as { message?: string }).message), ['e1', 'e2'])
+    assert.deepEqual(streamed.lines.map(l => (l as { sessionId?: string }).sessionId), ['e1', 'e2'])
   } finally {
     await close()
   }

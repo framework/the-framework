@@ -1,4 +1,4 @@
-import type { FrameworkEvent, ChoiceRequest, AgentMeta } from '../../src/index.js'
+import type { FrameworkEvent } from '../../src/index.js'
 
 // Live-run state derived from the event stream — kept pure so it can be driven and
 // tested on its own, away from React. The dashboard is a projection of the diary the
@@ -6,32 +6,6 @@ import type { FrameworkEvent, ChoiceRequest, AgentMeta } from '../../src/index.j
 // than any extra state.
 
 export { pendingChoices } from '../../src/client.js'
-
-/**
- * One ad-hoc markdown view the agent pushed to the right rail (#441): the `view` event
- * minus its discriminant, derived so a field added to the event carries through here on
- * its own — the same way {@link ChoiceEvent} tracks the `choice` event.
- */
-type ViewEvent = Extract<FrameworkEvent, { kind: 'view' }>
-export type AgentView = Omit<ViewEvent, 'kind'>
-
-/**
- * Every markdown view the agent has shown this agent (#441), in first-seen order. A `view`
- * event with an id already seen updates it in place (the agent re-showed the same title),
- * so the rail keeps one entry per view rather than stacking duplicates.
- */
-export function agentViews(events: readonly FrameworkEvent[]): AgentView[] {
-  const byId = new Map<string, AgentView>()
-  for (const event of events) {
-    // Strip the discriminant and keep the rest, like pendingChoices — a new field on the
-    // view event is then carried without touching this.
-    if (event.kind === 'view') {
-      const { kind: _kind, ...view } = event
-      byId.set(event.id, view)
-    }
-  }
-  return [...byId.values()]
-}
 
 /**
  * Whether the agent is still going, i.e. worth showing a Stop button. An agent ends with a
@@ -43,29 +17,6 @@ export function isAgentActive(events: readonly FrameworkEvent[]): boolean {
   // resumed-live run as inactive — hiding Stop and settling the pill while the agent worked.
   const current = currentAgentEvents(events)
   return current.length > 0 && !current.some(event => event.kind === 'end')
-}
-
-/**
- * Whether the agent has stopped working and parked on you (#785), rather than the agent's process
- * having exited.
- *
- * The two are not the same and the difference is the whole of #1173. A settled session stays
- * alive as a conversation (#714) so it can take your next message, which means its status is
- * still `running` long after the agent has finished. Anything that asks "is there anything more
- * coming?" — whether to offer the handoff, whether to read the branch — has to ask this rather
- * than whether the process is up, or a session that is plainly done offers nothing to do with it.
- *
- * A new turn un-settles it, the same rule the agent's own meta folds (`settled` sets it, a driver
- * `start` clears it), so this is that rule read off the stream rather than a second opinion.
- */
-export function agentSettled(events: readonly FrameworkEvent[]): boolean {
-  let settled = false
-  for (const event of events) {
-    if (event.kind === 'settled') settled = true
-    else if (event.kind === 'driver' && event.event.type === 'start') settled = false
-    else if (event.kind === 'end') settled = false // it ended outright; `live` already says so
-  }
-  return settled
 }
 
 /** How an agent ended, off its single `end` event. */
@@ -93,47 +44,6 @@ export function agentOutcome(events: readonly FrameworkEvent[]): AgentOutcome | 
 }
 
 /**
- * Whether the agent has ended clean and its armed handoff has not reported back yet (#1431):
- * the seconds after `end` while the epilogue is still pushing the branch, opening the PR,
- * merging. The pill said "finished" through that window, which reads as done-with-nothing-
- * coming while the PR link is moments away.
- *
- * The window is the CURRENT segment's: open after its clean `end`, closed by its `handoff`
- * event (every handoff reports — done, skipped, or failed). A resumed session's earlier
- * segment carries its own `handoff`, which must not hide the new window (#1450), so the
- * closing check does not look past the segment boundary. Arming, though, is run-level
- * config, not segment state — the latest `handoff-armed` wins wherever it sits in the feed.
- * And it must be a real arming event with the push rung on: treating the absent-means-armed
- * default as armed would leave archives from before the handoff mechanism "publishing…"
- * for ever.
- */
-export function isPublishing(events: readonly FrameworkEvent[]): boolean {
-  const current = currentAgentEvents(events)
-  const end = current.find(event => event.kind === 'end')
-  if (end?.kind !== 'end' || !end.ok) return false
-  if (current.some(event => event.kind === 'handoff')) return false
-  let armedPush: boolean | undefined
-  for (const event of events) {
-    if (event.kind === 'handoff-armed') armedPush = event.push
-  }
-  return armedPush === true
-}
-
-/**
- * {@link isPublishing}, but off an agent's meta snapshot instead of its event log — for the list
- * surfaces (the Recent-sessions rail) that only ever hold a {@link AgentMeta} (#1455). The rail
- * said "done" while the session's own pill still said "publishing…": `status` flips to `done`
- * the moment `end` lands, and the report reaches the meta only when the handoff answers, so
- * between the two a list could not know the epilogue was still pushing.
- *
- * `handoff.push` must be affirmatively on, the same rule as the event-side check: nothing to
- * wait for when the epilogue was never armed to push.
- */
-export function isMetaPublishing(meta: AgentMeta): boolean {
-  return meta.status === 'done' && meta.handoff?.push === true && meta.handoffReport === undefined
-}
-
-/**
  * The GitHub Actions run's live URL, from the `action` event the ActionsDriver emits once it
  * finds its workflow run (#1053): its label is `run <html_url>`. Lets the agent view link through
  * to the live Actions run while the transcript is still burst-replaying at the end. The last
@@ -152,7 +62,8 @@ export function actionsRunUrl(events: readonly FrameworkEvent[]): string | undef
 
 /**
  * The Claude Code cloud session a `web` run was handed to (#610), from the `action` event the
- * CloudDriver emits once the session exists: its label is `cloud <url>`. Read from the event
+ * cloud driver (since removed; such runs are read off their records) wrote once the session
+ * existed: its label is `cloud <url>`. Read from the event
  * stream rather than from the agent's meta for the same reason the Actions link is — the events
  * are what a tab opened mid-run replays. The last match wins, so a session that handed off more
  * than once points at its most recent cloud session. Absent until the hand-off has landed.

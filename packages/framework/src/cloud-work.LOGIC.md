@@ -2,23 +2,22 @@ Cloud work adoption [1]: the sweep [2] that, once per tick [3] of the daemon's c
 
 ## Context
 
-**User story**: the user starts a web agent; its cloud session works on a branch of its own naming on claude.ai and pushes it. Within a tick or so of the push, the agent's row in the dashboard names that branch instead of the empty branch the agent was born on, its pull request resolves, and the CI watch [8] and the merge can act on it; when the user had armed a pull request and the session opened none, a draft pull request appears, and the daemon's log says what was adopted and why something could not be.
+**User story**: a web agent's cloud session works on a branch of its own naming on claude.ai and pushes it. Within a tick or so of the push, the agent's row in the dashboard names that branch instead of the empty branch the agent was born on, its pull request resolves, and the "Merge" button can act on it; when the agent's record was armed for a pull request and the session opened none, a draft pull request appears, and the daemon's log says what was adopted and why something could not be. The dashboard starts no web agent today: the sweep adopts the work of any web agent on record, and stays for web agents' return.
 
 **Problem**: a web agent is a local wrapper that hands the task to claude.ai and ends, so its own record knows only the empty `agent-<id>` branch it pushed the anchor on, and every surface keyed to that branch would read the agent as "nothing committed" while its work sits on origin under a `claude/*` name nothing recorded.
 
 ## Glossary
 
 [1] cloud work adoption: recognizing the branch a cloud session pushed as the web agent's, by its descent from the agent's cloud anchor, and recording it on the agent's run.
-[2] sweep: a background job the daemon runs on its clock: the CI watch, the notification watchers, the sweep that reclaims checkouts, the branch-links sweep, the cloud scratch sweep, cloud work adoption.
+[2] sweep: a background job the daemon runs on its clock: the data sync, the notification watchers, the cloud scratch sweep, cloud work adoption. None of them starts an agent.
 [3] tick: one beat of the daemon's single background clock; each sweep says how many ticks it waits between turns.
 [4] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
 [5] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps. A web agent is one whose location is `web`.
 [6] run: only the `logs` skill's record of one agent on the `agent-data` branch: a card (what was asked, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said).
 [7] cloud anchor: an empty commit a web agent pushes before its task leaves this machine, unique to the agent: the branch the cloud session later pushes descends from it, which is how the daemon recognises that branch as the agent's.
-[8] CI watch: the sweep that merges the pull requests The Framework opened once their checks pass, and starts a fix agent when a check goes red.
 [9] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [11] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
-[12] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it).
+[12] handoff: what becomes of an agent's work once the agent has ended: its branch pushed, a pull request opened for it, the pull request merged. The agent does it itself; on a finished agent's page the "Open PR" and "Merge" buttons do it by hand. A web agent's record may say what its handoff was armed to do: push, open a pull request, merge.
 
 ## Business logic — TL;DR
 
@@ -81,7 +80,7 @@ The matched branch's whole pull request history is listed through `gh`. The pull
 
 #### Business logic
 
-When the listing succeeded and found no pull request, the agent [5] ended done, its handoff [12] was armed for a pull request, and the branch's head is beyond the anchor itself (so the session committed something), a draft pull request is opened for the remote branch with the same title and body rules as the end-of-agent handoff, draft so that a pull request The Framework opens by itself never puts a review request in anyone's inbox (`dashboard/agent-handoff.ts`). A failure to open it is reported as "could not open the armed draft PR for <branch>: <error>" and the branch is still recorded. An agent not armed for a pull request gets its branch recorded and nothing else.
+When the listing succeeded and found no pull request, the agent [5] ended done, its handoff [12] was armed for a pull request, and the branch's head is beyond the anchor itself (so the session committed something), a draft pull request is opened for the remote branch with the same title and body rules as the "Open PR" button, draft so that a pull request The Framework opens by itself never puts a review request in anyone's inbox (`dashboard/agent-handoff.ts`). A failure to open it is reported as "could not open the armed draft PR for <branch>: <error>" and the branch is still recorded. An agent not armed for a pull request gets its branch recorded and nothing else.
 
 ### Recording onto the run
 

@@ -1,28 +1,28 @@
-The cloud scratch sweep [1]: the sweep [2] that, once per tick [3] of the daemon's clock, deletes from origin the two dead refs every web agent [4] leaves behind, the slash-free `cloud-*` ref its cloud session [5] cloned at and the empty `agent-<id>` branch it was born on, once four gates are cleared: the ref is at least a day old, its agent is not one the daemon is still responsible for, it provably holds no work, and no open pull request is on it. A ref the sweep cannot prove dead simply stays for a later pass.
+The cloud scratch sweep [1]: the sweep [2] that, once per tick [3] of the daemon's clock, deletes from origin the two dead refs every web agent [4] leaves behind, the slash-free `cloud-*` ref its cloud session [5] cloned at and the empty `agent-<id>` branch it was born on, once four gates are cleared: the ref is at least a day old, its agent is not one the caller names as busy, it provably holds no work, and no open pull request is on it. A ref the sweep cannot prove dead simply stays for a later pass.
 
 ## Context
 
-**User story**: the user runs web agents for weeks and origin does not fill up with one pair of dead branch names per agent; a branch that holds unmerged work, a branch a pull request is open on, and a branch a cloud session might still be cloning are never touched.
+**User story**: the user has run web agents for weeks and origin does not fill up with one pair of dead branch names per agent; a branch that holds unmerged work, a branch a pull request is open on, and a branch a cloud session might still be cloning are never touched.
 
 **Problem**: the driver cannot delete its own ref, because session creation only says "created", not "cloned", and a ref deleted in that window strands the session; and a `cloud-*` ref carries no timestamp, its commit date being whatever the base commit's is, so its age can only be counted from when this machine first saw it.
 
 ## Glossary
 
-[1] cloud scratch sweep: the sweep that deletes, from origin, the scratch refs a web agent's handoff to a cloud session left behind once they are provably dead.
-[2] sweep: a background job the daemon runs on its clock: the CI watch, the notification watchers, the sweep that reclaims checkouts, the branch-links sweep, the cloud scratch sweep, cloud work adoption.
+[1] cloud scratch sweep: the sweep that deletes, from origin, the scratch refs a web agent left behind when it handed its task to a cloud session, once they are provably dead.
+[2] sweep: a background job the daemon runs on its clock: the data sync, the notification watchers, the cloud scratch sweep, cloud work adoption. None of them starts an agent.
 [3] tick: one beat of the daemon's single background clock; each sweep says how many ticks it waits between turns.
 [4] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps. A web agent is one whose location is `web`.
 [5] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
 [6] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
 [7] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
-[8] reclaim: removing a finished agent's checkout once its work is on the remote.
+[8] reclaim: removing a finished agent's checkout once its work is on the remote; the tool that runs the agent does it, the daemon never does.
 [9] cloud anchor: an empty commit a web agent pushes before its task leaves this machine, unique to the agent: the branch the cloud session later pushes descends from it.
 
 ## Business logic — TL;DR
 
 - **Which refs are candidates** - only refs named `cloud-<number>-<8 hex digits>` and `agent-<agent id>` branches whose id carries a start time; every other branch on origin is never considered.
 - **Old enough** - a candidate is left alone for 24 hours: a `cloud-*` ref from the moment this machine first saw it, remembered in `.the-framework/cloud-refs.json`; an `agent-*` branch from the start time in its name.
-- **Not a live agent's** - an `agent-*` branch whose agent the daemon is still responsible for is kept.
+- **Not a live agent's** - an `agent-*` branch whose agent the caller names as busy is kept; the daemon names none, since it runs no agent.
 - **Holds no work** - a ref goes only when its tip is already reachable from origin's default branch, or is an empty commit on a parent that is; anything unprovable keeps the ref.
 - **No open pull request** - a ref with an open pull request is kept, so a deletion never closes one.
 - **Deleting and remembering** - a cleared ref is deleted on origin; a failed deletion is reported and retried without restarting its day; the first-seen memory is rebuilt from what origin has so entries for vanished refs fall away.
@@ -35,7 +35,7 @@ The cloud scratch sweep [1]: the sweep [2] that, once per tick [3] of the daemon
 
 #### Context
 
-**Business logic story**: the cloud driver pushes a `cloud-<number>-<tag>` ref so the cloud session [5] has a slash-free ref to clone at (`driver/cloud.ts`), and the sweep that reclaims [8] checkouts pushes the agent [4]'s `agent-<id>` branch before removing its checkout; the session does its work on its own `claude/*` branch and opens its pull request from there, so both refs are dead names once provisioning settles.
+**Business logic story**: a web agent's driver pushed a `cloud-<number>-<tag>` ref so the cloud session [5] had a slash-free ref to clone at (that driver is gone; no web agent is started today, and the sweep stays for their return), and the reclaim [8] of the agent [4]'s checkout pushes its `agent-<id>` branch before removing the checkout; the session does its work on its own `claude/*` branch and opens its pull request from there, so both refs are dead names once provisioning settles.
 
 #### Business logic
 
@@ -59,7 +59,7 @@ See `## Context`.
 
 #### Business logic
 
-An `agent-*` branch whose agent id [6] the daemon reports as still its responsibility is kept as "busy", the same guard the reclaiming sweep takes. The check comes before the age check, so a long-running agent's branch is never a candidate however old.
+An `agent-*` branch whose agent id [6] the caller names as busy is kept as "busy". The check comes before the age check, so a busy agent's branch is never a candidate however old. The daemon's clock names no agent as busy, since the daemon runs no agent.
 
 ### Holds no work
 

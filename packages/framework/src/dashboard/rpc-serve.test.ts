@@ -164,8 +164,8 @@ test('the event stream ends cleanly when there is nothing to stream', async () =
 test('the event stream sends one SSE frame per event', async () => {
   // A relayed agent (#1067): an in-memory source, which is the branch that does not tail a file.
   async function* source() {
-    yield { kind: 'log', message: 'one' } as const
-    yield { kind: 'log', message: 'two' } as const
+    yield { kind: 'session-update', sessionId: 'one' } as const
+    yield { kind: 'session-update', sessionId: 'two' } as const
   }
   const server = await mounted({ eventsSource: () => source() })
   try {
@@ -174,8 +174,8 @@ test('the event stream sends one SSE frame per event', async () => {
     const events = text
       .split('\n\n')
       .filter(Boolean)
-      .map(frame => JSON.parse(frame.replace(/^data: /, '')) as { message?: string })
-    assert.deepEqual(events.map(e => e.message), ['one', 'two'])
+      .map(frame => JSON.parse(frame.replace(/^data: /, '')) as { sessionId?: string })
+    assert.deepEqual(events.map(e => e.sessionId), ['one', 'two'])
   } finally {
     await server.close()
   }

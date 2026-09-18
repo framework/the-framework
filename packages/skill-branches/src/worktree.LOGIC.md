@@ -8,14 +8,14 @@ Runs git's worktree mechanism for agents [1]: where an agent's checkout [2] live
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch. The user's own working copy is "the project's checkout" or "the user's checkout".
 [3] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
 [4] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
 [5] birth branch: the branch a checkout is created on, `agent-<agent id>`, which also names the checkout's directory; the agent's branch until the agent names its work.
 [6] agent branch: a branch whose name starts with `agent-`, other than `agent-data`: the branch a checkout is created on, or the `agent-<session name>` it is renamed to. The only branches this package renames or deletes.
 [7] branch link: a symbolic link under `.branches/`, named as the branch a checkout is on now and pointing at that checkout's directory, so `.branches/<branch>` reaches the checkout by its current branch name.
-[8] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
+[8] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [9] reclaim: removing a finished agent's checkout once its work is on the remote.
 [10] worktree root: a directory that is itself the top level of a git worktree: the project's checkout, or an agent's checkout that git still knows as a worktree.
 
@@ -44,7 +44,7 @@ See `## Context`.
 
 #### Business logic
 
-An agent's checkout [2] is the directory `.branches/agent-<agent id>` inside the project's checkout. The directory is named as the agent id [4], which is also the birth branch [5], and keeps that name for the checkout's whole life, even after the branch is renamed: the current branch name is then reachable as a branch link [7] beside it (`branch-links.ts`). `.branches/` also holds the `agent-data` branch's [8] checkout, at `.branches/agent-data`, made by the daemon and never by this package.
+An agent's checkout [2] is the directory `.branches/agent-<agent id>` inside the project's checkout. The directory is named as the agent id [4], which is also the birth branch [5], and keeps that name for the checkout's whole life, even after the branch is renamed: the current branch name is then reachable as a branch link [7] beside it (`branch-links.ts`). `.branches/` also holds the `agent-data` branch's [8] checkout, at `.branches/agent-data`, made by the `agent-data` package and never by this one.
 
 ### Which directories are checkouts
 

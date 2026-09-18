@@ -11,7 +11,7 @@ One "⋮" menu at the end of an agent's [1] action bar, holding everything the u
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] next step: what a person can do with an ended agent's work from the dashboard: open a pull request for its branch, or merge the pull request it has.
 [3] driver session: the coding agent's own conversation for one agent, which the driver can resume by its session id.
-[4] stop: ending an agent before it finishes: the Stop button, Ctrl-C, or a pick marked to stop.
+[4] stop: ending an agent before it finishes: the Stop button or Ctrl-C.
 [5] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [6] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 

@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { FrameworkEvent } from '../../src/index.js'
-import { agentProgress } from '../../src/client.js'
 import { onAgent, onRetainedWorktrees } from '../rpc/reads.js'
 import { useLoaded } from '../lib/use-async.js'
 import { useAgentHandoff } from '../lib/use-agent-handoff.js'
-import { agentSettled, isAgentActive, agentOutcome } from '../lib/live-state.js'
+import { isAgentActive, agentOutcome } from '../lib/live-state.js'
 import { AgentActionBar } from './AgentActionBar.js'
 import { AgentComposer } from './AgentComposer.js'
 import { AgentFeed } from './AgentFeed.js'
@@ -57,13 +56,13 @@ export function AgentView({
   /** Where the agent executes (#1053/#610): `actions` swaps the live feed for a burst-mode affordance; `remote` is relayed to a device (#1067); `web` is handed to a Claude Code cloud session. */
   target?: 'local' | 'actions' | 'remote' | 'web' | undefined
   /** The device this agent executes on (#1067), when it is relayed to a connected one. Set only for a
-   *  just-started remote run: its diff, handoff, and push/PR now relay to the device (slice 2), so the
-   *  panels are shown, and a "runs on <device>" notice only flags that the browser preview stays local. */
+   *  just-started remote run: its diff, handoff, and push/PR relay to the device (slice 2), so the
+   *  panels are shown, and a "runs on <device>" notice names where it executes. */
   remoteLabel?: string | undefined
   files: string[]
   /** The live channel's health (#948) — surfaced as a banner over the feed. */
   lost?: boolean
-  /** Jump to the agent a preset or a continuation started (#959). */
+  /** Jump to the agent a continuation started (#959). */
   onAgentStarted?: ((intent: string, agentId: string) => void) | undefined
   /** Leave this session after it is deleted (#1032) — back to the project home. */
   onDeleted?: (() => void) | undefined
@@ -73,9 +72,8 @@ export function AgentView({
 }) {
   // The archived log, read only once the agent has ended: while it runs, the channel is the truth.
   // `archiveBehind` re-reads it whenever the live channel has outgrown the copy on screen (#1460):
-  // a resumed session streams new events while `live` is still false for a poll round-trip, and a
-  // clean run's `handoff` event only ever lands in the archive — its worktree journal is torn down
-  // with the worktree — so without this the PR line waited for a manual refresh.
+  // a resumed session streams new events while `live` is still false for a poll round-trip, so
+  // without this its new events waited for a manual refresh.
   const [archiveBehind, setArchiveBehind] = useState(0)
   const archived = useLoaded<FrameworkEvent[] | null>(
     !live ? () => onAgent(projectId, agentId) : null,
@@ -97,14 +95,8 @@ export function AgentView({
   }, [agentId])
   const hasWorktree = !live && !removed && retained.includes(agentId)
 
-  // Whether the agent is still working, which is not whether the agent's process is up (#1173).
-  // A session that has settled parks on you but stays alive to take your next message (#785/#714),
-  // so its status reads `running` indefinitely. Keying the handoff off `live` meant a finished
-  // session showed its two arming checkboxes for ever and never offered the action they describe
-  // — the agent was done, and the answer to "what do I do now?" was nothing.
-  // Read off the channel rather than `shown`: while the agent is live those are the same events,
-  // and once it is not, `working` is false whatever they say.
-  const working = live && !agentSettled(events)
+  // Whether the agent is still working: its run is live.
+  const working = live
 
   // What the branch holds (#1023), read once for both the bar and the detail it opens. Read once
   // the agent stops rather than once the process does: while it is still writing to the branch
@@ -128,14 +120,12 @@ export function AgentView({
   // the whole continuation land in one jolting commit — or, when the poll lost the race entirely,
   // not render at all until a refresh. The channel is preferred the moment it knows more; the
   // archive is re-read behind it (`archiveBehind` above) and takes back over once it has caught
-  // up, which is also how the epilogue's archive-only events reach the screen.
+  // up.
   //
-  // "Knows more" is only trustworthy when the channel is this agent's OWN journal. It is not
-  // guaranteed to be: an ended agent whose worktree is gone resolves to the project ROOT journal
-  // server-side (resolveAgentCheckout's fallback), and that file holds whatever root run wrote it
-  // last — a longer foreign feed must never beat the agent's archive. The archive is the agent's own
-  // record, so its opening event is the fingerprint the channel has to match; an unloaded or
-  // empty archive can't be checked and keeps the pre-existing show-the-feed fallback.
+  // "Knows more" is only trustworthy when the channel is this agent's OWN diary — a longer
+  // foreign feed must never beat the agent's archive. The archive is the agent's own record, so
+  // its opening event is the fingerprint the channel has to match; an unloaded or empty archive
+  // can't be checked and keeps the pre-existing show-the-feed fallback.
   const sameJournal =
     !archived?.length || events.length === 0 || JSON.stringify(events[0]) === JSON.stringify(archived[0])
   const feedAhead = sameJournal && events.length > (archived?.length ?? 0)
@@ -148,7 +138,6 @@ export function AgentView({
   // the composer slot, so the continuation renders (and Stop takes over from Resume) the moment
   // the first event lands rather than when the poll does.
   const feedLive = live || (feedAhead && isAgentActive(events))
-  const progress = agentProgress(shown)
   // How the agent ended (#948) — read once for the composer's note and the Resume offer below.
   const outcome = live ? undefined : agentOutcome(shown)
   // Until the handoff has actually loaded, a just-stopped agent keeps showing the file counts it
@@ -162,7 +151,7 @@ export function AgentView({
         projectId={projectId}
         agentId={agentId}
         events={shown}
-        label={label ?? progress.sessionName}
+        label={label}
         projectName={projectName}
         retainedWorktree={hasWorktree}
         onWorktreeRemoved={onWorktreeRemoved}
@@ -200,8 +189,8 @@ export function AgentView({
       {/* A run handed to Claude Code on the web (#610): the work is happening in a cloud session
           this machine cannot stream, so point at where it is rather than show an empty feed. */}
       <CloudAgentNotice target={target} events={shown} projectId={projectId} agentId={agentId} />
-      {/* A run relayed to a connected device (#1067): its diff, handoff, and push/PR now relay to the
-          device (slice 2), so this notice only flags that the browser preview stays local-only for now. */}
+      {/* A run relayed to a connected device (#1067): its diff, handoff, and push/PR relay to the
+          device (slice 2), so this notice only names where the agent executes. */}
       <RemoteAgentNotice device={remoteLabel} />
       {/* Nothing to show yet is not the same thing in both states: a live run is waiting for its
           first event, a finished one is still reading its log. */}

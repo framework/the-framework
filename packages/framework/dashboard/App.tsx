@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { Intervention, Activity, ProjectionRead, ProjectSummary, RecentAgent } from '../src/index.js'
 import { onProjectFiles, onInterventions, onActivity, onRecentAgents } from './rpc/reads.js'
 import { onProjects } from './rpc/projects.js'
@@ -20,7 +20,6 @@ import { usePolled } from './lib/use-async.js'
 import { useRoute } from './lib/use-route.js'
 import { useActivityNotifications, useInterventionNotifications } from './lib/use-notifications.js'
 import { usePreferences, notificationsEnabled, newActivityEnabled, humanInterventionEnabled } from './lib/preferences.js'
-import { agentViews, currentAgentEvents } from './lib/live-state.js'
 import { useDocumentTitle } from './lib/document-title.js'
 import { useWorking } from './lib/use-working.js'
 import { useFavicon } from './lib/favicon.js'
@@ -196,17 +195,10 @@ export function App() {
     go({ view: 'tickets', projectId: id, agentId: null, ticketSlug: slug, plan: true })
   }
 
-  // The live agent feed is owned here so both the main view and the right rail's views tab read
-  // one shared event stream.
+  // The live agent feed is owned here, for the main view.
   // The agent whose feed and controls are in play is simply the one in the URL; in the no-id
   // fallback there is none yet, and a null id resolves to the project root, as before.
   const { events, lost } = useLiveEvents(projectId, agentId, agentStart.tick)
-  // The rail's views stay scoped to the newest `session` segment even though an agent's feed no
-  // longer is (a resumed session appends a second segment to the same journal). Choice gates
-  // are no longer folded here: they live inline in the transcript (#1455 items 6/7), where
-  // EventList derives open/answered state from the same events it renders.
-  const current = currentAgentEvents(events)
-  const views = projectId ? agentViews(current) : []
   // The selected session's loop verdict, for the rail's pinned block under the tabs. It comes up
   // from AgentView rather than being folded here: a finished agent's events live in its archived log,
   // which that view is the one to read.
@@ -368,7 +360,6 @@ export function App() {
           <RightRail
             projectId={projectId}
             agentId={agentId}
-            views={views}
             files={files}
             // The launcher shows Docs/History in its main column (#1455 items 2/3): exactly when
             // renderMain resolves to ProjectHome — a project selected, no run

@@ -9,7 +9,7 @@ import { linkSkill, type SkillLink } from './skill-links.js'
  * A checkout as an agent gets it (#1725): the worktree, `.branches/` hidden from git, the parent's
  * dependency trees linked in, the skill linked in where the agent's harness looks for it (#1739),
  * and the `.branches/` links brought up to date — one sequence, whichever surface asks for it (a
- * daemon allocating a run, the command line).
+ * scheduler starting a run, the command line).
  */
 
 /** Other skills to link into the checkout beside this package's own: see `SkillLink`. */

@@ -112,8 +112,7 @@ export function TicketsPage({
     if (outcome.ok) onAgentStarted?.(projectId, prompt, outcome.value.agentId)
   }
   // The page-wide queue-adds: every unclaimed shown ticket joins the AI queue — the work the
-  // framework picks up on its own — as an implementation entry, or as the [Plan tickets]
-  // preset's own plan ask. Both walk the shown order, so within a priority section entries keep
+  // framework picks up on its own — as an implementation entry, or as a plan ask. Both walk the shown order, so within a priority section entries keep
   // the order the reader saw; both read the queue at click time and leave alone what is already
   // there ("add" means the set ends up queued — a duplicate entry would outlive its agent's
   // check-off as an open entry naming a closed ticket, costing an agent). No agent starts
@@ -155,9 +154,8 @@ export function TicketsPage({
     if (outcome.ok) setQueuedKey(key)
   }
 
-  // Queue the tickets' PLANS: one `Create tickets/<stem>.plan.md` entry each — the [Plan
-  // tickets] preset's own ask, recognized by its exact text — so a drain agent reaching the
-  // entry writes the plan. A ticket whose plan ask is already queued is skipped by that text;
+  // Queue the tickets' PLANS: one `Create tickets/<stem>.plan.md` entry each, recognized by its
+  // exact text, so the agent that works the entry writes the plan. A ticket whose plan ask is already queued is skipped by that text;
   // one queued for implementation is skipped too, since its work would land before a trailing
   // plan could matter.
   const [plansQueuedKey, setPlansQueuedKey] = useState<string | null>(null)
@@ -264,8 +262,8 @@ export function TicketsPage({
             </p>
           </div>
           {/* The whole shown set onto the queue — or, with rows ticked, just the selected ones:
-              the detail page's Queue action lifted to the page, and its plan sibling — the [Plan
-              tickets] preset's entries for the same set. Each renders only when it has something
+              the detail page's Queue action lifted to the page, and its plan sibling — the plan
+              asks for the same set. Each renders only when it has something
               to add — "all 0 tickets" is not an offer, the list below already explains an empty
               set, and an all-claimed (or, for plans, all-planned) one has nothing left to ask
               for. */}
@@ -309,7 +307,7 @@ export function TicketsPage({
                 </TooltipTrigger>
                 <TooltipContent>
                   Each {hasSelection ? 'selected ' : ''}ticket gets its plan asked for on the AI queue — the same &quot;Create tickets/….plan.md&quot; entry the
-                  Plan tickets preset queues — worked highest priority first and, within a priority, in the order shown below.
+                  plan-tickets command queues — worked highest priority first and, within a priority, in the order shown below.
                   Tickets already planned, already queued, or held by an agent stay as they are.
                   {hasSelection && ' The rest of the shown set stays put.'}
                 </TooltipContent>

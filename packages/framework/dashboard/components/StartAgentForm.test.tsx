@@ -89,7 +89,7 @@ describe('StartAgentForm (#1774)', () => {
     onCommands.mockResolvedValue({ commands: [], startHook: false })
     render(<StartAgentForm {...props} />)
     const alert = await screen.findByRole('alert')
-    expect(alert.textContent).toBe('This project has no start hook. Add a start: line to .the-framework/hooks.yml.')
+    expect(alert.textContent).toBe('This project has no start hook. Run npx agent-scheduler init in the project, or add a start: line to .the-framework/hooks.yml.')
     expect((screen.getByText('submit-typed') as HTMLButtonElement).disabled).toBe(true)
   })
 

@@ -1,8 +1,8 @@
-The command line, `agent-scheduler <command>`: JSON on stdout, one line for a person on stderr, and the exit code says how it went, 0 for a result, 1 for a refusal or a failure, 2 for a command line that could not be read. The same contract as the skills' commands, so a person and a dashboard read it the same way. Eight commands: `tick`, `run <prompt> [--model <id>] [--driver <claude-code|codex>]`, `check [--driver <claude-code|codex>]`, `start [--keep-alive]`, `stop [--unless-keep-alive]`, `status`, `model <id>`, `offset <points>`.
+The command line, `agent-scheduler <command>`: JSON on stdout, one line for a person on stderr, and the exit code says how it went, 0 for a result, 1 for a refusal or a failure, 2 for a command line that could not be read. The same contract as the skills' commands, so a person and a dashboard read it the same way. Nine commands: `tick`, `run <prompt> [--model <id>] [--driver <claude-code|codex>]`, `check [--driver <claude-code|codex>]`, `init`, `start [--keep-alive]`, `stop [--unless-keep-alive]`, `status`, `model <id>`, `offset <points>`.
 
 ## Context
 
-**User story**: the user turns the scheduler on and off, reads its state, sets the model and the spend cushion for their machine, ticks once by hand, asks whether a run can start on this machine, or starts one run by hand, all from any directory of the project, and a dashboard runs the same commands and parses the same JSON.
+**User story**: the user runs `init` once so the dashboard's Start runs through this tool, turns the scheduler on and off, reads its state, sets the model and the spend cushion for their machine, ticks once by hand, asks whether a run can start on this machine, or starts one run by hand, all from any directory of the project, and a dashboard runs the same commands and parses the same JSON.
 
 **Business logic story**: every command acts on the project the working directory belongs to, found by the `branches` package even from inside a checkout under `.branches/`. What each command does is `scheduler.ts`'s and `state.ts`'s; this file is the contract around them.
 
@@ -19,6 +19,7 @@ The command line, `agent-scheduler <command>`: JSON on stdout, one line for a pe
 - **`tick`** - one tick of the project now, its decisions told on stderr, its record answered with `ok: true`.
 - **`run <prompt>`** - one run now, in this process (or, with `--detach`, in its own process, answered at once with `id`, `command`, `driver`, `model` when the run has one, and `detached: true`), `--id`, `--command`, `--model` and `--driver` optional (the tick passes the first two), the outcome answered with `ok` true when the run is `done` or `waiting`; `run --resume <id> [<text>] [--answer <label>]` continues an ended run with the text as its next prompt or the answer to the question it ended on, one of the two required, `--driver`, `--id` and `--command` a usage error with it; with `--detach` the continuation runs in its own process and the run's id is answered at once, and a run this project has no record of is refused before anything is spawned; a person's run (neither `--resume` nor `--id`) whose coding agent cannot start is refused `not-ready` before anything is written.
 - **`check`** - whether a run on the coding agent named (Claude Code when absent) can start on this machine: the problems and the warnings answered with `ok: true`.
+- **`init`** - this tool's lines written into the dashboard's hooks file, a line already there kept; answered with the file and which keys gained a line; refused `no-dashboard` where the project has no `.the-framework/` directory and `unreadable` where the file is not a YAML map (`init.ts`).
 - **`start`, `stop`, `status`** - the state answered after each; `start --foreground` makes this process the scheduler's; `start --keep-alive` writes keep-alive on; `stop --unless-keep-alive` leaves a keep-alive scheduler running, says so on stderr, and answers `kept: true`.
 - **`model <id>`, `offset <points>`** - the state's model or spend cushion written for this user and the state answered; `offset` with something that is not a number is a usage error, `<value> is not a number of percentage points`.
 
@@ -32,7 +33,7 @@ The command line, `agent-scheduler <command>`: JSON on stdout, one line for a pe
 
 #### Business logic
 
-A command that ran prints exactly one JSON document on stdout, an object with `ok`, and exits 0. A refusal, a rule saying no (the working directory is not inside a repository), prints `{"ok":false,"reason":…}` on stdout, one line on stderr, and exits 1. Anything else that fails (git, the file system, a driver) prints `{"ok":false,"reason":"failed","detail":<the error's message>}` on stdout, the detail on stderr, and exits 1. A command line that cannot be read is rejected before anything runs: no command or an unknown one prints the usage on stderr and exits 2; an unknown flag or the wrong number of arguments (`run`, `model` and `offset` take exactly one, the others none) prints what was wrong (`expected 1 argument(s), got 0`) followed by the usage on stderr, nothing on stdout, and exits 2. The usage names the eight commands and the contract.
+A command that ran prints exactly one JSON document on stdout, an object with `ok`, and exits 0. A refusal, a rule saying no (the working directory is not inside a repository), prints `{"ok":false,"reason":…}` on stdout, one line on stderr, and exits 1. Anything else that fails (git, the file system, a driver) prints `{"ok":false,"reason":"failed","detail":<the error's message>}` on stdout, the detail on stderr, and exits 1. A command line that cannot be read is rejected before anything runs: no command or an unknown one prints the usage on stderr and exits 2; an unknown flag or the wrong number of arguments (`run`, `model` and `offset` take exactly one, the others none) prints what was wrong (`expected 1 argument(s), got 0`) followed by the usage on stderr, nothing on stdout, and exits 2. The usage names the nine commands and the contract.
 
 ### The project
 
@@ -85,6 +86,16 @@ See `scheduler.ts`.
 #### Business logic
 
 `start` turns the scheduler on and answers the state [1] with the scheduler's pid; `--keep-alive` writes keep-alive on; `--foreground` runs the loop in this process, which is how the detached scheduler is started, and answers the state once stopped. `stop` turns it off, signals the scheduler's process, and answers the state with `kept: false`. `stop --unless-keep-alive` is the line a dashboard runs when it closes: when the state's keep-alive is on it changes nothing, prints `keep-alive is on, the scheduler keeps running` on stderr and answers the state as it is with `kept: true`; when keep-alive is off it is `stop`. `status` answers the state plus `running`.
+
+### `init`
+
+#### Context
+
+**User story**: the user adds a project in the dashboard and its launcher says the project has no start hook; the user runs `npx agent-scheduler init` in the project, and Start works.
+
+#### Business logic
+
+`init` takes no argument. It writes this tool's lines into the project's `.the-framework/hooks.yml`, keeping every line already there (`init.ts`), and answers `{"ok":true,"file":…,"added":[…],"kept":[…]}`. Where the project has no `.the-framework/` directory it refuses `{"ok":false,"reason":"no-dashboard","file":…}` with `no .the-framework/ here: add the project in the dashboard first` on stderr, exit 1; a file that is not YAML, or not a map, is refused `unreadable`, with the file and the parser's first line on stderr, exit 1.
 
 ### `model <id>`, `offset <points>`
 

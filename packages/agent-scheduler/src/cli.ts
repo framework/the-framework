@@ -2,6 +2,7 @@ import { parseArgs } from 'node:util'
 import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
 import { projectRoot } from '@gemstack/skill-branches'
 import { DRIVER_NAMES, detachResume, detachRun, isDriverName, readyToRun, resumeProject, runProject, schedulerStatus, startScheduler, stopScheduler, tickProject } from './scheduler.js'
+import { initHooks } from './init.js'
 import { updateState } from './state.js'
 
 /**
@@ -21,6 +22,7 @@ export const USAGE = `usage: agent-scheduler <command>
   run --detach --resume <id> …  the same continuing in its own process, answered at once: what a dashboard's resume hook runs
   check [--driver <claude-code|codex>]
                                 whether a run can start here: the coding agent's CLI installed and logged in, gh too; what a dashboard's check hook runs
+  init                          this tool's lines in the dashboard's .the-framework/hooks.yml, so its Start works; a line already there is kept
   start [--keep-alive]          the scheduler on, ticking every minute in its own process
   stop [--unless-keep-alive]    the scheduler off; runs in flight go to the end; with the flag a keep-alive scheduler is left running
   status                        the state file, and whether the scheduler's process is alive
@@ -142,6 +144,15 @@ const COMMANDS: Record<string, Command> = {
     if (!isDriverName(driver)) throw new Usage(`unknown driver "${driver}"; the drivers are ${DRIVER_NAMES.join(' and ')}`)
     await project(io.cwd, git)
     return { ok: true, ...(await readyToRun(driver)) }
+  },
+
+  async init(args, io, git) {
+    parse(args, {}, 0)
+    const repo = await project(io.cwd, git)
+    const outcome = await initHooks(repo)
+    if (outcome.ok) return outcome
+    const line = outcome.reason === 'no-dashboard' ? 'no .the-framework/ here: add the project in the dashboard first' : `${outcome.file}: ${outcome.detail ?? 'unreadable'}`
+    throw new Refused(outcome, line)
   },
 
   async start(args, io, git) {

@@ -59,6 +59,9 @@ importers:
       agent-driver:
         specifier: workspace:*
         version: link:../agent-driver
+      yaml:
+        specifier: ^2.5.0
+        version: 2.9.0
     devDependencies:
       '@types/node':
         specifier: ^20.0.0

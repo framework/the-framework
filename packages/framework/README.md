@@ -50,7 +50,8 @@ offset: npx agent-scheduler offset -- "$POINTS"
 The line is given the prompt and the user's picks in its environment, and answers one JSON
 document whose `id` names the agent it began. From there the agent belongs to whatever that
 line started. A project with no `start` line cannot start an agent from the dashboard, and the
-dashboard says so.
+dashboard says so. `npx agent-scheduler init`, run in the project, writes the lines above (and
+the scheduler's `open` and `close` lines) into the file, keeping any line already there.
 
 The `check` line is what the launcher runs before a Start, with the picked coding agent in
 `DRIVER`: it answers one JSON document with `problems` (a coding agent not installed or logged

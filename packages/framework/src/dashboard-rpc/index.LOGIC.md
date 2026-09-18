@@ -2,7 +2,7 @@ The table of every call the daemon answers by name, plus the live event stream [
 
 ## Glossary
 
-[1] event stream: everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface (dashboard, terminal, archive, run) is a projection of it.
+[1] event stream: everything an agent does, one event per line of the agent's diary — the file `<id>.jsonl` the tool that runs the agent writes under `.the-framework/` in the agent's checkout, copied onto the `agent-data` branch when the agent ends. Every surface (dashboard, terminal, replay) is a projection of it.
 
 ## Business logic — TL;DR
 

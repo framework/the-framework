@@ -7,3 +7,4 @@ What the tests cover, against real files on disk:
 - **Following the file into the archive** - lines appended in the same breath as the move to a new path arrive exactly once each, and the boundary is reported only once across the move.
 - **No replay after the move** - a same-content copy with a newer modification time and the same length is not replayed once the tail follows it.
 - **Waiting for the new home** - while the file is gone and no new path can be resolved yet, the tail idles rather than hopping somewhere wrong, then catches up once the new path appears.
+- **A diary never seen at its first home** - a file that never existed where the tail first looked, and appears at the place the resolver names next (a short agent, started and recorded between two polls), is read from the top, and the boundary is still reported once.

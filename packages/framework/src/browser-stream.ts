@@ -1,288 +1,19 @@
-import { createServer, type Server } from 'node:http'
-import type { AddressInfo } from 'node:net'
-
 /**
- * The agent's browser, streamed to a human (#802, part of #609).
- *
- * The browser hand-off gate (#796) parks an agent and asks someone to deal with a login wall or a
- * captcha. The browser it is parked on is headless and owned by the agent (#793), so there is
- * nothing for that person to click. This serves it: the latest screencast frame as MJPEG, and
- * clicks/keys back in over POST.
- *
- * Why the agent hosts this rather than the dashboard driving Chrome directly: Chrome refuses
- * DevTools socket connections carrying an `Origin` header unless launched with
+ * The DevTools connection to a Chrome the daemon owns: the bridge browser's (#1332). Chrome
+ * refuses DevTools socket connections carrying an `Origin` header unless launched with
  * `--remote-allow-origins`, and opening that up would let any page the user happens to visit
- * drive the agent's browser. The debug port stays unreachable from the web; this bridge is the
- * only way in.
- *
- * Why MJPEG rather than a WebSocket: an `<img>` renders `multipart/x-mixed-replace` natively
- * and input is a plain POST, so the dashboard needs no client library and the framework needs
- * no new dependency — Node's global WebSocket is enough to talk to Chrome.
+ * drive the browser. So the debug port stays unreachable from the web, and this process is the
+ * only one that talks to it.
  */
-export interface BrowserStream {
-  /** Where the dashboard points an `<img>` (`/stream`) and posts input (`/input`). */
-  url: string
-  /** The loopback port {@link url} is on, published on the agent's log so the daemon can proxy it (#813). */
-  port: number
-  /** Stop streaming and close the server. Safe to call twice. */
-  close(): Promise<void>
-}
 
-/** One page Chrome is showing, from `/json/list`. */
-export interface CdpPageTarget {
-  id: string
-  type: string
-  url: string
-  webSocketDebuggerUrl?: string
-}
-
-/**
- * The page a human should be looking at: the agent's current one.
- *
- * Chrome lists targets most-recently-used first, so the first `page` is the one the agent is
- * working in. Picking by position is what keeps the pane from going blind when the agent opens
- * a tab — the failure the spike hit. Ignores targets with no socket (a crashed or detached
- * tab) rather than returning something unusable.
- */
-export function pickActivePage(targets: readonly CdpPageTarget[]): CdpPageTarget | undefined {
-  return targets.find(t => t.type === 'page' && !!t.webSocketDebuggerUrl)
-}
-
-/** The input a human can send back through the pane. Coordinates are in page pixels. */
-export type BrowserInput =
-  | { type: 'click'; x: number; y: number }
-  | { type: 'key'; text: string }
-  | { type: 'scroll'; x: number; y: number; deltaY: number }
-  | { type: 'navigate'; url: string }
-
-/** A CDP call the bridge makes on the human's behalf. */
-export interface CdpCall {
-  method: string
-  params: Record<string, unknown>
-}
-
-/**
- * The CDP calls one input maps to, or `[]` for anything unrecognized — a malformed POST must
- * never reach Chrome. A click is press + release (Chrome ignores a lone `mousePressed`), and
- * text goes through `insertText` so it types the character rather than a key code, which is
- * what makes non-ASCII and password managers behave.
- */
-export function inputToCdp(input: BrowserInput): CdpCall[] {
-  switch (input?.type) {
-    case 'click': {
-      if (!Number.isFinite(input.x) || !Number.isFinite(input.y)) return []
-      const base = { x: input.x, y: input.y, button: 'left', clickCount: 1 }
-      return [
-        { method: 'Input.dispatchMouseEvent', params: { ...base, type: 'mousePressed' } },
-        { method: 'Input.dispatchMouseEvent', params: { ...base, type: 'mouseReleased' } },
-      ]
-    }
-    case 'key': {
-      if (typeof input.text !== 'string' || input.text === '') return []
-      return [{ method: 'Input.insertText', params: { text: input.text } }]
-    }
-    case 'scroll': {
-      if (!Number.isFinite(input.deltaY)) return []
-      return [
-        {
-          method: 'Input.dispatchMouseEvent',
-          params: { type: 'mouseWheel', x: input.x ?? 0, y: input.y ?? 0, deltaX: 0, deltaY: input.deltaY },
-        },
-      ]
-    }
-    case 'navigate': {
-      if (typeof input.url !== 'string' || !/^https?:\/\//i.test(input.url)) return []
-      return [{ method: 'Page.navigate', params: { url: input.url } }]
-    }
-    default:
-      return []
-  }
-}
-
-/** The MJPEG part header for one frame. */
-export function framePart(boundary: string, jpeg: Buffer): Buffer {
-  return Buffer.concat([
-    Buffer.from(`--${boundary}\r\nContent-Type: image/jpeg\r\nContent-Length: ${jpeg.length}\r\n\r\n`),
-    jpeg,
-    Buffer.from('\r\n'),
-  ])
-}
-
-const BOUNDARY = 'frame'
-
-/** What the bridge needs from a CDP connection, so a test can stand in for Chrome. */
+/** What a caller needs from a CDP connection, so a test can stand in for Chrome. */
 export interface CdpSession {
   send(method: string, params?: Record<string, unknown>): Promise<unknown>
-  on(event: 'Page.screencastFrame', handler: (params: { data: string; sessionId: number }) => void): void
   close(): void
 }
 
-/** How the bridge reaches a page. Injectable: the real one speaks WebSocket to Chrome. */
+/** How a caller reaches a browser or a page. Injectable: the real one speaks WebSocket to Chrome. */
 export type CdpConnect = (webSocketDebuggerUrl: string) => Promise<CdpSession>
-
-/**
- * Start the bridge. Returns undefined when Chrome has no page to stream — the caller carries
- * on without a pane rather than failing the agent.
- *
- * The stream is bound to loopback explicitly: the frames can contain whatever the human is
- * typing, including a password, so this must not be reachable from the network. For the same
- * reason no frame is ever written to disk or into the agent's event log.
- */
-export async function startBrowserStream(opts: {
-  browserUrl: string
-  connect: CdpConnect
-  listTargets?: (browserUrl: string) => Promise<CdpPageTarget[]>
-  /** How often to check whether the agent moved to another tab. 0 disables following. */
-  followIntervalMs?: number
-  /** How often to re-send the newest frame so a still page still paints (#818). */
-  repeatIntervalMs?: number
-  /**
-   * The page the human would be looking at changed (#1455 item 6b): fired for the first real
-   * (http/https) page and on every change after — a navigation in place or a followed tab
-   * switch. Never fired for about:blank or chrome:// (the browser idling is not the agent
-   * showing something), and never twice for the same URL in a row.
-   */
-  onPage?: (url: string) => void
-}): Promise<BrowserStream | undefined> {
-  const listTargets = opts.listTargets ?? defaultListTargets
-  const targets = await listTargets(opts.browserUrl).catch(() => [])
-  const page = pickActivePage(targets)
-  if (!page?.webSocketDebuggerUrl) return undefined
-
-  let latest: Buffer | undefined
-  const viewers = new Set<import('node:http').ServerResponse>()
-
-  // What onPage last said, so a poll that sees the same page again stays silent.
-  let announcedUrl: string | undefined
-  const announce = (url: string) => {
-    if (!/^https?:\/\//i.test(url) || url === announcedUrl) return
-    announcedUrl = url
-    opts.onPage?.(url)
-  }
-
-  /** Attach the screencast to one page. Frames land in `latest` and go straight to viewers. */
-  const attach = async (target: CdpPageTarget): Promise<CdpSession> => {
-    const session = await opts.connect(target.webSocketDebuggerUrl!)
-    session.on('Page.screencastFrame', ({ data, sessionId }) => {
-      latest = Buffer.from(data, 'base64')
-      for (const res of viewers) res.write(framePart(BOUNDARY, latest))
-      void session.send('Page.screencastFrameAck', { sessionId }).catch(() => {})
-    })
-    await session.send('Page.startScreencast', { format: 'jpeg', quality: 60, maxWidth: 1280, maxHeight: 720 })
-    return session
-  }
-
-  let current = page
-  let session = await attach(page)
-  announce(page.url)
-
-  /**
-   * Follow the agent when it opens or switches tabs. Without this the pane shows whichever
-   * page happened to be first while the agent works somewhere else — the exact failure the
-   * #609 spike reproduced. Cheap: one `/json/list` on an interval, re-attach only on change.
-   */
-  /**
-   * Re-send the newest frame while anyone is watching (#818).
-   *
-   * Chrome does not finalize a `multipart/x-mixed-replace` part until the next boundary arrives,
-   * so the most recent frame is always held back unpainted. A still page never produces that next
-   * frame, which left the pane blank while holding a perfectly good JPEG — and a still page is
-   * exactly the case this exists for: an agent parked on a login wall is not repainting itself.
-   *
-   * Repeating the frame supplies the boundary. Loopback only, and only while a viewer is attached.
-   */
-  const repeat = setInterval(() => {
-    if (!latest || viewers.size === 0) return
-    for (const res of viewers) res.write(framePart(BOUNDARY, latest))
-  }, opts.repeatIntervalMs ?? 1000)
-  repeat.unref?.()
-
-  const followMs = opts.followIntervalMs ?? 2000
-  const follow = followMs
-    ? setInterval(() => {
-        void (async () => {
-          const next = pickActivePage(await listTargets(opts.browserUrl).catch(() => []))
-          if (!next?.webSocketDebuggerUrl) return
-          if (next.id === current.id) {
-            // Same tab, possibly a new page: the screencast keeps itself current, but the
-            // navigation is still worth announcing (#1455 item 6b).
-            current = next
-            announce(next.url)
-            return
-          }
-          const previous = session
-          try {
-            session = await attach(next)
-            current = next
-            announce(next.url)
-            await previous.send('Page.stopScreencast').catch(() => {})
-            previous.close()
-          } catch {
-            // Keep streaming the page we already have rather than dropping the pane.
-          }
-        })()
-      }, followMs)
-    : undefined
-  follow?.unref?.()
-
-  const server: Server = createServer((req, res) => {
-    if (req.method === 'GET' && req.url?.startsWith('/stream')) {
-      res.writeHead(200, {
-        'content-type': `multipart/x-mixed-replace; boundary=${BOUNDARY}`,
-        'cache-control': 'no-store',
-        connection: 'close',
-      })
-      // Node holds the headers back until the first write, so a pane opened before any frame
-      // exists would hang waiting for a response rather than showing an empty stream.
-      res.flushHeaders()
-      // Chrome only emits a frame when the page changes, so a pane opened on a still page
-      // would sit blank. Send the last one we have immediately.
-      if (latest) res.write(framePart(BOUNDARY, latest))
-      viewers.add(res)
-      req.on('close', () => viewers.delete(res))
-      return
-    }
-    if (req.method === 'POST' && req.url?.startsWith('/input')) {
-      let body = ''
-      req.on('data', chunk => {
-        body += chunk
-        if (body.length > 8192) req.destroy() // an input payload is tiny; anything else is not input
-      })
-      req.on('end', () => {
-        let calls: CdpCall[] = []
-        try {
-          calls = inputToCdp(JSON.parse(body) as BrowserInput)
-        } catch {
-          calls = []
-        }
-        for (const call of calls) void session.send(call.method, call.params).catch(() => {})
-        res.writeHead(calls.length ? 204 : 400).end()
-      })
-      return
-    }
-    res.writeHead(404).end()
-  })
-
-  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
-  const port = (server.address() as AddressInfo).port
-
-  let closed = false
-  return {
-    url: `http://127.0.0.1:${port}`,
-    port,
-    close: async () => {
-      if (closed) return
-      closed = true
-      if (follow) clearInterval(follow)
-      clearInterval(repeat)
-      for (const res of viewers) res.end()
-      viewers.clear()
-      await session.send('Page.stopScreencast').catch(() => {})
-      session.close()
-      await new Promise<void>(resolve => server.close(() => resolve()))
-    },
-  }
-}
 
 /**
  * Talk CDP to Chrome over its debugger socket. Node's global WebSocket is enough, which is
@@ -297,25 +28,19 @@ export const connectCdp: CdpConnect = async (webSocketDebuggerUrl: string) => {
 
   let nextId = 1
   const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>()
-  const frameHandlers: ((p: { data: string; sessionId: number }) => void)[] = []
 
   ws.addEventListener('message', ev => {
-    let msg: { id?: number; method?: string; params?: unknown; result?: unknown; error?: { message?: string } }
+    let msg: { id?: number; result?: unknown; error?: { message?: string } }
     try {
       msg = JSON.parse(String(ev.data))
     } catch {
       return
     }
-    if (typeof msg.id === 'number') {
-      const p = pending.get(msg.id)
-      if (!p) return
-      pending.delete(msg.id)
-      msg.error ? p.reject(new Error(msg.error.message ?? 'CDP error')) : p.resolve(msg.result)
-      return
-    }
-    if (msg.method === 'Page.screencastFrame') {
-      for (const handler of frameHandlers) handler(msg.params as { data: string; sessionId: number })
-    }
+    if (typeof msg.id !== 'number') return
+    const p = pending.get(msg.id)
+    if (!p) return
+    pending.delete(msg.id)
+    msg.error ? p.reject(new Error(msg.error.message ?? 'CDP error')) : p.resolve(msg.result)
   })
 
   return {
@@ -330,15 +55,6 @@ export const connectCdp: CdpConnect = async (webSocketDebuggerUrl: string) => {
           reject(err instanceof Error ? err : new Error(String(err)))
         }
       }),
-    on: (_event, handler) => void frameHandlers.push(handler),
     close: () => ws.close(),
   }
-}
-
-/** The real target list: Chrome's own `/json/list`. */
-async function defaultListTargets(browserUrl: string): Promise<CdpPageTarget[]> {
-  const res = await fetch(`${browserUrl}/json/list`)
-  if (!res.ok) return []
-  const body = (await res.json()) as CdpPageTarget[]
-  return Array.isArray(body) ? body : []
 }

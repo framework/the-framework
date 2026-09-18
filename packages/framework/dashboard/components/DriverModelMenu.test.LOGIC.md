@@ -8,4 +8,4 @@ What the tests cover, for the menu that picks the driver [1] and model together:
 
 ## Glossary
 
-[1] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later. The user's driver choice is `claude` or `codex`.
+[1] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later.

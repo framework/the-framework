@@ -6,7 +6,6 @@ import { receivedAt } from '../lib/event-times.js'
 import { pendingChoices } from '../lib/live-state.js'
 import { AnsweredChoice } from './AnsweredChoice.js'
 import { ChoicePanel } from './ChoicePanel.js'
-import { InlineBrowser } from './InlineBrowser.js'
 import { Markdown } from './Markdown.js'
 import { Badge } from './ui/badge.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
@@ -29,9 +28,6 @@ import {
 //   - Choice gates, when the log knows its project (#1455 item 6): an open gate renders the same
 //     interactive ChoicePanel the rail used to hold, so the question is answered from the flow;
 //     a resolved one collapses to the AnsweredChoice ✓ card and hides its "✓ chose" line.
-//   - The latest `browser` row, when the log knows its project AND agent (#1455 item 6b): it hosts
-//     the live inline preview (InlineBrowser); earlier browser rows keep their one-line text, and
-//     a re-said URL replaces its earlier row in place rather than stacking a duplicate.
 // The kind badge shows once per agent of same-group rows — a 200-line driver turn used to be 200
 // identical badges (#948). A driver `start` breaks out of the AGENT group so the user's turn gets
 // its own YOU badge. Live rows carry their arrival time at each group boundary; replayed events were
@@ -203,38 +199,6 @@ function foldChoiceRows(events: FrameworkEvent[]): {
   return { rows, hidden }
 }
 
-/**
- * How the log's `browser` traffic renders (#1455 item 6b). Only the LATEST browser row hosts
- * the live pane — there is one screencast, not N — so `pane` is the last `browser` event and
- * every earlier one keeps the formatter's one-liner. A repeat of a URL already shown replaces
- * the earlier row in place (the `view` re-show rule: a continuation re-says its URL after
- * every `session`, which must not stack duplicates), so the superseded firing is hidden.
- * `live` is whether nothing has ended since the pane's row: an `end` after it means the
- * stream's other side is gone (#1359) and the pane must degrade rather than stay a control.
- */
-function foldBrowserRows(events: FrameworkEvent[]): {
-  pane: Extract<FrameworkEvent, { kind: 'browser' }> | undefined
-  live: boolean
-  hidden: Set<FrameworkEvent>
-} {
-  const lastByUrl = new Map<string, FrameworkEvent>()
-  const hidden = new Set<FrameworkEvent>()
-  let pane: Extract<FrameworkEvent, { kind: 'browser' }> | undefined
-  let live = false
-  for (const e of events) {
-    if (e.kind === 'browser') {
-      const prior = lastByUrl.get(e.url)
-      if (prior) hidden.add(prior)
-      lastByUrl.set(e.url, e)
-      pane = e
-      live = true
-    } else if (e.kind === 'end') {
-      live = false
-    }
-  }
-  return { pane, live, hidden }
-}
-
 // A conversation message (a prompt or a reply), rendered as compact Markdown. A short one renders
 // as-is. A long one clamps to its first line with a chevron beside it and expands in place on click —
 // the chevron stays on that first line (never a lone chevron on its own row), and the same rendered
@@ -292,10 +256,7 @@ export function EventList({
   agentId?: string | null | undefined
 }) {
   const choiceRows = useMemo(() => (projectId ? foldChoiceRows(events) : undefined), [projectId, events])
-  // The inline pane needs both halves of the proxy path, so a log rendered without a
-  // projectId/agentId keeps every browser row as formatter text.
-  const browserRows = useMemo(() => (projectId && agentId ? foldBrowserRows(events) : undefined), [projectId, agentId, events])
-  const shown = promptFirst(events).filter(e => !choiceRows?.hidden.has(e) && !browserRows?.hidden.has(e))
+  const shown = promptFirst(events).filter(e => !choiceRows?.hidden.has(e))
   return (
     <MessageScrollerProvider autoScroll={stick} defaultScrollPosition={openAt ?? (stick ? 'end' : 'start')}>
       <MessageScroller className="flex-1">
@@ -344,13 +305,6 @@ export function EventList({
                       ) : (
                         <AnsweredChoice choice={choiceRow.choice} pick={choiceRow.pick} />
                       )}
-                    </div>
-                  ) : e.kind === 'browser' && e === browserRows?.pane && projectId && agentId ? (
-                    // The latest browser row IS the preview (#1455 item 6b) — the same proxied
-                    // stream the rail's Browser tab shows, at the point of use. font-sans for
-                    // the same reason the choice rows drop the log's mono: a surface, not text.
-                    <div className="min-w-0 flex-1 font-sans">
-                      <InlineBrowser projectId={projectId} agentId={agentId} url={e.url} live={browserRows.live} />
                     </div>
                   ) : (
                     <span className={`min-w-0 flex-1 whitespace-pre-wrap break-words ${rowTone(e) || 'text-foreground'}`}>

@@ -15,10 +15,10 @@ import { cn } from '../lib/utils.js'
 const EMPTY: HotTicket[] = []
 
 /**
- * The prompt a ticket row hands the launcher. Its vocabulary is the drain preset's ("work on … Do
+ * The prompt a ticket row hands the launcher. Its vocabulary is the queue command's ("work on … Do
  * not start any other …"), narrowed to the one ticket the row names.
  *
- * Plain text rather than a preset: this is a draft the user reads and edits in the composer before
+ * Plain text rather than a command: this is a draft the user reads and edits in the composer before
  * sending, so there is no second, hidden version of the ask to drift from the button — which is
  * what #1187 was about. Exported so the test asserts against this and not a copy.
  */

@@ -9,7 +9,7 @@ The "Devices" section of Settings: the devices [1] saved in this browser, each r
 ## Glossary
 
 [1] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
-[2] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [3] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
 
 ## Business logic — TL;DR

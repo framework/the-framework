@@ -111,15 +111,11 @@ export function FileTree({
   projectId,
   agentId: agentId,
   files,
-  selected,
-  onToggle,
 }: {
   projectId: string
   /** The selected agent, so the dots describe its worktree and not the project root (#815). */
   agentId?: string | null | undefined
   files: string[]
-  selected: Set<string>
-  onToggle: (path: string) => void
 }) {
   const [query, setQuery] = useState('')
 
@@ -169,20 +165,15 @@ export function FileTree({
         .sort((a, b) => a.localeCompare(b))
         .map(path => {
           const name = path.slice(path.lastIndexOf('/') + 1)
-          const isOn = selected.has(path)
           const git = status[path]
           // No `title`: the hover preview card already leads with the full path, and a native
           // tooltip on top of it is the slow system one the dashboard no longer uses (#1149).
           const item = (
-            <button
-              type="button"
-              onClick={() => onToggle(path)}
-              className={cn('w-full rounded-lg text-start hover:bg-accent', isOn && 'text-primary')}
-            >
-              <Row icon={isOn ? Check : FileIcon} gitStatus={git} badge="letter">
+            <div className="w-full rounded-lg hover:bg-accent">
+              <Row icon={FileIcon} gitStatus={git} badge="letter">
                 {name}
               </Row>
-            </button>
+            </div>
           )
           // Every file previews on hover: a changed one shows its diff (#816), an unchanged one
           // its contents (#828). `git` picks which read the card makes, so the tree's own status

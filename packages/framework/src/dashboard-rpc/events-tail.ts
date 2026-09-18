@@ -6,13 +6,13 @@ import { JsonlTailer, followFile } from '../jsonl-tail.js'
 const POLL_MS = 1000
 
 /**
- * Tail a `.the-framework/events.jsonl`: read what is already logged, then follow
- * appends. Each complete JSONL line is parsed and handed to `onEvent`; malformed
- * lines are skipped. Returns a stop function that removes the watcher and the poll.
+ * Tail a JSONL log: read what is already in it, then follow appends. Each complete line is
+ * parsed and handed to `onEvent`; malformed lines are skipped. Returns a stop function that
+ * removes the watcher and the poll.
  *
- * The reading is {@link JsonlTailer} and the following is {@link followFile}, the same
- * two pieces the agent's control tail is built from. This used to be its own copy of both,
- * which is how it ended up missing the tailer's same-length-rewrite detection (#567).
+ * The reading is {@link JsonlTailer} and the following is {@link followFile}. This used to be
+ * its own copy of both, which is how it ended up missing the tailer's same-length-rewrite
+ * detection (#567).
  *
  * `onReplayed` is told once the first pull — the replay of everything already logged — has
  * been delivered (#1383). That boundary is what lets a reconnecting client buffer the replay
@@ -41,18 +41,21 @@ export function tailEvents<T = unknown>(path: string, onEvent: (event: T) => voi
 }
 
 /**
- * Tail an agent's journal across its relocations: the same read-then-follow as {@link tailEvents},
- * but the path is re-resolved whenever the tailed file disappears after having existed.
+ * Tail a run's diary across its relocations: the same read-then-follow as {@link tailEvents},
+ * but the path is re-resolved whenever the tailed file is not there.
  *
- * An agent's `events.jsonl` does not sit still. Teardown copies it verbatim into the archive and
- * removes the worktree; a continuation restores it into a fresh checkout. A fixed-path tail
- * whose file was retired went silent *without the final lines* whenever the last `fs.watch`
- * signal was lost — the 1s poll then found the file gone and had nothing to read, so the feed
- * never learned the agent ended. This tail treats "the file existed and is now gone" as the
- * relocation it is: it asks `resolvePath` where the journal lives now (`resolveAgentEventsPath`
- * already answers the archive once the worktree is gone, #1472), retargets the same tailer —
- * the copy is content-identical, so the offset carries and nothing is replayed — and follows
- * the new home.
+ * A run's diary does not sit still. While the run works it is in the run's checkout; when the
+ * run ends its tool records it on the data branch and reclaims the checkout; a resumed run
+ * writes on in a checkout again. A fixed-path tail whose file was retired went silent *without
+ * the final lines* whenever the last `fs.watch` signal was lost — the 1s poll then found the
+ * file gone and had nothing to read, so the feed never learned the run ended. This tail treats
+ * a missing file as the question it is: it asks `resolvePath` where the diary lives now
+ * (`resolveAgentEventsPath` answers the record once the checkout is gone, #1472), and on a
+ * new answer retargets the same tailer — the copy is content-identical, so the offset carries
+ * and nothing is replayed — and follows the new home. The same answer means the run has not
+ * made its checkout yet, and the tail keeps waiting there. Asking even when the file was never
+ * seen matters for a short run (#1774): started, ended and reclaimed between two polls, its
+ * diary was only ever visible at its second home.
  *
  * `onReplayed` keeps {@link tailEvents}' once-per-subscription contract: a relocation is not a
  * new replay boundary, so it never fires twice.
@@ -66,7 +69,6 @@ export function tailAgentEvents<T = unknown>(
   let stopFollow: (() => void) | undefined
   let path: string | undefined
   let tailer: JsonlTailer<T> | undefined
-  let sawFile = false
   let relocating = false
 
   const follow = (): void => {
@@ -80,7 +82,6 @@ export function tailAgentEvents<T = unknown>(
     if (stopped || !tailer || next === undefined || next === path) return
     stopFollow?.()
     path = next
-    sawFile = false
     tailer.retarget(next)
     await tailer.pull()
     follow()
@@ -89,12 +90,10 @@ export function tailAgentEvents<T = unknown>(
   const pullOrRelocate = async (): Promise<void> => {
     if (stopped || !tailer || path === undefined) return
     if (existsSync(path)) {
-      sawFile = true
       await tailer.pull()
       return
     }
-    // Gone before anything was written is an agent still booting, not a move.
-    if (!sawFile || relocating) return
+    if (relocating) return
     relocating = true
     try {
       await relocate()
@@ -116,7 +115,6 @@ export function tailAgentEvents<T = unknown>(
       const replayed = (): void => {
         if (stopped) return
         onReplayed?.()
-        if (existsSync(initial)) sawFile = true
         follow()
       }
       void tailer.pull().then(replayed, replayed)

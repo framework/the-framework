@@ -3,7 +3,7 @@ Gives every panel in the dashboard the same behavior when it reads something fro
 ## Glossary
 
 [1] project: a repository the user registered in the dashboard, identified by an id derived from its path.
-[2] agent: the unit of work: one task worked by a coding agent under The Framework's control, in its own checkout, on its own branch, streaming events, handed off when it ends.
+[2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 
 ## Business logic — TL;DR
 

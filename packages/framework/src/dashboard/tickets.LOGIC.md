@@ -7,7 +7,7 @@ Reads a project's tickets as the dashboard shows them: the rows the `tickets` sk
 [3] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch. Also "the `agent-data` branch's checkout".
 [4] holder: who a claim names: the agent's id when the daemon started the agent, else the branch the `tickets` command ran on.
 [5] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
-[6] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[6] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [7] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
 [8] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
 

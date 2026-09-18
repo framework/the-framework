@@ -1,45 +1,19 @@
 import type { AgentLocation } from '../agent-location.js'
 import { join } from 'node:path'
-import { hostname } from 'node:os'
 import type { AutoHandoffSkip, FrameworkEvent } from '../events.js'
 import { nodeFs } from '../node-fs.js'
 import { agentBranchName, isSafeAgentId, worktreeDirEntries } from '@gemstack/skill-branches'
 import { THE_FRAMEWORK_DIR } from '../framework-dir.js'
-import { findRun, listRuns, parseRunCard, readDiary, runFiles, writeRun, type LogsDeps, type LogsFunnel } from '@gemstack/skill-logs'
-import { eventsOf, fromRunCard, toDiaryLine, toRunCard } from './run-record.js'
-import { agentIdFromStartedAt, startedAtFromAgentId } from '../agent-id.js'
+import { listRuns, parseRunCard, readDiary, runFiles, type AnyDiaryLine, type LogsDeps } from '@gemstack/skill-logs'
+import { eventsOf, fromRunCard } from './run-record.js'
 
 /**
- * Persisted orchestration state (#211). The dashboard is a pure projection of the
- * {@link FrameworkEvent} stream, so persisting *is* durably logging that stream:
- * the stack rationale, the loop status, and the decisions ledger are all events
- * that already flow through it. We store the log append-only and rehydrate a
- * restarted dashboard by replaying it into a fresh stream — no separate state
- * model to keep in sync. Per the sync, we do **not** persist the agent's chat
- * transcript (Claude Code owns that); only our own orchestration events.
+ * The read side of a project's runs (#1774). The daemon runs no agent and writes no run: a run's
+ * tool keeps the run's card (`<id>.json`) and diary (`<id>.jsonl`) under the `.the-framework/`
+ * of the run's own checkout while it works, and the `logs` skill's copy of both on the data
+ * branch is the one place a finished run lives. The dashboard is a projection of those files.
  */
 
-/** The append-only event log: one {@link FrameworkEvent} per line (JSONL). */
-export const EVENTS_FILE = 'events.jsonl'
-
-/** A small snapshot for cheap status reads without replaying the whole log. */
-export const META_FILE = 'agent.json'
-
-/**
- * The transient archive, `.the-framework/agents/`: where an agent with no worktree of its own —
- * a project that is not a git repository — archives on close, where the crash rescue puts a run
- * whose process died, and where an agent's own worktree keeps its copy. Untracked by design. The
- * lasting record of a run is on the data branch, as the `logs` skill's card and diary (#1769):
- * the daemon writes it there at teardown, and every history read lists both places.
- *
- * The live agent stays at `events.jsonl`/`agent.json` (the daemon tails it); on
- * {@link AgentStore.close} a copy lands here as `<id>.jsonl` + `<id>.json` (#303).
- */
-export const ARCHIVE_DIR = 'agents'
-
-export { agentIdFromStartedAt, startedAtFromAgentId }
-
-/** How an agent ended (or that it is still going). */
 export type AgentStatus = 'running' | 'done' | 'stopped' | 'failed' | 'waiting'
 
 /**
@@ -59,9 +33,9 @@ export interface AgentMeta {
   /** What the run cost so far in US dollars, summed over its `usage` events; absent until one says. The skill's card field. */
   cost?: number
   /**
-   * The OS pid of the process that owns this agent (the one tailing `control.jsonl`), on {@link host}.
-   * Persisted so a reader can tell a live agent from one whose process died without writing `end`
-   * (#716): a `running` meta whose owning pid is gone is stale and gets flipped to `stopped`.
+   * The OS pid of the process running this run, on {@link host} — whatever process the project's
+   * start hook began. Recorded on the card so Stop has something to signal, and so a reader can
+   * tell a run that is working from one whose process died without recording an ending (#716).
    */
   pid?: number
   /** The host the owning {@link pid} lives on, so a pid probe only trusts a match (#716). */
@@ -204,9 +178,8 @@ export interface AgentMeta {
 }
 
 /**
- * The slice of a filesystem {@link AgentStore} needs. Mirrors the `LedgerFs` seam
- * in ai-autopilot's decisions store: the store logic is pure and testable with an
- * in-memory fs, and only {@link nodeStoreFs} touches disk.
+ * The slice of a filesystem the store's reads need: the logic is testable with an in-memory fs,
+ * and only {@link nodeStoreFs} touches disk.
  */
 export interface StoreFs {
   read(path: string): Promise<string>
@@ -218,437 +191,10 @@ export interface StoreFs {
   readdir(path: string): Promise<string[]>
   /** The names of the *directories* under `path` — a symlink is not one. Missing dir yields `[]`. */
   subdirs(path: string): Promise<string[]>
-  /**
-   * Replace `to` with `from` in one step. Optional: an adapter that has it gets torn-proof meta
-   * writes (see {@link writeMetaFile}), and one that does not writes in place, which is right for
-   * the in-memory fakes — a `Map.set` cannot be observed half-done.
-   */
-  rename?(from: string, to: string): Promise<void>
 }
 
-/** Options for {@link AgentStore.open}. */
-export interface OpenStoreOptions {
-  /** The filesystem adapter. Default {@link nodeStoreFs}. */
-  fs?: StoreFs
-  /**
-   * Truncate any prior log so this is a clean agent (MVP: one agent per workspace).
-   * `false` (the default) opens read-only-ish for {@link AgentStore.loadEvents} —
-   * the `--resume` path — and does not clear the log.
-   */
-  fresh?: boolean
-  /** The wall-clock start, ISO. Injectable so tests are deterministic. */
-  now?: string
-  /**
-   * Reads the current time for each appended event, so {@link AgentMeta.updatedAt} tracks the last
-   * event rather than the agent's start. Injectable so tests can step it deterministically.
-   *
-   * Separate from {@link now} on purpose: `now` is when the agent *opened*, and a single timestamp
-   * cannot answer both questions. Reusing it for appends froze `updatedAt` at `startedAt` for a
-   * run's whole life, which every reader that orders by recency (the overview, the activity feed,
-   * the interventions queue) silently sorted on.
-   */
-  clock?: () => string
-  /**
-   * The session's intent (its prompt / request) shown in the dashboard's sessions list. Seeded
-   * here so the row shows the prompt from the moment the store opens, before the session's own
-   * `intent` event lands; refreshed by that event.
-   */
-  intent?: string
-  /**
-   * Who owns this agent (#716). Defaults to the current process on this host — the process opening a
-   * fresh store *is* the agent's owner. Injectable so tests can seed a specific (dead) pid.
-   */
-  owner?: AgentOwner
-  /**
-   * The agent's id, overriding the one derived from {@link OpenStoreOptions.now}. The daemon
-   * allocates the id before it spawns the agent (it names the agent's worktree with it, #736) and
-   * passes it in, so the worktree directory and the agent inside it are one string rather than two
-   * timestamps taken a moment apart. Ignored unless path-safe.
-   */
-  id?: string
-  /**
-   * Reopen the agent already at this path instead of starting a new one (#762): keep its event log
-   * and its original intent, and flip it back to `running` under this process. What makes a
-   * continued run one row in the history rather than two: the follow-up is a second process, but
-   * it writes into the same agent.
-   *
-   * Falls back to a fresh agent when there is nothing to reopen.
-   */
-  continueAgent?: boolean
-  /** Where this agent executes (#1053/#610): recorded on the meta so the agent view can read it. */
-  target?: AgentLocation
-  /** The flow this agent started under (#1467): recorded on the meta so a continuation can re-enter it. */
-  kind?: 'build' | 'prompt'
-}
-
-/**
- * Fold one event into the running {@link AgentMeta}. Pure, so the same derivation
- * drives both a live append and reconstructing meta from a replayed log.
- */
-export function applyEventToMeta(meta: AgentMeta, event: FrameworkEvent, at: string): AgentMeta {
-  const next: AgentMeta = { ...meta, updatedAt: at }
-  switch (event.kind) {
-    case 'session':
-      next.driver = event.driver
-      next.workspace = event.workspace
-      if (event.sessionLink) next.sessionLink = event.sessionLink
-      // Per-leg (#1438): a leg that recorded no model leaves it unknown rather than
-      // inheriting the prior leg's — the agent may have resolved a different default.
-      if (event.model) next.model = event.model
-      else delete next.model
-      break
-    case 'session-update':
-      next.sessionId = event.sessionId
-      if (event.sessionLink) next.sessionLink = event.sessionLink
-      break
-    case 'ready-for-merge':
-      next.readyForMerge = true
-      break
-    case 'choice':
-      next.pendingChoice = { id: event.id, title: event.title }
-      break
-    case 'choice-resolved':
-      if (next.pendingChoice?.id === event.id) delete next.pendingChoice
-      break
-    case 'intent':
-      next.intent = event.text
-      break
-    case 'browser-stream':
-      next.browserStreamPort = event.port
-      break
-    case 'handoff-armed':
-      next.handoff = { push: event.push, pr: event.pr, ...(event.merge !== undefined ? { merge: event.merge } : {}) }
-      break
-    case 'handoff':
-      next.handoffReport = event.outcome
-      // Cleared on a non-skipped outcome rather than only ever set: a resumed run's second leg
-      // can publish after its first skipped, and a stale `no-commits` on a published run is
-      // exactly the lie the release must not act on.
-      if (event.outcome === 'skipped') next.handoffSkip = event.reason
-      else delete next.handoffSkip
-      if (event.outcome !== 'failed' && event.merge) next.mergeOutcome = event.merge.outcome
-      break
-    case 'pull-request':
-      next.pr = { number: event.number, url: event.url }
-      break
-    case 'branch':
-      next.branch = event.branch
-      break
-    case 'cloud-anchor':
-      next.cloudAnchor = event.sha
-      break
-    case 'settled':
-      next.settledAt = at
-      break
-    case 'driver':
-      // Any new turn means the agent is working again, so the agent is no longer parked (#785).
-      if (event.event.type === 'start') delete next.settledAt
-      break
-    case 'usage':
-      if (event.costUsd !== undefined) next.cost = (next.cost ?? 0) + event.costUsd
-      break
-    case 'end':
-      next.status = event.ok ? 'done' : event.stopped ? 'stopped' : event.waiting ? 'waiting' : 'failed'
-      next.endedAt = at
-      delete next.pendingChoice // a finished run is not awaiting anything
-      delete next.settledAt // nor is it waiting on you
-      // The bridge dies with the agent, so a kept port would send the pane at whatever else
-      // the OS handed that number next.
-      delete next.browserStreamPort
-      break
-    default:
-      break
-  }
-  return next
-}
-
-/** Who owns a live agent: its OS pid and the host that pid lives on (#716). */
-export interface AgentOwner {
-  pid: number
-  host: string
-}
-
-/** The seed meta an agent starts from, before any event is folded in. */
-function freshMeta(
-  startedAt: string,
-  intent?: string,
-  owner?: AgentOwner,
-  id?: string,
-  target?: AgentLocation,
-  kind?: 'build' | 'prompt',
-): AgentMeta {
-  return {
-    status: 'running',
-    id: id && isSafeAgentId(id) ? id : agentIdFromStartedAt(startedAt),
-    startedAt,
-    updatedAt: startedAt,
-    ...(owner ? { pid: owner.pid, host: owner.host } : {}),
-    ...(intent ? { intent } : {}),
-    // Only a non-local target travels; `local` is the default every reader already assumes.
-    ...(target && target !== 'local' ? { target } : {}),
-    ...(kind ? { kind } : {}),
-  }
-}
-
-/**
- * Parse a JSONL event log. A blank or malformed trailing line (e.g. a crash
- * mid-write) stops the read rather than throwing, so a partial agent still replays
- * everything up to the cut.
- */
-function parseEventLog(raw: string): FrameworkEvent[] {
-  const events: FrameworkEvent[] = []
-  for (const line of raw.split('\n')) {
-    const trimmed = line.trim()
-    if (!trimmed) continue
-    try {
-      events.push(JSON.parse(trimmed) as FrameworkEvent)
-    } catch {
-      break // a torn last line from an interrupted write; keep what we have
-    }
-  }
-  return events
-}
-
-/** How many times a meta that would not parse is re-read before it is called corrupt (#1540). */
-const TORN_META_READ_RETRIES = 2
-
-/** The pause between those re-reads: long enough for the write that tore the read to land. */
-const TORN_META_READ_DELAY_MS = 5
-
-/**
- * Read + parse a persisted {@link AgentMeta} file, or `undefined` if missing/unreadable.
- *
- * Re-read on a parse failure (#1540). {@link writeMetaFile} closes this off at the source, so this
- * is the backstop rather than the defence: a meta written through an adapter with no `rename` is
- * still written in place, so a reader can catch it mid-truncate, and reporting that as `undefined`
- * makes a live agent *vanish* from every composed read for one poll. A torn read is transient by
- * construction, so ask again; a file still unparseable after the retries is genuinely corrupt and
- * yields `undefined`, exactly as before.
- */
-async function readMetaFile(fs: StoreFs, path: string): Promise<AgentMeta | undefined> {
-  for (let attempt = 0; ; attempt++) {
-    if (!(await fs.exists(path))) return undefined
-    try {
-      return JSON.parse(await fs.read(path)) as AgentMeta
-    } catch {
-      if (attempt >= TORN_META_READ_RETRIES) return undefined
-      await new Promise(resolve => setTimeout(resolve, TORN_META_READ_DELAY_MS))
-    }
-  }
-}
-
-/**
- * Write a {@link AgentMeta} file. The one owner of the on-disk encoding, symmetric to
- * {@link readMetaFile} — every meta write in this module goes through it.
- *
- * Written beside the target and renamed over it (#1540). A meta is rewritten by the agent that owns
- * it, over and over, while the daemon and every dashboard read poll it from another process; a
- * plain write truncates the file before it refills, so a reader landing in that window saw an
- * empty one and reported the agent *gone*. A rename swaps the whole file in one step, so a reader
- * gets either the entire previous meta or the entire new one and never a half of either — which
- * {@link readMetaFile}'s retry can only paper over, never prevent. An adapter with no `rename`
- * writes in place as before.
- */
-async function writeMetaFile(fs: StoreFs, path: string, meta: AgentMeta): Promise<void> {
-  const contents = JSON.stringify(meta, null, 2) + '\n'
-  if (!fs.rename) return fs.write(path, contents)
-  // Named for the writing process: an agent and the daemon teardown archiving it can both be
-  // writing the same meta, and they must not share a scratch file and splice their writes into
-  // one. `.tmp` also keeps it out of the archive listing, which takes only `.json`.
-  const scratch = `${path}.${process.pid}.tmp`
-  await fs.write(scratch, contents)
-  await fs.rename(scratch, path)
-}
-
-/**
- * The `end` event written on behalf of an agent whose process died without reporting one (#1359):
- * a crash, a `kill -9`, or the empty-event-loop exit a parked gate used to cause. Every reader
- * of the stream — the dashboard's outcome pill, its choice rail, the meta fold — keys "over"
- * off a single `end` event, so a death that skipped it left the agent's last question rendering
- * as answerable forever while its picks were read by nobody.
- */
-function orphanEndEvent(): FrameworkEvent {
-  return { kind: 'end', ok: false, stopped: true, detail: 'its process died without reporting an end' }
-}
-
-/**
- * Record a dead agent's missing ending in place (#1359): append the surrogate `end` event to the
- * checkout's live log and fold it into the meta via {@link applyEventToMeta} — so the status
- * flips to `stopped` and a `pendingChoice` the agent died holding expires exactly as a run-written
- * end would expire it. Best-effort on both writes: healing must never make a read throw.
- */
-async function recordOrphanEnd(fs: StoreFs, dir: string, meta: AgentMeta): Promise<AgentMeta> {
-  const event = orphanEndEvent()
-  await fs.append(join(dir, EVENTS_FILE), JSON.stringify(event) + '\n').catch(() => {})
-  const ended = applyEventToMeta(meta, event, new Date().toISOString())
-  await writeMetaFile(fs, join(dir, META_FILE), ended).catch(() => {})
-  return ended
-}
-
-/**
- * Flip the live agent at `dir` to `stopped` and archive it, returning the stopped meta. The
- * shared tail of every self-heal: a `running` meta whose process is gone must both stop
- * showing as live and keep its history. The flip goes through {@link recordOrphanEnd}, so
- * the log gains the `end` event the dead process never wrote (#1359) before the archive
- * copies it. Best-effort on both writes — healing must never make a read throw.
- */
-async function stopAndArchiveLive(fs: StoreFs, dir: string, meta: AgentMeta): Promise<AgentMeta> {
-  const stopped = await recordOrphanEnd(fs, dir, meta)
-  await archivePriorAgent(fs, dir).catch(() => {})
-  return stopped
-}
-
-/**
- * Durable, append-only store for a single agent's orchestration events, plus a
- * derived {@link AgentMeta} snapshot. Writes are serialized through one tail
- * promise so an append and its meta rewrite never interleave; {@link close}
- * flushes that queue before the process exits.
- */
-export class AgentStore {
-  private tail: Promise<void> = Promise.resolve()
-  private meta: AgentMeta
-  /**
-   * The intent a continuation must keep (#762/#1467): a reopened session keeps its original
-   * label, but a continuation's own `intent` event carries the resume message and would relabel
-   * the row through {@link applyEventToMeta}'s normal refinement. Unset for a fresh session,
-   * where that refinement stands.
-   */
-  private pinnedIntent: string | undefined
-
-  private constructor(
-    private readonly fs: StoreFs,
-    readonly dir: string,
-    private readonly clock: () => string,
-    startMeta: AgentMeta,
-  ) {
-    this.meta = startMeta
-  }
-
-  /** The event log path. */
-  get eventsPath(): string {
-    return join(this.dir, EVENTS_FILE)
-  }
-
-  /** The meta snapshot path. */
-  get metaPath(): string {
-    return join(this.dir, META_FILE)
-  }
-
-  /**
-   * Open (creating `.the-framework/` if needed) under the workspace `cwd`. `fresh`
-   * truncates any prior log for a new agent; the default preserves it so a resume
-   * can {@link loadEvents}.
-   */
-  static async open(cwd: string, opts: OpenStoreOptions = {}): Promise<AgentStore> {
-    const fs = opts.fs ?? nodeStoreFs()
-    const dir = join(cwd, THE_FRAMEWORK_DIR)
-    const now = opts.now ?? new Date().toISOString()
-    await fs.mkdir(dir)
-    const owner = opts.owner ?? { pid: process.pid, host: hostname() }
-    const clock = opts.clock ?? (() => new Date().toISOString())
-    const store = new AgentStore(fs, dir, clock, freshMeta(now, opts.intent, owner, opts.id, opts.target, opts.kind))
-    if (opts.continueAgent) {
-      // Reopen: the log stays, the row keeps its original intent, and this process takes ownership
-      // so a liveness probe (#716) reads the agent as alive rather than as an orphan.
-      const prior = await readMetaFile(fs, store.metaPath)
-      if (prior) {
-        store.meta = { ...prior, status: 'running', pid: owner.pid, host: owner.host, updatedAt: now }
-        store.pinnedIntent = prior.intent
-        await store.writeMeta()
-        return store
-      }
-    }
-    if (opts.fresh) {
-      // A new agent truncates the live log. First rescue the prior agent if it never
-      // got archived (e.g. a crash exited before close), so no history is lost.
-      await archivePriorAgent(fs, dir).catch(() => {})
-      await fs.write(store.eventsPath, '')
-      await store.writeMeta()
-    }
-    return store
-  }
-
-  /**
-   * Append one event to the log and refresh the meta snapshot. Fire-and-forget at
-   * the call site: internally chained so writes stay ordered. A failed write is
-   * swallowed (persistence is best-effort — it must never break a live agent).
-   */
-  append(event: FrameworkEvent): Promise<void> {
-    this.meta = applyEventToMeta(this.meta, event, this.clock())
-    // A continuation keeps the session's original label (#762) even though its own `intent`
-    // event carries the resume message rather than a name (#1467).
-    if (this.pinnedIntent) this.meta = { ...this.meta, intent: this.pinnedIntent }
-    this.tail = this.tail
-      .then(() => this.fs.append(this.eventsPath, JSON.stringify(event) + '\n'))
-      .then(() => this.writeMeta())
-      .catch(err => {
-        console.error('[framework] failed to persist orchestration state:', err)
-      })
-    return this.tail
-  }
-
-  /**
-   * Flush any queued writes, then archive this agent into `agents/` so it shows up in
-   * the dashboard's history (#303). Both best-effort: persistence must never break
-   * an agent, so an archive failure is logged, not thrown.
-   */
-  async close(): Promise<void> {
-    await this.tail
-    try {
-      await archiveAgent(this.fs, archiveDir(this.dir), this.meta, this.eventsPath)
-    } catch (err) {
-      console.error('[framework] failed to archive run history:', err)
-    }
-  }
-
-  /** The current derived snapshot. */
-  snapshot(): AgentMeta {
-    return { ...this.meta }
-  }
-
-  /**
-   * Read and parse the persisted event log. A blank or malformed trailing line
-   * (e.g. a crash mid-write) is skipped rather than throwing, so a partial agent
-   * still replays everything up to the cut. Missing file yields `[]`.
-   */
-  async loadEvents(): Promise<FrameworkEvent[]> {
-    if (!(await this.fs.exists(this.eventsPath))) return []
-    return parseEventLog(await this.fs.read(this.eventsPath))
-  }
-
-  /** Read the persisted meta snapshot, or `undefined` if none/unreadable. */
-  readMeta(): Promise<AgentMeta | undefined> {
-    return readMetaFile(this.fs, this.metaPath)
-  }
-
-  private writeMeta(): Promise<void> {
-    return writeMetaFile(this.fs, this.metaPath, this.meta)
-  }
-}
-
-/** The transient archive inside a `.the-framework` dir. See {@link ARCHIVE_DIR}. */
-function archiveDir(dir: string): string {
-  return join(dir, ARCHIVE_DIR)
-}
-
-/** Paths of an agent's archived log + meta inside one archive directory. */
-function archivePaths(agentsDir: string, id: string): { events: string; meta: string } {
-  return { events: join(agentsDir, `${id}.jsonl`), meta: join(agentsDir, `${id}.json`) }
-}
-
-/** The transient archive of one agent under the project, or `undefined` when it has none. */
-async function findTransientArchive(fs: StoreFs, cwd: string, agentId: string): Promise<{ events: string; meta: string } | undefined> {
-  const paths = archivePaths(archiveDir(join(cwd, THE_FRAMEWORK_DIR)), agentId)
-  return (await fs.exists(paths.meta)) ? paths : undefined
-}
-
-/**
- * The `logs` skill's seams over a {@link StoreFs}: the store reaches the runs on the data
- * branch's checkout through the same injectable filesystem as its own files, so a test with an
- * in-memory fs reads and writes the committed side as it does the transient one. The funnel is
- * the skill's own (the persistent checkout's write cycle) unless a caller hands one in.
- */
-function runDeps(fs: StoreFs, funnel?: LogsFunnel): LogsDeps {
+/** The `logs` skill's file seam over a {@link StoreFs}. */
+function runDeps(fs: StoreFs): LogsDeps {
   return {
     read: path => fs.read(path),
     list: path => fs.readdir(path),
@@ -656,297 +202,33 @@ function runDeps(fs: StoreFs, funnel?: LogsFunnel): LogsDeps {
       await fs.mkdir(join(path, '..'))
       await fs.write(path, content)
     },
-    ...(funnel ? { funnel } : {}),
   }
 }
 
 /**
- * Copy an agent's live log + meta into `agentsDir` as `<id>.jsonl` / `<id>.json`. The live files
- * stay put (the daemon keeps tailing them until the next agent); this is a durable snapshot for
- * the history list. Idempotent per id.
- */
-async function archiveAgent(fs: StoreFs, agentsDir: string, meta: AgentMeta, eventsPath: string): Promise<void> {
-  if (!isSafeAgentId(meta.id)) return
-  await fs.mkdir(agentsDir)
-  const out = archivePaths(agentsDir, meta.id)
-  const events = (await fs.exists(eventsPath)) ? await fs.read(eventsPath) : ''
-  await fs.write(out.events, events)
-  await writeMetaFile(fs, out.meta, meta)
-}
-
-/**
- * Archive the agent currently sitting in the live files, unless it is already in
- * `agents/`. Used at the start of a fresh agent so a crash that skipped
- * {@link AgentStore.close} still leaves its history behind.
- */
-async function archivePriorAgent(fs: StoreFs, dir: string): Promise<void> {
-  const meta = await readMetaFile(fs, join(dir, META_FILE))
-  if (!meta?.id || !isSafeAgentId(meta.id)) return
-  if (await fs.exists(archivePaths(archiveDir(dir), meta.id).meta)) return
-  await archiveAgent(fs, archiveDir(dir), meta, join(dir, EVENTS_FILE))
-}
-
-/**
- * Put an archived agent's history back where an agent reads it (#762), so a continued agent picks up its
- * own log rather than starting empty. The inverse of the teardown's recording: teardown moved the
- * history onto the data branch, and continuing needs it in the checkout again — the run's diary
- * as the framework's events, its card as the framework's meta. A run the branch does not have is
- * looked for in the transient archive.
- *
- * A no-op when the worktree already holds a live agent (nothing to restore, and its log is newer),
- * or when there is no archive. Never throws.
- */
-export async function restoreArchivedAgent(
-  repo: string,
-  worktree: string,
-  agentId: string,
-  fs: StoreFs = nodeStoreFs(),
-): Promise<boolean> {
-  try {
-    if (!isSafeAgentId(agentId)) return false
-    const dir = join(worktree, THE_FRAMEWORK_DIR)
-    if (await fs.exists(join(dir, META_FILE))) return false
-    const card = await findRun(repo, agentId, runDeps(fs))
-    if (card) {
-      const diary = (await readDiary(repo, agentId, runDeps(fs))) ?? []
-      await fs.mkdir(dir)
-      await fs.write(join(dir, EVENTS_FILE), eventsOf(diary).map(event => JSON.stringify(event) + '\n').join(''))
-      await writeMetaFile(fs, join(dir, META_FILE), fromRunCard(card))
-      return true
-    }
-    const archive = await findTransientArchive(fs, repo, agentId)
-    if (!archive) return false
-    await fs.mkdir(dir)
-    await fs.write(join(dir, EVENTS_FILE), (await fs.exists(archive.events)) ? await fs.read(archive.events) : '')
-    await fs.write(join(dir, META_FILE), await fs.read(archive.meta))
-    return true
-  } catch {
-    return false
-  }
-}
-
-/**
- * A worktree agent's history, read for recording once its process is gone (#737): its meta and
- * its events, out of its own checkout. The worktree is about to go, so this is the last moment
- * the run can be read.
- *
- * A meta still marked `running` is flipped to `stopped` first, in the worktree's own files too
- * (#1359): this runs when the process is already gone, so `running` means it died without
- * closing (crash, kill -9), and the log gains the `end` event the dead process never wrote before
- * anything copies it. `branch` is stamped on the meta because the caller reads it off the checkout
- * and this is the last moment it can be observed (#799). Forgiving: a worktree with no run, or
- * an unreadable one, yields `undefined` rather than throwing.
- */
-export async function readWorktreeAgent(
-  worktree: string,
-  fs: StoreFs = nodeStoreFs(),
-  branch?: string,
-): Promise<{ meta: AgentMeta; events: FrameworkEvent[] } | undefined> {
-  try {
-    const worktreeDir = join(worktree, THE_FRAMEWORK_DIR)
-    const live = await readMetaFile(fs, join(worktreeDir, META_FILE))
-    if (!live?.id || !isSafeAgentId(live.id)) return undefined
-    const stopped: AgentMeta = live.status === 'running' ? await recordOrphanEnd(fs, worktreeDir, live) : live
-    const meta: AgentMeta = branch ? { ...stopped, branch } : stopped
-    const eventsPath = join(worktreeDir, EVENTS_FILE)
-    const events = (await fs.exists(eventsPath)) ? parseEventLog(await fs.read(eventsPath)) : []
-    return { meta, events }
-  } catch {
-    return undefined
-  }
-}
-
-/**
- * Archive a worktree agent's history into the project's transient archive (#737), returning the
- * meta it archived: the boot reconcile's rescue of a run a dead daemon left in a worktree, where
- * nothing reads it. The daemon's own teardown records the run on the data branch instead, through
- * the `logs` skill, from what {@link readWorktreeAgent} reads.
- */
-export async function archiveWorktreeAgent(worktree: string, repo: string, fs: StoreFs = nodeStoreFs(), branch?: string): Promise<AgentMeta | undefined> {
-  const run = await readWorktreeAgent(worktree, fs, branch)
-  if (!run) return undefined
-  try {
-    await archiveAgent(fs, archiveDir(join(repo, THE_FRAMEWORK_DIR)), run.meta, join(worktree, THE_FRAMEWORK_DIR, EVENTS_FILE))
-    return run.meta
-  } catch {
-    return undefined
-  }
-}
-
-/**
- * The archived log + meta paths of one agent, wherever it is filed — its card and diary on the
- * data branch's checkout, else its transient copy — or `[]` when it is nowhere. For a caller that
- * needs the file itself: the tail of an ended run, the retry's read of its failure detail.
+ * The card + diary paths of one finished run on the data branch's checkout, or `[]` when the
+ * branch has no such run. For a caller that needs the file itself: the tail of an ended run.
  */
 export async function archivedAgentPaths(cwd: string, agentId: string, fs: StoreFs = nodeStoreFs()): Promise<string[]> {
   if (!isSafeAgentId(agentId)) return []
   const files = await runFiles(cwd, agentId, runDeps(fs)).catch(() => undefined)
-  if (files) return [files.card, files.diary]
-  const archive = await findTransientArchive(fs, cwd, agentId).catch(() => undefined)
-  return archive ? [archive.meta, archive.events] : []
+  return files ? [files.card, files.diary] : []
 }
 
 /** Newest run first: an id sorts chronologically, so the id order IS the time order (no parse). */
 const byIdDesc = (a: { id: string }, b: { id: string }): number => (a.id < b.id ? 1 : a.id > b.id ? -1 : 0)
 
 /**
- * Whether an `<id>.json` archive entry is older than `since` going by its *name* — an id is the
- * run's start time, so the filename dates the record and most of a long history can be rejected
- * before it is ever read (#1607).
- *
- * Only a name that parses as one of our ids can reject: an id handed in from outside is not a
- * date, and is read like any other. The id is allocated when the run is spawned and `startedAt`
- * written when it first opens its store, so the name can be the older of the two by the length of
- * a spawn — a caller filtering on `startedAt` sees a record drop out at most that much early.
- */
-function namedBefore(name: string, since: number): boolean {
-  const startedAt = startedAtFromAgentId(name.slice(0, -'.json'.length))
-  return startedAt !== undefined && Date.parse(startedAt) < since
-}
-
-/**
- * Every `agents/*.json` archived meta with the path it was read from, torn/half-written entries
- * skipped. The one home of the archived-history read loop, shared by {@link listAgents} and the
- * boot reconcile. A missing/unreadable dir throws to the caller, as both callers always let it.
- *
- * `since` (epoch ms) drops the runs that started before it without reading them; see
- * {@link namedBefore}.
- */
-async function readArchivedMetaEntries(fs: StoreFs, agentsDir: string, since?: number): Promise<Array<{ path: string; meta: AgentMeta }>> {
-  const entries: Array<{ path: string; meta: AgentMeta }> = []
-  for (const name of await fs.readdir(agentsDir)) {
-    if (!name.endsWith('.json')) continue
-    if (since !== undefined && namedBefore(name, since)) continue
-    const path = join(agentsDir, name)
-    try {
-      entries.push({ path, meta: JSON.parse(await fs.read(path)) as AgentMeta })
-    } catch {
-      // torn/half-written meta — skip it
-    }
-  }
-  return entries
-}
-
-/**
- * A `running` meta whose owning process is provably gone (or unknowable on boot): the orphan
- * {@link reconcileOrphanedAgents} flips to `stopped`. A live pid on this host, or a non-running
- * meta, is left be. The narrowing lets a caller use the meta as present in the true branch.
- */
-function isDeadRunningAgent(meta: AgentMeta | undefined, isAlive: (pid: number) => boolean): meta is AgentMeta {
-  return meta?.status === 'running' && ownerLiveness(meta, isAlive) !== 'live'
-}
-
-/** The transient archive's metas with their paths, `[]` when there is none; `since` as in {@link listAgents}. */
-async function transientArchivedMetaEntries(fs: StoreFs, cwd: string, since?: number): Promise<Array<{ path: string; meta: AgentMeta }>> {
-  return readArchivedMetaEntries(fs, archiveDir(join(cwd, THE_FRAMEWORK_DIR)), since).catch(() => [])
-}
-
-/**
- * List a project's archived agents, most-recent first: the runs on the data branch (every
- * person's, read through the `logs` skill and unfolded into the framework's meta) plus the
- * transient archive, de-duplicated by id with the branch's copy winning — the crash rescue
- * archives transiently and the teardown records on the branch, so a run can sit in both and the
- * history must show it once. The id sorts chronologically so no timestamp parse is needed.
- * Missing or unreadable dir/entries are skipped, never thrown.
+ * A project's recorded runs, most-recent first: the runs on the data branch (every person's),
+ * read through the `logs` skill and unfolded into the framework's meta. An unreadable branch is
+ * no runs, never a throw.
  *
  * `since` (epoch ms) is for a caller that only wants recent runs — a poll on a cadence, not the
  * history list.
  */
 export async function listAgents(cwd: string, fs: StoreFs = nodeStoreFs(), since?: number): Promise<AgentMeta[]> {
-  const committed = (await listRuns(cwd, since === undefined ? {} : { since }, runDeps(fs)).catch((): never[] => [])).map(fromRunCard)
-  const seen = new Set(committed.map(meta => meta.id))
-  const transient = (await transientArchivedMetaEntries(fs, cwd, since)).map(entry => entry.meta).filter(meta => !seen.has(meta.id))
-  return [...committed, ...transient].sort(byIdDesc)
-}
-
-/**
- * Whether a `running` meta's owning process is provably there, provably gone, or unknowable.
- *
- * `'unknown'` is the load-bearing third state (#716/#926): a meta with no `pid` (it predates the
- * field) or one owned by another host cannot be probed from here. The two callers treat it
- * differently on purpose — the boot reconcile flips an unknown to `stopped` (a fresh daemon
- * drives no in-flight run, and there is nothing better to go on), while the self-heal on read
- * leaves it alone (a routine read must not kill an agent another machine may own).
- */
-function ownerLiveness(meta: AgentMeta, isAlive: (pid: number) => boolean): 'live' | 'dead' | 'unknown' {
-  if (meta.status !== 'running' || meta.pid === undefined || meta.host !== hostname()) return 'unknown'
-  return isAlive(meta.pid) ? 'live' : 'dead'
-}
-
-/**
- * Reconcile runs a dead process left marked `running` — a run on the data branch, the live
- * `agent.json`, a transient `agents/*.json`, or an agent inside a worktree. Such an agent shows as
- * active while nothing is left to read its `control.jsonl`, so its Stop is a no-op. Each is
- * flipped to `stopped`; the live run is archived first (idempotent) so its history is kept.
- * Returns how many were reconciled. Best-effort: a read/write error skips that agent, never throws.
- *
- * A run on the data branch is ended through the `logs` skill's write, so the ending is a commit:
- * a card edited in place on the branch's checkout is not a fact yet — the next sync's rebase
- * refuses the dirty tree and the funnel resets it. `funnel` is the skill's own unless a test
- * hands one in.
- *
- * An agent whose pid is alive on this host is left alone (#926). This used to flip every `running`
- * meta on the assumption that a fresh dashboard drives no in-flight run, which holds only while
- * exactly one is ever booted: a second one marked genuinely live agents as finished, giving them a
- * no-op Stop in the dashboard. A meta with no `pid` keeps the old behaviour, since there is
- * nothing better to go on.
- */
-export async function reconcileOrphanedAgents(
-  cwd: string,
-  fs: StoreFs = nodeStoreFs(),
-  isAlive: (pid: number) => boolean = isPidAlive,
-  funnel?: LogsFunnel,
-): Promise<number> {
-  const dir = join(cwd, THE_FRAMEWORK_DIR)
-  let fixed = 0
-  const deps = runDeps(fs, funnel)
-  for (const card of await listRuns(cwd, {}, deps).catch((): never[] => [])) {
-    const meta = fromRunCard(card)
-    if (!isDeadRunningAgent(meta, isAlive)) continue
-    // The surrogate end (#1359) lands in both files: the replayed diary sees the run finish, and
-    // the meta fold drops the pendingChoice the agent died holding.
-    const event = orphanEndEvent()
-    const diary = (await readDiary(cwd, card.id, deps).catch(() => undefined)) ?? []
-    const ended = await writeRun(cwd, toRunCard(applyEventToMeta(meta, event, new Date().toISOString())), [...diary, toDiaryLine(event)], deps)
-    if (ended.ok || ended.committed) fixed++
-  }
-  // The transient archive's runs stuck at `running`. Done before the live agent so its fresh
-  // archive isn't re-counted here.
-  for (const { path, meta } of await transientArchivedMetaEntries(fs, cwd)) {
-    if (!isDeadRunningAgent(meta, isAlive)) continue
-    try {
-      const event = orphanEndEvent()
-      await fs.append(path.replace(/\.json$/, '.jsonl'), JSON.stringify(event) + '\n').catch(() => {})
-      await writeMetaFile(fs, path, applyEventToMeta(meta, event, new Date().toISOString()))
-      fixed++
-    } catch {
-      // write failed — best-effort, skip
-    }
-  }
-  // The live agent: flip it, then archive so a crash that skipped close() still
-  // leaves the stopped agent in the history list.
-  const live = await readMetaFile(fs, join(dir, META_FILE))
-  if (isDeadRunningAgent(live, isAlive)) {
-    await stopAndArchiveLive(fs, dir, live)
-    fixed++
-  }
-
-  // Runs living in worktrees (#736/#737). A daemon that died mid-run never ran its teardown, so
-  // each of those agents is orphaned the same way — except its history sits inside the worktree,
-  // where nothing reads it. Flip it in place (so the dashboard stops showing it as live) and copy
-  // it into the transient archive. The worktree itself is left on disk: an agent that ended this way did
-  // not end cleanly, and those are kept for inspection. Removing one is an explicit action.
-  for (const entry of await worktreeDirEntries(cwd, path => fs.subdirs(path))) {
-    const worktreeDir = join(entry.path, THE_FRAMEWORK_DIR)
-    const meta = await readMetaFile(fs, join(worktreeDir, META_FILE))
-    if (!isDeadRunningAgent(meta, isAlive)) continue
-    // recordOrphanEnd rather than a bare status flip (#1359): the worktree's log gains the
-    // `end` event first, so the archive below copies a stream that actually ends.
-    await recordOrphanEnd(fs, worktreeDir, meta)
-    await archiveWorktreeAgent(entry.path, cwd, fs).catch(() => undefined)
-    fixed++
-  }
-  return fixed
+  const runs = await listRuns(cwd, since === undefined ? {} : { since }, runDeps(fs)).catch((): never[] => [])
+  return runs.map(fromRunCard).sort(byIdDesc)
 }
 
 /**
@@ -965,125 +247,92 @@ export function isPidAlive(pid: number): boolean {
   }
 }
 
-/**
- * The live (in-progress) run's meta snapshot from `.the-framework/agent.json`, or
- * `undefined` when none/unreadable. Unlike {@link listAgents} (which reads the
- * archived `agents/` copies written on close), this is the agent the daemon is
- * tailing right now — so the dashboard can list it with a `running` status
- * before it finishes. Missing or torn file yields `undefined`, never throws.
- *
- * Self-heals a stale agent on read (#716): if the meta says `running` but its owning process died
- * without writing `end` (a crash, `kill -9`, or the machine sleeping), nothing is left to consume
- * `control.jsonl` — so Stop is a no-op and the row is stuck. When the owning pid is gone on this
- * host, flip it to `stopped` and archive it, so the dashboard clears the row on the next poll
- * instead of only after a daemon restart's boot-time {@link reconcileOrphanedAgents}. An agent whose
- * meta predates this field (no `pid`) is left untouched — the boot reconcile still catches it.
- */
-export async function readLiveMeta(
-  cwd: string,
-  fs: StoreFs = nodeStoreFs(),
-  isAlive: (pid: number) => boolean = isPidAlive,
-): Promise<AgentMeta | undefined> {
-  const dir = join(cwd, THE_FRAMEWORK_DIR)
-  const meta = await readMetaFile(fs, join(dir, META_FILE))
-  if (!meta) return readLiveCardMeta(cwd, fs)
-  // Only a provably dead owner heals here — 'unknown' (no pid / another host) is left alone.
-  if (ownerLiveness(meta, isAlive) === 'dead') return stopAndArchiveLive(fs, dir, meta)
-  return meta
+/** The id of the run a checkout is for: the directory is `agent-<id>`. The project root is no run's. */
+function checkoutAgentId(cwd: string): string | undefined {
+  const name = cwd.split('/').pop() ?? ''
+  const prefix = agentBranchName('')
+  return name.startsWith(prefix) ? name.slice(prefix.length) : undefined
 }
 
 /**
- * A run whose live record is a card, `<id>.json` under the checkout's `.the-framework/`, the
- * shape agent-driver's log writes for a run another tool started (#1774): read as the meta the
- * card unfolds to, `running` or not. Never healed here: the tool that started the run sweeps
- * its own dead runs. The id is the checkout's, `agent-<id>`; the project root holds no card.
+ * The run a checkout holds, off its live card, `<id>.json` under the checkout's `.the-framework/`:
+ * the shape agent-driver's log writes, read as the meta the card unfolds to, `running` or not (a
+ * run that ended waiting on a question keeps its checkout). `undefined` when there is none.
+ * Never healed here: the tool that started the run sweeps its own dead runs.
  */
-async function readLiveCardMeta(cwd: string, fs: StoreFs): Promise<AgentMeta | undefined> {
-  const name = cwd.split('/').pop() ?? ''
-  const prefix = agentBranchName('')
-  if (!name.startsWith(prefix)) return undefined
-  const id = name.slice(prefix.length)
+export async function readLiveMeta(cwd: string, fs: StoreFs = nodeStoreFs()): Promise<AgentMeta | undefined> {
+  const id = checkoutAgentId(cwd)
+  if (id === undefined) return undefined
   const path = join(cwd, THE_FRAMEWORK_DIR, `${id}.json`)
   if (!(await fs.exists(path))) return undefined
   const card = parseRunCard(await fs.read(path).catch(() => ''))
   return card ? fromRunCard(card) : undefined
 }
 
-/**
- * A live agent plus the checkout it is running in (#738). Since #736 an agent lives in its own
- * worktree, so a project's live run is no longer a single thing and no longer sits at the
- * project path: `cwd` says which checkout to read that agent's git/file status from.
- */
+/** A run with a checkout, plus that checkout (#738): where to read the run's git and file status from. */
 export interface LiveAgent extends AgentMeta {
-  /** The agent's own checkout: a worktree under `.branches/`, or the repo root. */
+  /** The run's own checkout, a worktree under `.branches/`. */
   cwd: string
 }
 
 /**
- * Every live agent of a project (#738): the list variant of {@link readLiveMeta}.
- *
- * An agent started from the dashboard gets its own worktree (#736) and writes its `agent.json`
- * inside it, so the project path alone no longer sees any of them. This looks in both places:
- * each `.branches/*` checkout, and the repo root itself, which is where a
- * project that cannot be given a worktree (not a git repo) still runs and where every agent
- * from before #736 lives.
- *
- * Each candidate goes through {@link readLiveMeta}, so a stale agent self-heals exactly as it
- * did. Newest first, by id. Never throws: an unreadable worktree is skipped.
+ * Every run of a project that has a checkout (#738): each `.branches/*` checkout's card, through
+ * {@link readLiveMeta}. Newest first, by id. Never throws: an unreadable checkout is skipped.
  */
-export async function readLiveMetas(
-  cwd: string,
-  fs: StoreFs = nodeStoreFs(),
-  isAlive: (pid: number) => boolean = isPidAlive,
-): Promise<LiveAgent[]> {
+export async function readLiveMetas(cwd: string, fs: StoreFs = nodeStoreFs()): Promise<LiveAgent[]> {
   // The checkouts under `.branches/`: the agent-branch-named directories, never the rename links beside them.
-  const candidates = [cwd, ...(await worktreeDirEntries(cwd, path => fs.subdirs(path))).map(entry => entry.path)]
+  const candidates = (await worktreeDirEntries(cwd, path => fs.subdirs(path))).map(entry => entry.path)
   const agents: LiveAgent[] = []
   for (const candidate of candidates) {
-    const meta = await readLiveMeta(candidate, fs, isAlive).catch(() => undefined)
+    const meta = await readLiveMeta(candidate, fs).catch(() => undefined)
     if (meta) agents.push({ ...meta, cwd: candidate })
   }
   return agents.sort(byIdDesc)
 }
 
+/** A diary file's lines; a torn trailing line from a write in flight is dropped. */
+function parseDiary(raw: string): AnyDiaryLine[] {
+  const lines: AnyDiaryLine[] = []
+  for (const line of raw.split('\n')) {
+    const trimmed = line.trim()
+    if (!trimmed) continue
+    try {
+      lines.push(JSON.parse(trimmed) as AnyDiaryLine)
+    } catch {
+      break
+    }
+  }
+  return lines
+}
+
 /**
- * Read one archived agent's event log for replay: the run's diary on the data branch, read
- * through the `logs` skill and turned back into the framework's events, else the transient
- * archive's log. Returns `undefined` for an unknown or unsafe id; a torn trailing line is dropped
- * (same rule as the live {@link AgentStore.loadEvents}).
+ * One run's events, for a reader that replays them: the diary in the run's checkout while it has
+ * one (it is the newer of the two), else the run's diary on the data branch. `undefined` for an
+ * unknown or unsafe id.
  */
-export async function loadAgentEvents(
-  cwd: string,
-  id: string,
-  fs: StoreFs = nodeStoreFs(),
-): Promise<FrameworkEvent[] | undefined> {
+export async function loadAgentEvents(cwd: string, id: string, fs: StoreFs = nodeStoreFs()): Promise<FrameworkEvent[] | undefined> {
   if (!isSafeAgentId(id)) return undefined
+  const live = (await readLiveMetas(cwd, fs).catch((): LiveAgent[] => [])).find(agent => agent.id === id)
+  const liveDiary = live ? join(live.cwd, THE_FRAMEWORK_DIR, `${id}.jsonl`) : undefined
+  if (liveDiary && (await fs.exists(liveDiary))) return eventsOf(parseDiary(await fs.read(liveDiary).catch(() => '')))
   const diary = await readDiary(cwd, id, runDeps(fs)).catch(() => undefined)
-  if (diary) return eventsOf(diary)
-  const archive = await findTransientArchive(fs, cwd, id)
-  if (!archive || !(await fs.exists(archive.events))) return undefined
-  return parseEventLog(await fs.read(archive.events))
+  return diary ? eventsOf(diary) : undefined
 }
 
 /** A {@link StoreFs} backed by `node:fs/promises`. See {@link nodeFs}. */
 export function nodeStoreFs(): StoreFs {
   // Destructured rather than returned whole: the narrow interface is the contract,
   // so the object should not carry methods the store was never handed.
-  const { read, write, append, exists, mkdir, readdir, subdirs, rename } = nodeFs()
-  return { read, write, append, exists, mkdir, readdir, subdirs, rename }
+  const { read, write, append, exists, mkdir, readdir, subdirs } = nodeFs()
+  return { read, write, append, exists, mkdir, readdir, subdirs }
 }
 
 /**
- * A project's runs: the live ones prepended to the archived history, newest-first. Forgiving —
- * a side that cannot be read simply contributes nothing.
+ * A project's runs: the ones with a checkout prepended to the recorded history, newest-first.
+ * Forgiving — a side that cannot be read simply contributes nothing.
  *
- * Live wins over archived (#768). The dedup used to drop the live copy, which was right while
- * "archived" meant "finished for good": an agent was only ever copied into `agents/` on its way out.
- * Continuing an agent (#762) breaks that — the agent has an archived copy from its first leg AND is
- * live again — and keeping the archive showed a running agent as finished.
- *
- * This composition, not its two halves, is what every caller actually wants; the store exporting
- * only the halves is why three separate modules each grew their own copy of it.
+ * The checkout's card wins over the recorded one (#768): a resumed run has a record from its
+ * first leg AND is going again, and the record alone would show a running agent as finished.
  */
 export async function readAllAgents(cwd: string, fs: StoreFs = nodeStoreFs()): Promise<AgentMeta[]> {
   const [archived, live] = await Promise.all([
@@ -1093,27 +342,7 @@ export async function readAllAgents(cwd: string, fs: StoreFs = nodeStoreFs()): P
   return [...live, ...archived.filter(agent => !live.some(l => l.id === agent.id))]
 }
 
-/**
- * One agent's meta by id, live copy winning over archived — {@link readAllAgents}'s rule for a
- * single row. The find-by-id shape the RPCs kept privately rebuilding, for the same reason
- * the list shape did: the store exported only the halves.
- */
+/** One run's meta by id, the checkout's card winning over the record: {@link readAllAgents}'s rule for a single row. */
 export async function findAgent(cwd: string, agentId: string, fs: StoreFs = nodeStoreFs()): Promise<AgentMeta | undefined> {
   return (await readAllAgents(cwd, fs)).find(agent => agent.id === agentId)
-}
-
-/**
- * Read a checkout's live event log (`.the-framework/events.jsonl`). Missing or unreadable
- * yields `[]`, and a torn trailing line is dropped — the same rule as
- * {@link AgentStore.loadEvents}, exported so a reader outside the store (the Discord bot's gate
- * lookup) cannot keep a second parser with a drifted torn-line policy.
- */
-export async function readEventLog(cwd: string, fs: StoreFs = nodeStoreFs()): Promise<FrameworkEvent[]> {
-  const path = join(cwd, THE_FRAMEWORK_DIR, EVENTS_FILE)
-  try {
-    if (!(await fs.exists(path))) return []
-    return parseEventLog(await fs.read(path))
-  } catch {
-    return []
-  }
 }

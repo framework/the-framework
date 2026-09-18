@@ -10,9 +10,9 @@ import { hostname } from 'node:os'
 
 // The first-sidebar Overview (#437, part of #314): a cross-project glance at what the agent
 // is working on right now, the size of the backlog, and the recently active projects. It
-// rolls up three existing file projections across the whole registry — the live agent meta
-// (`.the-framework/agent.json`, kept current per event), the TODO queue (queue.ts), and each
-// project's last activity (ProjectSummary.lastActivityAt from its sessions).
+// rolls up three existing file projections across the whole registry — the card a run's tool
+// keeps in the run's own checkout, the TODO queue (queue.ts), and each project's last activity
+// (ProjectSummary.lastActivityAt from its runs).
 
 /** One project's in-flight run, surfaced in the Overview's "working now" list. */
 export interface ActiveAgent {

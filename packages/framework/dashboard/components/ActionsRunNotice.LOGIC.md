@@ -2,8 +2,8 @@ A notice on the agent view for an agent [1] whose location [2] is `actions`: a G
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
-[2] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
+[2] location: where an agent's turns ran, as its own record names it: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session). Only `local` and a device are offered today; the other two are read off agents recorded before they left the launcher.
 [3] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later.
 
 ## Business logic — TL;DR

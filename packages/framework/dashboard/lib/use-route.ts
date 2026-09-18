@@ -32,8 +32,8 @@ const currentPath = (): string => window.location.pathname
 
 export function useRoute(): {
   route: Route
-  /** Navigate to `next`. Replaces the current history entry when `replace` is set — for a correction
-   *  (adopting a started agent's id), not a step you should be able to go Back to. */
+  /** Navigate to `next`. Replaces the current history entry when `replace` is set — for a
+   *  correction, not a step you should be able to go Back to. */
   go: (next: Route, options?: { replace?: boolean }) => void
 } {
   const urlPathname = useSyncExternalStore(subscribe, currentPath, () => '/')

@@ -26,7 +26,7 @@ test('savePreferences returns the typed error when the store write fails, not a 
       },
     }),
   })
-  const result = await savePreferences({ vanilla: true })
+  const result = await savePreferences({ bridge: true })
   assert.deepEqual(result, { ok: false, error: 'failed to save preferences' })
 })
 

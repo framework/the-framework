@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { Preferences } from '../../src/index.js'
-import { presets } from '../../src/client.js'
 import { addProfile } from '../lib/profiles.js'
 import { selectRemoteDevice } from '../lib/remote-target.js'
 import { hoverTooltip } from '../test-utils.js'
@@ -12,18 +11,17 @@ let prefs: Preferences = {}
 vi.mock('../lib/preferences.js', () => ({
   usePreferences: () => prefs,
   updatePreferences,
-  themePreference: (p: Preferences) => p.theme ?? 'system',
-  // #842: the launcher strip reads the resolved layers; nothing here sets a repo tier.
-  usePreferenceSources: () => ({}),
-  // #1025: project presets; nothing here opens a project, so no shared presets and no project scope.
+  // #1025: the project's saved prompts; none here.
   useProjectPresets: () => [],
   saveProjectPresetList: vi.fn(),
-  useActiveProjectId: () => null,
+  useActiveProjectId: () => 'p1',
 }))
 // The editor picker (#727) detects installed editors over an RPC; stub it to none in the test.
 vi.mock('../lib/editors.js', () => ({ useDetectedEditors: () => [] }))
-// Composer loads its own projects for the `@` picker (#743); stub the read to none.
-vi.mock('../rpc/projects.js', () => ({ onProjects: () => Promise.resolve([]) }))
+// Composer loads its own projects for the `@` picker (#743) and the project's commands for the
+// `/` list; stub the reads.
+const onCommands = vi.hoisted(() => vi.fn())
+vi.mock('../rpc/projects.js', () => ({ onProjects: () => Promise.resolve([]), onCommands }))
 // The device health poll (#1072) reaches the daemon over an RPC; a hoisted stub so each test can
 // answer online/offline for the "Run on" target (#1073).
 const checkDevices = vi.hoisted(() => vi.fn())
@@ -54,7 +52,7 @@ vi.mock('./PromptEditor.js', async () => {
     useImperativeHandle(ref, () => ({
       clear: () => put(''),
       focus: () => {},
-      // Loading a preset puts its text in the box, which is what makes a loaded preset submittable.
+      // Loading a command puts its text in the box, which is what makes it submittable.
       loadTemplate: (text: string) => {
         if (!ready) return false
         put(text)
@@ -89,7 +87,6 @@ function renderComposer(over: Partial<Parameters<typeof Composer>[0]> = {}) {
   render(
     <Composer
       files={[]}
-      addContext={vi.fn()}
       onSubmit={onSubmit}
       busy={false}
       submitLabel="Send"
@@ -108,6 +105,8 @@ beforeEach(() => {
   selectRemoteDevice(null)
   checkDevices.mockReset()
   checkDevices.mockResolvedValue({}) // default: no devices reachable
+  onCommands.mockReset()
+  onCommands.mockResolvedValue({ commands: [{ name: 'work-queue', description: 'Work the agent queue', button: true }], startHook: true })
 })
 afterEach(cleanup)
 
@@ -118,59 +117,39 @@ const STUDIO = 'http://192.168.1.5:4200'
 const agentTrigger = () => screen.getByRole('button', { name: /^Driver: / })
 
 describe('Composer (#721)', () => {
-  test('renders the full control row: agent/model, options gear, and the submit button', async () => {
+  test('renders the full control row: commands, agent/model, "Run on", and the submit button', async () => {
     renderComposer({ submitLabel: 'Start session' })
-    // Presets have a visible surface again (#948): the `/` menu stays the fast path, the
-    // button is the discoverable one.
-    expect(screen.getByRole('button', { name: /Presets/ })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Session options' })).toBeTruthy()
+    // Commands have a visible surface (#948): the `/` menu stays the fast path, the button is
+    // the discoverable one.
+    expect(screen.getByRole('button', { name: 'Commands' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Run on' })).toBeTruthy()
     expect((await hoverTooltip(agentTrigger())).textContent).toContain('Driver: Claude Code')
     // The submit button appears only once the prompt has text (#721).
     fireEvent.change(screen.getByLabelText('prompt'), { target: { value: 'x' } })
     expect(screen.getByRole('button', { name: /Start session/ })).toBeTruthy()
   })
 
-  test('compact (#723) keeps the agent/model + options controls (#755)', async () => {
+  test('compact (#723) keeps the agent/model + "Run on" controls (#755)', async () => {
     const { onSubmit } = renderComposer({ compact: true, submitLabel: 'Start' })
-    // They used to be dropped here, which meant a navbar agent silently used the stored agent,
-    // model and options with nothing on screen saying which.
-    expect(screen.queryByRole('button', { name: 'Session options' })).not.toBeNull()
+    // They used to be dropped here, which meant a navbar agent silently used the stored agent
+    // and model with nothing on screen saying which.
+    expect(screen.queryByRole('button', { name: 'Run on' })).not.toBeNull()
     expect((await hoverTooltip(agentTrigger())).textContent).toContain('Driver: Claude Code')
-    // The editor + submit still work (so `/` `<` `@` `#` triggers remain live in the editor).
+    // The editor + submit still work (so `/` `@` `#` triggers remain live in the editor).
     fireEvent.change(screen.getByLabelText('prompt'), { target: { value: 'quick run' } })
     fireEvent.click(screen.getByRole('button', { name: 'Start' }))
-    expect(onSubmit).toHaveBeenCalledWith('quick run', 'build', { newAgent: false })
+    expect(onSubmit).toHaveBeenCalledWith('quick run')
   })
 
   test('showDriverModel={false} (#831) drops the agent/model select, keeping the rest of the row', () => {
     const { onSubmit } = renderComposer({ showDriverModel: false })
     // An in-session composer: the session is bound to the agent it started with, so offering the
     // select there would only ever rewrite the next session's default.
-    expect(screen.queryByRole('button', { name: 'Default' })).toBeNull()
-    expect(screen.getByRole('button', { name: 'Session options' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /^Driver: / })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Commands' })).toBeTruthy()
     fireEvent.change(screen.getByLabelText('prompt'), { target: { value: 'follow-up' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
-    expect(onSubmit).toHaveBeenCalledWith('follow-up', 'build', { newAgent: false })
-  })
-
-  test('option labels promise only what the code delivers (#801)', async () => {
-    prefs = { onBeforeMergeableQuality: true }
-    renderComposer()
-    fireEvent.click(screen.getByRole('button', { name: 'Session options' }))
-    // Scoped to the menu: the same label is on the resolved-options strip (#842), which explains
-    // where the value came from instead.
-    const menu = screen.getByRole('menu')
-    const row = within(menu).getByText('Post-merge cleanup').closest('[role="menuitemcheckbox"]')!
-    const tip = await hoverTooltip(row)
-    expect(tip.textContent).toMatch(/ready for merge/i)
-  })
-
-  test('Browser is disabled with a reason off Claude Code (#801)', () => {
-    prefs = { driver: 'codex', browser: true }
-    renderComposer()
-    fireEvent.click(screen.getByRole('button', { name: 'Session options' }))
-    // The browser rides Claude Code's MCP config, so under Codex the box was checkable and inert.
-    expect(screen.getByText(/only on Claude Code/)).toBeTruthy()
+    expect(onSubmit).toHaveBeenCalledWith('follow-up')
   })
 
   test('the submit button is hidden until the editor has text, then appears and fires onSubmit', () => {
@@ -181,50 +160,53 @@ describe('Composer (#721)', () => {
     const submit = screen.getByRole('button', { name: 'Send' })
     expect(submit.hasAttribute('disabled')).toBe(false)
     fireEvent.click(submit)
-    expect(onSubmit).toHaveBeenCalledWith('ship it', 'build', { newAgent: false })
+    expect(onSubmit).toHaveBeenCalledWith('ship it')
   })
 
   test('the editor shortcut (Cmd/Ctrl+Enter) submits too', () => {
     const { onSubmit } = renderComposer()
     fireEvent.change(screen.getByLabelText('prompt'), { target: { value: 'go' } })
     fireEvent.click(screen.getByText('editor-submit'))
-    expect(onSubmit).toHaveBeenCalledWith('go', 'build', { newAgent: false })
+    expect(onSubmit).toHaveBeenCalledWith('go')
   })
 
   test('mirrors prompt changes out via onPromptChange', () => {
     const onPromptChange = vi.fn()
     renderComposer({ onPromptChange })
     fireEvent.change(screen.getByLabelText('prompt'), { target: { value: 'hi' } })
-    expect(onPromptChange).toHaveBeenLastCalledWith('hi', 'build')
+    expect(onPromptChange).toHaveBeenLastCalledWith('hi')
   })
 
-  // #959: a preset can declare that it never belongs in the open session. The Composer does not
-  // act on that itself — it carries the flag out to the host, which is the only thing that knows
-  // whether "new session" means anything on its surface.
-  test('a new-session preset marks its submit, and a normal one does not (#959)', () => {
-    const { onSubmit } = renderComposer()
-    fireEvent.click(screen.getByRole('button', { name: /Presets/ }))
-    fireEvent.click(screen.getByText('Update from GitHub'))
+  test('a command picked from the menu loads as its slash line, and what is sent is that line plus the argument typed after it', async () => {
+    const onPreset = vi.fn()
+    const { onSubmit } = renderComposer({ onPreset })
+    await waitFor(() => expect(onCommands).toHaveBeenCalledWith('p1'))
+    fireEvent.click(screen.getByRole('button', { name: 'Commands' }))
+    fireEvent.click(await screen.findByText('/work-queue'))
+    expect(editorText()).toBe('/work-queue ')
+    expect(onPreset).toHaveBeenCalledWith('/work-queue', false)
+    fireEvent.change(screen.getByLabelText('prompt'), { target: { value: '/work-queue now' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
-    // The menu row is the label; what is submitted is the preset's prompt. They used to be the same
-    // string, which is how the import shipped asking for nothing in particular (#697).
-    expect(onSubmit).toHaveBeenCalledWith(presets.updateTickets.render(), 'prompt', { newAgent: true })
+    expect(onSubmit).toHaveBeenCalledWith('/work-queue now')
+  })
 
-    cleanup()
-    const second = renderComposer()
-    fireEvent.click(screen.getByRole('button', { name: /Presets/ }))
-    fireEvent.click(screen.getByText('Security audit'))
-    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
-    expect(second.onSubmit).toHaveBeenCalledWith(expect.stringContaining('Security audit'), 'prompt', { newAgent: false })
+  test('canSubmit={false} keeps the submit off, by click and by shortcut', () => {
+    const { onSubmit } = renderComposer({ canSubmit: false })
+    fireEvent.change(screen.getByLabelText('prompt'), { target: { value: 'ship it' } })
+    const submit = screen.getByRole('button', { name: 'Send' })
+    expect(submit.hasAttribute('disabled')).toBe(true)
+    fireEvent.click(submit)
+    fireEvent.click(screen.getByText('editor-submit'))
+    expect(onSubmit).not.toHaveBeenCalled()
   })
 
   // #1066: a draft carried across a device hop lands in sessionStorage; the launcher seeds it into
-  // the editor on mount, as a build (not a preset), and takes it once.
+  // the editor on mount, and takes it once.
   test('the launcher rehydrates a draft carried from another device (#1066)', () => {
     sessionStorage.setItem('fw.pending-draft', 'carried from the studio box')
     const { onSubmit } = renderComposer({ submitLabel: 'Start session' })
     fireEvent.click(screen.getByRole('button', { name: /Start session/ }))
-    expect(onSubmit).toHaveBeenCalledWith('carried from the studio box', 'build', { newAgent: false })
+    expect(onSubmit).toHaveBeenCalledWith('carried from the studio box')
     expect(sessionStorage.getItem('fw.pending-draft')).toBeNull() // taken once
   })
 
@@ -246,22 +228,8 @@ describe('Composer (#721)', () => {
     expect(screen.queryByRole('button', { name: 'Send' })).toBeNull() // nothing seeded
   })
 
-  test('emptying the box drops the preset\'s new-session rule with the preset (#959)', () => {
-    const { onSubmit } = renderComposer()
-    fireEvent.click(screen.getByRole('button', { name: /Presets/ }))
-    fireEvent.click(screen.getByText('Update from GitHub'))
-    // The stub editor does not mirror the loaded text into the DOM input, and jsdom drops a
-    // change event whose value did not actually change — so give it something to clear.
-    fireEvent.change(screen.getByLabelText('prompt'), { target: { value: 'edited' } })
-    // Clearing it back to a typed prompt is a fresh start: a plain build agent, in this session.
-    fireEvent.change(screen.getByLabelText('prompt'), { target: { value: '' } })
-    fireEvent.change(screen.getByLabelText('prompt'), { target: { value: 'just a question' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
-    expect(onSubmit).toHaveBeenCalledWith('just a question', 'build', { newAgent: false })
-  })
-
   // #1073: pressing Start on an offline "Run on" device would silently attempt the ~15s relay, so
-  // Start is blocked with a reason pointing back to the gear. No auto-fallback: the target stays.
+  // Start is blocked with a reason pointing back to the "Run on" pick. No auto-fallback: the target stays.
   test('an offline "Run on" device disables Start and shows the reason (#1073)', async () => {
     checkDevices.mockResolvedValue({ [STUDIO]: false })
     addProfile({ url: STUDIO, token: 'aaa', label: 'Studio' })
@@ -288,39 +256,14 @@ describe('Composer (#721)', () => {
     const submit = screen.getByRole('button', { name: 'Send' })
     expect(submit.hasAttribute('disabled')).toBe(false)
     fireEvent.click(submit)
-    expect(onSubmit).toHaveBeenCalledWith('ship it', 'build', { newAgent: false })
+    expect(onSubmit).toHaveBeenCalledWith('ship it')
   })
 })
 
-describe('the in-session options gear (#1172)', () => {
-  test('a live session drops the gear entirely instead of opening an empty dropdown', () => {
+describe('in a session', () => {
+  test('there is no "Run on" pick: a session already runs where it was started', () => {
     renderComposer({ inAgent: true })
-    expect(screen.queryByRole('button', { name: 'Session options' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Resume options' })).toBeNull()
-    // The old half-measure: a "Preferences" trigger whose menu had zero rows.
-    expect(screen.queryByRole('button', { name: 'Preferences' })).toBeNull()
-  })
-
-  test('an ended session offers exactly the options the Resume leg will arm (#1469)', () => {
-    renderComposer({ inAgent: true, agentEnded: true })
-    fireEvent.click(screen.getByRole('button', { name: 'Resume options' }))
-    const menu = screen.getByRole('menu')
-    for (const label of ['Push branch', 'Open PR', 'Auto-merge', 'Browser']) {
-      expect(within(menu).getByText(label)).toBeTruthy()
-    }
-    // The prompt-shaping rows stay out — the resumed transcript already carries its framing —
-    // and "Run on" stays out too: the continuation is pinned to its conversation.
-    for (const label of ['Transparent', 'Disable system prompt', 'Post-merge cleanup']) {
-      expect(within(menu).queryByText(label)).toBeNull()
-    }
-    expect(within(menu).queryByText('Run on')).toBeNull()
-  })
-
-  test('the resume gear writes the shared preference the continuation resolves at start (#1469)', () => {
-    renderComposer({ inAgent: true, agentEnded: true })
-    fireEvent.click(screen.getByRole('button', { name: 'Resume options' }))
-    const menu = screen.getByRole('menu')
-    fireEvent.click(within(menu).getByText('Browser').closest('[role="menuitemcheckbox"]')!)
-    expect(updatePreferences).toHaveBeenCalledWith({ browser: true })
+    expect(screen.queryByRole('button', { name: 'Run on' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Commands' })).toBeTruthy()
   })
 })

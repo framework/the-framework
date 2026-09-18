@@ -57,7 +57,7 @@ describe('OpenQuestions (#1455 item 4)', () => {
     expect(screen.getByText('triage-queue')).toBeTruthy()
     expect(screen.getByText('alpha')).toBeTruthy()
     fireEvent.click(screen.getByText('Work on it'))
-    await waitFor(() => expect(sendChoice).toHaveBeenCalledWith('p1', 'gate-1', 'work', 'user', 'run-1'))
+    await waitFor(() => expect(sendChoice).toHaveBeenCalledWith('p1', 'gate-1', 'work', 'run-1'))
   })
 
   test('questions from several projects sit side by side, each answerable', async () => {
@@ -68,7 +68,7 @@ describe('OpenQuestions (#1455 item 4)', () => {
     render(<OpenQuestions onOpenAgent={vi.fn()} />)
     await waitFor(() => expect(screen.getByText('Waiting on you · 2')).toBeTruthy())
     fireEvent.click(screen.getByText('Approve it'))
-    await waitFor(() => expect(sendChoice).toHaveBeenCalledWith('p2', 'gate-2', 'ok', 'user', 'run-9'))
+    await waitFor(() => expect(sendChoice).toHaveBeenCalledWith('p2', 'gate-2', 'ok', 'run-9'))
   })
 
   test('the card header jumps into the question session, project and all', async () => {

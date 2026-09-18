@@ -12,7 +12,7 @@ test('RELAY_RPC_NAMES is the run-scoped read/steer/handoff surface and excludes 
   for (const name of [
     'onProjectFiles', 'onProjectFileStatus', 'onFileDiff', 'onAgentChanges', 'onFileContent',
     'onGitStatus', 'onAgentWorktree', 'onAgentHandoff', 'onAgent',
-    'sendStop', 'sendChoice', 'sendMessage', 'sendSetHandoff', 'sendPushBranch', 'sendOpenPullRequest',
+    'sendStop', 'sendChoice', 'sendMessage', 'sendOpenPullRequest', 'sendMerge',
   ]) {
     assert.ok(RELAY_RPC_NAMES.includes(name), `expected ${name} on the relay whitelist`)
   }

@@ -12,10 +12,10 @@ Fires a browser notification when something new appears in one of the dashboard'
 
 [1] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds.
 [2] activity: the other notification feed: an agent started or finished.
-[3] agent: the unit of work: one task worked by a coding agent under The Framework's control, in its own checkout, on its own branch, streaming events, handed off when it ends.
+[3] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [4] project: a repository the user registered in the dashboard, identified by an id derived from its path.
-[5] open question: a gate nobody has answered yet, as the dashboard lists them across projects.
-[6] gate: a question with options at which an agent stops and waits for an answer: it emits the question in its turn's final message, the dashboard shows it as a card, and the answer re-prompts the agent.
+[5] open question: a question nobody has answered yet, as the dashboard lists them across projects.
+[6] gate: a question with options an agent's turn ended on: the agent ends waiting for the answer, the dashboard shows the question as a card, and the answer resumes the agent.
 
 ## Business logic — TL;DR
 

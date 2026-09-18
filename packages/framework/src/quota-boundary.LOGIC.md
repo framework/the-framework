@@ -1,8 +1,8 @@
-Computes the quota boundary [1]: the share of the account's quota [2] week that may have been spent by now, derived from nothing but the week's reset time as the coding agent [3] phrases it. The boundary is the elapsed share of the seven-day week and rises continuously with the clock; the user's spend offset [4] shifts it into the line that unattended [5] work stops at; every quota window in force is then measured against that line, and the first window at or past it is the one that stops the work. It also turns that measure into the daemon's one yes-or-no on whether unattended work may start, with the reason when it may not.
+Computes the quota boundary [1]: the share of the account's quota [2] week that may have been spent by now, derived from nothing but the week's reset time as the coding agent [3] phrases it. The boundary is the elapsed share of the seven-day week and rises continuously with the clock; the user's spend offset [4] shifts it into the line that unattended [5] work stops at; every quota window in force is then measured against that line, and the first window at or past it is the one that stops the work.
 
 ## Context
 
-**User story**: the user leaves the daemon running with "Fix red pull requests" on. The account's week is spent evenly: a quiet week still gets spent instead of expiring unused, and a burst of unattended agents [6] on Monday cannot leave nothing for the work the user asks for on Friday. In the dashboard's quota panel the user sees where the boundary sits and moves the line unattended work stops at with the spend offset. An agent the user starts by hand never stands down for quota, and an agent already running is never paused or cut short for it: the status computed here is read before an agent starts, never after.
+**User story**: the account's week is meant to be spent evenly: a quiet week still gets spent instead of expiring unused, and a burst of unattended agents [6] on Monday cannot leave nothing for the work the user asks for on Friday. In the dashboard's quota panel the user sees where the boundary sits and moves the line unattended work stops at with the spend offset. The status computed here is what the quota panel draws. The Framework starts no unattended work itself: the tool that starts agents on a schedule keeps its own line against the same boundary.
 
 **Problem**: The Framework never calls a model itself, so it knows the account's allowance only as the coding agent reports it: windows with a percentage used and a reset time written as prose, without a year. There is nothing to configure. A fixed limit would either strand allowance in a quiet week or run dry early in a busy one, while a boundary derived from the week itself reaches the full allowance exactly as the week resets, so nothing is left on the floor. Work the user asks for borrows against the days still to come; unattended work stands down once it passes the line, so low-priority work cannot starve high-priority work.
 
@@ -12,8 +12,8 @@ Computes the quota boundary [1]: the share of the account's quota [2] week that 
 [2] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
 [3] coding agent: the CLI doing the actual work: Claude Code or Codex.
 [4] spend offset: the user's adjustment of the quota boundary, in percentage points of the week.
-[5] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
-[6] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
+[5] unattended: said of an agent nobody is watching: one the scheduler started rather than a person. It is not answered any faster: a question it ends on waits for a human like any other.
+[6] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps. Started from the dashboard by the user, or by the daemon.
 
 ## Business logic — TL;DR
 
@@ -23,7 +23,6 @@ Computes the quota boundary [1]: the share of the account's quota [2] week that 
 - **Which windows are in force** - the account's week always; the selected model's own week only when the window's label names a model that the selected model's name contains; the session window and unrecognized windows never gate.
 - **Reached** - a window is reached when its percentage used is at or past the line; the first reached window, in the order the coding agent reported them, is the one that stops the work, and there is room while none is reached.
 - **Unknown is not zero** - with no week window, no reset time, or an unreadable one, there is no status at all, and the caller decides what "unknown" means.
-- **Whether unattended work may start** - no when there is no status, no with the reached window and the line named when a window is reached, yes otherwise.
 
 ## Business logic
 
@@ -90,13 +89,3 @@ Each window in force is reported with its label exactly as the coding agent [3] 
 #### Business logic
 
 There is no status at all when the coding agent [3] reported no weekly window for the account, when that window carries no reset time, or when the reset time cannot be read. "No status" means "we do not know where the week is". What to do with it is the caller's decision, not this file's: the daemon's quota reading in `dashboard/quota.ts` is where an unknown status is turned into a decision.
-
-### Whether unattended work may start
-
-#### Context
-
-**Problem**: the per-agent guard that watches an agent [6] the user started must never stop the user's own work, so an unreadable quota lets it carry on. Work nobody asked for is the opposite case: quietly burning a subscription on it is worse than skipping a turn.
-
-#### Business logic
-
-Given the status, the answer is one of: start; or do not start, with a reason that reads as a sentence. With no status at all, the answer is not to start, "the quota could not be read, so there is no way to tell what is spare". With a reached window, the answer is not to start, and the reason names the window, its percentage used, the day of the week reached and the line it stopped at: "the week's N%" when the spend offset [4] is zero, else "your N% limit (+O on the week's N%)" with the offset to one decimal. With room in every window in force, the answer is to start. The daemon asks this before starting its CI fix agent (`daemon-services.ts`).

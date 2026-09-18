@@ -1,4 +1,5 @@
-import { appendControl, type ControlEntry } from '../control.js'
+import { sayToRun, type SteerResult } from '../dashboard/run-inbox.js'
+export type { SteerResult }
 import { bridgeQuestions } from '../dashboard/bridge-store.js'
 import { openInApp, type OpenTarget, type OpenResult } from '../dashboard/open-in-app.js'
 import { contextBridgeBrowser, contextPreferences, contextStartAgent, resolveProjectPath, resolveAgentPath } from './context.js'
@@ -8,53 +9,33 @@ import { planTicketPrompt } from '../tickets.js'
 import { isTicketFile, queuePriorityForTicket, releaseTicket, TICKETS_DIR } from '@gemstack/skill-tickets'
 import { QUEUE_FILE, queueAdd } from '@gemstack/skill-queue'
 import { hostname } from 'node:os'
-import { findAgent, isPidAlive, readLiveMeta, type AgentMeta } from '../store/index.js'
-import { pushBranch } from '@gemstack/agent-data'
+import { findAgent, isPidAlive, loadAgentEvents, readLiveMeta, type AgentMeta } from '../store/index.js'
 import { isSafeAgentId, worktreePath } from '@gemstack/skill-branches'
 import { withAgentLock } from '../agent-locks.js'
 import { removeProjectWorktree, deleteProjectAgent } from '../worktrees.js'
 import { patchRun } from '@gemstack/skill-logs'
 import { mergeAgentPr, openAgentPullRequest, agentBranchFor, type HandoffResult } from '../dashboard/agent-handoff.js'
-import type { ChoiceBy } from '../events.js'
-import { isHandoffLevel, type HandoffLevel } from '../handoff-level.js'
+import { pendingChoices } from '../open-choices.js'
 import type {
   DeleteAgentResult,
   RemoveWorktreeResult,
-  StartAgentKind,
   StartAgentOptions,
   StartAgentResult,
 } from '../dashboard/types.js'
 import type { DashboardContext } from '../dashboard/rpc-serve.js'
 import type { Preferences } from '../registry.js'
 
-// The write side behind the new dashboard (#405): steering a live agent. The reverse of
-// the event stream — events flow run -> events.jsonl -> Channel -> browser; steering
-// flows browser -> here -> the agent's `.the-framework/control.jsonl` -> run, which tails that
-// file and resolves its gate. Stop alone is a signal to the agent's process, not a file write.
-// Same file-is-the-seam design as the daemon's legacy onStop/onChoice (#344/#393). Each steering call takes the agent id (#749): an agent tails the
-// log inside its own worktree since #736, so the entry has to be written there. (Starting an agent needs a spawn + the daemon's busy guard, so `sendStart`
-// lands with the daemon-serves-the-bundle wiring, not here.)
+// The write side behind the dashboard (#405, #1774). The daemon runs no agent, so every write here
+// reaches a run through what the run's tool reads: Start is the project's `start` hook line; what
+// a person says to a run (their words, their answer to its question) is a line in the run's inbox
+// file while the run works, and the project's `resume` hook line once it has ended; Stop is a
+// signal to the pid the run's card names. The framework names no tool in any of them.
 
 /**
- * Resolve the checkout to steer and append one entry to its `control.jsonl`. A no-op when
- * there is no local path (the read-only relay), so the agent channel is only ever written by a
- * host that owns the workspace.
- *
- * The `agentId` is what makes steering land (#749): an agent tails the control log inside its own
- * worktree, so an entry written to the project root reaches nothing. Absent, it addresses the
- * project root, which is still right for an agent that has no worktree (the non-git fallback).
- */
-async function appendControlFor(projectId: string, entry: ControlEntry, agentId?: string): Promise<void> {
-  const cwd = await resolveAgentPath(projectId, agentId)
-  if (cwd) await appendControl(cwd, entry)
-}
-
-/**
- * Stop a live agent (the Stop button): SIGINT to the process the agent's own meta names, when it is
- * this machine's and alive. The meta is the file the dashboard shows the agent from, and its pid is
- * whoever runs the agent, this daemon's own child or another tool's process; the framework names
- * none of them. Nothing else: an agent without a live pid here has nothing to stop. A stop is not a
- * control-file entry, since only this daemon's own child reads that file.
+ * Stop a live agent (the Stop button): SIGINT to the process the run's own card names, when it is
+ * this machine's and alive. The card is the file the dashboard shows the run from, and its pid is
+ * whoever runs the agent; the framework names no tool. Nothing else: a run without a live pid
+ * here has nothing to stop.
  */
 export async function sendStop(projectId: string, agentId?: string): Promise<void> {
   return relayOr(agentId, 'sendStop', [projectId, agentId], async () => {
@@ -71,47 +52,29 @@ export async function sendStop(projectId: string, agentId?: string): Promise<voi
 }
 
 /**
- * Move a live session's end-of-session handoff (#1102): how far it publishes itself when it
- * finishes.
- *
- * Steering rather than a setting write, because it is about *this* session: the preference sets
- * where the ladder starts, and this is the user changing their mind for one agent. The agent echoes
- * what it applied back as an event, so the surface reads from the agent's meta rather than from local
- * state that a reload would lose.
- *
- * One rung on the wire (B5), so there is nothing to normalise here: a surface offering the stages
- * as separate boxes resolves them on its own side, where an impossible answer settles *down* to the
- * rung actually asked for instead of being repaired upward into a push nobody ticked.
+ * Answer the question a run stopped on (#304, #1774). `pick` is one option id, or the chosen
+ * subset of a multi-select; the answer handed to the run is the chosen labels, read off the
+ * question as the run's own diary holds it, so only what the agent offered can be answered.
  */
-export async function sendSetHandoff(projectId: string, agentId: string, level: HandoffLevel): Promise<void> {
-  return relayOr(agentId, 'sendSetHandoff', [projectId, agentId, level], async () => {
-    if (!isHandoffLevel(level)) return
-    await appendControlFor(projectId, { kind: 'handoff', level }, agentId)
-  }, undefined)
-}
-
-/**
- * Resolve the project's parked choice gate (#304/#332): `pick` is one option id for a
- * single-select, or the selected subset for a multi-select. `by` records who picked
- * (a human here, vs the autopilot countdown or a headless auto-accept).
- */
-export async function sendChoice(
-  projectId: string,
-  id: string,
-  pick: string | string[],
-  by: ChoiceBy = 'user',
-  agentId?: string,
-): Promise<void> {
-  return relayOr(agentId, 'sendChoice', [projectId, id, pick, by, agentId], async () => {
-    await appendControlFor(projectId, { kind: 'choice', id, pick, by }, agentId)
-  }, undefined)
+export async function sendChoice(projectId: string, id: string, pick: string | string[], agentId?: string): Promise<SteerResult> {
+  return relayOr(agentId, 'sendChoice', [projectId, id, pick, agentId], async (): Promise<SteerResult> => {
+    const cwd = await resolveProjectPath(projectId)
+    if (!cwd || !agentId || !isSafeAgentId(agentId)) return { ok: false, error: 'unknown session' }
+    const question = pendingChoices((await loadAgentEvents(cwd, agentId).catch(() => undefined)) ?? []).find(choice => choice.id === id)
+    if (!question) return { ok: false, error: 'that question is no longer open' }
+    const picked = [pick].flat()
+    const labels = question.options.filter(option => picked.includes(option.id)).map(option => option.label)
+    if (labels.length !== picked.length) return { ok: false, error: 'every pick must be one of the question\'s options' }
+    if (!question.multi && labels.length !== 1) return { ok: false, error: 'pick exactly one option' }
+    return sayToRun(cwd, agentId, { kind: 'answer', question: question.title, answer: labels.length ? labels.join(', ') : '(none)' })
+  }, { ok: false, error: 'could not reach the device' })
 }
 
 /**
  * Queue the user's pick for the question a Claude web session is parked on (#1237).
  *
- * Not a control-log write like {@link sendChoice}: a cloud agent has no live local session to
- * steer, so the pick goes to the bridge store, where the browser extension collects it, types
+ * Not a line for a run like {@link sendChoice}: a cloud agent has no run here to hand it to, so
+ * the pick goes to the bridge store, where the browser extension collects it, types
  * it into the session's composer and submits. Only labels of the currently parked question are
  * accepted — one, or a multi-select's subset — and the daemon composes the text typed from them,
  * so this can never put arbitrary text in front of another product's agent. Local only, no
@@ -131,16 +94,18 @@ export async function sendBridgeAnswerCancel(sessionId: string): Promise<void> {
 }
 
 /**
- * Send a live-chat message to the project's running run (#714): append a `message` entry
- * that the agent drains between turns, continuing the same session via `--resume`. Empty
- * messages are dropped.
+ * Say something to a run (#714, #1774): the person's own words, the next prompt of the same
+ * conversation. A run that is working takes them when its turn ends; an ended run is resumed
+ * with them. Empty messages are dropped.
  */
-export async function sendMessage(projectId: string, text: string, agentId?: string): Promise<void> {
+export async function sendMessage(projectId: string, text: string, agentId?: string): Promise<SteerResult> {
   const message = text.trim()
-  if (!message) return
-  return relayOr(agentId, 'sendMessage', [projectId, text, agentId], async () => {
-    await appendControlFor(projectId, { kind: 'message', text: message }, agentId)
-  }, undefined)
+  if (!message) return { ok: true }
+  return relayOr(agentId, 'sendMessage', [projectId, text, agentId], async (): Promise<SteerResult> => {
+    const cwd = await resolveProjectPath(projectId)
+    if (!cwd || !agentId || !isSafeAgentId(agentId)) return { ok: false, error: 'unknown session' }
+    return sayToRun(cwd, agentId, { kind: 'message', text: message })
+  }, { ok: false, error: 'could not reach the device' })
 }
 
 /**
@@ -186,25 +151,18 @@ export async function sendDeleteAgent(projectId: string, agentId: string): Promi
 }
 
 /**
- * Start an agent in the project (#405, #345): the one write that needs the daemon, since
- * spawning goes through the daemon's own `startAgent` closure (with its one-run-per-
- * project busy guard). The daemon wires `startAgent` into the dashboard context, and this
- * runs in the daemon's own process, so the call reaches it directly. `kind` defaults to a plain build agent; a `build`/`prompt`
- * needs a non-empty prompt, `research` may be empty (its "what" defaults server-side).
- * Returns the daemon's {@link StartAgentResult} — `busy` when an agent is already active.
+ * Start a run in the project (#405, #1774): the project's own `start` hook line, reached through
+ * the daemon's wired `startAgent` (which relays to a connected device when the options name
+ * one). Answers the id of the run the hook began, or why there is none: a project without the
+ * line cannot start a run from here.
  */
-export async function sendStart(
-  projectId: string,
-  prompt: string,
-  kind: StartAgentKind = 'build',
-  options: StartAgentOptions = {},
-): Promise<StartAgentResult> {
+export async function sendStart(projectId: string, prompt: string, options: StartAgentOptions = {}): Promise<StartAgentResult> {
   // Throws on an unwired context (D3): there is one host and it wires everything, so "not
   // enabled on this server" stopped being a state a request can find.
   const startAgent = contextStartAgent()
   const text = prompt.trim()
-  if (!text && kind !== 'research') return { ok: false, error: 'a non-empty prompt is required' }
-  return startAgent(text, kind, options, projectId)
+  if (!text) return { ok: false, error: 'a non-empty prompt is required' }
+  return startAgent(text, options, projectId)
 }
 
 /**
@@ -242,26 +200,6 @@ async function handoffTargetFor(
 }
 
 /**
- * Push a finished session's branch to `origin` (#799).
- *
- * A click rather than something the agent does on its way out: pushing publishes the agent's work
- * to a shared remote under the user's name, which is the user's call.
- */
-export async function sendPushBranch(projectId: string, agentId: string): Promise<HandoffResult> {
-  return relayOr(agentId, 'sendPushBranch', [projectId, agentId], async () => {
-    const target = await handoffTargetFor(projectId, agentId)
-    if (!target) return { ok: false, error: 'unknown session' }
-    const branch = agentBranchFor(target.agent)
-    // Under the agent lock: teardown pushes the very same branch from inside this lock, so a push
-    // left outside it raced teardown's to create the ref and one of the two lost with `cannot lock
-    // ref … reference already exists` — which, when teardown was the loser, meant E5 kept the
-    // worktree rather than retiring it. What is pushed is the branch as the agent committed it
-    // (#1638): nothing is committed on its behalf first.
-    return withAgentLock(target.checkout, () => pushBranch(target.cwd, branch))
-  }, { ok: false, error: 'could not reach the device' })
-}
-
-/**
  * Open a PR for a finished session's branch (#799), pushing it first if the remote lacks it.
  *
  * The title and body come from what the agent already recorded: the session name the agent chose
@@ -272,8 +210,8 @@ export async function sendOpenPullRequest(projectId: string, agentId: string): P
   return relayOr(agentId, 'sendOpenPullRequest', [projectId, agentId], async () => {
     const target = await handoffTargetFor(projectId, agentId)
     if (!target) return { ok: false, error: 'unknown session' }
-    // Same run lock as sendPushBranch, for the same reason: the push inside `openAgentPullRequest`
-    // racing teardown's.
+    // Under the agent lock, so the push inside `openAgentPullRequest` cannot race a Remove of the
+    // same checkout.
     const opened = await withAgentLock(target.checkout, () => openAgentPullRequest(target.cwd, target.agent))
     // Record it on the agent (E6). The session's own process is gone by now, so there is no event
     // stream to carry the fact — but it is the same fact, and every surface reads it from the same
@@ -286,23 +224,15 @@ export async function sendOpenPullRequest(projectId: string, agentId: string): P
 }
 
 /**
- * The user's Merge action (#1391): one button, two states of the session it addresses.
- *
- * A live agent gets a `merge` control entry — the agent arms the full publish ladder, records the
- * human authorization (which the human-authorized merge gate (#1363) honors instead of demanding the agent's signal), and
- * merges at its own natural end (#1390). A finished agent has no process to steer, so its open PR
- * is merged directly — the answer to the withheld-merge ending, where an agent that never
- * signalled left a draft behind. If the agent ends between the check and the write, the entry lands
- * unread; the ended view then offers the direct merge, so the second click still gets there.
+ * The user's Merge action (#1391): merge a finished run's open pull request, directly. A run
+ * that is still working has no Merge: its agent publishes its own work, and the button comes
+ * with the ended view.
  */
 export async function sendMerge(projectId: string, agentId: string): Promise<HandoffResult> {
   return relayOr(agentId, 'sendMerge', [projectId, agentId], async () => {
     const target = await handoffTargetFor(projectId, agentId)
     if (!target) return { ok: false, error: 'unknown session' }
-    if (target.agent.status === 'running') {
-      await appendControlFor(projectId, { kind: 'merge' }, agentId)
-      return { ok: true }
-    }
+    if (target.agent.status === 'running') return { ok: false, error: 'that session is still going' }
     return mergeAgentPr(target.cwd, target.agent)
   }, { ok: false, error: 'could not reach the device' })
 }

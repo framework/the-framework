@@ -3,7 +3,6 @@ import type { Preferences } from '../../src/index.js'
 import { DRIVERS, DRIVER_LABELS, MAX_SPEND_OFFSET, DEFAULT_SPEND_OFFSET } from '../../src/client.js'
 import { useDetectedEditors } from '../lib/editors.js'
 import { usePreferences, updatePreferences, themePreference, type ThemePreference } from '../lib/preferences.js'
-import { agentOptionRows, type OptionRow } from '../lib/agent-option-rows.js'
 import { useNotificationPermission } from '../lib/notification-permission.js'
 import { useNotifyChannels, reloadNotifyChannels } from '../lib/notify-channels.js'
 import { OnboardingChecklist } from './OnboardingChecklist.js'
@@ -16,7 +15,6 @@ import { Button } from './ui/button.js'
 import { Checkbox } from './ui/checkbox.js'
 import { ScrollArea } from './ui/scroll-area.js'
 import { cn } from '../lib/utils.js'
-import { RUN_TARGET_LABELS } from '../lib/agent-settings.js'
 
 // The settings page (#958): every setting in one place, and the Onboarding checklist.
 //
@@ -25,16 +23,15 @@ import { RUN_TARGET_LABELS } from '../lib/agent-settings.js'
 // for one. This is the page the Overview's "you can resume the onboarding on the settings page"
 // points at, so the checklist lives here too and is not dismissible.
 //
-// Everything here writes the one writable tier: your own settings (B5). A repo-shaped value belongs
-// in that repo's committed `the-framework.yml`, which is edited in the repo, so a settings page can
-// only ever mean "the default" — which is what a settings page should mean.
+// Everything here writes your own settings, the same on every project: what is a project's own
+// (how a run is started) lives in that project's hooks file, not here.
 
 export function SettingsPage({
   onAgentStarted,
   onSelectProject,
 }: {
   /** Where a session the onboarding checklist starts lands (#1169): on that session. */
-  onAgentStarted: (projectId: string, intent: string, agentId?: string) => void
+  onAgentStarted: (projectId: string, intent: string, agentId: string) => void
   /** Where the checklist's "Configure first, then run" lands (#1507): that project's launcher. */
   onSelectProject: (id: string) => void
   onDone?: () => void
@@ -43,7 +40,6 @@ export function SettingsPage({
   const editors = useDetectedEditors()
   const theme = themePreference(preferences)
   // One shared table with the launcher (#958), rules already applied.
-  const { main: agentOptions } = agentOptionRows(preferences)
   // A notification toggle is a preference; whether it can deliver is a capability (#948). Both are
   // shown, the same way the bell does, so a row cannot promise delivery that will not happen.
   const permission = useNotificationPermission()
@@ -60,7 +56,7 @@ export function SettingsPage({
         <div>
           <h1 className="text-xl font-semibold">Settings</h1>
           <p className="text-sm text-muted-foreground">
-            Your defaults, everywhere. A repo can override them in its own the-framework.yml.
+            Your defaults, everywhere.
           </p>
         </div>
 
@@ -105,34 +101,10 @@ export function SettingsPage({
             placeholder="the agent's default"
             onChange={value => updatePreferences({ model: value })}
           />
-          <SelectRow
-            label="Run on"
-            description="Where an agent executes: this machine, a fresh GitHub Actions runner, or a Claude Code cloud session."
-            value={preferences.target ?? 'local'}
-            options={[
-              { value: 'local', label: RUN_TARGET_LABELS.local },
-              { value: 'actions', label: RUN_TARGET_LABELS.actions },
-              { value: 'web', label: RUN_TARGET_LABELS.web },
-            ]}
-            onChange={value => updatePreferences({ target: value as 'local' | 'actions' | 'web' })}
-          />
         </Section>
 
-        {/* Beside "Run on", since a saved device is the other thing a session can run on. */}
+        {/* A saved device is the other place a session can run on. */}
         <DevicesSettings />
-
-        {/* The same table the launcher renders (#958), so a rule cannot hold in one place and
-            not the other: Transparent overrides the rest, Eco is inert once the system prompt is
-            off, Browser is Claude-only, and the Eco drops need Eco. A row the rules disable is
-            shown greyed with its reason rather than hidden, since this is where you come to look. */}
-        <Section
-          title="Run options"
-          description="What a new agent starts with. The launcher's gear shows the same options, and an agent's own action bar can still change its ending."
-        >
-          {agentOptions.map(row => (
-            <OptionToggleRow key={row.key} row={row} />
-          ))}
-        </Section>
 
         <Section title="Notifications">
           <ToggleRow
@@ -176,12 +148,6 @@ export function SettingsPage({
         </Section>
 
         <Section title="Automation">
-          <ToggleRow
-            label="Fix red pull requests"
-            description="Put an agent on a watched pull request whose checks fail, on its own, while there is quota left in the week."
-            checked={preferences.autoPm ?? false}
-            onChange={next => updatePreferences({ autoPm: next })}
-          />
           {/* Bounded to the same ±MAX_SPEND_OFFSET the slider and the sanitizer use (#960). Without
               it a typed 9999 was clamped to 50 on save while the box kept showing 9999.
               An untouched preference shows the real default in force — the half-day cushion
@@ -263,32 +229,6 @@ function Row({
       </div>
       <div className="shrink-0">{control}</div>
     </div>
-  )
-}
-
-/**
- * One row of the shared run-option table (#958).
- *
- * A row the rules disable keeps its place and shows *why* instead of vanishing, because the whole
- * point of this page is to be where you look for a setting. `row.checked` is the effective value,
- * so an option Transparent overrides reads off here exactly as it does in the launcher.
- */
-function OptionToggleRow({ row }: { row: OptionRow }) {
-  const disabled = row.disabled ?? false
-  return (
-    <Row
-      label={row.label}
-      description={(disabled ? row.disabledReason : row.description) ?? row.description ?? ''}
-      dimmed={disabled}
-      control={
-        <Checkbox
-          checked={row.checked}
-          disabled={disabled}
-          onCheckedChange={next => updatePreferences(row.patch(next === true))}
-          aria-label={row.label}
-        />
-      }
-    />
   )
 }
 

@@ -61,43 +61,19 @@ test('unknown projects degrade quietly: reads are empty, writes are refused (#42
   }
 })
 
-test('settings written in the dashboard reach the next resumed run (#858/#1467)', async () => {
+test('settings written in the dashboard read back, and only what the dashboard knows is kept (#858)', async () => {
   const world = await makeWorld()
   const rpc = world.rpc
   try {
-    const project = await world.addProject()
-
-    // The Settings page: patch your settings and read them back. One writable tier (B5) — the
-    // repo's committed the-framework.yml is the other, and it is edited in the repo.
-    const patched = await rpc(patchPreferences)({ vanilla: false, model: 'fable-e2e' })
+    // The Settings page: patch your settings and read them back. The picks a Start hands to the
+    // project's start hook (the coding agent, the model) are among them.
+    const patched = await rpc(patchPreferences)({ driver: 'codex', model: 'gpt-5-e2e' })
     assert.equal(patched.ok, true)
-    assert.equal((await rpc(onPreferences)()).vanilla, false)
-    assert.equal((await rpc(onPreferences)()).model, 'fable-e2e')
-
-    // First leg: a plain agent, finished.
-    const agentId = await world.startAgent(project, 'Build the settings page')
-    await world.waitAgent(project, agentId, 'done')
-
-    // The composer's Resume sends only its seed (#1467); the daemon overlays the project's
-    // resolved options, so the model chosen in Settings reaches the continued session's argv.
-    // Fired the instant the row flips done — deliberately inside teardown's window: the busy
-    // guard waits out the still-exiting first leg instead of refusing (#1529), and the agent
-    // lock makes the continuation wait out the archive it is about to reopen, where it used
-    // to reuse a checkout mid-retirement.
-    const resumed = await rpc(sendStart)(project.id, 'Keep going', 'prompt', { continueAgentId: agentId })
-    assert.equal(resumed.ok, true, `the resume was refused: ${JSON.stringify(resumed)}`)
-    await world.waitAgent(project, agentId, 'done')
-    await world.waitRetired(project, agentId)
-    const sent = await waitFor(async () => {
-      const spawns = await world.spawnedSpecs()
-      return spawns.length >= 2 ? spawns[1] : undefined
-    }, 'the resumed child to be spawned')
-    assert.equal(sent.options.model, 'fable-e2e', 'the resumed run carries the project model')
-    assert.equal(sent.continueAgent, true, 'the resumed run reopens the same session row')
-
-    // One row throughout: the continuation is the same agent, not a second history entry.
-    const rows = await rpc(onAgents)(project.id)
-    assert.equal(rows.filter(r => r.id === agentId).length, 1)
+    assert.equal((await rpc(onPreferences)()).driver, 'codex')
+    assert.equal((await rpc(onPreferences)()).model, 'gpt-5-e2e')
+    // A coding agent nobody can pick is dropped rather than stored.
+    await rpc(patchPreferences)({ driver: 'no-such-agent' })
+    assert.equal((await rpc(onPreferences)()).driver, undefined)
   } finally {
     await world.close()
   }

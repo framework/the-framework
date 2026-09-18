@@ -9,7 +9,7 @@ The agent-facing side of the cloud session [1] start queue: how a web agent's [2
 ## Glossary
 
 [1] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
-[2] agent: the unit of work: one task worked by a coding agent under The Framework's control. A web agent is one whose location is `web`: its turns run in a Claude Code cloud session.
+[2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps. A web agent is one whose location is `web`: its turns run in a Claude Code cloud session.
 [3] the Claude web bridge (the bridge): the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge token is the secret the extension presents.
 
 ## Business logic — TL;DR

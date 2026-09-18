@@ -1,10 +1,7 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { join } from 'node:path'
 import { installProject } from './install.js'
-import { PRESETS, PRESET_DIR } from './presets.js'
 import { frameworkGitignore, gitignorePath } from './framework-gitignore.js'
-import { layoutMarker, layoutMarkerPath } from './layout.js'
 import type { GitRunner } from '@gemstack/agent-data'
 import type { StoreFs } from './store/index.js'
 
@@ -76,35 +73,16 @@ test('installProject on a clean repo seeds the ignore file and makes exactly one
   assert.deepEqual(commits, [['commit', '-m', '[The Framework] install The Framework']])
 })
 
-test('installProject materializes the quality presets so an on-before-mergeable filePath resolves (#326)', async () => {
-  const fs = memFs()
-  const { git } = fakeGit(args => (args[0] === 'rev-parse' ? 'true' : ''))
-  await installProject(CWD, { git, fs })
-  for (const [name, text] of Object.entries(PRESETS)) {
-    assert.equal(fs.files.get(join(CWD, PRESET_DIR, `${name}.md`)), text, `missing ${name}`)
-  }
-})
-
 test('installProject seeds .the-framework/.gitignore ignoring everything transient (#313/#1582)', async () => {
   const fs = memFs()
   const { git } = fakeGit(args => (args[0] === 'rev-parse' ? 'true' : ''))
 
   await installProject(CWD, { git, fs })
   const ignore = fs.files.get(gitignorePath(CWD)) ?? ''
-  // Everything under .the-framework/ is transient on main: the lasting records live on the data
-  // branch (#1582), so nothing is un-ignored except the file itself and the layout marker (#1575).
+  // Everything under .the-framework/ stays out of git on main: the lasting records live on the
+  // data branch (#1582), so nothing is un-ignored except the file itself.
   const rules = ignore.split('\n').filter(line => line && !line.startsWith('#'))
-  assert.deepEqual(rules, ['*', '!.gitignore', '!LAYOUT'])
-})
-
-test('installProject records the layout marker, tracked, so a skewed build is refused (#1575)', async () => {
-  const fs = memFs()
-  const { git } = fakeGit(args => (args[0] === 'rev-parse' ? 'true' : ''))
-
-  await installProject(CWD, { git, fs })
-  assert.equal(fs.files.get(layoutMarkerPath(CWD)), layoutMarker())
-  // The seeded ignore un-ignores it: `*` would otherwise keep the marker out of the install commit.
-  assert.match(fs.files.get(gitignorePath(CWD)) ?? '', /^!LAYOUT$/m)
+  assert.deepEqual(rules, ['*', '!.gitignore'])
 })
 
 test('installProject on a dirty repo leaves the user’s changes alone and adds only its own directory (#1638)', async () => {

@@ -1,34 +1,30 @@
-The composer [1] at the bottom of an agent's [2] page, one editor for the agent's whole life: while the agent runs, a send is a live chat [3] message the agent reads between turns; once the agent has ended with a known driver session [4] id, a send continues the same agent by resuming that driver session; once it has ended without one, a send starts a new agent with the text. The empty box's submit slot holds the agent's control, Stop while it runs and Resume once it was stopped, and typing swaps the send arrow back in.
+The box at the bottom of an agent view [1]: where the user says something to that agent [2], whether it is working or has ended, and where they stop it or resume it. A send is always the same thing — the user's words, the next prompt of the same conversation — and what becomes of them is the daemon's side: an agent that is working takes them when its turn ends, an ended agent is resumed with them through the project's resume hook [3].
 
 ## Context
 
-**User story**: the user types the next thing to an agent without caring whether it is still running, has settled, or has stopped: the box stays where it is with the half-typed text in it, and one line above it says what a send will do from here.
+**User story**: the user watches an agent work and types "also add a logout button": the agent does that next. Later the agent has ended; the user types "one more thing" into the same box, and the same agent — same row, same branch, same conversation — goes on. With the box empty, the button in its corner stops the agent while it works and resumes it once it was stopped.
 
-**Problem**: three different sends look the same to the user. A running agent takes a message through its control file [5], which the agent drains between turns, so the send is invisible until then. A finished agent has no process left to message; what it has is a driver session that the driver can resume, provided the agent reported its session id before it ended.
+**Problem**: the daemon runs no agent itself, so it can refuse: a project with no resume hook cannot continue an ended agent. The box must show that refusal in the daemon's words, keep the text the user typed, and never report a message as delivered that was not.
 
 ## Glossary
 
-[1] composer: the prompt editor, also used for live chat.
-[2] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
-[3] live chat: the user's own messages to a running agent, each continuing the same driver session. One of them is a message.
-[4] driver session: the coding agent's own conversation for one agent, which the driver can resume by its session id.
-[5] control file: `.the-framework/control.jsonl`: the file the daemon appends steering to (stops, picks, chat messages) and the agent's process tails.
-[6] prompt agent: an agent that runs one prompt and stops there (as opposed to a build agent, which works the agent queue after its opening exchange).
-[7] driver: a coding agent wrapped as a black box. The user's driver choice is `claude` or `codex`; the driver implementations are `claude-code`, `codex`, `github-actions`, `claude-web` and `fake`.
-[8] stop: ending an agent before it finishes: the Stop button, Ctrl-C, or a pick marked to stop.
-[9] ready for merge: the signal an agent emits when it believes its work is complete: it flips the agent's badge from building to ready and authorizes the handoff.
-[10] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
+[1] agent view: one agent's page.
+[2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
+[3] resume hook: the one shell line under `resume:` in the project's `.the-framework/hooks.yml`. The daemon runs it with the agent's id and the user's text or answer in its environment, and the line continues that agent.
+[4] inbox: the file in a working agent's checkout where what the user says waits; the agent takes it when its turn ends, as its next prompt.
+[5] waiting: how an agent that ended on a question reads: not working, its checkout kept, resumed by the answer or by the user's next message.
 
 ## Business logic — TL;DR
 
-- **What a send does** - a message to a running agent; a continuation of an ended agent that has a session id, on the driver it ran under; a brand-new agent when there is nothing to resume; and a preset marked to open its own agent always starts one.
-- **The line above the box** - "Queued — …" after a message to a running agent, or, for an ended agent, whether the next message resumes it after a failure, resumes it after a stop, or continues it; an agent that cannot be continued says so in the box's own placeholder instead.
-- **The submit slot** - Stop while the agent runs, Resume once it was stopped with a session id, nothing after any other ending; typing brings back the send arrow.
-- **Failures** - a refused send, start, continuation or stop is said in one red line above the box, and the typed text is kept.
+- **One send, working or ended** - the text goes to the daemon addressed at this agent; while the agent works the box says the message is queued, and when the agent had ended the shell is told to follow the same agent as it goes on.
+- **A refusal** - the daemon's reason is shown as an alert, the text stays in the box, and nothing is reported as queued or resumed.
+- **The slot: Stop, Resume, or send** - the empty box's corner holds "Stop agent" while the agent works and "Resume" once it was stopped; typing swaps in the send arrow.
+- **The line above the box** - what a send will do from here: queued, continues, resumes, or answer the question above.
+- **What the box leaves out** - no coding agent and model select and no "Run on": an agent cannot change either.
 
 ## Business logic
 
-### What a send does
+### One send, working or ended
 
 #### Context
 
@@ -36,51 +32,63 @@ See `## Context`.
 
 #### Business logic
 
-A send is ignored while another send or start is in flight. Otherwise, by the agent's [2] state:
+The editor and its controls are the shared composer (`Composer.tsx`); this box owns what a submit does. The submit button reads "Send"; while a send is in flight its busy label is "Sending…" for a working agent and "Resuming…" for an ended one. A second send while one is in flight does nothing.
 
-- A preset the composer [1] flags as opening its own agent (a "new agent" preset, the rule in `Composer.tsx`) always starts a new prompt agent [6] with the text: no resume seed and no link to this agent, so it gets its own checkout [10], branch and driver session [4]. On success the box is cleared and the page jumps to the agent just started.
-- While the agent runs: the text is sent as a live chat [3] message to the agent by its id (or, when no id is known, into the project's own control file [5]). On success the box is cleared and the message is remembered as queued (next section). The send button reads "Send", and "Sending…" while in flight.
-- Once the agent has ended and its driver session id is known: the text starts a continuation, a prompt agent that resumes that driver session and is written into this same agent, so it stays one row on one branch rather than opening a new one. It resumes on the driver [7] the agent ran under, never on the preferences' driver: an agent that ran under Codex resumes on Codex; Claude is the default and needs no choice. No model and no system-prompt options are sent, because the resumed conversation keeps the ones it had, and the composer offers no driver or model selector here for the same reason. The button reads "Resuming…" while in flight. On success the box is cleared and the page jumps to the agent.
-- Once the agent has ended without a session id: nothing can resume it, so the text starts a new prompt agent, with "Starting…" while in flight; on success the box is cleared and the page jumps to the new agent.
+A send hands the daemon the project, the text and this agent's id. It is the same call whatever the agent's state: while the agent works, the daemon puts the text in the agent's inbox [4]; once it has ended — done, stopped, failed or waiting [5] — the daemon resumes it through the project's resume hook [3].
 
-The options gear with the "Resume options" is offered only once the agent has ended: a running agent has nothing adjustable, so the gear is dropped rather than opened empty. The agent's session name is handed to the composer so a preset launched here targets this agent by default.
+When the send went through, the box is emptied and focused again. For a working agent it then shows, as a status, "Queued — the session reads it when its turn ends: "`<text>`"", because a line in the inbox is invisible until the agent takes it. The note goes when the user opens another agent or when this agent ends. For an agent that had ended, the box instead tells the shell that this same agent was continued with that text, so the shell keeps its page and its feed as the agent goes on under the same id.
+
+The box does not remount when the agent ends, so a half-typed message survives the ending.
+
+### A refusal
+
+#### Context
+
+See `## Context`.
+
+#### Business logic
+
+When the daemon refuses a send — the project has no resume hook, the resume hook's tool refused, the agent is unknown, the device could not be reached — the box shows the daemon's reason as an alert above the editor. A send that failed without a reason shows "Could not send. Your text is kept, try again.". Either way the text stays in the editor, no "Queued" note appears, and the shell is not told the agent was continued. A refused Resume behaves the same way: the button does not hold its busy state, and the reason is shown. A failed Stop shows "Could not stop the agent." in the same place.
+
+### The slot: Stop, Resume, or send
+
+#### Context
+
+**User story**: the corner of the box is one button with three meanings, like a coding agent's own terminal: stop what is running, resume what was stopped, send what was typed.
+
+#### Business logic
+
+While the box is empty:
+
+- a working agent shows "Stop agent". A press asks the daemon to stop this agent; once that landed the button reads "Stopping…" and stays disabled until the agent reads as ended, so a stop cannot be sent twice. The hold is released when the agent ends or when the user opens another agent, so an agent that is resumed later gets a working Stop again.
+- an agent that was stopped shows "Resume" ("Resume the agent"). A press sends a stock message in place of typed text: "This session was stopped before it finished, not because the work was done. Look at what you had already done, then carry on from there." — the resumed agent has its whole conversation back, and the one thing it lacks is why it stopped. After a press that went through, the button stays a busy "Resuming…" until the agent reads as working, so the slot never flickers between Resume, nothing and Stop.
+- an agent that ended any other way — done, failed, or waiting [5] on its question — shows nothing in the slot.
+
+As soon as the box has text, the slot is the send arrow, in every state.
 
 ### The line above the box
 
 #### Context
 
-**Problem**: a queued message is invisible until the agent [2] drains it between turns, so without a note the send looks like nothing happened. And an agent that crashed must not be described as having "ended".
+**Problem**: the same box does different things depending on the agent's state, and the user should not have to guess which.
 
 #### Business logic
 
-- While the agent runs: after a successful send, "Queued — the session reads it between turns: “<the message>”", on one truncated line. The note is hidden while an error is shown, and it is dropped when the agent ends or another agent is selected, since it is about this agent's live session only.
-- Once the agent has ended with a session id: "Session failed — your next message resumes it where it stopped." when it ended with an error, "Session stopped — your next message resumes it." when it was stopped [8], and "Agent ended — your next message continues it." when it finished on its own.
-- Once the agent has ended without a session id: no note. The box's placeholder says it instead, where the typing happens: "This agent can’t be continued — it ended before reporting a session id. Your next message starts a new one."
+While the agent works the line is absent, except for the "Queued" status after a send. Once the agent has ended the line says what the next message will do:
 
-The placeholder otherwise reads "Message the agent…  ( / commands · < tags · @ projects · # files )" while the agent runs, and "Message the agent to continue it…  ( / commands · < tags · @ projects · # files )" once it has ended with a session id.
+- waiting [5]: "The agent asked a question — answer it above, or your next message continues the session."
+- failed: "Session failed — your next message resumes it where it stopped."
+- stopped: "Session stopped — your next message resumes it."
+- otherwise: "Agent ended — your next message continues it."
 
-### The submit slot
+The "Queued" status is hidden while an error is shown, so the box never says "queued" next to a refusal. The editor's placeholder reads "Message the agent…" while the agent works and "Message the agent to continue it…" once it has ended.
+
+### What the box leaves out
 
 #### Context
 
-**User story**: the one control the user reaches for on an agent's page, Stop while it works and Resume after a stop [8], sits in the box's submit slot, where the send arrow appears the moment the user types. A stopped agent resumed from here has its whole conversation back and only lacks the reason it stopped, so the resume tells it that "the user pressed Stop" does not mean "the work was done".
+**Problem**: an agent is bound to the coding agent it started on and runs where it was started.
 
 #### Business logic
 
-With the box empty:
-
-- While the agent [2] runs: a square "Stop agent" button (hover "Stop agent"). Pressing it sends a stop to the agent by its id (or to the project's control file [5] without one). From the press until the agent is no longer running, the button shows a spinner, its hover reads "Stopping…", and it is disabled, so a landed stop cannot be fired twice. The latch is released the moment the agent stops being live, not only on an agent switch: a resumed agent is the same agent, and it must get a working Stop again. Failure: "Could not stop the agent.".
-- Once the agent was stopped and its driver session [4] id is known: a "Resume" button (hover "Resume the agent"). Pressing it starts a continuation as above (same driver session, same agent, same driver [7]) carrying the stock message: "This session was stopped before it finished, not because the work was done. Look at what you had already done, then carry on from there. The session lifecycle still applies: once the work is genuinely finished with nothing left to do, call setReadyForMerge() — without it the finished work is never merged." (its last sentence points at the ready for merge [9] signal). From the press until the resumed agent reads as running, the button shows a spinner, reads "Resuming…" and is disabled, so the slot never flickers between Resume, empty and Stop while the daemon's list catches up. On success the page jumps to the agent. Failure: "Failed to resume the agent.", or the daemon's refusal.
-- After any other ending (finished on its own, failed, or stopped without a session id): no control; the slot collapses as it does in the launcher.
-
-Typing anything replaces the control with the send arrow.
-
-### Failures
-
-#### Context
-
-**Problem**: the daemon refuses a second agent on a project whose checkout [10] is busy, and a message can miss an agent that has just ended.
-
-#### Business logic
-
-One red line above the box shows the first of: the message send's error, the start or continuation's error, the stop's error. A message that could not be sent reads "Could not send — the agent may have just ended. Your text is kept, try again.", and the text stays in the box. A start the daemon refused because an agent is already active reads "An agent is already active for this project." (the wording in `lib/use-start-agent.ts`); other refusals read "Failed to continue the agent.", "Failed to resume the agent." or "Failed to start the agent." by what was attempted, or the daemon's own reason. A refused start never navigates away.
+The box shows no coding agent and model select and no "Run on" pick. The Commands button, the `/` list and the `@` and `#` mentions work as at the launcher: inside an agent a command is a message like any other.

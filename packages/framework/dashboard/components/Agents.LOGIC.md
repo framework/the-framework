@@ -3,7 +3,7 @@ The Overview's [1] "Agents" card, described as "Agents currently working": one r
 ## Glossary
 
 [1] the Overview: the dashboard's cross-project page at `/`.
-[2] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [3] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
 [4] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
 [5] the Claude web bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session.

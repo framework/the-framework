@@ -12,7 +12,6 @@ vi.mock('../rpc/reads.js', () => ({ onDocs }))
 // The panels themselves are rendered elsewhere; here they are stand-ins.
 vi.mock('./DocsPanel.js', () => ({ DocsPanel: () => <div>docs</div> }))
 vi.mock('./FileTree.js', () => ({ FileTree: () => <div>files</div> }))
-vi.mock('./BrowserPanel.js', () => ({ BrowserPanel: () => <div>browser</div> }))
 
 const { RightRail } = await import('./RightRail.js')
 
@@ -29,8 +28,6 @@ const baseProps = {
   agentId: 'r1',
   views: [],
   files: [],
-  context: new Set<string>(),
-  toggleContext: () => {},
 }
 
 // The rail holds one fixed width for every tab: switching to a pushed view no longer widens it
@@ -58,20 +55,6 @@ describe('RightRail width', () => {
   test('no project means no rail', () => {
     const { container } = render(<RightRail {...baseProps} projectId={null} />)
     expect(container.querySelector('aside')).toBeNull()
-  })
-})
-
-// A GitHub Actions run has no browser on the runner (#1053), so the pane must not be offered even
-// when the browser flag is on; a local agent keeps it.
-describe('RightRail browser tab (#1053)', () => {
-  test('a local run with a browser offers the Browser tab', () => {
-    render(<RightRail {...baseProps} hasBrowser />)
-    expect(screen.getByRole('tab', { name: /browser/i })).toBeTruthy()
-  })
-
-  test('an Actions run never offers the Browser tab, even with the flag on', () => {
-    render(<RightRail {...baseProps} hasBrowser target="actions" />)
-    expect(screen.queryByRole('tab', { name: /browser/i })).toBeNull()
   })
 })
 

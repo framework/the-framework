@@ -1,7 +1,7 @@
 import { EventStream } from '../event-stream.js'
 import type { FrameworkEvent } from '../events.js'
-import { applyEventToMeta, type AgentMeta } from '../store/index.js'
-import type { StartAgentKind, StartAgentOptions, StartAgentResult } from './types.js'
+import type { AgentMeta } from '../store/index.js'
+import type { StartAgentOptions, StartAgentResult } from './types.js'
 import { errorMessage } from '../error-message.js'
 
 /**
@@ -25,7 +25,6 @@ export interface RemoteTarget {
 /** The body a relay start forwards to the remote's `/_relay/start`. */
 export interface RelayStartBody {
   prompt: string
-  kind: StartAgentKind
   options: StartAgentOptions
 }
 
@@ -226,7 +225,7 @@ export class RelayedAgents {
   private apply(agentId: string, event: FrameworkEvent): void {
     const entry = this.metas.get(agentId)
     if (!entry) return
-    entry.meta = applyEventToMeta(entry.meta, event, new Date().toISOString())
+    entry.meta = foldRelayedEvent(entry.meta, event, new Date().toISOString())
   }
 
   /** Close a relayed agent's event stream (not its target). Idempotent. */
@@ -255,4 +254,20 @@ export class RelayedAgents {
 /** Trim trailing slashes off a base URL so `${base}/_relay/...` never doubles them. */
 function trimSlashes(url: string): string {
   return url.replace(/\/+$/, '')
+}
+
+/**
+ * Fold one relayed event into the memory-only row of a run on a device: what the device's own
+ * card would say, kept here because that card is on the device. The events are the ones a run's
+ * diary yields: the agent's session id, its cost, its end.
+ */
+export function foldRelayedEvent(meta: AgentMeta, event: FrameworkEvent, at: string): AgentMeta {
+  const next: AgentMeta = { ...meta, updatedAt: at }
+  if (event.kind === 'session-update') next.sessionId = event.sessionId
+  else if (event.kind === 'usage' && event.costUsd !== undefined) next.cost = (next.cost ?? 0) + event.costUsd
+  else if (event.kind === 'end') {
+    next.status = event.ok ? 'done' : event.stopped ? 'stopped' : event.waiting ? 'waiting' : 'failed'
+    next.endedAt = at
+  }
+  return next
 }

@@ -12,7 +12,7 @@ Fixes what an unset preference [1] means and the bounds that the controls writin
 [2] spend offset: the user's adjustment of the quota boundary, in percentage points of the week.
 [3] quota boundary: the share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
 [4] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds. The other is activity: an agent started or finished.
-[5] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
+[5] unattended: said of an agent nobody is watching: one the scheduler started rather than a person. It is not answered any faster: a question it ends on waits for a human like any other.
 
 ## Business logic — TL;DR
 

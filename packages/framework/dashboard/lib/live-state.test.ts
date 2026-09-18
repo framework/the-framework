@@ -63,6 +63,26 @@ describe('pendingChoices', () => {
     // A gate asked after a (continued) run's next leg opens fresh — end only closes what came before.
     expect(pendingChoices([choice('c1', 'One?'), end, choice('c2', 'Two?')]).map(c => c.id)).toEqual(['c2'])
   })
+
+  // A run that asks ENDS on its question (#1774): waiting, its checkout kept for the answer.
+  test('a question stays open through an end that says waiting', () => {
+    const waiting: FrameworkEvent = { kind: 'end', ok: false, waiting: true }
+    expect(pendingChoices([choice('q', 'Which?'), waiting]).map(c => c.id)).toEqual(['q'])
+  })
+
+  test('the agent going on closes the question: the answer, or the person\'s text, began a new turn', () => {
+    const waiting: FrameworkEvent = { kind: 'end', ok: false, waiting: true }
+    const next: FrameworkEvent = { kind: 'driver', event: { type: 'text', text: 'On it.' } }
+    expect(pendingChoices([choice('q', 'Which?'), waiting, next])).toEqual([])
+    // What is not the agent's own (its cost, a log line) closes nothing.
+    expect(pendingChoices([choice('q', 'Which?'), { kind: 'usage', costUsd: 0.1 } as FrameworkEvent, waiting]).map(c => c.id)).toEqual(['q'])
+  })
+
+  test('an end that does not say waiting still closes it, also after a waiting one', () => {
+    const waiting: FrameworkEvent = { kind: 'end', ok: false, waiting: true }
+    const stopped: FrameworkEvent = { kind: 'end', ok: false, stopped: true }
+    expect(pendingChoices([choice('q', 'Which?'), waiting, stopped])).toEqual([])
+  })
 })
 
 describe('isAgentActive', () => {

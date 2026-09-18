@@ -2,9 +2,9 @@ The "about this agent [1]" strip behind the action bar's disclosure, always avai
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] coding agent: the CLI doing the actual work: Claude Code or Codex.
-[3] event / event stream: everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout.
+[3] event / event stream: everything an agent does, in order, read off the agent's diary: the file its tool writes one line at a time, in the agent's checkout while it has one and on the data branch once it is recorded; every surface is a projection of it.
 [4] turn: one prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
 
 ## Business logic — TL;DR

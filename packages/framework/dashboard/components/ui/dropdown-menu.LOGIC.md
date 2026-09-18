@@ -1,4 +1,4 @@
-Provides the dashboard's dropdown menu, the one behind the presets, agent/model, options gear, Context and notifications buttons: a menu that opens below its trigger, keeps the trigger lit while open, scrolls within the room it has, and offers plain items, check items, labeled groups, separators and submenus that open to the right.
+Provides the dashboard's dropdown menu, the one behind the commands, agent/model, "Run on" and notifications buttons: a menu that opens below its trigger, keeps the trigger lit while open, scrolls within the room it has, and offers plain items, check items, labeled groups, separators and submenus that open to the right.
 
 ## Business logic — TL;DR
 

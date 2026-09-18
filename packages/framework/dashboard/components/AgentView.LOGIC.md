@@ -1,4 +1,4 @@
-Shows one agent [1] on its own page, the agent view [2], in one frame that stays put whether the agent is running, settled [3] or finished: an action bar with the agent's name and the state of its work, the feed of its events [4], notices for work that runs somewhere other than this machine, and the composer [5] for live chat [6]. Only what those parts say changes: while the agent runs, its events arrive over the live event stream and the bar shows what its checkout [7] has changed; once it stops, the archive [8] of its events is swapped in without blanking the screen, and the bar turns to what its branch holds and what to do with it, the handoff [9].
+Shows one agent [1] on its own page, the agent view [2], in one frame that stays put whether the agent is running, settled [3] or finished: an action bar with the agent's name and the state of its work, the feed of its events [4], notices for work that runs somewhere other than this machine, and the composer [5] for saying something to the agent [6]. Only what those parts say changes: while the agent runs, its events arrive over the live event stream and the bar shows what its checkout [7] has changed; once it stops, the archive [8] of its events is swapped in without blanking the screen, and the bar turns to what its branch holds and what to do with it, the next step [9].
 
 ## Context
 
@@ -8,37 +8,35 @@ Shows one agent [1] on its own page, the agent view [2], in one frame that stays
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] agent view: one agent's page.
-[3] settled: said of an agent whose work has stopped and which is waiting for the user: it is alive, takes messages, and does nothing until told.
-[4] event / event stream: everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface (dashboard, terminal, archive, run) is a projection of it.
-[5] composer: the prompt editor, also used for live chat.
-[6] live chat: the user's own messages to a running agent, each continuing the same driver session. One of them is a message.
+[3] settled: said, in records of agents from before agents were started through the project's start hook, of an agent whose work had stopped while it stayed alive waiting for the user. An agent started today ends instead.
+[4] event / event stream: everything an agent does, in order, read off the agent's diary: the file its tool writes one line at a time, in the agent's checkout while it has one and on the data branch once it is recorded; every surface is a projection of it.
+[5] composer: the prompt editor, also used to say something to an agent.
+[6] message: the user's own words to an agent, the next prompt of the same conversation: an agent that is working takes it when its turn ends, an ended agent is resumed with it.
 [7] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [8] archive: the transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
-[9] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it).
+[9] next step: what a person can do with an ended agent's work from the dashboard: open a pull request for its branch, or merge the pull request it has.
 [10] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
 [11] driver session: the coding agent's own conversation for one agent, which the driver can resume by its session id.
-[12] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
-[13] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
-[14] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
-[15] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
-[16] stop: ending an agent before it finishes: the Stop button, Ctrl-C, or a pick marked to stop.
-[17] project home: a project's own page with the launcher (the Start form) and its composer.
+[12] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
+[13] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
+[14] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
+[15] stop: ending an agent before it finishes: the Stop button, Ctrl-C, or a pick marked to stop.
+[16] project home: a project's own page with the launcher (the Start form) and its composer.
 
 ## Business logic — TL;DR
 
 - **One frame for a running and a finished agent** - the same action bar, feed, notices and composer stay on screen for the agent's whole life; only their contents follow the agent's state.
 - **Which events are shown** - a running agent shows the live event stream; a finished one shows its archive, swapped in behind the events already on screen, and neither an empty nor a stale archive ever replaces what the stream shows.
 - **Loading and empty states** - a finished agent whose archive is still being read says "Loading agent…"; a finished agent with no events at all says "This agent has no events."; a running agent with nothing yet simply waits for its first event.
-- **Working is not the same as alive** - the agent counts as working only while it runs and has not settled; everything that asks "is there more coming?" asks this, so a settled agent gets its handoff offered instead of arming checkboxes for ever.
+- **Working is not the same as alive** - the agent counts as working only while it runs and has not settled; everything that asks "is there more coming?" asks this, so an agent that is not working gets its next step offered.
 - **Live as the feed knows it** - the feed follows new output, and the composer offers Stop, as soon as new events stream in, even during the seconds before the daemon's list of agents notices a resumed agent.
-- **What the action bar says** - the agent's name with its project as a breadcrumb; while working, the counts of what the checkout has changed; once stopped, the verdict on what the branch holds, any failed automatic handoff, and the offered next step.
-- **What the handoff is armed to do** - the armed levels are read off the events and seeded from the agent's record, so a tab opened halfway through a run reads the same as one that watched it start.
+- **What the action bar says** - the agent's name with its project as a breadcrumb; while working, the counts of what the checkout has changed; once not working, the verdict on what the branch holds and the offered next step.
 - **The disclosure** - opening the bar's disclosure adds the agent's details strip and, while working, the changes in its checkout, or, once stopped, the commits and files its branch holds.
 - **Removing a kept checkout** - a finished agent that kept its checkout (it failed or was stopped) is offered a Remove, which disappears at once when used.
 - **Notices for work that runs elsewhere** - an agent whose turns run on GitHub Actions, in a cloud session, or on a device gets a notice explaining what the feed can and cannot show.
-- **The feed and the composer** - a finished feed is static and opens at its end; the composer knows how the agent ended, its driver session, and its session name, so it can offer a resume or a follow-up message.
+- **The feed and the composer** - a finished feed is static and opens at its end; the composer knows how the agent ended, so it can say what the next message will do and offer a resume.
 
 ## Business logic
 
@@ -50,7 +48,7 @@ See `## Context`.
 
 #### Business logic
 
-The page for one agent [1] always holds, top to bottom: the action bar (`AgentActionBar.tsx`), the optional details strip and changes or handoff [9] detail behind the bar's disclosure, the notices for work that runs elsewhere, the feed of events [4] (`AgentFeed.tsx`), and the composer [5] (`AgentComposer.tsx`). None of these parts is replaced when the agent's state changes; each is told whether the agent is still running and what it has to show, and adapts its contents.
+The page for one agent [1] always holds, top to bottom: the action bar (`AgentActionBar.tsx`), the optional details strip and the changes or the branch detail behind the bar's disclosure, the notices for work that runs elsewhere, the feed of events [4] (`AgentFeed.tsx`), and the composer [5] (`AgentComposer.tsx`). None of these parts is replaced when the agent's state changes; each is told whether the agent is still running and what it has to show, and adapts its contents.
 
 The agent's name leads the bar: the session name [10] the caller passes (the same label the history rail shows), or, when none is passed, the session name read off the agent's own events once the agent has named its branch. The project's name is shown beside it as a `project / session` breadcrumb.
 
@@ -58,7 +56,7 @@ The agent's name leads the bar: the session name [10] the caller passes (the sam
 
 #### Context
 
-**Problem**: while an agent runs, its events reach the browser over the live event stream and that stream is the whole truth. Once it ends, the archive [8] is the durable copy, and some events only ever exist there: a clean agent's handoff [9] report is written after its checkout [7], and the event file inside it, are gone. But reading the archive at the wrong moment shows the wrong thing: right after a stop [16] the archive may not be written yet, and right after a resume the stream is already ahead of it.
+**Problem**: while an agent runs, its events reach the browser over the live event stream and that stream is the whole truth. Once it ends, the archive [8] is the durable copy, and some events only ever exist there: an agent's last lines are recorded after its checkout [7], and the event file inside it, are gone. But reading the archive at the wrong moment shows the wrong thing: right after a stop [15] the archive may not be written yet, and right after a resume the stream is already ahead of it.
 
 #### Business logic
 
@@ -84,15 +82,15 @@ The agent's name leads the bar: the session name [10] the caller passes (the sam
 
 #### Context
 
-**Problem**: a settled [3] agent stays alive to take the user's next message, so the daemon reports it as running long after it finished. If the page keyed the handoff [9] off "is the process up", a plainly finished agent would show its arming checkboxes for ever and never offer the action they describe.
+**Problem**: a settled [3] agent stays alive to take the user's next message, so the daemon reports it as running long after it finished. If the page keyed the next step [9] off "is the process up", a plainly finished agent would never be offered it.
 
 #### Business logic
 
 An agent [1] counts as working only while it is running and its events say it has not settled. An agent is settled once its events carry the settled signal, and un-settled again when a new turn starts or when the agent ends outright (the rules in `lib/live-state.ts`). Everything that asks "is there anything more coming?" asks whether the agent is working:
 
-- what the branch holds (the handoff read in `lib/use-agent-handoff.ts`) is only read once the agent is not working: a branch still being written to has nothing to hand off yet, but a settled agent's branch is finished work;
-- the bar's action slot shows the arming checkboxes while working, and the handoff's next step once not working;
-- the changes panel reads the checkout [7] while working; the handoff detail replaces it once not working.
+- what the branch holds (the read in `lib/use-agent-handoff.ts`) is only read once the agent is not working: a branch still being written to has nothing to offer yet, but a settled agent's branch is finished work;
+- the bar's action slot is empty while working — an agent that is working publishes its own work — and holds the next step [9] once not working;
+- the changes panel reads the checkout [7] while working; the branch's commits and files replace it once not working.
 
 ### Live as the feed knows it
 
@@ -108,31 +106,20 @@ The feed and the composer [5] are told the agent [1] is live when either the dae
 
 #### Context
 
-**User story**: the user glances at the bar and knows what state the agent's work is in, and what the one obvious next thing to do is. If an automatic handoff [9] failed, the user must see that it was tried, not just that the buttons are back.
+**User story**: the user glances at the bar and knows what state the agent's work is in, and what the one obvious next thing to do is.
 
 #### Business logic
 
 The bar's summary line:
 
 - While the agent [1] is working: the counts of what its checkout [7] has changed (files changed, lines added, lines removed), reported by the changes panel (`AgentChanges.tsx`).
-- Once the agent is not working and the read of what its branch holds has answered: the one-line verdict on the branch (`AgentHandoff.tsx`), followed, in the danger color, by "auto-handoff failed: <error>" when the armed handoff reported a failure, and by the error of the last handoff action the user pressed in the bar, when one failed.
+- Once the agent is not working and the read of what its branch holds has answered: the one-line verdict on the branch (`AgentHandoff.tsx`), followed, in the danger color, by the error of the last next-step [9] action the user pressed in the bar, when one failed.
 - Until that read has answered, a just-stopped agent keeps showing the counts it ended with: the summary swaps once, from the live counts to the branch verdict, instead of going blank for the beat the read takes.
 
 The bar's action slot:
 
-- Nothing at all while the agent has no id yet, which is the case right after Start until the daemon's list adopts the new agent.
-- While working: the checkboxes arming the handoff (`AgentHandoff.tsx`).
-- Once not working: the handoff's next step (push, open a pull request, merge) with the state of the branch read.
-
-### What the handoff is armed to do
-
-#### Context
-
-**Problem**: the agent writes its "handoff armed" event as its very first event, before the live event stream has attached, so a tab that opens on a running agent misses it. Read off the stream alone, an agent the launcher armed push-only would show as armed to open a pull request.
-
-#### Business logic
-
-The armed handoff [9] levels are folded from the agent's events, latest wins, and seeded from the agent's record when the caller passes it: the record's mirror of the armed push and pull-request levels. Without a record the defaults apply (push and pull request armed, merge not). An arming event in the stream still wins over the seed, since it is newer than any record snapshot. The folded state also carries the handoff's result once it has run: done (with the pull request's URL when there is one), skipped (with a reason), or failed (with the error).
+- Nothing while working.
+- Once not working: the next step [9] (open a pull request, or merge the one it has) with the state of the branch read (`AgentHandoff.tsx`).
 
 ### The disclosure
 
@@ -145,7 +132,7 @@ The armed handoff [9] levels are folded from the agent's events, latest wins, an
 The disclosure toggles open and closed from the bar. While open it shows, above the feed:
 
 - the details strip (`AgentDetails.tsx`) with the agent's session and spend facts, in every state;
-- while the agent is working: the changes in its checkout [7] (`AgentChanges.tsx`). The changes panel is only shown when the agent's id is known: a read without an id falls back to the project root and would report the user's own uncommitted files as the agent's. A relayed [14] agent's checkout lives on the device [13], and its changes are read there, so it is shown like a local agent's;
+- while the agent is working: the changes in its checkout [7] (`AgentChanges.tsx`). The changes panel is only shown when the agent's id is known: a read without an id falls back to the project root and would report the user's own uncommitted files as the agent's. A relayed [13] agent's checkout lives on the device [12], and its changes are read there, so it is shown like a local agent's;
 - once the agent is not working: the commits and files its branch holds (`AgentHandoff.tsx`).
 
 The changes panel also reports its counts to the bar's summary while the disclosure is closed.
@@ -164,15 +151,15 @@ Once the agent is no longer running, the project's list of kept checkouts is rea
 
 #### Context
 
-**User story**: the user started an agent [1] whose turns run on a GitHub Actions runner, in a cloud session [15], or on a device [13], and the feed does not look like a local agent's. The page says why.
+**User story**: the user started an agent [1] whose turns run on a GitHub Actions runner, in a cloud session [14], or on a device [12], and the feed does not look like a local agent's. The page says why.
 
 #### Business logic
 
-Where the agent runs is one of: this machine, a GitHub Actions runner, a device the agent is relayed [14] to, or a cloud session. Three notices sit between the disclosure and the feed, each shown only for its own case and absent otherwise:
+Where the agent runs is one of: this machine, a GitHub Actions runner, a device the agent is relayed [13] to, or a cloud session. Three notices sit between the disclosure and the feed, each shown only for its own case and absent otherwise:
 
 - a GitHub Actions agent replays its events in a burst at the end, so the feed looks stalled; the notice says the wait is expected and links to the live Actions run (`ActionsRunNotice.tsx`);
 - a cloud agent's work happens in a cloud session this machine cannot stream; the notice points at where it is instead of showing an empty feed (`CloudAgentNotice.tsx`), and a mirror row rides the tail of the feed where the story continues;
-- a relayed agent's notice only flags that the browser preview stays local, since its changes, handoff [9] and push relay to the device (`RemoteAgentNotice.tsx`).
+- a relayed agent's notice only flags that the browser preview stays local, since its changes and its next step [9] relay to the device (`RemoteAgentNotice.tsx`).
 
 ### The feed and the composer
 
@@ -184,5 +171,5 @@ See `## Context`.
 
 - The feed follows new output while the agent [1] is live as the feed knows it. A finished agent's feed is static: it does not follow, and it opens at its end, where the outcome, the final spend and the last changes are.
 - The health of the live event stream is passed to the feed, which shows a banner over the events when the stream is lost.
-- The composer [5] is told: whether the agent is live as the feed knows it; the driver session [11] id and the driver, read off the events, so it can offer to resume; the session name [10]; and, once the agent is finished, how it ended: cleanly, with an error, or by a stop [16], with the detail the end event carries. The composer uses the ending for its note and its resume offer.
-- When the composer starts another agent (a preset or a continuation), the page jumps to it. When the bar's menu deletes this agent, the page leaves for the project home [17].
+- The composer [5] is told: whether the agent is live as the feed knows it; and, once the agent is finished, how it ended: cleanly, with an error, by a stop [15], or waiting on a question, with the detail the end event carries. The composer uses the ending for its note and its resume offer.
+- When the composer's message continues this agent after it ended, the shell is told, and the page stays on the same agent as it goes on. When the bar's menu deletes this agent, the page leaves for the project home [16].

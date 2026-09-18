@@ -7,20 +7,20 @@ import { EventStream } from '../event-stream.js'
 import { startDashboard } from './server.js'
 import { testDashboardOptions } from '../dashboard-rpc/test-context.js'
 import { relayRpc } from './remote-run.js'
-import { createProjectRuntime, delay } from '../daemon-runtime.js'
+import { createProjectRuntime } from '../daemon-runtime.js'
 import { dispatchRelayRpc } from '../dashboard-rpc/relay-dispatch.js'
 import { forwardStream } from '../dashboard-rpc/stream-forward.js'
 import { projectId } from '../registry.js'
-import type { StartAgentKind, StartAgentOptions, StartAgentResult } from './types.js'
+import type { StartAgentOptions, StartAgentResult } from './types.js'
 import type { FrameworkEvent } from '../events.js'
 import type { HandoffResult } from './agent-handoff.js'
 
 // The real two-daemon proof for "run on a connected device" (#1067). Two HTTP servers stand up on
-// loopback: daemon A (the browser's local daemon, a real project runtime) relays an agent to daemon B
-// (the device, a dashboard whose Start is stubbed so no agent actually spawns). We assert the agent
-// is created on B, that A never touched its own busy guard, and that B's events stream back through
-// A's relayed-run source in order. That is the whole path minus the final same-origin RPC hop on A,
-// which relay.test.ts / server.test.ts cover on their own.
+// loopback: daemon A (the browser's local daemon, a real project runtime) relays a start to daemon B
+// (the device, a dashboard whose Start is stubbed so no run actually begins). We assert the run is
+// created on B, that A resolved no project and ran no hook of its own, and that B's events stream
+// back through A's relayed-run source in order. That is the whole path minus the final same-origin
+// RPC hop on A, which relay.test.ts / server.test.ts cover on their own.
 
 const TOKEN = 'zX2p8Q0hqk3m9tR7vN1cW4bY6sJ5aL0dFgHiKlMnOp'
 
@@ -41,18 +41,18 @@ async function collectUntil(stream: AsyncIterable<FrameworkEvent>, stopKind: str
       if ((e as { kind?: string }).kind === stopKind) return
     }
   })()
-  await Promise.race([loop, delay(timeoutMs)])
+  await Promise.race([loop, new Promise(resolve => setTimeout(resolve, timeoutMs))])
   return got
 }
 
 test('a run submitted with options.remote is created on the other daemon and its events stream back (#1067)', async () => {
   // Daemon B: the device. Its Start is stubbed to record the call and emit a short event stream,
   // so the relay path is exercised without spawning a real agent.
-  const bStarts: Array<{ prompt: string; kind: StartAgentKind; options: StartAgentOptions; projectId?: string }> = []
+  const bStarts: Array<{ prompt: string; options: StartAgentOptions; projectId?: string }> = []
   const bStreams = new Map<string, EventStream<FrameworkEvent>>()
   const B_RUN = 'remote-run-1'
-  const bStart = (prompt: string, kind: StartAgentKind, options: StartAgentOptions, pid?: string): StartAgentResult => {
-    bStarts.push({ prompt, kind, options, ...(pid ? { projectId: pid } : {}) })
+  const bStart = (prompt: string, options: StartAgentOptions, pid?: string): StartAgentResult => {
+    bStarts.push({ prompt, options, ...(pid ? { projectId: pid } : {}) })
     const stream = new EventStream<FrameworkEvent>()
     stream.push({ kind: 'log', message: 'hello from B' } as FrameworkEvent)
     stream.push({ kind: 'end', ok: true } as FrameworkEvent)
@@ -86,7 +86,7 @@ test('a run submitted with options.remote is created on the other daemon and its
   const homeIdA = projectId(resolve(cwdA))
 
   try {
-    const result = await runtimeA.onStart('build the thing', 'build', { remote: { url: deviceB.url, token: TOKEN, label: 'my-laptop' } })
+    const result = await runtimeA.onStart('build the thing', { remote: { url: deviceB.url, token: TOKEN, label: 'my-laptop' } })
 
     // The agent was created on B, and A returned B's own agent id (not a locally allocated one).
     assert.equal(result.ok, true)
@@ -95,9 +95,6 @@ test('a run submitted with options.remote is created on the other daemon and its
     assert.equal(bStarts[0]!.prompt, 'build the thing')
     assert.equal(bStarts[0]!.options.remote, undefined) // stripped before forwarding, no onward relay
     assert.equal(bStarts[0]!.projectId, undefined) // slice 1: the device's own home checkout
-
-    // A's own busy guard never fired: it allocated no worktree and spawned nothing.
-    assert.deepEqual(runtimeA.activeAgentSlots(homeIdA), [])
 
     // The relayed agent keeps a local list row on A (#1077), so a dashboard reload re-opens it instead of
     // losing it: a remote stub carrying B's agent id, the device label, and the prompt, running until the
@@ -129,9 +126,9 @@ test('a run submitted with options.remote is created on the other daemon and its
     const gitStatus = await relayRpc({ url: deviceB.url, token: TOKEN }, 'onGitStatus', [homeIdA, B_RUN])
     assert.equal(gitStatus, null)
 
-    // And a push runs ON the device: B_RUN is not a real session on B, so its sendPushBranch returns an
-    // ok:false HandoffResult - proof the push ran on B's side (its checkout, its remote) and came back.
-    const push = (await relayRpc({ url: deviceB.url, token: TOKEN }, 'sendPushBranch', [homeIdA, B_RUN])) as HandoffResult
+    // And a publish runs ON the device: B_RUN is not a real session on B, so its sendOpenPullRequest
+    // returns an ok:false HandoffResult - proof the call ran on B's side (its checkout, its remote) and came back.
+    const push = (await relayRpc({ url: deviceB.url, token: TOKEN }, 'sendOpenPullRequest', [homeIdA, B_RUN])) as HandoffResult
     assert.equal(push.ok, false)
   } finally {
     await runtimeA.dispose()

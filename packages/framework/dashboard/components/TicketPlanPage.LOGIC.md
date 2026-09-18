@@ -6,7 +6,7 @@ One ticket's plan, rendered as markdown: the `.plan.md` file sitting beside the 
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] agent view: one agent's page in the dashboard.
 [3] settled: said of an agent whose work has stopped and which is waiting for the user: it is alive, takes messages, and does nothing until told.
 [4] driver session: the coding agent's own conversation for one agent, which can be resumed by its session id.

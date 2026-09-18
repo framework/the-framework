@@ -7,13 +7,13 @@ This directory used to be a package of its own, `@gemstack/framework-dashboard`.
 now: the boundary bought a public export surface, a bundle-copying build step and a task graph to
 sequence it, for a dependency that only ever pointed one way.
 
-It is a **projection of the same files the daemon writes** — no daemon process, no
+It is a **projection of the files each agent's own tool writes** — no daemon process, no
 IPC:
 
 - **Reads** — `POST /_rpc/<name>` (`rpc/reads.ts`, `rpc/projects.ts`, …) for agent history, an agent's
   replay, and the surfaced PLAN/TODO docs.
 - **Live event stream** — Server-Sent Events at `GET /_rpc/events` (`rpc/events.ts`) tailing
-  the selected agent's `.the-framework/events.jsonl`; each new line becomes one SSE frame.
+  the selected agent's diary, `<id>.jsonl` in its checkout; each new line becomes one SSE frame.
 
 The `rpc/` modules are typed stubs: each is declared against the implementation's own signature in
 `../src/dashboard-rpc/`, so a renamed or re-shaped RPC is a type error here rather than a 404 in

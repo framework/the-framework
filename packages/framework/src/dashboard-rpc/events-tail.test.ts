@@ -213,3 +213,28 @@ test('tailAgentEvents stays put while the resolver has no better answer', async 
     await rm(cwd, { recursive: true, force: true })
   }
 })
+
+test('tailAgentEvents finds a diary it never saw at its first home: a short run, started and recorded between two polls (#1774)', async () => {
+  const cwd = await tmpWorkspace()
+  const checkout = join(cwd, 'checkout', 'diary.jsonl') // never exists: the run came and went
+  const recorded = join(cwd, 'recorded-diary.jsonl')
+  const seen: string[] = []
+  let sync = 0
+  const { existsSync } = await import('node:fs')
+  const stop = tailAgentEvents<FrameworkEvent>(
+    async () => (existsSync(recorded) ? recorded : checkout),
+    e => void (e.kind === 'log' && seen.push(e.message)),
+    () => sync++,
+  )
+  try {
+    await sleep(200)
+    assert.deepEqual(seen, [])
+    await writeFile(recorded, line('one') + line('two'))
+    await sleep(1600) // the poll backstop: nothing watches a directory that does not exist
+    assert.deepEqual(seen, ['one', 'two'])
+    assert.equal(sync, 1)
+  } finally {
+    stop()
+    await rm(cwd, { recursive: true, force: true })
+  }
+})

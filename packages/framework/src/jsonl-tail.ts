@@ -21,15 +21,15 @@ export class JsonlTailer<T> {
   ) {}
 
   /**
-   * Point the tailer at the journal's new home, keeping the read offset. For a log that is
-   * *relocated with its content intact* — an agent's `events.jsonl` is copied verbatim into the
-   * archive at teardown (and restored on a continuation) — the bytes already consumed are a
-   * prefix of the new file, so the next {@link pull} delivers exactly the lines the move would
-   * otherwise have swallowed, without replaying what was already delivered.
+   * Point the tailer at the log's new home, keeping the read offset. For a log that is
+   * *relocated with its content intact* — a run's diary is copied verbatim onto the data branch
+   * when the run ends and its checkout is reclaimed — the bytes already consumed are a prefix of
+   * the new file, so the next {@link pull} delivers exactly the lines the move would otherwise
+   * have swallowed, without replaying what was already delivered.
    *
    * The first pull after a retarget adopts the new home's mtime instead of running the
    * same-length-rewrite check: the copy is younger than the original by construction, and a
-   * fully-consumed journal would otherwise read as "rewritten to the same length" and replay
+   * fully-consumed log would otherwise read as "rewritten to the same length" and replay
    * every line it already delivered.
    */
   retarget(path: string): void {

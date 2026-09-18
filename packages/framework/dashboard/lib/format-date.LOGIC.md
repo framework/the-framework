@@ -9,7 +9,7 @@ Fixes how every moment and every span of time is worded in the dashboard: full d
 ## Glossary
 
 [1] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
-[2] agent: the unit of work: one task worked by a coding agent under The Framework's control, in its own checkout, on its own branch, streaming events, handed off when it ends.
+[2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [3] quota boundary: the share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
 
 ## Business logic — TL;DR

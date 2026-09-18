@@ -190,7 +190,7 @@ export function scrubMirrorText(text: string): string {
  * "Handed off: …", and this is what happens after — the bridge mirror streaming in place, with a
  * connecting placeholder so a web agent never shows dead air.
  *
- * Deliberately a single clearly-labelled box rather than ordinary log rows: `events.jsonl` is
+ * Deliberately a single clearly-labelled box rather than ordinary log rows: the run's diary is
  * durable provenance-clean data, the mirror is a best-effort tab scrape read through a browser
  * extension — no tool calls, no timings, nothing at all when the tab is closed — and one visible
  * boundary keeps the two from being confused. Renders nothing for any other target (or before the

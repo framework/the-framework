@@ -1,4 +1,4 @@
-Answers everything the dashboard reads about a project or an agent [1]: the agent history, one agent's replay, the project's surfaced documents, its tickets, the cross-project rollups the Overview [2] and the launcher show, the files of a checkout [3] with their git status, one file's diff or content, where an agent is working and what its handoff [4] left behind, the project's own `SYSTEM.md`, and the state of the Claude web bridge [5]. Every read is forgiving: an unknown project or a failing read answers the empty shape (an empty list, an empty map, nothing) rather than an error, and a read about an agent relayed [6] to a device [7] is answered by that device.
+Answers everything the dashboard reads about a project or an agent [1]: the agent history, one agent's replay, the project's surfaced documents, its tickets, the cross-project rollups the Overview [2] and the launcher show, the files of a checkout [3] with their git status, one file's diff or content, where an agent is working and what its handoff [4] left behind, and the state of the Claude web bridge [5]. Every read is forgiving: an unknown project or a failing read answers the empty shape (an empty list, an empty map, nothing) rather than an error, and a read about an agent relayed [6] to a device [7] is answered by that device.
 
 ## Context
 
@@ -8,7 +8,7 @@ Answers everything the dashboard reads about a project or an agent [1]: the agen
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. The Framework starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
 [2] the Overview: the dashboard's cross-project page at `/`. project home: a project's own page with the launcher (the Start form) and its composer. agent view: one agent's page.
 [3] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [4] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it).
@@ -17,17 +17,15 @@ Answers everything the dashboard reads about a project or an agent [1]: the agen
 [7] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 [8] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
 [9] run: only the `logs` skill's record of one agent on the `agent-data` branch: a card (what was asked, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said).
-[10] archive: the transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
 [11] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [12] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
 [13] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
 [14] retained checkout: the checkout of an agent that has ended and is still on disk, kept so the user can inspect what the agent left; nothing removes it on a timer.
-[15] event / event stream: everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface (dashboard, terminal, archive, run) is a projection of it.
+[15] event / diary: everything an agent does, one event per line of the agent's diary `<id>.jsonl`, which the tool that runs the agent keeps in the agent's checkout while it works and records on the `agent-data` branch when it ends.
 [16] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down. An item on it is a queue entry.
 [17] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds. The other is activity: an agent started or finished.
-[18] open question: a gate nobody has answered yet, as the dashboard lists them across projects.
-[19] gate: a question with options at which an agent stops and waits for an answer: it emits the question in its turn's final message, the dashboard shows it as a card, and the answer re-prompts the agent.
-[20] the built-in system prompt: the standing instructions every agent starts with (`prompts/system_prompt.md`); `SYSTEM.md` is the project's own instructions added on top.
+[18] open question: a question nobody has answered yet, as the dashboard lists them across projects.
+[19] gate: a question with options an agent's turn ended on: the agent ends waiting for the answer, the dashboard shows the question as a card, and the answer resumes the agent.
 [21] pick: the answer to a gate: the option or options chosen, by the user or automatically.
 [22] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 
@@ -36,7 +34,7 @@ Answers everything the dashboard reads about a project or an agent [1]: the agen
 - **Every read answers empty rather than failing** - an unknown project, an unknown agent, an unsafe id or a reader that throws all yield the read's own empty shape.
 - **The agent history** - a project's agents newest first, the live ones prepended to the recorded ones, one row per id with the live copy winning, and the agents relayed to devices merged in from the daemon's memory.
 - **What only the daemon knows about an agent** - a `web` agent whose cloud session is waiting on a human is marked waiting, and an agent another machine's daemon started is marked as from another host.
-- **An agent's replay** - the agent's recorded events, from its run on the `agent-data` branch or its archive; nothing when either is gone.
+- **An agent's replay** - the agent's events, from the diary in its checkout while it has one, else from its run on the `agent-data` branch; nothing when it is in neither.
 - **Retained checkouts** - the ids of ended agents whose checkout is still on disk, live agents excluded.
 - **Where an agent is working** - its checkout's path, whether that checkout is its own, its branch, whether it holds uncommitted changes, its size once nothing writes to it, and the pull request that belongs to this agent and not a predecessor's.
 - **Documents and tickets** - the surfaced documents at the project root, the project's tickets off the `agent-data` branch, one ticket's full text, the agent that wrote a ticket's plan, and when the tickets last caught up with GitHub.
@@ -45,7 +43,6 @@ Answers everything the dashboard reads about a project or an agent [1]: the agen
 - **One file's diff, one file's content, and what the agent changed** - the diff of a changed file, the content of an unchanged one, and every changed file with its line counts, always read from the checkout's own git state.
 - **The project's GitHub URL and git status** - the URL from the `origin` remote; the branch, dirty flag and linked pull request of the project or of one agent's checkout, filtered to that agent's lifetime.
 - **What an agent's handoff left behind** - read from the project's checkout against the agent's own branch, with uncommitted work counted only from the agent's own checkout.
-- **The project's own instructions** - the text of `SYSTEM.md`, so the prompt preview can show the whole system prompt.
 - **The bridge's state** - the question a cloud session is parked on, where the picked answer stands, what the session has said, whether anything reached the bridge and how, the bridge token while the bridge is on, and the bridge browser's state.
 - **Reads about a relayed agent go to the device** - the reads that are about one agent's checkout are answered by the device that runs the agent, and an unreachable device answers the read's empty shape.
 
@@ -69,7 +66,7 @@ A read about a project resolves the id through the registry and, when no project
 
 #### Business logic
 
-A project's agents are the live ones prepended to the recorded ones, newest first. The live agents are read from every checkout under `.branches/` and from the project root; the recorded ones are the project's runs [9] on the `agent-data` branch [11] plus the transient archive [10] (the store's reads, `store/`). There is one row per id, and where both a live and a recorded copy exist the live one wins, so a continued agent reads as running rather than as its archived first leg. The status is not filtered on: an agent the store has just self-healed to stopped keeps its row, so the list does not flicker. The agents this daemon relays [6] to devices exist only in the daemon's memory, so their in-memory records are merged in first and win an id tie, being the live authority; that is what lets a reload re-open a relayed agent instead of losing it. Every local row is annotated as described next.
+A project's agents are the live ones prepended to the recorded ones, newest first. The live agents are read from the card in every agent checkout under `.branches/`; the recorded ones are the project's runs [9] on the `agent-data` branch [11] (the store's reads, `store/`). There is one row per id, and where both a live and a recorded copy exist the live one wins, so a resumed agent reads as running rather than as its recorded first leg. The status is not filtered on: an agent that ended waiting on a question, its checkout kept, keeps its row. The agents this daemon relays [6] to devices exist only in the daemon's memory, so their in-memory records are merged in first and win an id tie, being the live authority; that is what lets a reload re-open a relayed agent instead of losing it. Every local row is annotated as described next.
 
 ### What only the daemon knows about an agent
 
@@ -89,7 +86,7 @@ An agent whose location [13] is `web`, which has a session id, and whose cloud s
 
 #### Business logic
 
-The replay is the agent's recorded events [15]: its run's [9] diary on the `agent-data` branch, turned back into events, else the transient archive's [10] event log; an unknown or unsafe id, or a project that is gone, answers an empty list. For a relayed agent the replay comes from the device.
+The replay is the agent's events [15]: the diary in its checkout while it has one, else its run's [9] diary on the `agent-data` branch, each line turned into the event it records; an unknown or unsafe id, or a project that is gone, answers an empty list. For a relayed agent the replay comes from the device.
 
 ### Retained checkouts
 
@@ -176,16 +173,6 @@ The GitHub URL is derived from the `origin` remote, nothing when there is no rem
 #### Business logic
 
 The project must be known, the id safe, and the agent found in the project's records, else nothing. The handoff [4] is read from the project's checkout against the agent's own branch (the branch it recorded, else `agent-<id>`), limited to what happened since the agent started (`dashboard/agent-handoff.ts`). Uncommitted work is the one thing the branch cannot answer, and it is counted only when the agent's checkout is a checkout of its own, never from the project's root.
-
-### The project's own instructions
-
-#### Context
-
-**User story**: the prompt preview claims to show the entire system prompt an agent starts with, which is the built-in system prompt [20] plus the project's `SYSTEM.md`.
-
-#### Business logic
-
-The answer is the trimmed text of `SYSTEM.md` at the project's root, or nothing when the project has none, the file is empty, or the project is unknown.
 
 ### The bridge's state
 

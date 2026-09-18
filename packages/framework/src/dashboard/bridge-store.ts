@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { continuationPrompt, takeoverPrompt } from '../turn-gate.js'
+import { continuationPrompt } from 'agent-driver'
 import type { BridgeEvent, BridgeHello, BridgeQuestion, BridgeSessionStatus } from './bridge-endpoints.js'
 import { CLOUD_SESSION_WINDOW_MS } from '../cloud-run-state.js'
 
@@ -62,6 +62,15 @@ export interface BridgeVersion {
   expected: string
   blocked: boolean
   at: string
+}
+
+/**
+ * What a cloud session is told when the user picks a `stop` option (#358, #1554). It lives on
+ * claude.ai where nothing of ours can end it, so the bridge types this instead of a continuation:
+ * the decision, and that the user is taking over from here.
+ */
+export function takeoverPrompt(question: string, answer: string): string {
+  return `You paused to ask: "${question}". The user chose: ${answer}. Stop here: the user is taking over and will come back with fresh instructions.`
 }
 
 /** How recently the extension must have spoken to count as present. */
@@ -220,7 +229,7 @@ export class BridgeQuestions {
     const picked = question.options.filter(option => labels.includes(option.label))
     if (picked.length !== labels.length || new Set(labels).size !== labels.length) return 'every label must be one of the question options'
     if (!question.multi && picked.length !== 1) return 'pick exactly one option'
-    // Worded as a local gate's answer is (await-gate.ts): the labels joined, `(none)` for an
+    // Worded as a local run's answer is (agent-driver's continuation prompt): the labels joined, `(none)` for an
     // empty multi-select, and a stopping pick hands the session over instead of continuing it.
     const answer = picked.length ? picked.map(option => option.label).join(', ') : '(none)'
     const text = picked.some(option => option.stop) ? takeoverPrompt(question.title, answer) : continuationPrompt(question.title, answer)

@@ -4,30 +4,13 @@ import type { ChoiceOption, FrameworkEvent } from '../events.js'
 import type { AgentMeta } from './agent-store.js'
 
 /**
- * The framework's run, in the `logs` skill's two shapes (#1769). The skill owns what a run's card
- * says to an agent — eleven plain fields, of which the framework fills ten: which ticket a run
- * worked is the agent's own doing now, not the framework's to know (#1774) — and four kinds of
- * diary line; everything else the framework records is its own. So the card carries the framework's remaining meta under the one
- * key the skill stores and never reads, `caller`, and the diary carries the framework's other
- * events as they are, among the four the skill knows. This module is the whole mapping, both
- * ways: the daemon writes through it at teardown, and every reader of an archived run — the run
- * page's replay, the tail of an ended run, a continuation's restore — comes back through it.
+ * A recorded run, read as the framework's own shapes (#1769). The `logs` skill owns what a run's
+ * card says (eleven plain fields) and four kinds of diary line; whoever wrote the run keeps the
+ * rest of what it knows under the one key the skill stores and never reads, `caller`, and writes
+ * its other lines as they are. This module is the reading half of that mapping: the card as the
+ * meta every list shows, the diary as the events the run page replays and tails. The framework
+ * records no run of its own (#1774), so there is no other half.
  */
-
-/** The framework's meta as the skill's card: the skill's fields on top, the rest under `caller`. */
-export function toRunCard(meta: AgentMeta): RunCard {
-  const { id, startedAt, endedAt, status, intent, driver, model, branch, pr, cost, ...caller } = meta
-  const card: RunCard = { id, startedAt, status }
-  if (endedAt !== undefined) card.endedAt = endedAt
-  if (intent !== undefined) card.intent = intent
-  if (driver !== undefined) card.driver = driver
-  if (model !== undefined) card.model = model
-  if (branch !== undefined) card.branch = branch
-  if (pr !== undefined) card.pr = pr
-  if (cost !== undefined) card.cost = cost
-  if (Object.keys(caller).length > 0) card.caller = caller
-  return card
-}
 
 /** The skill's card as the framework's meta: `caller` unfolded, the skill's fields winning. */
 export function fromRunCard(card: RunCard): AgentMeta {
@@ -36,35 +19,9 @@ export function fromRunCard(card: RunCard): AgentMeta {
 }
 
 /**
- * One framework event as one diary line: what the agent said, its result, the run's end and its
- * cost become the skill's four kinds; every other event is written as it is, under its own kind.
+ * One diary line as one framework event: what the agent said, its result, the run's end and its
+ * cost are the skill's four kinds; a line of any other kind is a framework event as written.
  */
-export function toDiaryLine(event: FrameworkEvent): AnyDiaryLine {
-  switch (event.kind) {
-    case 'driver': {
-      if (event.event.type === 'text') return { kind: 'said', text: event.event.text }
-      if (event.event.type === 'result') {
-        const { type: _type, ...rest } = event.event
-        return { kind: 'result', ...rest }
-      }
-      return event as unknown as AnyDiaryLine
-    }
-    case 'end':
-      return {
-        kind: 'ended',
-        status: event.ok ? 'done' : event.stopped ? 'stopped' : 'failed',
-        ...(event.detail !== undefined ? { detail: event.detail } : {}),
-      }
-    case 'usage': {
-      const { kind: _kind, costUsd, ...rest } = event
-      return { kind: 'cost', ...(costUsd !== undefined ? { usd: costUsd } : {}), ...rest }
-    }
-    default:
-      return event as unknown as AnyDiaryLine
-  }
-}
-
-/** The inverse of {@link toDiaryLine}: a line of any other kind is a framework event as written. */
 export function fromDiaryLine(line: AnyDiaryLine): FrameworkEvent {
   switch (line.kind) {
     case 'said':
@@ -113,11 +70,6 @@ export function fromDiaryLine(line: AnyDiaryLine): FrameworkEvent {
     default:
       return line as unknown as FrameworkEvent
   }
-}
-
-/** A run's events as its diary. */
-export function diaryOf(events: readonly FrameworkEvent[]): AnyDiaryLine[] {
-  return events.map(toDiaryLine)
 }
 
 /** A diary as the run's events, for a reader that replays them. */

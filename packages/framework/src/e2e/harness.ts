@@ -1,8 +1,10 @@
 // The world behind the backend E2E story tests (see README.md): the daemon's business logic wired
-// exactly as `runDaemon` wires it, against throwaway state, with runs spawned through
-// `fake-agent-bin.js` so the full production lifecycle executes offline.
+// exactly as `runDaemon` wires it, against throwaway state. Every fixture project's hooks file
+// names `fake-run-bin.js` as its start and resume lines, so a Start goes the whole production
+// way (the RPC, the hook, a detached run writing the files the dashboard reads) offline.
 import { mkdtempSync } from 'node:fs'
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { PROJECT_HOOKS_FILE } from '../project-hooks.js'
 import { execFile } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -12,19 +14,19 @@ import { setDashboardContext } from '../dashboard-rpc/context.js'
 import { createProjectRuntime, type ProjectRuntime } from '../daemon-runtime.js'
 import { registryPreferencesStore, projectId } from '../registry.js'
 import { registryDiscordCredentialsStore } from '../discord-credentials-store.js'
-import { resolveAgentEventsPath, type AgentMeta, type AgentStatus } from '../store/index.js'
+import { fromDiaryLine, resolveAgentEventsPath, type AgentMeta, type AgentStatus } from '../store/index.js'
+import type { AnyDiaryLine } from '@gemstack/skill-logs'
 import { withFileBranch, DATA_BRANCH } from '@gemstack/agent-data'
 import { worktreePath } from '@gemstack/skill-branches'
+import { runFiles } from '@gemstack/skill-logs'
 import { TICKETS_DIR } from '@gemstack/skill-tickets'
 import { QUEUE_FILE } from '@gemstack/skill-queue'
-import { withAgentLock } from '../agent-locks.js'
 import { tailAgentEvents } from '../dashboard-rpc/events-tail.js'
 import { sendAddProject } from '../dashboard-rpc/projects.js'
-import { sendStart } from '../dashboard-rpc/control.js'
+import { sendStart, sendStop } from '../dashboard-rpc/control.js'
 import { onAgents } from '../dashboard-rpc/reads.js'
 import type { FrameworkEvent } from '../events.js'
-import type { StartAgentKind, StartAgentOptions } from '../dashboard/types.js'
-import type { AgentSpec } from '../agent-spec.js'
+import type { StartAgentOptions } from '../dashboard/types.js'
 import type { QuotaView } from '../dashboard/quota.js'
 
 // Re-home the process-global config home FIRST: the registry, preferences, and daemon state all
@@ -59,7 +61,7 @@ export interface AgentTail {
 /**
  * Everything one story test stands up: the daemon runtime on a temp home, the dashboard context
  * the daemon would wire, and factories for registered projects. `close()` is the
- * whole teardown — it stops spawned agents the way daemon shutdown does, then removes the state.
+ * whole teardown — it stops the runs still working, then removes the state.
  */
 export interface StoryWorld {
   /** The daemon's home workspace (a plain temp dir, not a registered project). */
@@ -73,25 +75,31 @@ export interface StoryWorld {
    * is what keeps each story's calls addressing its own world rather than the last one's.
    */
   rpc<A extends unknown[], R>(fn: (...args: A) => R): (...args: A) => R
-  /** The session spec of every child this world spawned, one entry per spawn, oldest first. */
-  spawnedSpecs(): Promise<AgentSpec[]>
+  /** What every start and resume hook line of this world was handed in its environment, oldest first. */
+  hookCalls(): Promise<HookCall[]>
   /**
    * Create a real git repo (initial commit included) and register it through the same
    * `sendAddProject` RPC the dashboard's Add-project dialog calls.
    */
   addProject(files?: Record<string, string>): Promise<StoryProject>
   /** Start an agent through the same `sendStart` RPC the launcher calls; returns the agent id. */
-  startAgent(project: StoryProject, prompt: string, options?: StartAgentOptions, kind?: StartAgentKind): Promise<string>
+  startAgent(project: StoryProject, prompt: string, options?: StartAgentOptions): Promise<string>
   /** Poll `onAgents` until the agent reports one of `until`, failing after `timeoutMs`. */
   waitAgent(project: StoryProject, agentId: string, until: AgentStatus | AgentStatus[], timeoutMs?: number): Promise<AgentMeta>
   /**
-   * Wait until the daemon's teardown has retired the agent's worktree. An agent's meta flips to
-   * `done` before teardown archives the checkout, and acting on the session in that window
-   * (push, resume) races teardown's own git commits — the same window a user hits by clicking
-   * Push the instant a session finishes. The stories that act on a finished session wait here
-   * first, which is also the honest reading of "finished".
+   * Wait until the run's tool has reclaimed the run's checkout. A run's card says `done` before
+   * its tool records it and reclaims the checkout, and acting on the run in that window races
+   * the tool's own git commits. The stories that act on a finished run wait here first, which is
+   * also the honest reading of "finished".
    */
   waitRetired(project: StoryProject, agentId: string, timeoutMs?: number): Promise<void>
+  /**
+   * Wait until the run's tool has recorded the run on the data branch. A run's card says how it
+   * ended a moment before its record lands there, and for a run that keeps its checkout (one
+   * waiting on a question) that moment is the only window in which neither copy is readable — so
+   * a story that acts on such a run waits here rather than on the card alone.
+   */
+  waitRecorded(project: StoryProject, agentId: string, timeoutMs?: number): Promise<void>
   /** Follow an agent's event log live (replays what is already on disk first). */
   tailAgent(project: StoryProject, agentId: string): Promise<AgentTail>
   close(): Promise<void>
@@ -112,22 +120,21 @@ export async function waitFor<T>(
   }
 }
 
-/**
- * Set `FRAMEWORK_FAKE_AWAIT` for the Starts inside `fn`, so their fake agent's first turn parks
- * on that gate. Env-scoped rather than per-call because the spawned child reads it at boot; the
- * finally puts it back before the next story's Starts inherit it.
- */
-export async function withFakeAwait<T>(mode: 'choices' | 'multiselect' | 'confirmation', fn: () => Promise<T>): Promise<T> {
-  process.env.FRAMEWORK_FAKE_AWAIT = mode
-  try {
-    return await fn()
-  } finally {
-    delete process.env.FRAMEWORK_FAKE_AWAIT
-  }
+/** One start or resume hook line's environment, as `fake-run-bin.js` recorded it. */
+export interface HookCall {
+  hook: 'start' | 'resume'
+  id: string
+  prompt?: string
+  driver?: string
+  model?: string
+  text?: string
+  answer?: string
 }
 
-/** A minimal passing preflight: E2E runs never probe the real agent CLI (there is none here). */
-const agentReady = async () => ({ ok: true, checks: [] })
+/** Let a run whose prompt said "hold" go on to its first turn. */
+export async function release(project: StoryProject, agentId: string): Promise<void> {
+  await writeFile(join(worktreePath(project.cwd, agentId), '.the-framework', 'go'), '')
+}
 
 /**
  * Stand up one story world. The dashboard context mirrors `runDaemon`'s `startDashboard` wiring
@@ -136,15 +143,11 @@ const agentReady = async () => ({ ok: true, checks: [] })
  */
 export async function makeWorld(): Promise<StoryWorld> {
   const home = mkdtempSync(join(tmpdir(), 'framework-e2e-home-'))
-  const argvFile = join(home, 'spawned-argv.jsonl')
-  process.env.FRAMEWORK_E2E_ARGV_FILE = argvFile
+  const startsFile = join(home, 'hook-calls.jsonl')
+  process.env.FRAMEWORK_E2E_STARTS_FILE = startsFile
+  const fakeRun = fileURLToPath(new URL('./fake-run-bin.js', import.meta.url))
 
-  const runtime = createProjectRuntime({
-    cwd: home,
-    env: process.env,
-    binPath: fileURLToPath(new URL('./fake-agent-bin.js', import.meta.url)),
-    driverPreflight: agentReady,
-  })
+  const runtime = createProjectRuntime({ cwd: home, env: process.env })
 
   const quota = { view: { windows: [] } as QuotaView }
   const context = {
@@ -163,7 +166,7 @@ export async function makeWorld(): Promise<StoryWorld> {
 
   const repos: string[] = []
   const tails: AgentTail[] = []
-  const started: Array<{ cwd: string; agentId: string }> = []
+  const started: Array<{ project: StoryProject; agentId: string }> = []
 
   const rpc: StoryWorld['rpc'] = fn => {
     return (...args) => {
@@ -179,12 +182,12 @@ export async function makeWorld(): Promise<StoryWorld> {
     quota,
     rpc,
 
-    async spawnedSpecs() {
-      const raw = await readFile(argvFile, 'utf8').catch(() => '')
+    async hookCalls() {
+      const raw = await readFile(startsFile, 'utf8').catch(() => '')
       return raw
         .split('\n')
         .filter(line => line.trim())
-        .map(line => JSON.parse(line) as AgentSpec)
+        .map(line => JSON.parse(line) as HookCall)
     },
 
     async addProject(files = {}) {
@@ -221,14 +224,15 @@ export async function makeWorld(): Promise<StoryWorld> {
       await git(cwd, 'remote', 'add', 'origin', origin)
       const added = await rpc(sendAddProject)(cwd)
       if (!added.ok) throw new Error(`could not register the fixture repo: ${added.error}`)
+      // The project's own start and resume lines: this machine's file, under the ignored directory.
+      await writeFile(join(cwd, PROJECT_HOOKS_FILE), `start: node ${JSON.stringify(fakeRun)} start\nresume: node ${JSON.stringify(fakeRun)} resume\n`)
       return { id: projectId(resolve(cwd)), cwd }
     },
 
-    async startAgent(project, prompt, options = {}, kind: StartAgentKind = 'prompt') {
-      const result = await rpc(sendStart)(project.id, prompt, kind, options)
+    async startAgent(project, prompt, options = {}) {
+      const result = await rpc(sendStart)(project.id, prompt, options)
       if (!result.ok) throw new Error(`sendStart refused: ${result.error}`)
-      if (!result.agentId) throw new Error('sendStart returned no run id for a worktree project')
-      started.push({ cwd: project.cwd, agentId: result.agentId })
+      started.push({ project, agentId: result.agentId })
       return result.agentId
     },
 
@@ -255,14 +259,22 @@ export async function makeWorld(): Promise<StoryWorld> {
       )
     },
 
+    async waitRecorded(project, agentId, timeoutMs = 30_000) {
+      await waitFor(
+        async () => ((await runFiles(project.cwd, agentId).catch(() => undefined)) ? true : undefined),
+        `run ${agentId} to be recorded on the data branch`,
+        timeoutMs,
+      )
+    },
+
     async tailAgent(project, agentId) {
       const events: FrameworkEvent[] = []
-      // The relocating tail — the same seam the dashboard's onEvents rides: when teardown moves
-      // the journal into the archive, the tail re-resolves the agent's journal and carries its
-      // offset, so the feed keeps the final events even when their fs.watch signal was lost.
-      const stop = tailAgentEvents<FrameworkEvent>(
+      // The relocating tail — the same seam the dashboard's onEvents rides: when the run's tool
+      // records the run and reclaims the checkout, the tail re-resolves the diary and carries its
+      // offset, so the feed keeps the final lines even when their fs.watch signal was lost.
+      const stop = tailAgentEvents<AnyDiaryLine>(
         () => resolveAgentEventsPath(project.cwd, agentId),
-        event => events.push(event),
+        line => events.push(fromDiaryLine(line)),
       )
       const tail = { events, stop }
       tails.push(tail)
@@ -271,19 +283,18 @@ export async function makeWorld(): Promise<StoryWorld> {
 
     async close() {
       for (const tail of tails) tail.stop()
-      // Same order as daemon shutdown: stop the agents this world spawned, then the previews.
-      await runtime.stopAgents(2000).catch(() => 0)
-      // Teardowns fire off child-exit events and outlive the assertions — deleting the repos
-      // under a mid-flight archive-commit-retire kills its git ("cannot lock ref 'HEAD'") and
-      // litters the output with stranded-worktree warnings. Acquiring each agent's lock is the
-      // daemon's own way of waiting a teardown out.
-      await Promise.all(
-        started.map(({ cwd, agentId }) =>
-          withAgentLock(worktreePath(cwd, agentId), async () => {}),
-        ),
-      )
+      // A run is its own process and outlives the story: one still working is stopped the way
+      // the Stop button stops it, and waited out, so no git of its own runs under the `rm` below.
+      for (const { project, agentId } of started) {
+        await rpc(sendStop)(project.id, agentId)
+        await waitFor(
+          async () => ((await rpc(onAgents)(project.id)).find(agent => agent.id === agentId)?.status === 'running' ? undefined : true),
+          `run ${agentId} to end`,
+          10_000,
+        ).catch(() => {})
+      }
       await runtime.dispose().catch(() => {})
-      delete process.env.FRAMEWORK_E2E_ARGV_FILE
+      delete process.env.FRAMEWORK_E2E_STARTS_FILE
       await rm(home, { recursive: true, force: true }).catch(() => {})
       for (const repo of repos) await rm(repo, { recursive: true, force: true }).catch(() => {})
     },

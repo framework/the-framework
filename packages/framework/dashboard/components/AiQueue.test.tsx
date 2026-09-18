@@ -11,7 +11,8 @@ vi.mock('../lib/preferences.js', () => ({ usePreferences: () => prefs }))
 const start = vi.hoisted(() => vi.fn())
 let busy = false
 let startError: string | null = null
-vi.mock('../lib/use-start-agent.js', () => ({
+vi.mock('../lib/use-start-agent.js', async () => ({
+  ...(await vi.importActual<typeof import('../lib/use-start-agent.js')>('../lib/use-start-agent.js')),
   useStartAgent: () => ({ busy, error: startError, reset: () => {}, start }),
 }))
 
@@ -98,7 +99,8 @@ describe('AiQueue', () => {
     expect(screen.getAllByRole('button')).toHaveLength(4)
   })
 
-  test('the play button starts an unattended run on that one entry and selects it (#1191)', async () => {
+  test('the play button starts a run on that one entry, with the picked coding agent, and selects it (#1191)', async () => {
+    prefs = { driver: 'codex' }
     const started: unknown[][] = []
     const entry = '[Improve tooltip](tickets/2026-07-25_improve-tooltip.md) — agent note'
     render(
@@ -113,14 +115,12 @@ describe('AiQueue', () => {
     // The second row's button, so the prompt provably carries the clicked entry, not the first.
     fireEvent.click(screen.getAllByRole('button', { name: RUN_LABEL })[1]!)
     await waitFor(() => expect(start).toHaveBeenCalled())
-    const [projectId, prompt, kind, options] = start.mock.calls[0]!
+    const [projectId, prompt, options] = start.mock.calls[0]!
     expect(projectId).toBe('p1')
     // The raw line, not the pretty label: the agent must find exactly this entry to take it off the queue.
     expect(prompt).toBe(workOnEntryPrompt(entry))
     expect(prompt).toContain(entry)
-    expect(kind).toBe('prompt')
-    // Unattended (#1279): card-started queue work runs the way the drain sweep runs it.
-    expect(options).toMatchObject({ unattended: true })
+    expect(options).toEqual({ driver: 'codex' })
     await waitFor(() => expect(started).toHaveLength(1))
     expect(started[0]).toEqual(['p1', workOnEntryPrompt(entry), 'run-1'])
   })
@@ -193,7 +193,7 @@ describe('AiQueue', () => {
     }
   })
 
-  test('the fan-out button starts one unattended agent per top open entry, three by default', async () => {
+  test('the fan-out button starts one agent per top open entry, three by default', async () => {
     const started: unknown[][] = []
     // A done entry sits second, so "the top three" is provably the top three OPEN entries.
     render(
@@ -217,9 +217,7 @@ describe('AiQueue', () => {
     ])
     for (const call of start.mock.calls) {
       expect(call[0]).toBe('p1')
-      expect(call[2]).toBe('prompt')
-      // Unattended (#1279), exactly like the single play button: the batch is drain work.
-      expect(call[3]).toMatchObject({ unattended: true })
+      expect(call[2]).toEqual({})
     }
     // No navigation: a batch is a fan-out, and fan-outs land in the Agents card.
     expect(started).toHaveLength(0)

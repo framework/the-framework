@@ -11,22 +11,14 @@ Keeps the one file The Framework owns for the user, the registry [1] at `~/.the-
 [1] registry: `~/.the-framework.json`, the file that keeps the preferences [2] and also lists the projects.
 [2] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 [3] Settings: the settings page.
-[4] launcher: the Start form on a project's own page.
-[5] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
-[6] vanilla: an agent started without the built-in system prompt but with the signal protocols kept.
-[7] ready for merge: the signal an agent emits when it believes its work is complete: it flips the agent's badge from building to ready and authorizes the handoff.
-[8] transparent: an agent started with nothing of The Framework's — the raw coding agent.
-[9] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds. The other is activity: an agent started or finished.
-[10] the bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge token is the secret the extension presents; the bridge browser is the Chrome for Testing the daemon runs for it.
-[11] the Overview: the dashboard's cross-project page at `/`.
-[12] coding agent: the CLI doing the actual work: Claude Code or Codex.
-[13] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later. The user's driver choice is `claude` or `codex`.
-[14] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
-[15] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it).
-[16] spend offset: the user's adjustment of the quota boundary, in percentage points of the week.
-[17] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
-[18] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
-[19] quota boundary: the share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
+[4] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds. The other is activity: an agent started or finished.
+[5] the bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge token is the secret the extension presents; the bridge browser is the Chrome for Testing the daemon runs for it.
+[6] the Overview: the dashboard's cross-project page at `/`.
+[7] coding agent: the CLI doing the actual work: Claude Code or Codex.
+[8] spend offset: the user's adjustment of the quota boundary, in percentage points of the week.
+[9] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
+[10] unattended: said of an agent nobody is watching: one the scheduler started rather than a person. It is not answered any faster: a question it ends on waits for a human like any other.
+[11] quota boundary: the share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
 
 ## Business logic — TL;DR
 
@@ -35,7 +27,7 @@ Keeps the one file The Framework owns for the user, the registry [1] at `~/.the-
 - **Registering a project** - by normalized absolute path, once: a path already registered keeps its record and its registration time.
 - **Reading forgivingly** - a missing, unreadable or malformed file reads as an empty registry, and every value read is validated.
 - **The on/off preferences** - each kept only as a true or false, each with its own meaning when absent.
-- **The choice preferences** - the model, the driver, the editor, the theme, the location and the handoff level, each constrained to the values the dashboard offers.
+- **The choice preferences** - the model, the driver, the editor and the theme, each constrained to the values the dashboard offers.
 - **The number preference** - the spend offset, clamped to the slider's reach.
 - **The list preference** - the custom presets, trimmed, bounded and cleared when empty.
 - **Unknown keys are dropped, never migrated** - a key this version does not know is dropped on read and never written back.
@@ -90,39 +82,32 @@ A file that is missing, unreadable, not JSON, or whose top level is not an objec
 
 #### Context
 
-**User story**: the toggles on Settings [3] and on the launcher [4].
+**User story**: the toggles on Settings [3].
 
 #### Business logic
 
 Each of these keys of the preferences [2] is kept only when its value is a true or a false; anything else is dropped. Absent means the default given here:
 
-- `vanilla`: start agents [5] vanilla [6]; absent means off.
-- `onBeforeMergeableQuality`: after an agent signals ready for merge [7], give it one more turn to queue quality follow-ups; absent means off.
-- `browser`: give agents a real browser; absent means off.
-- `transparent`: start agents transparent [8]; absent means off.
 - `notifyBrowser`: notify in the browser; absent means on.
 - `notifyDiscord`: notify on Discord too; absent means off, because Discord reaches the user when no dashboard is open, and it also needs the webhook described below.
-- `notifyHumanIntervention`: the "needs you" category, an intervention [9]; absent means on, the baseline The Framework leans on.
+- `notifyHumanIntervention`: the "needs you" category, an intervention [4]; absent means on, the baseline The Framework leans on.
 - `notifyNewActivity`: the activity category, an agent started or finished; absent means off. The two categories compose with the two methods above: a notification is delivered by a method only when both its category and that method are on.
-- `autoPm`: let the daemon put an agent on a watched pull request whose checks fail, by itself, while there is quota left in the week; absent means off, because it spends the user's allowance without being asked.
-- `bridge`: switch the bridge [10] on; absent means off, because it opens the daemon's one route reachable from another origin.
+- `bridge`: switch the bridge [5] on; absent means off, because it opens the daemon's one route reachable from another origin.
 - `bridgeBrowser`: let the daemon run its own bridge browser; absent means off, because it downloads a browser and keeps a signed-in claude.ai session on disk. It only matters with `bridge` on.
-- `onboardingDismissed`: the Onboarding checklist on the Overview [11] has been dismissed; absent means show it, and dismissing hides it only there, the same checklist staying available on Settings.
+- `onboardingDismissed`: the Onboarding checklist on the Overview [6] has been dismissed; absent means show it, and dismissing hides it only there, the same checklist staying available on Settings.
 
 ### The choice preferences
 
 #### Context
 
-**Problem**: a value outside the set the dashboard offers must not reach the coding agent's [12] command line, where it would fail the turn on a word nobody chose.
+**Problem**: a value outside the set the dashboard offers must not reach the project's start hook, and through it the coding agent's [7] command line, where it would fail the agent on a word nobody chose.
 
 #### Business logic
 
-- `model`: the model agents run on, free text, trimmed; a blank value is dropped, and so is the word "Default" in any casing, which is a picker label and not a model. Absent means the driver's [13] own default.
-- `driver`: `claude` or `codex`; anything else is dropped. Absent means `claude`.
+- `model`: the model agents run on, free text, trimmed; a blank value is dropped, and so is the word "Default" in any casing, which is a picker label and not a model. It is handed to the project's start hook. Absent means the hook's own default.
+- `driver`: `claude-code` or `codex`; anything else is dropped, the old name `claude` included. Absent means the project's start hook decides.
 - `editor`: the command "Open in editor" runs (`code`, `cursor`, `zed`, ...), trimmed and cut to 100 characters; blank is dropped. Absent means the `FRAMEWORK_EDITOR` environment variable, then `code`.
 - `theme`: `system`, `light` or `dark`; anything else is dropped. Absent means `system`, following the operating system.
-- `target`: the location [14] `local`, `actions` or `web`; anything else is dropped. Absent means `local`.
-- `handoff`: the handoff [15] level `local`, `push`, `pr` or `merge`; anything else is dropped. Absent means `pr`, which is what makes the handoff zero-config: work never sits on a local branch nobody is told about.
 
 ### The number preference
 
@@ -132,7 +117,7 @@ Each of these keys of the preferences [2] is kept only when its value is a true 
 
 #### Business logic
 
-- `autoSpendOffset`, the spend offset [16]: a finite number, rounded to a whole number and clamped between -50 and 50 percentage points; anything else is dropped. Absent means about 7.1 points, a half day's share of the quota [17] week (100 divided by 14): unattended [18] work then starts a little ahead of the quota boundary [19] instead of exactly on it, where normal jitter would stop it. Negative holds unattended work back further; positive lets it borrow from the days still to come. It is an offset rather than an absolute percentage so the limit travels with the boundary as the week goes on.
+- `autoSpendOffset`, the spend offset [8]: a finite number, rounded to a whole number and clamped between -50 and 50 percentage points; anything else is dropped. Absent means about 7.1 points, a half day's share of the quota [9] week (100 divided by 14): unattended [10] work then starts a little ahead of the quota boundary [11] instead of exactly on it, where normal jitter would stop it. Negative holds unattended work back further; positive lets it borrow from the days still to come. It is an offset rather than an absolute percentage so the limit travels with the boundary as the week goes on.
 
 ### The list preference
 

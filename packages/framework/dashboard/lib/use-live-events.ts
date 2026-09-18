@@ -5,16 +5,16 @@ import { onEvents, type EventChannel } from '../rpc/events.js'
 import { currentAgentEvents } from './live-state.js'
 import { stampReceived } from './event-times.js'
 
-// The live agent feed (#405), shared. The dashboard is a projection of the selected project's
-// `.the-framework/events.jsonl`, streamed over Server-Sent Events that push one
-// `FrameworkEvent` per new line. Both the main event view and the right rail's choice gates
-// (#440) read this same stream, so the subscription lives here and each consumer owns one
+// The live agent feed (#405), shared. The dashboard is a projection of the selected run's diary,
+// the file the run's own tool writes as the agent works, streamed over Server-Sent Events that
+// push one `FrameworkEvent` per new line. Both the main event view and the right rail's choice
+// gates (#440) read this same stream, so the subscription lives here and each consumer owns one
 // channel rather than opening a second.
 //
-// The feed is per RUN, not per project (#749): each agent tails its own worktree's log since #736,
-// so the selected agent id picks the log to follow. Changing it resubscribes, which is what makes
-// selecting agent A vs agent B show different output. Omitted (the relay, or a Start whose id has not
-// been adopted yet) falls back to the project root.
+// The feed is per RUN, not per project (#749): each run has a diary of its own, so the selected
+// run's id picks the file to follow. Changing it resubscribes, which is what makes selecting run A
+// vs run B show different output. Without an id there is nothing to follow and the server closes
+// the channel at once.
 
 /** The live feed plus whether its channel is currently down (#948). */
 export interface LiveEvents {
@@ -45,12 +45,11 @@ export function useLiveEvents(projectId: string | null, agentId?: string | null,
   const [lost, setLost] = useState(false)
   const [done, setDone] = useState(false)
 
-  // Drop the accumulated feed at an agent boundary the caller knows about (a fresh Start bumps
-  // `resetKey`), WITHOUT tearing down the subscription. The new agent truncates events.jsonl a
-  // beat later, so until its first line streams the buffer would otherwise still hold the
-  // finished run — which the jump-to-live view (#705) would show. Clearing here means the pane
-  // waits empty for the new agent instead. The live tail then re-reads the truncated file on its
-  // own (JsonlTailer rewrite detection) and streams the new agent in.
+  // Drop the accumulated feed at a run boundary the caller knows about (a fresh Start bumps
+  // `resetKey`), WITHOUT tearing down the subscription. The new run's diary appears a beat later,
+  // so until its first line streams the buffer would otherwise still hold the finished run —
+  // which the jump-to-live view (#705) would show. Clearing here means the pane waits empty for
+  // the new run instead, and the live tail streams it in as soon as its diary exists.
   useEffect(() => {
     setEvents([])
   }, [resetKey])

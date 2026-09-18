@@ -1,89 +1,64 @@
 import { useEffect, useRef, useState } from 'react'
 import { Loader2, Play, Square } from 'lucide-react'
-import { driverFromImpl } from '../../src/client.js'
 import { Composer, type ComposerHandle } from './Composer.js'
 import { sendMessage, sendStop } from '../rpc/control.js'
 import { useAction } from '../lib/use-action.js'
-import { useStartAgent } from '../lib/use-start-agent.js'
 import type { AgentOutcome } from '../lib/live-state.js'
 import { Button } from './ui/button.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 
 /**
- * What a Resume press asks the agent to do (#1391). The resumed agent has its whole conversation
+ * What a Resume press says to the agent (#1391). The resumed agent has its whole conversation
  * back — the only thing it is missing is why it stopped, and "the user pressed Stop" must not
- * read as "the work was done". The wording mirrors the daemon's own RESUME_PROMPT (#923), minus
- * the restart framing that does not apply here.
+ * read as "the work was done".
  */
 export const RESUME_MESSAGE =
-  'This session was stopped before it finished, not because the work was done. Look at what you had already done, then carry on from there. ' +
-  'The session lifecycle still applies: once the work is genuinely finished with nothing left to do, call setReadyForMerge() — without it the finished work is never merged.'
+  'This session was stopped before it finished, not because the work was done. Look at what you had already done, then carry on from there.'
 
 // One composer for a session, live or finished (#1026).
 //
-// There used to be two: AgentChat while the agent was running, AgentResumeChat once it ended. They
-// looked identical and differed only in what submit did, but the session view swapped one for the
-// other the moment an agent stopped — so the editor remounted under the user, taking any half-typed
-// message with it, and for an agent that never reported a session id the composer vanished entirely
-// and left a dead end.
+// A send is always the same call, `sendMessage`: the person's words, the next prompt of the same
+// conversation (#1774). What happens to them is the daemon's side of it: a run that is working
+// takes them from its inbox when its turn ends, and an ended run is continued with them through
+// the project's resume hook — the same run, the same row, the same branch. The composer never
+// remounts when the agent ends, so a half-typed message survives it.
 //
-// So the composer stays; the send changes:
-//   - running          → a `message` control entry the agent drains between turns (#714)
-//   - ended, resumable → a fresh agent seeded with `--resume <sessionId>`, continuing this agent (#720)
-//   - ended, no id     → a new session carrying the text, which is all that is left to offer
-// A new-session preset (#959) always starts its own agent, in every one of those states.
-//
-// The empty box's submit slot is the session's control (#1455): Stop while the agent is live (the
-// pause that used to hide in the ⋮ menu), Resume once it was stopped (the offer that used to sit
-// in the action bar, #1391). Typing swaps the slot back to the send ↑ — one slot, three states,
+// The empty box's submit slot is the session's control (#1455): Stop while the agent is live,
+// Resume once it was stopped. Typing swaps the slot back to the send ↑ — one slot, three states,
 // like Claude Code's composer.
 export function AgentComposer({
   projectId,
-  agentId: agentId,
+  agentId,
   live,
-  sessionId,
-  driver,
   files,
-  addContext,
-  removeContext,
-  sessionName,
   onAgentStarted,
   outcome,
 }: {
   projectId: string
-  /** Which run this addresses (#749); absent falls back to the project's control log. */
-  agentId?: string | null | undefined
-  /** Whether the agent is still running — the only thing that changes what a send does. */
+  /** Which run this addresses (#749). */
+  agentId: string
+  /** Whether the agent is still running: what a send does is the same call, the note differs. */
   live: boolean
-  /** The agent session id, once reported: what a finished agent resumes from. */
-  sessionId?: string | undefined
-  /** The driver that ran it, so a continuation resumes on the same agent (#831). */
-  driver?: string | undefined
   files: string[]
-  addContext: (path: string) => void
-  /** Drop a path from the agent Context when its chip leaves the editor (#948). */
-  removeContext?: ((path: string) => void) | undefined
-  /** This session's name (#874), so a preset launched here targets it by default. */
-  sessionName?: string | undefined
-  onAgentStarted?: ((intent: string, agentId?: string) => void) | undefined
+  /** An ended run was continued: the shell follows the same run as it goes live again. */
+  onAgentStarted?: ((intent: string, agentId: string) => void) | undefined
   /** How the agent ended (#948), so the note does not call a crash "ended". */
   outcome?: AgentOutcome | undefined
 }) {
   const composerRef = useRef<ComposerHandle>(null)
   const { busy, error, run } = useAction()
-  const { busy: starting, error: startError, start } = useStartAgent()
   // The slot's Stop (#1455), its own action so a message send's busy beat cannot read as
   // "stopping". A landed Stop stays "Stopping…" until the end event flips `live`, so it cannot
-  // be re-fired — the same latch the ⋮ menu's Stop keeps. Released the moment `live` drops, not
-  // only on an agent switch: a Resume continues the SAME agent (#762), so a latch keyed to the agent id
-  // alone re-engaged on the resumed session and froze its Stop as a disabled spinner.
+  // be re-fired. Released the moment `live` drops, not only on an agent switch: a Resume continues
+  // the SAME agent (#762), so a latch keyed to the agent id alone re-engaged on the resumed
+  // session and froze its Stop as a disabled spinner.
   const { busy: stopBusy, error: stopError, run: runStop } = useAction()
   const [stopRequested, setStopRequested] = useState(false)
   useEffect(() => setStopRequested(false), [agentId])
   useEffect(() => {
     if (!live) setStopRequested(false)
   }, [live])
-  // The mirror latch for Resume (#1460): between the resume RPC resolving and the resumed leg's
+  // The mirror latch for Resume (#1460): between the resume resolving and the resumed leg's
   // first event flipping `live`, `outcome` momentarily stops reading `stopped` — without this the
   // slot flickered Resume → collapsed → Stop. Released when the agent reads live (the normal exit)
   // or when the row changes under the composer.
@@ -93,8 +68,8 @@ export function AgentComposer({
     if (live) setResuming(false)
   }, [live])
   const stopping = stopBusy || (stopRequested && live)
-  // The last message that went through: a queued control entry is invisible until the agent
-  // drains it between turns, so without this the send looked like nothing happened (#948).
+  // The last message that went through: a line in the inbox is invisible until the agent takes
+  // it when its turn ends, so without this the send looked like nothing happened (#948).
   // Reset like the latches above: the note is about THIS agent's live session, so it must not
   // survive an agent switch or outlive the session it was queued into.
   const [queued, setQueued] = useState<string | null>(null)
@@ -102,88 +77,40 @@ export function AgentComposer({
   useEffect(() => {
     if (!live) setQueued(null)
   }, [live])
-  const resumable = !live && sessionId !== undefined
 
-  const send = async (text: string, _kind: 'build' | 'prompt', opts: { newAgent: boolean }): Promise<void> => {
-    if (busy || starting) return
-    // A new-session preset is not a continuation (#959): it drops the resume seed and the agent id,
-    // so it opens its own agent with its own worktree, branch and transcript.
-    if (opts.newAgent || (!live && !resumable)) {
-      const started = await start(projectId, text, 'prompt', {})
-      if (started) {
-        composerRef.current?.clear()
-        onAgentStarted?.(text, started.agentId)
-      }
-      composerRef.current?.focus()
-      return
-    }
-    if (live) {
-      const outcome = await run(
-        () => sendMessage(projectId, text, agentId ?? undefined),
-        'Could not send — the agent may have just ended. Your text is kept, try again.',
-      )
-      if (outcome.ok) {
-        setQueued(text)
-        composerRef.current?.clear()
-      }
-      composerRef.current?.focus()
-      return
-    }
-    // A continuation is a `prompt` run seeded with the finished agent's session id (#720). It
-    // resumes on the agent's own agent; the model and the system-prompt options are moot here, since
-    // the resumed transcript keeps the framing and model it already had.
-    // The session records the implementation that ran it; the option takes the driver name (#831).
-    const picked = driverFromImpl(driver)
-    const result = await start(
-      projectId,
-      text,
-      'prompt',
-      {
-        resumeSession: sessionId as string,
-        // Continue this agent rather than opening a new row (#762): the follow-up writes into the
-        // same agent, on the same branch, so one thing you asked for stays one entry.
-        ...(agentId ? { continueAgentId: agentId } : {}),
-        ...(picked && picked !== 'claude' ? { driver: picked } : {}),
-      },
-      'Failed to continue the agent.',
+  /** Say `text` to the run. Resolves whether it went through; a refusal's words are shown. */
+  const say = async (text: string): Promise<boolean> => {
+    const wasLive = live
+    const outcome = await run(
+      () => sendMessage(projectId, text, agentId),
+      'Could not send. Your text is kept, try again.',
     )
-    if (result) {
-      composerRef.current?.clear()
-      onAgentStarted?.(text, result.agentId) // select the run we just started (#761)
-    }
+    if (!outcome.ok) return false
+    if (wasLive) setQueued(text)
+    // An ended run goes live again under the same id: tell the shell, which keeps its feed (#762).
+    else onAgentStarted?.(text, agentId)
+    return true
+  }
+
+  const send = async (text: string): Promise<void> => {
+    if (busy) return
+    if (await say(text)) composerRef.current?.clear()
+    composerRef.current?.focus()
   }
 
   const stopSession = () =>
-    void runStop(() => sendStop(projectId, agentId ?? undefined).then(() => true), 'Could not stop the agent.').then(result => {
+    void runStop(() => sendStop(projectId, agentId).then(() => true), 'Could not stop the agent.').then(result => {
       if (result) setStopRequested(true)
     })
 
-  // The action-bar ResumeButton's continuation (#1391), moved into the slot: the same `prompt`
-  // run seeded with the session id — same row, same branch, same agent conversation — carrying
-  // the stock RESUME_MESSAGE instead of typed text.
+  // The slot's Resume (#1391): the stock RESUME_MESSAGE instead of typed text.
   const resume = async () => {
-    if (starting || !sessionId) return
-    const picked = driverFromImpl(driver)
-    const result = await start(
-      projectId,
-      RESUME_MESSAGE,
-      'prompt',
-      {
-        resumeSession: sessionId,
-        ...(agentId ? { continueAgentId: agentId } : {}),
-        ...(picked && picked !== 'claude' ? { driver: picked } : {}),
-      },
-      'Failed to resume the agent.',
-    )
-    if (result) {
-      setResuming(true)
-      onAgentStarted?.(RESUME_MESSAGE, result.agentId)
-    }
+    if (busy) return
+    if (await say(RESUME_MESSAGE)) setResuming(true)
   }
 
-  // The empty box's slot control (#1455): Stop while live, Resume once stopped-with-an-id (#1322:
-  // without a session id there is nothing any agent could resume). Ended any other way, the slot
-  // keeps the launcher's collapse-when-empty.
+  // The empty box's slot control (#1455): Stop while live, Resume once stopped. Ended any other
+  // way, the slot keeps the launcher's collapse-when-empty.
   const idleControl = live ? (
     <Tooltip>
       <TooltipTrigger
@@ -202,7 +129,7 @@ export function AgentComposer({
       </TooltipTrigger>
       <TooltipContent>{stopping ? 'Stopping…' : 'Stop agent'}</TooltipContent>
     </Tooltip>
-  ) : resumable && (outcome?.stopped || resuming) ? (
+  ) : outcome?.stopped || resuming ? (
     <Tooltip>
       <TooltipTrigger
         render={
@@ -210,70 +137,52 @@ export function AgentComposer({
             type="button"
             size="icon-sm"
             onClick={() => void resume()}
-            disabled={starting || resuming}
+            disabled={busy || resuming}
             aria-label="Resume"
             className="h-8 w-8 shrink-0 disabled:opacity-100"
           />
         }
       >
-        {starting || resuming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-3.5 w-3.5 fill-current" />}
+        {busy || resuming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-3.5 w-3.5 fill-current" />}
       </TooltipTrigger>
-      <TooltipContent>{starting || resuming ? 'Resuming…' : 'Resume the agent'}</TooltipContent>
+      <TooltipContent>{busy || resuming ? 'Resuming…' : 'Resume the agent'}</TooltipContent>
     </Tooltip>
   ) : undefined
 
-  const surfacedError = error ?? startError ?? stopError
+  const surfacedError = error ?? stopError
 
   return (
     <div className="p-2">
-      <Note live={live} resumable={resumable} outcome={outcome} queued={queued} muted={Boolean(surfacedError)} />
+      <Note live={live} outcome={outcome} queued={queued} muted={Boolean(surfacedError)} />
       {surfacedError && <p role="alert" className="mb-1 px-2 text-xs text-danger">{surfacedError}</p>}
       <Composer
         ref={composerRef}
         files={files}
-        addContext={addContext}
-        removeContext={removeContext}
         onSubmit={send}
-        busy={busy || starting}
+        busy={busy}
         submitLabel="Send"
-        submitBusyLabel={live ? 'Sending…' : resumable ? 'Resuming…' : 'Starting…'}
+        submitBusyLabel={live ? 'Sending…' : 'Resuming…'}
         showDriverModel={false}
         inAgent
-        // Ended → the next message starts a new leg, whose options the gear can shape (#1172);
-        // live → nothing is adjustable and the gear is dropped rather than opening empty.
-        agentEnded={!live}
-        sessionName={sessionName}
         idleControl={idleControl}
         placeholder={
           live
-            ? 'Message the agent…  ( / commands · < tags · @ projects · # files )'
-            : resumable
-              ? 'Message the agent to continue it…  ( / commands · < tags · @ projects · # files )'
-              : // Not a continuation at all, so the box says so itself rather than a note above it
-                // saying one thing and the box below inviting another (see {@link Note}).
-                NOT_CONTINUABLE
+            ? 'Message the agent…  ( / commands · @ projects · # files )'
+            : 'Message the agent to continue it…  ( / commands · @ projects · # files )'
         }
       />
     </div>
   )
 }
 
-/** An agent that ended before reporting a session id cannot be resumed by any agent — the one state
- *  where the box is not a continuation. It is the composer's own placeholder rather than a note
- *  above it: the message is about what typing here does, so it belongs where you type. */
-const NOT_CONTINUABLE =
-  'This agent can’t be continued — it ended before reporting a session id. Your next message starts a new one.'
-
-/** What a send will do from here, in one line — it is not the same thing in all three states. */
+/** What a send will do from here, in one line — it is not the same thing live and ended. */
 function Note({
   live,
-  resumable,
   outcome,
   queued,
   muted,
 }: {
   live: boolean
-  resumable: boolean
   outcome: AgentOutcome | undefined
   queued: string | null
   muted: boolean
@@ -282,15 +191,13 @@ function Note({
     if (!queued || muted) return null
     return (
       <p role="status" className="mb-1 truncate px-2 text-xs text-muted-foreground">
-        Queued — the session reads it between turns: &ldquo;{queued}&rdquo;
+        Queued — the session reads it when its turn ends: &ldquo;{queued}&rdquo;
       </p>
     )
   }
-  // The one case that is not a continuation says so in the composer's placeholder (NOT_CONTINUABLE),
-  // so it is not also said here.
-  if (!resumable) return null
-  const text =
-    outcome && !outcome.ok && !outcome.stopped
+  const text = outcome?.waiting
+    ? 'The agent asked a question — answer it above, or your next message continues the session.'
+    : outcome && !outcome.ok && !outcome.stopped
       ? 'Session failed — your next message resumes it where it stopped.'
       : outcome?.stopped
         ? 'Session stopped — your next message resumes it.'

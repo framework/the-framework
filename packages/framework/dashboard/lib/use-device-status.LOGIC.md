@@ -9,7 +9,7 @@ Keeps the saved devices' [1] online or offline state current, so the device list
 ## Glossary
 
 [1] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
-[2] agent: the unit of work: one task worked by a coding agent under The Framework's control, in its own checkout, on its own branch, streaming events, handed off when it ends.
+[2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 
 ## Business logic — TL;DR
 

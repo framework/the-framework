@@ -1,32 +1,27 @@
-Decides what becomes of an agent's [1] work once the agent has ended, its handoff [2]: reads what the agent left on its branch (commits, changed files, whether the branch is pushed or merged, which pull request is the agent's, and what it left uncommitted in its checkout [3]), runs the automatic handoff the agent was armed for — push the branch, open a pull request, merge it — with every reason a step is skipped or a merge withheld, and backs the "Open PR" and "Merge" buttons on a finished agent's page. Nothing here commits on the agent's behalf, and every read is forgiving: a project that is not a git repository, has no remote or has no `gh` yields a handoff with less in it, never an error.
+Decides what becomes of an agent's [1] work once the agent has ended, its handoff [2]: reads what the agent left on its branch (commits, changed files, whether the branch is pushed or merged, which pull request is the agent's, and what it left uncommitted in its checkout [3]), and backs the "Open PR" and "Merge" buttons on a finished agent's page. It publishes nothing on its own: an agent publishes its own work, and the automatic handoff the daemon's former run process ran when an agent ended is gone with that process. Nothing here commits on the agent's behalf, and every read is forgiving: a project that is not a git repository, has no remote or has no `gh` yields a handoff with less in it, never an error.
 
 ## Context
 
 **User story**:
-- The user starts an agent [1] and walks away. When the agent ends, its branch is on the remote and a draft pull request is waiting, unless the user chose a lower handoff [2] level when starting it or unticked the push or the pull request in the agent's action bar. With the handoff level at `merge`, the pull request opens ready for review and lands once its checks pass, provided the agent declared its work ready for merge [4].
-- On a finished agent's page the user sees what the agent produced — its commits, the files it changed, the files it left uncommitted — and pushes the branch, opens the pull request ("Open PR") or merges it ("Merge") with one press. The user is never handed an empty pull request, a second pull request for the same branch, or a pull request made only of The Framework's own bookkeeping.
+- The user starts an agent [1] and walks away. The agent publishes its own work: it pushes its branch and opens its pull request itself. Nothing here does it for the agent.
+- On a finished agent's page the user sees what the agent produced — its commits, the files it changed, the files it left uncommitted — and opens the pull request ("Open PR") or merges it ("Merge") with one press. The user is never handed an empty pull request, a second pull request for the same branch, or a pull request made only of The Framework's own bookkeeping.
 
-**Business logic story**: the agent's own process runs the automatic handoff when the agent ends, after the agent's quality step (the built-in on-before-mergeable prompt, so what that step committed is published too) and before the event stream [5] is archived (so the outcome reaches the dashboard's history) — the sequencing lives in `../cli.ts`. The dashboard's buttons run the manual actions on a finished agent (`../dashboard-rpc/control.ts`). The CI watch [6] resolves and merges an agent's pull request with the rules here (`../ci-watch.ts`); cloud work adoption [7] opens the pull request for a branch that exists only on the remote (`../cloud-work.ts`); the intervention [8] feed reads a branch's state to list unpushed work (`interventions.ts`). Every pull request read, creation and merge goes through GitHub's `gh` command by the rules in `gh.ts`.
+**Business logic story**: the dashboard's buttons run the manual actions on a finished agent (`../dashboard-rpc/control.ts`); cloud work adoption [7] opens the pull request for a branch that exists only on the remote (`../cloud-work.ts`); the intervention [8] feed reads a branch's state to list unpushed work (`interventions.ts`). Every pull request read, creation and merge goes through GitHub's `gh` command by the rules in `gh.ts`.
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it). "Handoff level" is a rung of that ladder.
 [3] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [4] ready for merge: the signal an agent emits when it believes its work is complete: it flips the agent's badge from building to ready and authorizes the handoff.
-[5] event stream: everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface (dashboard, terminal, archive, run) is a projection of it.
-[6] CI watch: the sweep that merges the pull requests The Framework opened once their checks pass, and starts a fix agent when a check goes red.
+[5] event stream: everything an agent does, one event per line of the agent's diary — the file `<id>.jsonl` the tool that runs the agent writes under `.the-framework/` in the agent's checkout, copied onto the `agent-data` branch when the agent ends. Every surface (dashboard, terminal, replay) is a projection of it.
 [7] cloud anchor: an empty commit a web agent pushes before its task leaves this machine, unique to the agent: the branch the cloud session later pushes descends from it, which is how the daemon recognises that branch as the agent's (cloud work adoption).
 [8] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds.
 [9] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
 [10] hands-off: said of an agent whose work leaves this machine, so its first prompt is the whole agent: an agent whose location is `web`.
-[11] archive: the transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
 [12] run: only the `logs` skill's record of one agent on the `agent-data` branch: a card (what was asked, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said).
 [13] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
-[14] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down.
-[15] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
-[16] stop: ending an agent before it finishes: the Stop button, Ctrl-C, or a pick marked to stop.
-[17] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later. The driver implementations are `claude-code`, `codex`, `github-actions`, `claude-web` and `fake`.
+[15] unattended: said of an agent nobody is watching: one the scheduler started rather than a person. It is not answered any faster: a question it ends on waits for a human like any other.
 [18] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
 [19] turn signals: what The Framework reads off a turn's final message: the ready-for-merge signal, the pull request title and body, markdown views, reported errors, and the gate it stops at.
 
@@ -38,17 +33,13 @@ Decides what becomes of an agent's [1] work once the agent has ended, its handof
 - **Uncommitted work is named, never committed** - what the agent left uncommitted in its checkout is listed by path, absent when nobody asked, and nothing commits it on the agent's behalf.
 - **Which pull request is the agent's** - out of the branch's whole pull request history: an open one always, a closed one only when created after the agent started; the first for identity, the latest for handoff decisions.
 - **The pull request the agent recorded** - the number the agent wrote down is the fact; its state is read live, and when nothing live is known the record stands on its own.
-- **What an agent is armed for** - the push and the pull request start armed; the merge is armed only by the agent's configuration, never by a checkbox.
-- **Configuration arms the merge, the agent authorizes it** - an armed merge is withheld unless the agent declared ready for merge and its own TODO file has no open entries; withheld means a draft pull request, not a failed handoff.
-- **The automatic handoff when an agent ends** - reads the branch with a pull request lookup that waits for a real answer, then skips for a named reason (not armed, branch gone, no commits, no remote, already open, already landed, already pushed) or pushes and opens the pull request, as a draft unless the merge is armed.
-- **The merge half of the automatic handoff** - runs only after the pull request half succeeded and never lands a pull request before its checks: GitHub's auto-merge, else a direct merge only on green, else the CI watch; a merge that fails never fails the handoff.
 - **Opening a pull request for a branch** - push first, the base named as GitHub wants it, draft or ready for review, the URL and number read off what `gh` prints, and the cached "no pull request" forgotten.
 - **The "Open PR" button** - the agent's existing pull request first, even for a gone branch, unless the agent moved past it; a gone branch and an empty branch are refused with a reason; otherwise a pull request ready for review.
 - **A pull request for a branch only the remote has** - a cloud session's own branch gets a draft pull request with nothing pushed and `gh`'s default base.
 - **The "Merge" button on a finished agent** - refused when the agent has no pull request or it is no longer open; otherwise merged, a draft marked ready on the way, directly where GitHub cannot arm auto-merge.
 - **The pull request's title** - the agent's own title, else its session name, else "Session <agent id>", with an issue reference as "(fix #42)" when the caller names one; never the prompt.
 - **The pull request's body** - the agent's own description, else what was asked for, then which agent did it.
-- **What a handoff reports** - a button answers with success (and the pull request's URL and number) or one error line; the automatic handoff answers skipped with its reason, done, or failed at the push or the pull request step, and the number rides along so it gets recorded on the agent.
+- **What a handoff reports** - a button answers with success (and the pull request's URL and number) or one error line, and the number rides along so it gets recorded on the agent.
 
 ## Business logic
 
@@ -85,11 +76,11 @@ The branch is the one recorded on the agent's [1] record while it ran. An agent 
 
 #### Context
 
-**Problem**: an agent [1] that changed nothing is a real outcome, and must be said as such rather than shown as an empty branch with buttons that would push nothing. And every agent's branch carries The Framework's own paper trail under `.the-framework/` — the event stream [5] and the archive [11] — committed for provenance, never as publishable work; publishing that alone would open pull requests of pure bookkeeping.
+**Problem**: an agent [1] that changed nothing is a real outcome, and must be said as such rather than shown as an empty branch with buttons that would push nothing. And anything an agent's branch happens to carry under `.the-framework/` is bookkeeping, never publishable work — a branch holding only that is as empty as one holding nothing, and publishing it would open a pull request of pure bookkeeping.
 
 #### Business logic
 
-A branch is empty when it has no commit the base does not already have, or when every file it changed lies under `.the-framework/`. The files decide, not the commits: a branch whose commits touch only bookkeeping has commits and still nothing to hand off. Uncommitted work never makes a branch non-empty. An empty branch is refused by every step that would publish it, by the rules of the automatic handoff and the "Open PR" button below.
+A branch is empty when it has no commit the base does not already have, or when every file it changed lies under `.the-framework/`. The files decide, not the commits: a branch whose commits touch only bookkeeping has commits and still nothing to hand off. Uncommitted work never makes a branch non-empty. An empty branch is refused by every step that would publish it, by the rule of the "Open PR" button below.
 
 ### Uncommitted work is named, never committed
 
@@ -120,60 +111,6 @@ The branch's whole pull request history is read — through the dashboard's read
 #### Business logic
 
 An agent [1] with no recorded pull request has none. For an agent with one, the pull request's current state is read live through the dashboard's read cache, because it changes without the agent doing anything: a pull request merges, a human closes it. When the live read returns the recorded number, its state, title and URL are the answer. A different number on the branch is some other pull request and never this agent's answer. When the live read has nothing to say — the lookup still warming, `gh` missing, or a branch on a repository this machine cannot see — the recorded number and URL stand on their own, with state "OPEN" while the lookup is still pending (the caller may ask again) and "UNKNOWN" otherwise, and no title.
-
-### What an agent is armed for
-
-#### Context
-
-**User story**: the handoff [2] level chosen when the agent [1] was started, `local`, `push`, `pr` or `merge`, is what the end of the agent does; while the agent runs, its action bar lets the user untick the push and the pull request.
-
-#### Business logic
-
-The push and the pull request start armed, so the common case costs nothing: an agent [1] simply left alone puts its branch on the remote and opens a pull request for it. The merge is off unless the agent's configuration armed it (handoff [2] level `merge`); no checkbox arms it. How the level and the checkboxes translate into the three halves lives in `../handoff-level.ts`. The pull request half subsumes the push half: opening a pull request pushes the branch first.
-
-### Configuration arms the merge, the agent authorizes it
-
-#### Context
-
-**Problem**: landing work on the default branch unattended [15] is the one handoff [2] step nobody reviews first, so configuration alone must not be enough to run it: the agent [1] itself has to have declared its work complete.
-
-**User story**: an agent started with handoff level `merge` that never declares ready for merge [4] leaves a draft pull request for the user instead of merging, and its page says the merge was withheld and why.
-
-#### Business logic
-
-An armed merge may run only when the agent [1] emitted the ready-for-merge [4] signal; the agent's word is enough. The recorded reason for withholding is `not-ready-for-merge`. A withheld merge is not a failed handoff: the push and the pull request go ahead, the pull request just opens as a draft for a human.
-
-### The automatic handoff when an agent ends
-
-#### Context
-
-**User story**: the user starts an agent [1] and does not come back. When the agent ends, its branch is on the remote and a draft pull request is waiting for review — or the agent's page says exactly why nothing was published.
-
-**Business logic story**: the agent's own process runs this at its end, once, and two skips are decided there before anything here runs: an agent that was stopped [16] publishes nothing (publishing what it happened to reach is the opposite of what stopping meant), and an agent run by the `fake` driver [17] has nothing real to publish (`../cli.ts`).
-
-#### Business logic
-
-In this order:
-
-- Neither the push nor the pull request armed: skipped, `not-armed`.
-- The branch's state is read with a pull request lookup that does not go through the dashboard's read cache and waits for a real answer: a cached "not known yet" would read as "no pull request" and open a second one. The lookup is filtered by the agent's [1] start time, so a merged pull request from an earlier agent on the same branch name does not stop this agent from opening its own, and it picks the latest pull request that saw the branch.
-- The branch is gone, or the project cannot be read: skipped, `branch-gone`.
-- Nothing to hand off: skipped, `no-commits`.
-- The repository has no remote: skipped, `no-remote`.
-- The branch has an open pull request: skipped, `already-open`. The open pull request covers both halves — the branch is published and the human has a place to answer — and opening a second one is the one mistake the handoff [2] must never make. An armed merge still applies to that open pull request, since this is a rerun or a restart finding the pull request its predecessor opened and the merge is the half that has not happened yet: the merge half below runs on it, and its outcome rides along with the skip.
-- The branch's pull request is merged or closed and its head commit is still the branch tip: skipped, `already-landed`, since everything the agent did already reached the human. A tip past that head means the agent kept committing after the pull request closed: the handoff goes on and opens a fresh pull request for the new work, or that work reaches nobody.
-- The pull request armed: the branch is pushed and a pull request opened by the rule below, with the title and body rules below and the detected base, as a draft unless the merge is armed — GitHub refuses to merge or auto-merge a draft, and an armed merge means the review happened on the agent queue before the agent ran. A failure ends the handoff as failed at the `pr` step with the error. Otherwise the merge half runs when armed, and the outcome is done, with the branch pushed and the pull request's URL and number.
-- Only the push armed: a branch already on the remote at this commit is skipped, `already-pushed`; otherwise the branch is pushed to `origin`, and a failure ends the handoff as failed at the `push` step with git's own reason line.
-
-### The merge half of the automatic handoff
-
-#### Context
-
-**Problem**: a merge that could not happen must not turn a successful handoff [2] into a failed one, because the pull request exists either way and a human can still merge it by hand. And merging a pull request directly the second it opens lands it before its first check has run: in a repository without GitHub's auto-merge, every armed pull request would land unverified.
-
-#### Business logic
-
-The pull request's number comes off the URL `gh` prints when it creates the pull request (`…/pull/<number>`); when `gh` printed none, the pull request lookup supplies it. No number at all is a reported merge failure, "could not resolve the PR number to merge", and the handoff [2] is still done. With a number, the merge follows the merge rule in `gh.ts` in its watch mode: GitHub's own auto-merge is armed first, so the pull request lands when its checks pass (`auto-armed`); where GitHub refuses to arm it, the pull request is merged directly only when its checks have already passed (`merged`), and otherwise handed to the daemon's CI watch [6], which merges it once its checks go green (`watched`); a draft found on the already-open path is marked ready and tried once more; any other refusal is reported as `failed` with GitHub's reason. Every merge squashes: an agent's [1] branch is working history, not a story worth preserving. The merge outcome is reported beside the handoff's own.
 
 ### Opening a pull request for a branch
 
@@ -213,7 +150,7 @@ Nothing is pushed: creating the pull request for the remote branch is the whole 
 
 #### Business logic
 
-The agent's [1] recorded pull request is resolved by the rule above. No pull request: refused with "this session has no pull request to merge". A pull request that is not open: refused with "this session's PR is already merged" (or "closed"), because that is an answer, not an action. Otherwise the pull request is merged by the merge rule in `gh.ts` in its direct mode: GitHub's auto-merge first, a draft marked ready on the way (this is exactly the withheld-merge case), and where GitHub cannot arm auto-merge the pull request is merged directly, because a human just said to land it. A refusal is returned as the error. On success the branch's cached pull request answers are forgotten, so the page stops offering a merge for a pull request that landed, and the pull request's URL and number are returned.
+The agent's [1] recorded pull request is resolved by the rule above. No pull request: refused with "this session has no pull request to merge". A pull request that is not open: refused with "this session's PR is already merged" (or "closed"), because that is an answer, not an action. Otherwise the pull request is merged by the merge rule in `gh.ts` in its direct mode: GitHub's auto-merge first, a draft marked ready on the way, and where GitHub cannot arm auto-merge the pull request is merged directly, because a human just said to land it. A refusal is returned as the error. On success the branch's cached pull request answers are forgotten, so the page stops offering a merge for a pull request that landed, and the pull request's URL and number are returned.
 
 ### The pull request's title
 
@@ -243,4 +180,4 @@ The agent's [1] own description of the work from its turn signals [19] (its `ope
 
 #### Business logic
 
-A button action answers with success — and, when a pull request is involved, its URL and number — or with failure and one error line. The automatic handoff [2] answers with one of three outcomes: skipped, with its reason and, when an armed merge ran on an already-open pull request, the merge outcome; done, with whether the branch was pushed, the pull request's URL and number, and the merge outcome when the merge was armed; or failed, at the `push` or the `pr` step, with the error. The agent's process appends the outcome to the event stream [5] and, on a done handoff with a number, records the pull request on the agent [1]; the dashboard's "Open PR" button records it on the agent's run [12] card (`../cli.ts`, `../dashboard-rpc/control.ts`). The number rides along with the URL because the number is the fact worth recording: every later surface reads it off the agent instead of re-deriving it from branch names and timestamps.
+A button action answers with success — and, when a pull request is involved, its URL and number — or with failure and one error line. The dashboard's "Open PR" button records the pull request on the agent's run [12] card (`../dashboard-rpc/control.ts`). The number rides along with the URL because the number is the fact worth recording: every later surface reads it off the agent instead of re-deriving it from branch names and timestamps.

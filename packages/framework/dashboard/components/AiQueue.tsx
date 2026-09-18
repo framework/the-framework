@@ -1,10 +1,9 @@
 import { useState } from 'react'
 import type { ProjectQueue } from '../../src/index.js'
-import { agentOptionsFromPreferences } from '../../src/client.js'
 import { FastForward, ListTodo, Play } from 'lucide-react'
 import { queueEntryLabel } from '../lib/queue-entry.js'
 import { usePreferences } from '../lib/preferences.js'
-import { useStartAgent } from '../lib/use-start-agent.js'
+import { startPicks, useStartAgent } from '../lib/use-start-agent.js'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import { StartAgentButton } from './StartAgentButton.js'
@@ -16,11 +15,11 @@ import { StartAgentButton } from './StartAgentButton.js'
 // Two ways to act on an entry, and they are different acts. Its title opens what the entry NAMES:
 // a queued ticket links back to its ticket (#1164), so the title opens that ticket's own page
 // (#1144) — reading the plan, not starting it. The play button STARTS it: one agent, on that entry
-// alone, the same work the drain sweep would get to (#855) but on your click. The project header
+// alone, the same work the project's scheduler would get to (#855) but on your click. The project header
 // stays a header — a project name that jumped to the launcher was the odd redirect #1139 called
 // out, and that is still true — but it carries the project's batch act: a fan-out button that
 // starts one agent per top entry, as many as the count beside it says, each pinned to its own
-// entry the way the sweep pins a drain batch (#1204).
+// entry (#1204), so several agents are never told to implement the same one.
 //
 // Both starts are split buttons (#1507): the chevron beside each hands its prompt to the project's
 // launcher instead of spending an agent on the settings the card cannot show.
@@ -68,7 +67,7 @@ export function AiQueue({
    * Told which run the play button just started (#1191). The project-carrying form, because the
    * Overview has no project selected — each entry knows its own — so the shell cannot supply it.
    */
-  onAgentStarted: (projectId: string, intent: string, agentId?: string) => void
+  onAgentStarted: (projectId: string, intent: string, agentId: string) => void
   /** Where "Configure first, then run" lands (#1507): the entry's own project's launcher. */
   onSelectProject: (id: string) => void
 }) {
@@ -103,34 +102,29 @@ export function AiQueue({
     const key = `${projectId}\n${entry}`
     const prompt = workOnEntryPrompt(entry)
     setStarting(key)
-    // Unattended (#1279): starting a queue entry from the card is the same work the drain sweep
-    // starts, so it runs the same way — gates auto-answer, the agent ends at settle, and the armed
-    // handoff fires, instead of parking in the stay-open chat loop with its PR never opened.
-    const result = await start(projectId, prompt, 'prompt', { ...agentOptionsFromPreferences(preferences), unattended: true })
+    const result = await start(projectId, prompt, startPicks(preferences))
     setStarting(null)
-    // Go to the agent itself (#1191): one agent on one named entry is a session to watch, unlike the
-    // sweep's fan-out, which lands in the Agents card. With no id yet the shell lands on the
-    // project and adopts the running agent once the poll surfaces it.
+    // Go to the run itself (#1191): one run on one named entry is a session to watch, unlike the
+    // fan-out below, which lands in the Agents card.
     if (result) onAgentStarted(projectId, prompt, result.agentId)
   }
 
   const fanOutProject = async (project: ProjectQueue) => {
     if (inFlight) return
-    // The top of the queue, one agent per entry: the same order the drain sweep picks in, and each
-    // prompt pinned to its own entry for the same reason the sweep pins a batch (#1204) — several
-    // agents told "the first open entry" would all implement the same one.
+    // The top of the queue, one run per entry, each prompt pinned to its own entry (#1204):
+    // several agents told "the first open entry" would all implement the same one.
     const entries = topEntries(project)
     setFanningOut(project.projectId)
     for (const entry of entries) {
-      // One after another, the way the sweep spawns its batch: each start allocates a worktree and
-      // an id of its own. The batch ends at the first refusal — whatever refused this start is not
-      // going to take the next one a moment later, and the refusal stays on screen under the list.
-      const result = await start(project.projectId, workOnEntryPrompt(entry), 'prompt', { ...agentOptionsFromPreferences(preferences), unattended: true })
+      // One after another, each start answering an id of its own. The batch ends at the first
+      // refusal — whatever refused this start is not going to take the next one a moment later,
+      // and the refusal stays on screen under the list.
+      const result = await start(project.projectId, workOnEntryPrompt(entry), startPicks(preferences))
       if (!result) break
     }
     setFanningOut(null)
-    // No navigation, unlike the single play button (#1191): a batch is the sweep's fan-out fired
-    // by hand, and it lands in the Agents card sitting right above this one.
+    // No navigation, unlike the single play button (#1191): a batch lands in the Agents card
+    // sitting right above this one.
   }
 
   const withOpen = queue.filter(q => q.open > 0)

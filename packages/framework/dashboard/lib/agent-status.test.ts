@@ -72,4 +72,19 @@ describe('agentStatusPill', () => {
     expect(agentStatusPill(resumed)).toMatchObject({ label: 'building…' })
     expect(agentStatusPill([...resumed, ended({ ok: true })])).toMatchObject({ label: 'finished' })
   })
+
+  // A run that asked ends on its question (#1774): not failed, not finished, waiting on you.
+  test('a run that ended on its question says it waits for an answer, not that it failed', () => {
+    const pill = agentStatusPill([named, ended({ ok: false, waiting: true })])
+    expect(pill).toMatchObject({ label: 'waiting for an answer', tone: 'text-warning' })
+    // Nameless too: waiting alone is worth a pill.
+    expect(agentStatusPill([ended({ ok: false, waiting: true })])).toMatchObject({ label: 'waiting for an answer' })
+  })
+
+  test('answered, the same run builds again: the leg it waited in is behind it', () => {
+    const next = { kind: 'driver', event: { type: 'text', text: 'On it.' } } as FrameworkEvent
+    const answered = [named, ended({ ok: false, waiting: true }), next]
+    expect(agentStatusPill(answered)).toMatchObject({ label: 'building…' })
+    expect(agentStatusPill([...answered, ended({ ok: true })])).toMatchObject({ label: 'finished' })
+  })
 })

@@ -1,10 +1,9 @@
 import { mkdir } from 'node:fs/promises'
-import { basename, join, relative, isAbsolute } from 'node:path'
+import { join, relative, isAbsolute } from 'node:path'
 import type { FrameworkEvent } from './events.js'
-import { isPidAlive, reconcileOrphanedAgents } from './store/index.js'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
-import { startDashboard, type Dashboard, type StartAgentOptions } from './dashboard/index.js'
-import { createProjectRuntime, type ProjectRuntimeOptions } from './daemon-runtime.js'
+import { startDashboard, type Dashboard } from './dashboard/index.js'
+import { createProjectRuntime } from './daemon-runtime.js'
 import { defaultQuotaSource } from './dashboard/quota.js'
 import { startBackgroundServices, type BackgroundServices } from './daemon-services.js'
 import { projectErrorStore } from './project-errors.js'
@@ -17,25 +16,22 @@ import { isLoopbackHost } from './loopback-host.js'
 import { bridgeSessionsFrom } from './dashboard/bridge-sessions.js'
 import { bridgeQuestions } from './dashboard/bridge-store.js'
 import { bridgeBrowserDir, bridgeBrowserOwner, startBridgeBrowser, type BridgeBrowser, type BridgeBrowserOptions } from './bridge-browser.js'
-import { closeOrphanedAgentBrowsers } from './browser.js'
 import { runProjectHooks } from './project-hooks.js'
 import { readAllAgents } from './store/index.js'
 import type { BridgeSession } from './dashboard/index.js'
 
 /**
- * The dashboard process (#302). It is a pure projection of the store: a session appends its
- * events to `.the-framework/events.jsonl`, and the dashboard *tails* that file, pushing each
- * new event to connected browsers. No session<->dashboard IPC — the file is the seam, matching
- * "the dashboard is a projection of the event stream". Steering goes the other way through
- * `.the-framework/control.jsonl` (#344).
+ * The dashboard process (#302). It is a pure projection of files: a run's tool keeps the run's
+ * card and diary in the run's checkout, and the dashboard *tails* them, pushing each new line to
+ * connected browsers. No run<->dashboard IPC: the files are the seam. The daemon runs no agent
+ * (#1774): a Start is the project's own `start` hook line, and what a person says to a run goes
+ * into the run's inbox file, or through the `resume` hook line once the run has ended.
  *
- * It runs in the foreground and only in the foreground: Ctrl-C closes the dashboard and every
- * session it is running. There is no detached mode, so there is no liveness record, no
- * machine-global state file, and no second process to find, reuse or stop.
+ * It runs in the foreground and only in the foreground: Ctrl-C closes the dashboard. A run is
+ * not the daemon's process, so it goes on to its end. There is no detached mode, so there is no
+ * liveness record, no machine-global state file, and no second process to find, reuse or stop.
  *
- * Sessions and steering are keyed per project: it spawns each session with `--cwd <project
- * path>` and appends its control entries to that project's own `control.jsonl`. Its own `cwd`
- * is just the home project it streams by default.
+ * Its own `cwd` is just the home project it streams by default.
  */
 
 /** The default dashboard port the daemon binds. */
@@ -96,9 +92,8 @@ export async function registerHomeProject(cwd: string, env: NodeJS.ProcessEnv = 
 export { isPidAlive as isProcessAlive } from './store/index.js'
 
 /**
- * Tails the append-only `.the-framework/events.jsonl` agent log. The generic tailing
- * lives in {@link JsonlTailer}; this keeps the event-typed name the daemon (and
- * public API) always had.
+ * Tails an append-only log of {@link FrameworkEvent} lines. The generic tailing lives in
+ * {@link JsonlTailer}; this keeps the event-typed name the daemon (and public API) always had.
  */
 export class EventTailer extends JsonlTailer<FrameworkEvent> {}
 
@@ -111,12 +106,8 @@ export interface RunDaemonOptions {
   host?: string
   /** Shut the daemon down when this aborts (in addition to SIGINT/SIGTERM). For tests. */
   signal?: AbortSignal
-  /** The CLI entry script to re-invoke for a dashboard-started agent (#345). Default `process.argv[1]`. */
-  binPath?: string
   /** Env the registry is read from. Default `process.env`; injectable for tests. */
   env?: NodeJS.ProcessEnv
-  /** How a start checks the picked agent can run (#1326); default the real `preflight`. For tests. */
-  driverPreflight?: ProjectRuntimeOptions['driverPreflight']
   /** Called once the server has bound, before it blocks. The only way a caller learns the port. */
   onListening?: (state: DaemonState) => void
   /** How the bridge browser is launched (#1332); default the real Chrome for Testing. For tests. */
@@ -125,9 +116,9 @@ export interface RunDaemonOptions {
 
 /**
  * The daemon body, run in the foreground by bare `framework`. Serves the built dashboard bundle
- * (#405/#426): the SPA reads each project's `.the-framework/events.jsonl` over an event stream and
- * steers over control.jsonl, so the daemon just serves the files and spawns sessions. Resolves on
- * SIGINT/SIGTERM after tearing the dashboard down.
+ * (#405/#426): the SPA reads each run's files over an event stream, so the daemon just serves
+ * the files and runs the project's hooks. Resolves on SIGINT/SIGTERM after tearing the dashboard
+ * down.
  */
 export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promise<void> {
   const port = opts.port ?? DEFAULT_DAEMON_PORT
@@ -143,51 +134,26 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
   // narrowing anything. On a loopback bind that secret may not exist yet, hence ensure, not read.
   const bridgeOn = (await readPreferences(undefined, env).catch((): Preferences => ({}))).bridge === true
   const bridgeToken = bridgeOn ? await ensureDaemonToken(undefined, env) : undefined
-  // Steering (#344): the daemon owns no run, so its Stop button and choice picks
-  // append to `.the-framework/control.jsonl`; the live agent tails that file. Appends
-  // are best-effort — a full disk must not take the dashboard down with it.
-  // The event/control logs and the fs.watch all live under `.the-framework/` — create
-  // it up front so the daemon works as the very first command in a fresh workspace
-  // (before any run made the dir).
+  // The project's own `.the-framework/` — where its hooks file sits, and where a run's tool keeps
+  // the run's card and diary inside the run's checkout. Created up front so the daemon works as the
+  // very first command in a fresh workspace, before any run has made the directory.
   await mkdir(daemonDir(cwd), { recursive: true })
 
   // Multi-project (#392): make sure an activated home repo shows up in the Projects list.
   await registerHomeProject(cwd, env)
 
-  // Crash recovery (#642): a fresh daemon drives no in-flight run, so any run a dead
-  // process left marked `running` is orphaned — it would show as active forever with a
-  // no-op Stop. Reconcile them to `stopped` across every registered project at boot.
-  for (const record of await listProjects(undefined, env).catch(() => [])) {
-    const fixed = await reconcileOrphanedAgents(record.path).catch(() => 0)
-    if (fixed > 0) console.log(`[framework] reconciled ${fixed} orphaned agent(s) in ${basename(record.path)}`)
-  }
-  // Browsers those agents left behind (#1719): a Chrome whose agent died by SIGKILL runs on
-  // with nothing tracking it. Its throwaway profile marks it as ours; a parent that is not an
-  // agent marks it as nobody's.
-  const browsers = await closeOrphanedAgentBrowsers().catch((): [] => [])
-  if (browsers.length > 0) console.log(`[framework] closed ${browsers.length} orphaned agent browser(s): pid ${browsers.map(b => b.pid).join(', ')}`)
-
-  // Everything the dashboard drives per project — run spawning, project install, and app
-  // previews — lives in the runtime, so this body stays about the daemon's own lifecycle.
-  // Known only once the dashboard listens; the runtime reads it per spawn (#1328).
+  // Everything the dashboard drives per project (a run's start, project install, the device
+  // relay) lives in the runtime, so this body stays about the daemon's own lifecycle.
+  const runtime = createProjectRuntime({ cwd, env })
+  // Known only once the dashboard listens; the bridge browser is told it (#1332).
   let daemonUrl: string | undefined
-  const runtime = createProjectRuntime({
-    cwd,
-    env,
-    ...(opts.binPath !== undefined ? { binPath: opts.binPath } : {}),
-    ...(opts.driverPreflight !== undefined ? { driverPreflight: opts.driverPreflight } : {}),
-    daemonUrl: () => daemonUrl,
-  })
 
-  // The daemon serves the built dashboard bundle (#405/#426): the SPA reads each project's
-  // `.the-framework/events.jsonl` over `GET /_rpc/events` and steers over control.jsonl, so there
-  // is no in-process event stream to feed here. The runtime's RPCs reach the browser through the
+  // The daemon serves the built dashboard bundle (#405/#426): the SPA reads each run's files over
+  // `GET /_rpc/events`, so there is no in-process event stream to feed here. The runtime's RPCs reach the browser through the
   // dashboard context the mount is wired with. A missing bundle (a broken install) surfaces as a
   // 503 from the server.
   const clientBundleDir = await resolveDashboardBundle()
-  // Owned here rather than left to the dashboard (#685): the CI watch's fix gate has to consult
-  // the same long-lived meter the usage panel draws, and a second poller would double a
-  // rate-limited read.
+  // The long-lived meter the usage panel draws (#685), owned here so it stops with the daemon.
   const quota = defaultQuotaSource()
   // The per-project error state (#1500): the background services write it, the dashboard reads it.
   const projectErrors = projectErrorStore()
@@ -263,48 +229,23 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
     await runProjectHooks(record.path, 'open', { log: console.log })
   }
 
-  // Every background start is a verbatim prompt agent (#353): these are preset prompts and chat
-  // text, not build intents to scaffold from.
-  const startAgent = (prompt: string, options: StartAgentOptions, id: string) => runtime.onStart(prompt, 'prompt', options, id)
-
   // Everything that runs in the background beside serving the dashboard: the Discord watchers,
-  // the CI watch, the data sync and the sweeps.
-  //
-  // Nothing is resumed at boot. Ctrl-C closed the last dashboard and every session it was running,
-  // and that was a deliberate act — starting those sessions again behind the user's back is not
-  // what they asked for. A stopped session keeps its worktree and branch, so it is theirs to
-  // continue from the dashboard whenever they want it.
+  // the data sync and the cloud sweeps.
   services = startBackgroundServices({
-    cwd,
     env,
     dashboardUrl: dashboard.url,
-    quota,
-    startAgent,
-    activeAgentSlots: runtime.activeAgentSlots,
-    busyAgentIds: runtime.busyAgentIds,
     projectErrors,
     log: console.log,
   })
 
   await waitForShutdown(opts.signal)
 
-  // Nothing may start or steer an agent from here on, so the background services go first (#923):
-  // a CI fix starting mid-shutdown would start one while we stop the rest.
   await services.quiesce()
-  // Each project's close hooks (#1774), the counterpart of the open hooks above: once nothing may
-  // start an agent any more, before the agents this daemon spawned are stopped.
+  // Each project's close hooks (#1774), the counterpart of the open hooks above. A run in flight
+  // is not the daemon's process: it goes on to its end, and the next dashboard shows it.
   for (const record of await listProjects(undefined, env).catch(() => [])) {
     await runProjectHooks(record.path, 'close', { log: console.log })
   }
-  // Stop the agents this daemon spawned, before the previews they may be serving. Left running they
-  // are orphans nothing tracks; stopped here they keep their worktree and branch, so the dashboard
-  // can continue them on the next start.
-  // Named (#1646): a process still alive here that the dashboard showed as finished is the one
-  // fact that explains a slot the sweep could not account for, and the count alone hid it.
-  const stopped = await runtime.stopAgents().catch((): string[] => [])
-  if (stopped.length > 0) console.log(`[framework] stopped ${stopped.length} agent(s): ${stopped.join(', ')}`)
-  // Archives need no flush pass here (#1582): teardown writes each one through the data branch's
-  // funnel, committed and pushed the moment the session settles.
   // Stopped here as well as by the dashboard: a broken install serves 503s without ever taking
   // ownership of the source we handed in, and that poller would go on reading by itself.
   quota.stop()

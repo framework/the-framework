@@ -6,14 +6,12 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 const onGithubUrl = vi.fn(async () => 'https://github.com/o/r')
 const sendOpenInApp = vi.fn(async () => ({ ok: true as const }))
 const sendStop = vi.fn(async () => {})
-const sendMerge = vi.fn(async () => ({ ok: true as const }))
 const sendRemoveWorktree = vi.fn(async () => ({ ok: true as const }))
 const sendDeleteAgent = vi.fn(async () => ({ ok: true as const }))
 vi.mock('../rpc/reads.js', () => ({ onGithubUrl }))
 vi.mock('../rpc/control.js', () => ({
   sendOpenInApp,
   sendStop,
-  sendMerge,
   sendRemoveWorktree,
   sendDeleteAgent,
 }))
@@ -105,30 +103,21 @@ describe('AgentActionsMenu (#toolbar-menu)', () => {
   })
 })
 
-describe('the two live-session actions: Stop and Merge (#1391)', () => {
+describe('the live-session action: Stop', () => {
   const liveEvents = [{ kind: 'log', message: 'working' }] as never
 
-  test('a live session offers Stop and Merge side by side', async () => {
+  test('a live session offers Stop, and no Merge: a run that is working publishes its own work', async () => {
     render(<AgentActionsMenu projectId="p1" agentId="run-1" events={liveEvents} onDeleted={vi.fn()} />)
     openMenu()
     await waitFor(() => expect(screen.getByText('Stop agent')).toBeTruthy())
-    expect(screen.getByText('Merge when finished')).toBeTruthy()
+    expect(screen.queryByText(/Merge/)).toBeNull()
   })
 
-  test('Merge sends the control and stays armed — a pre-commitment, nothing to press twice', async () => {
-    sendMerge.mockClear()
-    render(<AgentActionsMenu projectId="p1" agentId="run-1" events={liveEvents} onDeleted={vi.fn()} />)
-    openMenu()
-    fireEvent.click(await screen.findByText('Merge when finished'))
-    await waitFor(() => expect(sendMerge).toHaveBeenCalledWith('p1', 'run-1'))
-  })
-
-  test('an ended session offers neither — its bar owns the Merge PR button by then', async () => {
+  test('an ended session offers no Stop', async () => {
     const ended = [{ kind: 'log', message: 'working' }, { kind: 'end', ok: true }] as never
     render(<AgentActionsMenu projectId="p1" agentId="run-1" events={ended} onDeleted={vi.fn()} />)
     openMenu()
     await waitFor(() => expect(screen.getByText('Open in editor')).toBeTruthy())
     expect(screen.queryByText('Stop agent')).toBeNull()
-    expect(screen.queryByText('Merge when finished')).toBeNull()
   })
 })

@@ -7,4 +7,4 @@ What the tests cover, for the agent view's choice of which events to show — th
 - **A foreign stream never beats the archive** - a live event stream whose first event does not match the archive's first event (the project root's event file, written by another agent) is never shown in place of the archive, however many events it holds.
 - **The archive takes back over once it has caught up** - when the stream outgrows the archive, the archive is read again, and the re-read archive brings the events that exist only there, so a finished agent's "branch pushed" line reaches the screen without a page refresh.
 
-The rules for when a resume is offered belong to the composer and are covered by its own tests; the view only hands it how the agent ended and its driver session id.
+The rules for when a resume is offered belong to the composer and are covered by its own tests; the view only hands it how the agent ended.

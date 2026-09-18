@@ -8,7 +8,7 @@ The "Discord notifications" dialog: explains what the Discord webhook is for, ta
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 
 ## Business logic — TL;DR

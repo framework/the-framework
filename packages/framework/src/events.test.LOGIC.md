@@ -1,6 +1,5 @@
-What the tests cover, across the pick normalization in `events.ts`, the session link helpers in `session-link.ts` and the terminal's one-line rendering of each event in `terminal.ts`:
+What the tests cover, across the pick normalization in `events.ts` and the terminal's one-line rendering of each event in `terminal.ts`:
 
-- **Session link templates** - a link with the session id placeholder is told apart from a literal URL; resolving fills every occurrence of the placeholder with the session id; a literal URL comes back unchanged.
 - **Normalizing a pick** - a single option id becomes a one-item list; a chosen subset stays the same list; an empty subset and an empty id both become an empty list.
 - **The gate as a terminal line** - a checklist renders "? <question>" and one indented line per option marked "[x]" or "[ ]" by whether it starts checked; a single-select gate marks the recommended option "●" and the others "○".
 - **The pick as a terminal line** - "✓ chose p0, p2 (user)": a subset lists its ids, an empty subset says "(none)", a single id is shown as is, and who picked follows in parentheses.

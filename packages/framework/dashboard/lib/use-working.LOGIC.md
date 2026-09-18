@@ -4,5 +4,5 @@ Deliberately cross-project: the question the tab icon answers is whether the pro
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent under The Framework's control, in its own checkout, on its own branch, streaming events, handed off when it ends.
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] project: a repository the user registered in the dashboard, identified by an id derived from its path.

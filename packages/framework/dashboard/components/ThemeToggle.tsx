@@ -5,9 +5,10 @@ import { buttonVariants } from './ui/button.js'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from './ui/dropdown-menu.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 
-// The appearance control (#754). The theme has been switchable since #725, but it lived inside the
-// per-agent options gear: an app-wide setting filed under one agent's options, and absent entirely on a
-// screen showing only the navbar. Nobody found it. It belongs in the header, which is always there.
+// The appearance control (#754). The theme has been switchable since #725, but it used to live inside
+// the composer's per-agent options menu (since removed): an app-wide setting filed under one agent's
+// options, and absent entirely on a screen showing only the navbar. Nobody found it. It belongs in
+// the header, which is always there.
 //
 // Same `preferences.theme` the rest of the app reads (LayoutDefault resolves it and toggles `dark`
 // on <html>), so this is a second surface onto one setting, not a second setting.

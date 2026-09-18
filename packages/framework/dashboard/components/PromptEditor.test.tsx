@@ -10,7 +10,7 @@ afterEach(cleanup)
 async function renderEditor() {
   const onSubmit = vi.fn()
   const onChange = vi.fn()
-  render(<PromptEditor onChange={onChange} onSubmit={onSubmit} projects={[]} presets={[]} />)
+  render(<PromptEditor onChange={onChange} onSubmit={onSubmit} projects={[]} commands={[]} />)
   // immediatelyRender: false — the contenteditable appears a tick after mount.
   const box = await waitFor(() => {
     const el = document.querySelector('[role="textbox"]')

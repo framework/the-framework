@@ -1,5 +1,5 @@
 import { onProjectFiles, onProjectFileStatus, onFileDiff, onAgentChanges, onFileContent, onGitStatus, onAgentWorktree, onAgentHandoff, onAgent } from './reads.js'
-import { sendStop, sendChoice, sendMessage, sendSetHandoff, sendPushBranch, sendOpenPullRequest, sendMerge } from './control.js'
+import { sendStop, sendChoice, sendMessage, sendOpenPullRequest, sendMerge } from './control.js'
 
 // The device side of the remote-agent relay (#1067 slice 2). A daemon that relayed an agent here asks this
 // to read/steer/hand off THAT run against THIS device's own checkout. Every entry is a run-scoped RPC
@@ -18,7 +18,7 @@ type RelayFn = (...args: unknown[]) => Promise<unknown>
 const RELAY_FNS = Object.assign(Object.create(null) as Record<string, RelayFn>, {
   onProjectFiles, onProjectFileStatus, onFileDiff, onAgentChanges, onFileContent,
   onGitStatus, onAgentWorktree, onAgentHandoff, onAgent,
-  sendStop, sendChoice, sendMessage, sendSetHandoff, sendPushBranch, sendOpenPullRequest, sendMerge,
+  sendStop, sendChoice, sendMessage, sendOpenPullRequest, sendMerge,
 }) as unknown as Record<string, RelayFn>
 
 /** The names a relay caller may invoke. */

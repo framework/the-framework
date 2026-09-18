@@ -7,8 +7,8 @@ import { OpenQuestions } from './OpenQuestions.js'
 import { ProjectDocs } from './ProjectDocs.js'
 import { ScrollArea } from './ui/scroll-area.js'
 
-// The project home / launcher — what "Live" selects. Always the Start form + preset cards +
-// the current stack overview; it is never consumed by an agent. Starting one appends an agent to
+// The project home / launcher — what "Live" selects. Always the Start form + the current stack
+// overview; it is never consumed by an agent. Starting one appends an agent to
 // the rail and adds that agent's own view (AgentView) alongside — this page stays put, so you can
 // launch again. (Actually running several at once lands with git worktrees, #453.)
 //
@@ -25,22 +25,14 @@ export function ProjectHome({
   events,
   onAgentStarted,
   files,
-  context,
-  addContext,
-  removeContext,
-  toggleContext,
   onOpenAgent,
   errors,
 }: {
   projectId: string
   events: FrameworkEvent[]
   /** Carries the started agent's id through to the shell; dropping it is what #1169 was. */
-  onAgentStarted?: ((intent: string, agentId?: string, runsOn?: string) => void) | undefined
+  onAgentStarted?: ((intent: string, agentId: string, runsOn?: string) => void) | undefined
   files: string[]
-  context: Set<string>
-  addContext: (path: string) => void
-  removeContext: (path: string) => void
-  toggleContext: (path: string) => void
   /** Jump into a parked session (#1455 item 4) — possibly another project's. */
   onOpenAgent: (projectId: string, agentId: string) => void
   /** What the daemon currently finds wrong with the project (#1500), off the shell's project list. */
@@ -52,15 +44,7 @@ export function ProjectHome({
       {/* Above the start form, because an agent started on a project whose agent-data branch cannot
           reach origin (#1599) works from stale tickets and a queue nobody else will see. */}
       <ProjectErrorBanner errors={errors} />
-      <StartAgentForm
-        projectId={projectId}
-        onAgentStarted={onAgentStarted}
-        files={files}
-        context={context}
-        addContext={addContext}
-        removeContext={removeContext}
-        toggleContext={toggleContext}
-      />
+      <StartAgentForm projectId={projectId} onAgentStarted={onAgentStarted} files={files} />
       {events.length > 0 && <AgentOverview events={events} />}
       <OpenQuestions onOpenAgent={onOpenAgent} />
       <ProjectDocs projectId={projectId} />

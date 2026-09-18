@@ -1,5 +1,5 @@
-import { nodeGitRunner, type GitRunner, pushBranch, gitReason } from '@gemstack/agent-data'
-import { agentBranchName, sessionNameOf, currentBranch, repoHasRemote } from '@gemstack/skill-branches'
+import { nodeGitRunner, type GitRunner, pushBranch } from '@gemstack/agent-data'
+import { agentBranchName, sessionNameOf, repoHasRemote } from '@gemstack/skill-branches'
 import { THE_FRAMEWORK_DIR } from '../framework-dir.js'
 import {
   cachedPrView,
@@ -7,7 +7,6 @@ import {
   forgetBranchPrs,
   forgetPr,
   ghMergePr,
-  ghPrsForBranch,
   nodeGhRunner,
   pickAgentPr,
   type GhRunner,
@@ -18,8 +17,7 @@ import type { Cached } from './cache.js'
 import { parseNumstat } from './file-diff.js'
 import { parsePorcelain } from './file-status.js'
 import { errorMessage } from '../error-message.js'
-import type { AutoHandoffSkip, AutoMergeOutcome, MergeWithheldReason } from '../events.js'
-import { startedAtFromAgentId, type AgentMeta } from '../store/index.js'
+import type { AgentMeta } from '../store/index.js'
 // What a finished session produced, and what is left to do with it (#799).
 //
 // Everything up to "the agent is done" was covered; the handoff back to the human was not. A
@@ -506,156 +504,6 @@ export async function openAgentPullRequest(
     ...(handoff?.base ? { base: handoff.base } : {}),
     ...(options.draft ? { draft: true } : {}),
   })
-}
-
-/**
- * What a session was left armed to do when it ends (#1102).
- *
- * Both start true. The point of the feature is that the common case costs nothing: a session that
- * is simply left alone puts its branch on the remote and opens a PR for it.
- */
-export interface HandoffIntent {
-  push: boolean
-  pr: boolean
-  /**
-   * Merge the PR once it is opened (#1216). Absent = off, unlike the pair above: landing work on
-   * the default branch is not something to arm by default. No action-bar checkbox mutates it —
-   * it comes settled off the agent's config.
-   */
-  merge?: boolean
-}
-
-/** Both halves armed — the default a session starts from. */
-const ARMED_HANDOFF: HandoffIntent = { push: true, pr: true }
-
-/**
- * Whether an armed merge may actually run (#1363), and if not, why.
- *
- * The rule settled on #1390: config *arms* the merge, the agent *authorizes* it. Landing on the
- * default branch unattended takes the agent having declared the session done via
- * setReadyForMerge() — the same signal the on-before-mergeable step requires. The agent's word is
- * enough (#1774): the belt that read the session's own TODO file beside it is gone. A withheld
- * merge is not a failed handoff: push and PR go ahead, the PR just opens as a draft for a human.
- */
-export function withheldMerge(deps: { readyForMerge: boolean }): MergeWithheldReason | undefined {
-  return deps.readyForMerge ? undefined : 'not-ready-for-merge'
-}
-
-/**
- * What auto-handoff did, so the agent can say it as an event (#835).
- *
- * A dashboard-started agent is spawned with `stdio: 'ignore'`, so anything printed here reaches
- * nobody: the outcome has to travel as an event or it does not travel at all. Skips are reported
- * for the same reason a skipped on-before-mergeable is — silence reads as "it ran and did nothing".
- */
-export type AutoHandoffOutcome =
-  | { outcome: 'skipped'; reason: AutoHandoffSkip; merge?: AutoMergeOutcome }
-  | { outcome: 'done'; pushed: boolean; url?: string; number?: number; merge?: AutoMergeOutcome }
-  | { outcome: 'failed'; step: 'push' | 'pr'; error: string }
-
-/**
- * Do the end-of-session handoff a session was left armed for (#1102): push the branch, open a
- * draft PR for it, or both.
- *
- * Reads the branch first and refuses on everything that is not a clean hand-off — a branch that is
- * gone, a session that committed nothing, a repo with no remote, a branch whose PR already covers
- * everything on it. Those are the cases where doing it anyway would produce a confusing artefact
- * rather than help. A merged PR the session kept working past is NOT one of them (#1512): the
- * work after the merge gets a fresh PR, or it reaches nobody.
- *
- * The PR is a draft on purpose. Opening one by itself at the end of every session must not put a
- * review request in anyone's inbox, and the interventions queue keeps listing a session's draft
- * so the work still comes back to the human.
- */
-export async function agentAutoHandoff(
-  cwd: string,
-  agent: HandoffAgent,
-  intent: HandoffIntent,
-  deps: AgentHandoffDeps & { gh?: GhRunner } = {},
-): Promise<AutoHandoffOutcome> {
-  if (!intent.push && !intent.pr) return { outcome: 'skipped', reason: 'not-armed' }
-  const branch = agentBranchFor(agent)
-  const since = agent.startedAt ?? startedAtFromAgentId(agent.id)
-  const { gh, ...readDeps } = deps
-  // The UNcached PR lookup, deliberately. The dashboard's cache answers `prPending` rather than
-  // yes-or-no (#1028), which is right for a panel repainting every 15s and wrong here: "not known
-  // yet" would read as "no PR" and this would open a second one. Proved against a real remote —
-  // only `gh` refusing the duplicate stopped it. This runs once, at the end of a session, so it
-  // can afford to wait for a real answer. Filtered by the agent's start time (#1251): a merged PR
-  // from an earlier agent on the same branch name must not stop this agent from opening its own.
-  // `latest` order (#1512): the decision below compares the branch tip against the PR's head, and
-  // only the last PR that saw the branch answers that — against the first, work a second PR
-  // already landed would read as unlanded and reopen.
-  const agentPr: BranchPrLookup = async (c, b) => pickAgentPr(await ghPrsForBranch(c, b), since, 'latest')
-  const state = await readAgentHandoff(cwd, branch, { pr: agentPr, ...readDeps }).catch(() => undefined)
-  if (!state || !state.exists) return { outcome: 'skipped', reason: 'branch-gone' }
-  if (state.empty) return { outcome: 'skipped', reason: 'no-commits' }
-  if (!state.hasRemote) return { outcome: 'skipped', reason: 'no-remote' }
-  // An OPEN PR covers both halves: it means the branch is published and the human has a place
-  // to answer. Opening a second one is the one mistake this must never make. An armed merge
-  // (#1216) still applies to the open PR — this is a rerun or a restart finding the PR its
-  // predecessor opened, and the merge is the half that has not happened yet.
-  if (state.pr?.state === 'OPEN') {
-    if (intent.merge) {
-      // `watch` mode (#1418), like the freshly-opened path below: an auto merge must wait for the
-      // PR's checks rather than land on the direct fallback before they run (#1406).
-      return { outcome: 'skipped', reason: 'already-open', merge: await ghMergePr(cwd, state.pr.number, gh, { whenUnarmed: 'watch' }) }
-    }
-    return { outcome: 'skipped', reason: 'already-open' }
-  }
-  // A merged or closed PR only covers the branch up to the head it carried (#1512). A tip it
-  // already landed means everything reached the human — done, not blocked. A tip past it means
-  // the session kept working after the PR closed, and refusing here is how that work reached
-  // nobody: fall through and open a fresh PR for it.
-  if (state.pr && !movedPastPr(state)) {
-    return { outcome: 'skipped', reason: 'already-landed' }
-  }
-
-  if (intent.pr) {
-    // `openBranchPullRequest` pushes first, so the PR half subsumes the push half.
-    const opened = await openBranchPullRequest(
-      cwd,
-      branch,
-      {
-        title: agentPrTitle(agent),
-        body: agentPrBody(agent),
-        // GitHub refuses to merge or auto-merge a draft, so an armed merge (#1216) opens the PR
-        // ready: its review happened on the queue before the agent, which is the same reason the
-        // merge is armed at all. Draft stays the default for PRs a human is meant to look at.
-        draft: !intent.merge,
-        ...(state.base ? { base: state.base } : {}),
-      },
-      { ...(readDeps.git ? { git: readDeps.git } : {}), ...(gh ? { gh } : {}) },
-    )
-    if (!opened.ok) return { outcome: 'failed', step: 'pr', error: opened.error }
-    // The merge half (#1216), only after the PR half succeeded. The number comes off the URL gh
-    // just printed; the lookup is the fallback for a gh that answered without one. Failing to
-    // resolve a number is a reported merge failure, never a failed handoff — the PR is there.
-    const merge = intent.merge
-      ? await (async (): Promise<AutoMergeOutcome> => {
-          const lookup = readDeps.pr ?? agentPr
-          const number = prNumberFromUrl(opened.url) ?? (await lookup(cwd, branch).catch(() => undefined))?.number
-          // `watch` mode (#1418): where GitHub cannot arm the merge, a just-opened PR defers to
-          // the daemon's CI watch instead of the direct fallback that landed it before its first
-          // check ran (#1406).
-          return number !== undefined
-            ? ghMergePr(cwd, number, gh, { whenUnarmed: 'watch' })
-            : { outcome: 'failed', error: 'could not resolve the PR number to merge' }
-        })()
-      : undefined
-    return {
-      outcome: 'done',
-      pushed: true,
-      ...(opened.url ? { url: opened.url } : {}),
-      ...(opened.number !== undefined ? { number: opened.number } : {}),
-      ...(merge ? { merge } : {}),
-    }
-  }
-
-  if (state.pushed) return { outcome: 'skipped', reason: 'already-pushed' }
-  const pushed = await pushBranch(cwd, branch, readDeps.git)
-  if (!pushed.ok) return { outcome: 'failed', step: 'push', error: pushed.error }
-  return { outcome: 'done', pushed: true }
 }
 
 /**

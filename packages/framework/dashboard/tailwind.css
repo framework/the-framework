@@ -226,16 +226,6 @@ body {
   white-space: nowrap;
   border: 1px solid transparent;
 }
-.pe-token[data-token='macro'] {
-  background: color-mix(in oklab, var(--primary) 18%, transparent);
-  color: var(--primary);
-  border-color: color-mix(in oklab, var(--primary) 35%, transparent);
-}
-.pe-token[data-token='action'] {
-  background: color-mix(in oklab, var(--primary) 12%, transparent);
-  color: var(--foreground);
-  border-color: var(--border);
-}
 .pe-token[data-token='project'] {
   background: var(--accent);
   color: var(--accent-foreground);

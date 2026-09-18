@@ -2,17 +2,17 @@ The browser's typed stubs for every read the dashboard makes: one stub per read 
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] the Claude web bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge token is the secret the extension presents; the bridge browser is the Chrome for Testing the daemon runs for it.
 [3] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
-[4] event: everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface (dashboard, terminal, archive, run) is a projection of it.
+[4] event: everything an agent does, in order, read off the agent's diary: the file its tool writes one line at a time, in the agent's checkout while it has one and on the data branch once it is recorded.
 [5] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down.
 [6] the Overview: the dashboard's cross-project page at `/`.
 [7] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds. The other is activity: an agent started or finished.
-[8] open question: a gate nobody has answered yet, as the dashboard lists them across projects.
-[9] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it).
+[8] open question: a question an agent ended on and still waits for, as the dashboard lists them across projects.
+[9] next step: what a person can do with an ended agent's work from the dashboard: open a pull request for its branch, or merge the pull request it has.
 [10] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
-[11] pick: the answer to a gate: the option or options chosen, by the user or automatically.
+[11] pick: the answer to a question: the option or options the user chose.
 
 ## Business logic — TL;DR
 
@@ -21,6 +21,5 @@ The browser's typed stubs for every read the dashboard makes: one stub per read 
 - **Documents and tickets** - the project's surfaced documents, its tickets, one ticket's full text, the agent that wrote a ticket's plan, and when the tickets last caught up with GitHub.
 - **Cross-project rollups** - every registered project's tickets, the aggregated agent queue [5], the Overview [6], the recent agents, the Overview's "hot tickets", the interventions [7], the open questions [8], the activity feed, the dashboard page's totals, agents going right now, projects and queues, and every project's scheduler state, each read across every registered project.
 - **A checkout's files and changes** - every file of the project's or of one agent's checkout, each changed file's git status, one file's diff or content, and every file the agent changed with its line counts.
-- **Git and the handoff** - the project's GitHub URL, the git status (branch, uncommitted changes, linked pull request) of the project or of one agent's checkout, and what an agent's handoff [9] left behind: its branch, commits, changes, pull request and uncommitted work.
-- **The project's own instructions** - the text of the project's `SYSTEM.md`, so the prompt preview can show the whole system prompt an agent starts with.
+- **Git and what an agent left** - the project's GitHub URL, the git status (branch, uncommitted changes, linked pull request) of the project or of one agent's checkout, and what an agent left behind, which decides its next step [9]: its branch, commits, changes, pull request and uncommitted work.
 - **The bridge's state** - the question a cloud session [10] is parked on, where the pick [11] the user made stands, what the session has said so far, whether the extension has reached the daemon and how it went, the bridge token, and the bridge browser's state.

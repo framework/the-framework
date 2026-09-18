@@ -8,10 +8,10 @@ Makes the browser's address the dashboard's selection: the URL path alone says w
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
 [3] the Overview: the dashboard's cross-project page at `/`.
-[4] project home: a project's own page with the launcher (the Start form) and its composer (the prompt editor, also used for live chat).
+[4] project home: a project's own page with the launcher (the Start form) and its composer (the prompt editor, also used to say something to an agent).
 [5] agent view: one agent's page.
 [6] Settings: the settings page.
 [7] driver session: the coding agent's own conversation for one agent, which the driver can resume by its session id.

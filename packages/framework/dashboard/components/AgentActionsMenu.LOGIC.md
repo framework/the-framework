@@ -1,4 +1,4 @@
-One "⋮" menu at the end of an agent's [1] action bar, holding everything the user can do to the agent other than its handoff's [2] next step: open the project on GitHub, open the agent's folder, open it in an editor, open its driver session [3], copy the command that resumes that driver session in a terminal, stop [4] the agent, arm a merge for when it finishes, remove its kept checkout [5], and delete it after a confirmation. Each item is offered only when it can honestly do what it says.
+One "⋮" menu at the end of an agent's [1] action bar, holding everything the user can do to the agent other than its next step [2]: open the project on GitHub, open the agent's folder, open it in an editor, open its driver session [3], copy the command that resumes that driver session in a terminal, stop [4] the agent, remove its kept checkout [5], and delete it after a confirmation. Each item is offered only when it can honestly do what it says.
 
 ## Context
 
@@ -8,19 +8,18 @@ One "⋮" menu at the end of an agent's [1] action bar, holding everything the u
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
-[2] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it).
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
+[2] next step: what a person can do with an ended agent's work from the dashboard: open a pull request for its branch, or merge the pull request it has.
 [3] driver session: the coding agent's own conversation for one agent, which the driver can resume by its session id.
 [4] stop: ending an agent before it finishes: the Stop button, Ctrl-C, or a pick marked to stop.
 [5] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [6] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
-[7] ready for merge: the signal an agent emits when it believes its work is complete: it flips the agent's badge from building to ready and authorizes the handoff.
 
 ## Business logic — TL;DR
 
 - **Opening the agent somewhere** - "Open on GitHub" when the project has a GitHub URL; a folder item named for what it will open; an "Open in editor" submenu with the preferred-editor picker; "Open session (<id>)" when the driver session has a real link.
 - **Copying the resume command** - when the driver session id is known, one item copies the terminal command that reopens the conversation, or just the id when the directory it ran in is unknown, and confirms with "Copied".
-- **Stop and merge, while the agent runs** - "Stop agent", which reads "Stopping…" until the agent's end arrives, and "Merge when finished", which reads "Merge armed" once sent and cannot be pressed twice.
+- **Stop, while the agent works** - "Stop agent", which reads "Stopping…" until the agent's end arrives. There is no merge here: an agent that is working publishes its own work.
 - **Remove and delete, once the agent has ended** - "Remove worktree" only while the agent's checkout is kept; "Delete session" only for a finished agent, behind a confirmation that says the history is gone for good while the branch and pull request stay in git.
 - **Failures are said in the menu** - a failed action's reason is shown at the bottom of the menu instead of nothing happening.
 
@@ -53,22 +52,19 @@ Opening the folder or the editor is disabled while another action is in flight; 
 
 Offered only when the agent's [1] events carry a driver session id. The item shows the first 8 characters of the session id at its end and the full command on hover. It reads "Copy resume command" when the directory the agent ran in is known, and copies `mkdir -p '<directory>' && cd '<directory>' && claude --resume <session id>` (built by the rule in `lib/resume-command.ts`, which sets no permission mode on purpose); otherwise it reads "Copy session id" and copies the id alone. The menu stays open on the click, and the item reads "Copied" for a moment so a click that only fills the clipboard shows something for itself.
 
-### Stop and merge, while the agent runs
+### Stop, while the agent works
 
 #### Context
 
-**User story**: the user wants to end a running agent [1], or to decide now that its pull request should be merged when it finishes, without waiting around for the end.
+**User story**: the user wants to end an agent [1] that is working.
 
-**Problem**: a merge is normally authorized by the agent's own ready for merge [7] signal; this item is the human's authorization instead. It is a pre-commitment, not a stop: the agent still ends at its own natural end and merges there.
+**Problem**: the daemon runs no agent itself, so a stop is a signal to the process the agent's own record names. And a merge decided ahead of time has no place here: an agent that is working publishes its own work, and merging its pull request is offered once it has ended, as the bar's next step [2].
 
 #### Business logic
 
-Both items appear, after a separator, only while the agent is running: its events have started and its current segment carries no end.
+"Stop agent" appears, after a separator, only while the agent is working: its events have started and its current segment carries no end. It sends a stop [4] to the agent by its id. From the click until the agent's end event arrives it reads "Stopping…" and is disabled, so a landed stop cannot be fired again. Failure: "Could not stop the session.".
 
-- "Stop agent" sends a stop [4] to the agent by its id (or to the project's own steering when no id is known). From the click until the agent's end event arrives it reads "Stopping…" and is disabled, so a landed stop cannot be fired again. Failure: "Could not stop the session.".
-- "Merge when finished" arms the merge for this agent; it needs the agent's id. Once the daemon has accepted it, the item reads "Merge armed" and stays disabled: there is nothing to press twice. Failure: "Could not arm the merge.".
-
-Switching to another agent clears both "Stopping…" and "Merge armed" so one agent's state never paints another's menu.
+Switching to another agent clears "Stopping…" so one agent's state never paints another's menu.
 
 ### Remove and delete, once the agent has ended
 
@@ -93,4 +89,4 @@ See `## Context`.
 
 #### Business logic
 
-When opening, stopping, arming the merge or removing the checkout fails, the reason is shown in the danger color at the bottom of the menu: the daemon's message when it gave one, otherwise the item's own fallback sentence quoted above.
+When opening, stopping or removing the checkout fails, the reason is shown in the danger color at the bottom of the menu: the daemon's message when it gave one, otherwise the item's own fallback sentence quoted above.

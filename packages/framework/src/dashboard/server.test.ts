@@ -9,7 +9,7 @@ import { startDashboard, type Dashboard, type DashboardOptions } from './server.
 import { isExpectedHost, isSameOriginRequest } from './rpc-serve.js'
 import { testDashboardOptions } from '../dashboard-rpc/test-context.js'
 import type { FrameworkEvent } from '../events.js'
-import type { StartAgentKind, StartAgentOptions, StartAgentResult } from './types.js'
+import type { StartAgentOptions, StartAgentResult } from './types.js'
 import type { IncomingMessage } from 'node:http'
 import { EXPECTED_EXTENSION_VERSION, EXTENSION_VERSION_HEADER } from './bridge-endpoints.js'
 import { resetBridgeStarts } from './bridge-starts.js'
@@ -159,24 +159,6 @@ test('a malformed percent-encoded path serves the SPA shell and the server survi
   }
 })
 
-test('a malformed escape inside a browser-proxy path serves the shell and the server survives (#938)', async () => {
-  const bundle = await fakeBundle()
-  const dash = await dashboard({ clientBundleDir: bundle })
-  try {
-    // Passes the pathname guard (the URL parses), enters the proxy dispatch, and only explodes
-    // at decode time inside parseBrowserRoute — the crash the round-2 pass live-repro'd.
-    const bad = await fetchText(dash.url + '/browser/p/%zz/stream')
-    assert.equal(bad.status, 200)
-    assert.match(bad.body, /<div id="root">/)
-
-    const after = await fetchText(dash.url + '/')
-    assert.equal(after.status, 200)
-  } finally {
-    await dash.close()
-    await rm(bundle, { recursive: true, force: true })
-  }
-})
-
 test('an unparseable absolute-form request target gets a 400 and the server survives (#938)', async () => {
   const bundle = await fakeBundle()
   const dash = await dashboard({ clientBundleDir: bundle })
@@ -248,8 +230,8 @@ async function guardedDashboard(): Promise<{ base: string; close: () => Promise<
 test('with a token set, every route is 401 without a cookie or ?token= (#1051)', async () => {
   const { base, close } = await guardedDashboard()
   try {
-    // The static bundle, the RPC mount, and the browser proxy are all fronted uniformly.
-    for (const path of ['/', '/assets/app.js', '/_rpc/onProjects', '/browser/p/x/stream']) {
+    // The static bundle and the RPC mount are fronted uniformly.
+    for (const path of ['/', '/assets/app.js', '/_rpc/onProjects']) {
       const res = await fetchAuth(base + path)
       assert.equal(res.status, 401, `${path} should be 401`)
       assert.match(res.body, /unauthorized/)
@@ -287,18 +269,16 @@ test('a wrong ?token= is 401, not admitted (timing-safe compare) (#1051)', async
   }
 })
 
-test('the fw_daemon cookie admits the bundle, /_rpc, and /browser (#1051)', async () => {
+test('the fw_daemon cookie admits the bundle and /_rpc (#1051)', async () => {
   const { base, close } = await guardedDashboard()
   try {
     const cookie = `fw_daemon=${TOKEN}`
     const root = await fetchAuth(`${base}/`, cookie)
     assert.equal(root.status, 200)
     assert.match(root.body, /<div id="root">/)
-    // Not 401 is the guard passing; the mount / proxy then answer on their own terms.
+    // Not 401 is the guard passing; the mount then answers on its own terms.
     const rpc = await fetchAuth(`${base}/_rpc/onProjects`, cookie)
     assert.notEqual(rpc.status, 401)
-    const browser = await fetchAuth(`${base}/browser/p/x/stream`, cookie)
-    assert.notEqual(browser.status, 401)
   } finally {
     await close()
   }
@@ -370,13 +350,13 @@ function readNdjson(url: string, cookie: string, count: number): Promise<{ statu
 // an events tail backed by a fixed list. Mirrors what the daemon wires, minus a real spawn.
 async function relayDashboard(opts: { token?: string | undefined } = { token: TOKEN }): Promise<{
   base: string
-  starts: Array<{ prompt: string; kind: StartAgentKind; options: StartAgentOptions; projectId?: string }>
+  starts: Array<{ prompt: string; options: StartAgentOptions; projectId?: string }>
   close: () => Promise<void>
 }> {
   const bundle = await fakeBundle()
-  const starts: Array<{ prompt: string; kind: StartAgentKind; options: StartAgentOptions; projectId?: string }> = []
-  const onStart = (prompt: string, kind: StartAgentKind, options: StartAgentOptions, projectId?: string): StartAgentResult => {
-    starts.push({ prompt, kind, options, ...(projectId ? { projectId } : {}) })
+  const starts: Array<{ prompt: string; options: StartAgentOptions; projectId?: string }> = []
+  const onStart = (prompt: string, options: StartAgentOptions, projectId?: string): StartAgentResult => {
+    starts.push({ prompt, options, ...(projectId ? { projectId } : {}) })
     return { ok: true, agentId: 'srv-run' }
   }
   const events: FrameworkEvent[] = [
@@ -401,7 +381,7 @@ async function relayDashboard(opts: { token?: string | undefined } = { token: TO
 test('/_relay/start needs the cookie: 401 without it, starts the run with it (#1067)', async () => {
   const { base, starts, close } = await relayDashboard()
   try {
-    const body = JSON.stringify({ prompt: 'do it', kind: 'build', options: { browser: true } })
+    const body = JSON.stringify({ prompt: 'do it', options: { model: 'opus' } })
     const unauth = await postAuth(`${base}/_relay/start`, body)
     assert.equal(unauth.status, 401) // the shared-token guard (#1051) fronts the relay too
     assert.equal(starts.length, 0)
@@ -420,11 +400,11 @@ test('/_relay/start needs the cookie: 401 without it, starts the run with it (#1
 test('/_relay/start strips a nested remote target so a relayed run never relays onward (#1067)', async () => {
   const { base, starts, close } = await relayDashboard()
   try {
-    const body = JSON.stringify({ prompt: 'x', kind: 'build', options: { remote: { url: 'http://evil', token: 'z' }, browser: true } })
+    const body = JSON.stringify({ prompt: 'x', options: { remote: { url: 'http://evil', token: 'z' }, model: 'opus' } })
     const ok = await postAuth(`${base}/_relay/start`, body, `fw_daemon=${TOKEN}`)
     assert.equal(ok.status, 200)
     assert.equal(starts[0]!.options.remote, undefined) // the onward target was dropped
-    assert.equal(starts[0]!.options.browser, true) // the rest of the options survive
+    assert.equal(starts[0]!.options.model, 'opus') // the rest of the options survive
   } finally {
     await close()
   }
@@ -464,7 +444,7 @@ test('/_relay/ping is 401 without the cookie, 200 with it, and starts nothing (#
 test('a loopback relay rejects a cross-origin POST and a rebound Host, and starts nothing', async () => {
   const { base, starts, close } = await relayDashboard({ token: undefined })
   try {
-    const body = JSON.stringify({ prompt: 'do it', kind: 'build', options: { browser: true } })
+    const body = JSON.stringify({ prompt: 'do it', options: { model: 'opus' } })
 
     const crossOrigin = await postCrossOrigin(`${base}/_relay/start`)
     assert.equal(crossOrigin.status, 403) // an Origin that is not this server: CSRF

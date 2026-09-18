@@ -4,34 +4,34 @@ Derives an agent's [1] current state from its event stream [2], as pure folds ov
 
 **User story**: the user opens an agent's page while the agent works, or hours later from the list of past agents, and both times the page says the same thing: a Stop button only while something more may come, "waiting for you" once the agent has parked, the questions it is asking, the documents it wants read, how it ended, and a pull request that is moments away rather than a page that reads as finished with nothing coming.
 
-**Business logic story**: the dashboard is a projection of the same event stream the agent appends to in its checkout [9] (`.the-framework/events.jsonl`); the rules here turn that stream into the facts the agent view, the status pill, the right rail and the actions menu render. The other folds over the same stream (the session name, ready for merge, what the handoff is armed to do, reported errors, the driver session) live in `../../src/agent-view.ts`, and the status words built on top of these facts live in `agent-status.ts`.
+**Business logic story**: the dashboard is a projection of the same event stream the agent's tool writes as the agent works — the agent's diary, in its checkout [9] and then on the data branch; the rules here turn that stream into the facts the agent view, the status pill, the right rail and the actions menu render. The other folds over the same stream (the session name, ready for merge, what the handoff is armed to do, reported errors, the driver session) live in `../../src/agent-view.ts`, and the status words built on top of these facts live in `agent-status.ts`.
 
-**Problem**: the stream the browser holds is not always exactly one agent's. The live channel keeps one subscription per project and appends everything it streams, while every agent starts its own file afresh with one opening `session` event, so a subscription that outlives an agent holds the previous agent's events before the new one's. A resumed agent also appends a second segment [10] to the same stream, after the `end` of its first. Facts that would read "was there ever an end" or "which gate is open" over the whole stream must therefore be asked of the right segment, or a fresh agent shows the prior agent's questions and a resumed agent shows as stopped while it works.
+**Problem**: an agent that is continued — its question answered, a message said to it after it ended — writes on into the same event stream [2], after the `end` of its earlier leg. Facts that would read "was there ever an end" or "which gates are open" off the whole stream would answer with a leg the agent has since left behind, so they are asked of the current segment [10]. Older records open each leg with a `session` event instead, and are cut there.
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent under The Framework's control, in its own checkout, on its own branch, streaming events, handed off when it ends.
-[2] event stream: everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface (dashboard, terminal, archive, run) is a projection of it.
-[3] gate: a question with options at which an agent stops and waits for an answer: it emits the question in its turn's final message, the dashboard shows it as a card, and the answer re-prompts the agent.
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
+[2] event stream: everything an agent does, in order, as the dashboard reads it off the agent's diary: the file the agent's tool writes one line at a time, in the agent's checkout while it has one and on the data branch once it is recorded. Every surface is a projection of it.
+[3] gate: a question with options an agent's turn ended on: the agent ends waiting for the answer, the dashboard shows the question as a card, and the answer resumes the agent.
 [4] view: a markdown document an agent pushes to the dashboard's right rail while it works.
 [5] stop: ending an agent before it finishes: the Stop button, Ctrl-C, or a pick marked to stop.
 [6] settled: said of an agent whose work has stopped and which is waiting for the user: it is alive, takes messages, and does nothing until told.
 [7] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request), `merge` (also merge it).
 [8] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
 [9] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
-[10] segment: the events of one agent from one opening `session` event up to the next `session` event or the end of the stream. A resumed agent adds a segment to its stream; a live subscription that outlives an agent holds the previous agent's segment before the new agent's. The latest segment is the agent in progress.
-[11] pick: the answer to a gate: the option or options chosen, by the user or automatically.
+[10] segment: one leg of an agent: the events from where the agent was last continued to the end of the stream. The boundary is the last `end` the agent went on after, or, in older records, the last opening `session` event. The latest segment is the agent in progress.
+[11] pick: the answer to a gate: the option or options the user chose.
 [12] turn: one prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
 [13] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later.
-[14] status snapshot: the small summary the daemon keeps beside an agent's event stream (`agent.json` next to `events.jsonl`): its status, cost, branch, pull request, what its handoff is armed to do and how the handoff reported. List surfaces read it instead of replaying the stream.
-[15] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
+[14] status snapshot: the small summary kept beside an agent's event stream, its card: its status, cost, branch and pull request. List surfaces read it instead of replaying the stream.
+[15] location: where an agent's turns ran, as its own record names it: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session). Only `local` and a device are offered today; the other two are read off agents recorded before they left the launcher.
 [16] coding agent: the CLI doing the actual work: Claude Code or Codex.
 [17] hands-off: said of an agent whose work leaves this machine, so its first prompt is the whole agent: an agent whose location is `web`.
 
 ## Business logic — TL;DR
 
-- **The current segment** - only the events from the latest opening `session` event onward are the agent in progress; a stream with no such event counts whole.
-- **Open gates** - a question opens with its `choice` event, closes with the pick carrying the same id, is replaced in place when re-asked under the same id, and every question closes when the agent ends.
+- **The current segment** - only the events after the last `end` the agent went on after (or from the latest opening `session` event, in older records) are the agent in progress; a stream with no such boundary counts whole.
+- **Open gates** - a question opens with its `choice` event and stays open through an `end` that says the agent is waiting on it; it closes when the agent goes on, when a recorded pick names it, and when the agent ends for good. The rule is shared with the daemon.
 - **Views** - one entry per view id, in first-seen order; showing a view again updates it in place.
 - **Still going** - the current segment has streamed something and holds no `end` yet; an empty stream is not going.
 - **Settled on the user** - true from a `settled` event until the next turn starts or the agent ends.
@@ -51,26 +51,32 @@ See `## Context`.
 
 #### Business logic
 
-The current segment [10] is the tail of the event stream [2] from its last `session` event, that event included, to the end of the stream. A stream holding no `session` event at all is taken whole. The right rail's views [4] tab reads only the current segment, so a fresh agent [1] never shows the previous agent's documents; the facts below that say "the current segment" are asked of this tail. The live feed shown in the agent view is cut the same way only when no agent is selected (the rule is in `use-live-events.ts`); a selected agent's feed keeps every segment.
+The current segment [10] is the tail of the event stream [2] from its latest boundary to the end of the stream. Reading the stream backwards, the boundary is whichever comes first:
+
+- an `end` event that is followed by an event of the agent's own (its text, its actions, its result): the agent went on after that end, so the end belongs to a leg it has left behind, and the segment starts right after it;
+- a `session` event, which opens each leg in older records: the segment starts at it.
+
+An `end` with nothing of the agent's own after it is no boundary: it is how the current leg ended. A stream holding no boundary at all is taken whole. So an agent that ended waiting [3], was answered, and is working again reads as working, and once it finishes it reads by its new end, not by "waiting". The right rail's views [4] tab reads only the current segment; the facts below that say "the current segment" are asked of this tail. The live feed shown in the agent view keeps every segment.
 
 ### Open gates
 
 #### Context
 
-**User story**: the agent stops on a question with options; the user sees it as a card in the transcript, answers it, and the card turns into an answered one. An agent may park on several questions at once, and the user sees all of them.
+**User story**: the agent's turn ends on a question with options; the agent ends waiting, and the user sees the question as a card in the transcript, in the right rail and among the open questions, answers it, and the agent goes on.
 
-**Problem**: an agent whose process died mid-question never records an answer. The question must not stay answerable forever once nobody is left to read its pick [11]; the `end` the daemon writes on such an agent's behalf is the only signal that the question's audience is gone.
+**Problem**: the agent has ENDED by the time the user reads its question, so "an end closes every question" would make every question unanswerable. But an agent that died or was stopped while holding a question must not stay answerable forever: nobody is left to read its pick [11].
 
 #### Business logic
 
-Gates [3] are tracked by id over the events given, in the order they first fired:
+The rule is the daemon's own, shared with it (`../../src/open-choices.ts`), so the transcript, the open-questions list and the daemon's check of an incoming pick can never disagree. Gates [3] are tracked by id over the events given, in the order they were first asked:
 
-- A `choice` event opens the gate with its id, carrying everything the question needs: its title, its options, the recommended option, whether several options may be picked, the auto-accept delay, and the file under review.
-- A `choice-resolved` event with the same id closes it.
-- A new `choice` event with an id that is already open replaces the earlier gate in place, keeping its position in the order.
-- An `end` event closes every open gate: a finished agent awaits nothing. This is what expires the question of an agent that died mid-gate.
+- A `choice` event opens the gate with its id, carrying everything the question needs: its title, its options, the recommended option, whether several options may be picked, and the file under review. Asked again under an id that is already open, the later one replaces the earlier in place.
+- An `end` event that says the agent is waiting closes nothing: the agent ended ON the question, and the answer resumes it.
+- Any later event of the agent's own (its text, its actions, its result) closes every open gate: the agent went on, so the question was answered, or the user's message took its place.
+- A `choice-resolved` event with the same id closes that gate; records from before agents ended on their questions carry these.
+- Any other `end` — done, stopped, failed — closes every open gate: nobody would read the pick.
 
-The result is the list of gates still open. The transcript uses it to tell an open gate card from an answered one (`EventList.tsx`), and a gate card is keyed by its id so a re-fired gate starts afresh.
+The result is the list of gates still open. The transcript uses it to tell an open gate card from an answered one (`EventList.tsx`), and a gate card is keyed by its id so a re-asked gate starts afresh.
 
 ### Views
 
@@ -108,7 +114,7 @@ An agent is still going when its current segment holds at least one event and no
 
 #### Business logic
 
-Read over the whole stream, latest event deciding: a `settled` event marks the agent settled [6]; a driver [13] `start` event (a new turn [12] begins) clears it; an `end` clears it too, since the agent ended outright and "still going" already says so. The agent view treats an agent as working only while its feed is live and it is not settled; once it is not working, the handoff bar reads the branch and offers the handoff.
+Only records of agents from before the launcher started agents through the project's start hook carry a `settled` event; an agent started today ends instead of parking, so it never reads as settled. Read over the whole stream, latest event deciding: a `settled` event marks the agent settled [6]; a driver [13] `start` event (a new turn [12] begins) clears it; an `end` clears it too, since the agent ended outright and "still going" already says so. The agent view treats an agent as working only while its feed is live and it is not settled; once it is not working, the handoff bar reads the branch and offers the handoff.
 
 ### How it ended
 
@@ -120,7 +126,7 @@ Read over the whole stream, latest event deciding: a `settled` event marks the a
 
 #### Business logic
 
-The outcome is read off the first `end` event of the current segment: whether it succeeded, whether the user stopped [5] it (only when the end says so explicitly; an end that does not say counts as not stopped), and the end's detail text when it carries one. While the current segment has no `end`, because the agent is still going or has just been resumed, there is no outcome at all. The agent view reads the outcome only for an agent that is no longer live.
+The outcome is read off the first `end` event of the current segment: whether it succeeded, whether the user stopped [5] it (only when the end says so explicitly; an end that does not say counts as not stopped), whether it ended waiting on a question (it then reads as waiting, not as failed), and the end's detail text when it carries one. While the current segment has no `end`, because the agent is still going or has just been resumed, there is no outcome at all. The agent view reads the outcome only for an agent that is no longer live.
 
 ### Publishing
 
@@ -130,7 +136,7 @@ The outcome is read off the first `end` event of the current segment: whether it
 
 #### Business logic
 
-An agent is publishing exactly when all three hold:
+Only records of agents from before the launcher started agents through the project's start hook carry `handoff-armed` and `handoff` events; an agent started today publishes its own work before it ends, so it never reads as publishing. An agent is publishing exactly when all three hold:
 
 - the current segment's [10] `end` reports success;
 - the current segment holds no `handoff` event yet. Every handoff reports, whether done, skipped or failed, so its report closes the window. Only the current segment is checked, because a resumed agent's earlier segment carries its own report, which must not hide the new window;

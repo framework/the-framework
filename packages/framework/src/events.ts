@@ -132,11 +132,15 @@ export function pickedIds(picked: string | readonly string[]): string[] {
 }
 
 /**
- * The single event type the whole agent streams over. It unifies three sources so
- * the dashboard (and terminal) render one timeline: the session's own narration
- * (the moat: checklist verdicts, deploy), the wrapped
- * agent's own black-box progress, and framework-level status. We own this stream
- * (guardrail #2, #165) rather than surfacing the agent's transport directly.
+ * The single type a run's timeline is read as. The framework emits none of these itself (#1774):
+ * a run's tool writes the run's diary, and every line of it is read as one of these so the
+ * dashboard and the terminal render one timeline whatever wrote it.
+ *
+ * What a diary yields today is the agent's own progress (`driver`), the session id it reports
+ * (`session-update`), the question a turn ended on (`choice`), what it cost (`usage`) and how it
+ * ended (`end`). **The rest of this union is a reading vocabulary for runs recorded before the
+ * daemon stopped running agents** — the framework's own narration back then. They are kept
+ * because that history is still on the data branch and still has to render.
  */
 export type FrameworkEvent =
   /**
@@ -221,9 +225,9 @@ export type FrameworkEvent =
    * The #326 post-merge cleanup step settled (#835): it queued the quality follow-ups,
    * queued them but did not finish cleanly, or declined with a {@link OnBeforeMergeableSkip}.
    *
-   * An event rather than stdout because the surfaces that need it cannot read stdout: a
-   * dashboard-started run is spawned with `stdio: 'ignore'`. Emitted only when the option
-   * was on, so an agent that never asked for the step stays quiet.
+   * An event rather than stdout because the surfaces that need it could not read stdout: a
+   * run started from the dashboard has none to read. Recorded only when the option was on, so
+   * a run that never asked for the step stays quiet.
    */
   | { kind: 'on-before-mergeable'; outcome: 'queued' | 'incomplete' }
   | { kind: 'on-before-mergeable'; outcome: 'skipped'; reason: OnBeforeMergeableSkip }

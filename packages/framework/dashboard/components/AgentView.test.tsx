@@ -37,7 +37,7 @@ const LIVE_EVENTS = [{ kind: 'log', message: 'the channel delivered this line' }
 const ARCHIVED = [{ kind: 'log', message: 'the archive delivered this line' }] as FrameworkEvent[]
 
 const view = (over: Partial<Parameters<typeof AgentView>[0]> = {}) => (
-  <AgentView projectId="p1" agentId="run-1" events={LIVE_EVENTS} live={false} files={[]} addContext={() => {}} {...over} />
+  <AgentView projectId="p1" agentId="run-1" events={LIVE_EVENTS} live={false} files={[]} {...over} />
 )
 
 beforeEach(() => {
@@ -117,4 +117,4 @@ describe('AgentView event source (#1026/#1383)', () => {
 })
 
 // The Resume offer (#1391) moved into the composer's submit slot (#1455): its when-offered rules
-// are AgentComposer's now, tested there — AgentView only hands `outcome` + `sessionId` down.
+// are AgentComposer's now, tested there — AgentView only hands `outcome` down.

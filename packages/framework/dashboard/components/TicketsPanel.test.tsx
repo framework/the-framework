@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { WorkspaceTicket } from '../../src/index.js'
-import { planTicketPrompt, presets } from '../../src/client.js'
+import { planTicketPrompt } from '../../src/client.js'
 import { configureFirst } from '../test-utils.js'
 
 const sendStart = vi.hoisted(() => vi.fn())
 vi.mock('../rpc/control.js', () => ({ sendStart }))
+// The picked coding agent and model ride every start; none picked here.
+vi.mock('../lib/preferences.js', () => ({ usePreferences: () => ({}) }))
 
 // The last-import stamp (#1208). Mocked at the lib boundary like every other read here: an
 // unmocked RPC stub fetches `/_rpc/<name>`, and nothing answers that behind jsdom.
@@ -59,31 +61,25 @@ describe('TicketsPanel (#697/#1144)', () => {
     render(<TicketsPanel projectId="p1" tickets={[ticket({ planned: false })]} loaded onOpen={() => {}} onAgentStarted={onAgentStarted} onSelectProject={() => {}} />)
     fireEvent.click(await screen.findByRole('button', { name: /create a plan for do the thing/i }))
     await waitFor(() => expect(sendStart).toHaveBeenCalled())
-    // A fixed prompt, so it takes the verbatim-text path rather than a build, and it is exactly the
-    // exported ask — no second, hidden copy to drift from the button (#1187).
-    expect(sendStart.mock.calls[0]?.[2]).toBe('prompt')
+    // Exactly the exported ask — no second, hidden copy to drift from the button (#1187).
     expect(sendStart.mock.calls[0]?.[1]).toBe(planTicketPrompt('2026-07-20_do-the-thing.md'))
     expect(sendStart.mock.calls[0]?.[1]).toBe('Create tickets/2026-07-20_do-the-thing.plan.md')
-    // Attended, unlike the import/update buttons: a per-ticket plan is a session you land in.
-    expect(sendStart.mock.calls[0]?.[3]).toEqual({})
+    expect(sendStart.mock.calls[0]?.[2]).toEqual({})
     await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith(expect.any(String), 'r3'))
   })
 
-  test('the start column spins up an agent working on the ticket, unattended (#1279)', async () => {
+  test('the start column spins up an agent working on the ticket', async () => {
     sendStart.mockResolvedValue({ ok: true, agentId: 'r4' })
     const onAgentStarted = vi.fn()
     const onOpen = vi.fn()
     render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onOpen={onOpen} onAgentStarted={onAgentStarted} onSelectProject={() => {}} />)
     fireEvent.click(await screen.findByRole('button', { name: /start work on do the thing/i }))
     await waitFor(() => expect(sendStart).toHaveBeenCalled())
-    // A fixed prompt on the verbatim-text path, and exactly the exported ask — no second, hidden
-    // copy to drift from the button (#1187).
-    expect(sendStart.mock.calls[0]?.[2]).toBe('prompt')
+    // Exactly the exported ask — no second, hidden copy to drift from the button (#1187).
     expect(sendStart.mock.calls[0]?.[1]).toBe(workOnTicketPrompt('2026-07-20_do-the-thing.md'))
     expect(sendStart.mock.calls[0]?.[1]).toBe('Work on tickets/2026-07-20_do-the-thing.md. Do not start any other ticket.')
-    // Unattended like the AI Queue card's play button (#1279). The prompt names the ticket; the
-    // framework records nothing else about it (#1774).
-    expect(sendStart.mock.calls[0]?.[3]).toEqual({ unattended: true })
+    // The prompt names the ticket; the framework records nothing else about it (#1774).
+    expect(sendStart.mock.calls[0]?.[2]).toEqual({})
     await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith(expect.any(String), 'r4'))
     // A sibling of the row's open button, like the plan cell: starting must not also navigate.
     expect(onOpen).not.toHaveBeenCalled()
@@ -246,14 +242,9 @@ describe('TicketsPanel (#697/#1144)', () => {
     render(<TicketsPanel projectId="p1" tickets={[]} loaded onOpen={() => {}} onAgentStarted={onAgentStarted} onSelectProject={() => {}} />)
     fireEvent.click(await screen.findByRole('button', { name: 'Update from GitHub' }))
     await waitFor(() => expect(sendStart).toHaveBeenCalled())
-    // A fixed prompt, so it takes the verbatim-text path rather than a build.
-    expect(sendStart.mock.calls[0]?.[2]).toBe('prompt')
-    // And it is the preset's own text: the onboarding checklist offers this button under the same
-    // label, so a second source here means one label, two asks. Its empty branch is the first
-    // import (#1501), which is why an empty tickets/ needs no preset of its own.
-    expect(sendStart.mock.calls[0]?.[1]).toBe(presets.updateTickets.render())
-    // Unattended (#1279): a button-fired update ends at settle instead of parking in the chat loop.
-    expect(sendStart.mock.calls[0]?.[3]).toEqual({ unattended: true })
+    // The project's own command: the onboarding checklist offers this button under the same
+    // label, so a second source here means one label, two asks.
+    expect(sendStart.mock.calls[0]?.[1]).toBe('/update-tickets')
     // The agent id is what lands you on the update session rather than the project home (#1169).
     await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith(expect.any(String), 'r1'))
   })
@@ -273,8 +264,7 @@ describe('TicketsPanel (#697/#1144)', () => {
     render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onOpen={() => {}} onAgentStarted={onAgentStarted} onSelectProject={() => {}} />)
     fireEvent.click(await screen.findByRole('button', { name: 'Update from GitHub' }))
     await waitFor(() => expect(sendStart).toHaveBeenCalled())
-    expect(sendStart.mock.calls[0]?.[2]).toBe('prompt')
-    expect(sendStart.mock.calls[0]?.[1]).toBe(presets.updateTickets.render())
+    expect(sendStart.mock.calls[0]?.[1]).toBe('/update-tickets')
     await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith(expect.any(String), 'r2'))
   })
 
@@ -340,13 +330,13 @@ describe('TicketsPanel (#697/#1144)', () => {
     render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onOpen={() => {}} onSelectProject={id => selected.push(id)} />)
     await configureFirst('Other ways to update from GitHub')
     await waitFor(() => expect(selected).toEqual(['p1']))
-    expect(takePendingDraft()).toBe(presets.updateTickets.render())
+    expect(takePendingDraft()).toBe('/update-tickets')
     cleanup()
     // And the empty panel's own button, which offers the same preset under the same label.
     render(<TicketsPanel projectId="p1" tickets={[]} loaded onOpen={() => {}} onSelectProject={id => selected.push(id)} />)
     await configureFirst('Other ways to update from GitHub')
     await waitFor(() => expect(selected).toEqual(['p1', 'p1']))
-    expect(takePendingDraft()).toBe(presets.updateTickets.render())
+    expect(takePendingDraft()).toBe('/update-tickets')
     expect(sendStart).not.toHaveBeenCalled()
   })
 

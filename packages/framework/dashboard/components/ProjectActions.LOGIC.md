@@ -2,5 +2,5 @@ The action bar at the top of the project home [1]: the project's git status on t
 
 ## Glossary
 
-[1] project home: a project's own page with the launcher (the Start form) and its composer (the prompt editor, also used for live chat).
-[2] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[1] project home: a project's own page with the launcher (the Start form) and its composer (the prompt editor, also used to say something to an agent).
+[2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.

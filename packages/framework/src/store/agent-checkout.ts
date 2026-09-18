@@ -1,15 +1,14 @@
 import { join } from 'node:path'
-import { archivedAgentPaths, readLiveMetas, EVENTS_FILE } from './agent-store.js'
+import { archivedAgentPaths, readLiveMetas } from './agent-store.js'
 import { isSafeAgentId, worktreePath } from '@gemstack/skill-branches'
 import { THE_FRAMEWORK_DIR } from '../framework-dir.js'
 import { nodeFs } from '../node-fs.js'
 
 /**
  * The checkout an agent id resolves to (#738/#797): the agent's own worktree while it exists, else
- * the project root. Live metas first — a running agent records its cwd — then the worktree
- * directory itself, which exists before the agent has written its `agent.json` (#766): the daemon
- * creates the directory and spawns the process, and only then does the agent write its meta, so
- * a lookup by agent state alone misses an agent that certainly exists.
+ * the project root. The checkouts' cards first, then the worktree directory itself, which exists
+ * before the run's tool has written the card (#766), so a lookup by card alone misses a run that
+ * certainly exists.
  *
  * The directory probe matters beyond a slow first read: the event stream resolves its path once,
  * when the browser opens it. Falling back to the project root would not self-correct a moment
@@ -31,38 +30,23 @@ export async function resolveAgentCheckout(projectCwd: string, agentId: string |
 }
 
 /**
- * The events journal a run-scoped subscribe should tail (#1472). Follows
- * {@link resolveAgentCheckout}'s order — live meta cwd, then the worktree — but where that
- * resolution would fall back to the project root, an ended agent's **archived** `<id>.jsonl`
- * wins: the archive existing proves the agent ended, and it is the agent's own record, where the
- * root journal belongs to whatever root run wrote it last. The root journal stays the final
- * fallback for the no-archive residue, so a just-starting root agent (no meta yet, #766, and no
- * worktree to probe) streams exactly as before.
+ * The diary a run-scoped subscribe should tail (#1472, #1774): the run's own `<id>.jsonl`.
+ * While the run has a checkout it is there, under the checkout's `.the-framework/`, written by
+ * the run's tool as the agent works. Once the run is recorded and its checkout reclaimed, it is
+ * the `logs` skill's copy on the data branch. A run that has neither yet was started a moment
+ * ago: its tool has not made the checkout, so the answer is where the diary will appear, and the
+ * tail waits for it there.
  *
  * Only the events tails resolve here; every other run-addressed surface keeps
  * {@link resolveAgentCheckout}'s root fallback, where the project's own state is the sane
  * thing to act on.
  */
-/**
- * The live journal in a checkout: the framework's own `events.jsonl`, or, for a run another tool
- * started (#1774), the diary agent-driver's log keeps beside its card, `<id>.jsonl`, whose lines
- * the tail turns into events.
- */
-async function liveJournal(checkout: string, agentId: string): Promise<string> {
-  const own = join(checkout, THE_FRAMEWORK_DIR, EVENTS_FILE)
-  if (await nodeFs().exists(own)) return own
-  const diary = join(checkout, THE_FRAMEWORK_DIR, `${agentId}.jsonl`)
-  return (await nodeFs().exists(diary)) ? diary : own
-}
-
-export async function resolveAgentEventsPath(projectCwd: string, agentId: string | undefined): Promise<string> {
-  const rootJournal = join(projectCwd, THE_FRAMEWORK_DIR, EVENTS_FILE)
-  if (!agentId || !isSafeAgentId(agentId)) return rootJournal
+export async function resolveAgentEventsPath(projectCwd: string, agentId: string | undefined): Promise<string | undefined> {
+  if (!agentId || !isSafeAgentId(agentId)) return undefined
   const live = await readLiveMetas(projectCwd).catch(() => [])
-  const running = live.find(agent => agent.id === agentId)?.cwd
-  if (running) return liveJournal(running, agentId)
-  const path = worktreePath(projectCwd, agentId)
-  if (await nodeFs().isDirectory(path)) return liveJournal(path, agentId)
-  const [, archivedEvents] = await archivedAgentPaths(projectCwd, agentId)
-  return archivedEvents ?? rootJournal
+  const checkout = live.find(agent => agent.id === agentId)?.cwd ?? worktreePath(projectCwd, agentId)
+  const liveDiary = join(checkout, THE_FRAMEWORK_DIR, `${agentId}.jsonl`)
+  if (await nodeFs().isDirectory(checkout)) return liveDiary
+  const [, recorded] = await archivedAgentPaths(projectCwd, agentId)
+  return recorded !== undefined && (await nodeFs().exists(recorded)) ? recorded : liveDiary
 }

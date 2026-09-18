@@ -1,13 +1,13 @@
-What the tests cover, for the composer at the bottom of an agent's page:
+What the tests cover, for the box at the bottom of an agent view:
 
-- **Stop in the slot** - a running agent offers "Stop agent" in the empty box's submit slot; pressing it stops this agent, and the button stays disabled ("Stopping…") until the agent is no longer running, so a landed stop is never fired twice; the latch releases when the agent stops being live, so the same agent resumed later gets a working Stop again.
-- **Resume in the slot** - an agent stopped with a known driver session id offers "Resume", which starts a prompt agent resuming that driver session, written into the same agent, carrying the stock resume message, and the page jumps to it; a resume the daemon refuses shows "An agent is already active for this project." and does not navigate.
-- **No control for other endings** - an agent that finished on its own offers neither "Resume" nor "Stop agent"; a stopped agent that never reported a session id offers no "Resume".
-- **No flicker after Resume** - after pressing "Resume", the slot holds a disabled Resume until the agent reads as running, then hands over to "Stop agent".
-- **A message to a running agent** - an ordinary send goes to this agent as a live chat message, starts nothing and does not navigate.
-- **A "new agent" preset while running** - starts its own prompt agent with the preset's text, never messages the running agent, carries no resume seed and no link to this agent, and the page follows the agent it started; a refused start shows "An agent is already active for this project." and does not navigate.
-- **Continuing an ended agent** - the note says "Session stopped — your next message resumes it." for a stopped agent; a send starts a prompt agent seeded with the finished agent's driver session id and written into the same agent, never a message; the page jumps to it.
-- **The driver the agent ran under** - a continuation resumes on the agent's own driver, ignoring the preferences: an agent that ran under Claude sends no driver or model choice, one that ran under Codex resumes on Codex; the composer offers no driver or model selector for an ended agent.
-- **The busy guard** - a continuation the daemon refuses shows "An agent is already active for this project." and does not navigate.
-- **Ended without a session id** - the composer stays, with the placeholder saying the agent can't be continued and no note above the box; the send button's busy label is "Starting…"; a send starts a fresh agent with the text, with no resume seed and no link to this agent, and the page jumps to it.
-- **The options gear** - a running agent tells the composer it has not ended (gear hidden); an ended agent tells it so, bringing the "Resume options" gear back.
+- **The slot while the agent works** - the empty box offers "Stop agent"; pressing it stops this agent [1], and the "Stopping…" hold releases when the stop lands, so an agent that is resumed gets a working Stop again.
+- **The slot once the agent was stopped** - the empty box offers "Resume", which says the stock continuation message to this same agent; a refused Resume shows the daemon's own words instead of pretending to resume; after a Resume that went through, the slot holds a busy Resume until the agent reads as working, with no flicker.
+- **No slot control otherwise** - an agent that finished on its own, and one waiting [2] on its question, offer neither Stop nor Resume.
+- **A send to a working agent** - the text goes to the daemon as a message for this agent, and the box says it is queued until the agent's turn ends; a refused message shows why and is not reported as queued.
+- **A send to an ended agent** - the box says the session can be continued; the send is the same message call, and the shell is told to follow the same agent; a refused resume shows why and the shell is told nothing.
+- **What is left out** - no coding agent and model select and no "Run on" pick, since an agent cannot change either.
+
+## Glossary
+
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook.
+[2] waiting: how an agent that ended on a question reads: not working, its checkout kept, resumed by the answer or by the user's next message.

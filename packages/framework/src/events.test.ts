@@ -2,12 +2,6 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { pickedIds, type OnBeforeMergeableSkip } from './events.js'
 import { formatFrameworkEvent } from './terminal.js'
-import { SESSION_ID_PLACEHOLDER, hasSessionIdPlaceholder, resolveSessionLink } from './session-link.js'
-
-test('hasSessionIdPlaceholder distinguishes templates from literal URLs', () => {
-  assert.equal(hasSessionIdPlaceholder(`https://x.dev/s/${SESSION_ID_PLACEHOLDER}`), true)
-  assert.equal(hasSessionIdPlaceholder('https://x.dev/live'), false)
-})
 
 test('pickedIds normalizes a single id or a subset to a list (#332)', () => {
   assert.deepEqual(pickedIds('proceed'), ['proceed'])
@@ -80,14 +74,6 @@ test('formatFrameworkEvent renders a resolved subset, and (none) when empty (#33
     formatFrameworkEvent({ kind: 'choice-resolved', id: 'plan', picked: 'proceed', by: 'user' }),
     '  ✓ chose proceed (user)',
   )
-})
-
-test('resolveSessionLink fills the placeholder and is a no-op for a literal', () => {
-  assert.equal(resolveSessionLink('https://x.dev/s/{sessionId}', 'abc123'), 'https://x.dev/s/abc123')
-  // Every occurrence is replaced.
-  assert.equal(resolveSessionLink('{sessionId}-{sessionId}', 'z'), 'z-z')
-  // A literal (no placeholder) comes back unchanged.
-  assert.equal(resolveSessionLink('https://x.dev/live', 'abc123'), 'https://x.dev/live')
 })
 
 test('formatFrameworkEvent renders a session-update line', () => {

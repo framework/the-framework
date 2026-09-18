@@ -195,7 +195,7 @@ describe('EventList inline choice rows (#1455 item 6)', () => {
   test('an open gate renders the interactive panel, and a pick posts against the run', () => {
     render(<EventList events={[gate()]} stick={false} projectId="p1" agentId="r1" />)
     fireEvent.click(screen.getByText('Work on it'))
-    expect(sendChoice).toHaveBeenCalledWith('p1', 'gate-1', 'work', 'user', 'r1')
+    expect(sendChoice).toHaveBeenCalledWith('p1', 'gate-1', 'work', 'r1')
   })
 
   test('without a projectId the row keeps the formatter text', () => {
@@ -229,50 +229,20 @@ describe('EventList inline choice rows (#1455 item 6)', () => {
     expect(screen.getByText(/Start the next backlog item\?/)).toBeTruthy()
   })
 
+  test('a run that ended waiting on its question keeps the question answerable, until the agent goes on (#1774)', () => {
+    const waiting: FrameworkEvent = { kind: 'end', ok: false, waiting: true }
+    const { rerender } = render(<EventList events={[gate(), waiting]} stick={false} projectId="p1" agentId="r1" />)
+    fireEvent.click(screen.getByText('Work on it'))
+    expect(sendChoice).toHaveBeenCalledWith('p1', 'gate-1', 'work', 'r1')
+    // The answer resumed the run: its next turn closes the question.
+    const next: FrameworkEvent = { kind: 'driver', event: { type: 'text', text: 'On it.' } }
+    rerender(<EventList events={[gate(), waiting, next]} stick={false} projectId="p1" agentId="r1" />)
+    expect(screen.queryByRole('button', { name: /Work on it/ })).toBeNull()
+  })
+
   test('only the latest firing of a re-fired gate is interactive', () => {
     render(<EventList events={[gate(), gate()]} stick={false} projectId="p1" agentId="r1" />)
     expect(screen.getAllByText('Work on it')).toHaveLength(1)
-  })
-})
-
-// The latest `browser` row hosts the live inline preview (#1455 item 6b); earlier rows and the
-// a log rendered without them keeps the formatter's text, and an ended agent's pane degrades (#1359).
-describe('EventList inline browser rows (#1455 item 6b)', () => {
-  const browser = (url = 'https://app.test/'): FrameworkEvent => ({ kind: 'browser', url })
-
-  test('the latest browser row hosts the pane; an earlier one keeps its one-liner', () => {
-    render(
-      <EventList events={[browser('https://a.test/'), browser('https://b.test/')]} stick={false} projectId="p1" agentId="r1" />,
-    )
-    expect(screen.getAllByAltText("The agent's browser")).toHaveLength(1)
-    expect(screen.getByText(/browser: https:\/\/a\.test\//)).toBeTruthy()
-  })
-
-  test('a re-said URL replaces its earlier row instead of stacking (the view re-show rule)', () => {
-    render(
-      <EventList events={[browser('https://a.test/'), browser('https://a.test/')]} stick={false} projectId="p1" agentId="r1" />,
-    )
-    expect(screen.getAllByAltText("The agent's browser")).toHaveLength(1)
-    expect(screen.queryByText(/browser: https:\/\/a\.test\//)).toBeNull()
-  })
-
-  test('after end, a pane with no captured frame degrades to the one-liner (#1359)', () => {
-    render(
-      <EventList events={[browser('https://a.test/'), { kind: 'end', ok: true }]} stick={false} projectId="p1" agentId="r1" />,
-    )
-    expect(screen.queryByAltText("The agent's browser")).toBeNull()
-    expect(screen.getByText(/browser · https:\/\/a\.test\//)).toBeTruthy()
-  })
-
-  test('without a agentId the row keeps the formatter text', () => {
-    render(<EventList events={[browser()]} stick={false} projectId="p1" />)
-    expect(screen.queryByAltText("The agent's browser")).toBeNull()
-    expect(screen.getByText(/browser: https:\/\/app\.test\//)).toBeTruthy()
-  })
-
-  test('a browser badge is primary — a pushed surface', () => {
-    render(<EventList events={[browser()]} stick={false} />)
-    expect(screen.getByText('browser').className).toContain('text-primary')
   })
 })
 

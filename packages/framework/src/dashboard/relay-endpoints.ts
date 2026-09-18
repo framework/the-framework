@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { FrameworkEvent } from '../events.js'
-import type { StartAgentKind, StartAgentOptions, StartAgentResult } from './types.js'
+import type { StartAgentOptions, StartAgentResult } from './types.js'
 import { end, readJsonBody, requireGet, sendJson } from './http.js'
 
 /**
@@ -24,7 +24,7 @@ export const RELAY_PREFIX = '/_relay'
 
 /** What the daemon wires behind the relay endpoints: its own start closure and an events tail. */
 export interface RelayHandlers {
-  start: (prompt: string, kind: StartAgentKind, options: StartAgentOptions, projectId?: string) => StartAgentResult | Promise<StartAgentResult>
+  start: (prompt: string, options: StartAgentOptions, projectId?: string) => StartAgentResult | Promise<StartAgentResult>
   tailEvents: (agentId: string, onEvent: (event: FrameworkEvent) => void) => () => void
   /** Run one whitelisted read/steer/handoff RPC against THIS device's own checkout, for the daemon
    *  relaying an agent here (#1067 slice 2); the caller wraps the result as {result}. */
@@ -34,7 +34,6 @@ export interface RelayHandlers {
 /** The body `POST /_relay/start` accepts: exactly what a local Start needs, minus any project id. */
 interface RelayStartBody {
   prompt?: unknown
-  kind?: unknown
   options?: unknown
 }
 
@@ -74,13 +73,12 @@ async function handleStart(req: IncomingMessage, res: ServerResponse, handlers: 
     return end(res, 400, 'invalid request body')
   }
   const prompt = typeof body.prompt === 'string' ? body.prompt : ''
-  const kind: StartAgentKind = body.kind === 'research' || body.kind === 'prompt' ? body.kind : 'build'
   const options = (body.options && typeof body.options === 'object' ? body.options : {}) as StartAgentOptions
   // Never relay onward from a relayed agent: strip any nested target before starting it here.
   const { remote: _drop, ...local } = options
   let result: StartAgentResult
   try {
-    result = await handlers.start(prompt, kind, local, undefined)
+    result = await handlers.start(prompt, local, undefined)
   } catch (err) {
     result = { ok: false, error: err instanceof Error ? err.message : String(err) }
   }

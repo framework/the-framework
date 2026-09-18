@@ -86,24 +86,3 @@ test('queue a ticket, and the boards show it queued (#1164)', async () => {
     await world.close()
   }
 })
-
-test('a prompt that is not about the queue leaves the queue alone', async () => {
-  const world = await makeWorld()
-  const rpc = world.rpc
-  try {
-    const project = await world.addProject({
-      'README.md': '# fixture\n',
-      [`tickets/${TICKET_FILE}`]: TICKET,
-    })
-    await rpc(sendQueueTicket)(project.id, 'Login page', { file: TICKET_FILE, priority: '8' })
-
-    const agentId = await world.startAgent(project, 'Look into the flaky CI job')
-    await world.waitAgent(project, agentId, 'done')
-    assert.ok((await rpc(onAgents)(project.id)).some(r => r.id === agentId), 'the run is on the list')
-    // The queue entry is still open: nothing consumed it.
-    const projectQueue = (await rpc(onQueue)()).find(q => q.projectId === project.id)
-    assert.equal(projectQueue?.open, 1)
-  } finally {
-    await world.close()
-  }
-})

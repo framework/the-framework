@@ -2,11 +2,11 @@ Decides what an agent [1] is called wherever the dashboard lists agents, from th
 
 ## Context
 
-**User story**: the user scans a list of agents and tells the rows apart by their first line. Many agents record no request of their own — one launched from a preset, or resumed outside the dashboard — so the line must still name something real about them rather than announce that there is no prompt and leave the row to be recognized by the small print beside it.
+**User story**: the user scans a list of agents and tells the rows apart by their first line. Many agents record no request of their own — one launched from a command, or resumed outside the dashboard — so the line must still name something real about them rather than announce that there is no prompt and leave the row to be recognized by the small print beside it.
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent under The Framework's control, in its own checkout, on its own branch, streaming events, handed off when it ends.
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
 [3] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [4] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.

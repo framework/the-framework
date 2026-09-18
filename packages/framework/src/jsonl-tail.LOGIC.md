@@ -1,22 +1,20 @@
-Follows an append-only JSONL file, one JSON value per line, delivering each complete line exactly once as it is written: the daemon tails an agent's [1] event stream [2] this way for the dashboard, and an agent's process tails its control file [3] the same way for steering. A reader sees only what was appended since it last looked and never a half-written line; a file truncated or rewritten by a fresh agent is read again from the start; a file relocated intact is followed from the same offset; and the follower that drives the reads survives everything that can go wrong in it.
+Follows an append-only JSONL file, one JSON value per line, delivering each complete line exactly once as it is written: the daemon tails an agent's [1] event stream [2] this way for the dashboard. A reader sees only what was appended since it last looked and never a half-written line; a file truncated or rewritten is read again from the start; a file relocated intact is followed from the same offset; and the follower that drives the reads survives everything that can go wrong in it.
 
 ## Context
 
-**Business logic story**: the file is the seam between an agent and the daemon. The agent appends events to `.the-framework/events.jsonl` in its checkout [4] and the dashboard is a projection of that file; the daemon appends stops, picks and messages to `.the-framework/control.jsonl` and the agent's process reads them from there. Neither side talks to the other directly, so the tail has to be right about what is new, what is torn, and what was replaced.
+**Business logic story**: the file is the seam between an agent and the daemon. The tool that runs the agent appends to the agent's diary in the agent's checkout [3] and the dashboard is a projection of that file; that tool never talks to the daemon. So the tail has to be right about what is new, what is torn, and what was replaced — nobody is going to tell it.
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
-[2] event stream: everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface (dashboard, terminal, archive, run) is a projection of it.
-[3] control file: `.the-framework/control.jsonl`: the file the daemon appends steering to (stops, picks, chat messages) and the agent's process tails.
-[4] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
-[5] archive: the transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
+[1] agent: the unit of work: one task worked by a coding agent, in its own checkout, on its own branch, keeping a diary of what it does, publishing its own work when it ends.
+[2] event stream: everything an agent does, one event per line of the agent's diary — the file `<id>.jsonl` the tool that runs the agent writes under `.the-framework/` in the agent's checkout, copied onto the `agent-data` branch when the agent ends. Every surface (dashboard, terminal, replay) is a projection of it.
+[3] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 
 ## Business logic — TL;DR
 
 - **Only what is new** - each read starts where the previous one ended and delivers the complete lines appended since; a file that does not exist yet delivers nothing and is not an error.
 - **A torn line waits for its newline** - the trailing fragment without a newline is held back and delivered once the rest arrives; a line that still does not parse is skipped, because the file never rewrites history.
-- **Truncation and rewrite restart the read** - a file that shrank below what was consumed, or that was rewritten to the same length, is read again from the top, so a fresh agent's stream replaces the old one.
+- **Truncation and rewrite restart the read** - a file that shrank below what was consumed, or that was rewritten to the same length, is read again from the top, so replaced content is delivered instead of being waited on.
 - **Relocation carries the offset** - when the file is copied intact elsewhere, the tail is pointed at the copy and continues from the same offset, delivering only the lines the move would have swallowed and replaying nothing.
 - **The follower never dies** - change notifications trigger reads and a periodic poll guarantees them; reads never overlap; a failed read or a broken watcher is survived and the poll carries on alone; a follower marked as not holding the process open releases both its handles.
 
@@ -46,7 +44,7 @@ Whatever follows the last newline is kept back as a fragment and prepended to th
 
 #### Context
 
-**Business logic story**: a fresh agent [1] starting in a checkout [4] truncates the event stream [2] in place, and a new control file [3] replaces the old one. The reader must switch to the new content instead of waiting for the old file to grow past where it was.
+**Business logic story**: a file the tail is following can be replaced in place by a shorter or an equally long one. The reader must switch to the new content instead of waiting for the old file to grow past where it was.
 
 #### Business logic
 
@@ -56,7 +54,7 @@ Two signs mean the file was replaced: its size fell below what was consumed, or 
 
 #### Context
 
-**Business logic story**: at teardown an agent's [1] events are copied verbatim into the archive [5] and its checkout [4] is removed; on a continuation the copy is restored into a checkout. A tail fixed on the old path would go silent without the agent's final events.
+**Business logic story**: when an agent [1] ends, its tool copies the agent's diary verbatim onto the project's `agent-data` branch and reclaims the checkout [3]; a resumed agent writes on in a checkout again. A tail fixed on the old path would go silent without the agent's final lines.
 
 #### Business logic
 
@@ -66,8 +64,8 @@ A tail can be pointed at the file's new home while keeping its offset. Because t
 
 #### Context
 
-**Problem**: the follower runs unattended for the life of an agent [1] or of the dashboard. A read that fails (a network mount, a directory where a file was expected, a file grown past what can be read at once) or a watcher that errors would, unhandled, end the process; and a tail that holds the process open would keep a finished agent alive forever.
+**Problem**: the follower runs unattended for the life of an agent [1] or of the dashboard. A read that fails (a network mount, a directory where a file was expected, a file grown past what can be read at once) or a watcher that errors would, unhandled, end the process; and a tail that holds the process open would keep a finished process alive forever.
 
 #### Business logic
 
-A follower watches the file's directory for change notifications, which give latency, and polls on a fixed period, which guarantees delivery where notifications are unreliable; the first read happens at once so whatever is already written is delivered. Reads are serialized: a trigger arriving during a read is dropped, since the read in progress picks up the same bytes. A read that fails is swallowed and retried at the next trigger, not logged, because a persisting fault would otherwise print once per poll forever. A watcher that errors is dropped and the poll alone carries the tail, which is a complete tail on its own. A follower started as not holding the process open releases both the poll and the watch, since either one alone would keep the process alive; this is how steering alone never keeps a finished agent's process running. Stopping the follower ends both.
+A follower watches the file's directory for change notifications, which give latency, and polls on a fixed period, which guarantees delivery where notifications are unreliable; the first read happens at once so whatever is already written is delivered. Reads are serialized: a trigger arriving during a read is dropped, since the read in progress picks up the same bytes. A read that fails is swallowed and retried at the next trigger, not logged, because a persisting fault would otherwise print once per poll forever. A watcher that errors is dropped and the poll alone carries the tail, which is a complete tail on its own. A follower started as not holding the process open releases both the poll and the watch, since either one alone would keep the process alive. Stopping the follower ends both.

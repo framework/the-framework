@@ -30,34 +30,6 @@ export function nodeGhRunner(): GhRunner {
  */
 const readGh = cliRunner({ bin: 'gh', timeoutMs: 8_000 })
 
-/**
- * The GitHub token an Actions run authenticates with (#1352).
- *
- * `GH_TOKEN` / `GITHUB_TOKEN` win, because CI sets them and must beat whatever `gh` happens to be
- * logged in as on the runner. With neither set, fall back to the `gh` CLI's own credential — the
- * same one every PR this framework opens is already authenticated by. A machine that can open a PR
- * could always have run an Actions session too; it just had no way to say so, and the agent failed
- * with the credential sitting one `gh auth token` away.
- *
- * Undefined when there is no token to be had (gh missing, logged out, or refusing to hand it over),
- * which the caller turns into the agent's stated reason for not starting. Deliberately quiet about
- * *why* gh declined: the caller's message names both ways to fix it, and a keyring prompt's stderr
- * is not something to put in front of someone who simply has not set GH_TOKEN.
- */
-export async function githubToken(
-  cwd: string,
-  env: Record<string, string | undefined> = process.env,
-  gh: GhRunner = readGh,
-): Promise<string | undefined> {
-  const fromEnv = env['GH_TOKEN'] ?? env['GITHUB_TOKEN']
-  if (fromEnv) return fromEnv
-  try {
-    return (await gh(['auth', 'token'], cwd)).trim() || undefined
-  } catch {
-    return undefined
-  }
-}
-
 /** A forgiving `gh --json` read: resolves `empty` when gh is missing/unauthed, or its output is not JSON. */
 export async function ghJson<T>(args: string[], cwd: string, empty: T, gh: GhRunner = readGh): Promise<T> {
   try {
@@ -340,39 +312,6 @@ export async function ghPrCiStatus(cwd: string, number: number, gh: GhRunner = r
   return { checks, failed, ...head }
 }
 
-/** Whether the repo lets PRs use GitHub auto-merge (#1417); `known: false` when `gh` could not say. */
-export interface RepoAutoMerge {
-  known: boolean
-  allowed: boolean
-}
-
-/**
- * Whether this repo allows GitHub auto-merge (#1417).
- *
- * An armed merge on a repo that does not (the {@link DIRECT_MERGE_FALLBACK} half of #1216) is
- * handed to the daemon's CI watch (#1418): merge on green, but only while the daemon runs — so
- * the launcher notes the local fallback and names the server-side Allow auto-merge setup.
- * `known: false` (gh missing, unauthenticated, not a GitHub repo) is "could not say", which
- * renders nothing: no crying wolf, same stance as the trust (#1318) read.
- *
- * The probe is the REST endpoint, not `gh repo view --json autoMergeAllowed`: `repo view` has no
- * such field (any gh version), so that spelling always errored into "could not say". REST omits
- * `allow_auto_merge` for viewers without push access — absent lands in the same "could not say".
- */
-export async function ghRepoAutoMerge(cwd: string, gh: GhRunner = readGh): Promise<RepoAutoMerge> {
-  try {
-    const parsed = JSON.parse(await gh(['api', 'repos/{owner}/{repo}'], cwd)) as { allow_auto_merge?: unknown }
-    if (typeof parsed.allow_auto_merge !== 'boolean') return { known: false, allowed: false }
-    return { known: true, allowed: parsed.allow_auto_merge }
-  } catch {
-    return { known: false, allowed: false }
-  }
-}
-
-/** The cached form of {@link ghRepoAutoMerge} (#1028): the launcher polls, the setting barely changes. */
-export async function cachedRepoAutoMerge(cwd: string): Promise<Cached<RepoAutoMerge>> {
-  return cachedRead(['auto-merge-allowed', cwd].join(KEY_SEP), () => ghRepoAutoMerge(cwd), { ttlMs: 5 * 60_000 })
-}
 
 /** The cached form of {@link ghPrsForBranch}, shared through the same read-through cache (#1028). */
 export async function cachedPrsForBranch(cwd: string, branch: string): Promise<Cached<LinkedPr[]>> {

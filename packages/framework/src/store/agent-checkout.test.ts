@@ -4,7 +4,6 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises'
 import { resolveAgentEventsPath } from './agent-checkout.js'
-import { EVENTS_FILE, ARCHIVE_DIR } from './agent-store.js'
 import { worktreePath } from '@gemstack/skill-branches'
 import { THE_FRAMEWORK_DIR } from '../framework-dir.js'
 import { DATA_BRANCH, fileBranchPath } from '@gemstack/agent-data'
@@ -20,73 +19,68 @@ async function makeProject(): Promise<string> {
   return cwd
 }
 
-const rootJournal = (cwd: string): string => join(cwd, THE_FRAMEWORK_DIR, EVENTS_FILE)
+/** Where the run's diary is while it has a checkout: written there by the run's tool. */
+const liveDiary = (cwd: string): string => join(worktreePath(cwd, RUN_ID), THE_FRAMEWORK_DIR, `${RUN_ID}.jsonl`)
 
-async function seedArchive(cwd: string, agentsDir: string): Promise<string> {
+async function seedRecord(cwd: string): Promise<string> {
+  const agentsDir = join(fileBranchPath(cwd, DATA_BRANCH), RUNS_DIR, 'someone')
   await mkdir(agentsDir, { recursive: true })
   await writeFile(join(agentsDir, `${RUN_ID}.json`), '{}')
-  const events = join(agentsDir, `${RUN_ID}.jsonl`)
-  await writeFile(events, '')
-  return events
+  const diary = join(agentsDir, `${RUN_ID}.jsonl`)
+  await writeFile(diary, '')
+  return diary
 }
 
-test('resolveAgentEventsPath: no run id (and unsafe ids) resolve to the root journal', async () => {
+test('resolveAgentEventsPath: no run id, and an unsafe one, have no diary', async () => {
   const cwd = await makeProject()
   try {
-    assert.equal(await resolveAgentEventsPath(cwd, undefined), rootJournal(cwd))
-    assert.equal(await resolveAgentEventsPath(cwd, '../escape'), rootJournal(cwd))
+    assert.equal(await resolveAgentEventsPath(cwd, undefined), undefined)
+    assert.equal(await resolveAgentEventsPath(cwd, '../escape'), undefined)
   } finally {
     await rm(cwd, { recursive: true, force: true })
   }
 })
 
-test('resolveAgentEventsPath: an existing worktree resolves to its own journal', async () => {
+test('resolveAgentEventsPath: a run with a checkout resolves to the diary in it', async () => {
   const cwd = await makeProject()
   try {
-    const worktree = worktreePath(cwd, RUN_ID)
-    await mkdir(worktree, { recursive: true })
-    assert.equal(await resolveAgentEventsPath(cwd, RUN_ID), join(worktree, THE_FRAMEWORK_DIR, EVENTS_FILE))
+    await mkdir(worktreePath(cwd, RUN_ID), { recursive: true })
+    assert.equal(await resolveAgentEventsPath(cwd, RUN_ID), liveDiary(cwd))
   } finally {
     await rm(cwd, { recursive: true, force: true })
   }
 })
 
-test('resolveAgentEventsPath: an ended run (worktree gone) resolves to its archived log, not the root journal (#1472)', async () => {
+test('resolveAgentEventsPath: an ended run (checkout gone) resolves to its recorded diary, under whichever person it is filed (#1472/#1769)', async () => {
   const cwd = await makeProject()
   try {
-    const events = await seedArchive(cwd, join(cwd, THE_FRAMEWORK_DIR, ARCHIVE_DIR))
-    assert.equal(await resolveAgentEventsPath(cwd, RUN_ID), events)
+    const diary = await seedRecord(cwd)
+    assert.equal(await resolveAgentEventsPath(cwd, RUN_ID), diary)
   } finally {
     await rm(cwd, { recursive: true, force: true })
   }
 })
 
-test('resolveAgentEventsPath: finds a run filed under a person on the data branch (#1179/#1582/#1769)', async () => {
+test('resolveAgentEventsPath: a checkout beats the record (a resumed run)', async () => {
   const cwd = await makeProject()
   try {
-    const events = await seedArchive(cwd, join(fileBranchPath(cwd, DATA_BRANCH), RUNS_DIR, 'someone'))
-    assert.equal(await resolveAgentEventsPath(cwd, RUN_ID), events)
+    await seedRecord(cwd)
+    await mkdir(worktreePath(cwd, RUN_ID), { recursive: true })
+    assert.equal(await resolveAgentEventsPath(cwd, RUN_ID), liveDiary(cwd))
   } finally {
     await rm(cwd, { recursive: true, force: true })
   }
 })
 
-test('resolveAgentEventsPath: a live worktree beats a stale archive (a resumed run)', async () => {
+test('resolveAgentEventsPath: a run started a moment ago, with no checkout and no diary yet, resolves to where its diary will appear (#1774)', async () => {
   const cwd = await makeProject()
   try {
-    await seedArchive(cwd, join(cwd, THE_FRAMEWORK_DIR, ARCHIVE_DIR))
-    const worktree = worktreePath(cwd, RUN_ID)
-    await mkdir(worktree, { recursive: true })
-    assert.equal(await resolveAgentEventsPath(cwd, RUN_ID), join(worktree, THE_FRAMEWORK_DIR, EVENTS_FILE))
-  } finally {
-    await rm(cwd, { recursive: true, force: true })
-  }
-})
-
-test('resolveAgentEventsPath: an unknown id with no archive keeps the root-journal fallback (#766 root runs)', async () => {
-  const cwd = await makeProject()
-  try {
-    assert.equal(await resolveAgentEventsPath(cwd, RUN_ID), rootJournal(cwd))
+    assert.equal(await resolveAgentEventsPath(cwd, RUN_ID), liveDiary(cwd))
+    // The start's marker may be on the branch already, a card with no diary: still the checkout's.
+    const agentsDir = join(fileBranchPath(cwd, DATA_BRANCH), RUNS_DIR, 'someone')
+    await mkdir(agentsDir, { recursive: true })
+    await writeFile(join(agentsDir, `${RUN_ID}.json`), '{}')
+    assert.equal(await resolveAgentEventsPath(cwd, RUN_ID), liveDiary(cwd))
   } finally {
     await rm(cwd, { recursive: true, force: true })
   }

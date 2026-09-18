@@ -6,16 +6,11 @@ import { Button } from './ui/button.js'
 import { Checkbox } from './ui/checkbox.js'
 import { cn } from '../lib/utils.js'
 
-// "Your call" — the interactive gate the agent parks on (#304/#332), rendered from the
-// live event stream and posted back over the control RPC (rpc/control.ts) to the
-// project's control.jsonl. One shape: a question with options, picked one at a time or
-// several at once (#332). There were three — an Approve/Decline confirm got its own green and
-// red buttons — but an approval is a question with two options, and rendering it as its own
-// card only meant the agent had to know which of three blocks to emit. It always asks: a gate
-// only reaches a panel when somebody is watching, and a session nobody is watching resolves
-// its gates to the recommended option without one. The panel clears itself when the resulting
-// `choice-resolved` event streams in
-// (pendingChoices drops it); mount it with `key={choice.id}` so a re-fired gate resets state.
+// "Your call" — the question a run stopped on (#304/#332), rendered from the run's events and
+// answered over the control RPC (rpc/control.ts), which hands the chosen labels to the run. One
+// shape: a question with options, picked one at a time or several at once (#332). The panel
+// clears itself when the agent goes on (pendingChoices drops the question); mount it with
+// `key={choice.id}` so a question asked again resets state.
 // `active` (the first gate in the right rail, #440) binds Ctrl+Enter to Accept.
 export function ChoicePanel({
   projectId,
@@ -27,7 +22,7 @@ export function ChoicePanel({
   send,
 }: {
   projectId: string
-  /** Which run the pick resolves (#749); absent falls back to the project's control log. */
+  /** Which run the pick answers (#749). */
   agentId?: string | null | undefined
   choice: ChoiceRequest
   active?: boolean
@@ -37,11 +32,11 @@ export function ChoicePanel({
   /**
    * Told once the pick is posted and accepted, with what was picked. The launcher's hub uses it
    * to collapse the answered card to a single line (#1455 bonus 2); the rail passes nothing —
-   * there the `choice-resolved` event unmounts the panel and that is the whole story.
+   * there the agent going on unmounts the panel and that is the whole story.
    */
   onAnswered?: ((pick: string | string[]) => void) | undefined
   /**
-   * Where the pick goes. Default: the agent's control log via `sendChoice`. A gate carried in by
+   * Where the pick goes. Default: to the run, via `sendChoice`. A gate carried in by
    * the browser bridge (#1554) hands one that queues the pick for the extension instead — the
    * panel is the same either way, which is the point: a cloud session's question is answered
    * exactly like a local one.
@@ -50,8 +45,9 @@ export function ChoicePanel({
 }) {
   const { busy, error, run } = useAction()
   // Posted and accepted by the daemon; the panel stays parked (buttons off, status shown)
-  // until the `choice-resolved` event unmounts it (#948) — before, the buttons just greyed
-  // out with no word on why.
+  // until the agent going on unmounts it (#948) — before, the buttons just greyed out with no
+  // word on why. A refusal (the question is no longer open, the project has no resume hook)
+  // is shown in the daemon's own words, and the buttons come back.
   const [sent, setSent] = useState(false)
   const [checked, setChecked] = useState<Set<string>>(
     () => new Set(choice.multi ? choice.options.filter(o => o.default).map(o => o.id) : []),
@@ -63,7 +59,7 @@ export function ChoicePanel({
   const parked = busy || sent
 
   const post = (pick: string | string[]) => {
-    const deliver = send ?? ((p: string | string[]) => sendChoice(projectId, choice.id, p, 'user', agentId ?? undefined))
+    const deliver = send ?? ((p: string | string[]) => sendChoice(projectId, choice.id, p, agentId ?? undefined))
     void run(() => deliver(pick), 'Could not send your choice — try again.').then(outcome => {
       if (outcome.ok) {
         setSent(true)
@@ -150,7 +146,7 @@ export function ChoicePanel({
         </div>
       )}
 
-      {error && <p className="mt-2 text-xs text-danger">{error}</p>}
+      {error && <p role="alert" className="mt-2 text-xs text-danger">{error}</p>}
 
       <div className="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
         {parked ? (

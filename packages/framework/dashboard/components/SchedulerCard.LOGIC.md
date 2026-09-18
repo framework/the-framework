@@ -9,7 +9,7 @@ The Overview's [1] "Scheduler" card: every registered project's scheduler [2], a
 [1] the Overview: the dashboard's cross-project page at `/`.
 [2] the scheduler: the `agent-scheduler` tool: one small process per project that ticks every minute and starts one agent per due command of the project's `agent-schedule.md`.
 [3] the state file: `.agent-scheduler/state.json` at the project's root, written by the scheduler, per user.
-[4] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[4] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [5] hooks: the shell lines a project's own `.the-framework/hooks.yml` names under `open` and `close`, run in the project by the daemon when the dashboard opens and closes.
 
 ## Business logic — TL;DR

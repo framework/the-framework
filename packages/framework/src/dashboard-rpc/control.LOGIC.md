@@ -1,17 +1,17 @@
-Carries out every action the user takes on an agent [1] or a project from the dashboard: stopping an agent, answering a gate [2], sending a live chat [3] message, moving the handoff [4], starting an agent, pushing its branch, opening or merging its pull request, removing a retained checkout [5], deleting an agent, opening a checkout [6] in an editor, putting a ticket or a ticket's plan on the agent queue [7], releasing a ticket's claim [8], answering the question a cloud session [9] is parked on, and showing or restarting the bridge browser [10]. For each action: what is validated, what is refused and why, and what the browser gets back. An action about an agent relayed [11] to a device [12] is carried out on the device that runs it.
+Carries out every action the user takes on an agent [1] or a project from the dashboard: stopping an agent, answering its question [2], sending it a message [3], starting an agent, opening or merging its pull request, removing a retained checkout [5], deleting an agent, opening a checkout [6] in an editor, putting a ticket or a ticket's plan on the agent queue [7], releasing a ticket's claim [8], answering the question a cloud session [9] is parked on, and showing or restarting the bridge browser [10]. For each action: what is validated, what is refused and why, and what the browser gets back. An action about an agent relayed [11] to a device [12] is carried out on the device that runs it.
 
 ## Context
 
-**User story**: on the agent view the user presses Stop, picks an option on a gate's card, types a message in the composer, moves the handoff, and, once the agent has ended, pushes its branch, opens a pull request for it, merges it, removes the checkout it kept, or deletes the agent altogether. On the project home the user starts an agent from the launcher, puts a ticket on the agent queue, or frees a ticket a dead agent still holds. In Settings the user shows or restarts the bridge browser. Each of these is one call from the browser to the daemon, and this is what the call does before it answers.
+**User story**: on the agent view the user presses Stop, picks an option on a question's card, types a message in the composer, and, once the agent has ended, opens a pull request for it, merges it, removes the checkout it kept, or deletes the agent altogether. On the project home the user starts an agent from the launcher, puts a ticket on the agent queue, or frees a ticket a dead agent still holds. In Settings the user shows or restarts the bridge browser. Each of these is one call from the browser to the daemon, and this is what the call does before it answers.
 
-**Business logic story**: steering a live agent is the reverse of its event stream [13]. Events flow from the agent's process through its events file to the browser; steering flows from the browser through the daemon into the agent's control file [14], which the agent's process tails and acts on: it resolves the gate it is parked on, drains messages between turns [15], or re-arms its handoff. Stop alone is a signal to the agent's process, whose pid the agent's meta names: the meta is the file the dashboard shows the agent from, and whoever runs the agent, this daemon's own child or another tool's process, is stopped the same way; the daemon names none of them.
+**Business logic story**: the daemon runs no agent, so every action here reaches an agent through what the agent's tool reads. Events flow from the agent's process through its diary [13] to the browser; the other way, Start is the project's start hook [4], what the user says to an agent is a line in the agent's inbox [14] while it works and the project's resume hook [4] once it has ended, and Stop is a signal to the process the agent's card [13] names. The Framework names no tool in any of them.
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
-[2] gate: a question with options at which an agent stops and waits for an answer: it emits the question in its turn's final message, the dashboard shows it as a card, and the answer re-prompts the agent. When nobody can answer, the recommended option is taken.
-[3] live chat: the user's own messages to a running agent, each continuing the same driver session. One of them is a message.
-[4] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it). "Handoff level" is a rung of that ladder.
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. The Framework starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
+[2] question: what an agent's turn ended on, asking the user to choose between options; the agent ends `waiting`, its checkout kept, and the answer resumes it.
+[3] message: the user's own words to an agent, the next prompt of the same conversation.
+[4] start hook / resume hook: the one shell line under `start`, and the one under `resume`, in a project's `.the-framework/hooks.yml`. The daemon runs the `start` line when the user presses Start and the `resume` line to continue an ended agent; each answers the agent's id as JSON on stdout.
 [5] retained checkout: the checkout of an agent that has ended and is still on disk, kept so the user can inspect what the agent left; nothing removes it on a timer.
 [6] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [7] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down. An item on it is a queue entry.
@@ -20,44 +20,34 @@ Carries out every action the user takes on an agent [1] or a project from the da
 [10] the Claude web bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge browser is the Chrome for Testing the daemon runs for it; the Driver tab is the extension's one pinned tab that reads claude.ai's session list, visits sessions and types answers.
 [11] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
 [12] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
-[13] event stream: everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface (dashboard, terminal, archive, run) is a projection of it.
-[14] control file: `.the-framework/control.jsonl`: the file the daemon appends steering to (picks, chat messages, handoff moves, merge authorizations) and the agent's process tails.
-[15] turn: one prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
+[13] card / diary: an agent's record in the `logs` skill's two shapes: the card `<id>.json` (what was asked, the branch, the pull request, how it ended, what it cost) and the diary `<id>.jsonl` (what the agent said, one line per event). While the agent has a checkout they sit under the checkout's `.the-framework/`, written by the tool that runs it; a finished agent's are on the `agent-data` branch.
+[14] inbox: `.the-framework/inbox.jsonl` in an agent's checkout: one JSON line per message or answer, which the agent's session takes when a turn ends.
 [16] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
-[17] pick: the answer to a gate: the option or options chosen, by the user or automatically.
-[18] driver session: the coding agent's own conversation for one agent, which the driver can resume by its session id.
-[19] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
-[20] build agent / prompt agent: the two kinds of agent: a build works the agent queue after its opening exchange; a prompt agent runs one prompt and stops there.
-[21] preset: a canned prompt the user launches from the dashboard.
+[17] pick: the answer to a question: the option or options the user chose.
 [22] the queued work: one agent started with `/work-queue`, which takes one task off the agent queue by composing the skills in its checkout.
 [23] the Overview: the dashboard's cross-project page at `/`.
-[24] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
-[25] vanilla: an agent started without the built-in system prompt but with the signal protocols kept. transparent: an agent started with nothing of The Framework's — the raw coding agent.
 [26] run: only the `logs` skill's record of one agent on the `agent-data` branch: a card (what was asked, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said).
 [27] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
-[28] archive: the transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
 [29] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
-[30] ready for merge: the signal an agent emits when it believes its work is complete: it flips the agent's badge from building to ready and authorizes the handoff.
 [31] holder: who a claim names: the agent's id when the daemon started the agent, else the branch the `tickets` command ran on.
 
 ## Business logic — TL;DR
 
-- **Stop is a signal** - the agent's meta names the process running it; when that process is this machine's and alive, it gets SIGINT, and nothing is written; otherwise nothing happens.
-- **Steering lands in the agent's own control file** - every pick, message, handoff change and merge authorization is one line appended to the control file of the checkout the agent id resolves to; when the project is unknown here nothing is written.
-- **The steering entries and what each validates** - a pick carries the gate's id, the option or options, and who picked; a message is trimmed and an empty one is dropped; a handoff change must name one of the four rungs or it is ignored.
+- **Stop is a signal** - the agent's card names the process running it; when that process is this machine's and alive, it gets SIGINT, and nothing is written; otherwise nothing happens.
+- **A message to an agent** - trimmed, an empty one dropped; a line in the agent's inbox while the agent works, the project's resume hook once it has ended; refused in words when there is no such agent or no resume hook.
+- **Answering an agent's question** - only the question the agent's own diary still holds open, only by its own options; the agent is handed the chosen labels, the same two ways as a message.
 - **Answering the question a cloud session is parked on** - the pick is queued for the bridge's extension to type into the session, accepted only as labels of the question actually parked, and can be withdrawn until it is collected.
-- **Starting an agent** - a build or prompt agent needs a non-empty prompt, a research agent may have none; the daemon's own start decides the rest and reports busy when it must.
+- **Starting an agent** - a non-empty prompt, trimmed, goes with the user's picks to the daemon's start, which runs the project's start hook; the answer is the new agent's id, or why there is none.
 - **Removing a retained checkout** - refused while the agent is still going, for an unsafe id, for a checkout that is not there, and whenever the work is not yet on the remote; a clean checkout is pushed first and then removed.
-- **Deleting an agent** - refused while the agent is still going; the checkout goes with whatever it holds, the agent's records go, and its branch stays.
+- **Deleting an agent** - refused while the agent is still going; the checkout goes with whatever it holds, the agent's record on the `agent-data` branch goes, and its branch stays.
 - **Opening a checkout in the file manager or an editor** - a local command against the agent's own checkout, or the project's; the editor is the one the preferences name, else the environment's, else VS Code.
-- **Pushing the agent's branch** - the branch as the agent committed it is pushed to `origin`, nothing committed on its behalf; "unknown session" when the agent is not known.
 - **Opening a pull request** - the agent's existing pull request is returned when it has one; a gone branch or an agent that committed nothing is refused; otherwise the branch is pushed if needed and a pull request opened ready for review and recorded on the agent's run.
-- **Merging** - a live agent gets a merge authorization in its control file and merges at its own end; an ended agent's open pull request is merged directly, and "already merged" is an answer, not an action.
+- **Merging** - an ended agent's open pull request is merged directly, and "already merged" is an answer, not an action; an agent still going has no Merge.
 - **Putting a ticket on the agent queue** - the entry lands in the priority section the ticket's own priority earns, as a link back to the ticket, on the `agent-data` branch.
 - **Putting a ticket's plan on the agent queue** - the plan sentence for that ticket lands by the same priority rule, deliberately not as a ticket link.
 - **Releasing a ticket's claim** - only a bare ticket filename is accepted; the lock is removed as one committed, pushed change, and "no lock" is an honest answer.
 - **Controlling the bridge browser** - show, hide or restart; anything else is refused.
-- **Actions about a relayed agent go to the device** - steering, push, open pull request and merge are forwarded to the device that runs the agent; start, remove, delete and everything local-only never are.
+- **Actions about a relayed agent go to the device** - stop, a message, an answer, open pull request and merge are forwarded to the device that runs the agent; start, remove, delete and everything local-only never are.
 
 ## Business logic
 
@@ -65,33 +55,33 @@ Carries out every action the user takes on an agent [1] or a project from the da
 
 #### Context
 
-**Problem**: the daemon's own agent reads the control file [14]; an agent another tool started (a scheduled run) reads nothing of the daemon's. Both write the meta the dashboard shows them from, and the meta names the process running the agent. A stop written to the control file would reach only the first; a signal reaches whoever runs the agent, and the daemon names no tool.
+**Problem**: an agent [1] is the process of a tool The Framework does not know. Its card [13], the file the dashboard shows it from, names the process running it. A signal reaches whoever runs the agent, and the daemon names no tool.
 
 #### Business logic
 
-The checkout the agent id [16] resolves to is read for its live meta. When the meta says `running`, names a pid and this machine as its host, and that process is alive, the process gets SIGINT; a process gone between the check and the signal is not an error. Otherwise, a meta that is missing, ended, from another machine or without a live process, nothing happens: there is nothing here to stop. Nothing is written to the control file. What the process does with the signal is its own: the daemon's own agent aborts and records itself stopped (`cli.ts`).
+The checkout the agent id [16] resolves to is read for its card. When the card says `running`, names a process id and this machine as its host, and that process is alive, the process gets SIGINT; a process gone between the check and the signal is not an error. Otherwise — a card that is missing, ended, from another machine or without a live process — nothing happens: there is nothing here to stop. Nothing is written anywhere. What the process does with the signal is its tool's own.
 
-### Steering lands in the agent's own control file
+### A message to an agent
 
 #### Context
 
-**Problem**: an agent tails the control file [14] inside its own checkout [6]. An instruction written at the project's root reaches nothing, and a pick and a message would each silently do nothing. So every steering call carries the agent id [16] and writes where that agent listens.
+**User story**: the user types in an agent's composer while it works, or long after it ended, and the same agent takes the words as its next prompt.
 
 #### Business logic
 
-A pick, a message, a handoff change and a merge authorization are each appended as one line to the control file of the checkout the agent id resolves to: the agent's own checkout while it exists, else the project's root, which is right for an agent that has no checkout of its own (the resolution is `context.ts`'s). Without an agent id the project's root is addressed. When the project id names no project on this machine, nothing is written at all. The call answers as soon as the line is written; whether the agent acts on it is the agent's affair, and a line written to an agent that has just ended lands unread.
+The message [3] is trimmed and an empty one is dropped, answering success. An unknown project, no agent id, or an id unsafe for a path is refused with "unknown session". Otherwise the message is handed to the agent by the rule in `dashboard/run-inbox.ts`: a line in the agent's inbox [14] while the agent is working, else the project's resume hook [4] with the text. The answer is success, or the refusal in words, such as "this project has no resume hook" or the resume hook's own error.
 
-### The steering entries and what each validates
+### Answering an agent's question
 
 #### Context
 
-See `## Context`.
+**User story**: an agent's turn ended on a question [2]; the user picks an option on its card, on the agent's page or in the questions hub, and the same agent goes on with that decision.
+
+**Problem**: a pick [17] arrives from the browser as option ids. The agent must only ever be answered with what it offered.
 
 #### Business logic
 
-- **A pick** [17]: the gate's [2] id, the pick (one option id for a single choice, or the chosen subset for a multiple choice, which may be empty), and who picked. Who picked is the user unless the caller says otherwise; the record can also say the pick was made automatically, for an agent nobody is watching.
-- **A message** [3]: the text is trimmed, and an empty or whitespace-only message is dropped without writing anything. The agent drains messages between turns [15], each one continuing the same driver session [18].
-- **A handoff change** [4]: the level must be one of the four rungs, `local`, `push`, `pr` or `merge`; anything else is ignored and nothing is written. One rung travels, never a set of stages: a surface offering the stages as separate boxes resolves them to a rung on its own side, where an impossible combination (a pull request without a push) settles down to the rung actually asked for instead of being repaired upward into a push nobody ticked. The change is steering rather than a setting because it is about this one agent, and the agent echoes what it applied back as an event, so surfaces read the agent's own record rather than local state a reload would lose.
+Same refusals as a message ("unknown session"). The agent's events are read (`store/agent-store.ts`) and the question the pick names must be one the agent still holds open by the shared rule (`open-choices.ts`); otherwise the answer is "that question is no longer open". Every picked id must be one of the question's options ("every pick must be one of the question's options"), and a question that is not a multi-select takes exactly one ("pick exactly one option"). The agent is then handed the question's title and the labels of the chosen options joined with ", " ("(none)" for an empty multi-select), by the same rule as a message: the inbox while the agent is working, else the project's resume hook with the labels as the answer.
 
 ### Answering the question a cloud session is parked on
 
@@ -107,15 +97,11 @@ The pick is not a control-file write: it goes to the bridge's store of parked qu
 
 #### Context
 
-**User story**: the user fills the launcher and presses Start. The launcher's options travel with the start, the daemon spawns the agent, and the browser selects the agent it just started.
-
-**Problem**: the daemon's start is the one place that may spawn an agent, because it keeps the guard that refuses to start the same work twice; every start from the dashboard has to go through it.
+**User story**: the user types a prompt or loads one of the project's commands in the launcher, picks a coding agent and a model, and presses Start; the tickets' and the queue's buttons start an agent the same way.
 
 #### Business logic
 
-The kind is a build agent [20] by default, a prompt agent, or a research agent. A build or a prompt agent needs a non-empty prompt after trimming ("a non-empty prompt is required"); a research agent may be started with none, its subject defaulting on the daemon's side. The options travel through untouched to the daemon's start, where their meaning is fixed (`dashboard/types.ts`): vanilla [25] or transparent, in-context directories, the on-before-mergeable follow-ups, a real browser for the agent, the handoff [4] level, the model, the driver, the location [24], unattended [19], a pre-minted agent id, the ticket it implements and whether it only plans it, the driver session [18] to resume, the agent to continue, and the device [12] to run on. The device's URL and token are memory-only relay configuration: never persisted, never a CLI flag, and stripped before the device starts the agent so it never relays onward.
-
-Nothing is resolved here beyond the trimmed prompt: the options travel as the browser sent them. The daemon's start answers: started, with the agent id when the agent got its own checkout; busy, when the same work is already active; or an error saying why.
+The prompt is trimmed; an empty one is refused with "a non-empty prompt is required". The prompt, the user's picks (the coding agent, the model, and a device [12] when one is the target) and the project id go to the daemon's start (`daemon-runtime.ts`), which runs the project's start hook [4] or forwards to the device. The answer is the id of the agent the hook began, or the refusal in words ("this project has no start hook", "unknown project: …", the hook's own error). There is no busy refusal: a person's Start has no cap.
 
 ### Removing a retained checkout
 
@@ -123,11 +109,11 @@ Nothing is resolved here beyond the trimmed prompt: the options travel as the br
 
 **User story**: an agent that failed or was stopped keeps its checkout so the user can look at what it was holding. Nothing removes such a checkout on a timer; the user removes it from the agent view, and expects never to lose work that exists nowhere else.
 
-**Problem**: the daemon's removal rule (`MEMORY.md`) is that only what has been pushed to the remote may be removed, so every removal is recoverable from the remote. The dashboard's Remove and the sweep that reclaims checkouts are one implementation (`worktrees.ts`), so the button gets the same checks.
+**Problem**: the daemon's removal rule (`MEMORY.md`) is that only what has been pushed to the remote may be removed, so every removal is recoverable from the remote. The dashboard's Remove lives in one implementation (`worktrees.ts`). An agent that ended waiting on its question [2] keeps its checkout too, and the user may remove it the same way.
 
 #### Business logic
 
-The project must be known here ("this project has no local path on this server"). The removal then runs under the agent's lock, serialized with the daemon's own teardown of the same checkout, so a Remove clicked the moment an agent ends does not race the teardown's archive-commit-remove of the same directory: whichever runs second finds the state the first one left. The checks and the removal are the shared implementation's: an id unsafe for a path is refused before anything is touched ("invalid session id: …"); an agent with no checkout on disk is reported rather than claimed removed ("no worktree for session …"); an agent still going is refused ("that session is still going; stop it before removing its worktree"); a checkout holding uncommitted work is kept and the edit stays in it, nothing is committed on the agent's behalf ("session … has uncommitted work; its worktree was kept"); a branch the remote does not have is pushed first, and if it cannot be the checkout is kept ("… is not on the remote (…); its worktree was kept"); an agent whose handoff [4] was set to publish nothing keeps its checkout, since pushing it to make removal possible would publish the very branch the handoff declined to ("session … was set to publish nothing (handoff: local); its worktree was kept"); a record that exists but cannot be read keeps the checkout, because it cannot tell a publish-nothing agent from any other. When the checks pass the checkout is removed, its committed work surviving on its branch and on the remote.
+The project must be known here ("this project has no local path on this server"). The removal then runs under the agent's lock, so two removals of the same checkout, or a removal and a pull request being opened from it, run one after the other. The checks and the removal are the shared implementation's: an id unsafe for a path is refused before anything is touched ("invalid session id: …"); an agent with no checkout on disk is reported rather than claimed removed ("no worktree for session …"); an agent still going is refused ("that session is still going; stop it before removing its worktree"); a checkout holding uncommitted work is kept and the edit stays in it, nothing is committed on the agent's behalf ("session … has uncommitted work; its worktree was kept"); a branch the remote does not have is pushed first, and if it cannot be the checkout is kept ("… is not on the remote (…); its worktree was kept"); When the checks pass the checkout is removed, its committed work surviving on its branch and on the remote.
 
 ### Deleting an agent
 
@@ -137,7 +123,7 @@ The project must be known here ("this project has no local path on this server")
 
 #### Business logic
 
-Same project check and same lock as removing a checkout. The checks and what is left behind are the shared implementation's (`worktrees.ts`): an unsafe id is refused ("invalid session id: …"); an agent still going is refused ("that session is still going; stop it before deleting it"). The checkout, if one is on disk, is removed by force, and any uncommitted work goes with it: throwing the work away is what a delete is for. The agent's records then go, as one committed and pushed change when they are the agent's run [26] on the `agent-data` branch [27], or by removing the files when they are the transient archive [28]; a half-deleted agent whose checkout was already gone still finishes cleanly. What stays is git's: the agent's branch (`agent-<id>`, or the name the agent gave it) and its commits, because deleting a branch that may carry merged work or an open pull request is not something a dashboard action does silently.
+Same project check and same lock as removing a checkout. The checks and what is left behind are the shared implementation's (`worktrees.ts`): an unsafe id is refused ("invalid session id: …"); an agent still going is refused ("that session is still going; stop it before deleting it"). The checkout, if one is on disk, is removed by force, and any uncommitted work goes with it: throwing the work away is what a delete is for. The agent's record then goes: its run [26] on the `agent-data` branch [27], deleted as one committed and pushed change; a half-deleted agent whose checkout was already gone still finishes cleanly. What stays is git's: the agent's branch (`agent-<id>`, or the name the agent gave it) and its commits, because deleting a branch that may carry merged work or an open pull request is not something a dashboard action does silently.
 
 ### Opening a checkout in the file manager or an editor
 
@@ -149,18 +135,6 @@ Same project check and same lock as removing a checkout. The checks and what is 
 
 Localhost-only by nature: the daemon spawns a local command against a registered path, never a path from the browser. When the project is unknown here the answer is "this project has no local path on this server". With an agent id the agent's own checkout is opened (the project's root when the agent has none); without one, the project's checkout. For the editor, the launcher used is the editor the preferences name, else `$FRAMEWORK_EDITOR`, else `code` (the fallback is `dashboard/open-in-app.ts`'s); a preferences read that fails counts as no preference. A launcher that is not installed comes back as a failure naming it ("… was not found on PATH"); any other failure to launch comes back as its message.
 
-### Pushing the agent's branch
-
-#### Context
-
-**User story**: an agent has ended with its work on its branch; the user presses the push action to put that branch on the shared remote.
-
-**Problem**: pushing publishes the agent's work under the user's name to a remote other people see, so it is the user's call rather than something the agent does on its way out.
-
-#### Business logic
-
-The target is the agent the id names, looked up in the project's records; an unknown project, an unsafe id or an unknown agent answers "unknown session". The branch pushed is the one the agent recorded (it renames its own branch after its session name [29]), else the branch it was born on, `agent-<id>`. It is pushed to `origin` with its upstream set, exactly as the agent committed it: nothing is committed on the agent's behalf first. The push runs under the agent's lock, because the daemon's teardown pushes the very same branch and two pushes racing to create the same reference make one of them fail. The answer is success, or git's own error line.
-
 ### Opening a pull request
 
 #### Context
@@ -169,17 +143,17 @@ The target is the agent the id names, looked up in the project's records; an unk
 
 #### Business logic
 
-Same target rule as pushing ("unknown session"). The decision of whether and how to open is `dashboard/agent-handoff.ts`'s: the agent's existing pull request is returned as the answer when it has one, unless the agent demonstrably kept committing after that pull request merged or closed; a branch that no longer exists is refused ("branch … no longer exists"); an agent that changed nothing is refused rather than given an empty pull request ("this session produced no commits to open a PR for"); otherwise the branch is pushed when the remote lacks it and a pull request is opened ready for review, not as a draft, because a pull request a human asked for by name is asking for review. Its title is the session name [29], else the first line of what the user asked for, else the agent id; its body is what was asked and which agent did it. The call runs under the agent's lock for the same reason as the push. When a pull request was opened, its number and URL are recorded on the agent's run [26]: the agent's process is gone by then, so no event can carry the fact, and every surface reads it from the same place rather than re-deriving it from branch names.
+The agent must be known in a known project, by a path-safe id, else the answer is "unknown session". The decision of whether and how to open is `dashboard/agent-handoff.ts`'s: the agent's existing pull request is returned as the answer when it has one, unless the agent demonstrably kept committing after that pull request merged or closed; a branch that no longer exists is refused ("branch … no longer exists"); an agent that changed nothing is refused rather than given an empty pull request ("this session produced no commits to open a PR for"); otherwise the branch is pushed when the remote lacks it and a pull request is opened ready for review, not as a draft, because a pull request a human asked for by name is asking for review. Its title is the session name [29], else the first line of what the user asked for, else the agent id; its body is what was asked and which agent did it. The call runs under the agent's lock, so its push cannot race a removal of the same checkout. When a pull request was opened, its number and URL are recorded on the agent's run [26]: the agent's process is gone by then, so no event can carry the fact, and every surface reads it from the same place rather than re-deriving it from branch names.
 
 ### Merging
 
 #### Context
 
-**User story**: one Merge action, in either of the two states an agent can be in. While the agent is still going, the user pre-authorizes the merge; once it has ended with a pull request open, the user lands it. This is the answer to an agent that never emitted ready for merge [30] and left a draft behind.
+**User story**: an agent has ended with a pull request open, and the user lands it with one button.
 
 #### Business logic
 
-Same target rule ("unknown session"). For an agent that is still running, a merge authorization is appended to its control file [14] and the call answers success at once: the agent arms the full handoff [4] ladder, records that a human authorized the merge (so the merge gate honors that instead of demanding the agent's ready-for-merge signal), and merges at its own natural end. For an agent that has ended, its pull request is merged directly (`dashboard/agent-handoff.ts`), a draft being marked ready on the way: refused when the agent has no pull request ("this session has no pull request to merge") or when it is no longer open ("this session's PR is already merged", or closed), since "already merged" is an answer, not an action; and the answer carries the pull request's number and URL. If the agent ends between the status check and the write, the authorization lands unread; the ended view then offers the direct merge, so the next press still gets there.
+Same target rule ("unknown session"). An agent that is still running has no Merge: it publishes its own work, and the call answers "that session is still going". For an agent that has ended, its pull request is merged directly (`dashboard/agent-handoff.ts`), a draft being marked ready on the way: refused when the agent has no pull request ("this session has no pull request to merge") or when it is no longer open ("this session's PR is already merged", or closed), since "already merged" is an answer, not an action; and the answer carries the pull request's number and URL.
 
 ### Putting a ticket on the agent queue
 
@@ -229,8 +203,8 @@ The action must be one of show, hide or restart; anything else is refused ("unkn
 
 #### Context
 
-**Problem**: an agent relayed [11] to a device [12] has no checkout on this machine; its control file, its branch and its pull request all live on the device. The daemon holds the device's token, so it forwards the action there and the device runs it against its own checkout (the forwarding is `relay-agent.ts`'s, the device side `relay-dispatch.ts`'s).
+**Problem**: an agent relayed [11] to a device [12] has no checkout on this machine; its inbox, its branch and its pull request all live on the device. The daemon holds the device's token, so it forwards the action there and the device runs it against its own checkout (the forwarding is `relay-agent.ts`'s, the device side `relay-dispatch.ts`'s).
 
 #### Business logic
 
-Stop, a pick, a message, a handoff change, the push, opening a pull request and the merge are forwarded when the agent id names an agent this daemon relays (a stop is then that device's signal); for an ordinary local agent they run here unchanged. When the device cannot be reached, or refuses, the steering calls answer nothing, exactly as they do after a successful write, so a stop or a pick sent to an unreachable device is lost silently; the push, the pull request and the merge answer "could not reach the device". Starting an agent, removing a checkout, deleting an agent, opening a checkout in an app, the queue and claim actions and the bridge actions are never forwarded: a device runs its own guarded start, and destroying a device's history or checkouts is not something a relaying daemon may do.
+Stop, a pick, a message, opening a pull request and the merge are forwarded when the agent id names an agent this daemon relays (a stop is then that device's signal, a message that device's inbox or resume hook); for an ordinary local agent they run here unchanged. When the device cannot be reached, or refuses, a stop answers nothing, so it is lost silently; every other forwarded action answers "could not reach the device". Starting an agent, removing a checkout, deleting an agent, opening a checkout in an app, the queue and claim actions and the bridge actions are never forwarded: a Start for a device is forwarded by the daemon's start itself (`daemon-runtime.ts`), not from here, and destroying a device's history or checkouts is not something a relaying daemon may do.

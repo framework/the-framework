@@ -19,10 +19,3 @@ export function startedAtFromAgentId(id: string): string | undefined {
   const match = /^(\d{4}-\d{2}-\d{2}T\d{2})-(\d{2})-(\d{2})-(\d{3})Z$/.exec(id)
   return match ? `${match[1]}:${match[2]}:${match[3]}.${match[4]}Z` : undefined
 }
-
-/**
- * The environment variable a spawned agent reads its own id from. The daemon sets it on every
- * agent it starts; a command the agent runs that needs to say who it is (a claim on a ticket) reads
- * it, so a claim names the agent for its whole life rather than a branch that gets renamed.
- */
-export const AGENT_ID_ENV = 'AGENT_ID'

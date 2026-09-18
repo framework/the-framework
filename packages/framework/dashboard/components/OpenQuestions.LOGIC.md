@@ -8,10 +8,10 @@ The "Waiting on you" section: every open question [1] across all projects, longe
 
 ## Glossary
 
-[1] open question: a gate nobody has answered yet, as the dashboard lists them across projects.
-[2] gate: a question with options at which an agent stops and waits for an answer: it emits the question in its turn's final message, the dashboard shows it as a card, and the answer re-prompts the agent. When nobody can answer, the recommended option is taken.
-[3] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
-[4] pick: the answer to a gate: the option or options chosen, by the user or automatically.
+[1] open question: a question nobody has answered yet, as the dashboard lists them across projects.
+[2] gate: a question with options an agent's turn ended on: the agent ends waiting for the answer, the dashboard shows the question as a card, and the answer resumes the agent.
+[3] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
+[4] pick: the answer to a gate: the option or options the user chose.
 [5] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
 [6] agent view: one agent's page.
 [7] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.

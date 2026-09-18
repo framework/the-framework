@@ -9,7 +9,7 @@ The "Notifications" bell in the sidebar's footer: one menu that writes the notif
 ## Glossary
 
 [1] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds. The other is activity: an agent started or finished.
-[2] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [3] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 [4] Settings: the settings page.
 

@@ -10,7 +10,6 @@ function deps(over: SummarizeDeps): SummarizeDeps {
   return {
     isActivated: async () => true,
     readAgents: async () => [],
-    readFileConfig: async () => ({}),
     ...over,
   }
 }
@@ -63,34 +62,6 @@ test('a throwing reader is forgiving: inactive, no activity, never throws', asyn
   )
   assert.equal(summary.activated, false)
   assert.equal('lastActivityAt' in summary, false)
-})
-
-test('the summary carries the repo the-framework.yml so the launcher can resolve (#842)', async () => {
-  const summary = await summarizeProject(
-    RECORD,
-    deps({ readFileConfig: async () => ({ handoff: 'local' as const, transparent: true }) }),
-  )
-  assert.deepEqual(summary.fileConfig, { handoff: 'local', transparent: true })
-})
-
-test('a repo that sets nothing carries no fileConfig key at all (#842)', async () => {
-  const summary = await summarizeProject(RECORD, deps({ readFileConfig: async () => ({}) }))
-  assert.equal('fileConfig' in summary, false)
-})
-
-test('an unreadable yml leaves the summary intact (#842)', async () => {
-  // loadFrameworkConfig already downgrades a malformed file to {}; this covers the read itself
-  // failing, which must not take the whole project summary down with it.
-  const summary = await summarizeProject(
-    RECORD,
-    deps({
-      readFileConfig: async () => {
-        throw new Error('EACCES')
-      },
-    }),
-  )
-  assert.equal(summary.name, 'app-a')
-  assert.equal(summary.fileConfig, undefined)
 })
 
 const RECORD_B: ProjectRecord = { id: 'app-b-2', path: '/repos/app-b', addedAt: '2026-07-11T00:00:00.000Z' }

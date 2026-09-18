@@ -5,18 +5,11 @@ import type { FrameworkEvent } from '../events.js'
 import { tailAgentEvents } from './events-tail.js'
 import { forwardStream } from './stream-forward.js'
 
-// The live event stream behind the dashboard (#405): the selected project's run, read straight
-// from the same `.the-framework/events.jsonl` the daemon writes. Each new JSONL line becomes one
-// `send(event)`, which the mount writes out as one SSE frame. Runs, docs, and the project log
-// come over the read-model RPCs (reads.ts).
+// The live event stream behind the dashboard (#405): the selected run's diary, the file the run's
+// tool writes as the agent works. Each new line becomes one `send(event)`, which the mount writes
+// out as one SSE frame. Runs, docs, and the project log come over the read-model RPCs (reads.ts).
 
-/**
- * The events file to tail, or undefined when the project is unknown. With a `agentId` this is
- * that agent's own log inside its worktree (#749): since #736 an agent appends there, not to the
- * project root, so streaming the project path would follow a file nothing writes to. Once the
- * run has ended and its worktree is gone, the agent's archived `<id>.jsonl` is that log (#1472) —
- * tailing the project root there would stream a foreign agent's journal.
- */
+/** The diary to tail, or undefined when the project or the run is unknown. */
 async function resolveEventsPath(projectId: string, agentId?: string): Promise<string | undefined> {
   const cwd = await resolveProjectPath(projectId)
   return cwd ? resolveAgentEventsPath(cwd, agentId) : undefined
@@ -39,10 +32,7 @@ export type LiveFeedEvent = FrameworkEvent | StreamSync
  * Returns undefined when there is nothing to stream (an unknown project), which the mount ends as
  * a clean close — mirroring the read model's empty results rather than throwing at the client.
  *
- * Pass the `agentId` to follow that agent's own log (#749). A project has several concurrent agents
- * since #736, each writing inside its worktree, so the agent id is what makes the feed that agent's
- * rather than a mix — and without it the feed for a worktree agent is empty. Omitting it keeps the
- * pre-#736 behavior of tailing the project root.
+ * The `agentId` names the run whose diary is followed; without one there is nothing to stream.
  *
  * Two sources, chosen by what is wired. An in-memory stream wins: an agent the daemon is relaying
  * from a device (#1067). Otherwise the on-disk log. The daemon's source answers only for relayed
@@ -63,29 +53,14 @@ export async function streamAgentEvents(
   // nothing more to say, and leaving the response open would read as a live feed gone quiet.
   if (stream) return forwardStream(stream, send, onDone)
 
-  // Everywhere else: tail the agent's on-disk events.jsonl (undefined path -> nothing to stream).
-  // The relocating tail, because the journal moves mid-subscription: teardown copies it into the
-  // archive and removes the worktree, and a fixed-path tail whose fs.watch missed the final
-  // appends went silent without the agent's `end`. On the move it re-resolves (the archive, #1472)
-  // and carries its offset, so the feed gets exactly the lines the move would have swallowed.
-  const path = await resolveEventsPath(projectId, agentId)
-  if (!path) return undefined
-  // The one place a run-scoped feed must NOT relocate to: the project-root journal, which is
-  // resolveAgentEventsPath's last-resort fallback once a Delete has removed worktree and archive
-  // alike — it is another agent's feed (#1472). A deleted session's tab goes quiet instead. The
-  // initial attach stays permissive: a fallback agent (non-git project) legitimately lives there.
-  const rootJournal = agentId === undefined ? undefined : await resolveEventsPath(projectId, undefined)
-  let initial = true
-  // An ended run's file is the `logs` skill's diary (#1769): its lines come back as the framework's events.
+  // Everywhere else: tail the run's diary. The relocating tail, because the diary moves
+  // mid-subscription: when the run ends its tool records it on the data branch and reclaims the
+  // checkout, and a fixed-path tail whose fs.watch missed the final appends went silent without
+  // the run's `end`. On the move it re-resolves and carries its offset, so the feed gets exactly
+  // the lines the move would have swallowed.
+  if ((await resolveEventsPath(projectId, agentId)) === undefined) return undefined
   return tailAgentEvents<AnyDiaryLine>(
-    async () => {
-      const next = await resolveEventsPath(projectId, agentId)
-      if (initial) {
-        initial = false
-        return next
-      }
-      return rootJournal !== undefined && next === rootJournal ? undefined : next
-    },
+    () => resolveEventsPath(projectId, agentId),
     line => send(fromDiaryLine(line)),
     () => send({ kind: 'stream-sync' }),
   )

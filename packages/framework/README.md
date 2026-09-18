@@ -17,55 +17,70 @@ the-framework      # serves the dashboard at http://127.0.0.1:4200
 ## The CLI is four options and no verbs
 
 ```
-the-framework          Serve the dashboard in the foreground. Ctrl+C closes it and
-                       every agent it is running.
+the-framework          Serve the dashboard in the foreground. Ctrl+C closes it; the
+                       agents it started go on to their own end.
 
   --port <n>           Dashboard port (default: 4200).
   --host <addr>        Bind address (default: 127.0.0.1). A non-loopback address
                        exposes the dashboard to your network and generates a shared
                        token; the printed URL carries it, and any request without it
-                       gets 401. Exposing a process spawner to the network is a
-                       security decision.
+                       gets 401. Exposing the daemon to the network is a security
+                       decision.
   -h, --help           Show this help.
   -v, --version        Print the version.
 ```
 
-Everything else is the dashboard. It is the product's user interface, and where a
-agent's prompt, its options, its coding agent and its checkout are chosen. The dashboard
-spawns each agent as its own process, handing it one JSON spec rather than a
-command line — so an agent's configuration is never also a human-facing flag
-surface.
+Everything else is the dashboard. It is the product's user interface, and where an agent's
+prompt, its coding agent and its model are chosen. There is no option that begins an agent:
+the command cannot start one at all.
 
 ## How it works
 
-The Framework does not run its own agent, and never makes its own model calls. It
-drives a coding agent as a **black box**: it sends a prompt, lets the agent's own
-loop run a full turn, then reads the code and the turn's final message. It gates on
-outcomes, never on the agent's individual tool calls — so the wrapped agent keeps
-its own subscription auth and stays swappable behind the driver seam
-([`Driver`](../agent-driver/src/types.ts) in the `agent-driver` package; Claude Code and Codex today).
+The Framework runs no coding agent, makes no model call, and names no tool. Starting an
+agent is running **one shell line the project itself names** — its `start` hook, in the
+project's own `.the-framework/hooks.yml`:
 
-Everything the framework learns from a turn, it learns by parsing that turn's final
-message: the session name the agent gave its work (the branch is renamed to match), the
-views it wants shown, the ready-for-merge signal, and the questions it stops to ask.
+```yaml
+start: npx agent-scheduler run --detach "$PROMPT" ${DRIVER:+--driver "$DRIVER"}
+resume: npx agent-scheduler run --detach --resume "$RUN_ID" ${TEXT:+"$TEXT"} ${ANSWER:+--answer "$ANSWER"}
+```
 
-- **One daemon per machine.** Running the CLI in any registered repo finds it. It
-  serves the dashboard, spawns agents, and runs the background work — the idle
-  sweeps, notifications, chat, the CI watch.
-- **An agent is one task being worked**, in its own checkout on its own
-  branch. It streams what it does as events; you can watch, answer its questions,
-  and chat with it live — or not be there at all.
-- **Work leaves as a pull request.** When an agent ends with real work, the work is
-  pushed and a pull request opened. An agent that committed nothing publishes nothing.
-- **When nobody is around**, the daemon plays product manager: it drains the
-  confirmed-task queue, refills it by triaging and planning tickets, keeps CI green
-  on the PRs it opened, and merges them once checks pass — all bounded by the
-  account's own quota week.
+The line is given the prompt and the user's picks in its environment, and answers one JSON
+document whose `id` names the agent it began. From there the agent belongs to whatever that
+line started. A project with no `start` line cannot start an agent from the dashboard, and the
+dashboard says so.
+
+The dashboard is a **projection of the agent's own files**. The agent's tool keeps the
+agent's card (`<id>.json`) and diary (`<id>.jsonl`) under `.the-framework/` in the agent's
+checkout, and copies both onto the project's `agent-data` branch when the agent ends.
+Everything the dashboard shows — live, and months later — it reads from those two files.
+
+Steering goes back the same way, never over a channel:
+
+- **What you say to a working agent** becomes a line in its `inbox.jsonl`, which the agent's
+  tool reads when a turn ends.
+- **What you say to an agent that has ended** — your words, or your answer to the question it
+  stopped on — runs the project's `resume` hook, which continues that same agent.
+- **Stop** is a signal to the process the agent's card names.
+
+So a working agent and a finished one render identically, and an agent on another machine
+needs only its lines carried home.
+
+- **One daemon per machine.** Running the CLI in any registered repo finds it. It serves
+  the dashboard, runs each project's hooks, and runs the background work — the notifications
+  and the cloud sweeps.
+- **An agent is one task being worked**, in its own checkout on its own branch. You can watch
+  it, answer its questions, and say more to it — or not be there at all.
+- **What you can ask for is your project's own commands**: its skills, read from
+  `.claude/skills/` and `.agents/skills/`, plus free text and the prompts you save. The
+  Framework ships no prompt text.
+- **Work leaves as a pull request**, opened by the agent itself. An agent that committed
+  nothing publishes nothing.
 
 ## Layout
 
-- `src/` — the CLI, the daemon, the agent lifecycle, git handoff, autonomy, and
-  the chat surfaces. Node only.
+- `src/` — the CLI, the daemon, the hooks, the reading of a project's agents, and the server
+  side of the dashboard. Node only.
 - `dashboard/` — the browser app: a Vite SPA the daemon serves as static files,
   talking back over plain HTTP. See [its README](./dashboard/README.md).
 

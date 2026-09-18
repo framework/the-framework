@@ -11,7 +11,7 @@ import { DEFAULT_MODEL, DEFAULT_SPEND_OFFSET, RUNS_DIR, STATE_DIR, STATE_FILE } 
  *
  * What is here is what would otherwise live in a process's memory: whether the scheduler is on,
  * whether it should outlive whatever started it, the model and the spend cushion this user's runs
- * take, the pid of the scheduler's own process when one runs, and the last tick with what it
+ * take, which scheduled commands this machine switched on or off, the pid of the scheduler's own process when one runs, and the last tick with what it
  * decided per command. A restart loses nothing.
  */
 
@@ -24,11 +24,24 @@ export interface TickDecision {
   run?: string
 }
 
+/** One command of the schedule as the tick read it, for a dashboard to list with its switch. */
+export interface ScheduleLine {
+  command: string
+  /** How often at most, as written (`1d`). */
+  every?: string
+  /** The check, when the line has one. */
+  when?: string
+  /** Whether the line runs it on a machine where nobody switched it. */
+  on: boolean
+}
+
 /** One tick as the state remembers it. */
 export interface TickRecord {
   /** ISO timestamp. */
   at: string
   decisions: TickDecision[]
+  /** The schedule's commands, as this tick read them; absent when there is no schedule. */
+  schedule?: ScheduleLine[]
   /** Why the tick decided nothing, when it could not: the schedule is missing, the pull failed. */
   note?: string
 }
@@ -42,6 +55,11 @@ export interface State {
   model: string
   /** How far past the spend boundary a run may still start, in percentage points. */
   spendOffset: number
+  /**
+   * This machine's switch per command, kept only where it differs from the schedule line: `true`
+   * runs a command the line lists `off`, `false` holds back one it lists on.
+   */
+  switches?: Record<string, boolean>
   /** The scheduler's own process, while `start` has one running. */
   pid?: number
   /** When that process started, ISO. */
@@ -95,6 +113,22 @@ export function withoutPid(state: State, pid: number): State {
   if (state.pid !== pid) return state
   const { pid: _pid, startedAt: _startedAt, ...rest } = state
   return rest
+}
+
+/** Whether a scheduled command runs on this machine: its switch here, else what its line says. */
+export function isSwitchedOn(state: State, command: { name: string; on: boolean }): boolean {
+  return state.switches?.[command.name] ?? command.on
+}
+
+/**
+ * The state with one command switched: kept only when it differs from the line, so switching a
+ * command back to what the line says leaves no trace.
+ */
+export function withSwitch(state: State, command: string, on: boolean, lineOn: boolean): State {
+  const { [command]: _previous, ...others } = state.switches ?? {}
+  const switches = on === lineOn ? others : { ...others, [command]: on }
+  const { switches: _switches, ...rest } = state
+  return Object.keys(switches).length ? { ...rest, switches } : rest
 }
 
 /** Read, change, write: one edit of the state. */

@@ -22,7 +22,7 @@ test('a project the dashboard knows, with no hooks file, gets every line', async
   const repo = await project(true)
   try {
     const outcome = await initHooks(repo)
-    assert.deepEqual(outcome, { ok: true, file: join(repo, '.the-framework', 'hooks.yml'), added: ['open', 'close', 'start', 'resume', 'check', 'offset'], kept: [] })
+    assert.deepEqual(outcome, { ok: true, file: join(repo, '.the-framework', 'hooks.yml'), added: ['open', 'close', 'start', 'resume', 'check', 'offset', 'switch'], kept: [] })
     assert.deepEqual(parse(await hooksOf(repo)), HOOK_LINES)
   } finally {
     await rm(repo, { recursive: true, force: true })
@@ -35,7 +35,7 @@ test("a person's file keeps its lines and its comments; a list gains the tool's 
   try {
     const outcome = await initHooks(repo)
     assert.ok(outcome.ok)
-    assert.deepEqual(outcome.added, ['open', 'close', 'resume', 'check', 'offset'])
+    assert.deepEqual(outcome.added, ['open', 'close', 'resume', 'check', 'offset', 'switch'])
     assert.deepEqual(outcome.kept, ['start'])
     const written = await hooksOf(repo)
     assert.match(written, /^# my hooks\n/)

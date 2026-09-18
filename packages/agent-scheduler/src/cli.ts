@@ -3,7 +3,8 @@ import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
 import { projectRoot } from '@gemstack/skill-branches'
 import { DRIVER_NAMES, detachResume, detachRun, isDriverName, readyToRun, resumeProject, runProject, schedulerStatus, startScheduler, stopScheduler, tickProject } from './scheduler.js'
 import { initHooks } from './init.js'
-import { updateState } from './state.js'
+import { updateState, withSwitch } from './state.js'
+import { readSchedule } from './schedule.js'
 
 /**
  * The command line: JSON on stdout, one line for a person on stderr, and the exit code says how
@@ -28,6 +29,7 @@ export const USAGE = `usage: agent-scheduler <command>
   status                        the state file, and whether the scheduler's process is alive
   model <id>                    the model every run starts on (this user)
   offset <points>               how far past the spend boundary a run may still start (this user)
+  switch <command> <on|off>     whether a command of agent-schedule.md runs on this machine; what a dashboard's switch hook runs
 
 JSON on stdout. Exit code 1 for a refusal or a failure (the reason on stderr), 2 for a usage error.`
 
@@ -192,6 +194,18 @@ const COMMANDS: Record<string, Command> = {
     if (!Number.isFinite(points)) throw new Usage(`${positionals[0]} is not a number of percentage points`)
     const repo = await project(io.cwd, git)
     return { ok: true, ...(await updateState(repo, s => ({ ...s, spendOffset: points }), git)) }
+  },
+
+  async switch(args, io, git) {
+    const { positionals } = parse(args, {}, 2)
+    const [name, to] = positionals as [string, string]
+    if (to !== 'on' && to !== 'off') throw new Usage(`${to} is neither on nor off`)
+    const repo = await project(io.cwd, git)
+    const schedule = await readSchedule(repo)
+    if (!schedule) throw new Refused({ ok: false, reason: 'no-schedule' }, 'no agent-schedule.md in this repository')
+    const command = schedule.commands.find(c => c.name === name)
+    if (!command) throw new Refused({ ok: false, reason: 'not-scheduled', command: name }, `agent-schedule.md has no line for ${name}`)
+    return { ok: true, ...(await updateState(repo, s => withSwitch(s, name, to === 'on', command.on), git)) }
   },
 }
 

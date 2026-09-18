@@ -21,6 +21,7 @@ export const HOOK_LINES: Readonly<Record<string, string | readonly string[]>> = 
   resume: 'npx agent-scheduler run --detach --resume "$RUN_ID" ${TEXT:+"$TEXT"} ${ANSWER:+--answer "$ANSWER"}',
   check: 'npx agent-scheduler check ${DRIVER:+--driver "$DRIVER"}',
   offset: 'npx agent-scheduler offset -- "$POINTS"',
+  switch: 'npx agent-scheduler switch "$COMMAND" "$SWITCH"',
 }
 
 export type InitOutcome =

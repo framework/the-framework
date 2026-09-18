@@ -21,7 +21,7 @@ Runs The Framework's one daemon per machine, in the foreground: it binds the das
 [11] pick: the answer to a question: the option or options the user chose.
 [15] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 [17] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
-[18] hooks: the shell lines a project's own `.the-framework/hooks.yml` names: the `open` and `close` lists, run in the project by the daemon when the dashboard opens and closes, and the `start`, `resume` and `offset` lines, run when the user starts an agent, continues an ended one, or sets the spend offset [19]; per user, since the file is ignored by git.
+[18] hooks: the shell lines a project's own `.the-framework/hooks.yml` names: the `open` and `close` lists, run in the project by the daemon when the dashboard opens and closes, and the `start`, `resume`, `check`, `offset` and `switch` lines, run when the user starts an agent, continues an ended one, opens the launcher, sets the spend offset [19], or switches a scheduled command on or off on this machine; per user, since the file is ignored by git.
 [19] spend offset: the user's adjustment of the quota boundary, in percentage points of the week: how far past it unattended work (an agent the scheduler started rather than a person) may start. Each project's scheduler holds its own, as `spendOffset` in its state file `.agent-scheduler/state.json`.
 
 ## Business logic — TL;DR

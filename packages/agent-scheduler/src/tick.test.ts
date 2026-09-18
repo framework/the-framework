@@ -114,6 +114,25 @@ test('off: the pull and the sweep still run, nothing is decided', async () => {
   assert.deepEqual(seen.checks, [])
 })
 
+test('a command switched off on this machine is not started, and says so; a line listed `off` runs where a machine switched it on', async () => {
+  const md = '- work-queue: when `npx queue`\n- post-merge-cleanup: every 1d, off\n'
+  const nobody = deps({ md })
+  const record = await tick(nobody.deps)
+  assert.deepEqual(record.decisions.map(d => [d.command, d.outcome.split(' ')[0]]), [['work-queue', 'started'], ['post-merge-cleanup', 'switched']])
+  assert.equal(record.decisions[1]!.outcome, 'switched off on this machine')
+  // The tick lists what the lines say, whatever this machine switched.
+  assert.deepEqual(record.schedule, [
+    { command: 'work-queue', when: 'npx queue', on: true },
+    { command: 'post-merge-cleanup', every: '1d', on: false },
+  ])
+
+  const switched = deps({ md, stateOver: { switches: { 'work-queue': false, 'post-merge-cleanup': true } } })
+  const after = await tick(switched.deps)
+  assert.deepEqual(after.decisions.map(d => [d.command, d.outcome.split(' ')[0]]), [['work-queue', 'switched'], ['post-merge-cleanup', 'started']])
+  // Switched off, its check never ran.
+  assert.deepEqual(switched.seen.checks, [])
+})
+
 test('a pull that fails ends the tick with the reason: a stale branch must not start anything', async () => {
   const { deps: d, seen } = deps({ pull: async () => ({ ok: false, error: 'origin is unreachable' }) })
   const record = await tick(d)

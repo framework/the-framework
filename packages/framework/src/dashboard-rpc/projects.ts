@@ -1,6 +1,6 @@
 import { contextAddProject, contextProjectErrors, contextProjects, resolveProjectPath } from './context.js'
 import { readProjectCommands, type ProjectCommand } from '../project-commands.js'
-import { readProjectHooks, runCheckHook, type StartReadiness } from '../project-hooks.js'
+import { readProjectHooks, runCheckHook, runSwitchHook, type StartReadiness } from '../project-hooks.js'
 import { pickDirectory, type PickDirectoryResult } from '../pick-directory.js'
 import type { ProjectSummary } from '../dashboard/projects.js'
 import type { AddProjectResult, OnboardingSuggestion } from '../dashboard/types.js'
@@ -87,4 +87,16 @@ export async function onStartCheck(projectId: string, driver?: string): Promise<
   const checked = await runCheckHook(cwd, driver !== undefined ? { driver } : {})
   if (checked.ok) return { problems: checked.problems, warnings: checked.warnings }
   return checked.noHook ? null : { problems: [], warnings: [checked.error] }
+}
+
+/**
+ * Switch one scheduled command on or off on this machine: the project's `switch` hook line. The
+ * daemon names no tool; the scheduler card reads the switch back from the scheduler's state.
+ */
+export async function sendScheduleSwitch(projectId: string, command: string, on: boolean): Promise<{ ok: true } | { ok: false; error: string }> {
+  const cwd = await resolveProjectPath(projectId)
+  if (!cwd) return { ok: false, error: 'unknown project' }
+  const switched = await runSwitchHook(cwd, command, on)
+  if (switched.ok) return { ok: true }
+  return { ok: false, error: switched.noHook ? 'this project has no switch hook in .the-framework/hooks.yml' : switched.error }
 }

@@ -1,10 +1,10 @@
-One tick [1]: pull the `agent-data` branch [2], sweep [3], read the schedule [4], and for each command [5] decide in the cheapest order (does the project have the command, is it due, is its cap [6] reached, can the coding agent start at all, is there quota [7]) then mark and spawn one run [8]. Every decision is one line in the state [9], so a dashboard or a person reads why nothing started without a log. Whether the coding agent can start, and then the quota, are each read once per tick and only when everything else says start: each read spawns the coding agent's CLI, and the agent's own usage fetch is refused upstream when asked too often. Two machines can tick the same schedule: each marks before it spawns, then counts again, and the marker that landed past the cap is withdrawn by the machine that wrote it.
+One tick [1]: pull the `agent-data` branch [2], sweep [3], read the schedule [4], and for each command [5] decide in the cheapest order (does the project have the command, is it switched on on this machine, is it due, is its cap [6] reached, can the coding agent start at all, is there quota [7]) then mark and spawn one run [8]. Every decision is one line in the state [9], so a dashboard or a person reads why nothing started without a log; the tick also records the schedule's commands as it read them, so a dashboard can list them without reading the schedule itself. Whether the coding agent can start, and then the quota, are each read once per tick and only when everything else says start: each read spawns the coding agent's CLI, and the agent's own usage fetch is refused upstream when asked too often. Two machines can tick the same schedule: each marks before it spawns, then counts again, and the marker that landed past the cap is withdrawn by the machine that wrote it.
 
 ## Context
 
-**User story**: every minute the user's scheduler looks at the schedule; when the queue holds work and nothing is running it, one agent starts; the user reads in the state, per command, `started <id>`, `not due`, `cap reached (1 in flight: <id> on <host>)`, `not ready: …` (Claude Code missing or logged out, with the command that fixes it), `quota: …` or `no such command in this project`; a schedule line with a typo shows as `line 3: unreadable: …` while the other lines still run.
+**User story**: every minute the user's scheduler looks at the schedule; when the queue holds work and nothing is running it, one agent starts; the user reads in the state, per command, `started <id>`, `not due`, `cap reached (1 in flight: <id> on <host>)`, `not ready: …` (Claude Code missing or logged out, with the command that fixes it), `quota: …`, `no such command in this project` or `switched off on this machine`; a schedule line with a typo shows as `line 3: unreadable: …` while the other lines still run.
 
-**Business logic story**: this file decides with every reading handed to it (the pull, the sweep, the command's existence, the check, the in-flight markers, the coding agent's readiness, the quota, the marker writes, the spawn); `scheduler.ts` wires it to the real project. The marker rule is `records.ts`'s, the due rule `schedule.ts`'s, the headroom rule `quota-boundary.ts`'s.
+**Business logic story**: this file decides with every reading handed to it (the pull, the sweep, the command's existence, the state's schedule switches [12], the check, the in-flight markers, the coding agent's readiness, the quota, the marker writes, the spawn); `scheduler.ts` wires it to the real project. The marker rule is `records.ts`'s, the due rule `schedule.ts`'s, the headroom rule `quota-boundary.ts`'s.
 
 ## Glossary
 
@@ -16,15 +16,17 @@ One tick [1]: pull the `agent-data` branch [2], sweep [3], read the schedule [4]
 [6] cap: how many runs of one command may be in flight at once, across every machine that shares the repository.
 [7] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
 [8] run: one agent this tool starts: a detached process of the tool's own, a checkout, one prompt to the coding agent, and a run record when it ends.
-[9] the state: `.agent-scheduler/state.json` at the repository root, per user: on or off, the model, the spend cushion, the last tick's decisions.
+[9] the state: `.agent-scheduler/state.json` at the repository root, per user: on or off, the model, the spend cushion, this machine's schedule switches [12], the last tick's decisions.
 [10] marker: a run record written before the agent exists: `status: running`, the tool's mark, an empty diary.
 [11] check: the shell command a schedule line puts after `when`, run at the repository root; its output says whether the command is due.
+[12] schedule switch: a person's choice, on one machine, whether a scheduled command runs there; kept in the state, not in the schedule. The schedule line is the default where nobody switched the command: on, unless the line says `off`.
 
 ## Business logic — TL;DR
 
 - **Before any decision** - the branch is pulled; a pull that fails ends the tick with the note `agent-data could not be pulled: <error>`, since a stale branch must start nothing; the sweep runs; a state that is off ends the tick with the note `off`; no schedule file ends it with `no agent-schedule.md`.
+- **The schedule as read** - every tick record carries the schedule's commands, each with its name, its interval as written, its check, and whether its line runs it where nobody switched it; this machine's schedule switches [12] are not in it; absent when there is no schedule file.
 - **Unreadable lines** - each is one decision under `line <N>` with `unreadable: <text>`.
-- **Per command, in order** - `no such command in this project`; for a line with an interval, `not due (last start <age> ago, every <interval>)` while the command's last recorded start on any machine is younger than the interval, and no check runs; for a line with a check, `check failed: <last line of stderr>` or `not due`; `cap reached (<N> in flight: <id> on <host>, …)`; `not ready: <problems>`; `quota: <reason>`; `not started: the scheduler was stopped` when a stop came in during the readings; then the marker, the re-count, and `started <id>` or `could not start: <error>`.
+- **Per command, in order** - `no such command in this project`; `switched off on this machine` when this machine's schedule switch [12], else the line, says off, and no check runs; for a line with an interval, `not due (last start <age> ago, every <interval>)` while the command's last recorded start on any machine is younger than the interval, and no check runs; for a line with a check, `check failed: <last line of stderr>` or `not due`; `cap reached (<N> in flight: <id> on <host>, …)`; `not ready: <problems>`; `quota: <reason>`; `not started: the scheduler was stopped` when a stop came in during the readings; then the marker, the re-count, and `started <id>` or `could not start: <error>`.
 - **Two machines** - a marker whose push was rejected twice is withdrawn: `another machine got there first: <error>`; a marker that landed but ranks past the cap among the in-flight ids in time order is withdrawn: `cap reached (…)` naming the others.
 - **The project has a command** - its `.claude/skills/<name>` is a directory, tracked file or link; a name outside lowercase letters, digits and dashes never matches.
 - **The check** - run through `sh -c` at the repository root within its budget; its exit code, stdout and stderr are what the tick reads.
@@ -41,6 +43,16 @@ See `## Context`.
 #### Business logic
 
 The tick's time is the clock's now. The `agent-data` branch is pulled first; when the pull fails, the tick records no decisions and the note `agent-data could not be pulled: <the pull's error>`. Then the sweep runs, whether or not the state is on. When the state is off, the note is `off` and no command is looked at, no check run. When there is no schedule file, the note is `no agent-schedule.md`.
+
+### The schedule as read
+
+#### Context
+
+**User story**: the dashboard's Settings page lists one schedule switch [12] per scheduled command of every project; the dashboard names no tool and does not read `agent-schedule.md`, so it lists what the scheduler's last tick recorded.
+
+#### Business logic
+
+Every tick record, whatever its note (a failed pull, `off`), carries `schedule`: one entry per readable command of the schedule, in the file's order, with the command's name (`command`), its interval as written (`every`, `1d`) when the line has one, its check (`when`) when the line has one, and `on`: what the line says, `false` for a line with `off`. This machine's schedule switches [12] are not folded in: the state carries them beside the tick. With no schedule file, the record has no `schedule`.
 
 ### Unreadable lines
 
@@ -60,17 +72,18 @@ Before the commands, every unreadable list line of the schedule is one decision:
 
 #### Business logic
 
-When the line carries an interval, the command's last start on any machine is read off the run records (the newest start among the records with this tool's mark for the command, whatever became of the run); a start younger than the interval decides `not due (last start <age> ago, every <interval>)` and nothing else of the line runs; a command never started is past every interval. When the line carries a check, it runs next. For each command of the schedule, in the file's order:
+Once the command passed its schedule switch (step 2 below), when the line carries an interval, the command's last start on any machine is read off the run records (the newest start among the records with this tool's mark for the command, whatever became of the run); a start younger than the interval decides `not due (last start <age> ago, every <interval>)` and nothing else of the line runs; a command never started is past every interval. When the line carries a check, it runs next. For each command of the schedule, in the file's order:
 1. The project has the command, or the outcome is `no such command in this project` and the check is not run.
-2. The check [11] runs; one that exited non-zero, timed out or could not run gives `check failed: <the last non-empty line of its stderr>`.
-3. The check's output says due, by `schedule.ts`'s rule, or the outcome is `not due`.
-4. The command's runs in flight, the running markers on the branch on any machine, are counted; at or past the cap, the outcome is `cap reached (<count> in flight: <id> on <host>, <id> on <host>)`, each run named by its id and the host that started it (the id alone when the host is unknown).
-5. Whether the coding agent can start on this machine is read, once per tick and only now (`readyToRun` in `scheduler.ts`); an answer with problems gives `not ready: <the problems, joined by a space>`, nothing is marked and the quota is not read, and every later command of this tick sees the same answer without a second read. Warnings change nothing here.
-6. The quota is read, once per tick and only now, and measured against the spend boundary with the state's model and spend cushion; a reading that fails or is not available counts as unknown. No headroom gives `quota: <the headroom rule's reason>`, and every later command of this tick sees the same answer without a second read.
-7. The scheduler has not been told to stop while the readings above ran, or the outcome is `not started: the scheduler was stopped`: a stopped scheduler starts nothing, and the readings are where a tick spends its seconds.
-8. A run id is minted from the clock, the prompt is `/<command>`, and a marker [10] is written: a running card with the prompt, the driver's id, the state's model, and the mark naming the command and this host (no pid: the run's process does not exist yet).
-9. The re-count, below.
-10. The run is spawned detached with the id, the command, the prompt and the model; the outcome is `started <id>` and the decision carries the id as its `run`; a spawn that throws gives `could not start: <the error>`, and the marker stays for the sweep to end on the next tick.
+2. The command is switched on on this machine: its schedule switch [12] in the state when it has one, else what its line says (on, unless the line says `off`); otherwise the outcome is `switched off on this machine`, and neither the interval nor the check is read.
+3. The check [11] runs; one that exited non-zero, timed out or could not run gives `check failed: <the last non-empty line of its stderr>`.
+4. The check's output says due, by `schedule.ts`'s rule, or the outcome is `not due`.
+5. The command's runs in flight, the running markers on the branch on any machine, are counted; at or past the cap, the outcome is `cap reached (<count> in flight: <id> on <host>, <id> on <host>)`, each run named by its id and the host that started it (the id alone when the host is unknown).
+6. Whether the coding agent can start on this machine is read, once per tick and only now (`readyToRun` in `scheduler.ts`); an answer with problems gives `not ready: <the problems, joined by a space>`, nothing is marked and the quota is not read, and every later command of this tick sees the same answer without a second read. Warnings change nothing here.
+7. The quota is read, once per tick and only now, and measured against the spend boundary with the state's model and spend cushion; a reading that fails or is not available counts as unknown. No headroom gives `quota: <the headroom rule's reason>`, and every later command of this tick sees the same answer without a second read.
+8. The scheduler has not been told to stop while the readings above ran, or the outcome is `not started: the scheduler was stopped`: a stopped scheduler starts nothing, and the readings are where a tick spends its seconds.
+9. A run id is minted from the clock, the prompt is `/<command>`, and a marker [10] is written: a running card with the prompt, the driver's id, the state's model, and the mark naming the command and this host (no pid: the run's process does not exist yet).
+10. The re-count, below.
+11. The run is spawned detached with the id, the command, the prompt and the model; the outcome is `started <id>` and the decision carries the id as its `run`; a spawn that throws gives `could not start: <the error>`, and the marker stays for the sweep to end on the next tick.
 
 ### Two machines
 

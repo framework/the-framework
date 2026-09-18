@@ -6,12 +6,12 @@ import type { RunCard } from '@gemstack/skill-logs'
 import { COMMANDS_DIR } from './names.js'
 import { quotaBoundaryStatus, quotaHeadroom } from './quota-boundary.js'
 import { markerCard, type SchedulerMark } from './records.js'
-import { commandPrompt, isDue, type Schedule } from './schedule.js'
-import type { State, TickDecision, TickRecord } from './state.js'
+import { commandPrompt, isDue, type Schedule, type ScheduledCommand } from './schedule.js'
+import { isSwitchedOn, type ScheduleLine, type State, type TickDecision, type TickRecord } from './state.js'
 
 /**
  * One tick (#1774): pull the branch, sweep, read the schedule, and for each command decide in
- * the cheapest order — does the project have the command, has its interval passed, is its check
+ * the cheapest order — does the project have the command, is it switched on on this machine, has its interval passed, is its check
  * due, is its cap reached, can the coding agent start at all, is there quota — then mark and spawn one run. Every decision is one line in the state, so a
  * dashboard or a person reads why nothing started without a log.
  *
@@ -59,7 +59,7 @@ export interface TickDeps {
 
 export async function tick(deps: TickDeps): Promise<TickRecord> {
   const at = deps.now().toISOString()
-  const record: TickRecord = { at, decisions: [] }
+  const record: TickRecord = { at, decisions: [], ...(deps.schedule ? { schedule: deps.schedule.commands.map(scheduleLine) } : {}) }
   const pulled = await deps.pull()
   if (!pulled.ok) return { ...record, note: `agent-data could not be pulled: ${pulled.error}` }
   await deps.sweep()
@@ -76,6 +76,10 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
     }
     if (!(await deps.hasCommand(command.name))) {
       decide('no such command in this project')
+      continue
+    }
+    if (!isSwitchedOn(deps.state, command)) {
+      decide('switched off on this machine')
       continue
     }
     if (command.every) {
@@ -147,6 +151,11 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
     }
   }
   return record
+}
+
+/** A command as a dashboard lists it: what the line says, not this machine's switch, which the state carries. */
+function scheduleLine(command: ScheduledCommand): ScheduleLine {
+  return { command: command.name, ...(command.every ? { every: command.every.text } : {}), ...(command.when !== undefined ? { when: command.when } : {}), on: command.on }
 }
 
 /** An age for a decision line: `less than a minute`, `12m`, `3h`, `2d`, floored. */

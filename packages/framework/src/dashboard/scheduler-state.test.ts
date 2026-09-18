@@ -9,7 +9,7 @@ import type { ProjectSummary } from './projects.js'
 // The scheduler card's read (#1774): the state file as the tool writes it, and every way it can
 // be absent or wrong, each read as "not set up" rather than an error.
 
-const NOT_SET_UP = { present: false, on: false, keepAlive: false, running: false }
+const NOT_SET_UP = { present: false, on: false, keepAlive: false, running: false, commands: [] }
 
 async function projectWith(state: string | undefined): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), 'framework-scheduler-state-'))
@@ -42,6 +42,7 @@ test('the state file as the scheduler writes it reads as the card shows it, with
       model: 'opus',
       spendOffset: 7.142857142857143,
       lastTick: { at: '2026-09-16T17:45:55.452Z', decisions: [{ command: 'work-queue', outcome: 'started 2026-09-16T16-47-27-780Z', run: '2026-09-16T16-47-27-780Z' }] },
+      commands: [],
     })
     assert.deepEqual(probed, [16393])
     // On with a dead process: the honest "on, not running" a crashed scheduler leaves.
@@ -57,7 +58,37 @@ test('a tick that decided nothing carries its note; keep-alive and no pid read a
   const cwd = await projectWith(JSON.stringify({ on: false, keepAlive: true, model: 'sonnet', lastTick: { at: '2026-09-16T17:00:00.000Z', decisions: [], note: 'off' } }))
   try {
     const state = await readSchedulerState(cwd, () => true)
-    assert.deepEqual(state, { present: true, on: false, keepAlive: true, running: false, model: 'sonnet', lastTick: { at: '2026-09-16T17:00:00.000Z', decisions: [], note: 'off' } })
+    assert.deepEqual(state, { present: true, on: false, keepAlive: true, running: false, model: 'sonnet', lastTick: { at: '2026-09-16T17:00:00.000Z', decisions: [], note: 'off' }, commands: [] })
+  } finally {
+    await rm(cwd, { recursive: true, force: true })
+  }
+})
+
+test("each scheduled command reads with this machine's switch, else what its line says; a line of the wrong shape is left out", async () => {
+  const cwd = await projectWith(JSON.stringify({
+    on: true,
+    switches: { 'post-merge-cleanup': true, 'triage-quick': false, 'work-queue': 'yes' },
+    lastTick: {
+      at: 't',
+      decisions: [],
+      schedule: [
+        { command: 'work-queue', when: 'npx queue', on: true },
+        { command: 'triage-quick', every: '6h', on: true },
+        { command: 'post-merge-cleanup', every: '1d', on: false },
+        { command: 'plan-tickets', every: '6h', on: false },
+        { command: 'odd' },
+        7,
+      ],
+    },
+  }))
+  try {
+    assert.deepEqual((await readSchedulerState(cwd, () => true)).commands, [
+      // A switch that is not a boolean is no switch.
+      { command: 'work-queue', when: 'npx queue', on: true },
+      { command: 'triage-quick', every: '6h', on: false },
+      { command: 'post-merge-cleanup', every: '1d', on: true },
+      { command: 'plan-tickets', every: '6h', on: false },
+    ])
   } finally {
     await rm(cwd, { recursive: true, force: true })
   }
@@ -73,7 +104,7 @@ test('no file, a file that does not parse, a file of the wrong shape, and a tick
     assert.deepEqual(await readSchedulerState(missing, () => true), NOT_SET_UP)
     assert.deepEqual(await readSchedulerState(broken, () => true), NOT_SET_UP)
     assert.deepEqual(await readSchedulerState(list, () => true), NOT_SET_UP)
-    assert.deepEqual(await readSchedulerState(oddTick, () => true), { present: true, on: true, keepAlive: false, running: false })
+    assert.deepEqual(await readSchedulerState(oddTick, () => true), { present: true, on: true, keepAlive: false, running: false, commands: [] })
     assert.deepEqual((await readSchedulerState(oddDecision, () => true)).lastTick, { at: 't', decisions: [{ command: 'y', outcome: 'not due' }] })
   } finally {
     for (const cwd of [missing, broken, list, oddTick, oddDecision]) await rm(cwd, { recursive: true, force: true })
@@ -84,12 +115,12 @@ test('collectSchedulers gives one row per registered project, in registry order,
   const project = (id: string): ProjectSummary => ({ id, path: `/${id}`, name: id, activated: true })
   const rows = await collectSchedulers([project('a'), project('b'), project('c')], async cwd => {
     if (cwd === '/b') throw new Error('unreadable')
-    return { present: true, on: cwd === '/a', keepAlive: false, running: cwd === '/a', model: 'opus' }
+    return { present: true, on: cwd === '/a', keepAlive: false, running: cwd === '/a', model: 'opus', commands: [] }
   })
   assert.deepEqual(rows, [
-    { projectId: 'a', projectName: 'a', present: true, on: true, keepAlive: false, running: true, model: 'opus' },
+    { projectId: 'a', projectName: 'a', present: true, on: true, keepAlive: false, running: true, model: 'opus', commands: [] },
     { projectId: 'b', projectName: 'b', ...NOT_SET_UP },
-    { projectId: 'c', projectName: 'c', present: true, on: false, keepAlive: false, running: false, model: 'opus' },
+    { projectId: 'c', projectName: 'c', present: true, on: false, keepAlive: false, running: false, model: 'opus', commands: [] },
   ])
 })
 

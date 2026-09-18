@@ -4,7 +4,7 @@ import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { nodeGitRunner } from '@gemstack/agent-data'
-import { DEFAULT_STATE, readState, statePath, updateState, writeState, type State } from './state.js'
+import { DEFAULT_STATE, readState, statePath, updateState, writeState, type State, isSwitchedOn, withSwitch } from './state.js'
 import { STATE_DIR } from './names.js'
 
 const git = nodeGitRunner()
@@ -52,6 +52,20 @@ test('a state file that does not parse reads as the default rather than stopping
   } finally {
     await rm(root, { recursive: true, force: true })
   }
+})
+
+test("a switch is kept only where it differs from the line: a command switched back leaves no trace", () => {
+  const on = withSwitch(DEFAULT_STATE, 'post-merge-cleanup', true, false)
+  assert.deepEqual(on.switches, { 'post-merge-cleanup': true })
+  assert.equal(isSwitchedOn(on, { name: 'post-merge-cleanup', on: false }), true)
+  const both = withSwitch(on, 'triage-quick', false, true)
+  assert.deepEqual(both.switches, { 'post-merge-cleanup': true, 'triage-quick': false })
+  assert.equal(isSwitchedOn(both, { name: 'triage-quick', on: true }), false)
+  // Nobody switched it: the line decides.
+  assert.equal(isSwitchedOn(both, { name: 'work-queue', on: true }), true)
+  assert.equal(isSwitchedOn(both, { name: 'work-queue', on: false }), false)
+  const back = withSwitch(withSwitch(both, 'triage-quick', true, true), 'post-merge-cleanup', false, false)
+  assert.equal('switches' in back, false)
 })
 
 test('a scheduler ending clears its own pid only: a pid another scheduler wrote meanwhile stays', async () => {

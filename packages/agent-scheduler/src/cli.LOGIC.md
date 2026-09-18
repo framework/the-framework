@@ -1,16 +1,17 @@
-The command line, `agent-scheduler <command>`: JSON on stdout, one line for a person on stderr, and the exit code says how it went, 0 for a result, 1 for a refusal or a failure, 2 for a command line that could not be read. The same contract as the skills' commands, so a person and a dashboard read it the same way. Nine commands: `tick`, `run <prompt> [--model <id>] [--driver <claude-code|codex>]`, `check [--driver <claude-code|codex>]`, `init`, `start [--keep-alive]`, `stop [--unless-keep-alive]`, `status`, `model <id>`, `offset <points>`.
+The command line, `agent-scheduler <command>`: JSON on stdout, one line for a person on stderr, and the exit code says how it went, 0 for a result, 1 for a refusal or a failure, 2 for a command line that could not be read. The same contract as the skills' commands, so a person and a dashboard read it the same way. Ten commands: `tick`, `run <prompt> [--model <id>] [--driver <claude-code|codex>]`, `check [--driver <claude-code|codex>]`, `init`, `start [--keep-alive]`, `stop [--unless-keep-alive]`, `status`, `model <id>`, `offset <points>`, `switch <command> <on|off>`.
 
 ## Context
 
-**User story**: the user runs `init` once so the dashboard's Start runs through this tool, turns the scheduler on and off, reads its state, sets the model and the spend cushion for their machine, ticks once by hand, asks whether a run can start on this machine, or starts one run by hand, all from any directory of the project, and a dashboard runs the same commands and parses the same JSON.
+**User story**: the user runs `init` once so the dashboard's Start runs through this tool, turns the scheduler on and off, reads its state, sets the model and the spend cushion for their machine, switches a scheduled command on or off for their machine, ticks once by hand, asks whether a run can start on this machine, or starts one run by hand, all from any directory of the project, and a dashboard runs the same commands and parses the same JSON.
 
 **Business logic story**: every command acts on the project the working directory belongs to, found by the `branches` package even from inside a checkout under `.branches/`. What each command does is `scheduler.ts`'s and `state.ts`'s; this file is the contract around them.
 
 ## Glossary
 
-[1] the state: `.agent-scheduler/state.json` at the repository root, per user: on or off, keep-alive, the model, the spend cushion, the scheduler's pid, the last tick's decisions.
+[1] the state: `.agent-scheduler/state.json` at the repository root, per user: on or off, keep-alive, the model, the spend cushion, this machine's schedule switches [4], the scheduler's pid, the last tick's decisions.
 [2] tick: one pass of the scheduler: pull the `agent-data` branch, sweep, then one decision per scheduled command.
 [3] run: one agent this tool starts: a detached process of the tool's own, a checkout, one prompt to the coding agent, and a run record when it ends.
+[4] schedule switch: a person's choice, on one machine, whether a scheduled command runs there; kept in the state, not in the schedule (`agent-schedule.md`). The schedule line is the default where nobody switched the command: on, unless the line says `off`.
 
 ## Business logic — TL;DR
 
@@ -22,6 +23,7 @@ The command line, `agent-scheduler <command>`: JSON on stdout, one line for a pe
 - **`init`** - this tool's lines written into the dashboard's hooks file, a line already there kept; answered with the file and which keys gained a line; refused `no-dashboard` where the project has no `.the-framework/` directory and `unreadable` where the file is not a YAML map (`init.ts`).
 - **`start`, `stop`, `status`** - the state answered after each; `start --foreground` makes this process the scheduler's; `start --keep-alive` writes keep-alive on; `stop --unless-keep-alive` leaves a keep-alive scheduler running, says so on stderr, and answers `kept: true`.
 - **`model <id>`, `offset <points>`** - the state's model or spend cushion written for this user and the state answered; `offset` with something that is not a number is a usage error, `<value> is not a number of percentage points`.
+- **`switch <command> <on|off>`** - this machine's schedule switch [4] for one command of `agent-schedule.md` written and the state answered; refused `no-schedule` without the file and `not-scheduled` when it has no line for the command; a value neither `on` nor `off` is a usage error.
 
 ## Business logic
 
@@ -33,7 +35,7 @@ The command line, `agent-scheduler <command>`: JSON on stdout, one line for a pe
 
 #### Business logic
 
-A command that ran prints exactly one JSON document on stdout, an object with `ok`, and exits 0. A refusal, a rule saying no (the working directory is not inside a repository), prints `{"ok":false,"reason":…}` on stdout, one line on stderr, and exits 1. Anything else that fails (git, the file system, a driver) prints `{"ok":false,"reason":"failed","detail":<the error's message>}` on stdout, the detail on stderr, and exits 1. A command line that cannot be read is rejected before anything runs: no command or an unknown one prints the usage on stderr and exits 2; an unknown flag or the wrong number of arguments (`run`, `model` and `offset` take exactly one, the others none) prints what was wrong (`expected 1 argument(s), got 0`) followed by the usage on stderr, nothing on stdout, and exits 2. The usage names the nine commands and the contract.
+A command that ran prints exactly one JSON document on stdout, an object with `ok`, and exits 0. A refusal, a rule saying no (the working directory is not inside a repository), prints `{"ok":false,"reason":…}` on stdout, one line on stderr, and exits 1. Anything else that fails (git, the file system, a driver) prints `{"ok":false,"reason":"failed","detail":<the error's message>}` on stdout, the detail on stderr, and exits 1. A command line that cannot be read is rejected before anything runs: no command or an unknown one prints the usage on stderr and exits 2; an unknown flag or the wrong number of arguments (`run`, `model` and `offset` take exactly one, `switch` exactly two, the others none) prints what was wrong (`expected 1 argument(s), got 0`) followed by the usage on stderr, nothing on stdout, and exits 2. The usage names the ten commands and the contract.
 
 ### The project
 
@@ -106,3 +108,13 @@ See `## Context`.
 #### Business logic
 
 `model <id>` writes the model every run of this user starts on and answers the state. `offset <points>` writes how far past the spend boundary a run may still start, in percentage points, and answers the state; a value that is not a finite number is a usage error, `<value> is not a number of percentage points`, exit 2.
+
+### `switch <command> <on|off>`
+
+#### Context
+
+**User story**: the user wants the daily clean-up after merges, listed `off` in the tracked `agent-schedule.md`, to run on their own machine; they flip its schedule switch [4] in the dashboard's Settings page, whose project `switch` hook runs `npx agent-scheduler switch "$COMMAND" "$SWITCH"`, or type `agent-scheduler switch post-merge-cleanup on`; the tracked file does not change, and no other machine runs it.
+
+#### Business logic
+
+`switch` takes exactly two arguments: a command's name and `on` or `off`; any other value is a usage error, `<value> is neither on nor off`, exit 2. With no `agent-schedule.md` in the repository it refuses `{"ok":false,"reason":"no-schedule"}` with `no agent-schedule.md in this repository` on stderr, exit 1; when the schedule has no readable line for the command it refuses `{"ok":false,"reason":"not-scheduled","command":<name>}` with `agent-schedule.md has no line for <name>` on stderr, exit 1. Otherwise it writes this machine's schedule switch [4] for the command by `state.ts`'s rule (kept only where it differs from what the line says) and answers the state with `ok: true`.

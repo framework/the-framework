@@ -19,11 +19,12 @@ const row = (projectName: string, over: Partial<ProjectScheduler> = {}): Project
   keepAlive: false,
   running: true,
   model: 'opus',
+  commands: [],
   ...over,
 })
 
 /** A project with no state file at all: nothing to show but its name. */
-const notSetUp = (projectName: string): ProjectScheduler => ({ projectId: projectName, projectName, present: false, on: false, keepAlive: false, running: false })
+const notSetUp = (projectName: string): ProjectScheduler => ({ projectId: projectName, projectName, present: false, on: false, keepAlive: false, running: false, commands: [] })
 
 describe('SchedulerCard (#1774)', () => {
   test('one word per state: not set up, off, on but its process gone, on', () => {

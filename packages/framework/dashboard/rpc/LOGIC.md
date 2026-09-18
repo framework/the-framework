@@ -22,11 +22,12 @@ The browser's side of the daemon's call surface: one module of typed stubs per g
 [12] quota boundary: The share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
 [13] device: Another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 [14] spend offset: the user's adjustment of the quota boundary, in percentage points of the week: how far past it unattended work may start. Each project's scheduler holds its own, as `spendOffset` in its state file. The offset hook, under `offset:` in `.the-framework/hooks.yml`, sets it.
+[15] schedule switch: a person's choice, on one machine, whether a scheduled command (a line of the project's `agent-schedule.md`) runs there; the project's scheduler keeps it in its state file. The switch hook, under `switch:` in `.the-framework/hooks.yml`, sets it.
 
 ## Business logic — TL;DR
 
 - **Typed against the daemon** - every stub is declared with the daemon's own signature for the call it makes, so a call renamed or re-shaped on the daemon's side is a type error in the dashboard's build rather than a broken page.
-- **Projects** (`projects.ts`) - the registered projects with what the daemon finds wrong with each, adding one, picking its directory on the daemon's machine, the onboarding suggestion, and what the launcher offers for a project: its commands [2] and whether it has a start hook [3].
+- **Projects** (`projects.ts`) - the registered projects with what the daemon finds wrong with each, adding one, picking its directory on the daemon's machine, the onboarding suggestion, and what the launcher offers for a project: its commands [2] and whether it has a start hook [3]; and a scheduled command's schedule switch [15], set through the project's switch hook.
 - **Reads** (`reads.ts`) - everything the pages read about a project or an agent [1]: the agent history and one agent's replay, documents and tickets, the cross-project rollups, a checkout's [4] files and diffs, its git status and what the agent left behind, which decides its next step [5], and the Claude web bridge's [6] state.
 - **The live event stream** (`events.ts`) - the subscription to one agent's events [7] as they are written, re-exported from the transport because a stream is not a call.
 - **Actions** (`control.ts`) - everything the user does to an agent or a project: what the user says to an agent (stop, pick [8], message), the bridge's answer and its browser, starting an agent, pull request and merge, removing a checkout or deleting an agent, opening a checkout in an app, and the ticket and agent queue [9] actions.

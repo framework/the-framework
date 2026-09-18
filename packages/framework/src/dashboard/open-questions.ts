@@ -1,4 +1,5 @@
-import { readAllAgents, readEventLog, readLiveMetas, type AgentMeta, type LiveAgent } from '../store/index.js'
+import { loadAgentEvents, readAllAgents, readLiveMetas, type AgentMeta, type LiveAgent } from '../store/index.js'
+import { pendingChoices } from '../open-choices.js'
 import { sessionNameField } from '../agent-view.js'
 import type { ChoiceRequest, FrameworkEvent } from '../events.js'
 import { bridgeChoiceRequest, type BridgeQuestion } from './bridge-question.js'
@@ -7,13 +8,10 @@ import type { ProjectSummary } from './projects.js'
 
 // Every session's open question, in one place (#1455 item 4).
 //
-// An agent parked on a choice gate was only answerable from inside its own session view; with
-// several sessions running the questions scattered, and the Overview badge could only count
-// them. The launcher's hub needs the *full* gate — options, multi, recommended — and that is
-// not on the agent meta: `pendingChoice` carries only id and title, because that is all the rail's
-// badge needed. The options live in the `choice` event, so this reads each parked agent's log
-// through the store's own reader — the same move the Discord chat surface makes (live-run.ts),
-// which keeps one torn-line policy rather than a drifted copy.
+// A run that asked has ended, `waiting`, its checkout kept for the answer (#1774); with several
+// of them the questions scattered across their run pages. The launcher's hub lists them all,
+// each with the full question (options, multi, recommended), read off the run's diary by the
+// same rule the run page uses ({@link pendingChoices}).
 
 /** One session's open question: the full gate, answerable from wherever it is rendered. */
 export interface OpenQuestion {
@@ -29,7 +27,7 @@ export interface OpenQuestion {
   choice: ChoiceRequest
   /**
    * Asked by a Claude web session and carried here by the browser bridge (#1237/#1554): the pick
-   * goes back through `sendBridgeAnswer` on this session, not the agent's control log. The option
+   * goes back through `sendBridgeAnswer` on this session, not through the run's resume hook. The option
    * ids of {@link choice} are the labels, which is what the extension types.
    */
   bridge?: { sessionId: string; url: string }
@@ -37,10 +35,10 @@ export interface OpenQuestion {
 
 /** Injectable seams so {@link buildOpenQuestions} is unit-testable off disk. */
 export interface OpenQuestionsDeps {
-  /** The live-agent reader (default {@link readLiveMetas}). */
+  /** The reader of the runs that have a checkout (default {@link readLiveMetas}): a waiting run keeps its own. */
   liveAgents?: (cwd: string) => Promise<LiveAgent[]>
-  /** An agent checkout's event log (default {@link readEventLog}). */
-  events?: (cwd: string) => Promise<FrameworkEvent[]>
+  /** One run's events, by the project's path and the run's id (default {@link loadAgentEvents}). */
+  events?: (cwd: string, agentId: string) => Promise<FrameworkEvent[] | undefined>
   /**
    * The questions the browser bridge holds, minus those with an answer already on its way
    * (default: the daemon's bridge store).
@@ -61,39 +59,20 @@ function unansweredBridgeQuestions(): BridgeQuestion[] {
 }
 
 /**
- * The full {@link ChoiceRequest} still open under this id: its `choice` event with no later
- * `choice-resolved` for the same id. The sibling of live-run.ts's `openGate`, which slims the
- * gate down to what chat can render — an answering *panel* needs everything the event carried
- * (multi, recommended, detail lines), so this keeps the request whole.
- */
-export function openChoiceRequest(events: FrameworkEvent[], gateId: string): ChoiceRequest | undefined {
-  let open: ChoiceRequest | undefined
-  for (const event of events) {
-    if (event.kind === 'choice' && event.id === gateId) {
-      const { kind: _kind, ...request } = event
-      open = request
-    } else if (event.kind === 'choice-resolved' && event.id === gateId) {
-      open = undefined
-    }
-  }
-  return open
-}
-
-/**
  * Every project's parked questions, longest-waiting first (#1455): an agent that has been blocked
  * on its human the longest is the one to unblock first.
  *
  * Forgiving throughout, like every cross-project rollup: an unreadable project, agent list or
- * event log contributes nothing rather than failing the read. A pending gate whose log no
- * longer shows it open (already resolved, log unreadable) is skipped — offering an answer the
- * daemon would refuse is worse than one card fewer.
+ * event log contributes nothing rather than failing the read. A waiting run whose diary shows no
+ * open question (log unreadable) is skipped — offering an answer the daemon would refuse is
+ * worse than one card fewer.
  */
 export async function buildOpenQuestions(
   projects: ProjectSummary[],
   deps: OpenQuestionsDeps = {},
 ): Promise<OpenQuestion[]> {
   const liveAgents = deps.liveAgents ?? readLiveMetas
-  const events = deps.events ?? readEventLog
+  const events = deps.events ?? loadAgentEvents
   const agents = deps.agents ?? readAllAgents
   // One card per bridged question, whichever project claims it first: two checkouts of the same
   // repository share their `agents-data` archive, so the web run behind a question shows up under each.
@@ -111,9 +90,8 @@ export async function buildOpenQuestions(
   })
   for (const project of projects) {
     for (const meta of await liveAgents(project.path).catch((): LiveAgent[] => [])) {
-      if (meta.status !== 'running' || !meta.pendingChoice) continue
-      // The agent's own checkout, not the project root: a daemon-spawned agent logs in its worktree.
-      const choice = openChoiceRequest(await events(meta.cwd).catch((): FrameworkEvent[] => []), meta.pendingChoice.id)
+      if (meta.status !== 'waiting') continue
+      const choice = pendingChoices((await events(project.path, meta.id).catch(() => undefined)) ?? []).at(-1)
       if (!choice) continue
       items.push(card(project, meta, choice, meta.updatedAt ? { updatedAt: meta.updatedAt } : {}))
     }

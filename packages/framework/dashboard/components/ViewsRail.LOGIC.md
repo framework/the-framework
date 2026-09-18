@@ -6,9 +6,9 @@ The dashboard's right rail for an agent's [1] views [2]: the markdown documents 
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] view: a markdown document an agent pushes to the dashboard's right rail while it works.
-[3] gate: a question with options at which an agent stops and waits for an answer.
+[3] gate: a question with options an agent's turn ended on: the agent ends waiting for the answer, the dashboard shows the question as a card, and the answer resumes the agent.
 
 ## Business logic — TL;DR
 

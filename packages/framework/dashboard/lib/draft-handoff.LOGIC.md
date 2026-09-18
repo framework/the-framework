@@ -11,7 +11,7 @@ Carries a prompt the user has typed into a composer [1] from wherever it was typ
 [1] composer: a project's prompt editor, also used for live chat.
 [2] the launcher: the Start form on a project's own page.
 [3] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
-[4] agent: the unit of work: one task worked by a coding agent under The Framework's control, in its own checkout, on its own branch, streaming events, handed off when it ends.
+[4] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 
 ## Business logic — TL;DR
 

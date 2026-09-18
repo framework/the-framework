@@ -1,44 +1,11 @@
 import type { FrameworkEvent, ChoiceRequest, AgentMeta } from '../../src/index.js'
 
 // Live-run state derived from the event stream — kept pure so it can be driven and
-// tested on its own, away from React. The dashboard is a projection of the same
-// events.jsonl the agent writes; the interactive gate and the Stop button read that
-// projection rather than any extra state.
+// tested on its own, away from React. The dashboard is a projection of the diary the
+// run's tool writes; the question panel and the Stop button read that projection rather
+// than any extra state.
 
-/** The `choice` event carries the full request; strip the `kind` discriminant. */
-type ChoiceEvent = { kind: 'choice' } & ChoiceRequest
-
-/**
- * Every choice gate the agent is currently parked on, in fire order. A `choice` event
- * opens a gate; a matching `choice-resolved` (same id) closes it. A re-fired gate (a new
- * `choice` with an id already open) replaces the earlier one in place; a resolved gate
- * never lingers. The agent can park on several gates at once (#440 shows them all at once
- * in the right rail), so this returns the list rather than just the latest.
- *
- * An `end` event closes every open gate — the same "a finished agent is not awaiting anything"
- * rule the agent's own meta fold applies. This is what expires a dead agent's question (#1359):
- * an agent that died mid-gate never wrote `choice-resolved`, and the store's surrogate end is
- * the only signal that the question's audience is gone, so rendering past it left the panel
- * answerable forever while its picks were read by nobody.
- */
-export function pendingChoices(events: readonly FrameworkEvent[]): ChoiceRequest[] {
-  const open = new Map<string, ChoiceRequest>()
-  for (const event of events) {
-    if (event.kind === 'choice-resolved') {
-      open.delete(event.id)
-      continue
-    }
-    if (event.kind === 'end') {
-      open.clear()
-      continue
-    }
-    if (event.kind === 'choice') {
-      const { kind: _kind, ...request } = event as ChoiceEvent
-      open.set(event.id, request)
-    }
-  }
-  return [...open.values()]
-}
+export { pendingChoices } from '../../src/client.js'
 
 /**
  * One ad-hoc markdown view the agent pushed to the right rail (#441): the `view` event
@@ -201,21 +168,28 @@ export function cloudSession(events: readonly FrameworkEvent[]): { url: string; 
 }
 
 /**
- * The current agent's slice of an accumulated live feed. The dashboard's live channel keeps
- * one long-lived subscription per project and appends every streamed event, but each agent
- * truncates `events.jsonl` on disk and opens with exactly one `session` event
- * (`emitSessionStart`). So a subscription that spans an agent boundary ends up holding the
- * previous run's log followed by the new one. Keep only the tail from the last `session`
- * event — that is the agent in progress; a feed with no `session` yet is returned whole. This
- * stops a fresh agent's live view (and the right-rail choices/views) from showing the prior agent.
+ * The current leg's slice of a run's feed. A run that is continued (its question answered, a
+ * message after it ended) keeps writing into the same diary, so the feed holds the ended leg,
+ * its `end` included, followed by the new one. The boundary is the last `end` the agent went on
+ * after (any later event of the agent's own), or the last `session` event, which opens the legs
+ * of older records. Keep only the tail from there: that is the leg in progress, and "how did it
+ * end" must not answer with a leg the run has since left behind (#762). A feed with no boundary
+ * is returned whole.
  */
 export function currentAgentEvents(events: readonly FrameworkEvent[]): FrameworkEvent[] {
   let start = 0
+  let wentOn = false
   for (let i = events.length - 1; i >= 0; i--) {
-    if (events[i]?.kind === 'session') {
+    const kind = events[i]?.kind
+    if (kind === 'session') {
       start = i
       break
     }
+    if (kind === 'end' && wentOn) {
+      start = i + 1
+      break
+    }
+    if (kind === 'driver') wentOn = true
   }
   return events.slice(start)
 }

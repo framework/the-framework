@@ -5,7 +5,6 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { provideTestContext } from './test-context.js'
 import { sendStart, sendReleaseTicketLock } from './control.js'
-import { presets } from '../preset-catalog.js'
 import { addProject, projectId } from '../registry.js'
 import { withFileBranch, nodeGitRunner, DATA_BRANCH } from '@gemstack/agent-data'
 import type { StartAgentOptions } from '../dashboard/types.js'
@@ -91,4 +90,19 @@ test('sendReleaseTicketLock rejects anything but a bare ticket filename (#1420)'
   } finally {
     await rm(cwd, { recursive: true, force: true })
   }
+})
+
+test('sendStart hands the trimmed prompt, the picks and the project to the daemon\'s start, and refuses an empty prompt (#1774)', async () => {
+  const calls: unknown[] = []
+  provideTestContext({
+    startAgent: (prompt: string, options: StartAgentOptions, projectId?: string) => {
+      calls.push([prompt, options, projectId])
+      return { ok: true, agentId: 'run-1' }
+    },
+  })
+  assert.deepEqual(await sendStart('p1', '  /work-queue now \n', { driver: 'codex', model: 'gpt-5' }), { ok: true, agentId: 'run-1' })
+  assert.deepEqual(await sendStart('p1', 'Read the docs'), { ok: true, agentId: 'run-1' })
+  assert.deepEqual(calls, [['/work-queue now', { driver: 'codex', model: 'gpt-5' }, 'p1'], ['Read the docs', {}, 'p1']])
+  assert.deepEqual(await sendStart('p1', '   '), { ok: false, error: 'a non-empty prompt is required' })
+  assert.equal(calls.length, 2)
 })

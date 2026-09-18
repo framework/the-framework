@@ -2,7 +2,6 @@ import { basename } from 'node:path'
 import { listProjects, type ProjectRecord } from '../registry.js'
 import { nodeFs } from '../node-fs.js'
 import { isActivated } from '../project.js'
-import { loadFrameworkConfig, type FrameworkFileConfig } from '../config.js'
 import { readAllAgents, type AgentMeta } from '../store/index.js'
 import type { ProjectError } from '../project-errors.js'
 
@@ -25,13 +24,6 @@ export interface ProjectSummary {
   activated: boolean
   /** ISO timestamp of the project's newest activity: its most recent session. */
   lastActivityAt?: string
-  /**
-   * The repo's committed run defaults from `the-framework.yml` (#842), so the launcher can show
-   * what an agent there will actually resolve to. Read fresh on every summarize, which is what keeps
-   * it current after an edit; absent when the repo sets nothing (or the file is malformed, which
-   * {@link loadFrameworkConfig} reports as empty rather than failing).
-   */
-  fileConfig?: FrameworkFileConfig
   /**
    * What the daemon's background jobs currently find wrong with the project (#1500), oldest
    * first — absent when nothing is. Not part of the summary itself: the dashboard's project
@@ -60,8 +52,6 @@ export interface SummarizeDeps {
   isActivated?: (path: string) => Promise<boolean>
   /** The project's runs (live + archived), newest-first. Defaults to {@link readAllAgents}. */
   readAgents?: (path: string) => Promise<AgentMeta[]>
-  /** The repo's `the-framework.yml` (#842). Defaults to {@link loadFrameworkConfig}. */
-  readFileConfig?: (path: string) => Promise<FrameworkFileConfig>
 }
 
 /** A project's runs, live prepended to the archived history. Forgiving: a failed read is `[]`. */
@@ -77,12 +67,8 @@ export interface SummarizeDeps {
 export async function summarizeProject(record: ProjectRecord, deps: SummarizeDeps = {}): Promise<ProjectSummary> {
   const checkActivated = deps.isActivated ?? isActivated
   const loadAgents = deps.readAgents ?? readAllAgents
-  const loadFileConfig = deps.readFileConfig ?? (path => loadFrameworkConfig(path))
   const activated = await checkActivated(record.path).catch(() => false)
-  const [agents, fileConfig] = await Promise.all([
-    loadAgents(record.path).catch(() => [] as AgentMeta[]),
-    loadFileConfig(record.path).catch(() => ({}) as FrameworkFileConfig),
-  ])
+  const agents = await loadAgents(record.path).catch(() => [] as AgentMeta[])
   // ISO timestamps sort chronologically.
   const agentActivity = agents.map(r => r.updatedAt || r.startedAt).filter(Boolean)
   const lastActivityAt = agentActivity.filter((a): a is string => !!a).sort().at(-1)
@@ -93,8 +79,6 @@ export async function summarizeProject(record: ProjectRecord, deps: SummarizeDep
     activated,
   }
   if (lastActivityAt) summary.lastActivityAt = lastActivityAt
-  // Omitted when the repo sets nothing, so a project with no yml carries no key at all.
-  if (Object.keys(fileConfig).length) summary.fileConfig = fileConfig
   return summary
 }
 

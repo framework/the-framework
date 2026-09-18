@@ -7,7 +7,7 @@ import { usePolled } from '../lib/use-async.js'
 import { usePreferences, updatePreferences, notificationsEnabled } from '../lib/preferences.js'
 import { useNotifyChannels, reloadNotifyChannels } from '../lib/notify-channels.js'
 import { useNotificationPermission } from '../lib/notification-permission.js'
-import { useStartAgent } from '../lib/use-start-agent.js'
+import { startPicks, useStartAgent } from '../lib/use-start-agent.js'
 import { AddProjectPanel } from './AddProjectPanel.js'
 import { UpdateTicketsButton, UPDATE_TICKETS_PROMPT } from './UpdateTicketsButton.js'
 import { DiscordWebhookDialog, DISCORD_WEBHOOK_DESCRIPTION } from './DiscordDialogs.js'
@@ -54,7 +54,7 @@ export function OnboardingChecklist({
    * travels with it: this renders on the Overview and the settings page, neither of which has
    * one selected. Required, so a new mounting surface cannot quietly drop the navigation.
    */
-  onAgentStarted: (projectId: string, intent: string, agentId?: string) => void
+  onAgentStarted: (projectId: string, intent: string, agentId: string) => void
   /** Where "Configure first, then run" lands (#1507): the launcher of the project the checklist
    *  acts on. Required for the same reason `onAgentStarted` is — a new mounting surface must not
    *  quietly leave the chevron with nowhere to go. */
@@ -106,8 +106,7 @@ export function OnboardingChecklist({
 
   const populateTickets = async () => {
     if (!targetProjectId) return
-    // Unattended (#1279): a checklist-fired routine ends at settle instead of parking in the chat loop.
-    const started = await start(targetProjectId, UPDATE_TICKETS_PROMPT, 'prompt', { unattended: true })
+    const started = await start(targetProjectId, UPDATE_TICKETS_PROMPT, startPicks(preferences))
     // Land on the session doing the import, not the project's launcher (#1169): its id is what
     // the shell needs to show the live output. A refusal keeps you here, with `startError` shown.
     if (started) onAgentStarted(targetProjectId, UPDATE_TICKETS_PROMPT, started.agentId)

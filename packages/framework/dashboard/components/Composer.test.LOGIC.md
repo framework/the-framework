@@ -1,9 +1,15 @@
 What the tests cover:
 
-- **The control row** - the full composer shows the "Presets" button, the "Session options" gear and the driver-and-model select, whose name reads "Driver: Claude Code" by default; the submit button exists only once the box has text. The compact single row keeps the select and the gear and still submits its text as a build agent. Hiding the driver-and-model select (inside an agent) keeps the gear and the submit, and a submit still goes out as a build agent.
-- **Option rows say what they do** - the "Post-merge cleanup" row's tooltip promises passes that run once the agent is ready for merge; with Codex as the driver the "Browser" row is disabled and its reason says it works only on Claude Code.
-- **Submitting** - "Send" is absent while the box is empty, then enabled with text and hands over the text as a build agent with no open-an-agent-of-its-own rule; the editor's own submit shortcut does the same; every change to the text is mirrored out together with the current kind.
-- **Presets** - loading "Update from GitHub" from the presets menu submits that preset's rendered prompt (not its label) as a prompt agent marked to open an agent of its own; loading "Security audit" submits a prompt agent without that mark; emptying the box after loading a preset returns to a build agent and drops the mark.
-- **A carried draft** - a draft carried from another device is seeded into the launcher's box, visible in the editor itself and not only in what a start would send, submitted as a build agent, and taken from its holding place once; a composer inside an agent leaves the carried draft untouched and seeds nothing.
+- **The control row** - the full composer shows the "Commands" button, the coding-agent-and-model select, whose name reads "Driver: Claude Code" by default, and the "Run on" pick; the submit button exists only once the box has text. The compact single row keeps the select and "Run on" and still submits. A surface that asks for no select gets the rest of the row without it.
+- **Submitting** - "Send" is absent while the box is empty, then enabled with text and hands over the text; the editor's own submit shortcut does the same; every change to the text is mirrored out.
+- **A command from the menu** - picking a command [1] in the Commands menu loads its slash line into the editor, and what is then submitted is that line plus the argument typed after it.
+- **A surface that cannot submit** - when the embedding surface says nothing can be submitted, the button stays disabled with text in the box, and neither the click nor the editor shortcut submits.
+- **A carried draft** - a draft carried from another device [2] is seeded into the launcher's box, visible in the editor itself and not only in what a start would send, and taken from its holding place once; a composer inside an agent [3] leaves the carried draft untouched.
 - **An offline "Run on" device** - with the selected device reported offline, the note "Studio is offline" appears, "Send" is disabled, and neither the button nor the editor shortcut submits; with the device reported online there is no note, the button is enabled, and the submit goes out.
-- **The gear inside an agent** - while the agent is live there is no gear at all (no "Session options", no "Resume options", no "Preferences"); once the agent has ended, "Resume options" offers exactly "Push branch", "Open PR", "Auto-merge" and "Browser", and none of "Transparent", "Disable system prompt", "Post-merge cleanup" or "Run on"; ticking "Browser" there writes the shared browser preference.
+- **Inside an agent** - there is no "Run on" pick: an agent already runs where it was started.
+
+## Glossary
+
+[1] command: one of the project's skills, typed as `/<name>`, optionally followed by an argument.
+[2] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
+[3] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook.

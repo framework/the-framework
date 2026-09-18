@@ -4,12 +4,12 @@ Follows one agent's [1] event stream [2] live in the browser: the dashboard asks
 
 **User story**: the user opens an agent's page and watches it work, line by line, with no reload and no refresh button. Opening the page hours later replays the whole recorded stream and reads exactly the same. Selecting another agent shows that agent's work instead. When the connection to the daemon drops, the feed says "Live stream lost — reconnecting. The session keeps running; this view may be behind." rather than going silently still.
 
-**Business logic story**: the dashboard is a projection of the file each agent appends its events to in its checkout [3] (`.the-framework/events.jsonl`). One stream is followed at a time, shared by everything on the page that reads it, so the transcript and the right rail's documents never open a second connection or drift apart.
+**Business logic story**: the dashboard is a projection of the agent's diary [2], the file the agent's own tool writes one line at a time in its checkout [3]. One stream is followed at a time, shared by everything on the page that reads it, so the transcript and the right rail's documents never open a second connection or drift apart.
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent under The Framework's control, in its own checkout, on its own branch, streaming events, handed off when it ends.
-[2] event stream: everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface (dashboard, terminal, archive, run) is a projection of it.
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
+[2] event stream: everything an agent does, in order, read off the agent's diary: the file its tool writes one line at a time, in the agent's checkout while it has one and on the data branch once it is recorded; every surface is a projection of it.
 [3] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [4] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
 [5] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.

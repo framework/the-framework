@@ -5,11 +5,8 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 // The client barrel's whole contract: the dashboard imports it in a browser, so
-// nothing reachable from it may import `node:*` (#431). #520 put the prompt
-// composition behind it, which is exactly the kind of addition that breaks this
-// by accident — `system-prompt.ts` imported `node:fs` to read SYSTEM.md, so
-// exporting it as-was would have pulled `node:fs` into the browser bundle. That
-// is why the disk half now lives in `system-prompt-file.ts`.
+// nothing reachable from it may import `node:*` (#431). An export added to it
+// breaks this by accident the day its module reads a file.
 //
 // Walk the real import graph rather than trusting the rule to be remembered. It
 // walks the *compiled* output, not the source: `import type` erases at compile,

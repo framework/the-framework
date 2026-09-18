@@ -1,32 +1,24 @@
-The backend end-to-end stories: what the user sees between registering a project and reading a finished agent's [1] row, proven against a daemon whose business logic is wired as in production and whose agents are real spawned processes running the complete agent lifecycle offline, with a scripted fake in the coding agent's [2] seat. Every story acts through the same RPCs the dashboard calls and observes through the same reads and the same event stream [3] tail, so what is proven is the product's behavior, not a test double's. The `*.BUG-ANALYSIS.md` files are review bookkeeping and carry no business logic.
+The backend end-to-end stories: what the user sees between registering a project and reading a finished agent's [1] row, proven against a daemon whose business logic is wired as in production. Every fixture project's hooks file names a stand-in tool as its start and resume hooks [2], so a Start goes the whole production way — the RPC, the hook, a detached process writing the files the dashboard reads — offline, with a scripted fake in the coding agent's [3] seat. Every story acts through the same RPCs the dashboard calls and observes through the same reads and the same tail of the agent's diary [4].
 
 ## Context
 
-**User story**: the stories are the product's own user stories end to end: register a repository, set preferences, start an agent, watch it, answer it, chat with it, stop it, publish its work, queue a ticket and have an agent work it.
+**User story**: the stories are the product's own user stories end to end: register a repository, set preferences, start an agent, watch it, answer its question, write to it, stop it, remove its checkout, delete it, and queue a ticket.
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent under The Framework's control, in its own checkout, on its own branch, streaming events, handed off when it ends.
-[2] coding agent: the CLI doing the actual work: Claude Code or Codex.
-[3] event stream: everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface (dashboard, terminal, archive, run) is a projection of it.
-[4] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down.
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. The Framework starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
+[2] start hook / resume hook: the one shell line under `start`, and the one under `resume`, in a project's `.the-framework/hooks.yml`. The daemon runs the `start` line when the user presses Start and the `resume` line to continue an ended agent; each answers the agent's id as JSON on stdout.
+[3] coding agent: the CLI doing the actual work: Claude Code or Codex.
+[4] card / diary: an agent's record in the `logs` skill's two shapes: the card `<id>.json` and the diary `<id>.jsonl`. While the agent has a checkout they sit under the checkout's `.the-framework/`, written by the tool that runs it; a finished agent's are on the `agent-data` branch.
 [5] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
-[6] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later.
-[7] gate: a question with options at which an agent stops and waits for an answer: it emits the question in its turn's final message, the dashboard shows it as a card, and the answer re-prompts the agent.
-[8] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
-[9] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
-[10] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request, the default), `merge` (also merge it).
-[11] open question: a gate nobody has answered yet, as the dashboard lists them across projects.
-[12] live chat: the user's own messages to a running agent, each continuing the same driver session.
-[13] turn: one prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
-[14] stop: ending an agent before it finishes: the Stop button, Ctrl-C, or a pick marked to stop.
-[15] reclaim: removing a finished agent's checkout once its work is on the remote.
-[16] the queued work: one agent started with `/work-queue`, which takes one task off the agent queue by composing the skills in its checkout.
+[6] question: what an agent's turn ended on, asking the user to choose between options; the agent ends `waiting`, its checkout kept, and the answer resumes it.
+[7] inbox: `.the-framework/inbox.jsonl` in an agent's checkout: one JSON line per message or answer, which the agent's session takes when a turn ends.
+[8] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory.
 
 ## Business logic — TL;DR
 
-- **The simulated world** (`harness.ts`, `fake-agent-bin.ts`) - one daemon per story on throwaway state, wired as in production, with real git repositories as projects (each with a bare `origin`, and its tickets and agent queue [4] seeded on the `agent-data` branch [5]), agents spawned as real processes that run the complete lifecycle with the scripted fake driver [6] in the coding agent's seat, and a scripted gate [7] when a story needs an agent parked.
-- **Projects and settings** (`story-projects-and-settings.test.ts`) - registering a repository installs and lists it, unknown projects degrade quietly, preferences [8] set in Settings reach the next continued agent, and the usage panel shows what the daemon reports.
-- **The agent lifecycle** (`story-session-lifecycle.test.ts`) - what the user sees between Start and the archived row: the live event stream in order, the finished row, a publish-nothing agent keeping its checkout [9], the archived replay and the cross-project surfaces, two agents at once each in its own checkout, and a finished agent pushed from the handoff [10] panel.
-- **Steering and gates** (`story-steering-and-gates.test.ts`) - answering a parked agent's question from the open questions [11] list, live chat [12] becoming the next turn [13] and surviving into the agent's record, rearming the handoff mid-run, and a stop [14] whose checkout is reclaimed [15] once its work is on the remote, then a delete that removes the row.
-- **Tickets and the queue** (`story-tickets-and-queue.test.ts`) - browsing the ticket backlog, queueing a ticket so the boards show it queued, and a prompt about something else leaving the queue alone.
+- **The simulated world** (`harness.ts`, `fake-run-bin.ts`) - one daemon runtime per story on throwaway state, wired as in production, with real git repositories as projects (each with a bare `origin`, its tickets and agent queue seeded on the `agent-data` branch [5], and a hooks file naming the stand-in tool), and agents that are real detached processes writing a real card and diary [4], reading a real inbox [7], recorded through the `logs` skill and reclaimed by the branches rule.
+- **Projects and settings** (`story-projects-and-settings.test.ts`) - registering a repository installs and lists it, unknown projects degrade quietly, the picks set in Settings read back, and the usage panel shows what the daemon reports.
+- **The agent lifecycle** (`story-session-lifecycle.test.ts`) - what the user sees between Start and the recorded row: the hook handed the prompt and the picks, the live feed up to the end, the finished row, the checkout reclaimed and the branch on the remote, the replay and the cross-project surfaces; two agents at once each in its own checkout [8]; a project without a start hook, and a hook that fails, refusing in words.
+- **Steering and questions** (`story-steering-and-gates.test.ts`) - answering a waiting agent's question [6] from the questions hub resumes the same agent; a message to a working agent becomes its next turn, and to an ended one resumes it; a stop ends the agent stopped, its checkout reclaimed, then a delete removes the row; a waiting agent's kept checkout is removed by hand.
+- **Tickets and the queue** (`story-tickets-and-queue.test.ts`) - browsing the ticket backlog, and queueing a ticket so the boards show it queued.

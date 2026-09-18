@@ -51,13 +51,13 @@ test('startRemoteAgent posts to /_relay/start with the fw_daemon cookie, no Orig
     })
   })
   try {
-    const result = await startRemoteAgent({ url: srv.url, token: 'sekret' }, { prompt: 'do it', kind: 'build', options: { browser: true } })
+    const result = await startRemoteAgent({ url: srv.url, token: 'sekret' }, { prompt: 'do it', options: { model: 'opus' } })
     assert.deepEqual(result, { ok: true, agentId: 'r1' })
     assert.equal(captured.method, 'POST')
     assert.equal(captured.url, '/_relay/start')
     assert.equal(captured.cookie, 'fw_daemon=sekret') // the shared-token cookie (#1051), daemon to daemon
     assert.equal(captured.origin, undefined) // NO Origin header, so it passes the remote CSRF guard
-    assert.deepEqual(captured.body, { prompt: 'do it', kind: 'build', options: { browser: true } })
+    assert.deepEqual(captured.body, { prompt: 'do it', options: { model: 'opus' } })
   } finally {
     await srv.close()
   }
@@ -69,7 +69,7 @@ test('startRemoteAgent surfaces a non-2xx from the device as an ok:false result 
     res.end('unauthorized')
   })
   try {
-    const result = await startRemoteAgent({ url: srv.url, token: 'wrong' }, { prompt: 'x', kind: 'build', options: {} })
+    const result = await startRemoteAgent({ url: srv.url, token: 'wrong' }, { prompt: 'x', options: {} })
     assert.equal(result.ok, false)
     if (!result.ok) assert.match(result.error, /403|device/)
   } finally {
@@ -275,27 +275,9 @@ test("a relayed run's list row flips to the device's ending, or stopped if the s
   assert.equal(await relayEndStatus({ kind: 'end', ok: true } as FrameworkEvent), 'done')
   assert.equal(await relayEndStatus({ kind: 'end', stopped: true, ok: false } as FrameworkEvent), 'stopped')
   assert.equal(await relayEndStatus({ kind: 'end', ok: false } as FrameworkEvent), 'failed')
+  // A run that ended on a question waits for its answer: the row says so, as the device's own does.
+  assert.equal(await relayEndStatus({ kind: 'end', ok: false, waiting: true } as FrameworkEvent), 'waiting')
   assert.equal(await relayEndStatus(null), 'stopped') // no end event: the stream dropped, so it is no longer live
-})
-
-test('a relayed run reads as waiting while the device has it parked on the user (#1067/#785)', async () => {
-  // The device streams `settled` and keeps the agent alive: the local list row must mirror that as
-  // waiting (settledAt set, still running), not a permanent running, so the badge matches the device.
-  const srv = await server((_req, res) => {
-    res.writeHead(200, { 'content-type': 'application/x-ndjson' })
-    res.write(`${JSON.stringify({ kind: 'settled' })}\n`) // stays open: parked, not finished
-  })
-  try {
-    const agents = new RelayedAgents()
-    agents.register('r1', { url: srv.url, token: 't' }, stubMeta('r1'), 'proj-1')
-    for (let i = 0; i < 40 && !agents.list('proj-1')[0]?.settledAt; i++) await new Promise(r => setTimeout(r, 25))
-    const row = agents.list('proj-1')[0]
-    assert.ok(row?.settledAt, 'a parked remote run carries settledAt, so its row reads waiting')
-    assert.equal(row?.status, 'running') // still live, so waiting (not a terminal status)
-    agents.dispose()
-  } finally {
-    await srv.close()
-  }
 })
 
 test('dispose clears the relayed run list and its device target (#1077)', async () => {

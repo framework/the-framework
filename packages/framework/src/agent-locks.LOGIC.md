@@ -8,13 +8,13 @@ Serializes everything that changes one agent [1]'s checkout [2] inside the daemo
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [3] sweep: a background job the daemon runs on its clock.
 [4] reclaim: removing a finished agent's checkout once its work is on the remote.
 [5] run: only the `logs` skill's record of one agent on the `agent-data` branch: a card (what was asked, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said).
 [6] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
-[7] archive: the transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
+[7] the record: the `logs` skill's copy of a finished agent's card and diary on the `agent-data` branch, which is the one place a finished agent lives.
 
 ## Business logic — TL;DR
 
@@ -42,7 +42,7 @@ The key is the checkout [2]'s path, resolved, so two spellings of one path are o
 
 #### Business logic
 
-A holder runs once every earlier holder of the same key has settled. Whoever runs first pushes, and the next finds the remote already has the branch; a Resume clicked off a fresh "done" waits the teardown out and then reads a settled archive [7]. The wait costs the click a beat and nothing else.
+A holder runs once every earlier holder of the same key has settled. Whoever runs first pushes, and the next finds the remote already has the branch; a second action clicked off a fresh "done" waits the first out and then reads a settled record [7]. The wait costs the click a beat and nothing else.
 
 ### A failure stays with its holder
 

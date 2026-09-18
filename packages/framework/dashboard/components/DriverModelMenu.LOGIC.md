@@ -2,9 +2,9 @@ Offers the driver [1] and model for the next agent [2] as one menu: a tree whose
 
 ## Glossary
 
-[1] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later. The user's driver choice is `claude` or `codex`.
-[2] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
-[3] composer: the prompt editor on a project's own page, also used for live chat.
+[1] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later.
+[2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
+[3] composer: the prompt editor on a project's own page, also used to say something to an agent.
 [4] coding agent: the CLI doing the actual work: Claude Code or Codex.
 
 ## Business logic — TL;DR

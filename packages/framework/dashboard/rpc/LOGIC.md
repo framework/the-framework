@@ -8,14 +8,14 @@ The browser's side of the daemon's call surface: one module of typed stubs per g
 
 ## Glossary
 
-[1] agent: The unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
-[2] preflight: The check that the chosen driver's coding agent can start an agent, run before a checkout is spent.
-[3] driver: A coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later. The user's driver choice is `claude` or `codex`.
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
+[2] command: One of the project's skills, read off the folders the coding agents read them from; typed as `/<name>`.
+[3] start hook: The one shell line under `start:` in the project's `.the-framework/hooks.yml`, which starts an agent and answers its id. The resume hook, under `resume:`, continues an ended agent.
 [4] checkout: An agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
-[5] handoff: What happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it).
+[5] next step: What a person can do with an ended agent's work from the dashboard: open a pull request for its branch, or merge the pull request it has.
 [6] the Claude web bridge: The daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge browser is the Chrome for Testing the daemon runs for it.
-[7] event / event stream: Everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface (dashboard, terminal, archive, run) is a projection of it.
-[8] pick: The answer to a gate: the option or options chosen, by the user or automatically.
+[7] event / event stream: Everything an agent does, in order, read off the agent's diary: the file its tool writes one line at a time, in the agent's checkout while it has one and on the data branch once it is recorded.
+[8] pick: The answer to a question an agent ended on: the option or options the user chose.
 [9] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down.
 [10] preferences: The user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 [11] quota: The account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
@@ -25,11 +25,11 @@ The browser's side of the daemon's call surface: one module of typed stubs per g
 ## Business logic — TL;DR
 
 - **Typed against the daemon** - every stub is declared with the daemon's own signature for the call it makes, so a call renamed or re-shaped on the daemon's side is a type error in the dashboard's build rather than a broken page.
-- **Projects** (`projects.ts`) - the registered projects with what the daemon finds wrong with each, adding one, picking its directory on the daemon's machine, the onboarding suggestion, whether the repository allows auto-merge, and the preflight [2] of the chosen driver [3].
-- **Reads** (`reads.ts`) - everything the pages read about a project or an agent [1]: the agent history and one agent's replay, documents and tickets, the cross-project rollups, a checkout's [4] files and diffs, its git status and what the agent's handoff [5] left behind, the project's `SYSTEM.md`, and the Claude web bridge's [6] state.
+- **Projects** (`projects.ts`) - the registered projects with what the daemon finds wrong with each, adding one, picking its directory on the daemon's machine, the onboarding suggestion, and what the launcher offers for a project: its commands [2] and whether it has a start hook [3].
+- **Reads** (`reads.ts`) - everything the pages read about a project or an agent [1]: the agent history and one agent's replay, documents and tickets, the cross-project rollups, a checkout's [4] files and diffs, its git status and what the agent left behind, which decides its next step [5], and the Claude web bridge's [6] state.
 - **The live event stream** (`events.ts`) - the subscription to one agent's events [7] as they are written, re-exported from the transport because a stream is not a call.
-- **Actions** (`control.ts`) - everything the user does to an agent or a project: steering (stop, pick [8], message, handoff), the bridge's answer and its browser, starting an agent, push, pull request and merge, removing a checkout or deleting an agent, opening a checkout in an app, and the ticket and agent queue [9] actions.
-- **Preferences** (`preferences.ts`) - reading, replacing or patching the preferences [10], a project's shared custom presets, the installed editors, and whether the Discord credentials are set and saving them.
+- **Actions** (`control.ts`) - everything the user does to an agent or a project: what the user says to an agent (stop, pick [8], message), the bridge's answer and its browser, starting an agent, pull request and merge, removing a checkout or deleting an agent, opening a checkout in an app, and the ticket and agent queue [9] actions.
+- **Preferences** (`preferences.ts`) - reading, replacing or patching the preferences [10], a project's shared saved prompts, the installed editors, and whether the Discord credentials are set and saving them.
 - **Quota** (`quota.ts`) - the quota [11] reading against the quota boundary [12].
 - **Devices** (`devices.ts`) - whether each saved device [13] answers, checked by the daemon with the token the browser holds and never keeps.
 

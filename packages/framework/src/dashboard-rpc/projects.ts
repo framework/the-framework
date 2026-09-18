@@ -1,9 +1,7 @@
-import { contextAddProject, contextProjectErrors, contextProjects } from './context.js'
-import { cachedRepoAutoMerge, type RepoAutoMerge } from '../dashboard/gh.js'
-import { preflight, preflightProblems } from '../preflight.js'
+import { contextAddProject, contextProjectErrors, contextProjects, resolveProjectPath } from './context.js'
+import { readProjectCommands, type ProjectCommand } from '../project-commands.js'
+import { readProjectHooks } from '../project-hooks.js'
 import { pickDirectory, type PickDirectoryResult } from '../pick-directory.js'
-import { isDriverName } from '../driver-names.js'
-import type { DriverReady } from '../dashboard/types.js'
 import type { ProjectSummary } from '../dashboard/projects.js'
 import type { AddProjectResult, OnboardingSuggestion } from '../dashboard/types.js'
 import type { DashboardContext } from '../dashboard/rpc-serve.js'
@@ -59,41 +57,20 @@ export async function onOnboarding(): Promise<OnboardingSuggestion> {
   return { cwd, cwdProjectId: registered.find(p => p.path === cwd)?.id ?? null }
 }
 
-/**
- * Whether this project's repo allows GitHub auto-merge (#1417): the launcher notes when the merge
- * rung is armed on a repo that does not, because the merge is then handled by the daemon's CI
- * watch (merge on green, #1216/#1418) — sound, but only while the daemon runs, unlike GitHub's
- * server-side auto-merge. Read-only and cached (#1028).
- * `null` when the project is unknown here; `known: false` when `gh` could not say (not installed,
- * not a GitHub repo), which renders nothing rather than crying wolf — the no-crying-wolf stance (#1318).
- */
-export async function onRepoAutoMerge(projectId: string): Promise<RepoAutoMerge | null> {
-  const projects = await contextProjects().list()
-  const root = projects.find(p => p.id === projectId)?.path
-  if (!root) return null
-  const cached = await cachedRepoAutoMerge(root)
-  return cached.value ?? { known: false, allowed: false }
+/** What the launcher offers for a project: its commands, and whether a run can be started here at all. */
+export interface ProjectLauncher {
+  commands: ProjectCommand[]
+  /** Whether the project's `.the-framework/hooks.yml` has a `start` line; without one Start is off. */
+  startHook: boolean
 }
 
 /**
- * Whether the picked driver's CLI can start a session at all (#1326): installed, logged in, and not
- * running as root. The launcher says so before the Start, the way #1318 warns about folder trust,
- * rather than leaving the user with a spent branch and a dashboard stuck on "Waiting for the
- * session to start..." (#1323).
- *
- * Reports problems only, and only ones the user can act on. The passing checks carry the version
- * string and the logged-in account, which are of no use to a launcher and have no business
- * reaching a browser that may be a relay guest, so they stay on this side.
- *
- * `publish` adds the `gh` half (#1419): a launcher with the PR/merge rung armed wants to hear
- * about a missing or logged-out GitHub CLI now, not discover it hours later as a session whose
- * publishing silently stopped at the pushed branch.
+ * The project's commands (#1774), read off its skills folders, and whether it has a start hook.
+ * `null` when the project is unknown here.
  */
-export async function onDriverReady(driver: string, publish?: boolean): Promise<DriverReady> {
-  const result = await preflight({ driver: isDriverName(driver) ? driver : 'claude', publish: publish === true })
-  return {
-    ok: result.ok,
-    problems: preflightProblems(result),
-    warnings: result.checks.filter(c => c.warn).map(c => c.detail),
-  }
+export async function onCommands(projectId: string): Promise<ProjectLauncher | null> {
+  const cwd = await resolveProjectPath(projectId)
+  if (!cwd) return null
+  const [commands, hooks] = await Promise.all([readProjectCommands(cwd), readProjectHooks(cwd)])
+  return { commands, startHook: hooks.start !== undefined }
 }

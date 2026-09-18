@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { findRun } from '@gemstack/skill-logs'
 import { CodexDriver, FakeDriver, type Driver } from 'agent-driver'
 import { runCommand } from './run.js'
-import { detachRun, driverFor, resumeProject, runArgs } from './scheduler.js'
+import { detachResume, detachRun, driverFor, resumeArgs, resumeProject, runArgs } from './scheduler.js'
 import { DEFAULT_STATE, writeState } from './state.js'
 import { removeRepo, testRepo } from './test-repo.js'
 
@@ -26,6 +26,23 @@ test('run --detach writes the marker, spawns the run with its id, and answers th
     const plain = await detachRun(repo, { prompt: 'Read the docs', model: 'opus', now: () => new Date(NOW.getTime() + 1000) }, { spawn: async () => {}, host: 'this-box' })
     assert.equal(plain.command, 'Read')
     assert.equal(plain.model, 'opus')
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test('run --detach --resume spawns the resume of a recorded run and answers its id at once; an unknown run is refused', async () => {
+  const repo = await testRepo()
+  try {
+    const started = await detachRun(repo, { prompt: '/work-queue', now: () => NOW }, { spawn: async () => {}, host: 'this-box' })
+    const spawned: unknown[] = []
+    const spawn = async (_repo: string, run: unknown): Promise<void> => { spawned.push(run) }
+    assert.deepEqual(await detachResume(repo, { id: started.id, answer: 'Yes' }, { spawn }), { id: started.id })
+    assert.deepEqual(spawned, [{ id: started.id, answer: 'Yes' }])
+    await assert.rejects(detachResume(repo, { id: 'no-such-run', text: 'go on' }, { spawn }), /no run no-such-run in this project/)
+    assert.equal(spawned.length, 1)
+    assert.deepEqual(resumeArgs({ id: 'r1', text: 'go on' }), ['run', '--resume', 'r1', 'go on'])
+    assert.deepEqual(resumeArgs({ id: 'r1', answer: 'Yes', model: 'opus' }), ['run', '--resume', 'r1', '--answer', 'Yes', '--model', 'opus'])
   } finally {
     await removeRepo(repo)
   }

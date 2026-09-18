@@ -2,7 +2,7 @@ Renders the floating menu a trigger opens in the composer [1]'s prompt editor: a
 
 ## Glossary
 
-[1] composer: the prompt editor, also used for live chat.
+[1] composer: the prompt editor, also used to say something to an agent.
 
 ## Business logic — TL;DR
 

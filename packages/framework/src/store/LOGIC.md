@@ -1,36 +1,29 @@
-The persisted state of one agent [1] and every read of it. An agent's event stream [2] and status snapshot [3] live in its checkout [4], the archive [5] of ended agents under the project, and the lasting run [6] on the `agent-data` branch [7] in the `logs` skill's [8] shape; this directory owns the writing of the first two, the rescue of an agent whose process died, the reads that list live and ended agents together from every place they can be, the two-way mapping to the run, and the rule that resolves an agent id [9] to the checkout and event stream it addresses. The daemon tails these files and records the run from them, the agent process appends to them, and the dashboard RPCs read them.
+Every read of a project's agents [1]. The Framework runs no agent and writes no agent's record: the tool that runs an agent keeps the agent's card and diary [2] in the agent's checkout [3] while it works, and the `logs` skill's copy of both on the `agent-data` branch [4] is the one place a finished agent lives. This directory reads both places, maps the skill's shapes onto what the dashboard draws, and owns the rule that resolves an agent id [5] to the checkout and the diary it addresses.
 
 ## Context
 
-**User story**: the user watches an agent live, restarts the daemon or reopens the dashboard and finds the same agent, continues an ended agent as one row, and sees every agent of a project — including those other machines and other people recorded — once in the history, with a crashed agent shown as `stopped` rather than running forever.
+**User story**: the user watches an agent live, restarts the daemon or reopens the dashboard and finds the same agent, answers a waiting agent's question and sees it go on as one row, and sees every agent of a project — including those other machines and other people recorded — once in the history.
 
 ## Glossary
 
-[1] agent: The unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
-[2] event stream: Everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface (dashboard, terminal, archive, run) is a projection of it.
-[3] status snapshot: `.the-framework/agent.json` in an agent's checkout: the agent's current state as one small JSON document, folded from its event stream, so that reading an agent's status never means replaying the stream.
-[4] checkout: An agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch. Also "the `agent-data` branch's checkout". The user's own working copy is "the project's checkout" or "the user's checkout".
-[5] archive: The transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
-[6] run: Only the `logs` skill's record of one agent on the `agent-data` branch: a card (what was asked, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said). Never the unit of work.
-[7] the `agent-data` branch: The branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs. Born as an orphan, written through one sync → commit → push cycle.
-[8] skill: One of the four capabilities an agent is taught — `branches`, `tickets`, `queue`, `logs` — each a package with the instructions the agent reads (its `SKILL.md`, linked into the checkout where the coding agent's harness looks for skills), a command on the agent's PATH, and an API the product calls.
-[9] agent id: An agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
-[10] surrogate end: the end event The Framework writes on behalf of an agent whose process died without reporting one, so the agent ends as `stopped` like any other.
-[11] crash rescue: ending an agent whose status snapshot says `running` while the process that owned it is gone, so it stops showing as live and keeps its history; done on read for a provably dead process, and at daemon boot for every process the daemon cannot find.
-[12] reclaim: Removing a finished agent's checkout once its work is on the remote.
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. The Framework starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
+[2] card / diary: an agent's record in the `logs` skill's two shapes: the card `<id>.json` (what was asked, the branch, the pull request, how it ended, what it cost) and the diary `<id>.jsonl` (what the agent said, one line per event). While the agent has a checkout they sit under the checkout's `.the-framework/`, written by the tool that runs it; a finished agent's are on the `agent-data` branch.
+[3] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, in a directory named `agent-<agent id>`. The user's own working copy is "the project's checkout".
+[4] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the recorded agents.
+[5] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its card and diary.
 
 ## Business logic — TL;DR
 
-- **An agent's record, from its checkout to the branch and back** - while an agent runs its process writes the event stream and the status snapshot in its own checkout; when it ends the run is written to the `agent-data` branch, and every history read joins both places.
-- **The agent's files and their lifecycle** (`agent-store.ts`) - one append-only event stream [2] and one status snapshot [3] per agent [1] in its checkout [4], written torn-proof and best-effort; a fresh open, a continuation that reopens the same agent, the fold of every event kind into the snapshot, the archive [5] on close, the surrogate end [10] for a process that died, the crash rescue [11] on read and at boot, and the history that lists live agents, the runs [6] on the `agent-data` branch [7] and the archive together.
-- **The run's two shapes** (`run-record.ts`) - which facts of the status snapshot are the `logs` skill's [8] card fields and which ride under its `caller` key, and which events become the skill's four diary kinds, both ways.
-- **Addressing an agent's checkout and event stream** (`agent-checkout.ts`) - an agent id [9] resolves to the live agent's checkout, else the checkout directory named for it, else the project root; a tail of an ended agent follows its recorded event stream instead of the root's.
+- **An agent's record, in two places** - while an agent has a checkout [3] its card and diary [2] are there; once it is recorded they are on the `agent-data` branch [4]; every list joins both, the checkout's copy winning.
+- **The reads** (`agent-store.ts`) - the recorded agents, the agent in a checkout, every agent with a checkout, all agents and one by id, one agent's events for replay, where a recorded agent's files are, and whether a process is alive. Nothing is ever written or repaired.
+- **The two shapes, mapped** (`run-record.ts`) - a card [2] becomes the dashboard's record of an agent [1], and each diary line the event the dashboard draws.
+- **Addressing an agent's checkout and diary** (`agent-checkout.ts`) - an agent id [5] resolves to the checkout whose card names it, else the checkout directory named for it, else the project root; a tail follows the diary in the checkout, then the recorded one, and waits where the diary will appear for an agent started a moment ago.
 - **The entry point** (`index.ts`) - what the rest of the product imports from this directory; no logic of its own.
 - **What the tests prove** (`agent-store.test.ts`, `run-record.test.ts`, `agent-checkout.test.ts`) - every rule above, pinned against an in-memory file system or a throwaway project directory.
 
 ## Business logic
 
-### An agent's record, from its checkout to the branch and back
+### An agent's record, in two places
 
 #### Context
 
@@ -38,4 +31,4 @@ See `## Context`.
 
 #### Business logic
 
-While an agent [1] runs, its process appends every event to the event stream [2] in its checkout [4] and rewrites the status snapshot [3] beside it (`agent-store.ts`). When the agent's process is gone, the daemon's teardown (`daemon-runtime.ts`) reads the snapshot and the events out of the checkout one last time — giving a snapshot still at `running` the surrogate end [10] and stamping the branch it observed — maps them to the `logs` skill's [8] card and diary (`run-record.ts`), and records the run [6] on the `agent-data` branch [7] through the skill; the checkout is then reclaimed [12]. Every later reader of that agent — the history list, the replay of its events, a tail of it, a continuation that puts its history back into a checkout — finds the run on the branch first and the transient archive [5] second, and maps the run back into the same snapshot and events (`agent-store.ts`, `run-record.ts`).
+While an agent [1] works, the tool that runs it writes the agent's card and diary [2] under the `.the-framework/` of the agent's checkout [3]. When the agent ends, that tool records both on the `agent-data` branch [4] through the `logs` skill and reclaims the checkout, unless the agent ended waiting on a question, in which case the checkout is kept for the answer. The Framework takes no part in either write. Its reads join the two places: an agent found in both is shown once, as its checkout says, because an agent the user continued is working again while its first leg is already recorded.

@@ -7,14 +7,14 @@ Gives every call the dashboard makes the daemon's own capabilities, wired once w
 ## Glossary
 
 [1] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
-[2] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
+[2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps. Started from the dashboard by the user, or by the daemon.
 [3] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 [4] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
 [5] sweep: a background job the daemon runs on its clock: the CI watch, the notification watchers, the sweep that reclaims checkouts, the branch-links sweep, the cloud scratch sweep, cloud work adoption.
 [6] the Claude web bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge browser is the Chrome for Testing the daemon runs for it.
 [7] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
 [8] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
-[9] event stream: everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface (dashboard, terminal, archive, run) is a projection of it.
+[9] event stream: everything an agent does, one event per line of the agent's diary — the file `<id>.jsonl` the tool that runs the agent writes under `.the-framework/` in the agent's checkout, copied onto the `agent-data` branch when the agent ends. Every surface (dashboard, terminal, replay) is a projection of it.
 [10] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
 
 ## Business logic — TL;DR
@@ -50,7 +50,7 @@ Every call names the project it is about by the project's id, and resolves it ag
 
 #### Context
 
-**Problem**: an agent reads and writes inside its own checkout [1]: its events, its control file, its working tree. Anything addressed at an agent has to resolve to that checkout, or it reads an empty log and steers an agent that is not listening. And an agent has a checkout before it has written any state of its own, because the daemon creates the directory before it spawns the process; a resolution that only looked at recorded state would miss an agent in its first seconds, and the live event stream [9], which resolves its file once when the browser opens it, would then follow the wrong file for the life of that connection.
+**Problem**: an agent reads and writes inside its own checkout [1]: its card, its diary, its inbox, its working tree. Anything addressed at an agent has to resolve to that checkout, or it reads an empty diary and writes to an inbox nobody is reading. And an agent has a checkout before it has written any state of its own, because the tool that runs it makes the directory before the agent's first turn; a resolution that only looked at recorded state would miss an agent in its first seconds, and the live event stream [9], which resolves its file once when the browser opens it, would then follow the wrong file for the life of that connection.
 
 #### Business logic
 

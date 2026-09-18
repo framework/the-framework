@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { ghMergePr, ghPrCiStatus, ghPrList, ghPrView, ghRepoAutoMerge, githubToken } from './gh.js'
+import { ghMergePr, ghPrCiStatus, ghPrList, ghPrView } from './gh.js'
 import type { GhRunner } from './gh.js'
 
 /** A `gh` that answers with `stdout`, or rejects, and records what it was asked. */
@@ -13,46 +13,6 @@ function fakeGh(stdout: string | Error): { gh: GhRunner; calls: string[][] } {
   }
   return { gh, calls }
 }
-
-test('GH_TOKEN wins over the gh CLI, which is not consulted at all', async () => {
-  // CI sets the variable and must beat whatever gh happens to be logged in as on the runner.
-  const { gh, calls } = fakeGh('gho_from_cli\n')
-  assert.equal(await githubToken('/repo', { GH_TOKEN: 'ghp_from_env' }, gh), 'ghp_from_env')
-  assert.deepEqual(calls, [])
-})
-
-test('GITHUB_TOKEN is honoured too, as the second environment spelling', async () => {
-  const { gh } = fakeGh('gho_from_cli\n')
-  assert.equal(await githubToken('/repo', { GITHUB_TOKEN: 'ghp_from_env' }, gh), 'ghp_from_env')
-})
-
-test('with no token in the environment, the gh CLI credential is used (#1352)', async () => {
-  // The point of the change: a machine whose gh can already open PRs can run an Actions session,
-  // instead of failing with the credential sitting one `gh auth token` away.
-  const { gh, calls } = fakeGh('gho_from_cli\n')
-  assert.equal(await githubToken('/repo', {}, gh), 'gho_from_cli')
-  assert.deepEqual(calls, [['auth', 'token']])
-})
-
-test('a gh that is missing, logged out, or refusing yields no token rather than throwing', async () => {
-  // The caller turns undefined into the agent's stated reason; a rejection here would instead
-  // surface as an unhandled failure deep in the start path.
-  const { gh } = fakeGh(new Error('gh: command not found'))
-  assert.equal(await githubToken('/repo', {}, gh), undefined)
-})
-
-test('an empty or blank gh answer is no token, not an empty-string one', async () => {
-  // `gh auth token` prints nothing when logged out of the active host. An empty string would sail
-  // past the caller's `if (!token)` check as a real credential and fail later, at the API.
-  assert.equal(await githubToken('/repo', {}, fakeGh('').gh), undefined)
-  assert.equal(await githubToken('/repo', {}, fakeGh('  \n').gh), undefined)
-})
-
-test('an empty environment variable falls through to the CLI rather than counting as a token', async () => {
-  // `GH_TOKEN=` in a shell profile is the same as unset, and used to be treated as a real value.
-  const { gh } = fakeGh('gho_from_cli\n')
-  assert.equal(await githubToken('/repo', { GH_TOKEN: '' }, gh), 'gho_from_cli')
-})
 
 test('ghMergePr arms GitHub auto-merge, so the PR lands when its checks pass (#1216)', async () => {
   const { gh, calls } = fakeGh('')
@@ -207,25 +167,6 @@ test('watch mode: a refusal with checks already green merges directly — nothin
 
 test('watch mode: no checks reported defers to the watch — a suite takes seconds to attach (#1418)', async () => {
   assert.deepEqual(await ghMergePr('/repo', 9, watchModeGh([]), { whenUnarmed: 'watch' }), { outcome: 'watched' })
-})
-
-test('ghRepoAutoMerge reads the repo setting, and an unreadable answer is unknown, not "off" (#1417)', async () => {
-  const { gh, calls } = fakeGh('{"allow_auto_merge":false}')
-  assert.deepEqual(await ghRepoAutoMerge('/repo', gh), { known: true, allowed: false })
-  assert.deepEqual(calls, [['api', 'repos/{owner}/{repo}']])
-
-  const { gh: allowed } = fakeGh('{"allow_auto_merge":true}')
-  assert.deepEqual(await ghRepoAutoMerge('/repo', allowed), { known: true, allowed: true })
-
-  // gh missing / unauthenticated / not a GitHub repo: "could not say" renders nothing on the
-  // launcher — the no-crying-wolf (#1318) stance — so it must never masquerade as a real "off".
-  const { gh: broken } = fakeGh(new Error('gh: command not found'))
-  assert.deepEqual(await ghRepoAutoMerge('/repo', broken), { known: false, allowed: false })
-  const { gh: junk } = fakeGh('not json')
-  assert.deepEqual(await ghRepoAutoMerge('/repo', junk), { known: false, allowed: false })
-  // REST omits allow_auto_merge for viewers without push access — absent is unknown too.
-  const { gh: noField } = fakeGh('{"full_name":"acme/repo"}')
-  assert.deepEqual(await ghRepoAutoMerge('/repo', noField), { known: false, allowed: false })
 })
 
 // #1334, found by dogfooding: `PR_VIEW_FIELDS` asked for `number,url,state,title` only, and the

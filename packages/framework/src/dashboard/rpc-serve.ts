@@ -10,13 +10,12 @@ import type { DiscordCredentialsStore } from '../discord-credentials.js'
 import type { QuotaSource } from './quota.js'
 import type { BridgeBrowserOwner } from '../bridge-browser.js'
 import type { ProjectErrorsReader } from '../project-errors.js'
-import type { AddProjectResult, StartAgentKind, StartAgentOptions, StartAgentResult } from './types.js'
+import type { AddProjectResult, StartAgentOptions, StartAgentResult } from './types.js'
 import type { AgentMeta } from '../store/index.js'
 
 /** Wired by the daemon so `sendStart` can reach the daemon's own `startAgent` closure. */
 export type StartAgentHandler = (
   prompt: string,
-  kind: StartAgentKind,
   options: StartAgentOptions,
   projectId?: string,
 ) => StartAgentResult | Promise<StartAgentResult>
@@ -70,7 +69,7 @@ export interface DashboardContext {
  * CSRF guard for the state-changing RPCs. A browser attaches an `Origin`
  * header to every cross-site request, so we reject any POST whose Origin is not this
  * same server (or a loopback host) — otherwise a page on `evil.com` could `fetch()` the
- * localhost dashboard and spawn/steer an agent. An absent Origin means a non-browser caller
+ * localhost dashboard and start or steer a run. An absent Origin means a non-browser caller
  * (curl, the test suite) with no ambient session to abuse, so it passes. Lives here beside
  * the mount, its only caller.
  */

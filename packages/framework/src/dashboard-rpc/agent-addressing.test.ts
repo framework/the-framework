@@ -6,37 +6,48 @@ import { hostname, tmpdir } from 'node:os'
 import { sendStop, sendMessage, sendChoice, sendRemoveWorktree } from './control.js'
 import { onRetainedWorktrees, onAgents } from './reads.js'
 import { addProject, projectId as idFor } from '../registry.js'
-import { nodeGitRunner } from '@gemstack/agent-data'
+import { DATA_BRANCH, fileBranchPath, nodeGitRunner } from '@gemstack/agent-data'
 import { worktreePath, addWorktree, agentBranchName } from '@gemstack/skill-branches'
 import { THE_FRAMEWORK_DIR } from '../framework-dir.js'
-import { CONTROL_FILE } from '../control.js'
+import { RUN_INBOX_FILE } from '../dashboard/run-inbox.js'
+import { PROJECT_HOOKS_FILE } from '../project-hooks.js'
 import { provideTestContext } from './test-context.js'
 
-// #749: an agent tails the control log inside its own worktree (#736), so a steering call has to
-// resolve the RUN, not the project. Addressed at the project root, Stop / messages / choice picks
-// reach a file the agent is not watching, which is why they silently did nothing.
+// #749, #1774: what is addressed at a RUN has to resolve the run's own checkout, not the project:
+// the run's card is there, and so is the inbox its tool reads. Addressed at the project root, a
+// message reaches a file nobody reads.
 //
 // These run against the real registry, pointed at a temp $XDG_CONFIG_HOME so the user's own
 // registry is never touched.
 
-/** A project with one live agent in a worktree. Returns its ids and the two candidate log paths. */
-async function projectWithWorktreeAgent(owner: { pid: number; host: string } = { pid: 0, host: 'elsewhere' }): Promise<{
+const QUESTION = { kind: 'question', title: 'Which way?', options: [{ id: 'a', label: 'Left' }, { id: 'b', label: 'Right' }] }
+
+/** A project with one run in a checkout of its own. Returns its ids and the two candidate inbox paths. */
+async function projectWithWorktreeAgent(
+  owner: { pid: number; host: string } = { pid: 0, host: 'elsewhere' },
+  run: { status?: string; diary?: unknown[]; hooks?: string } = {},
+): Promise<{
   dir: string
   projectId: string
   agentId: string
-  agentControl: string
-  rootControl: string
+  agentInbox: string
+  rootInbox: string
   restore: () => void
 }> {
   const dir = await realpath(await mkdtemp(join(tmpdir(), 'framework-addressing-')))
   const agentId = '2026-07-19T10-00-00-000Z'
   const worktree = worktreePath(dir, agentId)
   await mkdir(join(worktree, THE_FRAMEWORK_DIR), { recursive: true })
-  // The live meta is what readLiveMetas discovers, and its id is what the caller addresses.
+  // The run's card is what readLiveMetas discovers, and its id is what the caller addresses.
   await writeFile(
-    join(worktree, THE_FRAMEWORK_DIR, 'agent.json'),
-    JSON.stringify({ version: 1, status: 'running', id: agentId, startedAt: agentId, updatedAt: agentId, ...owner }),
+    join(worktree, THE_FRAMEWORK_DIR, `${agentId}.json`),
+    JSON.stringify({ id: agentId, startedAt: '2026-07-19T10:00:00.000Z', status: run.status ?? 'running', caller: owner }),
   )
+  await writeFile(join(worktree, THE_FRAMEWORK_DIR, `${agentId}.jsonl`), (run.diary ?? []).map(line => JSON.stringify(line) + '\n').join(''))
+  if (run.hooks !== undefined) {
+    await mkdir(join(dir, THE_FRAMEWORK_DIR), { recursive: true })
+    await writeFile(join(dir, PROJECT_HOOKS_FILE), run.hooks)
+  }
 
   const previous = process.env.XDG_CONFIG_HOME
   process.env.XDG_CONFIG_HOME = join(dir, 'cfg')
@@ -50,8 +61,8 @@ async function projectWithWorktreeAgent(owner: { pid: number; host: string } = {
     dir,
     projectId: idFor(dir),
     agentId,
-    agentControl: join(worktree, THE_FRAMEWORK_DIR, CONTROL_FILE),
-    rootControl: join(dir, THE_FRAMEWORK_DIR, CONTROL_FILE),
+    agentInbox: join(worktree, THE_FRAMEWORK_DIR, RUN_INBOX_FILE),
+    rootInbox: join(dir, THE_FRAMEWORK_DIR, RUN_INBOX_FILE),
     restore: () => {
       if (previous === undefined) delete process.env.XDG_CONFIG_HOME
       else process.env.XDG_CONFIG_HOME = previous
@@ -59,15 +70,18 @@ async function projectWithWorktreeAgent(owner: { pid: number; host: string } = {
   }
 }
 
+/** A resume line that writes down what it was handed and answers the run's id. */
+const RESUME_HOOK = `resume: 'printf "%s|%s|%s\\n" "$RUN_ID" "\${TEXT-}" "\${ANSWER-}" >> resumed.txt; echo "{\\"id\\":\\"$RUN_ID\\"}"'\n`
+
 const entries = async (path: string): Promise<unknown[]> =>
   (await readFile(path, 'utf8').catch(() => ''))
     .split('\n')
     .filter(Boolean)
     .map(line => JSON.parse(line) as unknown)
 
-// Stop is a signal to the process the agent's meta names, whoever runs the agent: this daemon's own
-// child, or another tool's run. The meta here names this test process, whose handler catches it.
-test('sendStop signals the pid the agent meta names, and writes nothing', async () => {
+// Stop is a signal to the process the run's card names, whoever runs the agent. The card here
+// names this test process, whose handler catches it.
+test('sendStop signals the pid the run\'s card names, and writes nothing', async () => {
   const ctx = await projectWithWorktreeAgent({ pid: process.pid, host: hostname() })
   // A signal watcher does not keep the event loop alive: a bound timer holds it open until the
   // signal lands, and fails the test rather than letting the process drain with the wait pending.
@@ -84,8 +98,8 @@ test('sendStop signals the pid the agent meta names, and writes nothing', async 
   try {
     await sendStop(ctx.projectId, ctx.agentId)
     await caught
-    assert.deepEqual(await entries(ctx.agentControl), [], 'a stop is not a control entry')
-    assert.deepEqual(await entries(ctx.rootControl), [])
+    assert.deepEqual(await entries(ctx.agentInbox), [], 'a stop is not an inbox line')
+    assert.deepEqual(await entries(ctx.rootInbox), [])
   } finally {
     process.off('SIGINT', onSignal)
     ctx.restore()
@@ -118,31 +132,69 @@ test('sendStop leaves an agent alone whose process is not this machine\'s, or is
   }
 })
 
-test('sendMessage and sendChoice address the run too (#749)', async () => {
-  const ctx = await projectWithWorktreeAgent()
+test('a message and an answer to a working run are lines in the inbox of the run\'s own checkout (#749/#1774)', async () => {
+  // The card names this test process, so the run reads as working; its diary holds the question.
+  const ctx = await projectWithWorktreeAgent({ pid: process.pid, host: hostname() }, { diary: [QUESTION], hooks: RESUME_HOOK })
   try {
-    await sendMessage(ctx.projectId, 'also add tests', ctx.agentId)
-    await sendChoice(ctx.projectId, 'gate-1', 'option-b', 'user', ctx.agentId)
-    assert.deepEqual(await entries(ctx.agentControl), [
+    assert.deepEqual(await sendMessage(ctx.projectId, '  also add tests ', ctx.agentId), { ok: true })
+    assert.deepEqual(await sendChoice(ctx.projectId, 'await-choices', 'b', ctx.agentId), { ok: true })
+    assert.deepEqual(await entries(ctx.agentInbox), [
       { kind: 'message', text: 'also add tests' },
-      { kind: 'choice', id: 'gate-1', pick: 'option-b', by: 'user' },
+      { kind: 'answer', question: 'Which way?', answer: 'Right' },
     ])
-    assert.deepEqual(await entries(ctx.rootControl), [])
+    assert.deepEqual(await entries(ctx.rootInbox), [])
+    assert.equal(await readFile(join(ctx.dir, 'resumed.txt'), 'utf8').catch(() => ''), '', 'a working run is not resumed')
+    assert.deepEqual(await sendMessage(ctx.projectId, '   ', ctx.agentId), { ok: true }, 'an empty message is dropped')
+    assert.equal((await entries(ctx.agentInbox)).length, 2)
   } finally {
     ctx.restore()
     await rm(ctx.dir, { recursive: true, force: true })
   }
 })
 
-test('an unknown or absent run id falls back to the project root, as before #736 (#749)', async () => {
+test('a message and an answer to an ended run go through the project\'s resume hook; without the hook they are refused in words (#1774)', async () => {
+  const waiting = await projectWithWorktreeAgent({ pid: 2 ** 22 - 1, host: hostname() }, { status: 'waiting', diary: [QUESTION, { kind: 'ended', status: 'waiting' }], hooks: RESUME_HOOK })
+  try {
+    assert.deepEqual(await sendChoice(waiting.projectId, 'await-choices', 'a', waiting.agentId), { ok: true })
+    assert.deepEqual(await sendMessage(waiting.projectId, 'go on', waiting.agentId), { ok: true })
+    assert.equal(await readFile(join(waiting.dir, 'resumed.txt'), 'utf8'), `${waiting.agentId}||Left\n${waiting.agentId}|go on|\n`)
+    assert.deepEqual(await entries(waiting.agentInbox), [], 'nothing waits in an inbox nobody reads')
+  } finally {
+    waiting.restore()
+    await rm(waiting.dir, { recursive: true, force: true })
+  }
+  const noHook = await projectWithWorktreeAgent({ pid: 2 ** 22 - 1, host: hostname() }, { status: 'done' })
+  try {
+    assert.deepEqual(await sendMessage(noHook.projectId, 'go on', noHook.agentId), { ok: false, error: 'this project has no resume hook' })
+  } finally {
+    noHook.restore()
+    await rm(noHook.dir, { recursive: true, force: true })
+  }
+})
+
+test('an answer must be to the question the run\'s diary holds open, by its own options (#1774)', async () => {
+  const ctx = await projectWithWorktreeAgent({ pid: process.pid, host: hostname() }, { diary: [QUESTION, { kind: 'said', text: 'going on' }] })
+  try {
+    // The agent went on after the question: it is no longer open.
+    assert.deepEqual(await sendChoice(ctx.projectId, 'await-choices', 'a', ctx.agentId), { ok: false, error: 'that question is no longer open' })
+    await writeFile(join(worktreePath(ctx.dir, ctx.agentId), THE_FRAMEWORK_DIR, `${ctx.agentId}.jsonl`), JSON.stringify(QUESTION) + '\n')
+    assert.deepEqual(await sendChoice(ctx.projectId, 'await-choices', 'zzz', ctx.agentId), { ok: false, error: 'every pick must be one of the question\'s options' })
+    assert.deepEqual(await sendChoice(ctx.projectId, 'await-choices', ['a', 'b'], ctx.agentId), { ok: false, error: 'pick exactly one option' })
+    assert.deepEqual(await entries(ctx.agentInbox), [])
+  } finally {
+    ctx.restore()
+    await rm(ctx.dir, { recursive: true, force: true })
+  }
+})
+
+test('a message with no run, or an unsafe run id, is refused (#749)', async () => {
   const ctx = await projectWithWorktreeAgent()
   try {
-    // No agent id at all: the pre-#736 addressing, still right for an agent with no worktree.
-    await sendMessage(ctx.projectId, 'one')
-    // An agent that has since finished and had its worktree removed must not throw or vanish.
-    await sendMessage(ctx.projectId, 'two', 'a-run-that-is-gone')
-    assert.deepEqual(await entries(ctx.rootControl), [{ kind: 'message', text: 'one' }, { kind: 'message', text: 'two' }])
-    assert.deepEqual(await entries(ctx.agentControl), [], 'the live run is left alone')
+    assert.deepEqual(await sendMessage(ctx.projectId, 'one'), { ok: false, error: 'unknown session' })
+    assert.deepEqual(await sendMessage(ctx.projectId, 'two', '../escape'), { ok: false, error: 'unknown session' })
+    assert.deepEqual(await sendMessage('no-such-project', 'three', ctx.agentId), { ok: false, error: 'unknown session' })
+    assert.deepEqual(await entries(ctx.rootInbox), [])
+    assert.deepEqual(await entries(ctx.agentInbox), [], 'the run is left alone')
   } finally {
     ctx.restore()
     await rm(ctx.dir, { recursive: true, force: true })
@@ -153,12 +205,12 @@ test('an unknown or absent run id falls back to the project root, as before #736
 // and must never yank the checkout out from under an agent that is still going.
 
 test('sendRemoveWorktree refuses while that run is still live (#737)', async () => {
-  const ctx = await projectWithWorktreeAgent() // its agent.json says `running`
+  const ctx = await projectWithWorktreeAgent() // its card says `running`
   try {
     const result = await sendRemoveWorktree(ctx.projectId, ctx.agentId)
     assert.equal(result.ok, false)
     assert.match(result.ok === false ? result.error : '', /still going/)
-    assert.equal(await entries(ctx.agentControl).then(() => true), true, 'the worktree is untouched')
+    assert.ok(await readFile(join(worktreePath(ctx.dir, ctx.agentId), THE_FRAMEWORK_DIR, `${ctx.agentId}.json`), 'utf8'), 'the worktree is untouched')
   } finally {
     ctx.restore()
     await rm(ctx.dir, { recursive: true, force: true })
@@ -283,8 +335,8 @@ test('onRetainedWorktrees hides a live run, and lists one that has finished (#73
     assert.deepEqual(await onRetainedWorktrees(ctx.projectId), [], 'a running run has nothing to offer removing')
     // Once it is no longer running, its retained checkout is listed.
     await writeFile(
-      join(worktreePath(ctx.dir, ctx.agentId), THE_FRAMEWORK_DIR, 'agent.json'),
-      JSON.stringify({ version: 1, status: 'failed', id: ctx.agentId, startedAt: ctx.agentId, updatedAt: ctx.agentId }),
+      join(worktreePath(ctx.dir, ctx.agentId), THE_FRAMEWORK_DIR, `${ctx.agentId}.json`),
+      JSON.stringify({ id: ctx.agentId, startedAt: '2026-07-19T10:00:00.000Z', status: 'failed' }),
     )
     assert.deepEqual(await onRetainedWorktrees(ctx.projectId), [ctx.agentId])
   } finally {
@@ -293,57 +345,20 @@ test('onRetainedWorktrees hides a live run, and lists one that has finished (#73
   }
 })
 
-// #766: for the first seconds of an agent there is a worktree but no `agent.json` yet. Resolving by run
-// state misses it and falls back to the project root, and because the event stream resolves its
-// path once, when the browser opens it, the feed then tails the root's log — a previous agent's
-// output — for the life of that connection. Resolve by the directory, which the daemon creates before it spawns.
-test('a run that has a worktree but has not written its state yet still resolves to it (#766)', async () => {
-  const ctx = await projectWithWorktreeAgent()
+// #768: a resumed run has a record from its first leg AND is going again in its checkout. The
+// dedup used to keep the record and drop the live copy, so the dashboard showed a running agent as
+// finished.
+test('a resumed run reads as running, not as its recorded first leg (#768)', async () => {
+  const ctx = await projectWithWorktreeAgent() // its checkout's card says `running`
   try {
-    const fresh = '2026-07-19T11-30-00-000Z'
-    const worktree = worktreePath(ctx.dir, fresh)
-    await mkdir(worktree, { recursive: true }) // the daemon has made the checkout; the run has not started writing
-    await sendMessage(ctx.projectId, 'hello', fresh)
-    assert.deepEqual(
-      await entries(join(worktree, THE_FRAMEWORK_DIR, CONTROL_FILE)),
-      [{ kind: 'message', text: 'hello' }],
-      'addressed at the run whose worktree exists, not the project root',
-    )
-    assert.deepEqual(await entries(ctx.rootControl), [], 'the project root is left alone')
-  } finally {
-    ctx.restore()
-    await rm(ctx.dir, { recursive: true, force: true })
-  }
-})
-
-test('a run id with no worktree at all still falls back to the project root (#766)', async () => {
-  const ctx = await projectWithWorktreeAgent()
-  try {
-    // The non-git fallback path, and any run whose worktree has since been removed.
-    await sendMessage(ctx.projectId, 'hello', '2026-07-19T11-45-00-000Z')
-    assert.deepEqual(await entries(ctx.rootControl), [{ kind: 'message', text: 'hello' }])
-  } finally {
-    ctx.restore()
-    await rm(ctx.dir, { recursive: true, force: true })
-  }
-})
-
-// #768: a continued agent (#762) has an archived copy from its first leg AND is live again. The
-// dedup used to keep the archive and drop the live copy, so the dashboard showed a running agent as
-// finished — the agent really was going, the UI just rendered its stale replay and looked dead.
-test('a continued run reads as running, not as its archived first leg (#768)', async () => {
-  const ctx = await projectWithWorktreeAgent() // its worktree meta says `running`
-  try {
-    // Its first leg was archived when it finished, exactly as teardown (#737) leaves things.
-    await mkdir(join(ctx.dir, THE_FRAMEWORK_DIR, 'agents'), { recursive: true })
-    await writeFile(
-      join(ctx.dir, THE_FRAMEWORK_DIR, 'agents', `${ctx.agentId}.json`),
-      JSON.stringify({ version: 1, status: 'done', id: ctx.agentId, startedAt: ctx.agentId, updatedAt: ctx.agentId }),
-    )
+    // Its first leg was recorded on the data branch when it ended.
+    const recorded = join(fileBranchPath(ctx.dir, DATA_BRANCH), 'agents', 'someone@example.com')
+    await mkdir(recorded, { recursive: true })
+    await writeFile(join(recorded, `${ctx.agentId}.json`), JSON.stringify({ id: ctx.agentId, startedAt: '2026-07-19T10:00:00.000Z', status: 'waiting' }))
     const agents = (await onAgents(ctx.projectId)) as { id: string; status: string }[]
     const mine = agents.filter(agent => agent.id === ctx.agentId)
     assert.equal(mine.length, 1, 'still one row, not two')
-    assert.equal(mine[0]?.status, 'running', 'and it reads as live, not as the archived first leg')
+    assert.equal(mine[0]?.status, 'running', 'and it reads as live, not as the recorded first leg')
   } finally {
     ctx.restore()
     await rm(ctx.dir, { recursive: true, force: true })

@@ -1,8 +1,7 @@
 import { useEffect, useSyncExternalStore } from 'react'
-import type { CustomPreset, FrameworkFileConfig, Preferences, ProjectSummary } from '../../src/index.js'
-import { preferencesFromFileConfig, notifyMethodEnabled, notifyCategoryEnabled } from '../../src/client.js'
+import type { CustomPreset, Preferences } from '../../src/index.js'
+import { notifyMethodEnabled, notifyCategoryEnabled } from '../../src/client.js'
 import { onPreferences, patchPreferences, onProjectPresets, saveProjectPresets } from '../rpc/preferences.js'
-import { onProjects } from '../rpc/projects.js'
 import { parseRoute } from './route.js'
 
 // The dashboard's Global options (#410), owned by the daemon and persisted in the same
@@ -16,27 +15,15 @@ import { parseRoute } from './route.js'
 // cached object meant a tab replayed every value it happened to hold, so a tab open since before
 // someone else's change reverted it on its next write — most visibly the theme.
 //
-// Two tiers (B5): your settings, and the open project's committed `the-framework.yml` on top.
-// Only the first is writable — the repo file is edited in the repo — so every write goes to one
-// place and there is no split to get wrong. A third tier lived here (the user's per-project
-// overrides, #840), duplicating for one machine what the committed file already says for everyone,
-// and its price was a write-split, per-tier write bookkeeping and a three-way provenance union.
+// One tier: your settings. Every write goes to one place.
 
 const EMPTY: Preferences = {}
 let cache: Preferences | null = null
 let loading: Promise<void> | null = null
-/** Each project's committed `the-framework.yml`, as served on the project payload (#842). */
-const files = new Map<string, FrameworkFileConfig>()
-let filesLoading: Promise<void> | null = null
-let filesLoaded = false
 /** Each project's shared custom presets, committed in its `.the-framework/custom-presets.json` (#1025). */
 const projectPresets = new Map<string, CustomPreset[]>()
 const projectPresetLoads = new Set<string>()
 const EMPTY_PRESETS: CustomPreset[] = []
-/** Resolved snapshots, one per project, cleared on every notify. `useSyncExternalStore` compares
- * snapshots by identity, so resolving fresh on each read would re-render forever. */
-let resolved = new Map<string, Preferences>()
-let sources = new Map<string, PreferenceSources>()
 /**
  * Write bookkeeping per tier (#1148), so nothing the daemon answers can replace the value the
  * user just chose: `writes` orders one write's reply against a newer write's, and `pending`
@@ -47,56 +34,12 @@ let globalPending = 0
 const listeners = new Set<() => void>()
 
 function notify(): void {
-  resolved = new Map()
-  sources = new Map()
   for (const listener of listeners) listener()
 }
 
 function subscribe(listener: () => void): () => void {
   listeners.add(listener)
   return () => listeners.delete(listener)
-}
-
-/** Which of the two tiers a resolved preference came from (#842). Absent = nobody set it. */
-export type PreferenceSource = 'repo' | 'global'
-
-/** The winning layer per key, for showing what is inherited rather than yours. */
-export type PreferenceSources = Partial<Record<keyof Preferences, PreferenceSource>>
-
-/** The repo tier as preference keys: `the-framework.yml`, committed, shared by everyone who clones. */
-function fileTier(projectId: string | null): Preferences {
-  const file = projectId ? files.get(projectId) : undefined
-  return file ? preferencesFromFileConfig(file) : EMPTY
-}
-
-function snapshot(projectId: string | null): Preferences {
-  const key = projectId ?? ''
-  const hit = resolved.get(key)
-  if (hit) return hit
-  const repo = fileTier(projectId)
-  // Nearest wins (#841): the repo's committed file over your own settings.
-  const value = repo === EMPTY ? (cache ?? EMPTY) : { ...(cache ?? EMPTY), ...repo }
-  resolved.set(key, value)
-  return value
-}
-
-function sourceSnapshot(projectId: string | null): PreferenceSources {
-  const key = projectId ?? ''
-  const hit = sources.get(key)
-  if (hit) return hit
-  const value: PreferenceSources = {}
-  const tiers: [PreferenceSource, Preferences][] = [
-    ['global', cache ?? EMPTY],
-    ['repo', fileTier(projectId)],
-  ]
-  // Later tiers are nearer, so each one that set a key overwrites the recorded source.
-  for (const [name, values] of tiers) {
-    for (const [k, v] of Object.entries(values)) {
-      if (v !== undefined) value[k as keyof Preferences] = name
-    }
-  }
-  sources.set(key, value)
-  return value
 }
 
 function ensureLoaded(projectId: string | null): void {
@@ -115,48 +58,15 @@ function ensureLoaded(projectId: string | null): void {
         notify()
       })
   }
-  if (!filesLoaded) loadFileConfigs()
   ensureProjectPresetsLoaded(projectId)
 }
 
-/**
- * Load every project's `the-framework.yml` off the project payload (#842). One call covers all
- * projects, since that is what the RPC returns; the daemon re-reads the file on each request, so
- * refetching is how the launcher stops showing a stale answer after someone edits the yml.
- */
-function loadFileConfigs(): void {
-  if (filesLoading) return
-  filesLoading = onProjects()
-    .then((list: ProjectSummary[]) => {
-      files.clear()
-      for (const project of list) if (project.fileConfig) files.set(project.id, project.fileConfig)
-    })
-    .catch(() => {})
-    .finally(() => {
-      filesLoading = null
-      filesLoaded = true
-      notify()
-    })
-}
-
-/**
- * Re-read the repo tier. Wired to the window regaining focus, which is when an edit made in an
- * editor becomes visible to someone looking at the launcher again.
- */
-export function refreshFileConfigs(): void {
-  loadFileConfigs()
-}
-
 if (typeof window !== 'undefined') {
-  const refreshAll = () => {
-    refreshFileConfigs()
-    refreshPreferences()
-  }
-  window.addEventListener('focus', refreshAll)
+  window.addEventListener('focus', refreshPreferences)
   // Switching back to a tab in an already-focused window fires no `focus` event, and that is
   // exactly when a tab is showing values someone changed in another one (#1148).
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') refreshAll()
+    if (document.visibilityState === 'visible') refreshPreferences()
   })
 }
 
@@ -223,8 +133,7 @@ function activeProjectId(): string | null {
  * the UI responsive; the save round-trip is best-effort (a failed save is not worth surfacing
  * over a checkbox toggle).
  *
- * One destination (B5): a repo-shaped setting belongs in the repo's committed file, which is
- * edited in the repo, so everything writable here is yours and goes to the one place.
+ * One destination: everything writable here is yours.
  */
 export function updatePreferences(patch: Partial<Preferences>): void {
   cache = { ...(cache ?? {}), ...patch }
@@ -246,9 +155,9 @@ export function updatePreferences(patch: Partial<Preferences>): void {
 }
 
 /**
- * Re-read your settings (#1148). Wired to the window regaining focus, next to
- * {@link refreshFileConfigs}: a tab left open in the background is showing values someone else
- * may have changed, and until #1148 it would also write them back.
+ * Re-read your settings (#1148). Wired to the window regaining focus: a tab left open in the
+ * background is showing values someone else may have changed, and until #1148 it would also
+ * write them back.
  *
  * Skipped while a write is in flight, whether it went out before this read or after it: until the
  * daemon has stored those keys, no read can answer with them, and the write's own reply carries
@@ -270,42 +179,17 @@ export function useActiveProjectId(): string | null {
   return typeof window === 'undefined' ? null : parseRoute(window.location.pathname).projectId
 }
 
-/**
- * The user preferences in force: your own settings with the open project's committed
- * `the-framework.yml` (#842) on top. Loaded once from the daemon per tier and kept in sync across
- * components.
- */
+/** The user preferences in force: loaded once from the daemon and kept in sync across components. */
 export function usePreferences(): Preferences {
   const projectId = typeof window === 'undefined' ? null : parseRoute(window.location.pathname).projectId
   const preferences = useSyncExternalStore(
     subscribe,
-    () => snapshot(projectId),
+    () => cache ?? EMPTY,
     () => EMPTY,
   )
   useEffect(() => ensureLoaded(projectId), [projectId])
   return preferences
 }
-
-/**
- * Where each resolved preference came from (#842), so the launcher can show a repo-inherited
- * value as not-yours rather than implying you chose it.
- */
-export function usePreferenceSources(): PreferenceSources {
-  const projectId = typeof window === 'undefined' ? null : parseRoute(window.location.pathname).projectId
-  const value = useSyncExternalStore(
-    subscribe,
-    () => sourceSnapshot(projectId),
-    () => EMPTY_SOURCES,
-  )
-  useEffect(() => ensureLoaded(projectId), [projectId])
-  return value
-}
-
-const EMPTY_SOURCES: PreferenceSources = {}
-
-// Autopilot's default-on moved into `framework` with the rest of the preferences ->
-// run options mapping (#858), so the daemon resolves it the same way. Re-exported here because
-// every component reaches for it through this module.
 
 export type ThemePreference = NonNullable<Preferences['theme']>
 

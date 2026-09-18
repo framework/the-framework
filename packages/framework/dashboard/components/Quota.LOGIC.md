@@ -1,8 +1,8 @@
-The "Usage" panel: the account's quota [1] week drawn as one week-long track — what has been spent, the room left before unattended [4] work stands down, and the quota boundary [2] as a line through it — with a draggable handle that sets the spend offset [3] and writes it straight to the preferences [8]. Below the track the panel says how far ahead of or behind the week's pace the account is, when the week resets, whether "Autonomous AI" currently has room to spend, and, whenever the week cannot be drawn, exactly why.
+The "Usage" panel: the account's quota [1] week drawn as one week-long track — what has been spent, the room left before unattended [4] work stands down, and the quota boundary [2] as a line through it — with a draggable handle that sets the spend offset [3] and writes it straight to the preferences [7]. Below the track the panel says how far ahead of or behind the week's pace the account is, when the week resets, whether "Autonomous AI" currently has room to spend, and, whenever the week cannot be drawn, exactly why.
 
 ## Context
 
-**User story**: the user glances at the Overview [9] to answer "am I ahead of or behind my week's allowance, and will unattended [4] work keep going?" and drags one handle to let unattended work spend more or less of the week. The daemon acts on the same handle position, so what the bar shows and what unattended work obeys never disagree.
+**User story**: the user glances at the Overview [8] to answer "am I ahead of or behind my week's allowance, and will unattended [4] work keep going?" and drags one handle to let unattended work spend more or less of the week. The daemon acts on the same handle position, so what the bar shows and what unattended work obeys never disagree.
 
 **Business logic story**: the panel reads the daemon's cached quota reading, refreshed every 30 seconds while the panel is open; a failed refresh keeps the last reading on screen (the polling lives in `lib/quota.ts`). The drawing arithmetic — day segments, tone, limit, projection, pace figures — lives in `lib/quota-bar.ts`; where the boundary sits is the daemon's rule in `src/quota-boundary.ts`, which the panel never re-derives.
 
@@ -11,18 +11,17 @@ The "Usage" panel: the account's quota [1] week drawn as one week-long track —
 [1] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
 [2] quota boundary: the share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
 [3] spend offset: the user's adjustment of the quota boundary, in percentage points of the week.
-[4] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
+[4] unattended: said of an agent nobody is watching: one the scheduler started rather than a person. It is not answered any faster: a question it ends on waits for a human like any other.
 [5] coding agent: the CLI doing the actual work: Claude Code or Codex.
-[6] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
-[7] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down.
-[8] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
-[9] the Overview: the dashboard's cross-project page at `/`.
+[6] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
+[7] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
+[8] the Overview: the dashboard's cross-project page at `/`.
 
 ## Business logic — TL;DR
 
 - **Before and without a reading** - "Reading your usage…" until the first answer; when the coding agent [5] cannot report, a sentence says why, and numbers kept from an earlier reading are dated with "Last read …".
 - **The week as one track** - the account's week runs edge to edge with one two-letter label per calendar day, the spent share as a solid fill, the room left for unattended [4] work as a dimmed segment after it, and the quota boundary [2] as a line at the elapsed share of the week; the color says how spending compares with the boundary.
-- **The handle sets the spend offset** - dragging the dimmed segment's edge ("Unattended work stops at") stores the distance from the boundary as the spend offset [3], clamped to ±50 points, written to the preferences [8] at once and drawn at once.
+- **The handle sets the spend offset** - dragging the dimmed segment's edge ("Unattended work stops at") stores the distance from the boundary as the spend offset [3], clamped to ±50 points, written to the preferences [7] at once and drawn at once.
 - **The figures under the track** - "Over-consuming"/"Under-consuming" as a duration, what was spent as quota time, consumption as a share of the pace, when the week resets, and "show all limits" for every window the coding agent reports.
 - **Legend, "Autonomous AI" status and the eager warning** - the legend names the three marks; the status says whether unattended work currently has room ("enabled"/"disabled") and how to change that; "⚠️ Eager consumption" appears once the handle sits more than a day's worth ahead of the boundary.
 - **A week that cannot be drawn is an error, not a plainer panel** - when the reading has windows but no placeable week, a red alert names the exact missing or unrecognized text, the reported windows are still listed, and there is no handle.
@@ -73,7 +72,7 @@ The track is about the account's own week ("Current week (all models)"), never t
 - The handle is a slider labeled "Unattended work stops at", drawn on the track itself, valued on the track's own 0–100 scale so its thumb sits exactly at the dimmed segment's right edge, and on the boundary line when the spend offset [3] is 0.
 - The stored value is the offset, not the position: the handle's value minus the boundary percentage, rounded to whole points and clamped to the range −50 to +50. Dragging to the far end of the track past that reach still stores +50 (or −50 at the near end).
 - Before anyone touches it, the offset is half a day's worth of the week (100/14, about 7 points) ahead of the boundary, so unattended work is not stopped by the normal jitter of being exactly on pace.
-- A move writes the offset to the preferences [8] immediately, and the panel draws the new limit immediately. The panel keeps the user's value until the daemon's reading, which arrives every 30 seconds, catches up with it, so several quick moves accumulate instead of snapping back to the last reading.
+- A move writes the offset to the preferences [7] immediately, and the panel draws the new limit immediately. The panel keeps the user's value until the daemon's reading, which arrives every 30 seconds, catches up with it, so several quick moves accumulate instead of snapping back to the last reading.
 - The handle exists only while the week can be drawn; without a track there is no line to move.
 
 ### The figures under the track

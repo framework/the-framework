@@ -8,8 +8,8 @@ Serves the dashboard's RPC surface at `/_rpc`: a call is a `POST /_rpc/<name>` w
 
 ## Glossary
 
-[1] event stream: everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface (dashboard, terminal, archive, run) is a projection of it.
-[2] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
+[1] event stream: everything an agent does, one event per line of the agent's diary — the file `<id>.jsonl` the tool that runs the agent writes under `.the-framework/` in the agent's checkout, copied onto the `agent-data` branch when the agent ends. Every surface (dashboard, terminal, replay) is a projection of it.
+[2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps. Started from the dashboard by the user, or by the daemon.
 [3] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
 [4] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 [5] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
@@ -81,4 +81,4 @@ See `## Context`.
 
 #### Business logic
 
-Mounting the surface installs one context every RPC reads: the daemon's start closure (a prompt, the kind, the start options and the project), its add-project closure, the events source for relayed [3] agents, the relayed-agent lookup (which device [4] an agent runs on, and a project's relayed agents), the preferences [5] store, the quota [6] source, the Discord credentials store, which also reloads the Discord services on a save, each project's current errors, and the daemon's bridge browser with its show, hide and restart.
+Mounting the surface installs one context every RPC reads: the daemon's start closure (a prompt, the start options and the project), its add-project closure, the events source for relayed [3] agents, the relayed-agent lookup (which device [4] an agent runs on, and a project's relayed agents), the preferences [5] store, the quota [6] source, the Discord credentials store, which also reloads the Discord services on a save, each project's current errors, and the daemon's bridge browser with its show, hide and restart.

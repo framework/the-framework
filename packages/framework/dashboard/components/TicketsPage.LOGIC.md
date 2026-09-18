@@ -8,15 +8,13 @@ Shows every registered project's tickets on one page, the dashboard's Tickets vi
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down. An item on it is a queue entry. The dashboard labels it "AI queue".
 [3] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [4] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
 [5] holder: who a claim names: the agent's id when the daemon started the agent, else the branch the `tickets` command ran on.
 [6] plan: a ticket's `.plan.md`: effort and uncertainty ratings and how to implement it.
 [7] the Overview: the dashboard's cross-project page at `/`.
-[8] prompt agent: an agent that runs one prompt and stops there.
-[9] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles. The opposite is attended.
 [10] launcher: the Start form on a project's own page (its project home).
 
 ## Business logic — TL;DR
@@ -28,7 +26,7 @@ Shows every registered project's tickets on one page, the dashboard's Tickets vi
 - **Selecting rows** - ticked rows narrow the heading's queue buttons to the selection, with an "N selected" readout and "Clear selection"; a selected row the filters hide does not count.
 - **Queue the shown tickets** - the "Add … to the AI queue" button puts every shown, or selected, unclaimed ticket on its project's agent queue, skipping what is already queued, and then reads "Queued".
 - **Queue plans for the unplanned ones** - the "Queue a plan …" button queues the plan ask for every shown, or selected, ticket that is neither planned, claimed nor already queued, and then reads "Plans queued".
-- **Starting an agent from a row** - a row starts an attended planning agent or an unattended work agent on the ticket's own project, or sends the user to that project's launcher to configure first; the agent holding a claim opens from the row.
+- **Starting an agent from a row** - a row starts a planning agent or a work agent on the ticket's own project, or sends the user to that project's launcher to configure first; the agent holding a claim opens from the row.
 
 ## Business logic
 
@@ -126,7 +124,7 @@ After a successful click the button reads "Queued" with a check mark and is disa
 
 #### Context
 
-**User story**: before implementing, the user wants each unplanned ticket to receive a plan [6]. The "Plan tickets" preset queues one plan ask per ticket; this button queues the same ask for the tickets shown, so a draining agent reaching the entry writes the plan.
+**User story**: before implementing, the user wants each unplanned ticket to receive a plan [6]. The project's `plan-tickets` command queues one plan ask per ticket; this button queues the same ask for the tickets shown, so a draining agent reaching the entry writes the plan.
 
 #### Business logic
 
@@ -134,7 +132,7 @@ The button's set is the same as the ticket-queue button's, further narrowed to t
 - Without a selection: "Queue plans for all N tickets shown below"; "Queue plans for the N unplanned tickets shown below" when some were skipped; for a single ticket "Queue a plan for the ticket shown below" or "Queue a plan for the one unplanned ticket shown below".
 - With a selection: "Queue plans for the N selected tickets"; "Queue plans for the N unplanned selected tickets" when some were skipped; for a single ticket "Queue a plan for the selected ticket" or "Queue a plan for the one unplanned selected ticket".
 
-Its tooltip reads "Each ticket gets its plan asked for on the AI queue — the same "Create tickets/….plan.md" entry the Plan tickets preset queues — worked highest priority first and, within a priority, in the order shown below. Tickets already planned, already queued, or held by an agent stay as they are." ("Each selected ticket …" and "The rest of the shown set stays put." with a selection).
+Its tooltip reads "Each ticket gets its plan asked for on the AI queue — the same "Create tickets/….plan.md" entry the plan-tickets command queues — worked highest priority first and, within a priority, in the order shown below. Tickets already planned, already queued, or held by an agent stay as they are." ("Each selected ticket …" and "The rest of the shown set stays put." with a selection).
 
 A click reads every project's agent queue [2] at that moment, noting per project the exact text of every open entry and the tickets open entries link to. Walking the set in the shown order, a ticket is skipped when its project's queue already holds an open entry with the exact plan ask text, `Create tickets/<stem>.plan.md`, and also when the ticket is already queued for implementation, since that work would land before a trailing plan could matter. Every other ticket gets that plan ask added to its own project's agent queue, placed by the ticket's `Priority:` when it has one. The walk stops at the first failure: the daemon's reason, or "The plans could not be queued." when it gives none, appears above the filter bar, and what was queued stays.
 
@@ -150,8 +148,8 @@ After success the button reads "Plans queued" with a check mark and is disabled 
 
 What a row shows, including its plan column, its start controls and how a claim [4] names its holder [5], is described in `TicketsPanel.tsx`. This page wires the row's actions, in flat mode directly and in grouped mode through each project's panel, always against the row's own project:
 - Opening a row opens the ticket's own page; the plan column's link opens the ticket's plan view. Both are addressed by project and ticket file.
-- "Start a plan" from a row starts an attended prompt agent [8] on the ticket's project with the prompt `Create tickets/<stem>.plan.md`. When the agent could not be started, the daemon's reason, or "The planning agent could not be started." when it gives none, appears above the filter bar.
-- "Start work" from a row starts a prompt agent on the ticket's project, unattended [9]; the prompt's wording is in `TicketsPanel.tsx`. Failure shows the daemon's reason or "The work agent could not be started.".
+- "Start a plan" from a row starts an agent on the ticket's project with the prompt `Create tickets/<stem>.plan.md`. When the agent could not be started, the daemon's reason, or "The planning agent could not be started." when it gives none, appears above the filter bar.
+- "Start work" from a row starts an agent on the ticket's project; the prompt's wording is in `TicketsPanel.tsx`. Failure shows the daemon's reason or "The work agent could not be started.".
 - Every "Configure first, then run" on this page selects the row's own project, landing on that project's launcher.
 - On a claimed row, the holder's name links to the holding agent's page in the ticket's project, when the holder is one of that project's agents.
 

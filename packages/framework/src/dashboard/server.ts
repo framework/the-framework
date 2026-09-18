@@ -9,10 +9,9 @@ import { defaultQuotaSource, type QuotaSource } from './quota.js'
 import type { ProjectErrorsReader } from '../project-errors.js'
 import type { BridgeBrowserOwner } from '../bridge-browser.js'
 import { serveClientBundle } from './static.js'
-import { BROWSER_PROXY_PREFIX, handleBrowserProxy } from './browser-proxy.js'
 import { makeRpcMount, RPC_PREFIX, isSameOriginRequest, isExpectedHost } from './rpc-serve.js'
 import { requestPathname } from '../request-path.js'
-import type { AddProjectResult, PreviewResult, PreviewStatus, StartAgentKind, StartAgentOptions, StartAgentResult } from './types.js'
+import type { AddProjectResult, PreviewResult, PreviewStatus, StartAgentOptions, StartAgentResult } from './types.js'
 import type { EventsSource, RemoteAgents } from './rpc-serve.js'
 import { handleRelayRequest, RELAY_PREFIX, type RelayHandlers } from './relay-endpoints.js'
 import { BRIDGE_PREFIX, EXPECTED_EXTENSION_VERSION, handleBridgeRequest, type BridgeHandlers } from './bridge-endpoints.js'
@@ -27,13 +26,11 @@ export interface DashboardOptions {
   /** Host to bind. Default `127.0.0.1` (localhost only). */
   host?: string
   /**
-   * Called when the browser starts a session (#345): the `sendStart` RPC reaches this through the
-   * wired dashboard context. Wire it to spawn the session; return `busy: true` to refuse because
-   * one is already active.
+   * Called when the browser starts a run (#345): the `sendStart` RPC reaches this through the
+   * wired dashboard context. Wire it to the project's start hook.
    */
   onStart: (
     prompt: string,
-    kind: StartAgentKind,
     options: StartAgentOptions,
     projectId?: string,
   ) => StartAgentResult | Promise<StartAgentResult>
@@ -68,14 +65,14 @@ export interface DashboardOptions {
   clientBundleDir?: string
   /**
    * The shared token that guards a non-loopback bind (#1051): with it set, every route (static
-   * bundle, `/_rpc`, `/browser`, `/_relay`) needs a valid `fw_daemon` cookie or a matching
+   * bundle, `/_rpc`, `/_relay`) needs a valid `fw_daemon` cookie or a matching
    * `?token=`, else 401. Omit for a loopback bind, where the guard is a no-op and local UX is
    * byte-identical. A separate concern from the CSRF origin check in rpc-serve.ts.
    */
   token?: string
   /**
-   * The live-events source for a session this daemon is relaying from a connected device (#1067):
-   * a stream for such a session, else undefined so `onEvents` tails the on-disk log.
+   * The live-events source for a run this daemon is relaying from a connected device (#1067):
+   * a stream for such a run, else undefined so `onEvents` tails the run's diary off disk.
    */
   eventsSource: EventsSource
   /**
@@ -84,9 +81,9 @@ export interface DashboardOptions {
    */
   remote: RemoteAgents
   /**
-   * Serve a relay-started agent's events back to the daemon that relayed it here (#1067): the
+   * Serve a relay-started run's events back to the daemon that relayed it here (#1067): the
    * `/_relay/*` endpoints (start + events, plus the slice-2 `rpc`). All are fronted by the same
-   * `token` guard above, so a device without the cookie cannot start or read an agent.
+   * `token` guard above, so a device without the cookie cannot start or read a run.
    */
   relay?: {
     tailEvents: (agentId: string, onEvent: (event: import('../events.js').FrameworkEvent) => void) => () => void
@@ -120,10 +117,10 @@ export interface Dashboard {
 
 /**
  * Start the localhost dashboard: a tiny `node:http` server that serves the built SPA (#405) and
- * mounts its RPC surface at `/_rpc` — the calls and the live-event stream. The dashboard reads the
- * agent's `.the-framework/events.jsonl` over that stream and steers it through `control.jsonl`, so
- * there is no in-process event stream here; the server is a static-bundle + RPC host. The RPCs run
- * in the daemon's own process, so `sendStart` / `sendAddProject` call the daemon's own closures via
+ * mounts its RPC surface at `/_rpc` — the calls and the live-event stream. The dashboard reads a
+ * run's own diary over that stream and steers the run through the files its tool reads, so there is
+ * no in-process event stream here; the server is a static-bundle + RPC host. The RPCs run in the
+ * daemon's own process, so `sendStart` / `sendAddProject` call the daemon's own closures via
  * {@link DashboardOptions.onStart} / {@link DashboardOptions.onAddProject}.
  */
 export function startDashboard(opts: DashboardOptions): Promise<Dashboard> {
@@ -231,10 +228,10 @@ export function startDashboard(opts: DashboardOptions): Promise<Dashboard> {
     }
     // #1051: one guard fronting every route on a non-loopback bind; a no-op when no token is set.
     if (token !== undefined && !authorizeDaemonRequest(req, res, token)) return
-    // The device relay (#1067): another daemon posts an agent here and streams its events back.
+    // The device relay (#1067): another daemon posts a start here and streams the run's events back.
     // The token guard above is a no-op on a loopback bind, so — exactly like the RPC mount below —
     // the relay carries its own CSRF + DNS-rebinding guard, or a page the user merely visited could
-    // POST /_relay/start to spawn an agent (the real device caller sends no Origin and a loopback
+    // POST /_relay/start to start a run (the real device caller sends no Origin and a loopback
     // Host, so both checks pass it; only a browser's cross-origin/rebound request is turned away).
     if (pathname === RELAY_PREFIX || pathname.startsWith(`${RELAY_PREFIX}/`)) {
       if (!guardBrowserOrigin(req, res, host)) return
@@ -243,21 +240,6 @@ export function startDashboard(opts: DashboardOptions): Promise<Dashboard> {
     }
     if (pathname === RPC_PREFIX || pathname.startsWith(`${RPC_PREFIX}/`)) {
       void rpcMount(req, res)
-      return
-    }
-    // The browser preview (#813) is proxied, not an RPC: it is an endless MJPEG body and a
-    // raw input POST, neither of which is a call. It carries the same guard as the RPCs: a raw
-    // /browser/…/input POST steers the agent's Chrome, so a cross-origin or rebound caller must
-    // not reach it (the dashboard's own <img>/fetch is same-origin and passes).
-    if (pathname.startsWith(`${BROWSER_PROXY_PREFIX}/`)) {
-      if (!guardBrowserOrigin(req, res, host)) return
-      void handleBrowserProxy(req, res)
-        .then(handled => {
-          if (!handled) void serveClientBundle(req, res, clientBundleDir)
-        })
-        // Whatever the proxy throws must not become an unhandled rejection that kills the
-        // daemon (#938); tear the socket down rather than leave the request hanging.
-        .catch(() => res.destroy())
       return
     }
     void serveClientBundle(req, res, clientBundleDir)
@@ -289,11 +271,11 @@ function closeServer(server: Server): Promise<void> {
 }
 
 /**
- * The CSRF + DNS-rebinding guard the RPC mount applies, lifted to the routes that dispatch outside
- * it — the device relay and the browser-preview proxy. Both are state-changing (spawn an agent,
- * steer its Chrome) and both are wired unconditionally on a loopback bind, where the shared-token
- * guard is a no-op, so without this a page the user merely visited reaches them. Returns true to
- * admit the request; on rejection it has already answered 403.
+ * The CSRF + DNS-rebinding guard the RPC mount applies, lifted to the device relay, which
+ * dispatches outside it. The relay is state-changing (it starts a run on this machine) and is
+ * wired unconditionally on a loopback bind, where the shared-token guard is a no-op, so without
+ * this a page the user merely visited reaches it. Returns true to admit the request; on rejection
+ * it has already answered 403.
  */
 function guardBrowserOrigin(req: IncomingMessage, res: ServerResponse, host: string): boolean {
   if (isSameOriginRequest(req) && isExpectedHost(req, host)) return true

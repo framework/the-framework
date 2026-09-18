@@ -10,13 +10,13 @@ What the agent view [1] says about a hands-off [2] agent [3] whose location [4] 
 
 [1] agent view: one agent's page.
 [2] hands-off: said of an agent whose work leaves this machine, so its first prompt is the whole agent: an agent whose location is `web`.
-[3] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
-[4] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
+[3] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
+[4] location: where an agent's turns ran, as its own record names it: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session). Only `local` and a device are offered today; the other two are read off agents recorded before they left the launcher.
 [5] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
-[6] gate: a question with options at which an agent stops and waits for an answer: it emits the question in its turn's final message, the dashboard shows it as a card, and the answer re-prompts the agent.
+[6] gate: a question with options an agent's turn ended on: the agent ends waiting for the answer, the dashboard shows the question as a card, and the answer resumes the agent.
 [7] the Claude web bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The Driver tab is the extension's one pinned tab that reads claude.ai's session list, visits sessions and types answers.
-[8] pick: the answer to a gate: the option or options chosen, by the user or automatically.
-[9] event stream: everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface is a projection of it.
+[8] pick: the answer to a gate: the option or options the user chose.
+[9] event stream: everything an agent does, in order, read off the agent's diary: the file its tool writes one line at a time, in the agent's checkout while it has one and on the data branch once it is recorded; every surface is a projection of it.
 
 ## Business logic — TL;DR
 

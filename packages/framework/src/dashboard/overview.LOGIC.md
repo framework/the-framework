@@ -9,14 +9,14 @@ Builds the data behind the dashboard's cross-project Overview [1] and its shared
 ## Glossary
 
 [1] the Overview: the dashboard's cross-project page at `/`.
-[2] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
+[2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps. Started from the dashboard by the user, or by the daemon.
 [3] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down. An item on it is a queue entry.
 [4] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [5] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
 [6] ready for merge: the signal an agent emits when it believes its work is complete: it flips the agent's badge from building to ready and authorizes the handoff.
 [7] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
 [8] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
-[9] archive: the transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
+[9] the record: the `logs` skill's copy of a finished agent's card and diary on the `agent-data` branch, which is the one place a finished agent lives.
 [10] the Claude web bridge (the bridge): the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session.
 [11] the queued work: one agent started with `/work-queue`, which takes one task off the agent queue by composing the skills in its checkout.
 [12] plan: a ticket's `.plan.md`: effort and uncertainty ratings and how to implement it.
@@ -51,7 +51,7 @@ For each project, every live agent [2] whose status is running is listed, one pe
 
 #### Business logic
 
-For each project, every agent [2] of the project is read, archive [9] included, and a web agent is listed when the state of its cloud side is either at work or waiting: waiting when the bridge [10] holds a question its cloud session [8] is parked on; at work when it has no pull request yet and started within the last 12 hours. The rules that turn an agent's record into that state are in `../cloud-run-state.ts`. Such a row is keyed to the project's own path instead of a checkout, and is marked with where the agent is: in its cloud session or waiting on a question. Two projects that are working copies of one repository share their agents' records, so each web agent is listed once, under the first project that lists it. A web agent with a pull request, one started more than 12 hours ago, or one that was stopped or failed is not listed.
+For each project, every agent [2] of the project is read, the record [9] included, and a web agent is listed when the state of its cloud side is either at work or waiting: waiting when the bridge [10] holds a question its cloud session [8] is parked on; at work when it has no pull request yet and started within the last 12 hours. The rules that turn an agent's record into that state are in `../cloud-run-state.ts`. Such a row is keyed to the project's own path instead of a checkout, and is marked with where the agent is: in its cloud session or waiting on a question. Two projects that are working copies of one repository share their agents' records, so each web agent is listed once, under the first project that lists it. A web agent with a pull request, one started more than 12 hours ago, or one that was stopped or failed is not listed.
 
 ### Open queue entries, summed
 
@@ -81,7 +81,7 @@ The projects that have a last-activity time are ordered by it, newest first, and
 
 #### Business logic
 
-Every project's agents, archive [9] included, are pooled and ordered by their start time, newest first. An agent appears once: two projects that are working copies of one repository share their agents' records, and the first project to list an agent keeps it. At most 30 rows are kept. A project whose agents cannot be read contributes nothing.
+Every project's agents, the record [9] included, are pooled and ordered by their start time, newest first. An agent appears once: two projects that are working copies of one repository share their agents' records, and the first project to list an agent keeps it. At most 30 rows are kept. A project whose agents cannot be read contributes nothing.
 
 ### Hot tickets
 

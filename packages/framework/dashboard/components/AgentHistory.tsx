@@ -46,7 +46,7 @@ type Row = { key: string; agent: AgentMeta; project?: string; active: boolean; o
 // where no project is — every project's sessions pooled newest-first (`recentAgents`), each row
 // naming its project and jumping into it when selected. `agents`/`recentAgents` are owned by the shell
 // so the rail and the main pane share one list. `startTick`/`startIntent` seed an optimistic
-// "starting…" row the instant Start is clicked, until the real agent.json lands.
+// "starting…" row the instant Start is clicked, until the run's real card lands.
 export function AgentHistory({
   projectId,
   agents,
@@ -59,7 +59,6 @@ export function AgentHistory({
   onProjectAdded,
   startTick = 0,
   startIntent = '',
-  followLive = false,
   working = false,
   onDashboard = () => {},
   onSelectProject = () => {},
@@ -104,7 +103,6 @@ export function AgentHistory({
   /** Just started an agent that reported no id, so there is nothing selected to highlight yet (#705):
    *  put the highlight on the running/optimistic row rather than the New row until the shell adopts
    *  the agent's real id. An agent that did report one is selected by URL instead (#784). */
-  followLive?: boolean
 }) {
   // The optimistic row, and the agents that already existed when Start was clicked. The two are one
   // piece of state on purpose: the row stands in for a session that is not in `known` yet, so a
@@ -116,7 +114,6 @@ export function AgentHistory({
   }, [startTick]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const hasRunning = agents.some(agent => agent.status === 'running')
-  const newestRunningAgentId = agents.find(agent => agent.status === 'running')?.id
   // The handover: the row this one stands in for has landed once an agent appears that was not in the
   // list when Start was clicked — whatever its status.
   //
@@ -149,10 +146,10 @@ export function AgentHistory({
   // painted together for a frame while the effect is still queued.
   const showOptimistic = !crossProject && optimistic !== null && !hasRunning && !landed
 
-  // A session selected but not in the list is one just started, whose row lands with its agent.json
+  // A session selected but not in the list is one just started, whose row lands with its card
   // a beat later (#784): the optimistic row is standing in for it, so highlight that. Following a
   // just-started run (#705) counts too, before its id is known.
-  const starting = followLive || (selectedAgentId !== null && !agents.some(agent => agent.id === selectedAgentId))
+  const starting = selectedAgentId !== null && !agents.some(agent => agent.id === selectedAgentId)
 
   const rows: Row[] = crossProject
     ? recentAgents!.map(rr => ({
@@ -167,7 +164,7 @@ export function AgentHistory({
         agent: agent,
         // Following live highlights the newest running agent, not every one of them (#738):
         // `agents` is newest-first, so that is the first with a running status.
-        active: agent.id === selectedAgentId || (followLive && agent.id === newestRunningAgentId),
+        active: agent.id === selectedAgentId,
         onClick: () => onSelect(agent.id),
       }))
 
@@ -175,7 +172,7 @@ export function AgentHistory({
   // screen: a project selected, no run picked, not following a live one). On the Overview that role
   // belongs to the Overview item instead, so the two are never active at once — and a ticket page
   // routes with a project but is the Tickets view, not the launcher.
-  const atProjectLauncher = projectId !== null && selectedAgentId === null && !followLive && !ticketsActive
+  const atProjectLauncher = projectId !== null && selectedAgentId === null && !ticketsActive
 
   const hasRecents = rows.length > 0 || showOptimistic
 

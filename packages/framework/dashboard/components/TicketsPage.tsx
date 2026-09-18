@@ -6,6 +6,8 @@ import { onAllTickets, onQueue } from '../rpc/reads.js'
 import { sendQueueTicket, sendQueueTicketPlan, sendStart } from '../rpc/control.js'
 import { usePolled } from '../lib/use-async.js'
 import { useAction } from '../lib/use-action.js'
+import { usePreferences } from '../lib/preferences.js'
+import { startPicks } from '../lib/use-start-agent.js'
 import { queueEntryLabel } from '../lib/queue-entry.js'
 import {
   defaultView,
@@ -55,7 +57,7 @@ export function TicketsPage({
   /** Told when an import/update session starts, so the shell can show it (#948) — which project
    *  started it is not implied the way it is for a single-project page, so each section binds
    *  its own id below rather than this prop guessing. */
-  onAgentStarted?: ((projectId: string, intent: string, agentId?: string) => void) | undefined
+  onAgentStarted?: ((projectId: string, intent: string, agentId: string) => void) | undefined
   /** Where every "Configure first, then run" on this page lands (#1507): the row's own project's
    *  launcher — which project that is comes from the row, since the page spans all of them. */
   onSelectProject: (id: string) => void
@@ -95,16 +97,16 @@ export function TicketsPage({
   // Flat mode renders rows outside any TicketsPanel, so the plan and start columns need their own
   // actions with the row's own project (a panel binds one projectId; the flat list has one per row).
   const { busy, error, run } = useAction()
+  const preferences = usePreferences()
   const startPlan = async (projectId: string, file: string) => {
     const prompt = planTicketPrompt(file)
-    const outcome = await run(() => sendStart(projectId, prompt, 'prompt'), 'The planning agent could not be started.')
+    const outcome = await run(() => sendStart(projectId, prompt, startPicks(preferences)), 'The planning agent could not be started.')
     if (outcome.ok) onAgentStarted?.(projectId, prompt, outcome.value.agentId)
   }
-  // Unattended, exactly as the panel's own start column does.
   const startWork = async (projectId: string, file: string) => {
     const prompt = workOnTicketPrompt(file)
     const outcome = await run(
-      () => sendStart(projectId, prompt, 'prompt', { unattended: true }),
+      () => sendStart(projectId, prompt, startPicks(preferences)),
       'The work agent could not be started.',
     )
     if (outcome.ok) onAgentStarted?.(projectId, prompt, outcome.value.agentId)

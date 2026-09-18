@@ -8,12 +8,12 @@ Every button in the dashboard that starts an agent [1], as one two-part offer: p
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] launcher: the Start form on a project home — a project's own page with the launcher and its composer (the prompt editor, also used for live chat).
 [3] coding agent: the CLI doing the actual work: Claude Code or Codex.
-[4] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
+[4] location: where an agent's turns ran, as its own record names it: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session). Only `local` and a device are offered today; the other two are read off agents recorded before they left the launcher.
 [5] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
-[6] project home: a project's own page with the launcher (the Start form) and its composer (the prompt editor, also used for live chat).
+[6] project home: a project's own page with the launcher (the Start form) and its composer (the prompt editor, also used to say something to an agent).
 [7] fan-out: starting several agents at once, one per queue entry.
 
 ## Business logic — TL;DR

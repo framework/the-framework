@@ -17,10 +17,10 @@ Keeps, in the daemon's memory, everything the Claude web bridge [1] reports and 
 [2] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
 [3] answer: the text the daemon composes from a pick for the extension to type into the cloud session; it is queued in the dashboard until a Driver tab collects it, then marked sent or failed as the extension reports.
 [4] hands-off: said of an agent whose work leaves this machine, so its first prompt is the whole agent: an agent whose location is `web`.
-[5] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
-[6] gate: a question with options at which an agent stops and waits for an answer: it emits the question in its turn's final message, the dashboard shows it as a card, and the answer re-prompts the agent.
+[5] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
+[6] gate: a question with options an agent's turn ended on: the agent ends waiting for the answer, the dashboard shows the question as a card, and the answer resumes the agent.
 [7] pick: the answer to a gate: the option or options chosen, by the user or automatically.
-[8] open question: a gate nobody has answered yet, as the dashboard lists them across projects.
+[8] open question: a question nobody has answered yet, as the dashboard lists them across projects.
 [9] the Overview: the dashboard's cross-project page at `/`.
 [10] Driver tab: the extension's one pinned tab that reads claude.ai's session list, visits sessions and types answers.
 [11] session request: the daemon's request that the extension create a cloud session on claude.ai for a hands-off agent: a repository, a branch, a prompt and optionally a model; queued on the daemon, claimed by the worker that reads it, and reported back as created or failed.
@@ -30,7 +30,7 @@ Keeps, in the daemon's memory, everything the Claude web bridge [1] reports and 
 ## Business logic — TL;DR
 
 - **The question a session is parked on** - one question per cloud session, the newest report replacing the older; a genuinely new question drops the old one's undelivered answer; a report of a question already answered is ignored; parked questions list newest first.
-- **An answer is composed only from what the session offered** - the pick must name labels of the parked question, exactly one unless the question is multi-select, and the text typed is the same continuation a local gate re-prompts with, or a takeover when the pick stops the session.
+- **An answer is composed only from what the session offered** - the pick must name labels of the parked question, exactly one unless the question is multi-select, and the text typed is the same continuation a local agent is resumed with, or a takeover when the pick stops the session.
 - **Withdrawal until collected** - a queued answer can be withdrawn until a Driver tab has collected it or the extension has delivered it.
 - **One Driver tab served at a time** - an answer is handed to the first Driver tab asking and to nobody else for 90 seconds; a claim nobody acknowledges expires and the answer is offered again.
 - **The delivery's outcome** - only the acknowledgment naming the queued answer's own id counts; delivered means the question is resolved and dropped, failed keeps the question and the extension's note so the user can pick again.
@@ -68,7 +68,7 @@ Queuing an answer [3] for a session:
 - must name only labels of the parked question's options, each at most once, else "every label must be one of the question options";
 - must name exactly one label unless the question is multi-select, else "pick exactly one option"; a multi-select takes any subset, including none.
 
-The answer's text is worded as a local gate's [6] answer is (`../turn-gate.ts`): `You paused to ask: "<title>". The user chose: <labels, comma-separated>. Continue with that decision.`, with "(none)" for an empty multi-select. When any picked option is marked as stopping the session, the text is instead `You paused to ask: "<title>". The user chose: <labels>. Stop here: the user is taking over and will come back with fresh instructions.` — a local agent is simply ended on such a pick [7], but nothing of The Framework's can end a session on claude.ai, so the session is told the user is taking over. Every queued answer gets its own id and the time it was queued, and it replaces whatever answer the session had, a failed one included.
+The answer's text is worded as a local agent's answer is (`agent-driver`'s continuation prompt): `You paused to ask: "<title>". The user chose: <labels, comma-separated>. Continue with that decision.`, with "(none)" for an empty multi-select. When any picked option is marked as stopping the session, the text is instead `You paused to ask: "<title>". The user chose: <labels>. Stop here: the user is taking over and will come back with fresh instructions.` — nothing of The Framework's can end a session on claude.ai, so the session is told the user is taking over. Every queued answer gets its own id and the time it was queued, and it replaces whatever answer the session had, a failed one included.
 
 ### Withdrawal until collected
 

@@ -6,9 +6,10 @@ import { QUEUE_FILE, readQueue } from '@gemstack/skill-queue'
  * The plan/backlog document categories the dashboard surfaces in its sidebar
  * (#319, part of the MVP UI #309), so the human can read them beside the agent.
  *
- * The Framework's system prompt writes these per session (#323/#326):
- * `PLAN_<SESSION>.agent.md` (the plan for now) and `TODO_<SESSION>.agent.md` (the
- * backlog), where SESSION is a git-branch slug. The flat fallbacks are `PLAN.md`
+ * These are written per session as `PLAN_<SESSION>.agent.md` (the plan for now) and
+ * `TODO_<SESSION>.agent.md` (the backlog), where SESSION is a git-branch slug — by
+ * The Framework's own system prompt back when it ran the agent (#323/#326), and by
+ * whatever a project's own skills tell an agent to write now. The flat fallbacks are `PLAN.md`
  * (root) and the flat backlog (`backlog: true` reads `TODO_AGENTS.md` off the data
  * branch, its one location since #1582). Scoped and flat-root names are matched
  * against a flat readdir of the root, never taken from user input, so there is no

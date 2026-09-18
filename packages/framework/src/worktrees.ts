@@ -1,10 +1,7 @@
-import { readFile } from 'node:fs/promises'
-import { join } from 'node:path'
 import { errorMessage } from './error-message.js'
-import { listAgents, readLiveMetas, archivedAgentPaths, META_FILE, type AgentMeta, type AgentStatus } from './store/index.js'
+import { listAgents, readLiveMetas, type AgentStatus } from './store/index.js'
 import { deleteRun, runFiles } from '@gemstack/skill-logs'
 import { agentBranchName, listWorktreeDirs, isSafeAgentId, reclaimWorktree, removeWorktree, pruneWorktrees, worktreePath, worktreeSize, type ReclaimOutcome } from '@gemstack/skill-branches'
-import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 
 /** A retained worktree and the agent that left it behind (#752). */
 export interface WorktreeRow {
@@ -18,18 +15,6 @@ export interface WorktreeRow {
   sizeBytes?: number
   /** True while the agent owning this checkout is still going: it is in use, not retained. */
   live: boolean
-}
-
-/** Why a worktree was left in place by {@link pruneProjectWorktrees}. */
-export interface SkippedWorktree {
-  agentId: string
-  reason: string
-}
-
-/** What {@link pruneProjectWorktrees} did. */
-export interface PruneResult {
-  removed: string[]
-  skipped: SkippedWorktree[]
 }
 
 /** The outcome of {@link removeProjectWorktree}. */
@@ -94,12 +79,8 @@ async function sizeOf(cwd: string, agentId: string): Promise<{ sizeBytes?: numbe
  * Remove one retained worktree (#752/#737/E5): the one implementation behind every surface that
  * removes one — the sweep, teardown, and the dashboard's Remove button (#982).
  *
- * **One rule: only what is on the remote may go** — the git side of it is the package's
- * `reclaimWorktree`. What this adds is the agent's side: its record, which says whether the
- * branch may be pushed at all (a session armed to publish nothing, `handoff: local`, B5/#1379,
- * said its branch must not reach the remote — pushing it to make removal possible would have
- * teardown publish the very branch the handoff declined to) and, for a cloud run, the pushed
- * anchor that proves what its checkout holds (#1601).
+ * **One rule: only what is on the remote may go**: the git side of it is the package's
+ * `reclaimWorktree`, which pushes the branch first when the remote lacks it.
  *
  * Refuses while the agent is still going — an agent's checkout is where its agent is working, and Stop
  * is how you end an agent, not pulling the floor out from under it.
@@ -117,97 +98,40 @@ export async function removeProjectWorktree(
     return { ok: false, error: 'that session is still going; stop it before removing its worktree' }
   }
   const path = worktreePath(cwd, agentId)
-  // The agent's record decides what the git rule may do, before any git runs: a `web` run's
-  // hand-off anchor (#1601) proves what its checkout holds; a publish-nothing handoff (B5) means
-  // the branch may not be pushed to make removal possible. `handoff` is on the meta from the
-  // agent's first event, so a meta that exists without one (a boot death) keeps the recoverable
-  // default; a meta that cannot be read keeps the checkout instead, because it cannot tell a
-  // publish-nothing session from any other (fail closed, retried by a later pass).
-  let meta: AgentMeta | undefined
-  try {
-    meta = await readMetaFor(cwd, path, agentId)
-  } catch (err) {
-    return {
-      ok: false,
-      error: `session ${agentId}'s record could not be read (${errorMessage(err)}); its worktree was kept`,
-    }
-  }
-  const publishNothing = Boolean(meta?.handoff && !meta.handoff.push)
   try {
     const outcome = await reclaimWorktree(cwd, path, {
       birthBranch: agentBranchName(agentId),
-      mayPush: !publishNothing,
-      ...(meta?.target === 'web' && meta.cloudAnchor ? { heldBy: meta.cloudAnchor } : {}),
+      mayPush: true,
       ...(opts.beforeRemove ? { beforeRemove: () => opts.beforeRemove!(agentId) } : {}),
     })
-    return outcome.ok ? outcome : { ok: false, error: refusal(agentId, outcome, publishNothing) }
+    return outcome.ok ? outcome : { ok: false, error: refusal(agentId, outcome) }
   } catch (err) {
     return { ok: false, error: errorMessage(err) }
   }
 }
 
 /** Why a checkout stayed, said the way every surface reports it. */
-function refusal(agentId: string, outcome: ReclaimOutcome & { ok: false }, publishNothing: boolean): string {
+function refusal(agentId: string, outcome: ReclaimOutcome & { ok: false }): string {
   switch (outcome.reason) {
     case 'not-a-worktree':
       return `session ${agentId}'s directory is not a git worktree; left alone`
     case 'no-branch':
       return `session ${agentId} is on no branch; its worktree was kept`
     case 'dirty':
-      // A publish-nothing session's checkout goes only once everything it holds is already on
-      // the remote by someone's explicit act — a clean tree on a pushed tip — so a dirty tree is
-      // that refusal too, said as such. Nothing is committed on the way to it (#1638).
-      return publishNothing
-        ? `session ${agentId} was set to publish nothing (handoff: local); its worktree was kept`
-        : `session ${agentId} has uncommitted work; its worktree was kept`
+      // Nothing is committed on the way to a removal (#1638).
+      return `session ${agentId} has uncommitted work; its worktree was kept`
     case 'not-on-remote':
-      return publishNothing
-        ? `session ${agentId} was set to publish nothing (handoff: local); its worktree was kept`
-        : `${outcome.branch} is not on the remote (${outcome.detail ?? 'not pushed'}); its worktree was kept`
+      return `${outcome.branch} is not on the remote (${outcome.detail ?? 'not pushed'}); its worktree was kept`
   }
-}
-
-/**
- * The meta the keep decision reads: the live copy in the checkout, else the archived one.
- *
- * Unlike the store's forgiving list reads — where anything unreadable contributes nothing — this
- * read tells absence from failure, because here they mean opposite things: `undefined` is "no
- * record was ever written" (a boot death, safe to treat as the default), while a record that
- * exists but cannot be read or parsed throws, so the caller refuses rather than guesses.
- */
-async function readMetaFor(cwd: string, path: string, agentId: string): Promise<AgentMeta | undefined> {
-  const live = await readMetaStrict(join(path, THE_FRAMEWORK_DIR, META_FILE))
-  if (live) return live
-  const archived = (await archivedAgentPaths(cwd, agentId)).find(p => p.endsWith('.json'))
-  return archived ? readMetaStrict(archived) : undefined
-}
-
-/** One meta file, strictly: `undefined` when absent, a throw when present but unreadable. */
-async function readMetaStrict(path: string): Promise<AgentMeta | undefined> {
-  let raw: string
-  try {
-    raw = await readFile(path, 'utf8')
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined
-    throw err
-  }
-  return JSON.parse(raw) as AgentMeta
 }
 
 /** The outcome of {@link deleteProjectAgent}. */
 export type DeleteAgentResult = { ok: true } | { ok: false; error: string }
 
-/** Surface-specific work {@link deleteProjectAgent} does, and the file-removal seam for tests. */
+/** Surface-specific work {@link deleteProjectAgent} does. */
 export interface DeleteAgentOptions {
   /** Run before the worktree comes off disk (stop a preview serving it, as removal does). */
   beforeRemove?: (agentId: string) => Promise<void>
-  /** Remove one file, tolerant of an absent one. Defaults to `rm(path, { force: true })`. */
-  removeFile?: (path: string) => Promise<void>
-}
-
-async function rmFile(path: string): Promise<void> {
-  const { rm } = await import('node:fs/promises')
-  await rm(path, { force: true })
 }
 
 /**
@@ -215,9 +139,9 @@ async function rmFile(path: string): Promise<void> {
  *
  * This is the sibling of {@link removeProjectWorktree}, and the difference is the whole point.
  * Remove-worktree reclaims the checkout on disk and keeps the session — its row, its replayable
- * log — because the history was already archived. Delete removes that archive too: the agent meta
- * (`<id>.json`, what the rail lists) and its event log (`<id>.jsonl`, what replays), wherever they
- * are filed, so the row is gone for good. It is the one destructive-of-history action, which is
+ * log — because the run is recorded on the data branch. Delete removes that record too: the card
+ * (`<id>.json`, what the rail lists) and the diary (`<id>.jsonl`, what replays), so the row is
+ * gone for good. It is the one destructive-of-history action, which is
  * why the surfaces that call it confirm first. Since #1179 that archive is committed, so the files
  * go but the deletion is itself a change git will record.
  *
@@ -237,7 +161,6 @@ export async function deleteProjectAgent(cwd: string, agentId: string, opts: Del
   if (live.some(agent => agent.id === agentId && agent.status === 'running')) {
     return { ok: false, error: 'that session is still going; stop it before deleting it' }
   }
-  const removeFile = opts.removeFile ?? rmFile
   try {
     // The worktree first, if one is on disk: force-removed (its uncommitted work goes with the
     // session), where remove-worktree would have committed it to the kept branch.
@@ -247,38 +170,15 @@ export async function deleteProjectAgent(cwd: string, agentId: string, opts: Del
       await removeWorktree(cwd, worktreePath(cwd, agentId))
       await pruneWorktrees(cwd)
     }
-    // Then the records that put the row in the list. The run on the data branch is deleted by the
-    // `logs` skill as one committed, pushed change (#1582/#1769); a transient copy is an unlink.
-    // Tolerant of an absent file, so a half-deleted session (its worktree already gone) still
-    // finishes cleanly.
+    // Then the record that put the row in the list: the run on the data branch, deleted by the
+    // `logs` skill as one committed, pushed change (#1582/#1769). Tolerant of an absent record, so
+    // a half-deleted session (its worktree already gone) still finishes cleanly.
     if (await runFiles(cwd, agentId)) {
       const removed = await deleteRun(cwd, agentId)
       if (!removed.ok && !removed.committed) return { ok: false, error: removed.error }
-    } else {
-      for (const path of await archivedAgentPaths(cwd, agentId)) await removeFile(path)
     }
     return { ok: true }
   } catch (err) {
     return { ok: false, error: errorMessage(err) }
   }
 }
-
-/**
- * Remove every retained worktree whose run is not live (#752): the "clean all of this up" case.
- * A live agent keeps its checkout and is reported as skipped, so the count always adds up to what
- * the list showed — and so does one whose branch could not reach the remote (E5).
- */
-export async function pruneProjectWorktrees(cwd: string): Promise<PruneResult> {
-  const result: PruneResult = { removed: [], skipped: [] }
-  for (const row of await listProjectWorktrees(cwd)) {
-    if (row.live) {
-      result.skipped.push({ agentId: row.agentId, reason: 'still running' })
-      continue
-    }
-    const outcome = await removeProjectWorktree(cwd, row.agentId)
-    if (outcome.ok) result.removed.push(row.agentId)
-    else result.skipped.push({ agentId: row.agentId, reason: outcome.error })
-  }
-  return result
-}
-

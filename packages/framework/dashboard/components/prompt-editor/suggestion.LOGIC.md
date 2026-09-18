@@ -1,12 +1,12 @@
-Wires a trigger character to a floating suggestion menu in the composer [1]'s prompt editor: typing the character opens a menu at the caret listing what the trigger offers for the text typed after it, key presses steer and pick from the menu, and a pick hands the chosen item back to the trigger to insert in place of the typed text. Each of the editor's triggers (`/`, `<`, `@` and `#`, defined in `PromptEditor.tsx`) is one instance of this mechanism with its own menu, so two triggers never interfere with each other.
+Wires a trigger character to a floating suggestion menu in the composer [1]'s prompt editor: typing the character opens a menu at the caret listing what the trigger offers for the text typed after it, key presses steer and pick from the menu, and a pick hands the chosen item back to the trigger to insert in place of the typed text. Each of the editor's triggers (`/`, `@` and `#`, defined in `PromptEditor.tsx`) is one instance of this mechanism with its own menu, so two triggers never interfere with each other.
 
 ## Context
 
-**User story**: the user types `/` in the composer [1] and a menu of presets and actions appears under the caret; they keep typing to narrow it, move through it with the arrow keys and pick an entry; the menu vanishes when they type a space or move the caret away. Typing `@` or `#` in the same way offers projects and files. A stray `<` or `@` in ordinary prose must not trap the user in a menu.
+**User story**: the user types `/` in the composer [1] and a menu of the project's commands and the saved prompts appears under the caret; they keep typing to narrow it, move through it with the arrow keys and pick an entry; the menu vanishes when they type a space or move the caret away. Typing `@` or `#` in the same way offers projects and files. A stray `/` or `@` in ordinary prose must not trap the user in a menu.
 
 ## Glossary
 
-[1] composer: the prompt editor, also used for live chat.
+[1] composer: the prompt editor, also used to say something to an agent.
 
 ## Business logic — TL;DR
 
@@ -35,7 +35,7 @@ A trigger character opens its menu only where it starts a word: at the start of 
 
 #### Context
 
-**User story**: the user types `/Sec` or `/sec` and gets the same "Security audit" preset offered.
+**User story**: the user types `/Sec` or `/sec` and gets the same "Security notes" saved prompt offered.
 
 #### Business logic
 
@@ -55,7 +55,7 @@ The menu is drawn over the page, left-aligned with the caret and just below it. 
 
 #### Context
 
-**Problem**: with nothing registered yet, a trigger that showed nothing at all would look broken; and a `<` or `@` typed in prose, followed by text that matches nothing, would trap the user in a menu if the menu insisted on staying open.
+**Problem**: with nothing registered yet, a trigger that showed nothing at all would look broken; and a `/` or `@` typed in prose, followed by text that matches nothing, would trap the user in a menu if the menu insisted on staying open.
 
 #### Business logic
 
@@ -89,7 +89,7 @@ See `## Context`.
 
 #### Business logic
 
-When an entry is picked, the trigger's own insertion receives the picked item together with the span from the trigger character to the caret; the insertion deletes that span and puts its result there (a chip, a loaded preset, or an opened panel, per trigger). Because the trigger text is gone, the trigger closes.
+When an entry is picked, the trigger's own insertion receives the picked item together with the span from the trigger character to the caret; the insertion deletes that span and puts its result there (a chip, a loaded command or saved prompt, or an opened dialog, per trigger). Because the trigger text is gone, the trigger closes.
 
 ### The open menu is announced
 

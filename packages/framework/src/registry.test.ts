@@ -179,11 +179,11 @@ test('readRegistry reads only the object form; a shape it no longer writes is an
 test('readRegistry reads the object form with preferences and drops unknown/non-boolean fields', async () => {
   const raw = JSON.stringify({
     projects: [APP_A],
-    preferences: { vanilla: true, transparent: 'yes', bogus: 1, onBeforeMergeableQuality: true, browser: true },
+    preferences: { bridge: true, notifyDiscord: 'yes', bogus: 1, notifyBrowser: true, bridgeBrowser: true },
   })
   assert.deepEqual(await readRegistry(memFs({ [FILE]: raw }), ENV), {
     projects: [APP_A],
-    preferences: { vanilla: true, onBeforeMergeableQuality: true, browser: true }, // transparent (non-boolean) + bogus dropped
+    preferences: { bridge: true, notifyBrowser: true, bridgeBrowser: true }, // notifyDiscord (non-boolean) + bogus dropped
   })
 })
 
@@ -195,15 +195,10 @@ test('every boolean preference survives a save; the sanitizer cannot silently dr
     [K in keyof Preferences]-?: NonNullable<Preferences[K]> extends boolean ? K : never
   }[keyof Preferences]
   const allOn: Record<BooleanKey, boolean> = {
-    vanilla: true,
-    onBeforeMergeableQuality: true,
-    browser: true,
-    transparent: true,
     notifyBrowser: true,
     notifyDiscord: true,
     notifyNewActivity: true,
     notifyHumanIntervention: true,
-    autoPm: true,
     bridge: true,
     bridgeBrowser: true,
     onboardingDismissed: true,
@@ -213,28 +208,19 @@ test('every boolean preference survives a save; the sanitizer cannot silently dr
   assert.deepEqual(await readPreferences(fs, ENV), allOn)
 })
 
-test('sanitizePreferences keeps a valid run target and drops junk (#1050)', async () => {
-  // The PREFERENCE_KEYS loop is boolean-only, so a string preference needs its own branch or the
-  // save silently eats it. A valid target round-trips; an unknown one is dropped to the default.
-  const fs = memFs()
-  await writePreferences({ target: 'actions' }, fs, ENV)
-  assert.deepEqual(await readPreferences(fs, ENV), { target: 'actions' })
-  await writePreferences({ target: 'moon' } as never, fs, ENV)
-  assert.deepEqual(await readPreferences(fs, ENV), {})
-})
-
 test('sanitizePreferences reads only the current spellings', async () => {
   // A renamed key is an unknown key, and an unknown key is dropped — the same answer the sanitizer
-  // gives junk. `handoff` does not read the three booleans B5 replaced, and `driver` does not read
-  // the `agent` D5 renamed: a stored file written before either is rewritten by hand, not by code
-  // that would then have to stay forever.
+  // gives junk. `driver` does not read the `agent` D5 renamed, nor the old name of Claude Code
+  // (#1774: the names are agent-driver's own now), and the options only the daemon's own runner
+  // read are gone: a stored file written before is rewritten by hand, not by code that would then
+  // have to stay forever.
   const stored = (preferences: Record<string, unknown>) =>
     readPreferences(memFs({ [FILE]: JSON.stringify({ projects: [], preferences }) }), ENV)
-  assert.deepEqual(await stored({ autoPushBranch: false, autoOpenPr: false, autoMerge: true }), {})
+  assert.deepEqual(await stored({ handoff: 'local', vanilla: true, transparent: true, browser: true, target: 'actions', autoPm: true }), {})
   assert.deepEqual(await stored({ agent: 'codex' }), {})
-  // The keys that replaced them still read, beside the ignored ones.
-  assert.deepEqual(await stored({ handoff: 'local', autoMerge: true }), { handoff: 'local' })
-  assert.deepEqual(await stored({ driver: 'codex', agent: 'gpt-9000' }), { driver: 'codex' })
+  assert.deepEqual(await stored({ driver: 'claude' }), {})
+  // The key that replaced it still reads, beside the ignored one.
+  assert.deepEqual(await stored({ driver: 'claude-code', agent: 'gpt-9000' }), { driver: 'claude-code' })
 })
 
 test('patchPreferences merges only the keys it is given (#1148)', async () => {
@@ -282,10 +268,10 @@ test('readPreferences on a missing file, or one with no preferences block, is {}
 
 test('writePreferences persists sanitized prefs and preserves the project list', async () => {
   const fs = memFs({ [FILE]: JSON.stringify({ projects: [APP_A, APP_B], preferences: {} }) })
-  await writePreferences({ vanilla: false, browser: true, bogus: 3 } as never, fs, ENV)
+  await writePreferences({ bridge: false, bridgeBrowser: true, bogus: 3 } as never, fs, ENV)
   assert.deepEqual(JSON.parse(fs.files.get(FILE)!), {
     projects: [APP_A, APP_B],
-    preferences: { vanilla: false, browser: true },
+    preferences: { bridge: false, bridgeBrowser: true },
   })
   // The project list still reads back unchanged.
   assert.deepEqual(await listProjects(fs, ENV), [APP_A, APP_B])
@@ -325,12 +311,6 @@ test('writePreferences round-trips the notifyHumanIntervention toggle (#627)', a
   // Default is on, so the persisted value that matters is the explicit opt-out.
   await writePreferences({ notifyHumanIntervention: false }, fs, ENV)
   assert.deepEqual(await readPreferences(fs, ENV), { notifyHumanIntervention: false })
-})
-
-test('writePreferences round-trips the transparent toggle (#625)', async () => {
-  const fs = memFs({ [FILE]: JSON.stringify({ projects: [APP_A], preferences: {} }) })
-  await writePreferences({ transparent: true }, fs, ENV)
-  assert.deepEqual(await readPreferences(fs, ENV), { transparent: true })
 })
 
 test('writePreferences keeps the model string but drops a blank one (#628)', async () => {
@@ -404,11 +384,11 @@ test('writePreferences omits customPresets entirely when none survive (#626)', a
 })
 
 test('addProject preserves existing preferences', async () => {
-  const fs = memFs({ [FILE]: JSON.stringify({ projects: [APP_A], preferences: { vanilla: false } }) })
+  const fs = memFs({ [FILE]: JSON.stringify({ projects: [APP_A], preferences: { bridge: false } }) })
   await addProject('/repos/app-b', APP_B.addedAt, fs, ENV)
   assert.deepEqual(JSON.parse(fs.files.get(FILE)!), {
     projects: [APP_A, APP_B],
-    preferences: { vanilla: false },
+    preferences: { bridge: false },
   })
 })
 
@@ -416,8 +396,8 @@ test('registryPreferencesStore round-trips through the same file', async () => {
   const fs = memFs()
   const store = registryPreferencesStore(fs, ENV)
   assert.deepEqual(await store.read(), {})
-  await store.save({ vanilla: true })
-  assert.deepEqual(await store.read(), { vanilla: true })
+  await store.save({ bridge: true })
+  assert.deepEqual(await store.read(), { bridge: true })
 })
 
 test('registryPreferencesStore tells its listener which keys were written (#1161)', async () => {
@@ -427,11 +407,11 @@ test('registryPreferencesStore tells its listener which keys were written (#1161
   const fs = memFs()
   const written: Preferences[] = []
   const store = registryPreferencesStore(fs, ENV, patch => written.push(patch))
-  await store.save({ autoPm: true })
-  await store.patch?.({ vanilla: true })
-  assert.deepEqual(written, [{ autoPm: true }, { vanilla: true }])
+  await store.save({ notifyDiscord: true })
+  await store.patch?.({ bridge: true })
+  assert.deepEqual(written, [{ notifyDiscord: true }, { bridge: true }])
   // The patch still merged, so the listener's narrower view is not the stored one.
-  assert.deepEqual(await store.read(), { autoPm: true, vanilla: true })
+  assert.deepEqual(await store.read(), { notifyDiscord: true, bridge: true })
 })
 
 test('a preferences listener that throws does not fail the write (#1161)', async () => {
@@ -440,13 +420,13 @@ test('a preferences listener that throws does not fail the write (#1161)', async
   const store = registryPreferencesStore(fs, ENV, () => {
     throw new Error('the daemon is mid-shutdown')
   })
-  await store.save({ autoPm: true })
-  assert.deepEqual(await store.read(), { autoPm: true })
+  await store.save({ notifyDiscord: true })
+  assert.deepEqual(await store.read(), { notifyDiscord: true })
 })
 
 test('the registry file is never written in place, only renamed over (#991)', async () => {
   const fs = memFs({ [FILE]: JSON.stringify({ projects: [APP_A], preferences: {} }) })
-  await writePreferences({ vanilla: true }, fs, ENV)
+  await writePreferences({ bridge: true }, fs, ENV)
   assert.deepEqual(
     fs.written.filter(path => path === FILE),
     [],
@@ -455,20 +435,20 @@ test('the registry file is never written in place, only renamed over (#991)', as
   assert.ok(fs.written.every(path => path.startsWith(`${FILE}.`) && path.endsWith('.tmp')))
   assert.deepEqual(await readRegistry(fs, ENV), {
     projects: [APP_A],
-    preferences: { vanilla: true },
+    preferences: { bridge: true },
   })
   assert.equal([...fs.files.keys()].length, 1, 'the temp file is renamed away, not left beside the real one')
 })
 
 test('a write that dies partway leaves the previous registry intact (#991)', async () => {
-  const stored = JSON.stringify({ projects: [APP_A, APP_B], preferences: { vanilla: false } })
+  const stored = JSON.stringify({ projects: [APP_A, APP_B], preferences: { bridge: false } })
   // The disk fills between the truncate and the flush. Whatever it truncated must not be the live file.
   const fs = memFs({ [FILE]: stored }, { failWritesTo: `${FILE}.${process.pid}.tmp` })
-  await assert.rejects(() => writePreferences({ vanilla: true }, fs, ENV), /ENOSPC/)
+  await assert.rejects(() => writePreferences({ bridge: true }, fs, ENV), /ENOSPC/)
   assert.equal(fs.files.get(FILE), stored, 'the live file is untouched by a failed write')
   assert.deepEqual(await readRegistry(fs, ENV), {
     projects: [APP_A, APP_B],
-    preferences: { vanilla: false },
+    preferences: { bridge: false },
   })
 })
 
@@ -480,10 +460,10 @@ test('concurrent addProject calls both survive rather than the later one droppin
 
 test('a concurrent addProject and writePreferences do not drop each other (#991)', async () => {
   const fs = memFs({ [FILE]: JSON.stringify({ projects: [], preferences: {} }) }, { slow: true })
-  await Promise.all([addProject('/repos/app-a', APP_A.addedAt, fs, ENV), writePreferences({ vanilla: true }, fs, ENV)])
+  await Promise.all([addProject('/repos/app-a', APP_A.addedAt, fs, ENV), writePreferences({ bridge: true }, fs, ENV)])
   assert.deepEqual(await readRegistry(fs, ENV), {
     projects: [APP_A],
-    preferences: { vanilla: true },
+    preferences: { bridge: true },
   })
 })
 
@@ -528,7 +508,7 @@ test('the daemon token survives the other registry mutators (#1051)', async () =
   const fs = memFs()
   const token = await ensureDaemonToken(fs, ENV)
   await addProject('/repos/app-a', APP_A.addedAt, fs, ENV)
-  await writePreferences({ vanilla: true }, fs, ENV)
+  await writePreferences({ bridge: true }, fs, ENV)
   await patchPreferences({ theme: 'dark' }, fs, ENV)
   assert.equal(await readDaemonToken(fs, ENV), token)
 })
@@ -581,11 +561,11 @@ test('a hand-edited secrets block is sanitized: unknown keys and non-strings dro
 test('saving a secret keeps the project list and preferences (#1095)', async () => {
   const fs = memFs()
   await addProject('/repos/app-a', APP_A.addedAt, fs, ENV)
-  await writePreferences({ vanilla: true }, fs, ENV)
+  await writePreferences({ bridge: true }, fs, ENV)
   await writeSecrets({ discordWebhook: 'https://hook' }, fs, ENV)
 
   assert.deepEqual(await listProjects(fs, ENV), [APP_A])
-  assert.deepEqual(await readPreferences(fs, ENV), { vanilla: true })
+  assert.deepEqual(await readPreferences(fs, ENV), { bridge: true })
   assert.deepEqual(await readSecrets(fs, ENV), { discordWebhook: 'https://hook' })
 })
 

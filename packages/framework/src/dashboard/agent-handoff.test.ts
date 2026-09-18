@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { isAgentBranch } from '@gemstack/skill-branches'
-import { readAgentHandoff, resolveAgentPr, mergeAgentPr, agentBranchFor, openBranchPullRequest, openRemoteBranchPullRequest, openAgentPullRequest, agentAutoHandoff, prBaseName, withheldMerge } from './agent-handoff.js'
+import { readAgentHandoff, resolveAgentPr, mergeAgentPr, agentBranchFor, openBranchPullRequest, openRemoteBranchPullRequest, openAgentPullRequest, prBaseName, type HandoffAgent } from './agent-handoff.js'
 import { pickAgentPr } from './gh.js'
 import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
 
@@ -324,7 +324,7 @@ test('a real repo: a branch whose work is already in the base reports empty (#11
   }
 })
 
-// The end-of-session handoff that fires by itself (#1102).
+
 
 /** A branch with one commit, a remote, and no PR: the case a handoff should act on. */
 const READY = {
@@ -338,244 +338,6 @@ const READY = {
   branch: '',
 }
 
-test('an armed session opens a DRAFT PR, and pushes on the way (#1102)', async () => {
-  const gh: string[][] = []
-  const { git } = fakeGit({ ...READY, push: '' })
-  const outcome = await agentAutoHandoff(
-    '/repo',
-    { id: 'r1', branch: 'the-framework/x', intent: 'build it' },
-    { push: true, pr: true },
-    {
-      git,
-      pr: async () => undefined,
-      gh: async args => {
-        gh.push(args)
-        return 'https://github.com/o/r/pull/9\n'
-      },
-    },
-  )
-  assert.deepEqual(outcome, { outcome: 'done', pushed: true, url: 'https://github.com/o/r/pull/9', number: 9 })
-  // The draft flag is the whole reason this is safe to fire on every session: without it every
-  // finished run would put a review request in someone's inbox.
-  assert.ok(gh[0]?.includes('--draft'), `expected --draft in ${JSON.stringify(gh[0])}`)
-  assert.ok(gh[0]?.includes('the-framework/x'))
-})
-
-test('push armed alone pushes and opens nothing (#1102)', async () => {
-  const pushes: string[][] = []
-  const { git: read } = fakeGit(READY)
-  const outcome = await agentAutoHandoff(
-    '/repo',
-    { id: 'r1', branch: 'the-framework/x' },
-    { push: true, pr: false },
-    {
-      git: async (args, cwd) => {
-        if (args[0] === 'push') {
-          pushes.push(args)
-          return ''
-        }
-        return read(args, cwd)
-      },
-      pr: async () => undefined,
-      gh: async () => assert.fail('no PR should be opened when only the push is armed'),
-    },
-  )
-  assert.deepEqual(outcome, { outcome: 'done', pushed: true })
-  assert.deepEqual(pushes, [['push', '--set-upstream', 'origin', 'the-framework/x']])
-})
-
-test('a disarmed session hands off nothing at all (#1102)', async () => {
-  const outcome = await agentAutoHandoff(
-    '/repo',
-    { id: 'r1', branch: 'the-framework/x' },
-    { push: false, pr: false },
-    { git: async () => assert.fail('a disarmed handoff must not touch git'), gh: async () => assert.fail('nor gh') },
-  )
-  assert.deepEqual(outcome, { outcome: 'skipped', reason: 'not-armed' })
-})
-
-test('a branch that already has a PR is never given a second one (#1102)', async () => {
-  const { git } = fakeGit(READY)
-  const outcome = await agentAutoHandoff(
-    '/repo',
-    { id: 'r1', branch: 'the-framework/x' },
-    { push: true, pr: true },
-    {
-      git,
-      pr: async () => ({ number: 4, url: 'https://github.com/o/r/pull/4', state: 'OPEN', title: 'already' }),
-      gh: async () => assert.fail('opening a second PR is the one mistake this must not make'),
-    },
-  )
-  assert.deepEqual(outcome, { outcome: 'skipped', reason: 'already-open' })
-})
-
-test('a session that kept working after its PR merged gets a fresh PR (#1512)', async () => {
-  // The #1512 session: its PR merged mid-run, the user asked for more, the branch tip moved past
-  // the merged head. "The branch already has a pull request" was how that work reached nobody.
-  const gh: string[][] = []
-  const { git } = fakeGit({ ...READY, push: '' })
-  const outcome = await agentAutoHandoff(
-    '/repo',
-    { id: 'r1', branch: 'the-framework/x' },
-    { push: true, pr: true },
-    {
-      git,
-      pr: async () => ({ number: 1509, url: 'u1509', state: 'MERGED', title: 'landed', headRefOid: 'ffff00' }),
-      gh: async args => (gh.push(args), 'https://github.com/o/r/pull/1513\n'),
-    },
-  )
-  assert.equal(gh[0]?.[1], 'create')
-  assert.deepEqual(outcome, { outcome: 'done', pushed: true, url: 'https://github.com/o/r/pull/1513', number: 1513 })
-})
-
-test('a merged PR whose head is still the branch tip means everything landed (#1512)', async () => {
-  // READY's branch tip is abc123: a merged PR carrying that head covered all of the session's
-  // work, so there is nothing left to publish — and the skip says landed, not "already has a PR".
-  const { git } = fakeGit(READY)
-  const outcome = await agentAutoHandoff(
-    '/repo',
-    { id: 'r1', branch: 'the-framework/x' },
-    { push: true, pr: true },
-    {
-      git,
-      pr: async () => ({ number: 1509, url: 'u1509', state: 'MERGED', title: 'landed', headRefOid: 'abc123' }),
-      gh: async () => assert.fail('everything already landed: nothing to open'),
-    },
-  )
-  assert.deepEqual(outcome, { outcome: 'skipped', reason: 'already-landed' })
-})
-
-test('a merged PR without a head to compare never risks a duplicate (#1512)', async () => {
-  const { git } = fakeGit(READY)
-  const outcome = await agentAutoHandoff(
-    '/repo',
-    { id: 'r1', branch: 'the-framework/x' },
-    { push: true, pr: true },
-    {
-      git,
-      pr: async () => ({ number: 1509, url: 'u1509', state: 'MERGED', title: 'landed' }),
-      gh: async () => assert.fail('without the head the safe answer is to skip'),
-    },
-  )
-  assert.deepEqual(outcome, { outcome: 'skipped', reason: 'already-landed' })
-})
-
-test('an armed merge follows the PR it just opened (#1216)', async () => {
-  const gh: string[][] = []
-  const { git } = fakeGit({ ...READY, push: '' })
-  const outcome = await agentAutoHandoff(
-    '/repo',
-    { id: 'r1', branch: 'the-framework/x', intent: 'build it' },
-    { push: true, pr: true, merge: true },
-    {
-      git,
-      pr: async () => undefined,
-      gh: async args => {
-        gh.push(args)
-        return args[1] === 'create' ? 'https://github.com/o/r/pull/9\n' : ''
-      },
-    },
-  )
-  // Auto-merge first: the PR lands when its checks pass, not before them.
-  assert.deepEqual(gh[1], ['pr', 'merge', '9', '--squash', '--auto'])
-  // Ready, not draft: GitHub refuses to merge drafts, so an armed merge and --draft are
-  // mutually exclusive on the same PR.
-  assert.ok(!gh[0]?.includes('--draft'), `expected no --draft in ${JSON.stringify(gh[0])}`)
-  assert.deepEqual(outcome, {
-    outcome: 'done',
-    pushed: true,
-    url: 'https://github.com/o/r/pull/9',
-    number: 9,
-    merge: { outcome: 'auto-armed' },
-  })
-})
-
-test('without the merge flag the PR is left alone, exactly as before (#1216)', async () => {
-  const gh: string[][] = []
-  const { git } = fakeGit({ ...READY, push: '' })
-  await agentAutoHandoff(
-    '/repo',
-    { id: 'r1', branch: 'the-framework/x' },
-    { push: true, pr: true },
-    { git, pr: async () => undefined, gh: async args => (gh.push(args), 'https://github.com/o/r/pull/9\n') },
-  )
-  assert.deepEqual(gh.map(args => args[1]), ['create'], 'no merge call without the flag')
-})
-
-test('a merge that fails is reported on a handoff that still succeeded (#1216)', async () => {
-  // The PR exists either way; a human can still merge it by hand. Turning the refusal into a
-  // failed handoff would misreport the half that worked.
-  const { git } = fakeGit({ ...READY, push: '' })
-  const outcome = await agentAutoHandoff(
-    '/repo',
-    { id: 'r1', branch: 'the-framework/x' },
-    { push: true, pr: true, merge: true },
-    {
-      git,
-      pr: async () => undefined,
-      gh: async args => {
-        if (args[1] === 'create') return 'https://github.com/o/r/pull/9\n'
-        throw new Error('GraphQL: Base branch was modified')
-      },
-    },
-  )
-  assert.equal(outcome.outcome, 'done')
-  assert.deepEqual('merge' in outcome ? outcome.merge : undefined, {
-    outcome: 'failed',
-    error: 'GraphQL: Base branch was modified',
-  })
-})
-
-test('an armed merge takes the already-open PR a predecessor left (#1216)', async () => {
-  // A daemon restart or rerun finds the PR its predecessor opened: the merge is the half that
-  // has not happened yet, and the skip reason still says why no second PR was opened.
-  const gh: string[][] = []
-  const { git } = fakeGit(READY)
-  const outcome = await agentAutoHandoff(
-    '/repo',
-    { id: 'r1', branch: 'the-framework/x' },
-    { push: true, pr: true, merge: true },
-    {
-      git,
-      pr: async () => ({ number: 4, url: 'https://github.com/o/r/pull/4', state: 'OPEN', title: 'already' }),
-      gh: async args => (gh.push(args), ''),
-    },
-  )
-  assert.deepEqual(gh, [['pr', 'merge', '4', '--squash', '--auto']])
-  assert.deepEqual(outcome, { outcome: 'skipped', reason: 'already-open', merge: { outcome: 'auto-armed' } })
-})
-
-test('a session that committed nothing is not published (#1102)', async () => {
-  const { git } = fakeGit({ ...READY, log: '', diff: '' })
-  const outcome = await agentAutoHandoff(
-    '/repo',
-    { id: 'r1', branch: 'the-framework/x' },
-    { push: true, pr: true },
-    { git, pr: async () => undefined, gh: async () => assert.fail('nothing to open a PR for') },
-  )
-  assert.deepEqual(outcome, { outcome: 'skipped', reason: 'no-commits' })
-})
-
-test('a branch of pure framework bookkeeping is empty, and is not published (#1291)', async () => {
-  // The observed junk PR: one "[The Framework] Uncommited changes" commit sweeping in the
-  // conversation record the daemon wrote at start, and nothing else on the branch.
-  const bookkeeping = {
-    ...READY,
-    log: `abc123${SEP}[The Framework] Uncommited changes`,
-    diff: '21\t0\t.the-framework/conversations/2026-07-27T14-21-36-276Z.md\n2\t0\t.the-framework/LOGS.md',
-  }
-  const { git } = fakeGit(bookkeeping)
-  const handoff = await readAgentHandoff('/repo', 'the-framework/x', { git, pr: async () => undefined })
-  assert.equal(handoff?.empty, true, 'paper trail is provenance, not work')
-  const outcome = await agentAutoHandoff(
-    '/repo',
-    { id: 'r1', branch: 'the-framework/x' },
-    { push: true, pr: true },
-    { git: fakeGit(bookkeeping).git, pr: async () => undefined, gh: async () => assert.fail('nothing to publish') },
-  )
-  assert.deepEqual(outcome, { outcome: 'skipped', reason: 'no-commits' })
-})
-
 test('bookkeeping alongside real work does not make a branch empty (#1291)', async () => {
   const { git } = fakeGit({
     ...READY,
@@ -583,34 +345,6 @@ test('bookkeeping alongside real work does not make a branch empty (#1291)', asy
   })
   const handoff = await readAgentHandoff('/repo', 'the-framework/x', { git, pr: async () => undefined })
   assert.equal(handoff?.empty, false)
-})
-
-test('a repo with no remote is a skip, not a failure (#1102)', async () => {
-  const { git } = fakeGit({ ...READY, remote: '' })
-  const outcome = await agentAutoHandoff(
-    '/repo',
-    { id: 'r1', branch: 'the-framework/x' },
-    { push: true, pr: true },
-    { git, pr: async () => undefined, gh: async () => assert.fail('nowhere to push to') },
-  )
-  assert.deepEqual(outcome, { outcome: 'skipped', reason: 'no-remote' })
-})
-
-test('a failed push is reported with git’s own reason, so the bar can offer the retry (#1102)', async () => {
-  const { git: read } = fakeGit(READY)
-  const outcome = await agentAutoHandoff(
-    '/repo',
-    { id: 'r1', branch: 'the-framework/x' },
-    { push: true, pr: false },
-    {
-      git: async (args, cwd) => {
-        if (args[0] === 'push') throw new Error('Command failed: git push\nfatal: no write access\n')
-        return read(args, cwd)
-      },
-      pr: async () => undefined,
-    },
-  )
-  assert.deepEqual(outcome, { outcome: 'failed', step: 'push', error: 'fatal: no write access' })
 })
 
 test('a session branch is recognised by its prefix, a hand-made one is not (#1102)', () => {
@@ -766,27 +500,15 @@ test('a different PR on the branch is not this run’s answer (E6)', async () =>
   assert.equal(found.value?.number, 42, 'the recorded number wins over whatever is on the branch now')
 })
 
-test('withheldMerge authorizes only a declared-done session (#1363)', () => {
-  // The rule settled on #1390: config arms the merge, the agent authorizes it. No signal means
-  // no merge, whatever else is true — this is what row 3 of the live matrix proved was missing
-  // (the daemon merged 3s after the PR opened, with setReadyForMerge never called).
-  assert.equal(withheldMerge({ readyForMerge: false }), 'not-ready-for-merge')
-  // Declared done: the merge may run. The agent's word is enough (#1774).
-  assert.equal(withheldMerge({ readyForMerge: true }), undefined)
-})
-
 test("a run implementing a ticket carries its issue as `(fix #42)` in the PR title (#1334)", async () => {
   // The squash-merge subject inherits the title, so this is what closes the ticket's issue on
   // merge; without it an auto-merged quick-win leaves its ticket open.
   assert.equal(await titleOf({ id: 'r1', branch: 'agent-fix-login', fixes: '#42' }), 'fix-login (fix #42)')
 })
 
-async function titleOf(agent: Parameters<typeof agentAutoHandoff>[1]): Promise<string | undefined> {
+async function titleOf(agent: HandoffAgent): Promise<string | undefined> {
   const gh: string[][] = []
-  const { git } = fakeGit({ ...READY, [`rev-parse --verify --quiet refs/heads/${agent.branch ?? 'the-framework/x'}`]: 'abc123\n', push: '' })
-  await agentAutoHandoff('/repo', agent, { push: true, pr: true }, {
-    git,
-    pr: async () => undefined,
+  await openRemoteBranchPullRequest('/repo', agent, 'claude/x', {
     gh: async args => {
       gh.push(args)
       return 'https://github.com/o/r/pull/9\n'

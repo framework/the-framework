@@ -3,16 +3,16 @@ import type { CustomPreset } from '../../src/index.js'
 import { Button } from './ui/button.js'
 import { Dialog } from './ui/dialog.js'
 
-// The "New preset" create dialog (#649/#626): a modal over the composer rather than a panel that
+// The "Save prompt" dialog (#649/#626): a modal over the composer rather than a panel that
 // pushed the controls down. Prefills the prompt from the editor's current text — the common "save
-// what I just wrote" path. A preset is just a label + a prompt, plus where it is saved (#1025).
+// what I just wrote" path. A saved prompt is just a label + a prompt, plus where it is kept (#1025).
 
 const LABEL_MAX = 80
 
-/** Where a saved preset lives (#1025): private to the user, or committed into the project's repo. */
+/** Where a saved prompt lives (#1025): private to the user, or committed into the project's repo. */
 export type PresetScope = 'user' | 'project'
 
-/** A fresh id for a saved preset. `crypto.randomUUID` is present in every browser this targets. */
+/** A fresh id for a saved prompt. `crypto.randomUUID` is present in every browser this targets. */
 function newId(): string {
   return typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `p-${Date.now()}`
 }
@@ -27,7 +27,7 @@ export function PresetCreatePanel({
   /** The editor's current text, prefilled so you can save what you just wrote. */
   currentPrompt: string
   busy: boolean
-  /** Whether a project is open to commit a shared preset into (#1025); hides the scope choice otherwise. */
+  /** Whether a project is open to commit a shared prompt into (#1025); hides the scope choice otherwise. */
   canSaveToProject: boolean
   onSave: (preset: CustomPreset, scope: PresetScope) => void
   onCancel: () => void
@@ -52,13 +52,13 @@ export function PresetCreatePanel({
   }
 
   return (
-    <Dialog open onOpenChange={next => { if (!next) onCancel() }} title="New preset">
+    <Dialog open onOpenChange={next => { if (!next) onCancel() }} title="Save prompt">
       <div className="flex w-full flex-col gap-2" onKeyDown={onKeyDown}>
       <input
         type="text"
         value={label}
         maxLength={LABEL_MAX}
-        placeholder="Preset name"
+        placeholder="Name"
         disabled={busy}
         autoFocus
         onChange={e => setLabel(e.target.value)}
@@ -66,7 +66,7 @@ export function PresetCreatePanel({
       />
       <textarea
         value={prompt}
-        placeholder="The prompt this preset runs…"
+        placeholder="The prompt to save…"
         disabled={busy}
         rows={5}
         onChange={e => setPrompt(e.target.value)}
@@ -103,7 +103,7 @@ export function PresetCreatePanel({
           Cancel
         </Button>
         <Button type="button" size="sm" disabled={busy || !label.trim() || !prompt.trim()} onClick={save}>
-          Save preset
+          Save prompt
         </Button>
       </div>
       </div>

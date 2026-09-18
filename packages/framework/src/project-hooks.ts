@@ -7,13 +7,14 @@ import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 
 /**
  * A project's hooks (#1774): the shell lines a project's own `.the-framework/hooks.yml` names to
- * run when the dashboard opens and when it closes. The daemon names no tool: it runs whatever
- * the file says, in the project, and logs how each line went. Per user, since `.the-framework/`
- * is ignored: a hook is this machine's, and a teammate's pull changes nothing.
+ * run when the dashboard opens and when it closes, and the two lines that start a run and
+ * continue one. The daemon names no tool: it runs whatever the file says, in the project. Per
+ * user, since `.the-framework/` is ignored: a hook is this machine's, and a teammate's pull
+ * changes nothing.
  *
- * Optional, best-effort and bounded: no file means nothing runs, a broken file is a warning, a
- * line that fails or hangs is logged and the next line still runs, and nothing here ever throws
- * to the daemon.
+ * Optional, best-effort and bounded: no file means nothing runs, a broken file is a warning, an
+ * `open` or `close` line that fails or hangs is logged and the next line still runs, and nothing
+ * here ever throws to the daemon.
  */
 
 /** The hooks file, under the project's ignored `.the-framework/`. */
@@ -25,12 +26,21 @@ export const HOOK_TIMEOUT_MS = 60_000
 /** When a project's hooks run: `open` when the dashboard starts (and when the project is added while it runs), `close` when it stops. */
 export type HookKind = 'open' | 'close'
 
+/**
+ * The two lines a person's click runs: `start` begins a run from a prompt, `resume` continues an
+ * ended one with a text or an answer. One line each, since each answers one document on stdout.
+ */
+export type RunHookKind = 'start' | 'resume'
+
 export interface ProjectHooks {
   open: string[]
   close: string[]
+  start?: string
+  resume?: string
 }
 
 const HOOK_KINDS: readonly HookKind[] = ['open', 'close']
+const RUN_HOOK_KINDS: readonly RunHookKind[] = ['start', 'resume']
 
 /**
  * Read a project's hooks. A missing file is no hooks. A file that cannot be parsed or has the
@@ -52,8 +62,8 @@ export async function readProjectHooks(cwd: string, onWarn?: (message: string) =
 }
 
 /**
- * Parse the hooks file: a YAML map whose keys are `open` and `close`, each a list of shell lines.
- * An empty document is no hooks. Anything else throws, so the reader can warn: a wrong key is
+ * Parse the hooks file: a YAML map whose keys are `open` and `close`, each a list of shell lines,
+ * and `start` and `resume`, each one shell line. An empty document is no hooks. Anything else throws, so the reader can warn: a wrong key is
  * refused rather than ignored, because a misspelled `open` would otherwise be a hook that
  * silently never runs.
  */
@@ -67,10 +77,16 @@ export function parseProjectHooks(raw: string, source = PROJECT_HOOKS_FILE): Pro
   }
   const hooks: ProjectHooks = { open: [], close: [] }
   if (data == null) return hooks
-  if (typeof data !== 'object' || Array.isArray(data)) throw new Error(`${source} must be a YAML map with "open" and "close" lists`)
+  if (typeof data !== 'object' || Array.isArray(data)) throw new Error(`${source} must be a YAML map; the keys are open, close, start and resume`)
   for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
-    if (!(HOOK_KINDS as readonly string[]).includes(key)) throw new Error(`${source}: unknown key "${key}"; the keys are open and close`)
+    const isRunHook = (RUN_HOOK_KINDS as readonly string[]).includes(key)
+    if (!isRunHook && !(HOOK_KINDS as readonly string[]).includes(key)) throw new Error(`${source}: unknown key "${key}"; the keys are open, close, start and resume`)
     if (value == null) continue
+    if (isRunHook) {
+      if (typeof value !== 'string' || value.trim() === '') throw new Error(`${source}: "${key}" must be one shell line`)
+      hooks[key as RunHookKind] = value.trim()
+      continue
+    }
     if (!Array.isArray(value) || !value.every(line => typeof line === 'string' && line.trim() !== '')) {
       throw new Error(`${source}: "${key}" must be a list of shell lines`)
     }
@@ -104,20 +120,74 @@ export async function runProjectHooks(cwd: string, kind: HookKind, opts: RunHook
   }
 }
 
-/** One line through the shell: how it ended, in words, and what it said on stderr. */
-function runLine(cwd: string, line: string, timeoutMs: number, env: NodeJS.ProcessEnv): Promise<{ summary: string; stderr: string }> {
+/** What a `start` line is given: the prompt, and the coding agent and model when the person picked them. */
+export interface StartHookInput {
+  prompt: string
+  driver?: string
+  model?: string
+}
+
+/** What a `resume` line is given: the run, and the person's text or their answer to the question it ended on. */
+export type ResumeHookInput = { runId: string } & ({ text: string } | { answer: string })
+
+export type RunHookResult = { ok: true; id: string } | { ok: false; error: string }
+
+/**
+ * Run the project's `start` line: the prompt in `PROMPT`, the picks in `DRIVER` and `MODEL` when
+ * made. The line answers one JSON document on stdout whose `id` names the run it started.
+ */
+export function runStartHook(cwd: string, input: StartHookInput, opts: Omit<RunHooksOptions, 'log'> = {}): Promise<RunHookResult> {
+  return runRunHook(cwd, 'start', {
+    PROMPT: input.prompt,
+    ...(input.driver !== undefined ? { DRIVER: input.driver } : {}),
+    ...(input.model !== undefined ? { MODEL: input.model } : {}),
+  }, opts)
+}
+
+/**
+ * Run the project's `resume` line: the run in `RUN_ID`, and the person's words in `TEXT` or their
+ * answer in `ANSWER`. The line answers like a `start` line, naming the run it continued.
+ */
+export function runResumeHook(cwd: string, input: ResumeHookInput, opts: Omit<RunHooksOptions, 'log'> = {}): Promise<RunHookResult> {
+  return runRunHook(cwd, 'resume', { RUN_ID: input.runId, ...('text' in input ? { TEXT: input.text } : { ANSWER: input.answer }) }, opts)
+}
+
+async function runRunHook(cwd: string, kind: RunHookKind, vars: Record<string, string>, opts: Omit<RunHooksOptions, 'log'>): Promise<RunHookResult> {
+  let broken: string | undefined
+  const hooks = await readProjectHooks(cwd, message => {
+    broken = message
+  })
+  const line = hooks[kind]
+  if (line === undefined) return { ok: false, error: broken ?? `this project has no ${kind} hook` }
+  const outcome = await runLine(cwd, line, opts.timeoutMs ?? HOOK_TIMEOUT_MS, { ...(opts.env ?? process.env), ...vars }, true)
+  let said: unknown
+  try {
+    said = JSON.parse(outcome.stdout)
+  } catch {
+    said = undefined
+  }
+  const id = said && typeof said === 'object' ? (said as Record<string, unknown>)['id'] : undefined
+  if (outcome.summary === 'exit 0' && typeof id === 'string' && id !== '') return { ok: true, id }
+  // The tool's one line for a person is its last on stderr; without one, how the line ended.
+  const lastSaid = outcome.stderr.split('\n').map(s => s.trim()).filter(Boolean).at(-1)
+  return { ok: false, error: `the ${kind} hook: ${lastSaid ?? (outcome.summary === 'exit 0' ? 'it answered no run id' : outcome.summary)}` }
+}
+
+/** One line through the shell: how it ended, in words, what it said on stderr, and its stdout when asked for. */
+function runLine(cwd: string, line: string, timeoutMs: number, env: NodeJS.ProcessEnv, readStdout = false): Promise<{ summary: string; stderr: string; stdout: string }> {
   return new Promise(resolve => {
     let stderr = ''
+    let stdout = ''
     let settled = false
     const done = (summary: string): void => {
       if (settled) return
       settled = true
       clearTimeout(timer)
-      resolve({ summary, stderr })
+      resolve({ summary, stderr, stdout })
     }
     let child: ReturnType<typeof spawn>
     try {
-      child = spawn('sh', ['-c', line], { cwd, env, stdio: ['ignore', 'ignore', 'pipe'] })
+      child = spawn('sh', ['-c', line], { cwd, env, stdio: ['ignore', readStdout ? 'pipe' : 'ignore', 'pipe'] })
     } catch (err) {
       done(`could not start: ${errorMessage(err)}`)
       return
@@ -129,6 +199,10 @@ function runLine(cwd: string, line: string, timeoutMs: number, env: NodeJS.Proce
     child.stderr?.setEncoding('utf8')
     child.stderr?.on('data', (chunk: string) => {
       stderr += chunk
+    })
+    child.stdout?.setEncoding('utf8')
+    child.stdout?.on('data', (chunk: string) => {
+      stdout += chunk
     })
     child.once('error', err => done(`could not start: ${errorMessage(err)}`))
     child.once('close', (code, signal) => done(signal ? `killed by ${signal}` : `exit ${code ?? 0}`))

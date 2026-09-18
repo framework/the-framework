@@ -6,7 +6,6 @@ vi.mock('../rpc/reads.js', () => ({ onProjectFileStatus }))
 
 const { FileTree } = await import('./FileTree.js')
 
-const noop = () => {}
 const files = ['src/app.ts', 'README.md']
 
 beforeEach(() => {
@@ -17,7 +16,7 @@ afterEach(cleanup)
 
 describe('FileTree (#815)', () => {
   test('the project home reads the project checkout', async () => {
-    render(<FileTree projectId="p1" files={files} selected={new Set()} onToggle={noop} />)
+    render(<FileTree projectId="p1" files={files} />)
     await waitFor(() => expect(onProjectFileStatus).toHaveBeenCalled())
     expect(onProjectFileStatus).toHaveBeenCalledWith('p1', undefined)
   })
@@ -25,23 +24,23 @@ describe('FileTree (#815)', () => {
   test("a session's dots come from that session's worktree", async () => {
     // The action bar right above the tree has resolved the worktree since #738. Reading the
     // project root here put a clean branch next to another checkout's M/U/D dots.
-    render(<FileTree projectId="p1" agentId="run-1" files={files} selected={new Set()} onToggle={noop} />)
+    render(<FileTree projectId="p1" agentId="run-1" files={files} />)
     await waitFor(() => expect(onProjectFileStatus).toHaveBeenCalled())
     expect(onProjectFileStatus).toHaveBeenCalledWith('p1', 'run-1')
   })
 
   test('switching session re-reads, rather than keeping the previous one’s dots', async () => {
     const { rerender } = render(
-      <FileTree projectId="p1" agentId="run-1" files={files} selected={new Set()} onToggle={noop} />,
+      <FileTree projectId="p1" agentId="run-1" files={files} />,
     )
     await waitFor(() => expect(onProjectFileStatus).toHaveBeenCalledWith('p1', 'run-1'))
-    rerender(<FileTree projectId="p1" agentId="run-2" files={files} selected={new Set()} onToggle={noop} />)
+    rerender(<FileTree projectId="p1" agentId="run-2" files={files} />)
     await waitFor(() => expect(onProjectFileStatus).toHaveBeenCalledWith('p1', 'run-2'))
   })
 
   test('a file the run changed is dotted with its status', async () => {
     onProjectFileStatus.mockResolvedValue({ 'README.md': 'modified' })
-    render(<FileTree projectId="p1" agentId="run-1" files={files} selected={new Set()} onToggle={noop} />)
+    render(<FileTree projectId="p1" agentId="run-1" files={files} />)
     await waitFor(() => expect(screen.getByText('M')).toBeTruthy())
   })
 })

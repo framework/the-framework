@@ -85,16 +85,34 @@ export function runArgs(run: { id: string; command: string; prompt: string; mode
   return args
 }
 
+/** The command line of a spawned resume: the text as the argument, or the answer. */
+export function resumeArgs(run: { id: string; text?: string; answer?: string; model?: string }): string[] {
+  const args = ['run', '--resume', run.id]
+  if (run.text !== undefined) args.push(run.text)
+  if (run.answer !== undefined) args.push('--answer', run.answer)
+  if (run.model !== undefined) args.push('--model', run.model)
+  return args
+}
+
 /** The run's process, detached from the tick that started it: `agent-scheduler run <prompt> --id <id>`, its stderr kept. */
-export async function spawnRun(repo: string, run: { id: string; command: string; prompt: string; model?: string; driver?: DriverName }): Promise<void> {
-  const stderrPath = runStderrPath(repo, run.id)
+export function spawnRun(repo: string, run: { id: string; command: string; prompt: string; model?: string; driver?: DriverName }): Promise<void> {
+  return spawnDetached(repo, run.id, runArgs(run))
+}
+
+/** A resumed run's process, detached the same way: `agent-scheduler run --resume <id> …`. */
+export function spawnResume(repo: string, run: { id: string; text?: string; answer?: string; model?: string }): Promise<void> {
+  return spawnDetached(repo, run.id, resumeArgs(run))
+}
+
+async function spawnDetached(repo: string, id: string, args: string[]): Promise<void> {
+  const stderrPath = runStderrPath(repo, id)
   mkdirSync(dirname(stderrPath), { recursive: true })
   const fd = openSync(stderrPath, 'a')
-  const child = spawn(process.execPath, [BIN, ...runArgs(run)], {
+  const child = spawn(process.execPath, [BIN, ...args], {
     cwd: repo,
     detached: true,
     stdio: ['ignore', 'ignore', fd],
-    env: { ...process.env, [AGENT_ID_ENV]: run.id },
+    env: { ...process.env, [AGENT_ID_ENV]: id },
   })
   closeSync(fd)
   child.unref()
@@ -124,6 +142,21 @@ export async function detachRun(
   if (!marked.ok && !marked.committed) opts.log?.(`[agent-scheduler] the run's record could not be written: ${marked.error}`)
   await (deps.spawn ?? spawnRun)(repo, { id, command, prompt: opts.prompt, driver, ...(model !== undefined ? { model } : {}) })
   return { id, command, driver, ...(model !== undefined ? { model } : {}) }
+}
+
+/**
+ * An ended run continued in its own process, and answered at once: what a dashboard's resume
+ * hook runs. A run this project has no record of is refused here, while someone is still
+ * listening; everything after is the resumed run's own record.
+ */
+export async function detachResume(
+  repo: string,
+  opts: { id: string; text?: string; answer?: string; model?: string },
+  deps: { spawn?: typeof spawnResume } = {},
+): Promise<{ id: string }> {
+  if (!(await findRun(repo, opts.id))) throw new Error(`no run ${opts.id} in this project`)
+  await (deps.spawn ?? spawnResume)(repo, opts)
+  return { id: opts.id }
 }
 
 /**

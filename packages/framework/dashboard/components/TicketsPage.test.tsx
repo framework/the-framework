@@ -9,6 +9,7 @@ const onAllTickets = vi.hoisted(() => vi.fn())
 const onTicketsMeta = vi.hoisted(() => vi.fn())
 const onQueue = vi.hoisted(() => vi.fn())
 vi.mock('../rpc/reads.js', () => ({ onAllTickets, onTicketsMeta, onQueue }))
+vi.mock('../lib/preferences.js', () => ({ usePreferences: () => ({}) }))
 vi.mock('../rpc/control.js', () => ({ sendQueueTicket: vi.fn(), sendQueueTicketPlan: vi.fn(), sendStart: vi.fn() }))
 
 const { TicketsPage } = await import('./TicketsPage.js')
@@ -267,7 +268,7 @@ describe('TicketsPage grouping (#1144)', () => {
     fireEvent.click(await screen.findByRole('button', { name: /start work on beta ticket/i }))
     // The row's own project, not a panel-bound one — the flat list carries one per row.
     await waitFor(() =>
-      expect(sendStart).toHaveBeenCalledWith('p2', expect.stringContaining('tickets/b.md'), 'prompt', { unattended: true }),
+      expect(sendStart).toHaveBeenCalledWith('p2', expect.stringContaining('tickets/b.md'), {}),
     )
     await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith('p2', expect.any(String), 'r9'))
   })

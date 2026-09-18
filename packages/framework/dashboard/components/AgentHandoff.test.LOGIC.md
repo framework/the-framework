@@ -1,4 +1,4 @@
-What the tests cover, for the handoff as shown in the agent's action bar and the detail it expands to:
+What the tests cover, for what an agent left behind as shown in the agent's action bar and the detail it expands to:
 
 - **The verdict and the lists** - a finished agent with one commit and one file reads "1 commit" and "1 file" in the bar, and, expanded, lists the commit's subject and the file's path; collapsed, the verdict stays and the lists are gone; the branch name is never repeated in either.
 - **The next step is never behind the disclosure** - "Open PR" is offered with the bar collapsed.
@@ -12,4 +12,3 @@ What the tests cover, for the handoff as shown in the agent's action bar and the
 - **A landed pull request offers nothing** - a merged or closed pull request offers neither "Merge PR" nor "Open PR".
 - **No remote** - a repository without a remote says "No remote to push to" and offers no push.
 - **Nothing before the first read** - until the branch read answers, nothing at all is rendered, so no wrong empty state flashes.
-- **The arming checkbox** - the default arming shows exactly one ticked box, "Open PR", and no "Push branch"; unticking it arms the `local` level (the agent hands off nothing); ticking it from nothing arms `pr`, which includes the push; a push-only agent shows a ticked "Push branch"; a merge-armed agent shows "Open PR & merge" and never "Open PR"; a click holds the box's new state until the agent's events echo it back, so the box does not bounce.

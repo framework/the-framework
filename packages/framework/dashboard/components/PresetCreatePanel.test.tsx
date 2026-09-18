@@ -9,9 +9,9 @@ describe('PresetCreatePanel (#649)', () => {
   test('prefills the prompt from the editor and saves a well-formed preset', () => {
     const onSave = vi.fn()
     render(<PresetCreatePanel currentPrompt="my crafted prompt" busy={false} canSaveToProject={false} onSave={onSave} onCancel={() => {}} />)
-    expect((screen.getByPlaceholderText(/prompt this preset runs/i) as HTMLTextAreaElement).value).toBe('my crafted prompt')
-    fireEvent.change(screen.getByPlaceholderText('Preset name'), { target: { value: 'My preset' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save preset' }))
+    expect((screen.getByPlaceholderText(/The prompt to save/) as HTMLTextAreaElement).value).toBe('my crafted prompt')
+    fireEvent.change(screen.getByPlaceholderText('Name'), { target: { value: 'My preset' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save prompt' }))
     const [saved, scope] = onSave.mock.calls[0]! as [CustomPreset, string]
     expect({ label: saved.label, prompt: saved.prompt }).toEqual({ label: 'My preset', prompt: 'my crafted prompt' })
     expect(saved.id).toBeTruthy()
@@ -20,15 +20,15 @@ describe('PresetCreatePanel (#649)', () => {
 
   test('cannot save without both a name and a prompt', () => {
     render(<PresetCreatePanel currentPrompt="" busy={false} canSaveToProject={false} onSave={() => {}} onCancel={() => {}} />)
-    expect((screen.getByRole('button', { name: 'Save preset' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('button', { name: 'Save prompt' }) as HTMLButtonElement).disabled).toBe(true)
   })
 
   test('with a project open, saving "This project" reports the project scope (#1025)', () => {
     const onSave = vi.fn()
     render(<PresetCreatePanel currentPrompt="shared prompt" busy={false} canSaveToProject onSave={onSave} onCancel={() => {}} />)
-    fireEvent.change(screen.getByPlaceholderText('Preset name'), { target: { value: 'Team preset' } })
+    fireEvent.change(screen.getByPlaceholderText('Name'), { target: { value: 'Team preset' } })
     fireEvent.click(screen.getByRole('button', { name: 'This project' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Save preset' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save prompt' }))
     const [, scope] = onSave.mock.calls[0]! as [CustomPreset, string]
     expect(scope).toBe('project')
   })

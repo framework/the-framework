@@ -8,8 +8,8 @@ Builds the data behind the Overview [1], the dashboard's cross-project page: how
 
 [1] the Overview: the dashboard's cross-project page at `/`.
 [2] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down. An item on it is a queue entry.
-[3] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
-[4] archive: the transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
+[3] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
+[4] the record: the `logs` skill's copy of a finished agent's card and diary on the `agent-data` branch, which is the one place a finished agent lives.
 [5] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [6] tick: one beat of the daemon's single background clock; each sweep says how many ticks it waits between turns.
 
@@ -18,7 +18,7 @@ Builds the data behind the Overview [1], the dashboard's cross-project page: how
 - **One read of the queues, shared** - the per-project queues are collected once and handed to the "working now" rollup, so the agent queues are read a single time per poll.
 - **Totals and the working-now list** - the number of registered projects, the number of open queue entries across them, and the agents going right now, as `overview.ts` rolls them up.
 - **Projects most recently active first, with ticket presence** - the onboarding checklist acts on the first project of the list, so the order is an output; each project says whether it has any ticket at all, not how many, and a failed read reads as none.
-- **Only what a reader asks for** - the payload has exactly these parts and nothing computed for nobody, since every extra field would cost a walk over every project's whole archive [4] on each poll.
+- **Only what a reader asks for** - the payload has exactly these parts and nothing computed for nobody, since every extra field would cost a walk over every project's whole record [4] on each poll.
 
 ## Business logic
 
@@ -56,7 +56,7 @@ Every registered project appears once, sorted by its last activity, most recent 
 
 #### Context
 
-**Problem**: numbers computed for surfaces that no longer exist (per-project agent counts, how past agents ended, a two-week activity window) once cost a walk over every project's whole archive [4] on every poll, twice per tick [6] between the two readers polling it.
+**Problem**: numbers computed for surfaces that no longer exist (per-project agent counts, how past agents ended, a two-week activity window) once cost a walk over every project's whole record [4] on every poll, twice per tick [6] between the two readers polling it.
 
 #### Business logic
 

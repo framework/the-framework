@@ -9,9 +9,9 @@ Every call the dashboard makes to the daemon [1], as one table the daemon answer
 ## Glossary
 
 [1] the daemon: the one foreground process per machine: serves the dashboard, starts agents, runs the sweeps.
-[2] event stream: everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface is a projection of it.
+[2] event stream: everything an agent does, one event per line of the agent's diary — the file `<id>.jsonl` the tool that runs the agent writes under `.the-framework/` in the agent's checkout, copied onto the `agent-data` branch when the agent ends. Every surface (dashboard, terminal, replay) is a projection of it.
 [3] projection: an answer computed on demand from the files the daemon and its agents write, never from state kept in memory.
-[4] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[4] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [5] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 [6] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
 

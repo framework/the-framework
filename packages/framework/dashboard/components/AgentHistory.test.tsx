@@ -84,7 +84,7 @@ describe('AgentHistory (#785)', () => {
   })
 
   test('a session selected before its row lands highlights the starting row (#784)', () => {
-    // Start navigates to the agent's id right away; its agent.json, and so its row, arrives a beat
+    // Start navigates to the run's id right away; its card, and so its row, arrives a beat
     // later. The highlight belongs on the optimistic row standing in for it, not on the home row.
     const { container, rerender } = renderRail(
       <AgentHistory projectId="p1" agents={[]} selectedAgentId={null} onSelect={() => {}} startTick={0} startIntent="" />,

@@ -1,28 +1,26 @@
-Starts an agent [1] for a project [2] from the dashboard, and reports back what the user needs to see: that the start is in flight, why it was refused, and which agent was started.
+Starting an agent [1] from the dashboard, the same way on every surface that does it: the launcher [2], the tickets' buttons, the agent queue's button, the onboarding checklist. It sends the start, tracks that one is in flight, and turns a refusal into words the surface shows.
 
 ## Context
 
-**User story**: the user writes a prompt in the launcher [3] and starts an agent, or picks a preset [4], or continues a finished agent from its composer, or starts one from the agent queue [5] card or the onboarding checklist. While the start is in flight the button is busy; when the daemon refuses, the reason appears on the surface the user started from; when it succeeds, the dashboard opens the agent that was just started.
+**User story**: the user presses a button that starts an agent. While the start is in flight the button is busy; when it is refused the reason appears beside it; when it works the dashboard opens the agent that was started.
 
-**Problem**: a project can only have one agent per checkout [6], and the daemon refuses a start that would collide with one already active. That refusal has to read the same on every surface that starts an agent, rather than each surface inventing its own wording.
+**Problem**: the daemon runs no agent itself. A start is the project's start hook [3], which may refuse for reasons only the tool it names knows (the coding agent is not installed, the command does not exist). Every surface must show those words as they came, and none should rebuild the busy-and-error handling for itself.
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent under The Framework's control, in its own checkout, on its own branch, streaming events, handed off when it ends.
-[2] project: a repository the user registered in the dashboard, identified by an id derived from its path.
-[3] launcher: the Start form on a project's own page.
-[4] preset: a canned prompt the user launches from the dashboard.
-[5] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down.
-[6] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
-[7] build agent / prompt agent: the two kinds of agent: a build works the agent queue after its opening exchange; a prompt agent runs one prompt and stops there.
-[8] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
+[2] launcher: the Start form on a project's own page.
+[3] start hook: the one shell line under `start:` in the project's `.the-framework/hooks.yml`. The daemon runs it with the prompt and the user's picks in its environment, and the line answers the id of the agent it started.
+[4] coding agent: the CLI doing the actual work: Claude Code or Codex.
+[5] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`).
+[6] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 
 ## Business logic — TL;DR
 
-- **What a start sends** - the project, the prompt, which kind of agent it is, and the rest of the launcher's configuration as options.
-- **The refusal the user reads** - a start refused because an agent is already active for the project says "An agent is already active for this project."
-- **Any other failure keeps its own words** - the daemon's own reason, or the caller's fallback wording when there is none.
-- **How the started agent is selected** - a successful start answers with the started agent's id, and the dashboard opens that agent.
+- **What a start sends** - the project, the prompt, and the options: the user's picks, and a device [6] when the launcher picked one.
+- **The user's picks** - the coding agent [4] and the model from the preferences [5]; one that was never picked is left out, so the start hook's own default applies.
+- **A refusal keeps its own words** - the reason the daemon answered, or the surface's fallback wording when there is none.
+- **How the started agent is selected** - a successful start answers the started agent's id, and the dashboard opens that agent.
 
 ## Business logic
 
@@ -34,38 +32,34 @@ See `## Context`.
 
 #### Business logic
 
-A start carries four things: which project [2] to start in, the prompt text, which kind of agent [1] it is — a build agent [7], a prompt agent, or one of the research-style presets [4] whose prompt may be left empty — and the rest of the launcher's [3] configuration as options. Every surface that starts an agent sends the same thing, so the launcher, a preset, the agent queue [5] card, the onboarding checklist and a finished agent's continuation all reach the daemon the same way.
+A start names the project, carries the prompt as typed or as the surface composed it (a command such as `/update-tickets`), and carries the options. There is one kind of start: a command, a saved prompt and the user's own words are all one prompt to the project's start hook [3]. While a start is in flight the surface reads as busy.
 
-While the start is in flight, the surface reports it as busy, and the reported failure from any previous attempt is cleared. Busy ends when the daemon answers, whether it succeeded or not.
-
-### The refusal the user reads
+### The user's picks
 
 #### Context
 
-**Problem**: the daemon phrases its refusal for its own log. On screen the user needs to be told what happened to them, in the same words wherever they started from.
+**Problem**: a start from a ticket's button should run on the same coding agent [4] and model as one from the launcher [2], without each surface reading the preferences [5] its own way.
 
 #### Business logic
 
-A start the daemon refuses because an agent [1] is already active for that project [2] is reported as "An agent is already active for this project.", replacing whatever the daemon called it.
+The picks are read off the preferences: the coding agent when the user picked one, the model when the user picked one. One that was never picked is not part of the start at all, so the project's start hook applies its own default rather than being handed a value nobody chose. Every surface that starts an agent sends these same picks; the launcher adds the picked device [6].
 
-### Any other failure keeps its own words
+### A refusal keeps its own words
 
 #### Context
 
-**Problem**: a start can fail for reasons the user can act on — an empty prompt, an unreachable daemon — and blanking those into one generic message would hide what to fix.
+See `## Context`.
 
 #### Business logic
 
-Any other refusal is reported with the reason the daemon gave. A failure that carries no reason of its own, such as the daemon not answering at all, is reported with the wording the calling surface supplies, which defaults to "Failed to start the agent." The reported failure stays on screen until the surface clears it or the next start begins.
+A refused start shows the reason the daemon answered: the start hook's own last line ("the start hook: …"), "this project has no start hook", "a non-empty prompt is required", an unknown project, or that the device could not be reached. A start that failed without any reason shows the surface's own fallback, "Failed to start the agent." unless the surface gave another. The error stays until the surface clears it or starts again.
 
 ### How the started agent is selected
 
 #### Context
 
-**Problem**: several agents [1] can run in one project [2] at once, so the agent just started cannot be found by looking for "the running one". It also has not yet written anything the daemon's agent list can see.
+**Problem**: several agents run at once, so "the running one" does not say which agent a start just made.
 
 #### Business logic
 
-A successful start answers with the agent id [8] the daemon allocated, which it has whenever the agent got a checkout [6] of its own. The dashboard navigates to that agent as a new entry in the browser history, so Back returns to where the start was made, and shows the agent's live feed on the strength of that id before its row exists in the agent list.
-
-When a start answers without an id, the dashboard lands on the project instead and adopts the project's running agent as the selection once the agent list surfaces it, correcting the address in place rather than adding a second history entry. A start that did not succeed answers with nothing, and the surface stays where it is.
+A successful start answers the id of the agent the start hook began. The surface hands that id to the shell, which opens exactly that agent. A refused start answers nothing, and the surface stays where it is.

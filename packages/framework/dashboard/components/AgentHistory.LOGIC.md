@@ -6,7 +6,7 @@ The dashboard's left column, present on every page: the brand mark, the "New age
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] the Overview: the dashboard's cross-project page at `/`.
 [3] coding agent: the CLI doing the actual work: Claude Code or Codex.
 [4] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
@@ -19,8 +19,7 @@ The dashboard's left column, present on every page: the brand mark, the "New age
 [11] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
 [12] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 [13] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
-[14] driver: a coding agent wrapped as a black box. The user's driver choice is `claude` or `codex`; the driver implementations are `claude-code`, `codex`, `github-actions`, `claude-web` and `fake`.
-[15] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next.
+[14] driver: a coding agent wrapped as a black box. The user's driver choice is `claude-code` or `codex`; the driver implementations are `claude-code`, `codex`, `github-actions`, `claude-web` and `fake`.
 
 ## Business logic — TL;DR
 
@@ -118,7 +117,7 @@ The stand-in retires the moment an agent appears in the list that was not in it 
 
 #### Business logic
 
-Within a project, a row is highlighted when it is the selected agent's, or, while following a just-started agent that reported no id, when it is the newest running agent's row: only one row, the first running agent in newest-first order, never every running one. The stand-in is highlighted while the page follows a just-started agent, or while the selected agent's own row has not landed in the list yet. On the Overview [2] nothing is highlighted, since a row there navigates into its project.
+Within a project, a row is highlighted when it is the selected agent's. The stand-in is highlighted while the selected agent's own row has not landed in the list yet. On the Overview [2] nothing is highlighted, since a row there navigates into its project.
 
 ### What a row shows
 

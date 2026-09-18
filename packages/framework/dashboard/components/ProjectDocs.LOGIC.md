@@ -2,4 +2,4 @@ The "Docs" section of the project home [1]: the project's workspace docs (its `P
 
 ## Glossary
 
-[1] project home: a project's own page with the launcher (the Start form) and its composer (the prompt editor, also used for live chat).
+[1] project home: a project's own page with the launcher (the Start form) and its composer (the prompt editor, also used to say something to an agent).

@@ -1,46 +1,40 @@
-The Settings page: every preference [1] the user can set, on one page, each change applied the moment it is made and saved to the daemon in the background, with the Onboarding checklist kept at the top. Everything written here goes to the user's own preferences; a project's `the-framework.yml` can override any of them for that project and is edited in the repository, never here, so a value on this page always means "the default".
+The Settings page: every preference [1] the user can set, on one page, each change applied the moment it is made and saved to the daemon in the background, with the Onboarding checklist kept at the top. Everything written here goes to the user's own preferences, so a value on this page always means "my default, everywhere".
 
 ## Context
 
-**User story**: the user opens Settings (the address `/settings`) to look up or change a setting without hunting through the header's menus, and follows the Overview's [2] hint that the onboarding can be resumed on the settings page. The heading is "Settings" and the line under it reads "Your defaults, everywhere. A repo can override them in its own the-framework.yml."
+**User story**: the user opens Settings (the address `/settings`) to look up or change a setting without hunting through the header's menus, and follows the Overview's [2] hint that the onboarding can be resumed on the settings page. The heading is "Settings" and the line under it reads "Your defaults, everywhere."
 
-**Business logic story**: the same preferences feed the launcher on a project home [3], the notifications bell and the daemon's sweeps [4]. This page is the one surface that lists all of them, so what it shows must match what those surfaces act on: an effective value, never a stored value that an agent [5] would ignore.
+**Business logic story**: the same preferences feed the launcher on a project home [3], the notifications bell and the daemon's sweeps [4]. This page is the one surface that lists all of them, so what it shows must match what those surfaces act on.
 
 ## Glossary
 
 [1] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 [2] the Overview: the dashboard's cross-project page at `/`.
-[3] project home: a project's own page with the launcher (the Start form) and its composer (the prompt editor, also used for live chat).
-[4] sweep: a background job the daemon runs on its clock: the CI watch, the notification watchers, the sweep that reclaims checkouts, the branch-links sweep, the cloud scratch sweep, cloud work adoption.
-[5] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
+[3] project home: a project's own page with the launcher (the Start form) and its composer (the prompt editor, also used to say something to an agent).
+[4] sweep: a background job the daemon runs on its clock: the notification watchers, the data sync, the cloud scratch sweep, cloud work adoption.
+[5] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [6] agent view: one agent's page.
 [7] coding agent: the CLI doing the actual work: Claude Code or Codex.
-[8] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later. The user's driver choice is `claude` or `codex`.
-[9] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
+[8] start hook: the one shell line under `start:` in a project's `.the-framework/hooks.yml`, which starts an agent; the user's picks of coding agent and model are handed to it.
+[9] relay: running an agent on a device: the local daemon forwards the start to the device and streams the events back.
 [10] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
-[11] transparent: an agent started with nothing of The Framework's — the raw coding agent.
-[12] vanilla: an agent started without the built-in system prompt but with the signal protocols kept.
-[13] the built-in system prompt: the standing instructions every agent starts with (`prompts/system_prompt.md`).
-[14] ready for merge: the signal an agent emits when it believes its work is complete: it flips the agent's badge from building to ready and authorizes the handoff.
-[15] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it). "Handoff level" is a rung of that ladder.
 [16] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds. The other is activity: an agent started or finished.
 [17] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
-[18] quota boundary: the share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
+[18] quota boundary: the share of the quota week that may be spent by now, rising with the clock.
 [19] spend offset: the user's adjustment of the quota boundary, in percentage points of the week.
-[20] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
+[20] unattended work: agents nobody started by hand.
 [21] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
 [22] the Claude web bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge token is the secret the extension presents; the bridge browser is the Chrome for Testing the daemon runs for it.
 
 ## Business logic — TL;DR
 
-- **One page, one destination** - every control reads and writes the user's own preferences, applied at once and saved in the background; the page never writes a project's `the-framework.yml`.
+- **One page, one destination** - every control reads and writes the user's own preferences, applied at once and saved in the background.
 - **The Onboarding checklist stays on this page** - it sits above every section, cannot be dismissed here, and its two navigating steps lead to an agent's page or a project's launcher.
 - **Appearance: theme and editor** - "Theme" follows the system by default; "Editor" offers "Auto-detect" plus the editors found on the daemon's machine.
-- **Agent: which coding agent, which model, where it runs** - "Agent" (Claude Code by default), "Model" (empty means the coding agent's own default) and "Run on" (this machine by default).
-- **Devices, beside "Run on"** - the saved devices follow directly, because a device is the other place an agent can run.
-- **Run options: the launcher's table, with reasons** - the same seven checkboxes the launcher's gear shows, each showing the effective value, and a row a rule turns off stays visible, greyed, with the reason in its place.
+- **Agent: which coding agent, which model** - "Agent" (Claude Code by default) and "Model" (empty means the coding agent's own default); both are handed to a project's start hook [8] with every start.
+- **Devices, after "Agent"** - the saved devices follow directly, because a device is the other place an agent can run.
 - **Notifications: how they reach you, and what about** - two delivery rows ("Browser", "Discord") and two category rows ("Human Queue", "New activity"), each showing both the preference and whether delivery can happen, with Discord's setup one button away.
-- **Automation: fixing red pull requests, and the spend offset** - "Fix red pull requests" is off until turned on; "Spend offset" is a whole number within ±50 that shows the default in force (7.1) when untouched.
+- **Automation: the spend offset** - "Spend offset" is a whole number within ±50 that shows the default in force (7.1) when untouched.
 - **Claude web: the bridge, and which browser does its work** - "Browser bridge" is off by default; while on, one exclusive choice decides whether the daemon runs the bridge browser or the user's own Chrome does the work, each option carrying its own setup.
 - **A list with nothing to pick is not shown** - a drop-down row with no choices is left out rather than rendered empty.
 
@@ -50,11 +44,11 @@ The Settings page: every preference [1] the user can set, on one page, each chan
 
 #### Context
 
-**Problem**: preferences [1] resolve in two tiers, the user's own settings and the open project's committed `the-framework.yml` on top (the resolution rules are in `lib/preferences.ts`). Only the first tier can be written from the dashboard; the repository file is edited in the repository. A page that could also write "for this project" would need a second destination and a way to show which tier won, for a value the committed file already states for everyone who clones.
+**Problem**: a setting with more than one home leaves the user unable to tell which copy a value was written to. The page has one destination.
 
 #### Business logic
 
-Every control on the page reads and writes the user's own preferences [1], which the daemon keeps in the registry file `~/.the-framework.json`. The page belongs to no project, so it shows the user's own values with no project's `the-framework.yml` layered on top. A change takes effect on the page the instant it is made and is saved to the daemon in the background; a failed save is not reported, and a value another tab changed is adopted when the daemon answers (the write rules are in `lib/preferences.ts`). The line under the heading tells the user where an override lives: "Your defaults, everywhere. A repo can override them in its own the-framework.yml."
+Every control on the page reads and writes the user's own preferences [1], which the daemon keeps in the registry file `~/.the-framework.json`. The page belongs to no project. A change takes effect on the page the instant it is made and is saved to the daemon in the background; a failed save is not reported, and a value another tab changed is adopted when the daemon answers (the write rules are in `lib/preferences.ts`).
 
 ### The Onboarding checklist stays on this page
 
@@ -79,47 +73,30 @@ The "Appearance" section has two rows:
 - "Theme" ("Follow the system, or pin light or dark."): "System", "Light" or "Dark". With nothing stored the theme is "System": the dashboard follows the operating system's light or dark choice.
 - "Editor" ("Which editor “Open in editor” launches."): "Auto-detect" followed by one entry per editor found installed on the daemon's machine, read once from the daemon. When none is detected, for example on a daemon serving a host with no local checkout, the list holds "Auto-detect" alone and the row stays usable. Choosing "Auto-detect" clears the stored editor, so the daemon picks the editor itself.
 
-### Agent: which coding agent, which model, where it runs
+### Agent: which coding agent, which model
 
 #### Context
 
-**Business logic story**: a start is made of three things — which coding agent [7] does the work, which model, and where it runs. The launcher sets the same three per start; the values here are what every start begins from.
+**Business logic story**: a start carries two picks — which coding agent [7] does the work, and which model. The launcher's select sets the same two; the values here are what every start carries, from the launcher and from every button that starts an agent.
 
 #### Business logic
 
-The "Agent" section has three rows:
+The "Agent" section has two rows:
 
-- "Agent" ("Which coding agent runs the work."): "Claude Code" or "Codex", the user's driver [8] choice. With nothing stored the driver is "Claude Code".
-- "Model" ("Passed through to the agent. Empty uses the agent's own default."): free text, with the placeholder "the agent's default". The value is handed to the coding agent as the model to run on; left empty, the coding agent uses its own default.
-- "Run on" ("Where an agent executes: this machine, a fresh GitHub Actions runner, or a Claude Code cloud session."): "This machine", "GitHub Actions" or "Claude web", the location [9] `local`, `actions` or `web`. With nothing stored the location is "This machine".
+- "Agent" ("Which coding agent runs the work."): "Claude Code" or "Codex". With nothing stored the row shows "Claude Code", and a start sends no coding agent at all, so the project's start hook [8] applies its own default.
+- "Model" ("Passed through to the agent. Empty uses the agent's own default."): free text, with the placeholder "the agent's default". The value is handed to the start hook as the model to run on; left empty, nothing is handed over and the coding agent uses its own default.
 
-### Devices, beside "Run on"
+Where an agent runs is not a setting: it is picked per start in the launcher's "Run on" (`RunOnMenu.tsx`).
+
+### Devices, after "Agent"
 
 #### Context
 
-**User story**: the user saves another machine's daemon as a device [10] to run agents on it from this dashboard, which makes a device the other thing an agent [5] can run on besides the three locations.
+**User story**: the user saves another machine's daemon as a device [10] to run agents on it from this dashboard; the local daemon relays [9] the start to it.
 
 #### Business logic
 
-The "Devices" section follows the "Agent" section directly, because a saved device [10] is the other place an agent can run. Its rows and rules live in `DevicesSettings.tsx`.
-
-### Run options: the launcher's table, with reasons
-
-#### Context
-
-**Problem**: the launcher's gear offers the same options, and the rules between them decide whether a box means anything: a transparent [11] agent ignores every other option, a rung of the handoff [15] ladder needs the rung below it, and the browser is wired only through Claude Code. Two hand-written copies of that table would drift, and a row that silently vanished when a rule turned it off would leave the user searching for a setting on the very page made for finding one.
-
-#### Business logic
-
-The "Run options" section ("What a new agent starts with. The launcher's gear shows the same options, and an agent's own action bar can still change its ending.") renders the one run-option table shared with the launcher; which rows are on, which are disabled and why is decided in `lib/agent-option-rows.ts`. Each row is a checkbox with a label and a one-line description:
-
-- "Transparent" — "Raw Claude Code — turns the whole framework off." (or "Raw Codex —" when Codex is the driver [8]): the agent runs transparent [11].
-- "Disable system prompt" — "Drops the added system prompt; keeps the agent controls.": the agent runs vanilla [12], without the built-in system prompt [13].
-- "Post-merge cleanup" — "Runs quality passes once it is ready to merge.": quality passes once the agent signals ready for merge [14].
-- "Push branch" — "Pushes the agent branch when it finishes.", "Open PR" — "Opens a draft pull request when it finishes.", "Auto-merge" — "Merges the pull request once it is opened.": the three rungs of the handoff [15] ladder above `local`. Ticking a rung sets the handoff to that rung; unticking it lowers the handoff to the rung below, so a merge is never armed with no pull request beneath it.
-- "Browser" — "Gives the agent a real browser to inspect pages."
-
-Every checkbox shows the effective value, not the stored one: an option that "Transparent" overrides reads as off, because off is what the agent will do. A row a rule turns off keeps its place, greyed, with the reason shown in place of its description rather than disappearing: "off while Transparent is on", "nothing to open while Push branch is off", "nothing to merge while Open PR is off", and for "Browser" under Codex "only on Claude Code — the browser is wired through its MCP config". With nothing stored, "Push branch" and "Open PR" are on (the default handoff is `pr`) and every other row is off.
+The "Devices" section follows the "Agent" section directly, because a saved device [10] is the other place an agent [5] can run. Its rows and rules live in `DevicesSettings.tsx`.
 
 ### Notifications: how they reach you, and what about
 
@@ -138,20 +115,15 @@ The "Notifications" section has four rows. Two say how a notification reaches th
 - "Human Queue" ("An agent awaiting your answer, or a PR ready to review."): the intervention [16] category; on when nothing is stored.
 - "New activity" ("Also ping when an agent starts or finishes."): the activity category; off when nothing is stored.
 
-### Automation: fixing red pull requests, and the spend offset
+### Automation: the spend offset
 
 #### Context
 
-**User story**: the user lets the daemon spend leftover quota [17] by itself on one thing: an agent put on a pull request The Framework is watching whose checks fail, while the week's quota lasts. Because it spends the allowance unasked, it stays off until the user turns it on.
-
-**Problem**: a typed offset beyond the allowed range must not be clamped on save while the box keeps showing what was typed, and an untouched offset must show the default the daemon is actually using rather than a zero it is not.
+**Problem**: a typed offset beyond the allowed range must not be clamped on save while the box keeps showing what was typed, and an untouched offset must show the default actually in force rather than a zero that is not.
 
 #### Business logic
 
-The "Automation" section has two rows:
-
-- "Fix red pull requests" ("Put an agent on a watched pull request whose checks fail, on its own, while there is quota left in the week."): off when nothing is stored.
-- "Spend offset" ("How far unattended work sits from the quota boundary, in percentage points (max 50). Negative holds it back; positive lets it borrow from the days ahead."): a number field. The spend offset [19] moves the quota boundary [18] for unattended [20] work, in percentage points of the quota week: negative holds it back, positive lets it borrow from the days ahead. A typed value is rounded to a whole number and clamped into -50 to 50 before it is saved, so the box never shows a value the daemon will not use; a saved value is always a whole number. When nothing is stored, the box shows the default in force, half a day's share of the week (100 divided by 14, shown to one decimal as 7.1), not zero.
+The "Automation" section has one row, "Spend offset" ("How far unattended work sits from the quota [17] boundary, in percentage points (max 50). Negative holds it back; positive lets it borrow from the days ahead."): a number field. The spend offset [19] moves the quota boundary [18] the usage panel draws for unattended work [20], in percentage points of the quota week: negative holds it back, positive lets it borrow from the days ahead. A typed value is rounded to a whole number and clamped into -50 to 50 before it is saved, so the box never shows a value that will not be used; a saved value is always a whole number. When nothing is stored, the box shows the default in force, half a day's share of the week (100 divided by 14, shown to one decimal as 7.1), not zero.
 
 ### Claude web: the bridge, and which browser does its work
 

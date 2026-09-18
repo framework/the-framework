@@ -64,9 +64,10 @@ export async function resolveAgentPath(projectId: string, agentId?: string): Pro
 }
 
 /**
- * The in-memory {@link EventsSource} (#426). It answers only for an agent this daemon is relaying
- * from a connected device (#1067) — such an agent has no `.the-framework/events.jsonl` here — and
- * returns undefined for an ordinary local agent, whose log `onEvents` tails off disk.
+ * The in-memory {@link EventsSource} (#426). It answers only for a run this daemon is relaying
+ * from a connected device (#1067) — such a run has no diary on this machine, since it works in a
+ * checkout over there — and returns undefined for an ordinary local run, whose diary `onEvents`
+ * tails off disk.
  */
 export function contextEventsSource(): EventsSource {
   return fromContext('eventsSource')

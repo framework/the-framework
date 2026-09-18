@@ -7,11 +7,11 @@ The Overview's [1] "Hot tickets" card: a cross-project shortlist of tickets in t
 ## Glossary
 
 [1] the Overview: the dashboard's cross-project page at `/`.
-[2] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [3] launcher: the Start form on a project's own page.
-[4] composer: the prompt editor on a project's own page, also used for live chat.
+[4] composer: the prompt editor on a project's own page, also used to say something to an agent.
 [5] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down.
-[6] preset: a canned prompt the user launches from the dashboard.
+[6] command: one of the project's own skills, which the user runs from the launcher by name.
 
 ## Business logic — TL;DR
 
@@ -50,7 +50,7 @@ A row is a button showing the ticket's title, truncated with an ellipsis, then a
 
 #### Business logic
 
-Selecting a ticket opens its project's launcher and hands the composer the draft "Work on tickets/<file>. Do not start any other ticket." — plain text the user reads and edits before sending, so there is no second, hidden version of the ask; it names the ticket's file, the ticket's identity, rather than its title, which is prose the agent would have to search for. Its wording is the drain [7] preset's [6], narrowed to the one ticket. The draft is stashed for the launcher to take once on arrival (the hand-over rules in `lib/draft-handoff.ts`); opening an agent leaves no draft behind, so nothing surfaces later on an unrelated visit to a launcher.
+Selecting a ticket opens its project's launcher and hands the composer the draft "Work on tickets/<file>. Do not start any other ticket." — plain text the user reads and edits before sending, so there is no second, hidden version of the ask; it names the ticket's file, the ticket's identity, rather than its title, which is prose the agent would have to search for. Its wording is the queue command's [6], narrowed to the one ticket. The draft is stashed for the launcher to take once on arrival (the hand-over rules in `lib/draft-handoff.ts`); opening an agent leaves no draft behind, so nothing surfaces later on an unrelated visit to a launcher.
 
 ### Empty says what is empty
 

@@ -1,26 +1,26 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { buildOpenQuestions, openChoiceRequest } from './open-questions.js'
+import { buildOpenQuestions } from './open-questions.js'
 import type { FrameworkEvent } from '../events.js'
 import type { LiveAgent } from '../store/index.js'
 
 const PROJECTS = [{ id: 'p1', path: '/one', name: 'one', activated: true }]
 
+/** A run that ended on its question: `waiting`, its checkout kept. */
 function liveAgent(overrides: Partial<LiveAgent> = {}): LiveAgent {
   return {
-    status: 'running',
+    status: 'waiting',
     id: 'run-1',
     startedAt: '2026-08-01T10:00:00.000Z',
     updatedAt: '2026-08-01T11:00:00.000Z',
-    cwd: '/one/.the-framework/worktrees/run-1',
-    pendingChoice: { id: 'gate-1', title: 'Approve the plan?' },
+    cwd: '/one/.branches/agent-run-1',
     ...overrides,
   }
 }
 
 const CHOICE: FrameworkEvent = {
   kind: 'choice',
-  id: 'gate-1',
+  id: 'await-choices',
   title: 'Approve the plan?',
   options: [
     { id: 'yes', label: 'Approve' },
@@ -28,61 +28,42 @@ const CHOICE: FrameworkEvent = {
   ],
   recommended: 'yes',
 }
+const WAITING: FrameworkEvent = { kind: 'end', ok: false, waiting: true }
 
-test('openChoiceRequest keeps the whole request — options and recommended', () => {
-  const open = openChoiceRequest([CHOICE], 'gate-1')
-  assert.deepEqual(open, {
-    id: 'gate-1',
-    title: 'Approve the plan?',
-    options: [
-      { id: 'yes', label: 'Approve' },
-      { id: 'no', label: 'Decline' },
-    ],
-    recommended: 'yes',
-  })
-})
-
-test('a resolved gate is closed, and a re-fired one is open again', () => {
-  const resolved: FrameworkEvent = { kind: 'choice-resolved', id: 'gate-1', picked: 'yes', by: 'user' }
-  assert.equal(openChoiceRequest([CHOICE, resolved], 'gate-1'), undefined)
-  assert.notEqual(openChoiceRequest([CHOICE, resolved, CHOICE], 'gate-1'), undefined)
-})
-
-test('a parked run yields its question with the full gate, read from the run own checkout (#1455)', async () => {
-  const readFrom: string[] = []
+test('a waiting run yields its question whole, options and recommendation, read off the run\'s own diary (#1455/#1774)', async () => {
+  const readFor: string[] = []
   const questions = await buildOpenQuestions(PROJECTS, {
     liveAgents: async () => [liveAgent({ branch: 'agent-triage', intent: 'triage the queue' })],
-    events: async cwd => {
-      readFrom.push(cwd)
-      return [CHOICE]
+    events: async (cwd, agentId) => {
+      readFor.push(`${cwd} ${agentId}`)
+      return [CHOICE, WAITING]
     },
   })
-  assert.deepEqual(readFrom, ['/one/.the-framework/worktrees/run-1'])
-  assert.equal(questions.length, 1)
-  assert.deepEqual(questions[0], {
-    projectId: 'p1',
-    projectName: 'one',
-    agentId: 'run-1',
-    sessionName: 'triage',
-    intent: 'triage the queue',
-    updatedAt: '2026-08-01T11:00:00.000Z',
-    choice: openChoiceRequest([CHOICE], 'gate-1'),
-  })
+  assert.deepEqual(readFor, ['/one run-1'])
+  const { kind: _kind, ...choice } = CHOICE as FrameworkEvent & { kind: 'choice' }
+  assert.deepEqual(questions, [
+    {
+      projectId: 'p1',
+      projectName: 'one',
+      agentId: 'run-1',
+      sessionName: 'triage',
+      intent: 'triage the queue',
+      updatedAt: '2026-08-01T11:00:00.000Z',
+      choice,
+    },
+  ])
 })
 
-test('not-running, not-parked, and already-resolved runs contribute nothing', async () => {
+test('a run that is working, one that ended for good, and a waiting one whose diary shows the agent went on contribute nothing', async () => {
   const questions = await buildOpenQuestions(PROJECTS, {
     liveAgents: async () => [
+      liveAgent({ id: 'working', status: 'running' }),
       liveAgent({ id: 'stopped', status: 'stopped' }),
-      (() => {
-        const { pendingChoice: _open, ...working } = liveAgent({ id: 'working' })
-        return working as LiveAgent
-      })(),
-      // Parked per the meta, but the log says the gate was already answered: no card — offering
-      // an answer the daemon would refuse is worse than one fewer.
-      liveAgent({ id: 'resolved' }),
+      // Waiting per the card, but the diary says the agent went on after the question: no card —
+      // offering an answer the daemon would refuse is worse than one fewer.
+      liveAgent({ id: 'went-on' }),
     ],
-    events: async () => [CHOICE, { kind: 'choice-resolved', id: 'gate-1', picked: 'yes', by: 'user' }],
+    events: async () => [CHOICE, WAITING, { kind: 'driver', event: { type: 'text', text: 'going on' } }],
   })
   assert.deepEqual(questions, [])
 })
@@ -93,7 +74,7 @@ test('longest-waiting first: the run blocked longest is the one to unblock first
       liveAgent({ id: 'fresh', updatedAt: '2026-08-01T11:30:00.000Z' }),
       liveAgent({ id: 'stale', updatedAt: '2026-08-01T09:00:00.000Z' }),
     ],
-    events: async () => [CHOICE],
+    events: async () => [CHOICE, WAITING],
   })
   assert.deepEqual(questions.map(q => q.agentId), ['stale', 'fresh'])
 })

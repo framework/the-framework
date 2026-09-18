@@ -1,19 +1,19 @@
-The project panel's file tree: every file of the project's repository, as git lists them, folded into a collapsible tree, where clicking a file toggles it in the set of context files the composer [1] attaches to the next prompt, and each changed file is tinted with git's verdict for the selected agent's [2] checkout [3]. A filter box narrows the tree, hovering a file previews it, and with no files at all the tree renders nothing.
+The project panel's file tree: every file of the project's repository, as git lists them, folded into a collapsible tree, where each changed file is tinted with git's verdict for the selected agent's [2] checkout [3]. A filter box narrows the tree, hovering a file previews it, and with no files at all the tree renders nothing.
 
 ## Context
 
-**User story**: on a project's page the user browses the repository's files in the panel, ticks the ones the next prompt should point the agent [2] at, sees at a glance which files the selected agent has changed, and hovers a file to peek at its contents or its diff.
+**User story**: on a project's page the user browses the repository's files in the panel, sees at a glance which files the selected agent has changed, and hovers a file to peek at its contents or its diff.
 
 ## Glossary
 
-[1] composer: the prompt editor on a project's own page, also used for live chat.
-[2] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[1] composer: the prompt editor on a project's own page, also used to say something to an agent.
+[2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [3] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch. The user's own working copy is "the project's checkout".
 
 ## Business logic — TL;DR
 
 - **A tree from the flat file list** - the paths git lists are folded into folders, folders first then files, each sorted by name; a folder opens and closes on click; with no files at all the panel renders nothing.
-- **Clicking a file toggles it as context** - a file row is a button that adds the file to, or removes it from, the context files; a selected file shows a check mark instead of the file icon and reads in the accent color.
+- **A file row shows, it does not pick** - a file row shows the file's name and git's verdict and previews on hover; clicking it does nothing. Naming a file in a prompt is done in the composer [1], with `#`.
 - **Git's verdict on each row** - a changed file is tinted and lettered "U", "M" or "D"; a folder with changes beneath it carries a dot in the same color, mixed changes reading as modified; the verdict is the selected agent's checkout's, re-read every 8 seconds.
 - **Filtering** - "Filter files…" narrows the tree to paths containing the query and the folders leading to them, reads "<n> of <m> files", and says "No files match “<query>”." when nothing does.
 - **Hover to preview** - hovering a file shows the preview card, a diff for a changed file and the contents for an unchanged one.
@@ -30,15 +30,15 @@ See `## Context`.
 
 The files arrive as paths relative to the repository's root, the list git keeps of the repository's files, and are folded into a tree of folders. At every level the folders come first, sorted by name, then the files, sorted by name. A folder is a native disclosure: closed until clicked (or operated from the keyboard), showing a closed-folder icon that turns into an open-folder icon while open, with its contents indented under a guide line. The tree scrolls within its own area, so a large repository does not stretch the panel past what follows it. When the project has no files at all, the tree renders nothing.
 
-### Clicking a file toggles it as context
+### A file row shows, it does not pick
 
 #### Context
 
-**User story**: the user wants the next prompt to point the agent [2] at particular files; the tree is a picker for that, not an editor.
+**User story**: the tree is where the user looks at the project and at what the selected agent [2] changed. Pointing a prompt at a file is done where the prompt is written: typing `#` in the composer [1] lists the same files.
 
 #### Business logic
 
-Each file row is a button showing the file's name, the last segment of its path; clicking it toggles the file in the selected set, which the caller keeps and which is the same set the composer's [1] `#` mentions and the whole-project context selector feed. A selected file shows a check mark in place of the file icon and its row reads in the accent color.
+Each file row shows the file's name, the last segment of its path, with the file icon. A row is not a button: clicking it does nothing, and no file is ever "selected" in the tree. Hovering a row previews the file (see below).
 
 ### Git's verdict on each row
 

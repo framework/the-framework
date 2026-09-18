@@ -2,7 +2,7 @@ The device [1] side of the relay [2]: the fixed set of calls a daemon that relay
 
 ## Context
 
-**User story**: the user starts an agent on a saved device from this dashboard and then reads its files, answers its gates [5], messages it, moves its handoff [6] and publishes its work as if it ran locally; the device carries out each of those on its own checkout of the agent.
+**User story**: the user starts an agent on a saved device from this dashboard and then reads its files, answers its question [5], messages it and publishes its work as if it ran locally; the device carries out each of those on its own checkout of the agent.
 
 **Problem**: a relayed call arrives at the device with no browser behind it and with the relaying daemon's own project id, which means nothing here. The device must limit what such a call can reach — its own home project, and only the actions steering an agent needs — because anyone holding the device's token can send one.
 
@@ -10,11 +10,11 @@ The device [1] side of the relay [2]: the fixed set of calls a daemon that relay
 
 [1] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 [2] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
-[3] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
+[3] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. The Framework starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
 [4] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch. Also "the `agent-data` branch's checkout". The user's own working copy is "the project's checkout" or "the user's checkout".
-[5] gate: a question with options at which an agent stops and waits for an answer: it emits the question in its turn's final message, the dashboard shows it as a card, and the answer re-prompts the agent. When nobody can answer, the recommended option is taken.
-[6] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it). "Handoff level" is a rung of that ladder.
-[7] stop: ending an agent before it finishes: the Stop button, Ctrl-C, or a pick marked to stop.
+[5] question: what an agent's turn ended on, asking the user to choose between options; the agent ends `waiting`, its checkout kept, and the answer resumes it.
+[6] handoff: what became of an ended agent's work: whether its branch exists, is pushed, and has a pull request.
+[7] stop: ending an agent before it finishes: the Stop button, a signal to the process the agent's card names.
 [8] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
 [9] registry: `~/.the-framework.json`: where the user's preferences are kept, and which also lists the projects.
 
@@ -35,7 +35,7 @@ See `## Context`.
 
 #### Business logic
 
-The calls a relaying daemon may make here are exactly the reads about one agent [3] — the project's files and their statuses, a file's diff and content, the agent's changes, the git status, the agent's checkout [4], its handoff [6] state and the agent itself (`reads.ts`) — and the steering of it: stopping [7], answering a gate [5], sending a message, moving the handoff, pushing the branch, opening the pull request and merging it (`control.ts`). Starting an agent, deleting one, removing a retained checkout and the browser preview are not on the list: a device runs its own guarded start, and destroying history or checkouts is not something a relaying daemon may reach.
+The calls a relaying daemon may make here are exactly the reads about one agent [3] — the project's files and their statuses, a file's diff and content, the agent's changes, the git status, the agent's checkout [4], its handoff [6] state and the agent itself (`reads.ts`) — and the steering of it: stopping [7], answering its question [5], sending a message, opening the pull request and merging it (`control.ts`). Starting an agent, deleting one, removing a retained checkout are not on the list: a Start reaches a device through its own relay endpoint, where the device runs its own project's start hook, and destroying history or checkouts is not something a relaying daemon may reach.
 
 ### Only the device's home project
 

@@ -1,5 +1,5 @@
 export { startDashboard, type Dashboard, type DashboardOptions } from './server.js'
-export type { StartAgentKind, StartAgentOptions, StartAgentResult, AddProjectResult, OnboardingSuggestion, DriverReady, PreviewResult, PreviewStatus, AgentWorktree } from './types.js'
+export type { StartAgentOptions, StartAgentResult, AddProjectResult, OnboardingSuggestion, DriverReady, PreviewResult, PreviewStatus, AgentWorktree } from './types.js'
 export {
   summarizeProject,
   defaultProjectsProvider,
@@ -41,7 +41,7 @@ export {
   type Intervention,
   type InterventionsDeps,
 } from './interventions.js'
-export { buildOpenQuestions, openChoiceRequest, type OpenQuestion, type OpenQuestionsDeps } from './open-questions.js'
+export { buildOpenQuestions, type OpenQuestion, type OpenQuestionsDeps } from './open-questions.js'
 export { bridgeChoiceRequest, type BridgeOption, type BridgeQuestion } from './bridge-question.js'
 export { buildActivity, activityKey, activityLine, postActivityDiscord, type Activity, type ActivityDeps } from './activity.js'
 export { startKeyedWatcher, SeenTracker, type KeyedWatcher, type KeyedWatcherOptions } from './keyed-watcher.js'

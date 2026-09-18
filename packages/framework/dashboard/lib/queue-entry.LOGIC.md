@@ -8,7 +8,7 @@ Decides how one queue entry [1] reads on screen and what it opens. Entries are l
 
 [1] queue entry: an item on the agent queue: one line of `TODO_AGENTS.md`, either a link to a ticket or a self-contained task.
 [2] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down.
-[3] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[3] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [4] the Overview: the dashboard's cross-project page at `/`.
 
 ## Business logic — TL;DR

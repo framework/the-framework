@@ -1,159 +1,137 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { readFile } from 'node:fs/promises'
-import { makeWorld, waitFor, withFakeAwait } from './harness.js'
-import { archivedAgentPaths } from '../store/index.js'
-import { onOpenQuestions, onAgents, onRetainedWorktrees, onAgentWorktree } from '../dashboard-rpc/reads.js'
-import {
-  sendChoice,
-  sendMessage,
-  sendStop,
-  sendSetHandoff,
-  sendDeleteAgent,
-} from '../dashboard-rpc/control.js'
+import { makeWorld, waitFor, release } from './harness.js'
+import { onOpenQuestions, onAgents, onAgent, onRetainedWorktrees, onAgentWorktree } from '../dashboard-rpc/reads.js'
+import { sendChoice, sendMessage, sendStop, sendDeleteAgent, sendRemoveWorktree } from '../dashboard-rpc/control.js'
 
-// The steering stories (README.md): everything the user does TO a live session — answer its
-// question, chat with it, change its handoff, stop it — flows browser -> RPC -> control.jsonl ->
-// the agent process, and the observable answer comes back through the agent's own event log.
+// The steering stories (README.md): everything the user does TO a run — answer its question, say
+// something to it, stop it — reaches the run through what its tool reads: the inbox file in the
+// run's checkout while it works, the project's resume hook once it has ended, a signal to the
+// pid on its card. The observable answer comes back through the run's own diary.
 
-test('answer a parked session’s question from the questions hub (#304/#1455)', async () => {
+test('answer a waiting run’s question from the questions hub; the answer resumes the same run (#304/#1455/#1774)', async () => {
   const world = await makeWorld()
   const rpc = world.rpc
   try {
     const project = await world.addProject()
-    const agentId = await withFakeAwait('choices', () => world.startAgent(project, 'Wire up auth'))
+    const agentId = await world.startAgent(project, 'ask before wiring up auth')
     const tail = await world.tailAgent(project, agentId)
 
-    // The agent parks: the full gate (title, options, recommendation) reaches the feed, and the
-    // cross-project questions hub lists it against this session.
-    const gate = await waitFor(() => tail.events.find(e => e.kind === 'choice'), 'the parked gate')
+    // The run's turn ends on a question, so the run ends `waiting`, its checkout kept: the full
+    // question (title, options, recommendation) is on the feed, and the cross-project questions
+    // hub lists it against this run.
+    const gate = await waitFor(() => tail.events.find(e => e.kind === 'choice'), 'the question')
     assert.equal(gate.kind, 'choice')
     if (gate.kind !== 'choice') return
-    assert.ok(gate.options.length >= 2, 'the gate offers options')
-    assert.ok(gate.recommended, 'the gate names a recommended option')
+    assert.deepEqual(gate.options.map(o => o.label), ['Left', 'Right'])
+    await world.waitAgent(project, agentId, 'waiting')
+    assert.equal((await rpc(onAgentWorktree)(project.id, agentId))?.own, true, 'a waiting run keeps its checkout')
     const question = await waitFor(
       async () => (await rpc(onOpenQuestions)()).find(q => q.agentId === agentId),
-      'the questions hub to list the parked run',
+      'the questions hub to list the waiting run',
     )
     assert.equal(question.projectId, project.id)
-    assert.equal(question.choice.id, gate.id)
+    assert.equal(question.choice.title, 'Which way?')
     assert.deepEqual(question.choice.options.map(o => o.id), gate.options.map(o => o.id))
 
-    // The user picks the recommended option. The agent records who answered and carries on to done.
-    await rpc(sendChoice)(project.id, gate.id, gate.recommended!, 'user', agentId)
-    const resolved = await waitFor(() => tail.events.find(e => e.kind === 'choice-resolved'), 'the resolution event')
-    assert.equal(resolved.kind === 'choice-resolved' && resolved.picked, gate.recommended)
-    assert.equal(resolved.kind === 'choice-resolved' && resolved.by, 'user')
-    await world.waitAgent(project, agentId, 'done')
+    // A pick that is not one of the question's options is refused, and nothing is resumed.
+    assert.deepEqual(await rpc(sendChoice)(project.id, gate.id, 'no-such-option', agentId), { ok: false, error: 'every pick must be one of the question\'s options' })
 
-    // Answered means gone from the hub.
-    assert.equal((await rpc(onOpenQuestions)()).some(q => q.agentId === agentId), false)
-  } finally {
-    await world.close()
-  }
-})
-
-test('chat with a live session: a message becomes the next agent turn (#714)', async () => {
-  const world = await makeWorld()
-  const rpc = world.rpc
-  try {
-    const project = await world.addProject()
-    const agentId = await withFakeAwait('choices', () => world.startAgent(project, 'Build the dashboard page'))
-    const tail = await world.tailAgent(project, agentId)
-    const gate = await waitFor(() => tail.events.find(e => e.kind === 'choice'), 'the parked gate')
-    if (gate.kind !== 'choice') return
-
-    // Said while the session is parked, so the queue provably holds it until the gate resolves.
-    await rpc(sendMessage)(project.id, 'Also add a logout button', agentId)
-    await rpc(sendChoice)(project.id, gate.id, gate.recommended!, 'user', agentId)
-
-    // The queued message is drained as its own turn: its text shows up as a driver prompt on the
-    // feed the transcript renders.
-    await waitFor(
-      () =>
-        tail.events.find(
-          e => e.kind === 'driver' && e.event.type === 'start' && e.event.prompt.includes('Also add a logout button'),
-        ),
-      'the chat message to become an agent turn',
-    )
+    // The user picks an option: the project's resume hook gets the run and the chosen label, and
+    // the same run goes on to done, under the same id, in the same diary.
+    const right = gate.options.find(o => o.label === 'Right')!
+    assert.deepEqual(await rpc(sendChoice)(project.id, gate.id, right.id, agentId), { ok: true })
+    assert.deepEqual((await world.hookCalls()).at(-1), { hook: 'resume', id: agentId, answer: 'Right' })
     await world.waitAgent(project, agentId, 'done')
     await world.waitRetired(project, agentId)
+    const replay = await rpc(onAgent)(project.id, agentId)
+    assert.ok(replay.some(e => e.kind === 'driver' && e.event.type === 'text' && e.event.text.includes('The user chose: Right')), 'the resumed turn carried the answer')
 
-    // What was said survives the session (#1179): teardown archives the agent's event log into the
-    // project checkout, where the daemon's committer picks it up, so a clone carries the exchange
-    // and not just the fact an agent happened. The event log *is* that record (B3) — a second, prose
-    // re-narration used to be committed beside it, which is what the Discord mirror then polled and
-    // diffed instead of reading this.
-    const archived = await archivedAgentPaths(project.cwd, agentId)
-    const events = archived.find(path => path.endsWith('.jsonl'))
-    assert.ok(events, `expected an archived event log, got: ${JSON.stringify(archived)}`)
-    const log = await readFile(events, 'utf8')
-    assert.ok(log.includes('Also add a logout button'), 'the archived event log carries the message')
+    // Answered means gone from the hub, and the question no longer open to a second answer.
+    assert.equal((await rpc(onOpenQuestions)()).some(q => q.agentId === agentId), false)
+    assert.deepEqual(await rpc(sendChoice)(project.id, gate.id, right.id, agentId), { ok: false, error: 'that question is no longer open' })
   } finally {
     await world.close()
   }
 })
 
-test('rearm the handoff mid-run; the meta a reloaded tab reads follows (#1102)', async () => {
+test('say something to a working run: the message is its next turn; said to an ended run, it resumes it (#714/#1774)', async () => {
   const world = await makeWorld()
   const rpc = world.rpc
   try {
     const project = await world.addProject()
-    const agentId = await withFakeAwait('choices', () => world.startAgent(project, 'Refactor the config layer'))
-    const tail = await world.tailAgent(project, agentId)
-    const gate = await waitFor(() => tail.events.find(e => e.kind === 'choice'), 'the parked gate')
-    if (gate.kind !== 'choice') return
+    const agentId = await world.startAgent(project, 'hold: build the dashboard page')
+    await world.waitAgent(project, agentId, 'running')
 
-    // The box starts armed (the PR rung is the default), and unticking it mid-run re-announces the
-    // armed state — the event is what folds onto the meta a tab opened later reads back.
-    await rpc(sendSetHandoff)(project.id, agentId, 'local')
-    await waitFor(
-      () => tail.events.find(e => e.kind === 'handoff-armed' && !e.push && !e.pr),
-      'the disarmed announcement',
-    )
-    const meta = await waitFor(async () => {
-      const agent = (await rpc(onAgents)(project.id)).find(r => r.id === agentId)
-      return agent?.handoff && !agent.handoff.push && !agent.handoff.pr ? agent : undefined
-    }, 'the disarmed state to reach the run meta')
-    assert.equal(meta.handoff?.push, false)
-    assert.equal(meta.handoff?.pr, false)
-
-    await rpc(sendChoice)(project.id, gate.id, gate.recommended!, 'user', agentId)
+    // Said while the run is certainly working: the line waits in the run's inbox, no hook runs,
+    // and the run takes it when its turn ends, as a turn of its own.
+    assert.deepEqual(await rpc(sendMessage)(project.id, 'Also add a logout button', agentId), { ok: true })
+    assert.equal((await world.hookCalls()).filter(call => call.hook === 'resume').length, 0)
+    await release(project, agentId)
     await world.waitAgent(project, agentId, 'done')
+    await world.waitRetired(project, agentId)
+    const first = await rpc(onAgent)(project.id, agentId)
+    assert.ok(first.some(e => e.kind === 'driver' && e.event.type === 'text' && e.event.text.includes('Also add a logout button')), 'the message became a turn')
+
+    // Said once the run has ended: the project's resume hook continues the same run with the text.
+    assert.deepEqual(await rpc(sendMessage)(project.id, 'One more thing', agentId), { ok: true })
+    assert.deepEqual((await world.hookCalls()).at(-1), { hook: 'resume', id: agentId, text: 'One more thing' })
+    await waitFor(async () => {
+      const events = await rpc(onAgent)(project.id, agentId)
+      return events.some(e => e.kind === 'driver' && e.event.type === 'text' && e.event.text.includes('One more thing')) ? true : undefined
+    }, 'the resumed turn to reach the run\'s diary')
+    assert.equal((await rpc(onAgents)(project.id)).filter(r => r.id === agentId).length, 1, 'one run, one row')
   } finally {
     await world.close()
   }
 })
 
-test('stop a session; its checkout is reclaimed once the work is on the remote, then deleted (#737/#1032/E5)', async () => {
+test('stop a run; its checkout is reclaimed once the work is on the remote, then the run is deleted (#737/#1032/E5)', async () => {
   const world = await makeWorld()
   const rpc = world.rpc
   try {
     const project = await world.addProject()
-    const agentId = await withFakeAwait('choices', () => world.startAgent(project, 'Long experiment'))
+    const agentId = await world.startAgent(project, 'hold: long experiment')
     const tail = await world.tailAgent(project, agentId)
-    await waitFor(() => tail.events.find(e => e.kind === 'choice'), 'the parked gate')
+    await world.waitAgent(project, agentId, 'running')
 
-    // Stop while parked: the agent ends `stopped`, not failed — the user interrupted it.
+    // Stop is a signal to the pid the run's card names: the run ends `stopped`, not failed.
     await rpc(sendStop)(project.id, agentId)
     const end = await waitFor(() => tail.events.find(e => e.kind === 'end'), 'the end event')
     assert.equal(end.kind === 'end' && end.stopped, true)
     tail.stop()
     await world.waitAgent(project, agentId, 'stopped')
 
-    // One rule (E5): the checkout goes once its work is on the remote, whatever the session did.
-    // A stopped agent used to keep it "for inspection", and nothing ever took those back — so a
-    // machine accumulated one full checkout per stopped session until a human noticed. What was
-    // stopped is not lost: the branch is on the remote, and `git worktree add` brings it back.
+    // One rule (E5): the checkout goes once its work is on the remote, whatever the run did.
     await world.waitRetired(project, agentId)
     assert.deepEqual(await rpc(onRetainedWorktrees)(project.id), [])
     assert.equal((await rpc(onAgentWorktree)(project.id, agentId))?.own, false, 'no checkout of its own is left')
-    assert.ok((await rpc(onAgents)(project.id)).some(r => r.id === agentId && r.status === 'stopped'), 'the session row survives')
+    assert.ok((await rpc(onAgents)(project.id)).some(r => r.id === agentId && r.status === 'stopped'), 'the run\'s row survives')
 
     // Delete is the destructive sibling: the row itself disappears from the dashboard.
     const deleted = await rpc(sendDeleteAgent)(project.id, agentId)
     assert.equal(deleted.ok, true, `delete failed: ${'error' in deleted ? deleted.error : ''}`)
     assert.equal((await rpc(onAgents)(project.id)).some(r => r.id === agentId), false)
+  } finally {
+    await world.close()
+  }
+})
+
+test('a waiting run’s kept checkout can be removed by hand (#737)', async () => {
+  const world = await makeWorld()
+  const rpc = world.rpc
+  try {
+    const project = await world.addProject()
+    const agentId = await world.startAgent(project, 'ask and wait')
+    await world.waitAgent(project, agentId, 'waiting')
+    // The record lands a moment after the card says `waiting`; removing the checkout before it
+    // does would take away the only copy there is.
+    await world.waitRecorded(project, agentId)
+    await waitFor(async () => ((await rpc(onRetainedWorktrees)(project.id)).includes(agentId) ? true : undefined), 'the kept checkout to reach the Remove list')
+    const removed = await rpc(sendRemoveWorktree)(project.id, agentId)
+    assert.equal(removed.ok, true, `remove failed: ${'error' in removed ? removed.error : ''}`)
+    assert.deepEqual(await rpc(onRetainedWorktrees)(project.id), [])
+    assert.ok((await rpc(onAgents)(project.id)).some(r => r.id === agentId && r.status === 'waiting'), 'the run\'s row survives, still waiting')
   } finally {
     await world.close()
   }

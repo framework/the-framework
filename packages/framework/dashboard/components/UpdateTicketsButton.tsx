@@ -1,17 +1,13 @@
 import { RefreshCw } from 'lucide-react'
-import { presets } from '../../src/client.js'
 import { StartAgentButton } from './StartAgentButton.js'
 
 /**
- * The prompt behind "Update from GitHub" (#1208), read from the preset rather than written here:
- * every surface offers the same button under the same label, and one label must mean one
+ * The prompt behind "Update from GitHub" (#1208): the project's `update-tickets` command. Written
+ * once: every surface offers the same button under the same label, and one label must mean one
  * instruction wherever it is pressed (#697's lesson, when two surfaces sent different texts behind
  * the same words).
- *
- * The one GitHub sync since #1501: the preset's own empty branch treats a bare `tickets/` as the
- * first import, so the separate import preset could go.
  */
-export const UPDATE_TICKETS_PROMPT = presets.updateTickets.render()
+export const UPDATE_TICKETS_PROMPT = '/update-tickets'
 
 /**
  * "Update from GitHub", as one button all three surfaces render: the tickets panel's header and

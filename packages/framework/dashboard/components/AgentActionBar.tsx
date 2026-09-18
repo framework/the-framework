@@ -27,7 +27,7 @@ export function AgentActionBar({
   actions,
 }: {
   projectId: string
-  /** Which run Stop addresses (#749); absent falls back to the project's own control log. */
+  /** Which run Stop addresses (#749). */
   agentId?: string | null | undefined
   events: FrameworkEvent[]
   /** The session's name — leads the bar, so the branch is git context, not the identity (#1030). */

@@ -2,14 +2,12 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 const onAgentHandoff = vi.fn(async () => null as unknown)
-const sendPushBranch = vi.fn(async () => ({ ok: true }) as unknown)
 const sendOpenPullRequest = vi.fn(async () => ({ ok: true }) as unknown)
-const sendSetHandoff = vi.fn(async () => undefined as unknown)
 const sendMerge = vi.fn(async () => ({ ok: true }) as unknown)
 vi.mock('../rpc/reads.js', () => ({ onAgentHandoff }))
-vi.mock('../rpc/control.js', () => ({ sendPushBranch, sendOpenPullRequest, sendSetHandoff, sendMerge }))
+vi.mock('../rpc/control.js', () => ({ sendOpenPullRequest, sendMerge }))
 
-const { HandoffActions, HandoffArm, HandoffSummary, AgentHandoffDetails, handoffExpandable } = await import('./AgentHandoff.js')
+const { HandoffActions, HandoffSummary, AgentHandoffDetails, handoffExpandable } = await import('./AgentHandoff.js')
 const { useAgentHandoff } = await import('../lib/use-agent-handoff.js')
 
 /** A handoff for a session that did real work, on a repo with a remote and no PR yet. */
@@ -43,11 +41,8 @@ function Harness({ open = true }: { open?: boolean }) {
 
 beforeEach(() => {
   onAgentHandoff.mockClear()
-  sendPushBranch.mockClear()
   sendOpenPullRequest.mockClear()
   sendOpenPullRequest.mockResolvedValue({ ok: true })
-  sendSetHandoff.mockClear()
-  sendSetHandoff.mockResolvedValue(undefined)
   sendMerge.mockClear()
   sendMerge.mockResolvedValue({ ok: true })
 })
@@ -153,7 +148,6 @@ describe('run handoff (#799)', () => {
     expect(screen.queryByText('Push branch')).toBeNull()
     fireEvent.click(screen.getByText('Open PR'))
     await waitFor(() => expect(sendOpenPullRequest).toHaveBeenCalledWith('p1', 'run-1'))
-    expect(sendPushBranch).not.toHaveBeenCalled()
   })
 
   test('a failed action surfaces its reason rather than doing nothing', async () => {
@@ -205,58 +199,5 @@ describe('run handoff (#799)', () => {
     onAgentHandoff.mockReturnValue(new Promise(() => {}) as never)
     const { container } = render(<Harness />)
     expect(container.textContent).toBe('')
-  })
-})
-
-describe('the handoff checkboxes (#1102)', () => {
-  const armed = { push: true, pr: true, merge: false }
-
-  test('one ticked box, so a session left alone hands itself back (#1102/#1173)', () => {
-    render(<HandoffArm projectId="p1" agentId="run-1" state={armed} />)
-    const boxes = screen.getAllByRole('checkbox')
-    expect(boxes).toHaveLength(1)
-    expect(screen.getByText('Open PR')).toBeTruthy()
-    expect(screen.queryByText('Push branch')).toBeNull()
-    expect(boxes[0]?.getAttribute('data-checked')).not.toBeNull()
-  })
-
-  test('unticking it means the session hands off nothing at all (#1173)', async () => {
-    // One control governs the whole end-of-session step, so what the box says is what happens.
-    // It used to leave the push armed, which is a thing still happening that nothing on screen said.
-    render(<HandoffArm projectId="p1" agentId="run-1" state={armed} />)
-    fireEvent.click(screen.getByText('Open PR'))
-    await waitFor(() => expect(sendSetHandoff).toHaveBeenCalledWith('p1', 'run-1', 'local'))
-  })
-
-  test('ticking it arms the push too, since opening a PR needs the branch on the remote', async () => {
-    // One rung travels (B5), and it already includes the push: nothing on the receiving end has to
-    // remember that a PR implies one.
-    render(<HandoffArm projectId="p1" agentId="run-1" state={{ push: false, pr: false, merge: false }} />)
-    fireEvent.click(screen.getByText('Open PR'))
-    await waitFor(() => expect(sendSetHandoff).toHaveBeenCalledWith('p1', 'run-1', 'pr'))
-  })
-
-  test('a push-only session says "Push branch", rather than an unticked box while it pushes (#1173)', () => {
-    // Reachable from the settings, where push and PR are still separate. The one box names whatever
-    // this session will actually do, so it is never describing something other than what happens.
-    render(<HandoffArm projectId="p1" agentId="run-1" state={{ push: true, pr: false, merge: false }} />)
-    expect(screen.getByText('Push branch')).toBeTruthy()
-    expect(screen.getAllByRole('checkbox')[0]?.getAttribute('data-checked')).not.toBeNull()
-  })
-
-  test('a merge-armed session says "Open PR & merge" — never "Open PR" about a run that lands on main (#1382)', () => {
-    render(<HandoffArm projectId="p1" agentId="run-1" state={{ push: true, pr: true, merge: true }} />)
-    expect(screen.getByText('Open PR & merge')).toBeTruthy()
-    expect(screen.queryByText('Open PR')).toBeNull()
-  })
-
-  test('the click holds until the run echoes it back, so the box does not bounce', async () => {
-    // The instruction round-trips through a file the agent tails, so the events lag the click by a
-    // beat. Rendering the stale value in that window would flick the box back on under the cursor.
-    const { rerender } = render(<HandoffArm projectId="p1" agentId="run-1" state={armed} />)
-    fireEvent.click(screen.getByText('Open PR'))
-    await waitFor(() => expect(sendSetHandoff).toHaveBeenCalled())
-    rerender(<HandoffArm projectId="p1" agentId="run-1" state={armed} />)
-    expect(screen.getAllByRole('checkbox')[0]?.getAttribute('data-checked')).toBeNull()
   })
 })

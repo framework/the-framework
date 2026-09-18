@@ -2,6 +2,6 @@ The "Preferred editor" group of menu rows, shared by the project home's [1] acti
 
 ## Glossary
 
-[1] project home: a project's own page with the launcher (the Start form) and its composer (the prompt editor, also used for live chat).
-[2] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[1] project home: a project's own page with the launcher (the Start form) and its composer (the prompt editor, also used to say something to an agent).
+[2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [3] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).

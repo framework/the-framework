@@ -1,5 +1,3 @@
-import { isAgentLocation, type AgentLocation } from './agent-location.js'
-import { isHandoffLevel, type HandoffLevel } from './handoff-level.js'
 import { basename, dirname, join, resolve } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { isDriverName } from './driver-names.js'
@@ -49,26 +47,6 @@ export interface CustomPreset {
 const CUSTOM_PRESET_LIMITS = { count: 30, label: 80, prompt: 20_000 } as const
 
 export interface Preferences {
-  vanilla?: boolean
-  /** On-before-mergeable prompt (#326): on setReadyForMerge(), queue the quality follow-ups as TODO entries. */
-  onBeforeMergeableQuality?: boolean
-  /** Give the agent a real browser via chrome-devtools-mcp during the agent (#452); maps to `--browser`. */
-  browser?: boolean
-  /**
-   * How far a finished session publishes itself (#1102/#1216/B5): keep it local, push the branch,
-   * open a draft PR, or merge that PR. Absent = {@link DEFAULT_HANDOFF} (`pr`).
-   *
-   * Default-on, unlike most of this file, because it is what makes the handoff zero-config: the
-   * old behaviour was a button nobody was obliged to press, and work that stayed on a local
-   * branch nobody was told about (#860). A session can still opt out from its action bar.
-   */
-  handoff?: HandoffLevel
-  /**
-   * Transparent mode (#625): run the wrapped agent raw — no framework system prompt, emit
-   * protocols, consumption guard, dashboard, or TODO loop, so an agent is identical to `claude -p`.
-   * The coarse master off-switch ("only pick what you need"); maps to `--transparent`. Absent = off.
-   */
-  transparent?: boolean
   /** Fire a browser notification when a new item lands on the "needs you" queue (#627). Absent = on. */
   notifyBrowser?: boolean
   /**
@@ -86,17 +64,15 @@ export interface Preferences {
    * unset preference keeps them firing; a user turns them off explicitly.
    */
   notifyHumanIntervention?: boolean
-  /** The model to run on (#628), e.g. `opus` / `sonnet`; maps to an agent's `--model`. Absent = the driver's default. */
+  /** The model to run on (#628), e.g. `opus` / `sonnet`, handed to the project's start hook. Absent = the hook's own default. */
   model?: string
-  /** Which coding agent drives the agent (#650): `claude` or `codex`; maps to `--agent`. Absent = the default (`claude`). */
+  /** Which coding agent a run starts on (#650): `claude-code` or `codex`, handed to the project's start hook. Absent = the hook's own default. */
   driver?: string
   /** Preferred editor for "Open in editor" (#727): an editor CLI (e.g. `code`, `cursor`, `zed`).
    * Absent falls back to `$FRAMEWORK_EDITOR`, then `code`. */
   editor?: string
   /** Dashboard color theme (#725): `system` (follow the OS, the default), `light`, or `dark`. Absent = system. */
   theme?: 'system' | 'light' | 'dark'
-  /** Where a run executes (#1050/#610): `local` (this device, the default), `actions` (a fresh GitHub Actions runner) or `web` (a Claude Code cloud session); maps to `--run-on`. Absent = local. */
-  target?: AgentLocation
   /**
    * Post a Discord message when a new item lands on the "needs you" queue (#627). Absent = off:
    * unlike the in-browser toggle, Discord reaches you when no dashboard is open, so it is opt-in.
@@ -104,12 +80,6 @@ export interface Preferences {
    * post; this is whether to).
    */
   notifyDiscord?: boolean
-  /**
-   * Let the daemon put an agent on a watched pull request whose checks fail (#1418), by itself,
-   * while there is quota left in the week. **Absent = off**: it spends the user's allowance
-   * without being asked, so it is opt-in like {@link notifyDiscord} rather than a baseline.
-   */
-  autoPm?: boolean
   /**
    * The browser bridge (#1237): let an extension running in the user's own Claude session report
    * the question a Claude web agent is parked on, so it shows in the dashboard rather than only on
@@ -297,15 +267,10 @@ type BooleanPreferenceKey = {
  * preference on every save, the write-then-vanish failure shape for a settings file.
  */
 const BOOLEAN_PREFERENCES: Record<BooleanPreferenceKey, true> = {
-  vanilla: true,
-  onBeforeMergeableQuality: true,
-  browser: true,
-  transparent: true,
   notifyBrowser: true,
   notifyDiscord: true,
   notifyNewActivity: true,
   notifyHumanIntervention: true,
-  autoPm: true,
   bridge: true,
   bridgeBrowser: true,
   onboardingDismissed: true,
@@ -318,7 +283,6 @@ const PREFERENCE_KEYS = Object.keys(BOOLEAN_PREFERENCES) as BooleanPreferenceKey
 /** The color themes the dashboard offers (#725); anything else means the default `system`. */
 const KNOWN_THEMES = ['system', 'light', 'dark'] as const
 
-/** The agent targets the dashboard offers (#1050/#610); anything else means the default `local`. */
 function sanitizePreferences(value: unknown): Preferences {
   if (typeof value !== 'object' || value === null) return {}
   const input = value as Record<string, unknown>
@@ -334,7 +298,7 @@ function sanitizePreferences(value: unknown): Preferences {
   const model = typeof input['model'] === 'string' ? input['model'].trim() : ''
   if (model && model.toLowerCase() !== 'default') preferences.model = model
   // `driver` (#650) is constrained to the known set so junk never reaches the agent; the set is the
-  // shared node-free vocabulary (agent-names.ts). Default = claude.
+  // shared node-free vocabulary (driver-names.ts).
   if (isDriverName(input['driver'] as string | undefined)) preferences.driver = input['driver'] as string
   // `editor` (#727) is a free-form CLI name, trimmed and length-capped so junk / a huge string
   // never lands in the file. A blank string is "no choice" (fall back to env / `code`), so dropped.
@@ -344,12 +308,6 @@ function sanitizePreferences(value: unknown): Preferences {
   // `system`, so it is simply dropped rather than persisted.
   if (typeof input['theme'] === 'string' && (KNOWN_THEMES as readonly string[]).includes(input['theme']))
     preferences.theme = input['theme'] as (typeof KNOWN_THEMES)[number]
-  // `target` (#1050) is a string, so the boolean-only PREFERENCE_KEYS loop would silently eat it;
-  // it gets its own branch like `theme`, constrained to the known set (anything else = default `local`).
-  if (isAgentLocation(input['target'])) preferences.target = input['target']
-  // `handoff` (B5) is the one ordinal the three booleans it replaced could never be: a rung, not a
-  // combination. Constrained to the ladder, so anything else means the default `pr`.
-  if (isHandoffLevel(input['handoff'])) preferences.handoff = input['handoff']
   // `autoSpendOffset` (#960) is the one numeric preference: a slider position in percentage
   // points, clamped so a hand-edited file cannot push the limit somewhere the slider could not.
   const offset = input['autoSpendOffset']

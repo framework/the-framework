@@ -1,10 +1,12 @@
 import type { TicketsMeta, WorkspaceTicket } from '../../src/index.js'
 // `planTicketPrompt` (#685): the shared plan ask — the sentence the plan column starts an agent
-// with, one wording with the [Plan tickets] preset's queued entries and the server's own queue
-// write, so no surface carries a hidden second copy (#1187).
-import { planTicketPrompt, presets } from '../../src/client.js'
+// with, one wording with the server's own queue write, so no surface carries a hidden second
+// copy (#1187).
+import { planTicketPrompt } from '../../src/client.js'
 import { Github, ClipboardPlus, ClipboardList, Hammer, Play } from 'lucide-react'
 import { sendStart } from '../rpc/control.js'
+import { usePreferences } from '../lib/preferences.js'
+import { startPicks } from '../lib/use-start-agent.js'
 import { onTicketsMeta } from '../rpc/reads.js'
 import { Button } from './ui/button.js'
 import { StartAgentButton } from './StartAgentButton.js'
@@ -23,7 +25,7 @@ const NO_META: TicketsMeta = {}
 
 /**
  * The prompt the start column fires a session with: work on this one ticket, nothing else. The
- * same sentence `workOnTicketDraft` (HotTickets) drafts into the launcher — the drain preset's
+ * same sentence `workOnTicketDraft` (HotTickets) drafts into the launcher — the queue command's
  * vocabulary narrowed to the one ticket the row names — but sent directly: the button is a start,
  * not a draft. Exported so the test asserts the exact ask rather than a copy (#1187).
  */
@@ -315,7 +317,7 @@ export function TicketsPanel({
   onOpenPlan?: ((file: string) => void) | undefined
   /** Told when the import session starts, so the shell can show it (#948) — the button used
    *  to flip "Starting…" and leave you staring at the still-empty panel. */
-  onAgentStarted?: ((intent: string, agentId?: string) => void) | undefined
+  onAgentStarted?: ((intent: string, agentId: string) => void) | undefined
   /** Where every "Configure first, then run" here lands (#1507): this project's own launcher. */
   onSelectProject: (id: string) => void
   /** Click-to-filter (#1144), threaded to every row; absent on a page with no filters. */
@@ -328,6 +330,7 @@ export function TicketsPanel({
   onClearFilters?: (() => void) | undefined
 }) {
   const { busy, error, run } = useAction()
+  const preferences = usePreferences()
   // When `tickets/` last caught up with GitHub. Read here rather than passed down: the cross-
   // project page reads one ticket list per project, and this is the one extra read a section adds.
   const meta = useLoaded<TicketsMeta>(projectId ? () => onTicketsMeta(projectId) : null, NO_META, [projectId])
@@ -340,25 +343,19 @@ export function TicketsPanel({
   // The prompt each button carries is stashed by the button itself.
   const configure = () => onSelectProject(projectId)
 
-  const startSession = async (prompt: string, failure: string, options: { unattended?: boolean; ticket?: string } = {}) => {
-    const outcome = await run(() => sendStart(projectId, prompt, 'prompt', options), failure)
+  const startSession = async (prompt: string, failure: string) => {
+    const outcome = await run(() => sendStart(projectId, prompt, startPicks(preferences)), failure)
     // Jump to the session doing the work, so its progress is watchable instead of the panel
     // sitting on stale rows until files land.
     if (outcome.ok) onAgentStarted?.(prompt, outcome.value.agentId)
   }
 
-  // Unattended (#1279): an update fired by a button is fired work, not a conversation — it
-  // ends at settle and its armed handoff fires.
-  const updateFromGithub = () => startSession(UPDATE_TICKETS_PROMPT, 'The update could not be started.', { unattended: true })
-  // Attended, unlike the imports above: a plan is written per-ticket for a human to read and act
-  // on, so the session stays a conversation you land in and steer rather than one that settles and
-  // hands itself off. The reader reviews the result through the plan column's link.
+  const updateFromGithub = () => startSession(UPDATE_TICKETS_PROMPT, 'The update could not be started.')
+  // A plan is written per-ticket for a human to read: the reader reviews the result through the
+  // plan column's link.
   const startPlan = (file: string) => startSession(planTicketPrompt(file), 'The planning agent could not be started.')
-  // The start column (#855's play button, on the backlog): one agent on this one ticket, run the
-  // way the daemon runs the queued work — unattended (#1279), ending at settle with its armed
-  // handoff.
-  const startWork = (file: string) =>
-    startSession(workOnTicketPrompt(file), 'The work agent could not be started.', { unattended: true })
+  // The start column (#855's play button, on the backlog): one agent on this one ticket.
+  const startWork = (file: string) => startSession(workOnTicketPrompt(file), 'The work agent could not be started.')
 
   if (tickets.length === 0 && hiddenByFilter > 0) {
     // Filtered to nothing, not genuinely empty (#1144/#1230): offering an import here would ask
@@ -393,7 +390,7 @@ export function TicketsPanel({
   return (
     <div className="overflow-hidden rounded-lg border border-border">
       {error && <p className="border-b border-border p-2 text-xs text-danger">{error}</p>}
-      {/* The same update as the empty state's button (#1501): one preset covers both, its empty
+      {/* The same update as the empty state's button (#1501): one command covers both, its empty
           branch being the first import. Here it sits beside the stamp it acts on. */}
       <div className="flex items-center gap-2 border-b border-border bg-muted/40 px-2 py-1.5">
         {/* The stamp and its action side by side (#1265) — the button used to sit flush right,

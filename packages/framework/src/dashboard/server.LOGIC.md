@@ -1,18 +1,18 @@
-The daemon's one HTTP server on its port. It serves the built dashboard, mounts the dashboard's RPC surface with its live event stream [1], and hosts three more surfaces: the relay [2] endpoints another device [3] calls, the Claude web bridge [4] together with the web-start endpoints, and the proxy to an agent's [5] browser preview. On a non-loopback bind every route sits behind a shared token; on a loopback bind the same-origin and Host checks keep a web page the user merely visited from starting or steering an agent.
+The daemon's one HTTP server on its port. It serves the built dashboard, mounts the dashboard's RPC surface with its live event stream [1], and hosts two more surfaces: the relay [2] endpoints another device [3] calls, and the Claude web bridge [4] together with the web-start endpoints. On a non-loopback bind every route sits behind a shared token; on a loopback bind the same-origin and Host checks keep a web page the user merely visited from starting or steering an agent.
 
 ## Context
 
 **User story**: the user runs `the-framework` and opens the printed URL. With `--host` set to a non-loopback address, the printed URL carries a token: a browser that follows it once is let in for good, and any request without the token gets 401.
 
-**Problem**: the daemon spawns processes, so anything that can call it can start an agent [5] on the user's machine. On a loopback bind the only caller to fear is a browser, and a browser always says which origin and which host name it is calling for. On a network bind the caller can be anyone who finds the port, so a secret is required.
+**Problem**: the daemon runs the shell lines a project names for itself, so anything that can call it can start an agent [5] — and run that line — on the user's machine. On a loopback bind the only caller to fear is a browser, and a browser always says which origin and which host name it is calling for. On a network bind the caller can be anyone who finds the port, so a secret is required.
 
 ## Glossary
 
-[1] event stream: everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface (dashboard, terminal, archive, run) is a projection of it.
+[1] event stream: everything an agent does, one event per line of the agent's diary — the file `<id>.jsonl` the tool that runs the agent writes under `.the-framework/` in the agent's checkout, copied onto the `agent-data` branch when the agent ends. Every surface (dashboard, terminal, replay) is a projection of it.
 [2] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
 [3] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 [4] the Claude web bridge (the bridge): the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge token is the secret the extension presents; the Driver tab is the extension's one pinned tab that reads claude.ai's session list, visits sessions and types answers.
-[5] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
+[5] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps. Started from the dashboard by the user, or by the daemon.
 [6] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 [7] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
 [8] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
@@ -20,12 +20,11 @@ The daemon's one HTTP server on its port. It serves the built dashboard, mounts 
 ## Business logic — TL;DR
 
 - **A broken install answers 503 everywhere** - without a built dashboard, every request gets 503 "the dashboard bundle is not installed" and nothing else is mounted.
-- **One route order for every request** - an unparseable request target is 400; the bridge and the web-start routes come first; then the shared-token guard; then the relay, the RPC mount, the browser preview proxy, and finally the built dashboard.
+- **One route order for every request** - an unparseable request target is 400; the bridge and the web-start routes come first; then the shared-token guard; then the relay, the RPC mount, and finally the built dashboard.
 - **The shared token on a non-loopback bind** - a valid `?token=` sets the `fw_daemon` cookie and redirects to the clean URL, a valid cookie is admitted, anything else is 401, the comparison is constant-time, and with no token configured the guard does not exist.
-- **The same-origin and Host guards on a loopback bind** - the relay and the browser preview proxy refuse a cross-origin or rebound-Host request with 403, exactly as the RPC mount does, because on loopback nothing else guards them.
+- **The same-origin and Host guards on a loopback bind** - the relay refuses a cross-origin or rebound-Host request with 403, exactly as the RPC mount does, because on loopback nothing else guards it.
 - **The bridge and the web-start routes carry their own token** - both are 404 unless a bridge token is configured, both authenticate with it as a bearer token, and both are reached before the shared-token guard.
 - **The relay endpoints, when the daemon wires them** - present only when the daemon supplies an events tail, starting agents through the daemon's own start closure.
-- **The browser preview proxy** - an agent's Chrome reaches the dashboard same-origin through the daemon, an unrecognized path falls back to the dashboard shell, and a proxy failure tears the socket down instead of taking the daemon down.
 - **Binding, the URL, and closing** - port 4200 and host 127.0.0.1 by default, a taken port fails the start, and closing stops the quota [7] polling and force-closes every open connection.
 
 ## Business logic
@@ -38,7 +37,7 @@ The daemon's one HTTP server on its port. It serves the built dashboard, mounts 
 
 #### Business logic
 
-When no bundle directory is supplied, the server answers every request with 503 and the text "the dashboard bundle is not installed". No RPC surface, relay, bridge or proxy is mounted.
+When no bundle directory is supplied, the server answers every request with 503 and the text "the dashboard bundle is not installed". No RPC surface, relay or bridge is mounted.
 
 ### One route order for every request
 
@@ -55,7 +54,6 @@ Every request is dispatched in this order:
 - When a shared token is configured, the request must pass the shared-token guard (next section).
 - A path at or under `/_relay` must pass the browser-origin guard, then goes to the relay [2] endpoints (`relay-endpoints.ts`).
 - A path at or under `/_rpc` goes to the RPC mount, which applies its own same-origin and Host guards (`rpc-serve.ts`).
-- A path under `/browser/` must pass the browser-origin guard, then goes to the browser preview proxy (`browser-proxy.ts`); a path the proxy does not recognize is served as the built dashboard instead.
 - Everything else is served from the built dashboard: the file when it exists, else the app shell (`static.ts`).
 
 The RPC surface acts through what the daemon wires into it, all of it required: the daemon's own start and add-project closures, the events source and the lookup for agents [5] relayed from a device [3], the preferences [6] store, the Discord credentials store, the quota [7] source, each project's current errors, and the daemon's own bridge browser. The mount is also told the bound host, so it can reject a rebound `Host`.
@@ -82,11 +80,11 @@ The comparison is constant-time, and a value of a different length never matches
 
 #### Context
 
-**Problem**: on a loopback bind the shared-token guard does not exist, and the relay start and the browser preview input both change state: one spawns an agent [5], the other steers an agent's Chrome. Without a guard, a page the user merely visited could reach them.
+**Problem**: on a loopback bind the shared-token guard does not exist, and the relay start changes state: it starts an agent [5]. Without a guard, a page the user merely visited could reach it.
 
 #### Business logic
 
-Before the relay [2] endpoints and the browser preview proxy, a request is admitted only when both of the RPC mount's rules hold (`rpc-serve.ts`): its `Origin` is absent, names this server, or names a loopback host; and, when the daemon is bound to a loopback address, its `Host` names a loopback host or the bound address. Any other request is answered 403 "forbidden". The real device [3] caller sends no `Origin` and a loopback `Host`, so it passes; only a browser's cross-origin or rebound request is turned away.
+Before the relay [2] endpoints, a request is admitted only when both of the RPC mount's rules hold (`rpc-serve.ts`): its `Origin` is absent, names this server, or names a loopback host; and, when the daemon is bound to a loopback address, its `Host` names a loopback host or the bound address. Any other request is answered 403 "forbidden". The real device [3] caller sends no `Origin` and a loopback `Host`, so it passes; only a browser's cross-origin or rebound request is turned away.
 
 ### The bridge and the web-start routes carry their own token
 
@@ -117,18 +115,6 @@ The web-start routes are wired with the same token, with whether an extension ha
 #### Business logic
 
 The relay [2] endpoints are mounted only when the daemon supplies a way to tail an agent's events. They start an agent through the daemon's own start closure and, when the daemon also supplies it, run one whitelisted agent-scoped call against this daemon's own checkout. The rules of each endpoint are in `relay-endpoints.ts`.
-
-### The browser preview proxy
-
-#### Context
-
-**User story**: the user starts an agent [5] with a browser and watches the agent's Chrome in the agent view, clicking and typing into it.
-
-**Problem**: the preview is an endless image stream and a raw input POST, neither of which is an RPC call, and the agent's Chrome listens on a port the dashboard's origin cannot reach directly.
-
-#### Business logic
-
-A request under `/browser/` is handed to the proxy after the browser-origin guard. When the proxy does not recognize the path, the request is served as the built dashboard. Whatever the proxy throws destroys the socket rather than becoming an unhandled failure that ends the daemon.
 
 ### Binding, the URL, and closing
 

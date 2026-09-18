@@ -1,5 +1,5 @@
 import { sessionNameOf } from '@gemstack/skill-branches/branch-names'
-import type { AutoHandoffSkip, FrameworkEvent } from './events.js'
+import type { FrameworkEvent } from './events.js'
 
 // Derived agent state for the dashboard's overview cards (#431): the production-grade
 // loop status, the deploy plan, and the live session link — each a pure projection of
@@ -64,58 +64,6 @@ export function agentErrors(events: readonly FrameworkEvent[]): AgentError[] {
     errors.push({ headline: event.headline, ...(event.detail ? { detail: event.detail } : {}) })
   }
   return errors
-}
-
-/** What a session will do with its work when it ends (#1102), and what it did. */
-export interface HandoffState {
-  /** Push the branch to `origin` on finish. */
-  push: boolean
-  /** Open a draft PR on finish. Implies {@link push}. */
-  pr: boolean
-  /**
-   * Merge the PR once opened (#1216) — armed at launch, no checkbox, never changes mid-run.
-   * Unlike the pair above this defaults to off: merging is opt-in, so a stream from before the
-   * event carried it (#1382) must not read as an agent that will land on main by itself.
-   */
-  merge: boolean
-  /** How the handoff ended, once it has run. Absent while the session is still going. */
-  result?: { outcome: 'skipped'; reason: AutoHandoffSkip } | { outcome: 'done'; url?: string } | { outcome: 'failed'; error: string }
-}
-
-/**
- * What the session is armed to hand back, folded from its own events (#1102).
- *
- * Both halves start armed, so an agent from before this existed — which emits no `handoff-armed` —
- * reads as armed, which is what it will actually do once it is running new code. Latest wins: the
- * checkboxes re-emit on every change.
- *
- * `initial` seeds the armed pair for a reader whose event stream missed the opening
- * `handoff-armed` (#1376): the agent writes it as its very first event, before the live channel has
- * attached, so a live tab can only learn the real state from the agent record's mirror
- * (`AgentRecord.handoff`) — without it, a session the launcher armed push-only reads as "Open PR".
- * A `handoff-armed` event in the stream still wins: it is newer than any record snapshot.
- */
-export function handoffState(
-  events: readonly FrameworkEvent[],
-  initial?: { push: boolean; pr: boolean; merge?: boolean },
-): HandoffState {
-  const state: HandoffState = { push: initial?.push ?? true, pr: initial?.pr ?? true, merge: initial?.merge ?? false }
-  for (const event of events) {
-    if (event.kind === 'handoff-armed') {
-      state.push = event.push
-      state.pr = event.pr
-      // Absent on pre-#1382 events: keep the seed rather than flipping an armed merge off.
-      if (event.merge !== undefined) state.merge = event.merge
-    } else if (event.kind === 'handoff') {
-      state.result =
-        event.outcome === 'done'
-          ? { outcome: 'done', ...(event.url ? { url: event.url } : {}) }
-          : event.outcome === 'failed'
-            ? { outcome: 'failed', error: event.error }
-            : { outcome: 'skipped', reason: event.reason }
-    }
-  }
-  return state
 }
 
 /** The wrapped agent session (#431): its id and a deep link, when one is known. */

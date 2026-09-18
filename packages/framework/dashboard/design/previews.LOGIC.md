@@ -2,7 +2,7 @@ The design gallery's card registry: the cards the gallery renders, each with its
 
 ## Glossary
 
-[1] event: everything an agent does, one event per line appended to `.the-framework/events.jsonl` in its checkout; every surface (dashboard, terminal, archive, run) is a projection of it.
+[1] event: everything an agent does, in order, read off the agent's diary: the file its tool writes one line at a time, in the agent's checkout while it has one and on the data branch once it is recorded; every surface is a projection of it.
 [2] the Overview: the dashboard's cross-project page at `/`.
 
 ## Business logic — TL;DR

@@ -39,7 +39,7 @@ export function DashboardPage({
   /** Open one ticket's own page (#1144): a queued entry links to its ticket, so its row does too. */
   onOpenTicket: (projectId: string, file: string) => void
   /** Where a session the onboarding checklist starts lands (#1169): on that session. */
-  onAgentStarted: (projectId: string, intent: string, agentId?: string) => void
+  onAgentStarted: (projectId: string, intent: string, agentId: string) => void
   interventions: Intervention[]
 }) {
   const { value: data } = usePolled<DashboardData | null>(onDashboard, null, 5000, [])

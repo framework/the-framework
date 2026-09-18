@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { DashboardData } from '../../src/index.js'
-import { presets } from '../../src/client.js'
 import { configureFirst } from '../test-utils.js'
 
 // The checklist reads its state over several RPC stubs and hooks; stub them all so nothing reaches
@@ -22,7 +21,10 @@ vi.mock('../lib/notify-channels.js', () => ({ useNotifyChannels: () => null, rel
 vi.mock('../lib/notification-permission.js', () => ({ useNotificationPermission: () => 'default' }))
 // One stable object, so a test can steer the start and its error without a re-mock.
 const startAgent = vi.hoisted(() => ({ start: vi.fn(), busy: false, error: null as string | null }))
-vi.mock('../lib/use-start-agent.js', () => ({ useStartAgent: () => startAgent }))
+vi.mock('../lib/use-start-agent.js', async () => ({
+  ...(await vi.importActual<typeof import('../lib/use-start-agent.js')>('../lib/use-start-agent.js')),
+  useStartAgent: () => startAgent,
+}))
 
 const { OnboardingChecklist } = await import('./OnboardingChecklist.js')
 const { takePendingDraft } = await import('../lib/draft-handoff.js')
@@ -94,9 +96,9 @@ describe('the GitHub import lands on the session it starts (#1169)', () => {
     await clickImport()
 
     // The project travels with it: this surface has none selected, so an id alone cannot be routed.
-    // Unattended (#1279): a checklist-fired routine ends at settle instead of parking in the chat loop.
-    expect(startAgent.start).toHaveBeenCalledWith('p1', presets.updateTickets.render(), 'prompt', { unattended: true })
-    await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith('p1', presets.updateTickets.render(), 'run-7'))
+    // The prompt is the project's own command: the framework ships no prompt text.
+    expect(startAgent.start).toHaveBeenCalledWith('p1', '/update-tickets', {})
+    await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith('p1', '/update-tickets', 'run-7'))
   })
 
   test('a project with no worktree hands up no id, so the shell can adopt the running one', async () => {
@@ -107,7 +109,7 @@ describe('the GitHub import lands on the session it starts (#1169)', () => {
     render(<OnboardingChecklist onAgentStarted={onAgentStarted} onSelectProject={() => {}} />)
     await clickImport()
 
-    await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith('p1', presets.updateTickets.render(), undefined))
+    await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith('p1', '/update-tickets', undefined))
   })
 
   test('a refused start says why and moves you nowhere', async () => {
@@ -132,7 +134,7 @@ describe('the GitHub import lands on the session it starts (#1169)', () => {
     // The launcher, not an agent — the model and where it runs are nowhere on this checklist.
     await waitFor(() => expect(onSelectProject).toHaveBeenCalledWith('p1'))
     expect(startAgent.start).not.toHaveBeenCalled()
-    expect(takePendingDraft()).toBe(presets.updateTickets.render())
+    expect(takePendingDraft()).toBe('/update-tickets')
   })
 
   test('with no project yet, neither half of the import button can be pressed', async () => {

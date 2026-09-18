@@ -11,9 +11,6 @@ vi.mock('../rpc/preferences.js', () => ({
   onProjectPresets,
   saveProjectPresets,
 }))
-// The repo tier (#842) rides on the project payload, so the store reads the projects RPC too.
-const onProjects = vi.hoisted(() => vi.fn())
-vi.mock('../rpc/projects.js', () => ({ onProjects }))
 
 const flush = () => act(async () => {
   await Promise.resolve()
@@ -34,7 +31,6 @@ describe('preferences', () => {
     patchPreferences.mockReset().mockImplementation(async (patch: unknown) => ({ ok: true, preferences: patch }))
     onProjectPresets.mockReset().mockResolvedValue([])
     saveProjectPresets.mockReset().mockResolvedValue({ ok: true })
-    onProjects.mockReset().mockResolvedValue([])
     openProject(null)
   })
 
@@ -44,128 +40,25 @@ describe('preferences', () => {
     const { usePreferences, updatePreferences } = await import('./preferences.js')
 
     const { result } = renderHook(() => usePreferences())
-    // The load is in flight; the user toggles the browser off before it resolves.
-    act(() => updatePreferences({ browser: false }))
-    expect(result.current.browser).toBe(false)
+    // The load is in flight; the user turns browser notifications off before it resolves.
+    act(() => updatePreferences({ notifyBrowser: false }))
+    expect(result.current.notifyBrowser).toBe(false)
 
     // The load now resolves with the server's pre-toggle value; the toggle must win.
     await act(async () => {
-      resolveLoad({ browser: true })
+      resolveLoad({ notifyBrowser: true })
       await Promise.resolve()
     })
-    expect(result.current.browser).toBe(false)
+    expect(result.current.notifyBrowser).toBe(false)
   })
 
   test('the initial load populates the cache when no optimistic write raced it', async () => {
-    onPreferences.mockResolvedValue({ browser: false, vanilla: true })
+    onPreferences.mockResolvedValue({ notifyBrowser: false, notifyDiscord: true })
     const { usePreferences } = await import('./preferences.js')
 
     const { result } = renderHook(() => usePreferences())
     await flush()
-    expect(result.current).toEqual({ browser: false, vanilla: true })
-  })
-
-  test("the repo's the-framework.yml resolves over the global tier (#842)", async () => {
-    onPreferences.mockResolvedValue({ browser: true, transparent: false })
-    onProjects.mockResolvedValue([{ id: 'app-a-1', path: '/repos/a', name: 'a', activated: true, fileConfig: { transparent: true, vanilla: true } }])
-    openProject('app-a-1')
-    const { usePreferences } = await import('./preferences.js')
-
-    const { result } = renderHook(() => usePreferences())
-    await flush()
-    expect(result.current.transparent).toBe(true) // the repo turned it on over the global off
-    expect(result.current.vanilla).toBe(true) // the file's own key, same name and direction (C3)
-    expect(result.current.browser).toBe(true) // the repo said nothing, so global stands
-  })
-
-  test('a repo-shaped setting is written in the repo, so a toggle only ever writes your tier (B5)', async () => {
-    // A third tier used to sit above the file — the user's per-project overrides — so the same
-    // question had two answers on one machine and a write had to be split between them.
-    openProject('app-a-1')
-    onPreferences.mockResolvedValue({})
-    onProjects.mockResolvedValue([{ id: 'app-a-1', path: '/repos/a', name: 'a', activated: true, fileConfig: { transparent: true } }])
-    const { usePreferences, updatePreferences } = await import('./preferences.js')
-
-    const { result } = renderHook(() => usePreferences())
-    await flush()
-    act(() => updatePreferences({ model: 'opus', theme: 'dark' }))
-
-    expect(patchPreferences).toHaveBeenCalledWith({ model: 'opus', theme: 'dark' })
-    expect(result.current.model).toBe('opus')
-    // And the repo's own key still wins over yours, which is the point of it being committed.
-    expect(result.current.transparent).toBe(true)
-  })
-
-  test('a repo that sets nothing changes nothing (#842)', async () => {
-    onPreferences.mockResolvedValue({ vanilla: true })
-    onProjects.mockResolvedValue([{ id: 'app-a-1', path: '/repos/a', name: 'a', activated: true }])
-    openProject('app-a-1')
-    const { usePreferences } = await import('./preferences.js')
-
-    const { result } = renderHook(() => usePreferences())
-    await flush()
-    expect(result.current).toEqual({ vanilla: true })
-  })
-
-  test('usePreferenceSources names the tier that won each key (#842)', async () => {
-    onPreferences.mockResolvedValue({ browser: true, model: 'sonnet' })
-    onProjects.mockResolvedValue([{ id: 'app-a-1', path: '/repos/a', name: 'a', activated: true, fileConfig: { transparent: true, vanilla: true } }])
-    openProject('app-a-1')
-    const { usePreferenceSources } = await import('./preferences.js')
-
-    const { result } = renderHook(() => usePreferenceSources())
-    await flush()
-    expect(result.current.transparent).toBe('repo')
-    expect(result.current.vanilla).toBe('repo') // the repo's own vanilla:true
-    expect(result.current.model).toBe('global')
-    expect(result.current.browser).toBe('global')
-  })
-
-  test('refreshFileConfigs re-reads the repo tier after an edit on disk (#842)', async () => {
-    onPreferences.mockResolvedValue({})
-    onProjects.mockResolvedValue([{ id: 'app-a-1', path: '/repos/a', name: 'a', activated: true, fileConfig: { transparent: true } }])
-    openProject('app-a-1')
-    const { usePreferences, refreshFileConfigs } = await import('./preferences.js')
-
-    const { result } = renderHook(() => usePreferences())
-    await flush()
-    expect(result.current.transparent).toBe(true)
-
-    // Someone edits the yml; the launcher must not keep showing the old answer.
-    onProjects.mockResolvedValue([{ id: 'app-a-1', path: '/repos/a', name: 'a', activated: true, fileConfig: { transparent: false } }])
-    refreshFileConfigs()
-    await flush()
-    expect(result.current.transparent).toBe(false)
-
-    // And a yml deleted outright stops contributing at all, rather than lingering in the cache.
-    onProjects.mockResolvedValue([{ id: 'app-a-1', path: '/repos/a', name: 'a', activated: true }])
-    refreshFileConfigs()
-    await flush()
-    expect('vanilla' in result.current).toBe(false)
-  })
-
-  test('a failed project read leaves the other tiers intact (#842)', async () => {
-    const unhandled = vi.fn()
-    process.on('unhandledRejection', unhandled)
-    onPreferences.mockResolvedValue({ browser: false })
-    onProjects.mockRejectedValue(new Error('offline'))
-    openProject('app-a-1')
-    const { usePreferences, refreshFileConfigs } = await import('./preferences.js')
-
-    const { result } = renderHook(() => usePreferences())
-    await flush()
-    expect(result.current.browser).toBe(false)
-
-    // The read is best-effort like every other tier: it must be swallowed, not left to surface as
-    // an unhandled rejection, and the next refresh must still be able to run.
-    await new Promise(resolve => setTimeout(resolve, 0))
-    expect(unhandled).not.toHaveBeenCalled()
-    process.off('unhandledRejection', unhandled)
-
-    onProjects.mockResolvedValue([{ id: 'app-a-1', path: '/repos/a', name: 'a', activated: true, fileConfig: { transparent: true } }])
-    refreshFileConfigs()
-    await flush()
-    expect(result.current.transparent).toBe(true)
+    expect(result.current).toEqual({ notifyBrowser: false, notifyDiscord: true })
   })
 
   // A stale tab reverting settings it never touched (#1148).

@@ -1,39 +1,30 @@
+import type { Preferences } from '../../src/index.js'
 import { sendStart } from '../rpc/control.js'
 import { useAction } from './use-action.js'
 
 type StartArgs = Parameters<typeof sendStart>
 
-// Starting an agent is the one mutation with a failure branch of its own: the daemon refuses a
-// second run on the same checkout with `busy`. Both composers that start runs (the launcher
-// and the finished-agent continuation) route through here, so the refusal reads the same on
-// either surface and neither hand-rolls the busy/error/finally scaffold useAction owns.
+/** The person's picks a start carries to the project's start hook; an unset one is left to the hook's own default. */
+export function startPicks(preferences: Preferences): { driver?: string; model?: string } {
+  return {
+    ...(preferences.driver ? { driver: preferences.driver } : {}),
+    ...(preferences.model ? { model: preferences.model } : {}),
+  }
+}
+
+// Starting a run, for every surface that does (the launcher, the tickets' and the queue's
+// buttons): the project's start hook answers the new run's id, or says in words why there is
+// none, and neither surface hand-rolls the busy/error/finally scaffold useAction owns.
 export function useStartAgent(): {
   busy: boolean
   error: string | null
   reset: () => void
-  /** Start the agent; resolves with the success branch, or `undefined` (error state set). */
-  start: (
-    projectId: string,
-    text: string,
-    kind: StartArgs[2],
-    options: StartArgs[3],
-    fallback?: string,
-  ) => Promise<{ agentId?: string | undefined } | undefined>
+  /** Start the run; resolves with its id, or `undefined` (error state set). */
+  start: (projectId: string, text: string, options?: StartArgs[2], fallback?: string) => Promise<{ agentId: string } | undefined>
 } {
   const { busy, error, reset, run } = useAction()
-  const start = async (
-    projectId: string,
-    text: string,
-    kind: StartArgs[2],
-    options: StartArgs[3],
-    fallback = 'Failed to start the agent.',
-  ) => {
-    const outcome = await run(async () => {
-      const started = await sendStart(projectId, text, kind, options)
-      // The daemon's refusal is phrased for its own log; give the dashboard its words.
-      if (!started.ok && started.busy) return { ...started, error: 'An agent is already active for this project.' }
-      return started
-    }, fallback)
+  const start = async (projectId: string, text: string, options: StartArgs[2] = {}, fallback = 'Failed to start the agent.') => {
+    const outcome = await run(() => sendStart(projectId, text, options), fallback)
     return outcome.ok ? outcome.value : undefined
   }
   return { busy, error, reset, start }

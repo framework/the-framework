@@ -3,5 +3,5 @@ The two brand logomarks the dashboard shows for the coding agents [1] it drives:
 ## Glossary
 
 [1] coding agent: the CLI doing the actual work: Claude Code or Codex.
-[2] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later. The user's driver choice is `claude` or `codex`.
-[3] agent: the unit of work: one task worked by a coding agent under The Framework's control.
+[2] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later.
+[3] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.

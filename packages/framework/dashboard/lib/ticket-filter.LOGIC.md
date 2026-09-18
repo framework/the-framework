@@ -15,7 +15,7 @@ Decides which tickets [1] the tickets page shows, in what order and under which 
 [3] project: a repository the user registered in the dashboard, identified by an id derived from its path.
 [4] facet: one of the filter toolbar's dimensions — the text search, priority, effort, uncertainty, topics, stage, project, and the "Not linked" switch.
 [5] plan: a ticket's `.plan.md`: effort and uncertainty ratings and how to implement it.
-[6] agent: the unit of work: one task worked by a coding agent under The Framework's control, in its own checkout, on its own branch, streaming events, handed off when it ends.
+[6] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [7] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
 
 ## Business logic — TL;DR

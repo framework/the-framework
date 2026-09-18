@@ -11,10 +11,10 @@ Assembles the dashboard's quota [1] view: the account's windows as the coding ag
 [1] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
 [2] coding agent: the CLI doing the actual work: Claude Code or Codex.
 [3] quota boundary: the share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
-[4] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[4] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [5] spend offset: the user's adjustment of the quota boundary, in percentage points of the week.
-[6] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
-[7] driver: a coding agent wrapped as a black box. The user's driver choice is `claude` or `codex`.
+[6] unattended: said of an agent nobody is watching: one the scheduler started rather than a person. It is not answered any faster: a question it ends on waits for a human like any other.
+[7] driver: a coding agent wrapped as a black box. The user's driver choice is `claude-code` or `codex`.
 [8] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 
 ## Business logic — TL;DR

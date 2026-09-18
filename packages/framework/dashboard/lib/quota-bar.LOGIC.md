@@ -11,7 +11,7 @@ Works out everything the quota [1] bar draws and says: where each calendar day o
 [1] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
 [2] quota boundary: the share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
 [3] spend offset: the user's adjustment of the quota boundary, in percentage points of the week.
-[4] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles.
+[4] unattended: said of an agent nobody is watching: one the scheduler started rather than a person. It is not answered any faster: a question it ends on waits for a human like any other.
 
 ## Business logic — TL;DR
 

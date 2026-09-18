@@ -1,7 +1,7 @@
 import { parseArgs } from 'node:util'
 import { checkoutRoot, nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
 import { projectRoot } from '@gemstack/skill-branches'
-import { DRIVER_NAMES, detachRun, isDriverName, resumeProject, runProject, schedulerStatus, startScheduler, stopScheduler, tickProject } from './scheduler.js'
+import { DRIVER_NAMES, detachResume, detachRun, isDriverName, resumeProject, runProject, schedulerStatus, startScheduler, stopScheduler, tickProject } from './scheduler.js'
 import { updateState } from './state.js'
 
 /**
@@ -18,6 +18,7 @@ export const USAGE = `usage: agent-scheduler <command>
   run --detach <prompt>         the same run in its own process, answered at once with its id: what a dashboard's start hook runs
   run --resume <id> [<text>] [--answer <label>]
                                 continue an ended run: the same record, its session resumed; the text as the next prompt, or the answer to the question it ended on
+  run --detach --resume <id> …  the same continuing in its own process, answered at once: what a dashboard's resume hook runs
   start [--keep-alive]          the scheduler on, ticking every minute in its own process
   stop [--unless-keep-alive]    the scheduler off; runs in flight go to the end; with the flag a keep-alive scheduler is left running
   status                        the state file, and whether the scheduler's process is alive
@@ -85,15 +86,26 @@ const COMMANDS: Record<string, Command> = {
     const repo = await project(io.cwd, git)
     const driver = values.driver
     if (driver !== undefined && !isDriverName(driver)) throw new Usage(`unknown driver "${driver}"; the drivers are ${DRIVER_NAMES.join(' and ')}`)
+    if (values.resume !== undefined) {
+      if (driver !== undefined) throw new Usage('--resume takes no --driver: a run continues on the coding agent its record names')
+      if (positionals[0] === undefined && values.answer === undefined) throw new Usage('a text or --answer is needed to resume a run')
+    }
+    if (values.detach && values.resume !== undefined) {
+      const resumed = await detachResume(repo, {
+        id: values.resume,
+        ...(positionals[0] !== undefined ? { text: positionals[0] } : {}),
+        ...(values.answer !== undefined ? { answer: values.answer } : {}),
+        ...(values.model !== undefined ? { model: values.model } : {}),
+      })
+      return { ok: true, detached: true, ...resumed }
+    }
     if (values.detach) {
       if (positionals[0] === undefined) throw new Usage('expected 1 argument(s), got 0')
-      if (values.resume !== undefined || values.id !== undefined) throw new Usage('--detach takes a prompt only')
+      if (values.id !== undefined) throw new Usage('--detach takes no --id: the run\'s id is minted and answered')
       const started = await detachRun(repo, { prompt: positionals[0], ...(values.model !== undefined ? { model: values.model } : {}), ...(driver !== undefined ? { driver } : {}), log: io.stderr })
       return { ok: true, detached: true, ...started }
     }
     if (values.resume !== undefined) {
-      if (driver !== undefined) throw new Usage('--resume takes no --driver: a run continues on the coding agent its record names')
-      if (positionals[0] === undefined && values.answer === undefined) throw new Usage('a text or --answer is needed to resume a run')
       const outcome = await resumeProject(repo, {
         id: values.resume,
         ...(positionals[0] !== undefined ? { text: positionals[0] } : {}),

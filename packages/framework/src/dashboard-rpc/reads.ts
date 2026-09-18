@@ -2,7 +2,6 @@ import type { BridgeBrowserStatus } from '../bridge-browser.js'
 import { findAgent, readLiveMetas, readAllAgents, loadAgentEvents, startedAtFromAgentId, type AgentMeta, type AgentStatus } from '../store/index.js'
 import { worktreeSize, isSafeAgentId } from '@gemstack/skill-branches'
 import { planAgentFor } from '../tickets.js'
-import { loadUserSystemPrompt } from '../system-prompt-file.js'
 import { listProjectWorktrees } from '../worktrees.js'
 import { readDocs, type WorkspaceDoc } from '../dashboard/docs.js'
 import { readTickets, readTicket, readTicketsMeta, type WorkspaceTicket, type WorkspaceTicketDetail, type TicketsMeta } from '../dashboard/tickets.js'
@@ -429,17 +428,6 @@ export async function onAgentHandoff(projectId: string, agentId: string): Promis
     const deps = { since: agent.startedAt, ...(checkout && checkout !== cwd ? { checkout } : {}) }
     return (await readAgentHandoff(cwd, agentBranchFor(agent), deps).catch(() => undefined)) ?? null
   }, null)
-}
-
-/**
- * The project's own `SYSTEM.md` text, or null when it has none (#872). The prompt preview
- * claims to show the entire system prompt; composition takes this text as `opts.user`, but
- * reading it is Node-bound, so the browser needs this read to keep that claim true.
- */
-export async function onSystemPromptUser(projectId: string): Promise<string | null> {
-  const cwd = await resolveProjectPath(projectId)
-  if (!cwd) return null
-  return (await loadUserSystemPrompt(cwd)) ?? null
 }
 
 /**

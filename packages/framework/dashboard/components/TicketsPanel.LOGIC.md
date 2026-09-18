@@ -8,14 +8,11 @@ Lists one project's tickets as one-liner rows — priority, topics, who holds th
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends. Started from the dashboard by the user, or by the daemon.
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [3] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
 [4] holder: who a claim names: the agent's id when the daemon started the agent, else the branch the `tickets` command ran on.
 [5] session name: the name an agent gives its own work; its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
-[6] prompt agent: an agent that runs one prompt and stops there.
-[7] unattended: said of an agent nobody is watching: its gates take the recommended option and it ends when its work settles. The opposite is attended.
-[8] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: keep the work in its checkout, push its branch, also open a pull request, also merge it.
 [9] launcher: the Start form on a project's own page.
 
 ## Business logic — TL;DR
@@ -78,7 +75,7 @@ The marker acts on click when the surrounding page offers it. When the claim nam
 
 A ticket that has a plan shows a clipboard in blue, drawn heavier than the column's other state, labeled "View the plan for <title>" with the tooltip "View the plan"; clicking opens the ticket's plan. Where the surrounding page has nowhere to open a plan, the icon is shown disabled. There is no "configure" offer beside it: reading a file spends no agent [1].
 
-A ticket with no plan shows a quieter clipboard, lighter than the row's own age column, labeled "Create a plan for <title>" with the tooltip "Plan this ticket — starts an agent to write its plan". Clicking starts a prompt agent [6] on this project asked to write the plan — "Create tickets/<stem>.plan.md", the one wording the "Plan tickets" preset and the daemon's own queue writes use. That agent is attended: a plan is written for a human to read and act on, so it stays a conversation the user lands in and steers, rather than one that settles and hands itself off. A refusal reads "The planning agent could not be started.".
+A ticket with no plan shows a quieter clipboard, lighter than the row's own age column, labeled "Create a plan for <title>" with the tooltip "Plan this ticket — starts an agent to write its plan". Clicking starts a agent on this project asked to write the plan — "Create tickets/<stem>.plan.md", the one wording the daemon's own queue writes use. A plan is written for a human to read: the user reviews it through the plan column's link. A refusal reads "The planning agent could not be started.".
 
 The two states are told apart by color and weight, not by the icon alone, so the planned rows are scannable down the column.
 
@@ -92,9 +89,9 @@ The two states are told apart by color and weight, not by the icon alone, so the
 
 #### Business logic
 
-The start column is a play button labeled "Start work on <title>", with the tooltip "Spin up an agent working on this ticket". It starts a prompt agent [6] on this project with the prompt "Work on tickets/<file>. Do not start any other ticket." — and nothing else: the agent claims the ticket itself through the `tickets` skill.
+The start column is a play button labeled "Start work on <title>", with the tooltip "Spin up an agent working on this ticket". It starts a agent on this project with the prompt "Work on tickets/<file>. Do not start any other ticket." — and nothing else: the agent claims the ticket itself through the `tickets` skill.
 
-That agent runs unattended [7]: it ends when its work settles and fires the handoff [8] it was armed with. A refusal reads "The work agent could not be started.".
+The start carries the coding agent and the model the user picked in their preferences, when they picked them, like every start (`lib/use-start-agent.ts`). A refusal reads "The work agent could not be started.".
 
 When a start succeeds, the surrounding page is told what was asked and which agent was started, so it can take the user to the agent instead of leaving them on rows that have not changed yet.
 
@@ -120,7 +117,7 @@ A chevron is never disabled by a start in flight, because it starts nothing: bei
 
 Above the rows, one line states when the tickets last caught up with GitHub — "Updated from GitHub 3h ago", or "No record of an import yet" when nothing was ever imported — with the update button immediately beside it, rather than a panel's width away from the line it acts on. What that button offers and how it words itself is described in `UpdateTicketsButton.tsx`.
 
-The update runs unattended [7]: an import fired by a button is a task rather than a conversation, so it ends when its work settles and fires its armed handoff [8]. A refusal reads "The update could not be started.".
+The update is the project's `update-tickets` command, started like any other agent. A refusal reads "The update could not be started.".
 
 ### Nothing to show
 

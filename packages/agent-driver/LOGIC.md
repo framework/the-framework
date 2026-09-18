@@ -18,4 +18,4 @@ The `agent-driver` package is how The Framework works a repository without ever 
 
 ## Business logic — TL;DR
 
-- **The driver seam and its implementations** (`src/`) - the contract every driver [2] honors, the process core shared by the local implementations with its stop and reaping rules, the Claude Code, Codex, GitHub Actions and fake implementations, the question an agent asks, the inbox that reaches a running agent, the log a session keeps, and the reader of Claude Code's quota [7]; told in `src/LOGIC.md`.
+- **The driver seam and its implementations** (`src/`) - the contract every driver [2] honors, the process core shared by the local implementations with its stop and reaping rules, the Claude Code, Codex, GitHub Actions and fake implementations, the question an agent asks, the inbox that reaches a running agent, the log a session keeps, the reader of Claude Code's quota [7], and the check that a coding agent's CLI is installed and logged in; told in `src/LOGIC.md`.

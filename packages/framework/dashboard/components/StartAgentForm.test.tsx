@@ -1,10 +1,11 @@
-import { afterEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 // Everything the form reads goes through a lib module, so the mocks stop at the `rpc/` stubs: an
 // unmocked one reaches for `/_rpc/<name>`, and there is no daemon behind jsdom to answer.
 const onCommands = vi.hoisted(() => vi.fn())
-vi.mock('../rpc/projects.js', () => ({ onCommands }))
+const onStartCheck = vi.hoisted(() => vi.fn())
+vi.mock('../rpc/projects.js', () => ({ onCommands, onStartCheck }))
 
 // Mutable so a test can pick the coding agent and the model; reset after each.
 const prefs = vi.hoisted(() => ({ current: {} as Record<string, unknown> }))
@@ -39,10 +40,16 @@ vi.mock('./Composer.js', async () => {
 
 const { StartAgentForm } = await import('./StartAgentForm.js')
 
+// No check hook unless a test gives one: nothing to say.
+beforeEach(() => {
+  onStartCheck.mockResolvedValue(null)
+})
+
 afterEach(() => {
   cleanup()
   start.mockReset()
   onCommands.mockReset()
+  onStartCheck.mockReset()
   prefs.current = {}
   device.current = null
 })
@@ -106,5 +113,20 @@ describe('StartAgentForm (#1774)', () => {
     fireEvent.click(screen.getByText('submit-typed'))
     await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith('do the thing', 'r2', 'box'))
     expect(start).toHaveBeenCalledWith('p1', 'do the thing', { remote: { url: 'http://box:4200', token: 't', label: 'box' } })
+    expect(onStartCheck).not.toHaveBeenCalled()
+  })
+
+  test('what would stop the run is said before the Start, for the coding agent picked; a warning is said too, and neither turns Start off', async () => {
+    onCommands.mockResolvedValue({ commands: [], startHook: true })
+    prefs.current = { driver: 'codex' }
+    onStartCheck.mockResolvedValue({ problems: ['`codex` is not logged in. Run `codex login`, then start again.'], warnings: ['`gh` is not logged in.'] })
+    render(<StartAgentForm {...props} />)
+    await waitFor(() => expect(screen.getAllByRole('alert')).toHaveLength(2))
+    expect(onStartCheck).toHaveBeenCalledWith('p1', 'codex')
+    const [problem, warning] = screen.getAllByRole('alert')
+    expect(problem!.textContent).toBe('`codex` is not logged in. Run `codex login`, then start again.')
+    expect(problem!.className).toContain('text-danger')
+    expect(warning!.className).toContain('text-warning')
+    expect((screen.getByText('submit-typed') as HTMLButtonElement).disabled).toBe(false)
   })
 })

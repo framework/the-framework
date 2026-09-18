@@ -1,4 +1,4 @@
-The launcher on a project home [1]: the box where the user says what an agent [3] should do, or picks one of the project's commands [2] from its `/` list, and Start. A Start is the project's own start hook [4]: the launcher hands it the prompt, the coding agent [5] and model the user picked, and the device [6] when one is picked, and selects the agent the hook answers. A project that has no start hook cannot start an agent from here, and the launcher says what to add.
+The launcher on a project home [1]: the box where the user says what an agent [3] should do, or picks one of the project's commands [2] from its `/` list, and Start. A Start is the project's own start hook [4]: the launcher hands it the prompt, the coding agent [5] and model the user picked, and the device [6] when one is picked, and selects the agent the hook answers. A project that has no start hook cannot start an agent from here, and the launcher says what to add. What would stop the agent (a coding agent not installed or logged out) is said before the Start, from the project's check hook [10].
 
 ## Context
 
@@ -17,12 +17,14 @@ The launcher on a project home [1]: the box where the user says what an agent [3
 [7] relay: running an agent on a device: the local daemon forwards the start to the device, which runs its own project's start hook, and streams the events back, so the agent renders like a local one.
 [8] saved prompt: a prompt the user saved under a name, either for themselves (kept with their preferences) or for the project (committed in the project's repository), and loads back into the editor verbatim.
 [9] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
+[10] check hook: the one shell line under `check:` in the project's `.the-framework/hooks.yml`. The daemon runs it with the picked coding agent in its environment, and the line answers a list of problems, which would stop the agent, and a list of warnings, which are only worth knowing; each names its own fix. The Framework names no tool: the line does.
 
 ## Business logic — TL;DR
 
 - **Commands load, never start** - the commands [2] are in the editor's `/` list and the Commands menu, not buttons; picking one loads `/<name> ` into the editor for review, and the form leaves a note saying so.
 - **What a Start sends** - the text, the coding agent [5] and the model when the user picked them, and the picked device's address and token; nothing else.
 - **A project with no start hook** - Start is off and the form says which line to add to which file; a picked device lifts the block, since the device runs its own hook.
+- **Before the Start: what would stop the agent** - the check hook's [10] problems in red and its warnings in amber, under the editor, for the coding agent picked; read again when the pick changes; not asked for a picked device; neither turns Start off.
 - **Feedback about the start itself** - "Starting…", the refusal in the start hook's own words, the note a loaded command or saved prompt [8] leaves, and an error that clears as soon as the user edits.
 - **The moment an agent starts** - the agent is shown and selected immediately under the typed prompt, marked with the device it runs on, and the editor is emptied.
 
@@ -70,6 +72,18 @@ Whether the text is a command, a saved prompt [8] or the user's own words makes 
 Once the project is read and it has no start hook [4], and no device [6] is picked, the submit stays disabled — by click and by keyboard — and the form shows, as an alert: "This project has no start hook. Add a `start:` line to `.the-framework/hooks.yml`."
 
 A picked device lifts the block: the device runs its own project's start hook, so this project's lack of one says nothing about that start. Before the project is read nothing is shown and the submit is on, so the message never flashes on a project that does have the line.
+
+### Before the Start: what would stop the agent
+
+#### Context
+
+**User story**: the user picks Codex, and before typing a task reads under the editor "`codex` is not logged in. Run `codex login`, then start again."; after logging in and picking again, the line is gone.
+
+**Problem**: an agent whose coding agent [5] is missing or logged out would die before its first turn; said after the Start, the user has lost the task they typed and the tool may have spent a branch on it. The Framework does not know which CLI the project's tool needs, so it asks the project's check hook [10].
+
+#### Business logic
+
+The form asks the daemon for the project's check (`dashboard-rpc/projects.ts`, `onStartCheck`) with the coding agent read off the preferences [9] (none when never picked), once per project and again whenever the pick changes or a device [6] is picked or unpicked. With a device picked it asks nothing and shows nothing: the device runs on its own machine, and this machine's CLIs say nothing about it. Every problem the answer holds shows as an alert in red, then every warning as an alert in amber, each in the answer's own words, under the start's own feedback and above the no-start-hook message. A project without a check hook answers nothing, and nothing shows. Neither a problem nor a warning turns Start off: a Start pressed anyway is refused by the tool the start hook names, in its own words.
 
 ### Feedback about the start itself
 

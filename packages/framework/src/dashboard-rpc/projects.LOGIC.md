@@ -1,8 +1,8 @@
-Everything the dashboard asks the daemon about projects [1]: the list of registered projects with whatever the daemon currently finds wrong with each, adding a new one (opening the machine's own folder dialog, then installing and registering the chosen folder), the folder the onboarding offers as a first project, and what the launcher [2] offers for a project: its commands [3], and whether an agent can be started there at all.
+Everything the dashboard asks the daemon about projects [1]: the list of registered projects with whatever the daemon currently finds wrong with each, adding a new one (opening the machine's own folder dialog, then installing and registering the chosen folder), the folder the onboarding offers as a first project, and what the launcher [2] offers for a project: its commands [3], whether an agent can be started there at all, and what would stop an agent before it is started.
 
 ## Context
 
-**User story**: the user registers a repository in the dashboard so agents [4] can work it, sees at a glance when something is wrong with one of their projects [1], and finds on a project's launcher the commands that project has, or the reason Start is off.
+**User story**: the user registers a repository in the dashboard so agents [4] can work it, sees at a glance when something is wrong with one of their projects [1], and finds on a project's launcher the commands that project has, or the reason Start is off, and reads there, before pressing Start, what would stop the agent.
 
 **Problem**: the dashboard runs in a browser. It cannot open a folder dialog that yields an absolute path, and cannot read a project's folders or its hooks file. All of that is the daemon's, which runs on the machine the user is sitting at.
 
@@ -15,6 +15,7 @@ Everything the dashboard asks the daemon about projects [1]: the list of registe
 [5] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [6] sweep: a background job the daemon runs on its clock: the data sync, the notification watchers, the cloud scratch sweep, cloud work adoption.
 [7] start hook: the one shell line under `start` in a project's `.the-framework/hooks.yml`, which the daemon runs when the user presses Start.
+[8] check hook: the one shell line under `check` in a project's `.the-framework/hooks.yml`, which the daemon runs when the launcher asks what would stop an agent; it answers a list of problems and a list of warnings.
 
 ## Business logic — TL;DR
 
@@ -23,6 +24,7 @@ Everything the dashboard asks the daemon about projects [1]: the list of registe
 - **The folder dialog is the daemon's** - the machine's own choose-a-folder dialog is opened by the daemon, because a browser cannot learn an absolute path; dismissing it is an ordinary answer, not a failure.
 - **The onboarding's first suggestion** - the directory the daemon was started in is offered as the first project, together with whether it is already registered.
 - **What the launcher offers** - the project's commands [3], read off its skills folders, and whether its hooks file has a start hook [7]; an unknown project answers nothing.
+- **What would stop an agent** - the project's check hook [8], run with the coding agent the user picked: its problems and its warnings; a check hook that fails is one warning; no check hook, or an unknown project, answers nothing.
 
 ## Business logic
 
@@ -83,3 +85,15 @@ The daemon answers with the directory it is running in, and with that directory'
 #### Business logic
 
 For a given project [1] the daemon answers two things, read fresh each time: the project's commands (the rule is `project-commands.ts`'s: the skills written to be run by a person, each with its name and description), and whether the project's `.the-framework/hooks.yml` names a `start` line (`project-hooks.ts`; a hooks file that is missing or refused counts as no start line). A project id that names no registered project answers nothing at all.
+
+### What would stop an agent
+
+#### Context
+
+**User story**: the user opens a project's launcher [2], or picks another coding agent in it, and reads under the prompt box, before pressing Start, what would stop the agent [4] (Claude Code not logged in, with the command that fixes it) and what is only worth knowing (`gh` missing).
+
+**Problem**: the daemon names no tool and no coding agent's CLI; only the project's own line knows what to ask.
+
+#### Business logic
+
+For a given project [1] and, when the user picked one, a coding agent, the daemon runs the project's check hook [8] (`project-hooks.ts`), the pick in `DRIVER`, and answers its two lists: the problems and the warnings. A check hook that fails, hangs, answers something else, or sits in a hooks file that is refused, is answered as no problem and one warning, its error in words ("the check hook: <what it said>"): a broken check is worth saying, not a reason to stop. A project with no check hook, and a project id that names no registered project, answer nothing at all: there is nothing to say.

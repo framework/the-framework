@@ -6,7 +6,7 @@ export { inFlight, markerCard, writeMarker, withdrawMarker, recordRun, scheduler
 export { runCommand, runIdFrom, type RunOptions, type RunOutcome } from './run.js'
 export { sweep, type SweepDeps, type SweepResult } from './sweep.js'
 export { tick, projectHasCommand, runCheck, type TickDeps, type CheckResult } from './tick.js'
-export { tickProject, runProject, startScheduler, stopScheduler, schedulerStatus, spawnRun, AGENT_ID_ENV } from './scheduler.js'
+export { tickProject, runProject, readyToRun, startScheduler, stopScheduler, schedulerStatus, spawnRun, AGENT_ID_ENV } from './scheduler.js'
 export { isPidAlive } from './run-lock.js'
 export { prOfBranch, nodeGhRunner, type GhRunner } from './pr.js'
 export { runCli, USAGE, type CliIo, type CliRefusal } from './cli.js'

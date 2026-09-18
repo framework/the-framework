@@ -3,7 +3,7 @@ import { closeSync, mkdirSync, openSync } from 'node:fs'
 import { hostname } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { ClaudeCodeDriver, CodexDriver, readClaudeQuota, type Driver } from 'agent-driver'
+import { ClaudeCodeDriver, CodexDriver, checkDriverReady, probeCli, readClaudeQuota, type CliProbe, type Driver, type DriverReadiness } from 'agent-driver'
 import { findRun } from '@gemstack/skill-logs'
 import { DATA_BRANCH, nodeGitRunner, pullFileBranch, type GitRunner } from '@gemstack/agent-data'
 import { CHECK_TIMEOUT_MS, SCHEDULER_LOG, TICK_MS } from './names.js'
@@ -54,6 +54,7 @@ export async function tickProject(repo: string, opts: { git?: GitRunner; log?: (
     check: shell => runCheck(repo, shell, CHECK_TIMEOUT_MS),
     lastStart: command => lastStart(repo, command),
     inFlight: command => inFlight(repo, command),
+    ready: () => readyToRun('claude-code'),
     quota: () => readClaudeQuota({ cwd: repo }),
     mint: () => runIdFrom(now().toISOString()),
     writeMarker: card => writeMarker(repo, card),
@@ -66,6 +67,26 @@ export async function tickProject(repo: string, opts: { git?: GitRunner; log?: (
   await updateState(repo, s => ({ ...s, lastTick: record }), git)
   for (const line of describe(record)) log(line)
   return record
+}
+
+/**
+ * Whether a run on `driver` can start on this machine, asked before it spends a checkout: the
+ * coding agent's CLI is installed and logged in (a problem when not: the session would die
+ * before its first turn), and `gh` is there and logged in (a warning when not: the agent opens
+ * its own pull request with it, and the run reads the number back, but the work itself needs
+ * no `gh`). What a dashboard's check hook runs, and what a person's run and the tick refuse on.
+ */
+export async function readyToRun(driver: DriverName, deps: { probe?: CliProbe; isRoot?: () => boolean } = {}): Promise<DriverReadiness> {
+  const probe = deps.probe ?? probeCli
+  const ready = await checkDriverReady(driver, { probe, ...(deps.isRoot ? { isRoot: deps.isRoot } : {}) })
+  const noPr = 'the run\'s agent cannot open its pull request, and its record will name none.'
+  if (!(await probe('gh', ['--version'])).ok) {
+    ready.warnings.push(`\`gh\` not found — ${noPr} Install the GitHub CLI (https://cli.github.com) and run \`gh auth login\`.`)
+  } else if (!(await probe('gh', ['auth', 'status'])).ok) {
+    // `gh auth status` exits non-zero when no host is logged in; the exit code is the answer.
+    ready.warnings.push(`\`gh\` is not logged in — ${noPr} Run \`gh auth login\`.`)
+  }
+  return ready
 }
 
 /** The command line of a spawned run: the model and the coding agent named only when the run has them, so the run's own defaults apply otherwise. */

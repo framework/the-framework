@@ -55,7 +55,7 @@ test('usage errors exit 2 with the usage on stderr and nothing on stdout; outsid
   const repo = await testRepo()
   const elsewhere = await mkdtemp(join(tmpdir(), 'not-a-repo-'))
   try {
-    for (const argv of [[], ['nope'], ['model'], ['offset', 'many'], ['status', 'extra']]) {
+    for (const argv of [[], ['nope'], ['model'], ['offset', 'many'], ['status', 'extra'], ['check', 'extra']]) {
       const bad = await run(repo, ...argv)
       assert.equal(bad.code, 2, argv.join(' '))
       assert.equal(bad.out, undefined)
@@ -65,6 +65,9 @@ test('usage errors exit 2 with the usage on stderr and nothing on stdout; outsid
     const unknown = await run(repo, 'run', 'Read the docs', '--driver', 'pi')
     assert.equal(unknown.code, 2)
     assert.match(unknown.err, /unknown driver "pi"; the drivers are claude-code and codex/)
+    const unknownCheck = await run(repo, 'check', '--driver', 'pi')
+    assert.equal(unknownCheck.code, 2)
+    assert.match(unknownCheck.err, /unknown driver "pi"/)
     const renamed = await run(repo, 'run', '--resume', '2026-09-17T20-00-00-000Z', 'go on', '--driver', 'codex')
     assert.equal(renamed.code, 2)
     assert.match(renamed.err, /--resume takes no --driver/)

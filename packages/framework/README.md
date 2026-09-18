@@ -43,6 +43,7 @@ project's own `.the-framework/hooks.yml`:
 ```yaml
 start: npx agent-scheduler run --detach "$PROMPT" ${DRIVER:+--driver "$DRIVER"}
 resume: npx agent-scheduler run --detach --resume "$RUN_ID" ${TEXT:+"$TEXT"} ${ANSWER:+--answer "$ANSWER"}
+check: npx agent-scheduler check ${DRIVER:+--driver "$DRIVER"}
 offset: npx agent-scheduler offset -- "$POINTS"
 ```
 
@@ -50,6 +51,11 @@ The line is given the prompt and the user's picks in its environment, and answer
 document whose `id` names the agent it began. From there the agent belongs to whatever that
 line started. A project with no `start` line cannot start an agent from the dashboard, and the
 dashboard says so.
+
+The `check` line is what the launcher runs before a Start, with the picked coding agent in
+`DRIVER`: it answers one JSON document with `problems` (a coding agent not installed or logged
+out: said in red) and `warnings` (said in amber), each line naming its own fix. A project
+with no `check` line shows nothing there.
 
 The `offset` line is how the usage panel's slider (and Settings → Automation → Spend offset)
 reaches the scheduler: it runs in every project that has it, with the percentage points in

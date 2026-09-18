@@ -130,6 +130,17 @@ export class SessionLog {
     })
   }
 
+  /**
+   * Open an ended log again, for more turns of the same session: the card back to `running`, its
+   * end time gone. The diary keeps its `ended` line; the turns that follow are appended after it,
+   * as a resumed run's are.
+   */
+  reopen(): Promise<void> {
+    const { endedAt: _endedAt, ...card } = this.card
+    this.card = { ...card, status: 'running' }
+    return this.queue(() => this.writeCard())
+  }
+
   /** Resolves once every write so far has landed. */
   settled(): Promise<void> {
     return this.tail

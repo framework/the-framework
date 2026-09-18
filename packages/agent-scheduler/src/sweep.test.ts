@@ -7,12 +7,18 @@ import { createCheckout, worktreePath } from '@gemstack/skill-branches'
 import { findRun, readDiary, type RunCard } from '@gemstack/skill-logs'
 import { liveDir, readLiveCard } from './live-card.js'
 import { markerCard, writeMarker } from './records.js'
+import { acquireRunLock } from './run-lock.js'
 import { runStderrPath, writeState, DEFAULT_STATE } from './state.js'
 import { sweep } from './sweep.js'
 import { git, removeRepo, testRepo } from './test-repo.js'
 
 // The sweep on real checkouts: the live card and diary as agent-driver's log leaves them, and the
 // markers on the branch. The agent is never run.
+
+/** A run's lock as its process leaves it while it lives. */
+function hold(repo: string, id: string, pid: number): Promise<void> {
+  return acquireRunLock(repo, id, { pid, isAlive: () => true })
+}
 
 const NOW = new Date('2026-09-16T14:30:00.000Z')
 
@@ -39,6 +45,7 @@ test('a running checkout under a dead pid on this machine is ended, recorded fai
   try {
     await liveRun(repo, 'dead', 'this-box', 999_999)
     await liveRun(repo, 'alive', 'this-box', 1)
+    await hold(repo, 'alive', 1)
     await liveRun(repo, 'elsewhere', 'other-box', 999_999)
     const result = await sweep(repo, { host: 'this-box', isAlive: pid => pid === 1, now: () => NOW })
     assert.deepEqual(result.recorded, [{ id: 'dead', status: 'failed' }])
@@ -94,15 +101,33 @@ test('a marker of this machine with no checkout behind it: failed with the stder
   }
 })
 
-test('a marker whose process is alive and whose checkout is not there yet is a run still booting: left alone', async () => {
+test('a marker whose lock a live process holds and whose checkout is not there yet is a run still booting: left alone', async () => {
   const repo = await testRepo()
   try {
-    const mark = { command: 'work-queue', host: 'this-box', pid: 1 }
+    // A detached run's marker carries no pid: the lock, taken before the marker, is what says it lives.
+    const mark = { command: 'work-queue', host: 'this-box' }
     await writeMarker(repo, markerCard({ id: 'booting', startedAt: '2026-09-16T14:01:00.000Z', prompt: '/work-queue', driver: 'fake', model: 'opus', mark }))
+    await hold(repo, 'booting', 1)
     const result = await sweep(repo, { host: 'this-box', isAlive: pid => pid === 1, now: () => NOW })
     assert.deepEqual(result.recorded, [])
     assert.equal((await findRun(repo, 'booting'))?.status, 'running')
     assert.equal((await git(['status', '--porcelain'], repo)).trim(), '')
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test('a run being resumed holds its lock: its kept checkout still saying waiting is not recorded over the running record', async () => {
+  const repo = await testRepo()
+  try {
+    // The resume has written the record running and holds the lock; its session has not reopened the live card yet.
+    await liveRun(repo, 'resuming', 'this-box', 999_999, 'waiting')
+    await hold(repo, 'resuming', 1)
+    const mark = { command: 'work-queue', host: 'this-box', pid: 1 }
+    await writeMarker(repo, markerCard({ id: 'resuming', startedAt: '2026-09-16T14:01:00.000Z', prompt: '/work-queue', driver: 'fake', model: 'opus', mark }))
+    const result = await sweep(repo, { host: 'this-box', isAlive: pid => pid === 1, now: () => NOW })
+    assert.deepEqual(result, { recorded: [], reclaimed: [], kept: [] })
+    assert.equal((await findRun(repo, 'resuming'))?.status, 'running')
   } finally {
     await removeRepo(repo)
   }

@@ -178,11 +178,4 @@ export async function runCheck(repo: string, shell: string, timeoutMs: number): 
   })
 }
 
-/** The list a decision reads as, one line per command, for a person. */
-export function describeTick(record: TickRecord): string[] {
-  const lines = [`tick ${record.at}${record.note ? `: ${record.note}` : ''}`]
-  for (const d of record.decisions) lines.push(`  ${d.command}: ${d.outcome}`)
-  return lines
-}
-
 export type { TickDecision }

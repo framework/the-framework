@@ -1,0 +1,83 @@
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
+import { excludeFromGit } from '@gemstack/agent-data'
+import { RUNS_DIR, STATE_DIR } from './names.js'
+import { stateDir } from './state.js'
+
+/**
+ * One process per run at a time (#1774). A run's process holds its run's lock from before it
+ * touches the record until it has let the checkout go. A second process for the same run waits
+ * until the holder is gone: a resume that comes while the run still records and reclaims, or two
+ * resumes started together by two messages. The sweep leaves a run alone while its lock is held.
+ *
+ * The lock is a file under the tool's directory holding the pid of its holder. A pid that is not
+ * alive holds nothing, so a process that died leaves no lock that matters. Per machine, like the
+ * pid in it. Two waiters taking over a dead holder's lock in the same instant can both believe
+ * they hold it; a holder that dies is already the sweep's case.
+ */
+
+/** Whether `pid` is a live process on this host. A pid on another host is unknowable here. */
+export function isPidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (err) {
+    return (err as { code?: string }).code === 'EPERM'
+  }
+}
+
+/** How often a waiting process looks at the lock again. */
+const POLL_MS = 500
+
+export function runLockPath(repo: string, id: string): string {
+  return join(stateDir(repo), RUNS_DIR, `${id}.lock`)
+}
+
+async function readHolder(repo: string, id: string): Promise<number | undefined> {
+  const raw = await readFile(runLockPath(repo, id), 'utf8').catch(() => undefined)
+  const pid = Number(raw?.trim())
+  return Number.isInteger(pid) && pid > 0 ? pid : undefined
+}
+
+/** The live pid holding the run's lock, or `undefined` when none does. */
+export async function lockHolder(repo: string, id: string, isAlive: (pid: number) => boolean): Promise<number | undefined> {
+  const pid = await readHolder(repo, id)
+  return pid !== undefined && isAlive(pid) ? pid : undefined
+}
+
+/** Take the run's lock for `pid`, waiting while another live process holds it. A lock already naming `pid` is its own. */
+export async function acquireRunLock(
+  repo: string,
+  id: string,
+  opts: { pid: number; isAlive: (pid: number) => boolean; pollMs?: number },
+): Promise<void> {
+  const path = runLockPath(repo, id)
+  await mkdir(dirname(path), { recursive: true })
+  // Hidden from git like the state file: a lock written before any state must not dirty the tree.
+  await excludeFromGit(repo, `/${STATE_DIR}`).catch(() => {})
+  for (;;) {
+    try {
+      await writeFile(path, `${opts.pid}\n`, { flag: 'wx' })
+      return
+    } catch (err) {
+      if ((err as { code?: string }).code !== 'EEXIST') throw err
+    }
+    const holder = await readHolder(repo, id)
+    if (holder === opts.pid) return
+    if (holder === undefined || !opts.isAlive(holder)) {
+      await rm(path, { force: true })
+      continue
+    }
+    await new Promise(resolve => setTimeout(resolve, opts.pollMs ?? POLL_MS))
+  }
+}
+
+/** Hand the lock `from` holds to the process `to`: a detached run's parent to the run's own process. */
+export async function handOverRunLock(repo: string, id: string, from: number, to: number): Promise<void> {
+  if ((await readHolder(repo, id)) === from) await writeFile(runLockPath(repo, id), `${to}\n`)
+}
+
+/** Let the lock go, when `pid` holds it. */
+export async function releaseRunLock(repo: string, id: string, pid: number): Promise<void> {
+  if ((await readHolder(repo, id)) === pid) await rm(runLockPath(repo, id), { force: true })
+}

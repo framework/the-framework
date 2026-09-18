@@ -13,6 +13,7 @@ import { resumeRun, runCommand, runIdFrom, type RunOutcome } from './run.js'
 import { readSchedule } from './schedule.js'
 import { readState, runStderrPath, stateDir, updateState, withoutPid, type State, type TickRecord } from './state.js'
 import { sweep } from './sweep.js'
+import { acquireRunLock, handOverRunLock, isPidAlive, releaseRunLock } from './run-lock.js'
 import { projectHasCommand, runCheck, tick } from './tick.js'
 
 /**
@@ -33,16 +34,6 @@ export type DriverName = (typeof DRIVER_NAMES)[number]
 
 export function isDriverName(name: string): name is DriverName {
   return (DRIVER_NAMES as readonly string[]).includes(name)
-}
-
-/** Whether `pid` is a live process on this host. A pid on another host is unknowable here. */
-export function isPidAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0)
-    return true
-  } catch (err) {
-    return (err as { code?: string }).code === 'EPERM'
-  }
 }
 
 /** One tick of the real project, and the state written with what it decided. */
@@ -94,17 +85,29 @@ export function resumeArgs(run: { id: string; text?: string; answer?: string; mo
   return args
 }
 
-/** The run's process, detached from the tick that started it: `agent-scheduler run <prompt> --id <id>`, its stderr kept. */
-export function spawnRun(repo: string, run: { id: string; command: string; prompt: string; model?: string; driver?: DriverName }): Promise<void> {
-  return spawnDetached(repo, run.id, runArgs(run))
+/**
+ * The run's process, detached from the tick that started it: `agent-scheduler run <prompt> --id <id>`,
+ * its stderr kept. The run's lock is taken here before the process exists and handed to it once it
+ * does, so the sweep never finds the run with neither a lock nor a checkout while it boots.
+ */
+export async function spawnRun(repo: string, run: { id: string; command: string; prompt: string; model?: string; driver?: DriverName }): Promise<void> {
+  await acquireRunLock(repo, run.id, { pid: process.pid, isAlive: isPidAlive })
+  try {
+    const child = await spawnDetached(repo, run.id, runArgs(run))
+    await handOverRunLock(repo, run.id, process.pid, child)
+  } catch (err) {
+    await releaseRunLock(repo, run.id, process.pid)
+    throw err
+  }
 }
 
 /** A resumed run's process, detached the same way: `agent-scheduler run --resume <id> …`. */
-export function spawnResume(repo: string, run: { id: string; text?: string; answer?: string; model?: string }): Promise<void> {
-  return spawnDetached(repo, run.id, resumeArgs(run))
+export async function spawnResume(repo: string, run: { id: string; text?: string; answer?: string; model?: string }): Promise<void> {
+  await spawnDetached(repo, run.id, resumeArgs(run))
 }
 
-async function spawnDetached(repo: string, id: string, args: string[]): Promise<void> {
+/** Spawn a detached process of this tool for the run `id`; resolves with its pid once it is spawned. */
+async function spawnDetached(repo: string, id: string, args: string[]): Promise<number> {
   const stderrPath = runStderrPath(repo, id)
   mkdirSync(dirname(stderrPath), { recursive: true })
   const fd = openSync(stderrPath, 'a')
@@ -120,6 +123,7 @@ async function spawnDetached(repo: string, id: string, args: string[]): Promise<
     child.once('spawn', resolve)
     child.once('error', reject)
   })
+  return child.pid!
 }
 
 /**
@@ -138,9 +142,17 @@ export async function detachRun(
   const command = opts.prompt.replace(/^\//, '').split(/\s+/)[0] || opts.prompt
   const driver = opts.driver ?? 'claude-code'
   const model = await modelFor(repo, driver, opts.model)
-  const marked = await writeMarker(repo, markerCard({ id, startedAt: now().toISOString(), prompt: opts.prompt, driver, ...(model !== undefined ? { model } : {}), mark: { command, host: deps.host ?? hostname() } }))
-  if (!marked.ok && !marked.committed) opts.log?.(`[agent-scheduler] the run's record could not be written: ${marked.error}`)
-  await (deps.spawn ?? spawnRun)(repo, { id, command, prompt: opts.prompt, driver, ...(model !== undefined ? { model } : {}) })
+  // The lock before the marker: a scheduler's sweep that reads the marker in the moment before
+  // the run's process has its checkout sees the run held, not gone.
+  await acquireRunLock(repo, id, { pid: process.pid, isAlive: isPidAlive })
+  try {
+    const marked = await writeMarker(repo, markerCard({ id, startedAt: now().toISOString(), prompt: opts.prompt, driver, ...(model !== undefined ? { model } : {}), mark: { command, host: deps.host ?? hostname() } }))
+    if (!marked.ok && !marked.committed) opts.log?.(`[agent-scheduler] the run's record could not be written: ${marked.error}`)
+    await (deps.spawn ?? spawnRun)(repo, { id, command, prompt: opts.prompt, driver, ...(model !== undefined ? { model } : {}) })
+  } catch (err) {
+    await releaseRunLock(repo, id, process.pid)
+    throw err
+  }
   return { id, command, driver, ...(model !== undefined ? { model } : {}) }
 }
 

@@ -1,5 +1,5 @@
 import { parseArgs } from 'node:util'
-import { checkoutRoot, nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
+import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
 import { projectRoot } from '@gemstack/skill-branches'
 import { DRIVER_NAMES, detachResume, detachRun, isDriverName, resumeProject, runProject, schedulerStatus, startScheduler, stopScheduler, tickProject } from './scheduler.js'
 import { updateState } from './state.js'
@@ -88,6 +88,7 @@ const COMMANDS: Record<string, Command> = {
     if (driver !== undefined && !isDriverName(driver)) throw new Usage(`unknown driver "${driver}"; the drivers are ${DRIVER_NAMES.join(' and ')}`)
     if (values.resume !== undefined) {
       if (driver !== undefined) throw new Usage('--resume takes no --driver: a run continues on the coding agent its record names')
+      if (values.id !== undefined || values.command !== undefined) throw new Usage('--resume takes no --id or --command: a run continues under its own')
       if (positionals[0] === undefined && values.answer === undefined) throw new Usage('a text or --answer is needed to resume a run')
     }
     if (values.detach && values.resume !== undefined) {
@@ -191,4 +192,3 @@ function parse<O extends Options>(args: string[], options: O, min: number, max: 
   }
 }
 
-export { checkoutRoot }

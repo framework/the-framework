@@ -29,10 +29,11 @@ test('CodexJsonParser takes the last message as the turn (#539)', () => {
   assert.equal(turn.sessionId, '019f660b-bf69-7d62-a96c-34aad1f083db')
 })
 
-test('CodexJsonParser streams text and surfaces tool kinds only (#539)', () => {
+test('CodexJsonParser announces the session at once, streams text and surfaces tool kinds only (#539)', () => {
   const p = new CodexJsonParser()
   const events = REAL_RUN.flatMap(line => p.push(line))
   assert.deepEqual(events, [
+    { type: 'session', sessionId: '019f660b-bf69-7d62-a96c-34aad1f083db' },
     { type: 'text', text: 'I’ll create `hello.txt`.' },
     { type: 'action', label: 'file_change' },
     { type: 'text', text: 'Created hello.txt' },
@@ -132,6 +133,19 @@ test('CodexDriver runs a prompt through the CLI and returns the turn (#539)', as
   assert.equal(turn.sessionId, '019f660b-bf69-7d62-a96c-34aad1f083db')
   assert.ok(events.some(e => e.type === 'action' && e.label === 'file_change'))
   assert.ok(events.some(e => e.type === 'result'))
+})
+
+test('a Codex turn that fails keeps its session id on the log: a later resume continues the same thread', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'codex-log-'))
+  try {
+    const driver = new CodexDriver({ spawn: fakeSpawn(REAL_RUN.slice(0, 3), undefined, 1) })
+    const session = await driver.start({ cwd: dir, log: { dir, card: { id: 'r1' } } })
+    await assert.rejects(session.prompt('build it'), /exited \(1\)/)
+    await session.log!.settled()
+    assert.equal(session.log!.card.caller?.['sessionId'], '019f660b-bf69-7d62-a96c-34aad1f083db')
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
 })
 
 test('CodexDriver runs sandboxed in the workspace, never with the bypass (#539)', async () => {

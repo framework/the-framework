@@ -1,4 +1,4 @@
-The sweep [1]: what a run's [2] own process could not do because it died. Runs on every tick, before anything is decided, and only for this machine: a pid means nothing on another. A checkout [3] whose live card [4] says `running` under a dead pid is a run that died mid-work; a checkout whose card says the run ended is one whose process died between the end and the record, or whose reclaim [5] could not push; a running card on the branch from this machine with no checkout behind it is a run that never started. A running record from another machine is never touched: no age-out, a person's pick.
+The sweep [1]: what a run's [2] own process could not do because it died. Runs on every tick, before anything is decided, and only for this machine: a pid means nothing on another. A run whose lock [7] a live process holds is that process's: it is booting, working, recording, reclaiming or resuming, and the sweep does not touch it. Otherwise, a checkout [3] whose live card [4] says `running` is a run that died mid-work; a checkout whose card says the run ended is one whose process died between the end and the record, or whose reclaim [5] could not push; a running card on the branch from this machine with no checkout behind it is a run that never started. A running record from another machine is never touched: no age-out, a person's pick.
 
 ## Context
 
@@ -14,11 +14,12 @@ The sweep [1]: what a run's [2] own process could not do because it died. Runs o
 [4] live card: the card `<id>.json` under `.the-framework/` in a run's checkout, written by the session as the agent works, beside the diary `<id>.jsonl`; carries the tool's mark with the run's pid and host.
 [5] reclaim: removing a finished agent's checkout once its work is on the remote.
 [6] marker: a run record written before the agent exists: `status: running`, the tool's mark, an empty diary.
+[7] the run's lock: `.agent-scheduler/runs/<id>.lock` at the repository root, holding the pid of the one process of the run at work on it; a pid that is not a live process holds nothing (`run-lock.ts`).
 
 ## Business logic — TL;DR
 
-- **Checkouts of this machine** - every checkout under `.branches/` whose live card is this tool's and names this host: `running` under a live pid is left alone; `running` under a dead pid is ended `failed` with `its process died before the run ended`; either way an ended card is recorded with its diary; a `waiting` run is kept, for the answer; any other is reclaimed, kept with the `branches` reason when it cannot go.
-- **Markers of this machine with nothing behind them** - a running card marked by this host whose checkout the first pass did not see: left alone while its process is alive and its checkout not there yet (still booting), or while a checkout exists with no live card yet (the run is opening it); otherwise recorded `failed` with the last five lines of the spawn's stderr when there are any, else `stopped` as `its process is gone and left no checkout`.
+- **Checkouts of this machine** - every checkout under `.branches/` whose live card is this tool's and names this host: a run whose lock a live process holds is left alone, whatever its card says; otherwise `running` is ended `failed` with `its process died before the run ended`; either way an ended card is recorded with its diary; a `waiting` run is kept, for the answer; any other is reclaimed, kept with the `branches` reason when it cannot go.
+- **Markers of this machine with nothing behind them** - a running card marked by this host whose checkout the first pass did not see: left alone while a live process holds its lock (booting, or resuming), or while a checkout exists with no live card yet (the run is opening it); otherwise recorded `failed` with the last five lines of the spawn's stderr when there are any, else `stopped` as `its process is gone and left no checkout`.
 - **Never another machine's** - a live card or a marker naming another host is that machine's.
 - **What the sweep answers** - the runs it recorded with their status, the checkouts it reclaimed, and the ones it kept with why.
 
@@ -32,7 +33,7 @@ See `## Context`.
 
 #### Business logic
 
-For every checkout under `.branches/`, the live card [4] named for the checkout's id is read; a checkout with no card, a card that does not parse, one without the tool's mark, or one naming another host is skipped. A card saying `running` whose pid is alive is a run at work: left alone. One whose pid is dead is ended from outside: an `ended` line with `its process died before the run ended` appended to the diary, the card set `failed` with the tick's time. Every ended card is then recorded with its diary over the marker [6], idempotent. A `waiting` card keeps its checkout, with the reason `waiting`. Any other is reclaimed [5] under the `branches` rule, pushing allowed, the birth branch named; a checkout that cannot go is kept with the package's reason and its detail.
+For every checkout under `.branches/`, the live card [4] named for the checkout's id is read; a checkout with no card, a card that does not parse, one without the tool's mark, or one naming another host is skipped. A run whose lock [7] a live process holds is left alone, whatever its card says: a card saying `running` is a run at work, and an ended one is a run still recording and reclaiming, or being resumed while its card has not been reopened yet. Otherwise, a card saying `running` is ended from outside: an `ended` line with `its process died before the run ended` appended to the diary, the card set `failed` with the tick's time. Every ended card is then recorded with its diary over the marker [6], idempotent. A `waiting` card keeps its checkout, with the reason `waiting`. Any other is reclaimed [5] under the `branches` rule, pushing allowed, the birth branch named; a checkout that cannot go is kept with the package's reason and its detail.
 
 ### Markers of this machine with nothing behind them
 
@@ -42,7 +43,7 @@ For every checkout under `.branches/`, the live card [4] named for the checkout'
 
 #### Business logic
 
-Every running card on the branch not seen in the first pass, marked by this host, is looked at. One whose pid is alive and whose checkout does not exist yet is a run still booting: left for the next tick. One whose checkout exists but holds no live card yet is opening it: left alone too. Otherwise the run never started: when the spawn's stderr file under `.agent-scheduler/runs/` has content, the card is recorded `failed` with the detail `its process died before the run started: ` and the last five lines of it; else `stopped` with `its process is gone and left no checkout`.
+Every running card on the branch not seen in the first pass, marked by this host, is looked at. One whose lock a live process holds is left for the next tick: a run still booting (the process that spawned it took the lock before the spawn and handed it to the run's process), or one being resumed. One whose checkout exists but holds no live card yet is opening it: left alone too. Otherwise the run never started: when the spawn's stderr file under `.agent-scheduler/runs/` has content, the card is recorded `failed` with the detail `its process died before the run started: ` and the last five lines of it; else `stopped` with `its process is gone and left no checkout`.
 
 ### Never another machine's
 

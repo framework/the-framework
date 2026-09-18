@@ -15,8 +15,9 @@ import { readSchedule } from './schedule.js'
 export const USAGE = `usage: agent-scheduler <command>
 
   tick                          pull agent-data, sweep, read agent-schedule.md, start what is due
-  run <prompt> [--model <id>] [--driver <claude-code|codex>]
-                                one run of <prompt> in its own checkout, now, recorded; needs no scheduler; on Claude Code unless --driver says Codex
+  run <prompt> [--model <id>] [--driver <claude-code|codex>] [--then <prompt>]
+                                one run of <prompt> in its own checkout, now, recorded; needs no scheduler; on Claude Code unless --driver says Codex;
+                                with --then, once it ends done with a pull request, a fresh agent on its branch gets that prompt and the run's id, and the merge waits for it
   run --detach <prompt>         the same run in its own process, answered at once with its id: what a dashboard's start hook runs
   run --resume <id> [<text>] [--answer <label>]
                                 continue an ended run: the same record, its session resumed; the text as the next prompt, or the answer to the question it ended on
@@ -88,21 +89,24 @@ const COMMANDS: Record<string, Command> = {
   },
 
   async run(args, io, git) {
-    const { positionals, values } = parse(args, { id: { type: 'string' }, command: { type: 'string' }, model: { type: 'string' }, resume: { type: 'string' }, answer: { type: 'string' }, detach: { type: 'boolean' }, driver: { type: 'string' } }, 0, 1)
+    const { positionals, values } = parse(args, { id: { type: 'string' }, command: { type: 'string' }, model: { type: 'string' }, resume: { type: 'string' }, answer: { type: 'string' }, detach: { type: 'boolean' }, driver: { type: 'string' }, then: { type: 'string' } }, 0, 1)
     const repo = await project(io.cwd, git)
     const driver = values.driver
     if (driver !== undefined && !isDriverName(driver)) throw new Usage(`unknown driver "${driver}"; the drivers are ${DRIVER_NAMES.join(' and ')}`)
     if (values.resume !== undefined) {
       if (driver !== undefined) throw new Usage('--resume takes no --driver: a run continues on the coding agent its record names')
       if (values.id !== undefined || values.command !== undefined) throw new Usage('--resume takes no --id or --command: a run continues under its own')
+      if (values.then !== undefined) throw new Usage('--resume takes no --then: a run continues with the follow-up its record names')
       if (positionals[0] === undefined && values.answer === undefined) throw new Usage('a text or --answer is needed to resume a run')
     }
+    if (values.then !== undefined && !values.then.trim()) throw new Usage('--then needs a prompt')
     // A person's run is refused before it spends a checkout when its coding agent cannot start;
     // the tick asks the same before it marks, and a resumed run's agent already ran once here.
     if (values.resume === undefined && values.id === undefined) {
       const ready = await readyToRun(driver ?? 'claude-code')
       if (ready.problems.length > 0) throw new Refused({ ok: false, reason: 'not-ready', ...ready }, ready.problems.join(' '))
     }
+    const then = values.then !== undefined ? { then: values.then.trim() } : {}
     if (values.detach && values.resume !== undefined) {
       const resumed = await detachResume(repo, {
         id: values.resume,
@@ -115,7 +119,7 @@ const COMMANDS: Record<string, Command> = {
     if (values.detach) {
       if (positionals[0] === undefined) throw new Usage('expected 1 argument(s), got 0')
       if (values.id !== undefined) throw new Usage('--detach takes no --id: the run\'s id is minted and answered')
-      const started = await detachRun(repo, { prompt: positionals[0], ...(values.model !== undefined ? { model: values.model } : {}), ...(driver !== undefined ? { driver } : {}), log: io.stderr })
+      const started = await detachRun(repo, { prompt: positionals[0], ...(values.model !== undefined ? { model: values.model } : {}), ...(driver !== undefined ? { driver } : {}), ...then, log: io.stderr })
       return { ok: true, detached: true, ...started }
     }
     if (values.resume !== undefined) {
@@ -135,6 +139,7 @@ const COMMANDS: Record<string, Command> = {
       ...(values.command !== undefined ? { command: values.command } : {}),
       ...(values.model !== undefined ? { model: values.model } : {}),
       ...(driver !== undefined ? { driver } : {}),
+      ...then,
       log: io.stderr,
     })
     return { ok: outcome.status === 'done' || outcome.status === 'waiting', ...outcome }

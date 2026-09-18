@@ -101,10 +101,11 @@ test('no file runs nothing and logs nothing; a broken file logs why it was ignor
 })
 
 test('the start line gets the prompt and the picks in its environment, and the id it answers on stdout comes back', async () => {
-  const cwd = await project(`start: 'printf "%s|%s|%s" "$PROMPT" "$DRIVER" "\${MODEL-unset}" > started.txt; echo "{\\"ok\\":true,\\"id\\":\\"run-1\\"}"'\n`)
+  const cwd = await project(`start: 'printf "%s|%s|%s|%s\\n" "$PROMPT" "$DRIVER" "\${MODEL-unset}" "\${THEN-unset}" >> started.txt; echo "{\\"ok\\":true,\\"id\\":\\"run-1\\"}"'\n`)
   try {
     assert.deepEqual(await runStartHook(cwd, { prompt: '/work-queue "now"', driver: 'codex' }), { ok: true, id: 'run-1' })
-    assert.equal(await readFile(join(cwd, 'started.txt'), 'utf8'), '/work-queue "now"|codex|unset')
+    assert.deepEqual(await runStartHook(cwd, { prompt: 'Fix it', then: '/post-merge-cleanup' }), { ok: true, id: 'run-1' })
+    assert.equal(await readFile(join(cwd, 'started.txt'), 'utf8'), '/work-queue "now"|codex|unset|unset\nFix it||unset|/post-merge-cleanup\n')
   } finally {
     await rm(cwd, { recursive: true, force: true })
   }

@@ -107,6 +107,12 @@ export function SettingsPage({
             placeholder="the agent's default"
             onChange={value => updatePreferences({ model: value })}
           />
+          <ToggleRow
+            label="Post-merge cleanup"
+            description="The launcher's box, ticked by default: once a run ends done with a pull request, a fresh agent runs /post-merge-cleanup on its branch before it merges. In projects with that command."
+            checked={preferences.postMergeCleanup ?? false}
+            onChange={next => updatePreferences({ postMergeCleanup: next })}
+          />
         </Section>
 
         {/* A saved device is the other place a session can run on. */}

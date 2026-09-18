@@ -90,6 +90,7 @@ Each of these keys of the preferences [2] is kept only when its value is a true 
 - `bridge`: switch the bridge [5] on; absent means off, because it opens the daemon's one route reachable from another origin.
 - `bridgeBrowser`: let the daemon run its own bridge browser; absent means off, because it downloads a browser and keeps a signed-in claude.ai session on disk. It only matters with `bridge` on.
 - `onboardingDismissed`: the Onboarding checklist on the Overview [6] has been dismissed; absent means show it, and dismissing hides it only there, the same checklist staying available on Settings.
+- `postMergeCleanup`: follow an agent started from the launcher, in a project that has the `post-merge-cleanup` command, with a fresh agent running that command on the first one's branch before its pull request merges; the default of the launcher's "Post-merge cleanup" box, which writes it too; absent means off.
 
 ### The choice preferences
 

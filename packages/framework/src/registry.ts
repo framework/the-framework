@@ -67,6 +67,13 @@ export interface Preferences {
   model?: string
   /** Which coding agent a run starts on (#650): `claude-code` or `codex`, handed to the project's start hook. Absent = the hook's own default. */
   driver?: string
+  /**
+   * Post-merge cleanup: a run started from the launcher, in a project that has the
+   * `post-merge-cleanup` command, is followed by a fresh agent running it on the run's branch
+   * before the run's pull request merges. The default of the launcher's box, which writes it
+   * too. **Absent = off.**
+   */
+  postMergeCleanup?: boolean
   /** Preferred editor for "Open in editor" (#727): an editor CLI (e.g. `code`, `cursor`, `zed`).
    * Absent falls back to `$FRAMEWORK_EDITOR`, then `code`. */
   editor?: string
@@ -255,6 +262,7 @@ const BOOLEAN_PREFERENCES: Record<BooleanPreferenceKey, true> = {
   bridge: true,
   bridgeBrowser: true,
   onboardingDismissed: true,
+  postMergeCleanup: true,
 }
 
 const PREFERENCE_KEYS = Object.keys(BOOLEAN_PREFERENCES) as BooleanPreferenceKey[]

@@ -1,15 +1,17 @@
 import { useRef, useState } from 'react'
 import { onProjects, onStartCheck } from '../rpc/projects.js'
 import type { ProjectSummary } from '../../src/index.js'
-import { usePreferences } from '../lib/preferences.js'
+import { usePreferences, updatePreferences } from '../lib/preferences.js'
 import { useConnectionProfiles } from '../lib/profiles.js'
 import { useSelectedRemoteDeviceId } from '../lib/remote-target.js'
-import { startPicks, useStartAgent } from '../lib/use-start-agent.js'
+import { cleanupPick, offersPostMergeCleanup, startPicks, useStartAgent } from '../lib/use-start-agent.js'
 import { useProjectLauncher } from '../lib/use-project-launcher.js'
 import { useLoaded } from '../lib/use-async.js'
 import { promptWithContext } from '../lib/use-context-set.js'
 import { ContextMenu } from './ContextMenu.js'
 import { Composer, type ComposerHandle } from './Composer.js'
+import { Checkbox } from './ui/checkbox.js'
+import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 
 // Start a run in the selected project (#405, #1774): a free-text box, where `/` lists the project's
 // commands, and Start, which is the project's own start hook (posted over `sendStart`). The editor +
@@ -20,6 +22,9 @@ import { Composer, type ComposerHandle } from './Composer.js'
 // from the project's check hook.
 // The Context picker (#439/#314) narrows the run's focus to other projects and to files: the
 // picked paths ride the prompt as one `Context:` line at its end.
+// The "Post-merge cleanup" box, where the project has that command: ticked, the run is followed
+// by a fresh agent running the command on its branch before its pull request merges. The box
+// writes the same saved setting as Settings → Agent, so its state is every next run's default.
 export function StartAgentForm({
   projectId,
   onAgentStarted,
@@ -56,6 +61,9 @@ export function StartAgentForm({
   const selectedDeviceId = useSelectedRemoteDeviceId()
   const remoteDevice = selectedDeviceId ? profiles.find(p => p.id === selectedDeviceId) : undefined
   const noStartHook = launcher !== null && !launcher.startHook && !remoteDevice
+  // A device starts the run in its own project, whose commands this launcher does not read.
+  const commands = remoteDevice ? [] : (launcher?.commands ?? [])
+  const offersCleanup = offersPostMergeCleanup(commands)
 
   // Re-read when the pick changes: `claude` being logged in says nothing about `codex`. A device
   // runs on its own machine, so this one's CLIs say nothing about it.
@@ -82,6 +90,7 @@ export function StartAgentForm({
     setNote('Starting…')
     const result = await start(projectId, promptWithContext(text, context), {
       ...startPicks(preferences),
+      ...cleanupPick(preferences, commands),
       ...(remoteDevice ? { remote: { url: remoteDevice.url, token: remoteDevice.token, label: remoteDevice.label } } : {}),
     })
     setNote(null)
@@ -107,15 +116,37 @@ export function StartAgentForm({
         files={files}
         addContext={addContext}
         removeContext={removeContext}
-        contextControl={
-          <ContextMenu
-            otherProjects={otherProjects}
-            context={context}
-            contextFiles={contextFiles}
-            summary={contextSummary}
-            busy={busy}
-            onToggle={toggleContext}
-          />
+        launcherControls={
+          <>
+            <ContextMenu
+              otherProjects={otherProjects}
+              context={context}
+              contextFiles={contextFiles}
+              summary={contextSummary}
+              busy={busy}
+              onToggle={toggleContext}
+            />
+            {offersCleanup && (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <label className="flex cursor-pointer items-center gap-1.5 px-1.5 text-xs text-muted-foreground">
+                      <Checkbox
+                        checked={preferences.postMergeCleanup ?? false}
+                        disabled={busy}
+                        onCheckedChange={next => updatePreferences({ postMergeCleanup: next === true })}
+                        aria-label="Post-merge cleanup"
+                      />
+                      Post-merge cleanup
+                    </label>
+                  }
+                />
+                <TooltipContent>
+                  Once the run ends done with a pull request, a fresh agent runs /post-merge-cleanup on its branch; the merge waits for it.
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </>
         }
         onSubmit={submit}
         onPromptChange={value => {

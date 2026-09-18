@@ -17,7 +17,7 @@ import { DASHBOARD_DIR, DASHBOARD_HOOKS } from './names.js'
 export const HOOK_LINES: Readonly<Record<string, string | readonly string[]>> = {
   open: ['npx agent-scheduler start'],
   close: ['npx agent-scheduler stop --unless-keep-alive'],
-  start: 'npx agent-scheduler run --detach "$PROMPT" ${DRIVER:+--driver "$DRIVER"} ${MODEL:+--model "$MODEL"}',
+  start: 'npx agent-scheduler run --detach "$PROMPT" ${DRIVER:+--driver "$DRIVER"} ${MODEL:+--model "$MODEL"} ${THEN:+--then "$THEN"}',
   resume: 'npx agent-scheduler run --detach --resume "$RUN_ID" ${TEXT:+"$TEXT"} ${ANSWER:+--answer "$ANSWER"}',
   check: 'npx agent-scheduler check ${DRIVER:+--driver "$DRIVER"}',
   offset: 'npx agent-scheduler offset -- "$POINTS"',

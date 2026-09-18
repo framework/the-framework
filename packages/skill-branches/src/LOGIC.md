@@ -21,6 +21,7 @@ Implements the `branches` skill [1]: one git worktree per agent [2] under the pr
 [11] branch link: a symbolic link under `.branches/`, named as the branch a checkout is on now and pointing at that checkout's directory, so `.branches/<branch>` reaches the checkout by its current branch name.
 [12] sweep: the scheduler's (`agent-scheduler`) pass on every tick that records and reclaims the runs of this machine whose process died, and only this machine's.
 [13] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
+[14] hold: a mark put on a checkout by whoever starts the agent, saying more work comes on its branch after the agent; a publish from it that asks for the merge arms nothing until a release.
 
 ## Business logic — TL;DR
 
@@ -31,9 +32,10 @@ Implements the `branches` skill [1]: one git worktree per agent [2] under the pr
 - **The skill linked in** (`skill-links.ts`, `skill-links.test.ts`) - `SKILL.md` reachable where each coding agent [10] looks for skills at the checkout root, hidden from git, an existing entry left alone; further skills the caller names beside it.
 - **The links under `.branches/`** (`branch-links.ts`, `branch-links.test.ts`) - a branch link [11] per checkout whose branch differs from its directory's name, stale ones dropped, nothing else touched; run after every checkout made and every change through the command.
 - **Reclaiming** (`reclaim.ts`, `reclaim.test.ts`) - only what is on the remote may go: the refusals `not-a-worktree`, `no-branch`, `dirty` and `not-on-remote`, the push when the caller allows it, and the branches that go with a reclaimed [4] checkout.
-- **Publishing** (`publish.ts`) - the agent's own last step: a clean checkout's branch pushed, its pull request opened with the agent's words, the merge armed on request; a branch with an open request gets no second one.
+- **Publishing** (`publish.ts`, `publish.test.ts`) - the agent's own last step: a clean checkout's branch pushed, its pull request opened with the agent's words, the merge armed on request; a branch with an open request gets no second one. From a checkout under a hold [14] the merge is only recorded as wanted, and the release arms it later.
+- **The held merge** (`merge-hold.ts`) - the hold [14] on a checkout, kept in its private git directory; the record of a merge wanted and held, under `.branches/merge-held/`, which outlives the checkout; the line a held request's body carries.
 - **Merge on green without auto-merge** (`merge-watch.ts`, `merge-watch.test.ts`) - a detached process of this tool's own that reads one request's checks every minute and merges it once they pass; red, a request closed meanwhile, or six hours pending end it with nothing merged.
-- **The `branches` command** (`cli.ts`, `cli.test.ts`) - `create`, `attach`, `name`, `status`, `list`, `remove` and `prune`: one JSON document on stdout, one line on stderr, exit code 0, 1 or 2.
+- **The `branches` command** (`cli.ts`, `cli.test.ts`) - `create`, `attach`, `name`, `status`, `publish`, `merge-on-green`, `release`, `list`, `remove` and `prune`: one JSON document on stdout, one line on stderr, exit code 0, 1 or 2.
 - **The executable's home** (`bin-dir.ts`) - the `bin/` directory, exported for a caller that puts the command on a process's PATH; no caller in the repository does.
 - **The entry point** (`index.ts`) - what the scheduler and the dashboard's server import, and the naming rules alone for the dashboard's browser code.
 - **A checkout's life** - made, named, listed and reclaimed: the flow across the files above.
@@ -53,6 +55,7 @@ See `## Context`.
 - The agent [2] runs `branches status` to learn where it is and `branches name <name>` to name its work; the branch becomes `agent-<name>`, suffixed when the name is taken, while the directory keeps its name and the branch link `.branches/agent-<name>` reaches it (`worktree.ts`, `branch-links.ts`).
 - The dashboard lists the checkouts on disk with their branch and size (`worktree.ts`, `cli.ts`).
 - Once the agent is done, the scheduler's run at its end or its sweep [12], the dashboard's "Remove" button or `branches remove` reclaims [4] the checkout under the one rule (`reclaim.ts`): a clean tree whose tip is on the remote, pushed on the way when allowed; a branch that held nothing and the birth branch the agent left behind go with it. `branches remove` reconciles the branch links again; after the other two a stale link goes at the next reconcile.
+- When the scheduler put a hold [14] on the checkout before the agent started, the agent's `publish --merge` opens the request and arms nothing; the record of the wanted merge stays under `.branches/merge-held/` after the checkout is reclaimed, until the scheduler, or a person with `branches release`, releases it (`merge-hold.ts`, `publish.ts`).
 - A continued agent is put back on the branch its work is on, in a checkout named as its agent id [6] again and set up the same way (`worktree.ts`, `checkout.ts`).
 
 ### Nothing runs through a directory git does not know

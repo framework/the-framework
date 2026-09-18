@@ -61,6 +61,10 @@ test('run --detach on Codex: the marker and the spawned run name Codex, and no m
     assert.equal(card?.model, undefined)
     const named = await detachRun(repo, { prompt: '/work-queue', driver: 'codex', model: 'gpt-5', now: () => new Date(NOW.getTime() + 1000) }, { spawn: async () => {}, host: 'this-box' })
     assert.equal(named.model, 'gpt-5', 'a model given by hand is passed on')
+    const followed: unknown[] = []
+    const withThen = await detachRun(repo, { prompt: '/work-queue', driver: 'codex', then: '/post-merge-cleanup', now: () => new Date(NOW.getTime() + 2000) }, { spawn: async (_repo, run) => { followed.push(run) }, host: 'this-box' })
+    assert.deepEqual(followed, [{ id: withThen.id, command: 'work-queue', prompt: '/work-queue', driver: 'codex', then: '/post-merge-cleanup' }])
+    assert.deepEqual((await findRun(repo, withThen.id))?.caller?.['scheduler'], { command: 'work-queue', host: 'this-box', then: '/post-merge-cleanup' }, 'the follow-up is on the record from the start')
   } finally {
     await removeRepo(repo)
   }
@@ -101,6 +105,7 @@ test('a resumed run continues on the tool its record names, and a Codex run with
 test('a spawned run is told its tool, and its model only when it has one', () => {
   assert.deepEqual(runArgs({ id: 'r1', command: 'work-queue', prompt: '/work-queue', model: 'opus' }), ['run', '/work-queue', '--id', 'r1', '--command', 'work-queue', '--model', 'opus'])
   assert.deepEqual(runArgs({ id: 'r1', command: 'work-queue', prompt: '/work-queue', driver: 'codex' }), ['run', '/work-queue', '--id', 'r1', '--command', 'work-queue', '--driver', 'codex'])
+  assert.deepEqual(runArgs({ id: 'r1', command: 'work-queue', prompt: '/work-queue', then: '/post-merge-cleanup' }), ['run', '/work-queue', '--id', 'r1', '--command', 'work-queue', '--then', '/post-merge-cleanup'])
 })
 
 test('ready to run: the coding agent\'s problems stop a run, a missing or logged-out gh only warns', async () => {

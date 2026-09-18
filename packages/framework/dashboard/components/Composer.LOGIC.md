@@ -1,4 +1,4 @@
-The dashboard's prompt editor with the controls around it, shared by the launcher [1] (where a submit starts an agent [2]) and by an agent view [1] (where a submit says the text to that agent): a rich editor opened by `/` for the project's commands [3] and the saved prompts [4], `@` for projects and `#` for files, the Commands menu, the launcher's Context [10] picker, the coding agent [5] and model select, the "Run on" pick of this machine or a device [6], and the submit arrow.
+The dashboard's prompt editor with the controls around it, shared by the launcher [1] (where a submit starts an agent [2]) and by an agent view [1] (where a submit says the text to that agent): a rich editor opened by `/` for the project's commands [3] and the saved prompts [4], `@` for projects and `#` for files, the Commands menu, the launcher's own controls (its Context [10] picker and its "Post-merge cleanup" box), the coding agent [5] and model select, the "Run on" pick of this machine or a device [6], and the submit arrow.
 
 ## Context
 
@@ -21,7 +21,7 @@ The dashboard's prompt editor with the controls around it, shared by the launche
 
 ## Business logic — TL;DR
 
-- **What the composer shows** - one bordered box: the editor, and under it the Commands button and, at the launcher, the Context [10] picker, then the coding-agent-and-model select, the "Run on" pick and the submit arrow; everything is disabled while the embedding surface is busy.
+- **What the composer shows** - one bordered box: the editor, and under it the Commands button and, at the launcher, its own controls (the Context [10] picker and, where offered, the "Post-merge cleanup" box), then the coding-agent-and-model select, the "Run on" pick and the submit arrow; everything is disabled while the embedding surface is busy.
 - **Commands and saved prompts load into the editor** - the open project's commands [3] and the user's and the project's saved prompts [4], from the `/` list or the Commands menu, each replacing the box in one undoable step; "Save prompt…" saves the current text for "Just me" or "This project".
 - **Mentions feed the Context** - where the surface keeps a Context (the launcher), an `@` or `#` mention adds the project's path or the file to it and deleting the chip takes it out; elsewhere a mention is only text.
 - **Driver and model** - a tree of Claude Code and Codex with each one's own models; picking a model sets both, and no model is pinned by default.
@@ -41,7 +41,7 @@ See `## Context`.
 
 #### Business logic
 
-The full composer is one bordered box. The editor is on top (`PromptEditor.tsx`). Under it is one row: the Commands button at the start, followed by whatever control the surface hangs there (the launcher hangs its Context [10] picker, `ContextMenu.tsx`); the coding-agent-and-model select, the "Run on" pick and the submit slot clustered at the end. Under the box, when it applies, is the note that the target device [6] is offline.
+The full composer is one bordered box. The editor is on top (`PromptEditor.tsx`). Under it is one row: the Commands button at the start, followed by whatever controls the surface hangs there (the launcher hangs its Context [10] picker, `ContextMenu.tsx`, and, where the project offers it, its "Post-merge cleanup" box, `StartAgentForm.tsx`); the coding-agent-and-model select, the "Run on" pick and the submit slot clustered at the end. Under the box, when it applies, is the note that the target device [6] is offline.
 
 While the embedding surface is busy (a start or a send is in flight) the editor and every control are disabled.
 

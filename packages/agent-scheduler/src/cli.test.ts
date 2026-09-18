@@ -76,6 +76,9 @@ test('usage errors exit 2 with the usage on stderr and nothing on stdout; outsid
       assert.equal(relabelled.code, 2, flag)
       assert.match(relabelled.err, /--resume takes no --id or --command/)
     }
+    const followed = await run(repo, 'run', '--detach', '--resume', '2026-09-17T20-00-00-000Z', 'go on', '--then', '/post-merge-cleanup')
+    assert.equal(followed.code, 2)
+    assert.match(followed.err, /--resume takes no --then/)
     const outside = await run(elsewhere, 'status')
     assert.equal(outside.code, 1)
     assert.deepEqual(outside.out, { ok: false, reason: 'not-a-repo' })

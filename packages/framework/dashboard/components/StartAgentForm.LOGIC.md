@@ -1,4 +1,4 @@
-The launcher on a project home [1]: the box where the user says what an agent [3] should do, or picks one of the project's commands [2] from its `/` list, and Start. A Start is the project's own start hook [4]: the launcher hands it the prompt, with the Context [11] the user picked on its last line, the coding agent [5] and model the user picked, and the device [6] when one is picked, and selects the agent the hook answers. A project that has no start hook cannot start an agent from here, and the launcher says what to add. What would stop the agent (a coding agent not installed or logged out) is said before the Start, from the project's check hook [10].
+The launcher on a project home [1]: the box where the user says what an agent [3] should do, or picks one of the project's commands [2] from its `/` list, and Start. A Start is the project's own start hook [4]: the launcher hands it the prompt, with the Context [11] the user picked on its last line, the coding agent [5] and model the user picked, the follow-up [12] when the "Post-merge cleanup" box is ticked, and the device [6] when one is picked, and selects the agent the hook answers. A project that has no start hook cannot start an agent from here, and the launcher says what to add. What would stop the agent (a coding agent not installed or logged out) is said before the Start, from the project's check hook [10].
 
 ## Context
 
@@ -19,12 +19,14 @@ The launcher on a project home [1]: the box where the user says what an agent [3
 [9] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 [10] check hook: the one shell line under `check:` in the project's `.the-framework/hooks.yml`. The daemon runs it with the picked coding agent in its environment, and the line answers a list of problems, which would stop the agent, and a list of warnings, which are only worth knowing; each names its own fix. The Framework names no tool: the line does.
 [11] Context: the set of paths the user picked to focus an agent on: other registered projects, by their absolute path, and files of the current project, by their path relative to the repository's root. The agent can still reach everything; the Context only says where to look.
+[12] follow-up: a prompt a Start carries besides its own: once the agent ends done with a pull request, the tool the start hook names starts a fresh agent on the same branch with that prompt and the first agent's id, and holds the pull request's merge until that one is done. Handed to the start hook as `THEN`.
 
 ## Business logic — TL;DR
 
 - **Commands load, never start** - the commands [2] are in the editor's `/` list and the Commands menu, not buttons; picking one loads `/<name> ` into the editor for review, and the form leaves a note saying so.
 - **The Context picker** - a "Context" menu on the control row lists the other registered projects to tick and the picked files to remove; `@`/`#` mentions and the right rail's file tree feed the same Context [11].
-- **What a Start sends** - the text with the Context on one `Context:` line at its end, the coding agent [5] and the model when the user picked them, and the picked device's address and token; nothing else.
+- **The "Post-merge cleanup" box** - on the control row, after the Context menu, only when the project has the `post-merge-cleanup` command [2] and no device is picked; ticked from the user's saved setting, and a click writes that setting.
+- **What a Start sends** - the text with the Context on one `Context:` line at its end, the coding agent [5] and the model when the user picked them, `/post-merge-cleanup` as the follow-up [12] when the box is offered and ticked, and the picked device's address and token; nothing else.
 - **A project with no start hook** - Start is off and the form says to run `npx agent-scheduler init` in the project, or which line to add to which file; a picked device lifts the block, since the device runs its own hook.
 - **Before the Start: what would stop the agent** - the check hook's [10] problems in red and its warnings in amber, under the editor, for the coding agent picked; read again when the pick changes; not asked for a picked device; neither turns Start off.
 - **Feedback about the start itself** - "Starting…", the refusal in the start hook's own words, the note a loaded command or saved prompt [8] leaves, and an error that clears as soon as the user edits.
@@ -58,6 +60,18 @@ The Context [11] belongs to the shell (`App.tsx`, `lib/use-context-set.ts`) and 
 
 Mentioning a project with `@` in the editor adds that project's path to the Context, and mentioning a file with `#` adds the file's path; deleting the chip takes the path out again (`PromptEditor.tsx`).
 
+### The "Post-merge cleanup" box
+
+#### Context
+
+**User story**: the user wants every agent's work cleaned up before it merges: its maintainability and security follow-ups queued and the project's knowledge files brought up to date, in the same pull request. They tick "Post-merge cleanup" once; from then on each Start is followed by a second agent running `/post-merge-cleanup` on the first one's branch, and the pull request merges only after it.
+
+**Problem**: the follow-up is a project command [2]: a project without it has nothing to follow up with, and a device [6] runs its own project, whose commands this launcher does not read.
+
+#### Business logic
+
+The form hangs a checkbox labelled "Post-merge cleanup" on the composer's control row, right after the "Context" menu, only when the project's commands (as the launcher read them) include one named `post-merge-cleanup` and no device [6] is picked in "Run on"; otherwise there is no box. Its tooltip reads "Once the run ends with a pull request, a fresh agent runs /post-merge-cleanup on its branch; the merge waits for it." It is ticked when the user's preferences [9] say `postMergeCleanup` is on, and unticked when it is off or was never set. Clicking it writes that preference, the same one Settings → Agent → "Post-merge cleanup" shows, so its state is every next Start's default, in every project. It is disabled while a start is in flight.
+
 ### What a Start sends
 
 #### Context
@@ -73,6 +87,7 @@ A Start sends the project, the text, and:
 - the Context [11], when anything is picked, as one line at the end of the text: the text's trailing whitespace trimmed, a blank line, then `Context: ` and the picked paths joined by ", " (`lib/use-context-set.ts`). At the end, because a command's text must begin with `/<command>`;
 
 - the coding agent [5] the user picked, and the model they picked, read off their preferences [9]. One that was never picked is not sent, so the project's start hook [4] applies its own default;
+- `/post-merge-cleanup` as the follow-up [12], when the box is offered (the project has the command and no device is picked) and the preference is on. A preference left on sends nothing in a project without the command, or with a device picked;
 - when a device [6] is picked in "Run on": that device's URL, token and label, so the local daemon relays [7] the start to it. The token travels with this one start and is never stored by the daemon.
 
 Whether the text is a command, a saved prompt [8] or the user's own words makes no difference to what is sent: it is one prompt. The Context goes the same way whether the agent runs here or on a device.

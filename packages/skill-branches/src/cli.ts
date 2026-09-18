@@ -19,7 +19,7 @@ import {
 import { createCheckout, attachCheckout } from './checkout.js'
 import { reconcileBranchLinks } from './branch-links.js'
 import { reclaimWorktree, type ReclaimOutcome, type ReclaimRefusal } from './reclaim.js'
-import { nodeGhRunner, publishCheckout, type PublishOutcome } from './publish.js'
+import { nodeGhRunner, publishCheckout, releaseMerge, type PublishOutcome } from './publish.js'
 import { watchAndMerge } from './merge-watch.js'
 
 /**
@@ -48,6 +48,7 @@ export const USAGE = `usage: branches <command>
   publish --title <t> [--body <b>] [--merge] [--draft]
                                push this checkout's branch and open its pull request; --merge lands it on green
   merge-on-green <number>      wait for pull request <number>'s checks and merge it once they pass; what --merge starts where the repository has no auto-merge
+  release <number>             arm the merge a publish held for pull request <number>, as --merge would have
   list [--sizes]               every agent checkout under .branches/
   remove <id> [--no-push]      reclaim agent <id>'s checkout, once the remote has everything it holds
   prune [--no-push]            remove, for every checkout
@@ -162,6 +163,17 @@ const COMMANDS: Record<string, Command> = {
     const repo = await project(cwd, git)
     const outcome = await watchAndMerge(repo, number, { gh: nodeGhRunner(), log: line => console.error(line) })
     return { ok: outcome.outcome === 'merged', number, ...outcome }
+  },
+
+  async release(args, cwd, git) {
+    const { positionals } = parse(args, {}, 1)
+    const number = Number(positionals[0])
+    if (!Number.isInteger(number) || number <= 0) throw new Usage(`${positionals[0]} is not a pull request number`)
+    const repo = await project(cwd, git)
+    const outcome = await releaseMerge(repo, number)
+    if (outcome.outcome === 'not-held') throw new Refused({ ok: false, reason: 'not-held', number }, `pull request ${number} has no held merge here`)
+    if (outcome.outcome === 'failed') throw new Refused({ ok: false, reason: 'release-failed', number, detail: outcome.error }, `the merge of pull request ${number} could not be armed: ${outcome.error}`)
+    return { ok: true, number, ...outcome }
   },
 
   async list(args, cwd, git) {

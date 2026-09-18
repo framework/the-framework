@@ -1,4 +1,4 @@
-Gives an agent [1] in a shell, and the user, the `branches` command over this package: `create`, `attach`, `name`, `status`, `publish`, `merge-on-green`, `list`, `remove` and `prune`, the same operations the scheduler and the dashboard's server call as a library, so one implementation serves every surface. Every run prints one JSON document on stdout, at most one line for a person on stderr, and exits with a code that says how it went: 0 for a result, 1 for a refusal or a git failure, 2 for a command line that could not be read.
+Gives an agent [1] in a shell, and the user, the `branches` command over this package: `create`, `attach`, `name`, `status`, `publish`, `merge-on-green`, `release`, `list`, `remove` and `prune`, the same operations the scheduler and the dashboard's server call as a library, so one implementation serves every surface. Every run prints one JSON document on stdout, at most one line for a person on stderr, and exits with a code that says how it went: 0 for a result, 1 for a refusal or a git failure, 2 for a command line that could not be read.
 
 ## Context
 
@@ -21,14 +21,15 @@ Gives an agent [1] in a shell, and the user, the `branches` command over this pa
 
 - **One JSON document, one line, an exit code** - the result or the refusal on stdout, the reason for a person on stderr, exit 0 for a result and 1 for a refusal or a git failure.
 - **A command line that cannot be read** - an unknown command, an unknown flag or the wrong argument count prints the usage on stderr, nothing on stdout, and exits 2.
-- **Where a command acts** - `create`, `attach`, `list`, `remove` and `prune` act on the project found from the `.branches/` layout, even from inside a checkout; `name`, `status` and `publish` act on the checkout the command runs in.
+- **Where a command acts** - `create`, `attach`, `merge-on-green`, `release`, `list`, `remove` and `prune` act on the project found from the `.branches/` layout, even from inside a checkout; `name`, `status` and `publish` act on the checkout the command runs in.
 - **Outside a repository** - a command that needs one is refused as `not-a-repo`; only git's own "not a git repository" reads as that.
 - **An agent id is checked before anything runs** - `create`, `attach` and `remove` refuse an id outside the charset, or `data`, as `invalid-id`, before the repository is even looked for.
 - **`create`: a checkout for a new agent** - `.branches/agent-<id>` on the fresh branch `agent-<id>`, from `--base` or the project's head, fully set up.
 - **`attach`: a checkout for a continued agent** - `.branches/agent-<id>` on the branch named, taken as given, fully set up.
 - **`name`: the agent names its work** - the branch becomes `agent-<name>`, suffixed when taken, the name got is printed, and the branch links follow at once; four refusals.
 - **`status`: where the agent is and whether it may finish** - the checkout's path, its branch, whether it is clean and whether it is on the remote; refused for a directory git does not know as a worktree.
-- **`publish`: the agent hands off its own work** - `--title` is required; the branch is pushed, the pull request opened with the title and `--body`, `--merge` arms the merge on green (GitHub's auto-merge, a direct merge of a request already green, or the merge watcher where the repository has no auto-merge), `--draft` opens a draft; a dirty tree, a push that did not land and a request gh refused are refusals with a line each (`publish.ts`).
+- **`publish`: the agent hands off its own work** - `--title` is required; the branch is pushed, the pull request opened with the title and `--body`, `--merge` arms the merge on green (GitHub's auto-merge, a direct merge of a request already green, or the merge watcher where the repository has no auto-merge; `held` from a checkout under a hold, armed later by `release`), `--draft` opens a draft; a dirty tree, a push that did not land and a request gh refused are refusals with a line each (`publish.ts`).
+- **`release`: arm a held merge** - for one pull request number, arms the merge a publish under a hold recorded as wanted, exactly as `--merge` would have; a request with no held merge and an arming that failed are refusals.
 - **`list`: every checkout under `.branches/`** - a bare JSON array, one row per checkout directory, with its branch when git knows it and its size on request.
 - **`remove`: reclaim one checkout** - under the reclaim rule, pushing unless `--no-push`, with a line for each refusal and `no-checkout` for a missing one; the branch links follow at once.
 - **`prune`: reclaim every checkout** - `remove` for each checkout directory, reporting the removed and the skipped, never refusing as a whole.
@@ -63,7 +64,7 @@ An unknown command, an unknown flag or the wrong number of arguments never reach
 
 #### Business logic
 
-The working directory decides. `create`, `attach`, `list`, `remove` and `prune` act on the project: the checkout [2] whose `.branches/` directory the working directory is under, or, when it is under none, the checkout containing the working directory (the rule is in `worktree.ts`). `name` and `status` act on the checkout containing the working directory, found from anywhere inside it. `status` alone also takes the path of a checkout root as an argument, resolved against the working directory.
+The working directory decides. `create`, `attach`, `merge-on-green`, `release`, `list`, `remove` and `prune` act on the project: the checkout [2] whose `.branches/` directory the working directory is under, or, when it is under none, the checkout containing the working directory (the rule is in `worktree.ts`). `name`, `status` and `publish` act on the checkout containing the working directory, found from anywhere inside it. `status` alone also takes the path of a checkout root as an argument, resolved against the working directory.
 
 ### Outside a repository
 
@@ -134,6 +135,16 @@ See `## Context`.
 #### Business logic
 
 `merge-on-green <number>` takes one pull request number; anything that is not a positive whole number is a usage error, exit 2. It acts on the project found from the working directory, runs the merge watcher (`merge-watch.ts`) for that request until it ends, says each read on stderr, and answers the watcher's outcome with the number, `ok` true only when it merged. `publish --merge` starts it as its own detached process, its output in `.branches/merge-on-green/<number>.log`.
+
+### `release`: arm a held merge
+
+#### Context
+
+**User story**: whoever put a hold on an agent's checkout [2], the scheduler once the follow-up agent ended done, or a person, lets the request merge now that the rest of the work is done.
+
+#### Business logic
+
+`release <number>` takes one pull request number; anything that is not a positive whole number is a usage error, exit 2. It acts on the project found from the working directory and runs the release (`publish.ts`): the held line leaves the request's body and the merge is armed as `publish --merge` arms it. The result is `{"ok": true, "number": …, "outcome": …}` with `auto-armed`, `merged`, `watching`, or `closed` (with the request's `state`) for a request no longer open. Two refusals, exit 1: `not-held` ("pull request <number> has no held merge here") when no held merge is recorded for the number in this project, and `release-failed` with gh's line as `detail` ("the merge of pull request <number> could not be armed: <line>") when the request could not be read or the arming failed; the record then stays, so `release` can be run again.
 
 ### `list`: every checkout under `.branches/`
 

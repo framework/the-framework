@@ -1,6 +1,7 @@
 import { nodeGitRunner, pushBranch, type GitRunner } from '@gemstack/agent-data'
 import { currentBranch, isWorktreeRoot, projectRoot, worktreeClean } from './worktree.js'
 import { spawnMergeWatch } from './merge-watch.js'
+import { dropHeldMerge, heldMergeRecorded, MERGE_HELD_NOTE, mergeHeld, recordHeldMerge, withHeldNote, withoutHeldNote } from './merge-hold.js'
 
 /**
  * Publishing a checkout (#1774): the agent's own last step. Push the branch, open its pull
@@ -14,6 +15,9 @@ import { spawnMergeWatch } from './merge-watch.js'
  * The merge is GitHub's auto-merge where the repository allows it. Where it does not, this tool's
  * own watcher waits for the checks and merges (`merge-watch.ts`); where the request is already
  * green, GitHub will not arm anything and the request is merged at once.
+ *
+ * A checkout under a hold (`merge-hold.ts`) arms nothing: the merge is recorded as wanted, the
+ * request's body says it is held, and the caller who put the hold releases it (`releaseMerge`).
  */
 
 /** A `gh` runner: the standard output of one invocation; rejects with gh's own line on failure. */
@@ -69,13 +73,16 @@ export type PublishOutcome =
       existing: boolean
       /**
        * How the merge arming went, when asked for: GitHub's auto-merge armed, merged at once (the
-       * request was already green), or this tool's watcher started (the repository does not
-       * allow auto-merge).
+       * request was already green), this tool's watcher started (the repository does not allow
+       * auto-merge), or held (the checkout is under a hold; armed at its release).
        */
-      merge?: { outcome: 'auto-armed' | 'merged' | 'watching' } | { outcome: 'failed'; error: string }
+      merge?: MergeArming | { outcome: 'held' }
     }
   | { ok: false; reason: 'not-a-worktree' | 'no-branch' }
   | { ok: false; reason: 'dirty' | 'push-failed' | 'pr-failed'; branch: string; detail?: string }
+
+/** How arming a merge went. */
+export type MergeArming = { outcome: 'auto-armed' | 'merged' | 'watching' } | { outcome: 'failed'; error: string }
 
 export async function publishCheckout(path: string, opts: PublishOptions): Promise<PublishOutcome> {
   const git = opts.git ?? nodeGitRunner()
@@ -86,6 +93,7 @@ export async function publishCheckout(path: string, opts: PublishOptions): Promi
   if (!(await worktreeClean(path, git).catch(() => false))) return { ok: false, reason: 'dirty', branch }
 
   const repo = await projectRoot(path, git)
+  const held = opts.merge === true && (await mergeHeld(path, git))
   const pushed = await pushBranch(repo, branch, git)
   if (!pushed.ok) return { ok: false, reason: 'push-failed', branch, detail: pushed.error }
 
@@ -94,7 +102,7 @@ export async function publishCheckout(path: string, opts: PublishOptions): Promi
   if (!pr) {
     existing = false
     try {
-      const args = ['pr', 'create', '--head', branch, '--title', opts.title, '--body', opts.body ?? '']
+      const args = ['pr', 'create', '--head', branch, '--title', opts.title, '--body', held ? withHeldNote(opts.body ?? '') : (opts.body ?? '')]
       if (opts.draft && !opts.merge) args.push('--draft')
       const out = await gh(args, path)
       const url = out.trim().split('\n').filter(Boolean).at(-1)
@@ -107,8 +115,60 @@ export async function publishCheckout(path: string, opts: PublishOptions): Promi
   }
 
   const outcome: PublishOutcome = { ok: true, branch, pr, existing }
-  if (opts.merge) outcome.merge = await armMerge(repo, pr.number, gh, opts.watch ?? spawnMergeWatch)
+  if (held) {
+    await recordHeldMerge(repo, pr.number)
+    if (existing) await noteHeld(path, pr.number, gh)
+    outcome.merge = { outcome: 'held' }
+  } else if (opts.merge) {
+    outcome.merge = await armMerge(repo, pr.number, gh, opts.watch ?? spawnMergeWatch)
+  }
   return outcome
+}
+
+/** An open request's body gains the held note, once. The note is for a person: an edit gh refuses never fails the publish. */
+async function noteHeld(cwd: string, number: number, gh: GhRunner): Promise<void> {
+  try {
+    const body = String((JSON.parse(await gh(['pr', 'view', String(number), '--json', 'body'], cwd)) as { body?: unknown }).body ?? '')
+    if (!body.includes(MERGE_HELD_NOTE)) await gh(['pr', 'edit', String(number), '--body', withHeldNote(body)], cwd)
+  } catch {
+    // The record is written; only the line for a person is missing.
+  }
+}
+
+export type ReleaseOutcome = MergeArming | { outcome: 'not-held' } | { outcome: 'closed'; state: string }
+
+export interface ReleaseOptions {
+  gh?: GhRunner
+  /** Start the merge watcher for a request (default {@link spawnMergeWatch}). For tests. */
+  watch?: (repo: string, number: number) => Promise<void>
+}
+
+/**
+ * Release a held merge: the request's merge is armed the way `publish --merge` arms it, and then
+ * the held note leaves its body. A request with no held merge is `not-held` (its publish never asked
+ * to merge), one no longer open is `closed` and its record dropped. A failed arming keeps the
+ * record and the note, so the release can be tried again and the request still says it is held.
+ */
+export async function releaseMerge(repo: string, number: number, opts: ReleaseOptions = {}): Promise<ReleaseOutcome> {
+  const gh = opts.gh ?? nodeGhRunner()
+  if (!(await heldMergeRecorded(repo, number))) return { outcome: 'not-held' }
+  let view: { state?: unknown; body?: unknown }
+  try {
+    view = JSON.parse(await gh(['pr', 'view', String(number), '--json', 'state,body'], repo)) as typeof view
+  } catch (err) {
+    return { outcome: 'failed', error: errorMessage(err) }
+  }
+  const state = typeof view.state === 'string' ? view.state : 'OPEN'
+  if (state !== 'OPEN') {
+    await dropHeldMerge(repo, number)
+    return { outcome: 'closed', state }
+  }
+  const merge = await armMerge(repo, number, gh, opts.watch ?? spawnMergeWatch)
+  if (merge.outcome === 'failed') return merge
+  await dropHeldMerge(repo, number)
+  const body = typeof view.body === 'string' ? view.body : ''
+  if (body.includes(MERGE_HELD_NOTE)) await gh(['pr', 'edit', String(number), '--body', withoutHeldNote(body)], repo).catch(() => {})
+  return merge
 }
 
 /**
@@ -119,7 +179,7 @@ export async function publishCheckout(path: string, opts: PublishOptions): Promi
 const AUTO_MERGE_OFF = /auto[- ]?merge is not allowed/i
 const ALREADY_GREEN = /clean status/i
 
-async function armMerge(repo: string, number: number, gh: GhRunner, watch: (repo: string, number: number) => Promise<void>): Promise<NonNullable<(PublishOutcome & { ok: true })['merge']>> {
+async function armMerge(repo: string, number: number, gh: GhRunner, watch: (repo: string, number: number) => Promise<void>): Promise<MergeArming> {
   try {
     await gh(['pr', 'merge', String(number), '--squash', '--auto'], repo)
     return { outcome: 'auto-armed' }

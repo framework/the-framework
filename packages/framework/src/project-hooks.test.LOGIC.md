@@ -4,7 +4,7 @@ What the tests cover, with real shell lines in a throwaway project:
 - **The lines run in order, in the project, through the shell** - the lines leave their traces in a file in the project in the order written, the working directory is the project's root, a line that exits 3 is logged as such with what it said on stderr under it, and the next line still runs; the close lines are separate from the open lines.
 - **A hanging line is bounded** - a line that sleeps past the bound is killed, logged as timed out, and the next line runs.
 - **Nothing to run** - no file runs nothing and logs nothing; a broken file logs why it was ignored and runs nothing.
-- **The start line** - it gets the prompt and the picks in its environment (a pick not made leaves its variable unset), and the id it answers on stdout comes back.
+- **The start line** - it gets the prompt and the picks in its environment (a pick not made leaves its variable unset), and the follow-up in `THEN` when the start carries one (unset otherwise), and the id it answers on stdout comes back.
 - **The resume line** - it gets the agent's id and the text, or the answer, never both.
 - **Every refusal is words** - no start or resume line, a broken file, a failing line (its stderr line is the reason), a line that answers no id, and a line that hangs past the bound.
 - **The offset line** - it gets the points in `POINTS`, a negative fraction included ("-12.5"), and exit 0 is done; no offset line is "this project has no offset hook" marked as no hook; a failing line's reason is its stderr line; a broken file is the "ignoring …" reason, not marked as no hook.

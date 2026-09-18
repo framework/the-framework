@@ -39,6 +39,11 @@ export interface StartAgentOptions {
   /** Which coding agent the run is on: `claude-code` or `codex`. */
   driver?: string
   /**
+   * The follow-up's prompt: once the run ends done with a pull request, a fresh agent works its
+   * branch from it before the request merges. The launcher's "Post-merge cleanup" box.
+   */
+  then?: string
+  /**
    * Run this session on a connected device (#1067): the local daemon relays the start to the remote
    * daemon at `url` (authenticating with `token` as the `fw_daemon` cookie) and streams its events
    * back into the local agent view. The device `label` rides along (memory-only, like `url`/`token`) so

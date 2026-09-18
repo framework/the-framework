@@ -1,4 +1,4 @@
-Merges one pull request once its checks pass, for a repository that does not allow GitHub's auto-merge: a process of this tool's own, started detached by `publish --merge`, that reads the request every minute and merges it by squash when it is green.
+Merges one pull request once its checks pass, for a repository that does not allow GitHub's auto-merge: a process of this tool's own, started detached by `publish --merge`, or by the release of a held merge (`publish.ts`), that reads the request every minute and merges it by squash when it is green.
 
 ## Context
 

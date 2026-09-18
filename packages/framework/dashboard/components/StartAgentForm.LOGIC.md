@@ -1,15 +1,15 @@
-The launcher on a project home [1]: the project's commands [2] as buttons, the box where the user says what an agent [3] should do, and Start. A Start is the project's own start hook [4]: the launcher hands it the prompt, the coding agent [5] and model the user picked, and the device [6] when one is picked, and selects the agent the hook answers. A project that has no start hook cannot start an agent from here, and the launcher says what to add.
+The launcher on a project home [1]: the box where the user says what an agent [3] should do, or picks one of the project's commands [2] from its `/` list, and Start. A Start is the project's own start hook [4]: the launcher hands it the prompt, the coding agent [5] and model the user picked, and the device [6] when one is picked, and selects the agent the hook answers. A project that has no start hook cannot start an agent from here, and the launcher says what to add.
 
 ## Context
 
-**User story**: the user opens a project's project home [1], clicks a command [2] or types a task into the editor, reviews it, and presses "Start agent". The agent appears in the dashboard at once and the box is empty again, ready for the next one. The section is headed "Start an agent".
+**User story**: the user opens a project's project home [1], types a task into the editor or picks a command [2] from its `/` list or its Commands menu, reviews it, and presses "Start agent". The agent appears in the dashboard at once and the box is empty again, ready for the next one. The section is headed "Start an agent".
 
 **Problem**: The Framework ships no prompt text and runs no agent itself. What a project can be asked to do is what its own commands say, and what runs the agent is whatever tool the project's start hook names. So the launcher offers exactly what the project has, and when the project has no start hook it must say so before the user has typed a task into a box that cannot send it.
 
 ## Glossary
 
 [1] project home: a project's own page with the launcher (the Start form) and its composer (the prompt editor, also used to say something to an agent).
-[2] command: one of the project's skills, read off the folders the coding agents read them from (`.claude/skills/`, `.agents/skills/`); typed as `/<name>`, optionally followed by an argument. A command written to be run by a person, not picked up by the coding agent on its own, is one the launcher shows as a button.
+[2] command: one of the project's skills written to be run by a person, never picked up by the coding agent on its own (its front matter says `disable-model-invocation: true`), read off the folders the coding agents read them from (`.claude/skills/`, `.agents/skills/`); typed as `/<name>`, optionally followed by an argument.
 [3] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [4] start hook: the one shell line under `start:` in the project's `.the-framework/hooks.yml`. The daemon runs it with the prompt and the user's picks in its environment, and the line answers the id of the agent it started. The Framework names no tool: the line does.
 [5] coding agent: the CLI doing the actual work: Claude Code or Codex.
@@ -20,7 +20,7 @@ The launcher on a project home [1]: the project's commands [2] as buttons, the b
 
 ## Business logic — TL;DR
 
-- **Command buttons** - every command [2] written to be run by a person is a button reading `/<name>`; a click loads `/<name> ` into the editor for review and never starts anything.
+- **Commands load, never start** - the commands [2] are in the editor's `/` list and the Commands menu, not buttons; picking one loads `/<name> ` into the editor for review, and the form leaves a note saying so.
 - **What a Start sends** - the text, the coding agent [5] and the model when the user picked them, and the picked device's address and token; nothing else.
 - **A project with no start hook** - Start is off and the form says which line to add to which file; a picked device lifts the block, since the device runs its own hook.
 - **Feedback about the start itself** - "Starting…", the refusal in the start hook's own words, the note a loaded command or saved prompt [8] leaves, and an error that clears as soon as the user edits.
@@ -28,21 +28,19 @@ The launcher on a project home [1]: the project's commands [2] as buttons, the b
 
 ## Business logic
 
-### Command buttons
+### Commands load, never start
 
 #### Context
 
-**User story**: the user wants to run one of the project's commands [2] (work the queue, update the tickets) without remembering its name. The buttons sit above the editor.
+**User story**: the user wants to run one of the project's commands [2] (work the queue, review the UI flows) without remembering its name.
 
-**Problem**: a command may take an argument, and a start spends the account's quota. A button that started the agent outright would do both wrong.
+**Problem**: a command may take an argument, and a start spends the account's quota. Picking a command that started the agent outright would do both wrong. The editor's `/` list and the Commands menu already list every command; a button per command above the editor would repeat that list, a long row once a project has many.
 
 #### Business logic
 
-The form reads the project's commands [2] and whether it has a start hook [4] once per project. Until that read answers, the form shows no buttons and says nothing about the start hook.
+The form shows no command of its own: the commands are listed by the shared composer (`Composer.tsx`), in the editor's `/` list and in the Commands menu. The form reads whether the project has a start hook [4] once per project; until that read answers it says nothing about the start hook.
 
-Every command written to be run by a person is one button, labelled `/<name>`, in the order the project lists them; its description, when it has one, is the button's tooltip. Commands the coding agent [5] picks up on its own (knowledge the project's skills carry) get no button; they are still in the editor's `/` list and in the Commands menu (`Composer.tsx`). A project with no such command shows no row at all.
-
-A click loads `/<name> ` — the name and one trailing space, so an argument can follow — into the editor, replacing what was there. It leaves the note "`/<name>` loaded — review or edit, then Start", or "`/<name>` loaded over your draft — undo (⌘Z) brings the draft back" when it replaced typed text. It starts nothing. The buttons are off while a start is in flight.
+Picking a command loads `/<name> ` into the editor, replacing what was there, and starts nothing. The form then shows the note "`/<name>` loaded — review or edit, then Start", or "`/<name>` loaded over your draft — undo (⌘Z) brings the draft back" when it replaced typed text. A saved prompt [8] loads the same way under its own name.
 
 ### What a Start sends
 
@@ -83,7 +81,7 @@ See `## Context`.
 
 - While the start is in flight the form shows "Starting…".
 - A refused start shows its reason as an alert under the editor, in the words it came with: the start hook's own last line when the tool it names refused ("the start hook: …"), "this project has no start hook", "a non-empty prompt is required", or that the device could not be reached. A start that failed without a reason shows "Failed to start the agent.".
-- Loading a command [2] or a saved prompt [8] leaves the note described under "Command buttons". The note goes when the editor is emptied.
+- Loading a command [2] or a saved prompt [8] leaves the note described under "Commands load, never start". The note goes when the editor is emptied.
 - An error describes the attempt that failed: it is dropped as soon as the user edits the text or loads something.
 
 ### The moment an agent starts

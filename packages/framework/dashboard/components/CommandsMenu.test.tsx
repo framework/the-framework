@@ -5,8 +5,8 @@ import { CommandsMenu } from './CommandsMenu.js'
 afterEach(cleanup)
 
 const commands = [
-  { name: 'work-queue', description: 'Work the agent queue', button: true },
-  { name: 'tickets', button: false },
+  { name: 'work-queue', description: 'Work the agent queue' },
+  { name: 'ux' },
 ]
 const custom = [{ id: 'c1', label: 'My sweep', prompt: 'sweep it' }]
 const project = [{ id: 'p1', label: 'Team sweep', prompt: 'team it' }]
@@ -37,7 +37,7 @@ function mount(over: Partial<Parameters<typeof CommandsMenu>[0]> = {}) {
 describe('CommandsMenu', () => {
   test('lists the project\'s commands, and one loads as its slash line for an argument to follow', () => {
     const { onLoad } = mount()
-    expect(screen.getByText('/tickets')).toBeTruthy()
+    expect(screen.getByText('/ux')).toBeTruthy()
     fireEvent.click(screen.getByText('/work-queue'))
     expect(onLoad).toHaveBeenCalledWith('/work-queue ', '/work-queue')
   })

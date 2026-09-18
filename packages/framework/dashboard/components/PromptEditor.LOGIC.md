@@ -8,7 +8,7 @@ The prompt editor of the composer [2]: where the user writes an agent's [1] prom
 
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] composer: the prompt editor on a project's own page, also used to say something to an agent.
-[3] command: one of the project's skills, read off the folders the coding agents read them from; typed as `/<name>`, optionally followed by an argument.
+[3] command: one of the project's skills written to be run by a person, never picked up by the coding agent on its own (its front matter says `disable-model-invocation: true`), read off the folders the coding agents read them from (`.claude/skills/`, `.agents/skills/`); typed as `/<name>`, optionally followed by an argument.
 [4] coding agent: the CLI doing the actual work: Claude Code or Codex.
 [5] launcher: the Start form on a project's own page.
 [6] saved prompt: a prompt the user saved under a name, for themselves or for the project, loaded back into the editor verbatim.
@@ -18,7 +18,7 @@ The prompt editor of the composer [2]: where the user writes an agent's [1] prom
 - **Live markdown in, markdown out** - the user writes markdown with live formatting; what leaves the editor on every change is that markdown, with each chip written as its exact text.
 - **The `/` menu: commands and saved prompts** - `/` lists the open project's commands [3], the user's and the project's saved prompts [6], and "Save prompt…"; picking a command loads `/<name> ` and picking a saved prompt loads it verbatim, each replacing the editor's content.
 - **The `@` and `#` menus: projects and files** - `@` lists the registered projects and `#` the current project's files, at most eight each; a pick inserts a chip that submits as the project's name or the file's path.
-- **Chips and how the menus behave** - a chip reads as a pill but submits as its text; a menu closes on a space or a non-matching query and never traps a stray character.
+- **Chips and how the menus behave** - a chip reads as a pill but submits as its text; a menu closes on a space or a non-matching query and never traps a stray character; the `/` menu also closes once a command is typed in full.
 - **Loading a prompt replaces the draft** - a command, a saved prompt or an opening text replaces whatever is typed without asking, in one undo step; the caller learns whether a draft was replaced so it can say that undo brings it back.
 - **Submit keys** - Enter and Cmd/Ctrl+Enter submit; Shift+Enter and Alt+Enter do not; Enter is left alone while a menu is open, inside a code block, or during an IME composition.
 - **Placeholder, disabled state and the compact form** - an empty editor shows "Describe what to do…  ( / commands · @ projects · # files )"; a disabled editor is read-only; the navbar's compact form starts one line tall.
@@ -48,19 +48,19 @@ The editor also exposes three operations to the surface that contains it: clear 
 
 **User story**: the user types `/` and picks "/work-queue" to run the project's command of that name, or picks a prompt they saved last week.
 
-**Problem**: The Framework ships no prompt text. The `/` list is the open project's own skills, the way the coding agent's [4] own `/` list shows them, plus what people saved.
+**Problem**: The Framework ships no prompt text. The `/` list is the open project's own commands, plus what people saved. A skill that teaches the agent how to use the tickets, the queue or the logs is not listed: typed alone, it would start an agent with nothing to do.
 
 #### Business logic
 
 Typing `/` opens a menu whose items, in this order, are:
 
-- Under "Commands": every command [3] of the open project, shown as `/<name>`, with the command's description as hover text when it has one. Typing after the `/` keeps the commands whose name contains the typed text.
+- Under "Commands": every command [3] of the open project, shown as `/<name>`, with the command's description as hover text when it has one. Typing after the `/` keeps the commands whose name contains the typed text. When the typed text is exactly a command's name, the menu closes: the command is already in the box, and nothing is left to pick, so Enter submits it.
 - Under "Saved prompts": the user's saved prompts [6], shown by name with the hint "saved prompt", then the open project's saved prompts committed in its repository, shown by name with the hint "project saved prompt". Both are filtered by name, case-insensitively.
 - Under "Saved prompts": "Save prompt…" with the hint "save the current prompt", only where a save dialog exists (the full composer [2], not the navbar's compact launch) and only while the typed text is part of "save prompt".
 
 What a pick does:
 
-- A command: the `/` and the typed query are removed first (so they never count as a replaced draft), then `/<name> ` — the name and one trailing space, so an argument can follow — replaces the editor's content, and the surface is told `/<name>` and whether a typed draft was replaced.
+- A command: the `/` and the typed query are removed first (so they never count as a replaced draft), then `/<name> ` — the name and one trailing space, so an argument can follow and the menu stays closed — replaces the editor's content, and the surface is told `/<name>` and whether a typed draft was replaced.
 - A saved prompt, the user's or the project's: same, with the saved text loaded verbatim and the surface told its name.
 - "Save prompt…": the `/` and the query are removed so the save dialog captures the real prompt, then the dialog opens.
 
@@ -96,7 +96,7 @@ A mention is text in the prompt and nothing more: it changes nothing else about 
 
 #### Business logic
 
-- Loading a text — a command or a saved prompt from the `/` menu, or a load requested by the surface (the Commands menu, the launcher's command buttons) — replaces the whole content as plain text, places the caret at the end, and reports the new markdown. The load never asks for confirmation; it is one undo step, so undo restores the previous draft. The caller is told whether the editor held anything before the load, so its note can say that undo brings the draft back.
+- Loading a text — a command or a saved prompt from the `/` menu, or a load requested by the surface (the Commands menu) — replaces the whole content as plain text, places the caret at the end, and reports the new markdown. A text that ends in a space keeps that space, so the caret waits after it. The load never asks for confirmation; it is one undo step, so undo restores the previous draft. The caller is told whether the editor held anything before the load, so its note can say that undo brings the draft back.
 - An opening text handed to the editor is applied exactly once, as soon as the editor is ready, and never again: it is a draft to start from, not a value the surface controls, so re-applying it would overwrite what the user typed since.
 - A load requested before the editor is ready does nothing and reports that nothing was replaced.
 

@@ -4,3 +4,6 @@ What the tests cover, against the real editor:
 - **Cmd/Ctrl+Enter submits** - both Cmd+Enter and Ctrl+Enter submit.
 - **An open menu owns Enter** - while a suggestion menu is open Enter does not submit (the menu uses it to pick); once the menu is closed Enter submits again.
 - **IME composition is not a send** - an Enter that confirms an IME composition does not submit.
+- **A partly typed command opens the `/` menu** - loading `/re` into an editor that knows the commands `research` and `readability` opens the menu.
+- **A picked command closes the `/` menu** - loading `/research ` keeps its trailing space, and the menu stays closed.
+- **A command typed in full closes the `/` menu** - the menu open on `/re` closes once the text is `/research`.

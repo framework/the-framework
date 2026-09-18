@@ -7,5 +7,5 @@ What the tests cover, for the "Commands" button beside the composer:
 
 ## Glossary
 
-[1] command: one of the project's skills, typed as `/<name>`, optionally followed by an argument.
+[1] command: one of the project's skills written to be run by a person, never picked up by the coding agent on its own (its front matter says `disable-model-invocation: true`), read off the folders the coding agents read them from (`.claude/skills/`, `.agents/skills/`); typed as `/<name>`, optionally followed by an argument.
 [2] saved prompt: a prompt the user saved under a name, for themselves or for the project, loaded back into the editor verbatim.

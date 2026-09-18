@@ -2,11 +2,11 @@ What the launcher offers for one project, read once per project: its commands [1
 
 ## Context
 
-**Problem**: two surfaces need the same answer — the launcher's Start form, for its command buttons and its "no start hook" message, and the composer, for its `/` list and its Commands menu — and both must tell "not read yet" from "read, and the project has none", or the "no start hook" message would flash on every project while the read is in flight.
+**Problem**: two surfaces need the same answer — the launcher's Start form, for its "no start hook" message, and the composer, for its `/` list and its Commands menu — and both must tell "not read yet" from "read, and the project has none", or the "no start hook" message would flash on every project while the read is in flight.
 
 ## Glossary
 
-[1] command: one of the project's skills, read off the folders the coding agents read them from; typed as `/<name>`. Each says whether it was written to be run by a person, which is what makes it a launcher button.
+[1] command: one of the project's skills written to be run by a person, never picked up by the coding agent on its own (its front matter says `disable-model-invocation: true`), read off the folders the coding agents read them from (`.claude/skills/`, `.agents/skills/`); typed as `/<name>`, optionally followed by an argument.
 [2] start hook: the one shell line under `start:` in the project's `.the-framework/hooks.yml`, which starts an agent and answers its id.
 
 ## Business logic

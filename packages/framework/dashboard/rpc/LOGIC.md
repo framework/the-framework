@@ -9,7 +9,7 @@ The browser's side of the daemon's call surface: one module of typed stubs per g
 ## Glossary
 
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
-[2] command: One of the project's skills, read off the folders the coding agents read them from; typed as `/<name>`.
+[2] command: one of the project's skills written to be run by a person, never picked up by the coding agent on its own (its front matter says `disable-model-invocation: true`), read off the folders the coding agents read them from (`.claude/skills/`, `.agents/skills/`); typed as `/<name>`, optionally followed by an argument.
 [3] start hook: The one shell line under `start:` in the project's `.the-framework/hooks.yml`, which starts an agent and answers its id. The resume hook, under `resume:`, continues an ended agent.
 [4] checkout: An agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [5] next step: What a person can do with an ended agent's work from the dashboard: open a pull request for its branch, or merge the pull request it has.

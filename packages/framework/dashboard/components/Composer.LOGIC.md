@@ -10,7 +10,7 @@ The dashboard's prompt editor with the controls around it, shared by the launche
 
 [1] project home: a project's own page with the launcher (the Start form) and its composer (the prompt editor, also used to say something to an agent). agent view: one agent's page.
 [2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
-[3] command: one of the project's skills, read off the folders the coding agents read them from; typed as `/<name>`, optionally followed by an argument.
+[3] command: one of the project's skills written to be run by a person, never picked up by the coding agent on its own (its front matter says `disable-model-invocation: true`), read off the folders the coding agents read them from (`.claude/skills/`, `.agents/skills/`); typed as `/<name>`, optionally followed by an argument.
 [4] saved prompt: a prompt the user saved under a name, either for themselves (kept with their preferences) or for the project (committed in the project's repository), and loads back into the editor verbatim.
 [5] coding agent: the CLI doing the actual work: Claude Code or Codex.
 [6] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
@@ -43,7 +43,7 @@ The full composer is one bordered box. The editor is on top (`PromptEditor.tsx`)
 
 While the embedding surface is busy (a start or a send is in flight) the editor and every control are disabled.
 
-The composer reads the open project's commands [3] itself, for whichever project the dashboard has open, so the launcher and an agent view offer the same list. It also lets the embedding surface load a text into the editor and tells it whether a typed draft was replaced; the launcher's command buttons use that.
+The composer reads the open project's commands [3] itself, for whichever project the dashboard has open, so the launcher and an agent view offer the same list.
 
 ### Commands and saved prompts load into the editor
 

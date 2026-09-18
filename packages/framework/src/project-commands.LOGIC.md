@@ -1,13 +1,13 @@
-A project's commands [1]: its skills, read off the folders the coding agents read them from. The Framework ships no prompt text; what a project can be asked to do is what its own skills say, and the launcher lists them the way Claude Code's `/` list does.
+A project's commands [1]: the skills it has written to be run by a person, read off the folders the coding agents read them from. The Framework ships no prompt text; what a project can be asked to do is what its own command skills say.
 
 ## Context
 
-**User story**: the launcher of a project shows a button per command the project has, such as `/work-queue` or `/update-tickets`, and typing `/` in the prompt box lists them all with their descriptions. A project with no skills shows none, and the free-text box still works.
+**User story**: typing `/` in a project's prompt box, or opening the Commands menu beside it, lists the jobs a person can start there, such as `/work-queue` or `/ux`, with their descriptions. The skills that teach an agent how to use the project's tickets, queue or logs are not listed: typed alone, they would start an agent with nothing to do. A project with no command shows none, and the free-text box still works.
 
 ## Glossary
 
-[1] command: a skill of the project that a person can run by name: a folder under `.claude/skills/` or `.agents/skills/` holding a `SKILL.md`; what is typed after the slash is the folder's name.
+[1] command: one of the project's skills written to be run by a person, never picked up by the coding agent on its own (its front matter says `disable-model-invocation: true`), read off the folders the coding agents read them from (`.claude/skills/`, `.agents/skills/`); typed as `/<name>`, optionally followed by an argument.
 
 ## Business logic
 
-The two folders are read at the project's root, `.claude/skills/` first and then `.agents/skills/` (the one Codex reads); a skill present in both is listed once. A folder counts when its name is lowercase letters, digits and dashes and it holds a readable `SKILL.md`. The file's front matter gives the command's [1] description (the `description` key, when it is a non-empty text). A skill whose front matter says `user-invocable: false` is no command, as in Claude Code. A skill whose front matter says `disable-model-invocation: true` is one written to be run by a person rather than picked up by the agent on its own: it is marked as a launcher button; every command is in the `/` list either way. Front matter that is missing or does not parse counts as empty. The commands are answered sorted by name; a project with neither folder has none.
+The two folders are read at the project's root, `.claude/skills/` first and then `.agents/skills/` (the one Codex reads). A folder counts when its name is lowercase letters, digits and dashes and it holds a readable `SKILL.md`. A skill's first readable copy decides: a skill present in both folders is judged by its `.claude/skills/` copy, and the other copy is not looked at. A skill is a command [1] only when its front matter says `disable-model-invocation: true`; every other skill, one the agent may pick up on its own or one only the agent may use (`user-invocable: false`), is not listed. Front matter that is missing or does not parse says nothing, so such a skill is no command. The command's description is the front matter's `description` key, when it is a non-empty text. The commands are answered sorted by name; a project with neither folder has none.

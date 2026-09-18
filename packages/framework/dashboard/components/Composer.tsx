@@ -54,8 +54,6 @@ const DRIVER_OPTIONS: DriverOption[] = DRIVERS.map(name => ({
 export interface ComposerHandle {
   clear: () => void
   focus: () => void
-  /** Load a text into the editor, like the commands menu does. Returns whether it replaced a draft. */
-  load: (text: string) => boolean
 }
 
 // The shared agent composer (#721): the Tiptap editor (`/` `@` `#` triggers) plus the control
@@ -131,7 +129,6 @@ export const Composer = forwardRef<ComposerHandle, {
       setPrompt('')
     },
     focus: () => editorRef.current?.focus(),
-    load: (text: string) => editorRef.current?.loadTemplate(text) ?? false,
   }))
 
   // Rehydrate a draft carried in — from another device (#1066) or from the click that navigated

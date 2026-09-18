@@ -11,7 +11,7 @@ The Overview's [1] "Hot tickets" card: a cross-project shortlist of tickets in t
 [3] launcher: the Start form on a project's own page.
 [4] composer: the prompt editor on a project's own page, also used to say something to an agent.
 [5] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down.
-[6] command: one of the project's own skills, which the user runs from the launcher by name.
+[6] command: one of the project's skills written to be run by a person, never picked up by the coding agent on its own (its front matter says `disable-model-invocation: true`), read off the folders the coding agents read them from (`.claude/skills/`, `.agents/skills/`); typed as `/<name>`, optionally followed by an argument.
 
 ## Business logic — TL;DR
 

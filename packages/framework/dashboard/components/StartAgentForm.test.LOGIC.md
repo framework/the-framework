@@ -1,6 +1,6 @@
 What the tests cover, for the launcher on a project home [1]:
 
-- **A command is a button that loads, never starts** - a command [2] written to be run by a person shows as a `/<name>` button and one the coding agent picks up on its own does not; a click puts `/<name> ` with its trailing space into the editor, leaves the "review or edit, then Start" note, and sends nothing.
+- **No command buttons** - a project's command [2] shows as no `/<name>` button on the form, and nothing is started.
 - **Start carries the picks** - a Start sends the text with the coding agent [3] and the model the user picked, and the shell is told the id the start hook [4] answered.
 - **No pick, nothing sent** - with no coding agent and no model picked, neither is sent, so the start hook decides.
 - **No start hook** - a project read as having no start hook shows the alert naming the `start:` line and `.the-framework/hooks.yml`, and the submit stays disabled with text in the editor.
@@ -10,7 +10,7 @@ What the tests cover, for the launcher on a project home [1]:
 ## Glossary
 
 [1] project home: a project's own page with the launcher (the Start form) and its composer (the prompt editor, also used to say something to an agent).
-[2] command: one of the project's skills, typed as `/<name>`; one written to be run by a person is shown as a launcher button.
+[2] command: one of the project's skills written to be run by a person, never picked up by the coding agent on its own (its front matter says `disable-model-invocation: true`), read off the folders the coding agents read them from (`.claude/skills/`, `.agents/skills/`); typed as `/<name>`, optionally followed by an argument.
 [3] coding agent: the CLI doing the actual work: Claude Code or Codex.
 [4] start hook: the one shell line under `start:` in the project's `.the-framework/hooks.yml`, which starts an agent and answers its id.
 [5] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.

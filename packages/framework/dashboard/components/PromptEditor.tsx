@@ -78,6 +78,9 @@ function insertToken(editor: Editor, range: Range, spec: TokenSpec): void {
 function applyTemplate(editor: Editor, text: string): void {
   editor.commands.setContent(text)
   editor.commands.focus('end')
+  // Parsing the text as markdown drops a trailing space; a command loads as `/<name> ` so the
+  // cursor waits after the space, where the `/` menu no longer matches and stays closed.
+  if (/\s$/.test(text)) editor.commands.insertContent({ type: 'text', text: ' ' })
 }
 
 export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(function PromptEditor(
@@ -136,6 +139,8 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
         key: 'slash',
         items: query => {
           const q = query.toLowerCase()
+          // A command typed in full: nothing is left to pick, so the menu closes.
+          if (commandsRef.current.some(c => c.name === q)) return []
           const commandItems: SuggestionItem[] = commandsRef.current
             .filter(c => c.name.includes(q))
             .map(c => ({ id: `command:${c.name}`, label: `/${c.name}`, group: 'Commands', ...(c.description ? { title: c.description } : {}) }))

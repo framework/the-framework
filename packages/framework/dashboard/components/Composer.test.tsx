@@ -106,7 +106,7 @@ beforeEach(() => {
   checkDevices.mockReset()
   checkDevices.mockResolvedValue({}) // default: no devices reachable
   onCommands.mockReset()
-  onCommands.mockResolvedValue({ commands: [{ name: 'work-queue', description: 'Work the agent queue', button: true }], startHook: true })
+  onCommands.mockResolvedValue({ commands: [{ name: 'work-queue', description: 'Work the agent queue' }], startHook: true })
 })
 afterEach(cleanup)
 

@@ -10,6 +10,6 @@ What the tests cover:
 
 ## Glossary
 
-[1] command: one of the project's skills, typed as `/<name>`, optionally followed by an argument.
+[1] command: one of the project's skills written to be run by a person, never picked up by the coding agent on its own (its front matter says `disable-model-invocation: true`), read off the folders the coding agents read them from (`.claude/skills/`, `.agents/skills/`); typed as `/<name>`, optionally followed by an argument.
 [2] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 [3] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook.

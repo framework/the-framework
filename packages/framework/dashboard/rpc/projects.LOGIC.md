@@ -2,7 +2,7 @@ The browser's typed stubs for what the dashboard asks the daemon about projects:
 
 ## Glossary
 
-[1] command: one of the project's skills, read off the folders the coding agents read them from; typed as `/<name>`.
+[1] command: one of the project's skills written to be run by a person, never picked up by the coding agent on its own (its front matter says `disable-model-invocation: true`), read off the folders the coding agents read them from (`.claude/skills/`, `.agents/skills/`); typed as `/<name>`, optionally followed by an argument.
 [2] start hook: the one shell line under `start:` in the project's `.the-framework/hooks.yml`, which starts an agent.
 [3] launcher: the Start form on a project's own page (the project home).
 [5] sweep: a background job the daemon runs on its clock: the notification watchers, the data sync, the cloud scratch sweep, cloud work adoption.

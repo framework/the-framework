@@ -66,6 +66,12 @@ export interface ComposerHandle {
 export const Composer = forwardRef<ComposerHandle, {
   /** The current project's files for the `#` picker (#504). */
   files: string[]
+  /** Add a path to the Context (from an `@`/`#` mention). Omit where nothing keeps a Context. */
+  addContext?: ((path: string) => void) | undefined
+  /** Drop a path from the Context when its `@`/`#` chip leaves the editor (#948). */
+  removeContext?: ((path: string) => void) | undefined
+  /** A control the launcher hangs at the start of the control row (#1046): the Context picker. */
+  contextControl?: ReactNode
   /** Run the composed text. */
   onSubmit: (text: string) => void | Promise<void>
   /** Mirror the live prompt out, so the launcher can drive its note. */
@@ -95,7 +101,7 @@ export const Composer = forwardRef<ComposerHandle, {
    *  without one the slot keeps its collapse-when-empty behavior for the launcher. */
   idleControl?: ReactNode
 }>(function Composer(
-  { files, onSubmit, onPromptChange, onPreset, busy, submitLabel, submitBusyLabel, placeholder, compact = false, showDriverModel = true, inAgent = false, canSubmit = true, idleControl },
+  { files, addContext, removeContext, contextControl, onSubmit, onPromptChange, onPreset, busy, submitLabel, submitBusyLabel, placeholder, compact = false, showDriverModel = true, inAgent = false, canSubmit = true, idleControl },
   ref,
 ) {
   const [prompt, setPrompt] = useState('')
@@ -181,6 +187,8 @@ export const Composer = forwardRef<ComposerHandle, {
       onChange={onPromptEdit}
       onSubmit={submit}
       {...(onPreset ? { onPreset } : {})}
+      {...(addContext ? { onMentionProject: addContext, onMentionFile: addContext } : {})}
+      {...(removeContext ? { onMentionRemoved: removeContext } : {})}
       projects={projects}
       files={files}
       commands={commands}
@@ -322,10 +330,11 @@ export const Composer = forwardRef<ComposerHandle, {
           borderless here (its border moved out to this box); controls sit tucked below it. */}
       <div className="rounded-lg border border-border bg-transparent focus-within:border-muted-foreground/40">
         {editorEl}
-        {/* Run controls (#649/#650/#654/#668): the commands menu at the start, the agent+model
-            select, the "Run on" pick and submit clustered at the end. */}
+        {/* Run controls (#649/#650/#654/#668): the commands menu and the Context picker at the
+            start, the agent+model select, the "Run on" pick and submit clustered at the end. */}
         <div className="flex flex-wrap items-center gap-1.5 px-2 pb-2">
           {commandsEl}
+          {contextControl}
           <div className="ml-auto flex items-center gap-1.5">
             {driverModelEl}
             {runOnEl}

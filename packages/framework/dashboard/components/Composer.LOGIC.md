@@ -1,4 +1,4 @@
-The dashboard's prompt editor with the controls around it, shared by the launcher [1] (where a submit starts an agent [2]) and by an agent view [1] (where a submit says the text to that agent): a rich editor opened by `/` for the project's commands [3] and the saved prompts [4], `@` for projects and `#` for files, the Commands menu, the coding agent [5] and model select, the "Run on" pick of this machine or a device [6], and the submit arrow.
+The dashboard's prompt editor with the controls around it, shared by the launcher [1] (where a submit starts an agent [2]) and by an agent view [1] (where a submit says the text to that agent): a rich editor opened by `/` for the project's commands [3] and the saved prompts [4], `@` for projects and `#` for files, the Commands menu, the launcher's Context [10] picker, the coding agent [5] and model select, the "Run on" pick of this machine or a device [6], and the submit arrow.
 
 ## Context
 
@@ -17,11 +17,13 @@ The dashboard's prompt editor with the controls around it, shared by the launche
 [7] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 [8] relay: running an agent on a device: the local daemon forwards the start to the device, which runs its own project's start hook, and streams the events back, so the agent renders like a local one.
 [9] start hook: the one shell line under `start:` in the project's `.the-framework/hooks.yml`, which starts an agent and answers its id.
+[10] Context: the set of paths the user picked to focus an agent on: other registered projects, by their absolute path, and files of the current project, by their path relative to the repository's root. The agent can still reach everything; the Context only says where to look.
 
 ## Business logic — TL;DR
 
-- **What the composer shows** - one bordered box: the editor, and under it the Commands button, then the coding-agent-and-model select, the "Run on" pick and the submit arrow; everything is disabled while the embedding surface is busy.
+- **What the composer shows** - one bordered box: the editor, and under it the Commands button and, at the launcher, the Context [10] picker, then the coding-agent-and-model select, the "Run on" pick and the submit arrow; everything is disabled while the embedding surface is busy.
 - **Commands and saved prompts load into the editor** - the open project's commands [3] and the user's and the project's saved prompts [4], from the `/` list or the Commands menu, each replacing the box in one undoable step; "Save prompt…" saves the current text for "Just me" or "This project".
+- **Mentions feed the Context** - where the surface keeps a Context (the launcher), an `@` or `#` mention adds the project's path or the file to it and deleting the chip takes it out; elsewhere a mention is only text.
 - **Driver and model** - a tree of Claude Code and Codex with each one's own models; picking a model sets both, and no model is pinned by default.
 - **"Run on": this machine or a device, and the offline rule** - this machine then the saved devices, one checkmark; a device selected in place is relayed [8] to; a device known to be offline blocks starting and says so.
 - **Submitting** - the arrow exists only once there is text; refused while blank, busy, already submitting, targeting an offline device, or when the surface says nothing can be submitted; a double press starts one agent; an idle control (Stop, Resume) can take the arrow's slot while the box is empty.
@@ -39,7 +41,7 @@ See `## Context`.
 
 #### Business logic
 
-The full composer is one bordered box. The editor is on top (`PromptEditor.tsx`). Under it is one row: the Commands button at the start; the coding-agent-and-model select, the "Run on" pick and the submit slot clustered at the end. Under the box, when it applies, is the note that the target device [6] is offline.
+The full composer is one bordered box. The editor is on top (`PromptEditor.tsx`). Under it is one row: the Commands button at the start, followed by whatever control the surface hangs there (the launcher hangs its Context [10] picker, `ContextMenu.tsx`); the coding-agent-and-model select, the "Run on" pick and the submit slot clustered at the end. Under the box, when it applies, is the note that the target device [6] is offline.
 
 While the embedding surface is busy (a start or a send is in flight) the editor and every control are disabled.
 
@@ -63,6 +65,16 @@ Two ways in, one result. Typing `/` in the editor lists the commands and the sav
 - "Save prompt…" opens a dialog (`PresetCreatePanel.tsx`) seeded with the editor's current text; the user names it and saves it for "Just me" (kept with their preferences [7]) or "This project" (committed in the project's repository; offered only while a project is open). The `X` on a saved prompt's row deletes it without loading it.
 
 Nothing about a loaded text changes what a submit does: a command, a saved prompt and the user's own words are all one prompt.
+
+### Mentions feed the Context
+
+#### Context
+
+**User story**: at the launcher the user types "port the login flow from @my-other-app" and the other project is picked in the Context [10] as well, so the agent's prompt ends by naming its path.
+
+#### Business logic
+
+The surface may hand the composer two edits of its Context: add a path, and remove one. When it does (the launcher), picking a project in the `@` menu adds that project's path, picking a file in the `#` menu adds the file's repository-relative path, and a chip that leaves the editor removes its path again (the rules in `PromptEditor.tsx`). When it does not (an agent view, the compact row), a mention changes nothing but the text.
 
 ### Driver and model
 
@@ -117,7 +129,7 @@ At the launcher, and never in the compact row nor inside an agent [2], a draft c
 
 #### Business logic
 
-Inside an agent the coding-agent-and-model select and the "Run on" pick are not shown, and no carried draft is taken. The Commands button, the `/` list, the mentions and "Save prompt…" work as at the launcher.
+Inside an agent the coding-agent-and-model select and the "Run on" pick are not shown, no carried draft is taken, and there is no Context [10] picker: a mention there is only text. The Commands button, the `/` list, the mentions and "Save prompt…" work as at the launcher.
 
 ### The compact single row
 

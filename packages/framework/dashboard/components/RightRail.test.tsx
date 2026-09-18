@@ -28,6 +28,8 @@ const baseProps = {
   agentId: 'r1',
   views: [],
   files: [],
+  context: new Set<string>(),
+  toggleContext: () => {},
 }
 
 // The rail holds one fixed width for every tab: switching to a pushed view no longer widens it

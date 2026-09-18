@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 const onProjectFileStatus = vi.fn(async () => ({}) as unknown)
 vi.mock('../rpc/reads.js', () => ({ onProjectFileStatus }))
 
 const { FileTree } = await import('./FileTree.js')
 
+const noop = () => {}
 const files = ['src/app.ts', 'README.md']
 
 beforeEach(() => {
@@ -16,7 +17,7 @@ afterEach(cleanup)
 
 describe('FileTree (#815)', () => {
   test('the project home reads the project checkout', async () => {
-    render(<FileTree projectId="p1" files={files} />)
+    render(<FileTree projectId="p1" files={files} selected={new Set()} onToggle={noop} />)
     await waitFor(() => expect(onProjectFileStatus).toHaveBeenCalled())
     expect(onProjectFileStatus).toHaveBeenCalledWith('p1', undefined)
   })
@@ -24,23 +25,32 @@ describe('FileTree (#815)', () => {
   test("a session's dots come from that session's worktree", async () => {
     // The action bar right above the tree has resolved the worktree since #738. Reading the
     // project root here put a clean branch next to another checkout's M/U/D dots.
-    render(<FileTree projectId="p1" agentId="run-1" files={files} />)
+    render(<FileTree projectId="p1" agentId="run-1" files={files} selected={new Set()} onToggle={noop} />)
     await waitFor(() => expect(onProjectFileStatus).toHaveBeenCalled())
     expect(onProjectFileStatus).toHaveBeenCalledWith('p1', 'run-1')
   })
 
   test('switching session re-reads, rather than keeping the previous one’s dots', async () => {
     const { rerender } = render(
-      <FileTree projectId="p1" agentId="run-1" files={files} />,
+      <FileTree projectId="p1" agentId="run-1" files={files} selected={new Set()} onToggle={noop} />,
     )
     await waitFor(() => expect(onProjectFileStatus).toHaveBeenCalledWith('p1', 'run-1'))
-    rerender(<FileTree projectId="p1" agentId="run-2" files={files} />)
+    rerender(<FileTree projectId="p1" agentId="run-2" files={files} selected={new Set()} onToggle={noop} />)
     await waitFor(() => expect(onProjectFileStatus).toHaveBeenCalledWith('p1', 'run-2'))
   })
 
   test('a file the run changed is dotted with its status', async () => {
     onProjectFileStatus.mockResolvedValue({ 'README.md': 'modified' })
-    render(<FileTree projectId="p1" agentId="run-1" files={files} />)
+    render(<FileTree projectId="p1" agentId="run-1" files={files} selected={new Set()} onToggle={noop} />)
     await waitFor(() => expect(screen.getByText('M')).toBeTruthy())
+  })
+
+  test('clicking a file ticks it into the Context; a picked file shows ticked', async () => {
+    const onToggle = vi.fn()
+    const { rerender } = render(<FileTree projectId="p1" files={files} selected={new Set()} onToggle={onToggle} />)
+    fireEvent.click(screen.getByText('README.md'))
+    expect(onToggle).toHaveBeenCalledWith('README.md')
+    rerender(<FileTree projectId="p1" files={files} selected={new Set(['README.md'])} onToggle={onToggle} />)
+    expect(screen.getByText('README.md').closest('button')!.className).toContain('text-primary')
   })
 })

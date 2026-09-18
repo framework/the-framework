@@ -7,6 +7,7 @@ What the tests cover, for the launcher on a project home [1]:
 - **No false alarm** - before the project is read, and for a project that has a start hook, no message shows and the submit is on.
 - **A picked device** - the start carries the device's [5] URL, token and label, a project with no start hook of its own does not block it, and the check hook [6] is not asked.
 - **What would stop the agent** - the check hook [6] is asked with the project and the picked coding agent; its problem shows in red and its warning in amber, in the answer's words, and Start stays on.
+- **The Context [7] rides the prompt** - with another project's path and a file picked, the Start sends the typed text followed by a blank line and `Context: <project path>, <file>` at its end.
 
 ## Glossary
 
@@ -16,3 +17,4 @@ What the tests cover, for the launcher on a project home [1]:
 [4] start hook: the one shell line under `start:` in the project's `.the-framework/hooks.yml`, which starts an agent and answers its id.
 [5] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 [6] check hook: the one shell line under `check:` in the project's `.the-framework/hooks.yml`, which answers what would stop an agent (problems) and what is only worth knowing (warnings).
+[7] Context: the set of paths the user picked to focus an agent on: other registered projects, by their absolute path, and files of the current project, by their path relative to the repository's root.

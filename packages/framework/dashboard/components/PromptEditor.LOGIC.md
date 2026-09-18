@@ -1,4 +1,4 @@
-The prompt editor of the composer [2]: where the user writes an agent's [1] prompt, in the launcher [5] and on an agent's page, as live markdown. Three menus open as the user types — `/` for the project's commands [3] and the saved prompts [6], `@` for projects, `#` for files — and a picked project or file becomes a chip that submits as the exact text the coding agent [4] reads.
+The prompt editor of the composer [2]: where the user writes an agent's [1] prompt, in the launcher [5] and on an agent's page, as live markdown. Three menus open as the user types — `/` for the project's commands [3] and the saved prompts [6], `@` for projects, `#` for files — and a picked project or file becomes a chip that submits as the exact text the coding agent [4] reads and is reported to the surface, which may add it to the Context [7].
 
 ## Context
 
@@ -12,12 +12,14 @@ The prompt editor of the composer [2]: where the user writes an agent's [1] prom
 [4] coding agent: the CLI doing the actual work: Claude Code or Codex.
 [5] launcher: the Start form on a project's own page.
 [6] saved prompt: a prompt the user saved under a name, for themselves or for the project, loaded back into the editor verbatim.
+[7] Context: the set of paths the user picked to focus an agent on: other registered projects, by their absolute path, and files of the current project, by their path relative to the repository's root. The agent can still reach everything; the Context only says where to look.
 
 ## Business logic — TL;DR
 
 - **Live markdown in, markdown out** - the user writes markdown with live formatting; what leaves the editor on every change is that markdown, with each chip written as its exact text.
 - **The `/` menu: commands and saved prompts** - `/` lists the open project's commands [3], the user's and the project's saved prompts [6], and "Save prompt…"; picking a command loads `/<name> ` and picking a saved prompt loads it verbatim, each replacing the editor's content.
-- **The `@` and `#` menus: projects and files** - `@` lists the registered projects and `#` the current project's files, at most eight each; a pick inserts a chip that submits as the project's name or the file's path.
+- **The `@` and `#` menus: projects and files** - `@` lists the registered projects and `#` the current project's files, at most eight each; a pick inserts a chip that submits as the project's name or the file's path, and tells the surface the project's path or the file's path.
+- **A chip that leaves takes its Context out** - whenever the content changes, is loaded or is cleared, every `@`/`#` chip no longer in the editor is reported as removed, so the surface's Context [7] and the prompt never diverge.
 - **Chips and how the menus behave** - a chip reads as a pill but submits as its text; a menu closes on a space or a non-matching query and never traps a stray character; the `/` menu also closes once a command is typed in full.
 - **Loading a prompt replaces the draft** - a command, a saved prompt or an opening text replaces whatever is typed without asking, in one undo step; the caller learns whether a draft was replaced so it can say that undo brings it back.
 - **Submit keys** - Enter and Cmd/Ctrl+Enter submit; Shift+Enter and Alt+Enter do not; Enter is left alone while a menu is open, inside a code block, or during an IME composition.
@@ -75,7 +77,17 @@ What a pick does:
 - Typing `@` opens a menu under "Projects" listing the registered projects by name as `@<name>` with the hint "project": the ones whose name contains the typed text, case-insensitively, and at most eight of them. When no project is registered, a fresh `@` shows "No projects to reference yet." instead of nothing. A pick inserts the chip `@<name>` followed by a space.
 - Typing `#` opens a menu under "Files" listing the current project's files by repository-relative path as `#<path>` with the hint "file": the ones whose path contains the typed text, case-insensitively, and at most eight of them. When the project's file list is empty, a fresh `#` shows "No files indexed here yet.". A pick inserts the chip `#<path>` followed by a space.
 
-A mention is text in the prompt and nothing more: it changes nothing else about the agent.
+Each pick is also reported to the surface: a project by its path (the chip itself carries only the name), a file by its repository-relative path. The launcher adds it to the Context [7]; a surface that keeps no Context ignores it.
+
+### A chip that leaves takes its Context out
+
+#### Context
+
+**Problem**: the chip is the only visible sign that a mention also picked something into the Context [7]. A prompt with no chip left that still carries the path would say one thing and send another.
+
+#### Business logic
+
+The editor remembers which `@` and `#` chips its content holds. After every change the user makes, after a text is loaded (which replaces every chip) and after the editor is cleared, it compares: each chip that was there and is gone is reported to the surface as removed — a file by its path, a project by the path of the registered project with the chip's name (a project no longer registered is not reported). Chips that were added are not reported here: the menus report them when picked.
 
 ### Chips and how the menus behave
 

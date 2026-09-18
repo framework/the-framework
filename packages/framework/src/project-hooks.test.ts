@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { mkdtemp, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { PROJECT_HOOKS_FILE, parseProjectHooks, readProjectHooks, runProjectHooks } from './project-hooks.js'
+import { PROJECT_HOOKS_FILE, parseProjectHooks, readProjectHooks, runProjectHooks, runResumeHook, runStartHook } from './project-hooks.js'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 
 // The hooks file and the runner (#1774), for real: `sh -c` in a throwaway project, the lines
@@ -24,10 +24,13 @@ test('the file: open and close lists of shell lines; missing means none; the wro
   })
   assert.deepEqual(parseProjectHooks('open:\n  - echo one\n  - echo two\n'), { open: ['echo one', 'echo two'], close: [] })
   assert.deepEqual(parseProjectHooks('open:\nclose:\n'), { open: [], close: [] })
-  assert.throws(() => parseProjectHooks('- echo hi\n'), /hooks\.yml must be a YAML map with "open" and "close" lists/)
-  assert.throws(() => parseProjectHooks('opne:\n  - echo hi\n'), /unknown key "opne"; the keys are open and close/)
+  assert.throws(() => parseProjectHooks('- echo hi\n'), /hooks\.yml must be a YAML map; the keys are open, close, start and resume/)
+  assert.throws(() => parseProjectHooks('opne:\n  - echo hi\n'), /unknown key "opne"; the keys are open, close, start and resume/)
   assert.throws(() => parseProjectHooks('open: echo hi\n'), /"open" must be a list of shell lines/)
   assert.throws(() => parseProjectHooks('close:\n  - 3\n'), /"close" must be a list of shell lines/)
+  assert.deepEqual(parseProjectHooks('start: npx agent-scheduler run --detach "$PROMPT"\nresume:\n'), { open: [], close: [], start: 'npx agent-scheduler run --detach "$PROMPT"' })
+  assert.throws(() => parseProjectHooks('start:\n  - echo hi\n'), /"start" must be one shell line/)
+  assert.throws(() => parseProjectHooks('resume: 3\n'), /"resume" must be one shell line/)
 
   const none = await project()
   const broken = await project('open: [\n')
@@ -91,5 +94,45 @@ test('no file runs nothing and logs nothing; a broken file logs why it was ignor
   } finally {
     await rm(none, { recursive: true, force: true })
     await rm(broken, { recursive: true, force: true })
+  }
+})
+
+test('the start line gets the prompt and the picks in its environment, and the id it answers on stdout comes back', async () => {
+  const cwd = await project(`start: 'printf "%s|%s|%s" "$PROMPT" "$DRIVER" "\${MODEL-unset}" > started.txt; echo "{\\"ok\\":true,\\"id\\":\\"run-1\\"}"'\n`)
+  try {
+    assert.deepEqual(await runStartHook(cwd, { prompt: '/work-queue "now"', driver: 'codex' }), { ok: true, id: 'run-1' })
+    assert.equal(await readFile(join(cwd, 'started.txt'), 'utf8'), '/work-queue "now"|codex|unset')
+  } finally {
+    await rm(cwd, { recursive: true, force: true })
+  }
+})
+
+test('the resume line gets the run and the text or the answer', async () => {
+  const cwd = await project(`resume: 'printf "%s|%s|%s" "$RUN_ID" "\${TEXT-unset}" "\${ANSWER-unset}" >> resumed.txt; echo "{\\"id\\":\\"$RUN_ID\\"}"'\n`)
+  try {
+    assert.deepEqual(await runResumeHook(cwd, { runId: 'run-1', text: 'go on' }), { ok: true, id: 'run-1' })
+    assert.deepEqual(await runResumeHook(cwd, { runId: 'run-2', answer: 'Yes' }), { ok: true, id: 'run-2' })
+    assert.equal(await readFile(join(cwd, 'resumed.txt'), 'utf8'), 'run-1|go on|unsetrun-2|unset|Yes')
+  } finally {
+    await rm(cwd, { recursive: true, force: true })
+  }
+})
+
+test('no start line, a broken file, a failing line, a line that answers no id, a line that hangs: each is an error in words', async () => {
+  const none = await project('open:\n  - echo hi\n')
+  const broken = await project('start: [\n')
+  const failing = await project('start: echo "the project has no such command" >&2; exit 1\n')
+  const mute = await project('start: echo done\n')
+  const hanging = await project('start: sleep 30\n')
+  try {
+    assert.deepEqual(await runStartHook(none, { prompt: 'x' }), { ok: false, error: 'this project has no start hook' })
+    assert.deepEqual(await runResumeHook(none, { runId: 'r', text: 'x' }), { ok: false, error: 'this project has no resume hook' })
+    const said = await runStartHook(broken, { prompt: 'x' })
+    assert.ok(!said.ok && /^ignoring .*hooks\.yml/.test(said.error), JSON.stringify(said))
+    assert.deepEqual(await runStartHook(failing, { prompt: 'x' }), { ok: false, error: 'the start hook: the project has no such command' })
+    assert.deepEqual(await runStartHook(mute, { prompt: 'x' }), { ok: false, error: 'the start hook: it answered no run id' })
+    assert.deepEqual(await runStartHook(hanging, { prompt: 'x' }, { timeoutMs: 300 }), { ok: false, error: 'the start hook: timed out after 0s' })
+  } finally {
+    for (const dir of [none, broken, failing, mute, hanging]) await rm(dir, { recursive: true, force: true })
   }
 })

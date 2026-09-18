@@ -19,19 +19,14 @@ vi.mock('../lib/use-start-agent.js', async () => ({
   useStartAgent: () => ({ busy: false, error: null, reset: vi.fn(), start }),
 }))
 
-// The Composer is exercised by its own tests; here it hands back a typed submit, records what
-// the form loads into it, and shows whether the form lets it submit at all.
-const loaded = vi.hoisted(() => [] as string[])
+// The Composer is exercised by its own tests; here it hands back a typed submit and shows
+// whether the form lets it submit at all.
 vi.mock('./Composer.js', async () => {
   const { forwardRef, useImperativeHandle } = await import('react')
   const Composer = forwardRef((props: any, ref: any) => {
     useImperativeHandle(ref, () => ({
       clear: () => {},
       focus: () => {},
-      load: (text: string) => {
-        loaded.push(text)
-        return false
-      },
     }))
     return (
       <button type="button" disabled={!props.canSubmit} onClick={() => props.onSubmit('do the thing')}>
@@ -48,26 +43,19 @@ afterEach(() => {
   cleanup()
   start.mockReset()
   onCommands.mockReset()
-  loaded.length = 0
   prefs.current = {}
   device.current = null
 })
 
-const COMMANDS = [
-  { name: 'work-queue', description: 'Work the agent queue', button: true },
-  { name: 'tickets', description: 'Where the tickets live', button: false },
-]
+const COMMANDS = [{ name: 'work-queue', description: 'Work the agent queue' }]
 const props = { projectId: 'p1', files: [] }
 
 describe('StartAgentForm (#1774)', () => {
-  test('a command written to be run by a person is a button, and a click loads it into the box for review', async () => {
+  test('the project\'s commands are no buttons: they are in the box\'s `/` list, and nothing starts', async () => {
     onCommands.mockResolvedValue({ commands: COMMANDS, startHook: true })
     render(<StartAgentForm {...props} />)
-    fireEvent.click(await screen.findByRole('button', { name: '/work-queue' }))
-    expect(loaded).toEqual(['/work-queue '])
-    expect(screen.getByRole('status').textContent).toBe('/work-queue loaded — review or edit, then Start')
-    // A skill the agent picks up on its own is in the `/` list, not a button; and a click starts nothing.
-    expect(screen.queryByRole('button', { name: '/tickets' })).toBeNull()
+    await waitFor(() => expect(onCommands).toHaveBeenCalled())
+    expect(screen.queryByRole('button', { name: '/work-queue' })).toBeNull()
     expect(start).not.toHaveBeenCalled()
   })
 

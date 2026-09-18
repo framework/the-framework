@@ -11,7 +11,7 @@ The dashboard's [1] view layer: every page the user sees and every control on it
 [3] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [4] the agent queue: the priority-ordered list of what agents will work on next.
 [5] next step: what a person can do with an ended agent's work from the dashboard: open a pull request for its branch, or merge the pull request it has.
-[6] command: one of the project's skills, read off the folders the coding agents read them from; typed as `/<name>`.
+[6] command: one of the project's skills written to be run by a person, never picked up by the coding agent on its own (its front matter says `disable-model-invocation: true`), read off the folders the coding agents read them from (`.claude/skills/`, `.agents/skills/`); typed as `/<name>`, optionally followed by an argument.
 [7] intervention: something that needs a human — an open question, a pull request to review, unpushed commits.
 [8] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 

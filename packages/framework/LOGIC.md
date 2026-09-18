@@ -12,7 +12,7 @@ The product itself, published as the npm package `framework`: one command, `the-
 [2] the dashboard: the browser app the daemon serves — the product's only user interface.
 [3] agent: the unit of work: one task worked by a coding agent [12], in its own checkout [6], on its own branch, keeping a card [7] and a diary [8], publishing its own work when it ends.
 [4] start hook: the one shell line under `start` in a project's `.the-framework/hooks.yml`, which the daemon runs when the user presses Start. It is given the prompt, and the coding agent [12] and model the user picked, in its environment, and answers the id of the agent [3] it began as JSON on stdout.
-[5] command: a skill of the project that a person can run by name: a folder under `.claude/skills/` or `.agents/skills/` holding a `SKILL.md`; what is typed after the slash is the folder's name.
+[5] command: one of the project's skills written to be run by a person, never picked up by the coding agent on its own (its front matter says `disable-model-invocation: true`), read off the folders the coding agents read them from (`.claude/skills/`, `.agents/skills/`); typed as `/<name>`, optionally followed by an argument.
 [6] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [7] card: `.the-framework/<id>.json` in an agent's checkout: the agent's own record while it works — what was asked, which coding agent [12], the branch, the process running it, how it ended — written by the tool that runs the agent.
 [8] diary: `.the-framework/<id>.jsonl` in an agent's checkout: one line per thing the agent said or did, written by the tool that runs the agent.

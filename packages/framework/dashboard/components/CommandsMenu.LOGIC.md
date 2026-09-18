@@ -9,7 +9,7 @@ The "Commands" button beside the composer [1]: one dropdown that lists the open 
 ## Glossary
 
 [1] composer: the prompt editor on a project's own page, also used to say something to an agent.
-[2] command: one of the project's skills, read off the folders the coding agents read them from; typed as `/<name>`, optionally followed by an argument.
+[2] command: one of the project's skills written to be run by a person, never picked up by the coding agent on its own (its front matter says `disable-model-invocation: true`), read off the folders the coding agents read them from (`.claude/skills/`, `.agents/skills/`); typed as `/<name>`, optionally followed by an argument.
 [3] saved prompt: a prompt the user saved under a name, either for themselves (kept with their preferences) or for the project (committed in the project's repository), and loads back into the editor verbatim.
 
 ## Business logic — TL;DR

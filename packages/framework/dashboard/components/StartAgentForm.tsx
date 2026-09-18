@@ -5,12 +5,10 @@ import { useSelectedRemoteDeviceId } from '../lib/remote-target.js'
 import { startPicks, useStartAgent } from '../lib/use-start-agent.js'
 import { useProjectLauncher } from '../lib/use-project-launcher.js'
 import { Composer, type ComposerHandle } from './Composer.js'
-import { Button } from './ui/button.js'
-import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 
-// Start a run in the selected project (#405, #1774): the project's commands as buttons, a free-text
-// box, and Start, which is the project's own start hook (posted over `sendStart`). The editor +
-// control row are the shared Composer (#721); this form owns the submit and the command buttons.
+// Start a run in the selected project (#405, #1774): a free-text box, where `/` lists the project's
+// commands, and Start, which is the project's own start hook (posted over `sendStart`). The editor +
+// control row are the shared Composer (#721); this form owns the submit.
 // A project without a start hook cannot start a run from here, and the form says how to add one.
 export function StartAgentForm({
   projectId,
@@ -59,38 +57,9 @@ export function StartAgentForm({
     setNote(replaced ? `${label} loaded over your draft — undo (⌘Z) brings the draft back` : `${label} loaded — review or edit, then Start`)
   }
 
-  // The commands written to be run by a person, one button each. A click loads the command into
-  // the box rather than starting it: a command may take an argument, and a start spends money.
-  const buttons = launcher?.commands.filter(command => command.button) ?? []
-
   return (
     <form onSubmit={e => e.preventDefault()} className="p-3">
       <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Start an agent</div>
-      {buttons.length > 0 && (
-        <div className="mb-2 flex flex-wrap gap-1.5">
-          {buttons.map(command => {
-            const props = {
-              type: 'button' as const,
-              variant: 'outline' as const,
-              size: 'sm' as const,
-              disabled: busy,
-              onClick: () => loaded(`/${command.name}`, composerRef.current?.load(`/${command.name} `) ?? false),
-            }
-            if (!command.description)
-              return (
-                <Button key={command.name} {...props}>
-                  /{command.name}
-                </Button>
-              )
-            return (
-              <Tooltip key={command.name}>
-                <TooltipTrigger render={<Button {...props} />}>/{command.name}</TooltipTrigger>
-                <TooltipContent className="max-w-[22rem]">{command.description}</TooltipContent>
-              </Tooltip>
-            )
-          })}
-        </div>
-      )}
       <Composer
         ref={composerRef}
         files={files}

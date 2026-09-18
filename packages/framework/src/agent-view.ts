@@ -1,48 +1,23 @@
 import { sessionNameOf } from '@gemstack/skill-branches/branch-names'
 import type { FrameworkEvent } from './events.js'
 
-// Derived agent state for the dashboard's overview cards (#431): the production-grade
-// loop status, the deploy plan, and the live session link — each a pure projection of
-// the same FrameworkEvent stream the log renders, so the live dashboard and a past-agent
-// replay show the identical summary. Kept here (not in the dashboard) so it is
-// unit-tested against the real event shapes. The bootstrap phase (checklist/deploy)
-// carries the structured data; we surface it as cards.
-
-/** The agent's lifecycle progress (#326): the session name it chose and whether it is ready for merge. */
-export interface AgentProgress {
-  /** The session name, read off the agent's `agent-<name>` branch (#1725), once the agent named it. */
-  sessionName?: string
-  /** True once the agent signalled `setReadyForMerge()`: building (false) -> ready (true). */
-  readyForMerge: boolean
-}
-
-/**
- * The agent's lifecycle progress (#326): the session name its latest observed branch carries and
- * whether a `ready-for-merge` has fired. Drives the dashboard status label + dot (orange building,
- * green ready). Always returns a value — an untouched agent is `{ readyForMerge: false }`.
- */
-export function agentProgress(events: readonly FrameworkEvent[]): AgentProgress {
-  let sessionName: string | undefined
-  let readyForMerge = false
-  for (const event of events) {
-    if (event.kind === 'branch') sessionName = event.sessionName
-    else if (event.kind === 'ready-for-merge') readyForMerge = true
-  }
-  return { ...(sessionName ? { sessionName } : {}), readyForMerge }
-}
+// Derived agent state for the dashboard's overview cards (#431): the errors a run hit and the
+// live session link — each a pure projection of the same FrameworkEvent stream the log renders,
+// so the live dashboard and a past-agent replay show the identical summary. Kept here (not in the
+// dashboard) so it is unit-tested against the real event shapes.
 
 /**
  * The `sessionName` a derived view carries (#1725): the name the agent's branch carries, as a
  * field that is present only when there is one — so a view of an unnamed agent has no name,
  * rather than a name that is `undefined`. The one spelling behind every view built from an
- * agent's record; a view built from the event stream reads the name off the `branch` event.
+ * agent's record.
  */
 export function sessionNameField(branch: string | undefined, agentId: string): { sessionName?: string } {
   const sessionName = sessionNameOf(branch, agentId)
   return sessionName ? { sessionName } : {}
 }
 
-/** One error the agent reported through an `error` block (#1500). */
+/** One error of a run: one the agent reported through an `error` block (#1500), or one its tool wrote in the diary. */
 export interface AgentError {
   /** What is wrong, in one line. */
   headline: string
@@ -51,8 +26,11 @@ export interface AgentError {
 }
 
 /**
- * Every error the agent reported (#1500), oldest first — the count the dashboard shows on the
- * session, and the latest headline it shows beside it.
+ * Every error of the run (#1500), oldest first — the count the dashboard shows on the session, and
+ * the latest headline it shows beside it. Two sources: the `error` lines the run's tool writes in
+ * the diary when the coding agent or its transport fails (the message's first line is the
+ * headline, the rest the detail), and the `error` blocks of runs recorded before the daemon
+ * stopped running agents.
  *
  * A fold over the log rather than state of its own: an error is an event that happened, so the
  * list only ever grows, and reopening a finished agent shows exactly what it showed while it ran.
@@ -60,8 +38,13 @@ export interface AgentError {
 export function agentErrors(events: readonly FrameworkEvent[]): AgentError[] {
   const errors: AgentError[] = []
   for (const event of events) {
-    if (event.kind !== 'error') continue
-    errors.push({ headline: event.headline, ...(event.detail ? { detail: event.detail } : {}) })
+    if (event.kind === 'error') {
+      errors.push({ headline: event.headline, ...(event.detail ? { detail: event.detail } : {}) })
+    } else if (event.kind === 'driver' && event.event.type === 'error' && typeof event.event.message === 'string') {
+      const [headline = '', ...rest] = event.event.message.trim().split('\n')
+      const detail = rest.join('\n').trim()
+      errors.push({ headline: headline || 'error', ...(detail ? { detail } : {}) })
+    }
   }
   return errors
 }

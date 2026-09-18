@@ -3,7 +3,7 @@ import type { FrameworkEvent } from '../../src/index.js'
 import { GitStatusBar } from './GitStatusBar.js'
 import { AgentActionsMenu } from './AgentActionsMenu.js'
 import { AgentErrorCount } from './AgentErrorCount.js'
-import { agentStatusPill } from '../lib/agent-status.js'
+import { agentStatusPill, type AgentCardFacts } from '../lib/agent-status.js'
 import { cn } from '../lib/utils.js'
 
 // One agent's action bar: what the session IS (its branch / PR / summary, as a disclosure) on the
@@ -16,6 +16,7 @@ export function AgentActionBar({
   projectId,
   agentId: agentId,
   events,
+  card,
   retainedWorktree = false,
   onWorktreeRemoved,
   onDeleted,
@@ -30,6 +31,8 @@ export function AgentActionBar({
   /** Which run Stop addresses (#749). */
   agentId?: string | null | undefined
   events: FrameworkEvent[]
+  /** What the run's card says, for the status pill: its status, its pull request, whether it is publishing. */
+  card?: AgentCardFacts | undefined
   /** The session's name — leads the bar, so the branch is git context, not the identity (#1030). */
   label?: string | undefined
   /** The session's project, shown as a `project / session` breadcrumb before the name. */
@@ -51,8 +54,9 @@ export function AgentActionBar({
 }) {
   // What state the session is in, said once, here: it used to be a banner over the feed, which
   // spent a full row on one word and pushed the output down. Ranked in agentStatusPill, so exactly
-  // one of stopped / ready for merge / failed / building / finished is ever shown.
-  const status = agentStatusPill(events)
+  // one of failed / stopped / waiting for an answer / publishing… / ready for merge / building… /
+  // finished is ever shown.
+  const status = agentStatusPill(events, card)
   return (
     // One row, always (#1026). The branch and its summary give up width as the row fills; the
     // controls never drop under them, because a bar that reflows moves everything below it.

@@ -38,12 +38,20 @@ export function fromDiaryLine(line: AnyDiaryLine): FrameworkEvent {
         ...(line['status'] === 'waiting' ? { waiting: true } : {}),
         ...(typeof line['detail'] === 'string' ? { detail: line['detail'] } : {}),
       }
+    // An error line with a headline is the agent's own `error` block, from a run recorded before the
+    // daemon stopped running agents; any other is agent-driver's, a driver's message.
+    case 'error': {
+      if (typeof line['headline'] === 'string') {
+        return { kind: 'error', headline: line['headline'], ...(typeof line['detail'] === 'string' ? { detail: line['detail'] } : {}) }
+      }
+      const { kind: _kind, ...rest } = line
+      return { kind: 'driver', event: { type: 'error', ...rest } as DriverEvent }
+    }
     // The lines agent-driver's own log writes (its `session-log.ts`): a driver event per kind, the
     // agent's session id, and the question a turn ended on as the gate the dashboard shows.
     case 'start':
     case 'action':
     case 'rate-limit':
-    case 'error':
     case 'notice': {
       const { kind, ...rest } = line
       return { kind: 'driver', event: { type: kind, ...rest } as DriverEvent }

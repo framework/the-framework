@@ -1,10 +1,10 @@
-Derives an agent's [1] current state from its event stream [2], as pure folds over the events with nothing kept beside them, so that a live agent and a replayed one show the same thing: which gates [3] it is parked on, which views [4] it has pushed, whether it is still going (which is what offers the Stop [5] button), whether it has settled [6] on the user, how it ended, whether its handoff [7] is still publishing, and the links to its GitHub Actions run or its cloud session [8].
+Derives an agent's [1] current state from its event stream [2], as pure folds over the events with nothing kept beside them, so that a live agent and a replayed one show the same thing: which gates [3] it is parked on, which views [4] it has pushed, whether it is still going (which is what offers the Stop [5] button), how it ended, and the links to its GitHub Actions run or its cloud session [8].
 
 ## Context
 
-**User story**: the user opens an agent's page while the agent works, or hours later from the list of past agents, and both times the page says the same thing: a Stop button only while something more may come, "waiting for you" once the agent has parked, the questions it is asking, the documents it wants read, how it ended, and a pull request that is moments away rather than a page that reads as finished with nothing coming.
+**User story**: the user opens an agent's page while the agent works, or hours later from the list of past agents, and both times the page says the same thing: a Stop button only while something more may come, the questions it is asking, the documents it wants read, and how it ended.
 
-**Business logic story**: the dashboard is a projection of the same event stream the agent's tool writes as the agent works — the agent's diary, in its checkout [9] and then on the data branch; the rules here turn that stream into the facts the agent view, the status pill, the right rail and the actions menu render. The other folds over the same stream (the session name, ready for merge, what the handoff is armed to do, reported errors, the driver session) live in `../../src/agent-view.ts`, and the status words built on top of these facts live in `agent-status.ts`.
+**Business logic story**: the dashboard is a projection of the same event stream the agent's tool writes as the agent works — the agent's diary, in its checkout [9] and then on the data branch; the rules here turn that stream into the facts the agent view, the status pill, the right rail and the actions menu render. The other folds over the same stream (the errors the agent hit, the driver session) live in `../../src/agent-view.ts`, and the status words built on top of these facts live in `agent-status.ts`.
 
 **Problem**: an agent that is continued — its question answered, a message said to it after it ended — writes on into the same event stream [2], after the `end` of its earlier leg. Facts that would read "was there ever an end" or "which gates are open" off the whole stream would answer with a leg the agent has since left behind, so they are asked of the current segment [10]. Older records open each leg with a `session` event instead, and are cut there.
 
@@ -15,8 +15,6 @@ Derives an agent's [1] current state from its event stream [2], as pure folds ov
 [3] gate: a question with options an agent's turn ended on: the agent ends waiting for the answer, the dashboard shows the question as a card, and the answer resumes the agent.
 [4] view: a markdown document an agent pushes to the dashboard's right rail while it works.
 [5] stop: ending an agent before it finishes: the Stop button, Ctrl-C, or a pick marked to stop.
-[6] settled: said of an agent whose work has stopped and which is waiting for the user: it is alive, takes messages, and does nothing until told.
-[7] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request), `merge` (also merge it).
 [8] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
 [9] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [10] segment: one leg of an agent: the events from where the agent was last continued to the end of the stream. The boundary is the last `end` the agent went on after, or, in older records, the last opening `session` event. The latest segment is the agent in progress.
@@ -34,10 +32,7 @@ Derives an agent's [1] current state from its event stream [2], as pure folds ov
 - **Open gates** - a question opens with its `choice` event and stays open through an `end` that says the agent is waiting on it; it closes when the agent goes on, when a recorded pick names it, and when the agent ends for good. The rule is shared with the daemon.
 - **Views** - one entry per view id, in first-seen order; showing a view again updates it in place.
 - **Still going** - the current segment has streamed something and holds no `end` yet; an empty stream is not going.
-- **Settled on the user** - true from a `settled` event until the next turn starts or the agent ends.
 - **How it ended** - the current segment's `end`: success or failure, whether the user stopped it, whether it waits on an answer, and its detail; nothing while the segment has no end.
-- **Publishing** - the current segment ended clean and has no handoff report yet, and the latest arming anywhere in the stream has push on.
-- **Publishing, from the status snapshot** - the same window read off the snapshot for lists: status done, push armed, no handoff report recorded.
 - **The GitHub Actions run link** - the latest progress line reading `run <url>`; absent for every other agent.
 - **The cloud session** - the latest progress line reading `cloud <url>`, with the session id read off the claude.ai URL.
 
@@ -104,18 +99,6 @@ An agent is still going when its current segment holds at least one event and no
 - the agent view's own verdict that its feed is live, so a resumed agent's continuation renders and Stop takes over from Resume the moment its first event lands, before the daemon's agent list notices;
 - the status words in `agent-status.ts`.
 
-### Settled on the user
-
-#### Context
-
-**User story**: an agent [1] whose work has stopped stays alive as a conversation so the user can send the next message; the page tells "working" from "waiting for you" even though the agent's status stays running either way.
-
-**Problem**: anything that asks "is there anything more coming?", such as whether to offer the handoff [7] or whether to read what the branch holds, must ask this rather than whether the process is up, or a plainly finished agent offers nothing to do with it.
-
-#### Business logic
-
-Only records of agents from before the launcher started agents through the project's start hook carry a `settled` event; an agent started today ends instead of parking, so it never reads as settled. Read over the whole stream, latest event deciding: a `settled` event marks the agent settled [6]; a driver [13] `start` event (a new turn [12] begins) clears it; an `end` clears it too, since the agent ended outright and "still going" already says so. The agent view treats an agent as working only while its feed is live and it is not settled; once it is not working, the handoff bar reads the branch and offers the handoff.
-
 ### How it ended
 
 #### Context
@@ -127,32 +110,6 @@ Only records of agents from before the launcher started agents through the proje
 #### Business logic
 
 The outcome is read off the first `end` event of the current segment: whether it succeeded, whether the user stopped [5] it (only when the end says so explicitly; an end that does not say counts as not stopped), whether it ended waiting on a question (it then reads as waiting, not as failed), and the end's detail text when it carries one. While the current segment has no `end`, because the agent is still going or has just been resumed, there is no outcome at all. The agent view reads the outcome only for an agent that is no longer live.
-
-### Publishing
-
-#### Context
-
-**User story**: after an agent [1] finishes clean, its handoff [7] still pushes the branch, opens the pull request and maybe merges it; for those seconds the status pill says the agent is publishing rather than finished, which would read as done with nothing coming while the pull request link is moments away.
-
-#### Business logic
-
-Only records of agents from before the launcher started agents through the project's start hook carry `handoff-armed` and `handoff` events; an agent started today publishes its own work before it ends, so it never reads as publishing. An agent is publishing exactly when all three hold:
-
-- the current segment's [10] `end` reports success;
-- the current segment holds no `handoff` event yet. Every handoff reports, whether done, skipped or failed, so its report closes the window. Only the current segment is checked, because a resumed agent's earlier segment carries its own report, which must not hide the new window;
-- the latest `handoff-armed` event anywhere in the stream has push on. Arming is agent-level configuration rather than segment state, so it is read across segments.
-
-A stream with no `handoff-armed` event at all is not publishing. The "absent means armed" default that the handoff fold applies elsewhere is deliberately not applied here, or an agent recorded before arming events existed would show as publishing forever.
-
-### Publishing, from the status snapshot
-
-#### Context
-
-**Problem**: the list of recent agents holds only each agent's [1] status snapshot [14], never its event stream. The snapshot's status flips to done the moment the `end` lands, while the handoff [7] report reaches the snapshot only when the handoff answers, so between the two a list would say done while the agent's own page says publishing.
-
-#### Business logic
-
-Off the status snapshot, an agent is publishing when its status is done, the handoff it is armed for has push affirmatively on (an absent arming reads as nothing to wait for, the same rule as the event-side check), and no handoff report has been recorded yet. The list of recent agents shows the same publishing state the agent's own page shows.
 
 ### The GitHub Actions run link
 

@@ -111,6 +111,22 @@ test('readLiveMeta reads a checkout\'s card as the meta; the project root, a che
   assert.equal(await readLiveMeta(CWD, fs), undefined)
 })
 
+test('readLiveMeta gives a checkout\'s run the branch the checkout is on now: the agent renames it while the card keeps the first name', async () => {
+  const checkout = join(CWD, '.branches', 'agent-r1')
+  const gitdir = join(CWD, '.git', 'worktrees', 'agent-r1')
+  const fs = memFs({
+    [liveAt('r1', 'json')]: card('r1', 'running', { branch: 'agent-r1' }),
+    [join(checkout, '.git')]: `gitdir: ${gitdir}\n`,
+    [join(gitdir, 'HEAD')]: 'ref: refs/heads/agent-add-comments\n',
+  })
+  assert.equal((await readLiveMeta(checkout, fs))?.branch, 'agent-add-comments')
+  // A detached checkout, or git files that cannot be read, leave the card's branch.
+  fs.files.set(join(gitdir, 'HEAD'), '0123456789abcdef0123456789abcdef01234567\n')
+  assert.equal((await readLiveMeta(checkout, fs))?.branch, 'agent-r1')
+  fs.files.delete(join(checkout, '.git'))
+  assert.equal((await readLiveMeta(checkout, fs))?.branch, 'agent-r1')
+})
+
 test('readLiveMeta never ends a run whose process is gone: the tool that started it sweeps its own', async () => {
   const fs = memFs({ [liveAt('r1', 'json')]: card('r1', 'running', { caller: { pid: 2 ** 22 - 1, host: 'this-box' } }) })
   const before = fs.files.get(liveAt('r1', 'json'))

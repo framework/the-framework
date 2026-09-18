@@ -9,10 +9,8 @@ export { errorMessage } from './error-message.js'
 export { pickedIds } from './events.js'
 export {
   sessionInfo,
-  agentProgress,
   agentErrors,
   type SessionInfo,
-  type AgentProgress,
   type AgentError,
 } from './agent-view.js'
 // Which questions a run still waits on: one rule for the run page and the daemon's own reads.

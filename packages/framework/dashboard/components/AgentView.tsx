@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { FrameworkEvent } from '../../src/index.js'
-import { agentProgress } from '../../src/client.js'
 import { onAgent, onRetainedWorktrees } from '../rpc/reads.js'
 import { useLoaded } from '../lib/use-async.js'
 import { useAgentHandoff } from '../lib/use-agent-handoff.js'
-import { agentSettled, isAgentActive, agentOutcome } from '../lib/live-state.js'
+import { isAgentActive, agentOutcome } from '../lib/live-state.js'
+import type { AgentCardFacts } from '../lib/agent-status.js'
 import { AgentActionBar } from './AgentActionBar.js'
 import { AgentComposer } from './AgentComposer.js'
 import { AgentFeed } from './AgentFeed.js'
@@ -32,6 +32,7 @@ export function AgentView({
   agentId: agentId,
   events,
   live,
+  card,
   label,
   projectName,
   target,
@@ -48,6 +49,8 @@ export function AgentView({
   events: FrameworkEvent[]
   /** Whether the agent is still running. */
   live: boolean
+  /** What the run's card says, off the runs poll: the status pill's facts the feed cannot carry. Absent until the card is listed. */
+  card?: AgentCardFacts | undefined
   /** The session's own name — the same label the rail shows (#1030). It leads the action bar as
    * the stable identity, so the branch renaming itself near the end of an agent (#736) reads as a
    * detail changing rather than the whole view changing. */
@@ -97,14 +100,9 @@ export function AgentView({
   }, [agentId])
   const hasWorktree = !live && !removed && retained.includes(agentId)
 
-  // Whether the agent is still working, which is not whether the agent's process is up (#1173).
-  // A session that has settled parks on you but stays alive to take your next message (#785/#714),
-  // so its status reads `running` indefinitely. Keying the handoff off `live` meant a finished
-  // session showed its two arming checkboxes for ever and never offered the action they describe
-  // — the agent was done, and the answer to "what do I do now?" was nothing.
-  // Read off the channel rather than `shown`: while the agent is live those are the same events,
-  // and once it is not, `working` is false whatever they say.
-  const working = live && !agentSettled(events)
+  // Whether the agent is still working. A run that stops on a question ends `waiting` rather than
+  // staying up, so a live run is a working one.
+  const working = live
 
   // What the branch holds (#1023), read once for both the bar and the detail it opens. Read once
   // the agent stops rather than once the process does: while it is still writing to the branch
@@ -148,7 +146,6 @@ export function AgentView({
   // the composer slot, so the continuation renders (and Stop takes over from Resume) the moment
   // the first event lands rather than when the poll does.
   const feedLive = live || (feedAhead && isAgentActive(events))
-  const progress = agentProgress(shown)
   // How the agent ended (#948) — read once for the composer's note and the Resume offer below.
   const outcome = live ? undefined : agentOutcome(shown)
   // Until the handoff has actually loaded, a just-stopped agent keeps showing the file counts it
@@ -162,7 +159,8 @@ export function AgentView({
         projectId={projectId}
         agentId={agentId}
         events={shown}
-        label={label ?? progress.sessionName}
+        card={card}
+        label={label}
         projectName={projectName}
         retainedWorktree={hasWorktree}
         onWorktreeRemoved={onWorktreeRemoved}

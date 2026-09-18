@@ -3,6 +3,7 @@ Tests of the read side of a project's agents (`agent-store.ts`), against an in-m
 Covered:
 - The recorded agents are listed newest first, every person's, each card unfolded into the dashboard's record (the running tool's fields included); a project with no `agent-data` branch has none; a "since" keeps only the agents started at or after it.
 - A checkout's card is read as the agent, with its process id and host; the project's own checkout, a checkout with no card and a card that does not parse are no agent.
+- A checkout's agent carries the branch the checkout is on now, a renamed one included, rather than the card's first name; a checkout on no branch, or whose git files cannot be read, keeps the card's branch.
 - A read never ends an agent whose process is gone, and writes nothing.
 - Every `agent-<id>` checkout is found, newest first, a waiting one too; other directories are skipped; a project that never had an agent has none.
 - An agent with both a record and a checkout is listed once, as its checkout says; one agent is found by id the same way; an unknown id finds nothing.

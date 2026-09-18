@@ -1,30 +1,7 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { sessionInfo, agentProgress, agentErrors } from './agent-view.js'
+import { sessionInfo, agentErrors } from './agent-view.js'
 import type { FrameworkEvent } from './events.js'
-
-test('agentProgress starts building with no name and flips to ready on setReadyForMerge (#326)', () => {
-  assert.deepEqual(agentProgress([]), { readyForMerge: false })
-  // The birth branch is not a name (#1725): the agent is unnamed until it renames its branch.
-  assert.deepEqual(agentProgress([{ kind: 'branch', branch: 'agent-r1' }]), { readyForMerge: false })
-  const building: FrameworkEvent[] = [{ kind: 'branch', branch: 'agent-add-comments', sessionName: 'add-comments' }]
-  assert.deepEqual(agentProgress(building), { sessionName: 'add-comments', readyForMerge: false })
-  const ready: FrameworkEvent[] = [...building, { kind: 'ready-for-merge' }]
-  assert.deepEqual(agentProgress(ready), { sessionName: 'add-comments', readyForMerge: true })
-})
-
-test('agentProgress reads the session name off the latest observed branch (#326/#1725)', () => {
-  // The name rides the event: only the journal that wrote it knows which branch the checkout was
-  // created on, so the projection never derives it from the branch itself (#1736).
-  const events: FrameworkEvent[] = [
-    { kind: 'branch', branch: 'agent-r1' },
-    { kind: 'branch', branch: 'agent-first-guess', sessionName: 'first-guess' },
-    { kind: 'branch', branch: 'agent-better-name-2', sessionName: 'better-name-2' },
-  ]
-  assert.equal(agentProgress(events).sessionName, 'better-name-2')
-  // A branch The Framework did not mint carries no session name.
-  assert.equal(agentProgress([...events, { kind: 'branch', branch: 'feat/mine' }]).sessionName, undefined)
-})
 
 test('sessionInfo merges the opening session with the latest session-update link (#431)', () => {
   const events: FrameworkEvent[] = [
@@ -70,4 +47,20 @@ test('agentErrors folds the errors the agent reported, oldest first (#1500)', ()
     { headline: 'gh is not logged in', detail: 'ran `gh auth status`' },
     { headline: 'tickets/meta.json has no lastImportedAt' },
   ])
+})
+
+test('agentErrors also counts the error lines the run\'s tool writes in the diary: first line the headline, the rest the detail', () => {
+  const events: FrameworkEvent[] = [
+    { kind: 'driver', event: { type: 'text', text: 'working' } },
+    { kind: 'driver', event: { type: 'error', message: 'claude exited with code 1\nstderr: not logged in\n' } },
+    { kind: 'error', headline: 'gh is not logged in' },
+    { kind: 'driver', event: { type: 'error', message: 'rate limited' } },
+  ]
+  assert.deepEqual(agentErrors(events), [
+    { headline: 'claude exited with code 1', detail: 'stderr: not logged in' },
+    { headline: 'gh is not logged in' },
+    { headline: 'rate limited' },
+  ])
+  // A notice is something the driver worked around, not an error.
+  assert.deepEqual(agentErrors([{ kind: 'driver', event: { type: 'notice', message: 'retried' } }]), [])
 })

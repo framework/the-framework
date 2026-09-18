@@ -5,7 +5,6 @@ import { DRIVER_LABELS, driverFromImpl, cloudRunState, type CloudRunState } from
 import { Button, buttonVariants } from './ui/button.js'
 import { Badge } from './ui/badge.js'
 import { cn } from '../lib/utils.js'
-import { isMetaPublishing } from '../lib/live-state.js'
 import { formatRelative } from '../lib/format-date.js'
 import { STATUS_TONE } from '../lib/status-tone.js'
 import { agentLabel } from '../lib/agent-label.js'
@@ -245,14 +244,13 @@ export function AgentHistory({
                   <SidebarMenuItem key={row.key}>
                     <AgentHistoryRow
                       status={row.agent.status}
-                      publishing={isMetaPublishing(row.agent)}
+                      publishing={row.agent.publishing === true}
                       intent={agentLabel(row.agent)}
                       driver={row.agent.driver}
                       // On the Overview the project is what tells the rows apart, so it leads the meta
                       // line; a project's own rail already knows its project, so it shows just the time.
                       subtitle={row.project ? `${row.project} · ${formatRelative(row.agent.startedAt)}` : formatRelative(row.agent.startedAt)}
                       active={row.active}
-                      waiting={row.agent.settledAt !== undefined}
                       remote={row.agent.target === 'remote'}
                       cloud={row.agent.target === 'web'}
                       {...(row.agent.otherHost && row.agent.host ? { startedOn: row.agent.host } : {})}
@@ -533,7 +531,6 @@ function AgentHistoryRow({
   onClick,
   driver,
   dim = false,
-  waiting = false,
   publishing = false,
   remote = false,
   cloud = false,
@@ -549,10 +546,8 @@ function AgentHistoryRow({
   active: boolean
   onClick: () => void
   dim?: boolean
-  /** Live, but parked on the user rather than working (#785). */
-  waiting?: boolean
-  /** Ended clean, armed handoff not reported yet (#1455): the row must not say "done" while the
-   *  session's own pill says "publishing…" — the epilogue is still pushing / opening the PR. */
+  /** Ended clean, its process still recording the run and pushing its branch (#1455): the row must
+   *  not say "done" while the session's own pill says "publishing…". */
   publishing?: boolean
   /** Runs on a connected device (#1067): the row gets a device glyph next to the agent logo. */
   remote?: boolean
@@ -565,9 +560,9 @@ function AgentHistoryRow({
   /** The machine whose daemon started the run, when that is another machine (#1648): a glyph names it. */
   startedOn?: string | undefined
 }) {
-  // Only a live agent can be waiting on you; a finished one is just finished — except a web run
-  // whose cloud session the bridge reports as parked (#1668).
-  const parked = (waiting && status === 'running') || cloudState === 'waiting'
+  // A run that ended on its question waits on you (#785), and so does a web run whose cloud
+  // session the bridge reports as parked (#1668).
+  const parked = status === 'waiting' || cloudState === 'waiting'
   const picked = driverFromImpl(driver)
   // A web agent's local process ends at the hand-off by design, so its `done` is about this
   // machine, not the session (#1264): the cloud side keeps working and opens its own PR. Saying

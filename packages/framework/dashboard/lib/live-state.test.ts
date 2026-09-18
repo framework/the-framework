@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
-import type { FrameworkEvent, AgentMeta } from '../../src/index.js'
-import { agentSettled, agentViews, pendingChoices, isPublishing, isMetaPublishing, isAgentActive, currentAgentEvents, agentOutcome, actionsRunUrl } from './live-state.js'
+import type { FrameworkEvent } from '../../src/index.js'
+import { agentViews, pendingChoices, isAgentActive, currentAgentEvents, agentOutcome, actionsRunUrl } from './live-state.js'
 
 const view = (id: string, title: string, markdown: string): FrameworkEvent => ({ kind: 'view', id, title, markdown })
 const choice = (id: string, title: string): FrameworkEvent => ({
@@ -105,74 +105,6 @@ describe('isAgentActive', () => {
   })
 })
 
-describe('isPublishing', () => {
-  const armed = (push: boolean): FrameworkEvent => ({ kind: 'handoff-armed', push, pr: push }) as FrameworkEvent
-  const handoff = (outcome: string): FrameworkEvent => ({ kind: 'handoff', outcome }) as FrameworkEvent
-
-  test('the window opens on a clean armed end and every handoff report closes it (#1431)', () => {
-    const running = [armed(true), { kind: 'log', message: 'go' }] as FrameworkEvent[]
-    expect(isPublishing(running)).toBe(false)
-    const endedClean = [...running, { kind: 'end', ok: true }] as FrameworkEvent[]
-    expect(isPublishing(endedClean)).toBe(true)
-    // Done, skipped, and failed all report — any of them means the epilogue has spoken.
-    for (const outcome of ['done', 'skipped', 'failed']) {
-      expect(isPublishing([...endedClean, handoff(outcome)])).toBe(false)
-    }
-  })
-
-  test('no window without a real arming event, with the push rung off, or on an unclean end', () => {
-    // Absent-means-armed defaults must not count: archives from before the handoff mechanism
-    // have no `handoff-armed` event and would otherwise read "publishing…" for ever.
-    expect(isPublishing([{ kind: 'end', ok: true }] as FrameworkEvent[])).toBe(false)
-    expect(isPublishing([armed(false), { kind: 'end', ok: true }] as FrameworkEvent[])).toBe(false)
-    expect(isPublishing([armed(true), { kind: 'end', ok: false, stopped: true }] as FrameworkEvent[])).toBe(false)
-    expect(isPublishing([armed(true), { kind: 'end', ok: false, detail: 'exit 1' }] as FrameworkEvent[])).toBe(false)
-  })
-
-  test("a resumed run's window is its own — the old segment's handoff does not close it, the old arming still counts (#1450)", () => {
-    const firstSegment = [
-      { kind: 'session' },
-      armed(true),
-      { kind: 'end', ok: true },
-      handoff('done'),
-    ] as FrameworkEvent[]
-    const resumedEnded = [...firstSegment, { kind: 'session' }, { kind: 'end', ok: true }] as FrameworkEvent[]
-    expect(isPublishing(resumedEnded)).toBe(true)
-    expect(isPublishing([...resumedEnded, handoff('done')])).toBe(false)
-  })
-})
-
-describe('isMetaPublishing', () => {
-  const meta = (over: Partial<AgentMeta>): AgentMeta => ({
-    status: 'done',
-    id: 'r1',
-    startedAt: '2026-01-01T00:00:00.000Z',
-    updatedAt: '2026-01-01T00:00:00.000Z',
-    handoff: { push: true, pr: true },
-    ...over,
-  })
-
-  test('open between a clean end and the folded handoff report (#1455)', () => {
-    expect(isMetaPublishing(meta({}))).toBe(true)
-    for (const report of ['done', 'skipped', 'failed'] as const) {
-      expect(isMetaPublishing(meta({ handoffReport: report }))).toBe(false)
-    }
-  })
-
-  test('no window while running, on an unclean end, or with the push rung off', () => {
-    expect(isMetaPublishing(meta({ status: 'running' }))).toBe(false)
-    expect(isMetaPublishing(meta({ status: 'stopped' }))).toBe(false)
-    expect(isMetaPublishing(meta({ status: 'failed' }))).toBe(false)
-    expect(isMetaPublishing(meta({ handoff: { push: false, pr: false } }))).toBe(false)
-    const { handoff: _handoff, ...unarmed } = meta({})
-    expect(isMetaPublishing(unarmed as AgentMeta)).toBe(false)
-  })
-
-  test('a record that never armed a push is not publishing, whatever its report says', () => {
-    expect(isMetaPublishing(meta({ handoff: { push: false, pr: false } }))).toBe(false)
-  })
-})
-
 describe('currentAgentEvents', () => {
   const session = (workspace: string): FrameworkEvent => ({ kind: 'session', driver: 'claude', workspace, fake: false })
 
@@ -268,36 +200,5 @@ describe('actionsRunUrl', () => {
     expect(
       actionsRunUrl([action('run https://github.com/o/r/actions/runs/1'), action('run https://github.com/o/r/actions/runs/2')]),
     ).toBe('https://github.com/o/r/actions/runs/2')
-  })
-})
-
-describe('agentSettled (#1173)', () => {
-  test('a session parked on you is settled, though its process is still up', () => {
-    // The whole bug: this agent is `status: running` and will stay that way for as long as the
-    // conversation is open (#714), so anything keyed off liveness thinks the agent is still working.
-    expect(agentSettled([{ kind: 'log', message: 'go' }, { kind: 'settled' }])).toBe(true)
-    expect(agentSettled([{ kind: 'log', message: 'go' }])).toBe(false)
-    expect(agentSettled([])).toBe(false)
-  })
-
-  test('a new turn un-settles it, so answering a parked session puts it back to work', () => {
-    expect(
-      agentSettled([
-        { kind: 'settled' },
-        { kind: 'driver', event: { type: 'start' } } as never,
-      ]),
-    ).toBe(false)
-    // ...and settling again after that turn parks it once more.
-    expect(
-      agentSettled([
-        { kind: 'settled' },
-        { kind: 'driver', event: { type: 'start' } } as never,
-        { kind: 'settled' },
-      ]),
-    ).toBe(true)
-  })
-
-  test('a run that ended is not "settled" — it is over, which liveness already says', () => {
-    expect(agentSettled([{ kind: 'settled' }, { kind: 'end', ok: true }])).toBe(false)
   })
 })

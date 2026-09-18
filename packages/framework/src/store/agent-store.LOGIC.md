@@ -21,7 +21,7 @@ The read side of a project's agents [1]. The Framework runs no agent and writes 
 ## Business logic — TL;DR
 
 - **The recorded agents** - every person's agents on the `agent-data` branch, newest first, each card unfolded into the fields the dashboard reads; optionally only those started since a moment.
-- **The agent in a checkout** - a checkout's card read as it stands, whatever its status; the project's own checkout holds no agent; nothing is ever repaired on read.
+- **The agent in a checkout** - a checkout's card read as it stands, whatever its status, with the branch the checkout has checked out now; the project's own checkout holds no agent; nothing is ever repaired on read.
 - **Every agent that has a checkout** - each `agent-<id>` directory under `.branches/`, newest first; anything else in there is skipped.
 - **All agents, and one by id** - the ones with a checkout first, then the recorded ones; an agent in both is listed once, from its checkout.
 - **One agent's events for replay** - the diary in the agent's checkout while it has one, else the recorded diary, each line turned into the event the dashboard draws.
@@ -44,11 +44,11 @@ The recorded agents of a project are read through the `logs` skill from the `age
 
 #### Context
 
-**Problem**: an agent that is working is not on the branch yet, or is there only as its first leg; its current state is in its checkout.
+**Problem**: an agent that is working is not on the branch yet, or is there only as its first leg; its current state is in its checkout. And the agent renames its branch itself while it works, while its card learns the new name only when the agent ends; the name the dashboard labels the agent by is read off that branch.
 
 #### Business logic
 
-The agent a checkout [3] holds is read off the card `<agent id>.json` under the checkout's `.the-framework/`, the agent id [5] being the checkout directory's name without its `agent-` prefix. The card is read as it stands, `running` or not: an agent that ended `waiting` [6] keeps its checkout and is read the same way. A directory whose name is not an agent's, a checkout with no card, and a card that does not parse are no agent. The project's own checkout is never an agent's, whatever files sit in it. A read never writes: an agent whose card says `running` while its process is gone stays as it is, since the tool that started it sweeps its own.
+The agent a checkout [3] holds is read off the card `<agent id>.json` under the checkout's `.the-framework/`, the agent id [5] being the checkout directory's name without its `agent-` prefix. The card is read as it stands, `running` or not: an agent that ended `waiting` [6] keeps its checkout and is read the same way. The branch is the exception: it is the branch the checkout has checked out right now, read off the checkout's git files (its `.git` file names the checkout's git directory, whose `HEAD` names the branch). When those files cannot be read, or the checkout is on no branch, the card's branch stands. A directory whose name is not an agent's, a checkout with no card, and a card that does not parse are no agent. The project's own checkout is never an agent's, whatever files sit in it. A read never writes: an agent whose card says `running` while its process is gone stays as it is, since the tool that started it sweeps its own.
 
 ### Every agent that has a checkout
 

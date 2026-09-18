@@ -2,7 +2,7 @@ The dashboard's left column, present on every page: the brand mark, the "New age
 
 ## Context
 
-**User story**: the user finds every agent from the same column on every page, tells a working agent from one waiting for a message, one still publishing from one done, one running on another machine or in a cloud session [4] from a local one, and jumps to any of them, or starts a new one, without leaving the column.
+**User story**: the user finds every agent from the same column on every page, tells a working agent from one waiting for an answer, one still publishing from one done, one running on another machine or in a cloud session [4] from a local one, and jumps to any of them, or starts a new one, without leaving the column.
 
 ## Glossary
 
@@ -12,8 +12,7 @@ The dashboard's left column, present on every page: the brand mark, the "New age
 [4] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
 [5] launcher: the Start form on a project's own page (the project home).
 [6] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds.
-[7] settled: said of an agent whose work has stopped and which is waiting for the user: it is alive, takes messages, and does nothing until told.
-[8] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it).
+[7] publishing: the window after an agent ended clean in which the tool that runs it still records the agent on the data branch and pushes its branch. The daemon marks an agent's record publishing while its status is done and its process is still alive on this machine (`src/dashboard-rpc/reads.ts`).
 [9] the Claude web bridge / the bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session.
 [10] cloud work adoption: how the daemon recognises the branch a cloud session pushed as the agent's, by the cloud anchor it descends from.
 [11] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
@@ -131,8 +130,8 @@ Each row is a button with two lines.
 
 The first line, left to right:
 
-- a dot, only while the agent is running or parked: pulsing in the primary color while it is working, still and muted while it is parked on the user; and, while the agent is publishing, a pulsing green dot instead, the same window the agent's own status pill calls "publishing…";
-- the status word (next section), in uppercase, colored by the stored status when it is the word (primary for running, green for done, amber for stopped, red for failed), muted when parked or publishing, primary for "in cloud", green for "merged";
+- a dot, only while the agent is running or waiting: pulsing in the primary color while it is working, still and muted while it waits for the user's answer; and, while the agent is publishing [7], a pulsing green dot instead, the same window the agent's own status pill calls "publishing…";
+- the status word (next section), in uppercase, colored by the stored status when it is the word (primary for running, green for done, amber for stopped, red for failed), muted when waiting or publishing, primary for "in cloud", green for "merged";
 - the subtitle: on the Overview [2], "<project name> · <when it started>"; within a project, just when it started, as "just now", "<N>m ago", "<N>h ago", "<N>d ago" up to a week, and the local date beyond it (the rule in `lib/format-date.ts`);
 - at the right end, a cluster of small glyphs, each with a hover: a laptop glyph named "Started on <host>" with the hover "Started on <host>, by that machine's daemon." when another machine's daemon started the agent, since the shared record lists every machine's agents here; a device glyph named "Runs on <device>" (or "Runs on a connected device" when the device has no label) when the agent is relayed [13]; a cloud glyph named "Runs as a Claude Code cloud session" with the hover "Runs as a Claude Code cloud session; it works and opens its PR over there." for a web agent; and the coding agent's logo, named "Claude Code" or "Codex". The logo names the driver [14] the agent recorded, and every surface Claude runs on — the local CLI, the cloud session, the Actions runner — is still "Claude Code": where it runs is the glyph beside it, not the logo.
 
@@ -142,16 +141,16 @@ The second line is the title: what the user typed as the prompt; failing that, t
 
 #### Context
 
-**Problem**: a web agent's local process ends at its hands-off by design, so its stored status is "done" from that moment on, which says nothing about the cloud session [4] still working, parked on a question, or long finished. And an agent that ended cleanly with an armed handoff [8] is "done" in its record while its branch is still being pushed and its pull request opened.
+**Problem**: a web agent's local process ends at its hands-off by design, so its stored status is "done" from that moment on, which says nothing about the cloud session [4] still working, parked on a question, or long finished. And an agent that ended cleanly is "done" in its record while the tool that runs it is still recording it and pushing its branch.
 
 #### Business logic
 
 The word, by the first rule that applies:
 
-- "waiting": the agent [1] is running and settled [7], or it is a web agent whose cloud session the bridge [9] reports as parked on a question. A finished agent is never waiting: a stale settled mark on a "done", "stopped" or "failed" agent does not relabel it.
+- "waiting": the agent's [1] stored status is `waiting` (it ended on its question and waits for the user's answer), or it is a web agent whose cloud session the bridge [9] reports as parked on a question.
 - "in cloud": a web agent whose local half is done, with no pull request known, no question pending, and started within the last 12 hours (the window in `src/cloud-run-state.ts`). This outranks "publishing…": the cloud side owns its own push and pull request.
 - "merged": a web agent whose adopted work (cloud work adoption [10]) had its pull request merged by The Framework.
-- "publishing…": a non-web agent that ended cleanly, was armed to push, and whose handoff has not reported back yet.
+- "publishing…": a non-web agent the daemon marks publishing [7]: it ended cleanly and its process is still alive on this machine.
 - Otherwise the stored status: "running", "done", "stopped" or "failed". A web agent past the 12-hour window with nothing adopted, or with a pull request, reads "done"; a web agent that was stopped or failed reads that.
 
 ### Long titles

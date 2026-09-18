@@ -1,5 +1,5 @@
 import type { BridgeBrowserStatus } from '../bridge-browser.js'
-import { findAgent, readLiveMetas, readAllAgents, loadAgentEvents, startedAtFromAgentId, type AgentMeta, type AgentStatus } from '../store/index.js'
+import { findAgent, readLiveMetas, readAllAgents, loadAgentEvents, startedAtFromAgentId, isPidAlive, type AgentMeta, type AgentStatus } from '../store/index.js'
 import { worktreeSize, isSafeAgentId } from '@gemstack/skill-branches'
 import { planAgentFor } from '../tickets.js'
 import { listProjectWorktrees } from '../worktrees.js'
@@ -118,9 +118,20 @@ export function markOtherHost(agent: AgentMeta, thisHost: string = hostname()): 
   return { ...agent, otherHost: true }
 }
 
+/**
+ * A run that ended clean while the process its card names is still alive on this host is marked
+ * publishing: the tool that runs it records the run and pushes its branch after the card says
+ * done, and a row that said "done" through that window read as finished with nothing coming. A
+ * run of another host, or with no recorded process, passes through untouched.
+ */
+export function markPublishing(agent: AgentMeta, thisHost: string = hostname(), alive: (pid: number) => boolean = isPidAlive): AgentMeta {
+  if (agent.status !== 'done' || agent.pid === undefined || agent.host !== thisHost || !alive(agent.pid)) return agent
+  return { ...agent, publishing: true }
+}
+
 /** Every annotation a run's record gets on its way to the dashboard: what the daemon knows and the disk cannot. */
 function forDashboard(agent: AgentMeta): AgentMeta {
-  return markOtherHost(markCloudWaiting(agent))
+  return markPublishing(markOtherHost(markCloudWaiting(agent)))
 }
 
 /**

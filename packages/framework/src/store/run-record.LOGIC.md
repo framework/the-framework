@@ -18,7 +18,7 @@ Maps the `logs` skill's [2] run [3] — a card and a diary — onto the record a
 ## Business logic — TL;DR
 
 - **From a card** - `caller` is unfolded into the status snapshot, and the card's own fields win over anything of the same name under `caller`.
-- **The lines another tool's session writes** - a diary kept by `agent-driver`'s own log (a run the scheduler started) is read back too: its `start`, `action`, `rate-limit`, `error` and `notice` lines become driver events; its `session` line, the agent's session id alone, becomes a session update; its `question` line becomes the gate the agent view shows, with the id `await-choices`; an `ended` line saying `waiting` becomes an end that says so.
+- **The lines another tool's session writes** - a diary kept by `agent-driver`'s own log (a run the scheduler started) is read back too: its `start`, `action`, `rate-limit` and `notice` lines become driver events, and so does an `error` line, unless it carries a headline: that one is an agent's own error report from an agent recorded before the daemon stopped running agents, read back as that report (its headline and its detail); its `session` line, the agent's session id alone, becomes a session update; its `question` line becomes the gate the agent view shows, with the id `await-choices`; an `ended` line saying `waiting` becomes an end that says so.
 - **The diary: four kinds of line are the skill's** - what the agent said, its result, how it ended and what it cost are read from the skill's four kinds of line; a line of any other kind is an event as written.
 
 ## Business logic

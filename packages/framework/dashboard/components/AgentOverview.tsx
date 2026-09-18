@@ -1,5 +1,5 @@
 import type { FrameworkEvent } from '../../src/index.js'
-import { sessionInfo, agentProgress, agentErrors } from '../../src/client.js'
+import { sessionInfo, agentErrors } from '../../src/client.js'
 import { AgentErrorCount } from './AgentErrorCount.js'
 import { agentStatusPill } from '../lib/agent-status.js'
 import { describeSessionLink } from '../lib/session-link.js'
@@ -12,7 +12,6 @@ import { cn } from '../lib/utils.js'
 // shows nothing extra.
 export function AgentOverview({ events }: { events: FrameworkEvent[] }) {
   const session = sessionInfo(events)
-  const progress = agentProgress(events)
   const status = agentStatusPill(events)
   const errors = agentErrors(events)
 
@@ -28,7 +27,6 @@ export function AgentOverview({ events }: { events: FrameworkEvent[] }) {
       {status && (
         <div className="flex items-center gap-2 text-sm md:col-span-2">
           <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', status.dot)} aria-hidden />
-          {progress.sessionName && <span className="font-medium">{progress.sessionName}</span>}
           <span className={cn('text-xs', status.tone)}>{status.label}</span>
         </div>
       )}

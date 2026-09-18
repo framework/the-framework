@@ -1,16 +1,16 @@
-Shows one agent [1] on its own page, the agent view [2], in one frame that stays put whether the agent is running, settled [3] or finished: an action bar with the agent's name and the state of its work, the feed of its events [4], notices for work that runs somewhere other than this machine, and the composer [5] for saying something to the agent [6]. Only what those parts say changes: while the agent runs, its events arrive over the live event stream and the bar shows what its checkout [7] has changed; once it stops, the archive [8] of its events is swapped in without blanking the screen, and the bar turns to what its branch holds and what to do with it, the next step [9].
+Shows one agent [1] on its own page, the agent view [2], in one frame that stays put whether the agent is running, waiting for an answer or finished: an action bar with the agent's name and the state of its work, the feed of its events [4], notices for work that runs somewhere other than this machine, and the composer [5] for saying something to the agent [6]. Only what those parts say changes: while the agent runs, its events arrive over the live event stream and the bar shows what its checkout [7] has changed; once it stops, the archive [8] of its events is swapped in without blanking the screen, and the bar turns to what its branch holds and what to do with it, the next step [9].
 
 ## Context
 
 **User story**: the user opens an agent from the Overview or from a project's history rail and reads what it is doing. The moment the agent ends is the moment the user is most likely to be reading it, so the page must not flinch: nothing is rebuilt, nothing goes blank, the output keeps its place, and the bar simply turns from "what is changing" to "what the branch holds, and what next".
 
-**Problem**: three different things all look like "the agent is done" and the page tells them apart. The agent's process may still be alive while its work has settled and it waits for the user; the daemon's list of agents may lag a couple of seconds behind what the event stream already shows; and a finished agent's archive may be missing, empty, or older than the events already on screen.
+**Problem**: two different things all look like "the agent is done" and the page tells them apart. The daemon's list of agents may lag a couple of seconds behind what the event stream already shows; and a finished agent's archive may be missing, empty, or older than the events already on screen.
 
 ## Glossary
 
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] agent view: one agent's page.
-[3] settled: said, in records of agents from before agents were started through the project's start hook, of an agent whose work had stopped while it stayed alive waiting for the user. An agent started today ends instead.
+[3] card: an agent's record as the daemon hands it to the dashboard with the project's list of agents: its status, its branch, its pull request, and what only the daemon knows, such as whether the agent is publishing: ended clean while the tool that runs it still records it and pushes its branch.
 [4] event / event stream: everything an agent does, in order, read off the agent's diary: the file its tool writes one line at a time, in the agent's checkout while it has one and on the data branch once it is recorded; every surface is a projection of it.
 [5] composer: the prompt editor, also used to say something to an agent.
 [6] message: the user's own words to an agent, the next prompt of the same conversation: an agent that is working takes it when its turn ends, an ended agent is resumed with it.
@@ -30,9 +30,9 @@ Shows one agent [1] on its own page, the agent view [2], in one frame that stays
 - **One frame for a running and a finished agent** - the same action bar, feed, notices and composer stay on screen for the agent's whole life; only their contents follow the agent's state.
 - **Which events are shown** - a running agent shows the live event stream; a finished one shows its archive, swapped in behind the events already on screen, and neither an empty nor a stale archive ever replaces what the stream shows.
 - **Loading and empty states** - a finished agent whose archive is still being read says "Loading agent…"; a finished agent with no events at all says "This agent has no events."; a running agent with nothing yet simply waits for its first event.
-- **Working is not the same as alive** - the agent counts as working only while it runs and has not settled; everything that asks "is there more coming?" asks this, so an agent that is not working gets its next step offered.
+- **Working means running** - the agent counts as working exactly while the daemon's list says it runs; everything that asks "is there more coming?" asks this, so an agent that is not working gets its next step offered.
 - **Live as the feed knows it** - the feed follows new output, and the composer offers Stop, as soon as new events stream in, even during the seconds before the daemon's list of agents notices a resumed agent.
-- **What the action bar says** - the agent's name with its project as a breadcrumb; while working, the counts of what the checkout has changed; once not working, the verdict on what the branch holds and the offered next step.
+- **What the action bar says** - the agent's name with its project as a breadcrumb; the one status word, from the events shown and the agent's card; while working, the counts of what the checkout has changed; once not working, the verdict on what the branch holds and the offered next step.
 - **The disclosure** - opening the bar's disclosure adds the agent's details strip and, while working, the changes in its checkout, or, once stopped, the commits and files its branch holds.
 - **Removing a kept checkout** - a finished agent that kept its checkout (it failed or was stopped) is offered a Remove, which disappears at once when used.
 - **Notices for work that runs elsewhere** - an agent whose turns run on GitHub Actions, in a cloud session, or on a device gets a notice explaining what the feed can and cannot show.
@@ -50,7 +50,7 @@ See `## Context`.
 
 The page for one agent [1] always holds, top to bottom: the action bar (`AgentActionBar.tsx`), the optional details strip and the changes or the branch detail behind the bar's disclosure, the notices for work that runs elsewhere, the feed of events [4] (`AgentFeed.tsx`), and the composer [5] (`AgentComposer.tsx`). None of these parts is replaced when the agent's state changes; each is told whether the agent is still running and what it has to show, and adapts its contents.
 
-The agent's name leads the bar: the session name [10] the caller passes (the same label the history rail shows), or, when none is passed, the session name read off the agent's own events once the agent has named its branch. The project's name is shown beside it as a `project / session` breadcrumb.
+The agent's name leads the bar: the label the caller passes, the same label the history rail shows (what the user typed, else the session name [10], else the branch, else the start time). The project's name is shown beside it as a `project / session` breadcrumb.
 
 ### Which events are shown
 
@@ -78,17 +78,17 @@ The agent's name leads the bar: the session name [10] the caller passes (the sam
 - A finished agent whose archive has answered but holds nothing shows the feed's empty state with the label "This agent has no events.".
 - A running agent with nothing yet shows the feed waiting for its first event, with the feed's own default empty label.
 
-### Working is not the same as alive
+### Working means running
 
 #### Context
 
-**Problem**: a settled [3] agent stays alive to take the user's next message, so the daemon reports it as running long after it finished. If the page keyed the next step [9] off "is the process up", a plainly finished agent would never be offered it.
+**Problem**: an agent that stops on a question does not stay alive waiting: it ends with the status `waiting`, and the answer resumes it. So "is the agent still running" is the whole answer to "is there anything more coming?", and an agent that is waiting for an answer is offered its next step [9] like any finished one.
 
 #### Business logic
 
-An agent [1] counts as working only while it is running and its events say it has not settled. An agent is settled once its events carry the settled signal, and un-settled again when a new turn starts or when the agent ends outright (the rules in `lib/live-state.ts`). Everything that asks "is there anything more coming?" asks whether the agent is working:
+An agent [1] counts as working exactly while the daemon's list of agents says it is running. Everything that asks "is there anything more coming?" asks whether the agent is working:
 
-- what the branch holds (the read in `lib/use-agent-handoff.ts`) is only read once the agent is not working: a branch still being written to has nothing to offer yet, but a settled agent's branch is finished work;
+- what the branch holds (the read in `lib/use-agent-handoff.ts`) is only read once the agent is not working: a branch still being written to has nothing to offer yet;
 - the bar's action slot is empty while working — an agent that is working publishes its own work — and holds the next step [9] once not working;
 - the changes panel reads the checkout [7] while working; the branch's commits and files replace it once not working.
 
@@ -115,6 +115,8 @@ The bar's summary line:
 - While the agent [1] is working: the counts of what its checkout [7] has changed (files changed, lines added, lines removed), reported by the changes panel (`AgentChanges.tsx`).
 - Once the agent is not working and the read of what its branch holds has answered: the one-line verdict on the branch (`AgentHandoff.tsx`), followed, in the danger color, by the error of the last next-step [9] action the user pressed in the bar, when one failed.
 - Until that read has answered, a just-stopped agent keeps showing the counts it ended with: the summary swaps once, from the live counts to the branch verdict, instead of going blank for the beat the read takes.
+
+The bar's status word, ranked in `lib/agent-status.ts`, is read off the events shown and the agent's card [3]: the caller hands over the agent's card as the daemon's list of agents last reported it, which is what the word needs for "publishing…" and "ready for merge"; before the list holds the agent there is no card, and the word is read off the events alone.
 
 The bar's action slot:
 

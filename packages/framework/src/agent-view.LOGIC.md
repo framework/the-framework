@@ -1,8 +1,8 @@
-Derives what the dashboard shows about an agent [1] from its event stream [2]: its progress (the session name [3] it gave its work and whether it is ready for merge [4]), the errors it reported, and the driver session [5] behind it (driver, checkout [6], session id and link, model). Every derivation is a fold over the events, so the live agent view [7] and the replay of a finished agent show the identical summary.
+Derives what the dashboard shows about an agent [1] from its event stream [2]: the errors it hit and the driver session [5] behind it (driver, checkout [6], session id and link, model); and, from the agent's record, the session name [3] a row built from that record carries. Every derivation from the events is a fold over them, so the live agent view [7] and the replay of a finished agent show the identical summary.
 
 ## Context
 
-**User story**: the agent view's status label and dot (orange while building, green once ready), the session name the agent is labeled by, the error count and the latest headline beside it, and the "open session" and "Resume" affordances are all read from these projections.
+**User story**: the session name a row built from an agent's record is labeled by, the agent view's error count and the latest headline beside it, and the "open session" and "Resume" affordances are all read from these projections.
 
 **Business logic story**: nothing here is state of its own. An error is an event that happened, so the list only grows; the session behind the agent is the latest leg's.
 
@@ -11,7 +11,6 @@ Derives what the dashboard shows about an agent [1] from its event stream [2]: i
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] event stream: everything an agent does, one event per line of the agent's diary — the file `<id>.jsonl` the tool that runs the agent writes under `.the-framework/` in the agent's checkout, copied onto the `agent-data` branch when the agent ends. Every surface (dashboard, terminal, replay) is a projection of it.
 [3] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
-[4] ready for merge: the signal an agent emits when it believes its work is complete: it flips the agent's badge from building to ready and authorizes the handoff.
 [5] driver session: the coding agent's own conversation for one agent, which the driver can resume by its session id.
 [6] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [7] agent view: one agent's page.
@@ -22,22 +21,11 @@ Derives what the dashboard shows about an agent [1] from its event stream [2]: i
 
 ## Business logic — TL;DR
 
-- **Progress: the session name and ready for merge** - the name is the one carried by the latest branch observation, an observation without a name leaving the agent unnamed, and the agent is building until the ready-for-merge signal has been seen.
 - **The session name of a view built from the record** - a name is present only when the agent's branch carries one, so an unnamed agent has no name rather than an empty one.
-- **The errors the agent reported** - every error the agent reported, oldest first, each with its headline and its detail when the agent wrote one.
+- **The errors the agent hit** - every error the agent reported and every error the tool that runs it wrote in its diary, oldest first, each with its headline and its detail when there is one.
 - **The driver session behind the agent** - nothing before the session opening; then the driver, the checkout, the link and the model of the latest leg, plus the id and link of the latest session update.
 
 ## Business logic
-
-### Progress: the session name and ready for merge
-
-#### Context
-
-**User story**: the agent view [7] labels the agent by the session name [3] it chose, and its dot turns from orange (building) to green (ready) when the agent declares its work complete.
-
-#### Business logic
-
-The session name is the one carried by the latest branch observation in the stream. A latest observation without a name leaves the agent unnamed, whether the branch is the one the checkout [6] was born on or a branch The Framework did not mint, even when an earlier observation carried a name; the writer of the observation is the one that knows which branch the checkout was created on, never this reader. The agent is ready for merge [4] once a ready-for-merge signal appears anywhere in the stream, and building before. An agent with no events at all is building and unnamed.
 
 ### The session name of a view built from the record
 
@@ -49,15 +37,20 @@ The session name is the one carried by the latest branch observation in the stre
 
 The name is derived from the branch by the `branches` skill's rule: an `agent-<name>` branch that is not the agent's birth branch (the one named by the agent id) yields `<name>`; any other branch, or no branch, yields no name. The field is present only when there is a name, so a view of an unnamed agent carries no name rather than an empty one.
 
-### The errors the agent reported
+### The errors the agent hit
 
 #### Context
 
-**User story**: the agent view shows how many errors the agent ran into that only the user can fix ("gh is not logged in") and the latest headline beside the count. Reopening a finished agent shows exactly what it showed while running.
+**User story**: the agent view shows how many errors the agent ran into, both the ones only the user can fix ("gh is not logged in") and the coding agent or its connection failing ("claude exited with code 1"), and the latest headline beside the count. Reopening a finished agent shows exactly what it showed while running.
 
 #### Business logic
 
-Every error report in the stream, in order, becomes one entry with its headline and, when the agent wrote one, its detail (what it ran and what that said). Nothing removes an entry: an error is something that happened.
+Two kinds of event in the stream each become one entry, in the order they happened:
+
+- an error report the agent itself wrote (only agents recorded before the daemon stopped running agents carry these): its headline and, when the agent wrote one, its detail (what it ran and what that said);
+- an error the tool that runs the agent wrote in the diary when the coding agent or its connection failed: the first line of its message is the headline, and the remaining lines, when there are any, are the detail. A message with nothing on its first line gets the headline "error"; an error event whose message is not text is skipped. A notice (something the driver [11] worked around) is not an error.
+
+Nothing removes an entry: an error is something that happened.
 
 ### The driver session behind the agent
 

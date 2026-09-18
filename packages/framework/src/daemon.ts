@@ -1,17 +1,16 @@
 import { mkdir } from 'node:fs/promises'
 import { join, relative, isAbsolute } from 'node:path'
-import type { FrameworkEvent } from './events.js'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import { startDashboard, type Dashboard } from './dashboard/index.js'
 import { createProjectRuntime } from './daemon-runtime.js'
 import { defaultQuotaSource } from './dashboard/quota.js'
+import { loosestSpendOffset, readSchedulerState } from './dashboard/scheduler-state.js'
 import { startBackgroundServices, type BackgroundServices } from './daemon-services.js'
 import { projectErrorStore } from './project-errors.js'
 import { resolveDashboardBundle } from './dashboard/bundle.js'
 import { isActivated } from './project.js'
 import { addProject, ensureDaemonToken, listProjects, nodeRegistryFs, readPreferences, registryPreferencesStore, type Preferences } from './registry.js'
 import { registryDiscordCredentialsStore } from './discord-credentials-store.js'
-import { JsonlTailer } from './jsonl-tail.js'
 import { isLoopbackHost } from './loopback-host.js'
 import { bridgeSessionsFrom } from './dashboard/bridge-sessions.js'
 import { bridgeQuestions } from './dashboard/bridge-store.js'
@@ -91,12 +90,6 @@ export async function registerHomeProject(cwd: string, env: NodeJS.ProcessEnv = 
  * {@link isPidAlive} under the daemon's historical public name -- the two were byte-identical. */
 export { isPidAlive as isProcessAlive } from './store/index.js'
 
-/**
- * Tails an append-only log of {@link FrameworkEvent} lines. The generic tailing lives in
- * {@link JsonlTailer}; this keeps the event-typed name the daemon (and public API) always had.
- */
-export class EventTailer extends JsonlTailer<FrameworkEvent> {}
-
 /** Options for {@link runDaemon}. */
 export interface RunDaemonOptions {
   /** Port to bind. Default {@link DEFAULT_DAEMON_PORT}; pass `0` for an ephemeral port. */
@@ -153,8 +146,12 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
   // dashboard context the mount is wired with. A missing bundle (a broken install) surfaces as a
   // 503 from the server.
   const clientBundleDir = await resolveDashboardBundle()
-  // The long-lived meter the usage panel draws (#685), owned here so it stops with the daemon.
-  const quota = defaultQuotaSource()
+  // The long-lived meter the usage panel draws (#685), owned here so it stops with the daemon. Its
+  // stop line is the registered projects' schedulers' spend offset, read off their state files.
+  const quota = defaultQuotaSource(async () => {
+    const projects = await listProjects(undefined, env).catch(() => [])
+    return loosestSpendOffset(await Promise.all(projects.map(project => readSchedulerState(project.path))))
+  })
   // The per-project error state (#1500): the background services write it, the dashboard reads it.
   const projectErrors = projectErrorStore()
   // The bridge browser (#1332): the daemon's own Chrome for Testing with the extension installed,

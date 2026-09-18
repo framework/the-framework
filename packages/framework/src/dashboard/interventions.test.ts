@@ -5,6 +5,7 @@ import type { OpenPr } from './gh.js'
 import type { AgentHandoff } from './agent-handoff.js'
 import type { ProjectSummary } from './projects.js'
 import type { LiveAgent, AgentMeta } from '../store/index.js'
+import type { FrameworkEvent } from '../events.js'
 
 const project = (id: string, path: string): ProjectSummary => ({ id, path, name: id, activated: true })
 
@@ -88,29 +89,43 @@ test('buildInterventions dedupes a PR shared by two registered projects (same re
 
 const noPrs = async (): Promise<OpenPr[]> => []
 
-test('buildInterventions adds an awaiting item for a running run parked on a choice (#636)', async () => {
-  const liveAgents = async (cwd: string): Promise<LiveAgent[]> =>
-    cwd === '/a' ? [live(runningAgentMeta({ pendingChoice: { id: 'gate-1', title: 'Cache the auth store?' } }))] : []
-  const { items } = await buildInterventions([project('a', '/a'), project('b', '/b')], { prs: noPrs, liveAgents })
+/** A run that ended on a question: its meta says `waiting`, its diary holds the question. */
+const waitingOn = (id: string, title: string): FrameworkEvent[] => [
+  { kind: 'choice', id, title, options: [{ id: 'yes', label: 'Yes' }, { id: 'no', label: 'No' }] },
+  { kind: 'end', ok: false, waiting: true },
+]
+
+test('buildInterventions adds an awaiting item for a run waiting on the question it ended on (#636/#1774)', async () => {
+  const liveAgents = async (cwd: string): Promise<LiveAgent[]> => (cwd === '/a' ? [live(runningAgentMeta({ status: 'waiting' }))] : [])
+  const read: string[] = []
+  const events = async (cwd: string, agentId: string) => (read.push(`${cwd} ${agentId}`), waitingOn('gate-1', 'Cache the auth store?'))
+  const { items } = await buildInterventions([project('a', '/a'), project('b', '/b')], { prs: noPrs, liveAgents, events })
 
   assert.equal(items.length, 1)
   assert.deepEqual(
-    { kind: items[0]!.kind, project: items[0]!.projectId, title: items[0]!.title, awaitId: items[0]!.awaitId },
-    { kind: 'awaiting', project: 'a', title: 'Cache the auth store?', awaitId: 'gate-1' },
+    { kind: items[0]!.kind, project: items[0]!.projectId, title: items[0]!.title, awaitId: items[0]!.awaitId, agentId: items[0]!.agentId },
+    { kind: 'awaiting', project: 'a', title: 'Cache the auth store?', awaitId: 'gate-1', agentId: 'r1' },
   )
+  assert.deepEqual(read, ['/a r1'], "only the waiting run's diary is read")
 })
 
-test('buildInterventions ignores a pendingChoice on a run that is no longer running', async () => {
-  const liveAgents = async (): Promise<LiveAgent[]> =>
-    [live(runningAgentMeta({ status: 'done', pendingChoice: { id: 'gate-1', title: 'stale' } }))]
-  assert.deepEqual((await buildInterventions([project('a', '/a')], { prs: noPrs, liveAgents })).items, [])
+test('buildInterventions adds no awaiting item for a run that is not waiting, or whose diary shows no open question', async () => {
+  const events = async () => waitingOn('gate-1', 'stale')
+  const running = async (): Promise<LiveAgent[]> => [live(runningAgentMeta())]
+  assert.deepEqual((await buildInterventions([project('a', '/a')], { prs: noPrs, liveAgents: running, events })).items, [])
+  const waiting = async (): Promise<LiveAgent[]> => [live(runningAgentMeta({ status: 'waiting' }))]
+  const answered = async (): Promise<FrameworkEvent[]> => [...waitingOn('gate-1', 'q?'), { kind: 'driver', event: { type: 'start', prompt: 'Yes' } }]
+  assert.deepEqual((await buildInterventions([project('a', '/a')], { prs: noPrs, liveAgents: waiting, events: answered })).items, [])
+  const unreadable = async () => undefined
+  assert.deepEqual((await buildInterventions([project('a', '/a')], { prs: noPrs, liveAgents: waiting, events: unreadable })).items, [])
 })
 
 test('buildInterventions links an awaiting item to the dashboard URL when given, else empty', async () => {
-  const liveAgents = async (): Promise<LiveAgent[]> => [live(runningAgentMeta({ pendingChoice: { id: 'g', title: 'q?' } }))]
-  const { items: withUrl } = await buildInterventions([project('a', '/a')], { prs: noPrs, liveAgents, dashboardUrl: 'http://localhost:4200' })
+  const liveAgents = async (): Promise<LiveAgent[]> => [live(runningAgentMeta({ status: 'waiting' }))]
+  const events = async () => waitingOn('g', 'q?')
+  const { items: withUrl } = await buildInterventions([project('a', '/a')], { prs: noPrs, liveAgents, events, dashboardUrl: 'http://localhost:4200' })
   assert.equal(withUrl[0]!.url, 'http://localhost:4200')
-  const { items: withoutUrl } = await buildInterventions([project('a', '/a')], { prs: noPrs, liveAgents })
+  const { items: withoutUrl } = await buildInterventions([project('a', '/a')], { prs: noPrs, liveAgents, events })
   assert.equal(withoutUrl[0]!.url, '')
 })
 
@@ -118,8 +133,8 @@ test('buildInterventions surfaces PRs and awaiting runs together, newest first',
   const prs = async (cwd: string): Promise<OpenPr[]> =>
     cwd === '/a' ? [{ number: 5, title: 'pr', url: 'u5', isDraft: false, createdAt: '2026-07-10T00:00:00Z' }] : []
   const liveAgents = async (cwd: string): Promise<LiveAgent[]> =>
-    cwd === '/b' ? [live(runningAgentMeta({ updatedAt: '2026-07-16T00:00:00Z', pendingChoice: { id: 'g', title: 'q?' } }))] : []
-  const { items } = await buildInterventions([project('a', '/a'), project('b', '/b')], { prs, liveAgents })
+    cwd === '/b' ? [live(runningAgentMeta({ status: 'waiting', updatedAt: '2026-07-16T00:00:00Z' }))] : []
+  const { items } = await buildInterventions([project('a', '/a'), project('b', '/b')], { prs, liveAgents, events: async () => waitingOn('g', 'q?') })
   assert.deepEqual(items.map(i => i.kind), ['awaiting', 'pr']) // awaiting is newer
 })
 

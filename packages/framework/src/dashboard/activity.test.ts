@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { buildActivity, activityKey, type Activity } from './activity.js'
+import { buildActivity, activityKey } from './activity.js'
 import type { ProjectSummary } from './projects.js'
 import type { AgentMeta } from '../store/index.js'
 

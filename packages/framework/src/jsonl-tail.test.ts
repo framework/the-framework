@@ -42,6 +42,71 @@ function captureWatcher(create: () => () => void): { watcher: FSWatcher; stop: (
   return { watcher, stop }
 }
 
+type Line = { message: string }
+
+test('JsonlTailer dispatches only lines appended since the last pull', async () => {
+  const dir = await tmpWorkspace()
+  const path = join(dir, 'log.jsonl')
+  try {
+    const seen: string[] = []
+    const tailer = new JsonlTailer<Line>(path, e => void seen.push(e.message))
+
+    await tailer.pull() // file absent -> no throw, nothing seen
+    assert.deepEqual(seen, [])
+
+    await writeFile(path, line('one') + line('two'))
+    await tailer.pull()
+    assert.deepEqual(seen, ['one', 'two'])
+
+    await appendFile(path, line('three'))
+    await tailer.pull()
+    assert.deepEqual(seen, ['one', 'two', 'three']) // only the new line was re-read
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('JsonlTailer buffers a torn trailing line until its newline arrives', async () => {
+  const dir = await tmpWorkspace()
+  const path = join(dir, 'log.jsonl')
+  try {
+    const seen: string[] = []
+    const tailer = new JsonlTailer<Line>(path, e => void seen.push(e.message))
+
+    await writeFile(path, line('complete') + '{"mess') // half a second line
+    await tailer.pull()
+    assert.deepEqual(seen, ['complete']) // the fragment is held back
+
+    await appendFile(path, 'age":"rest"}\n')
+    await tailer.pull()
+    assert.deepEqual(seen, ['complete', 'rest'])
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('JsonlTailer resets when the log is truncated by a fresh run', async () => {
+  const dir = await tmpWorkspace()
+  const path = join(dir, 'log.jsonl')
+  try {
+    const seen: string[] = []
+    const tailer = new JsonlTailer<Line>(path, e => void seen.push(e.message))
+
+    await writeFile(path, line('old-run'))
+    await tailer.pull()
+    assert.deepEqual(seen, ['old-run'])
+
+    // Truncate + rewrite to the SAME byte length, so this is caught by the mtime check, not by
+    // the shrink check.
+    await sleep(20) // let mtime advance past the read above
+    await writeFile(path, line('new-run'))
+    await tailer.pull()
+    assert.deepEqual(seen, ['old-run', 'new-run'])
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
 test('JsonlTailer.pull rejects when the read fails, which is what pump has to absorb (#996)', async () => {
   const cwd = await tmpWorkspace()
   try {

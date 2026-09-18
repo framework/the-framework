@@ -99,7 +99,7 @@ See `## Context`.
 
 #### Business logic
 
-The unattended work is the scheduler's: it ticks, decides which of the project's commands [9] are due, and starts one agent each, standing down before the quota boundary [14] so that what it spends never eats into what a human will want. The dashboard shows those agents exactly as it shows the user's own, because they leave the same files.
+The unattended work is the scheduler's: it ticks, decides which of the project's commands [9] are due, and starts one agent each, standing down before the quota boundary [14] so that what it spends never eats into what a human will want. The dashboard shows those agents exactly as it shows the user's own, because they leave the same files. Its usage panel draws where the account stands against that boundary, and its one handle moves how far past the boundary every project's scheduler may start work, through each project's own `offset` line in `.the-framework/hooks.yml`.
 
 The daemon's own background work starts no agent. On one shared clock it keeps every project's `agent-data` branch [8] in step with the remote and records what a project cannot converge, announces what is new on two feeds — what needs a human (an open question, a pull request to review, unpushed commits) and plain activity — to the browser and, when configured, to Discord, and tidies what cloud sessions left behind: it adopts the branch a session pushed by its ancestry from the cloud anchor [18], and expires dead cloud refs.
 

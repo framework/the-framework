@@ -12,8 +12,8 @@ import { startProjectPass, type ProjectPass, type ProjectsSource } from './proje
 //
 // Every "Run on: Claude web" run pushes two refs that nothing ever consumes again: the slash-free
 // `cloud-*` ref the driver pushes so the cloud session has a ref it can clone at (#1320,
-// anthropics/claude-code#87235), and the run branch (`agent-…`) the worktree sweep
-// (#1036) pushes before reclaiming the checkout. The session does its work on its own `claude/*`
+// anthropics/claude-code#87235), and the run branch (`agent-…`) the checkout's reclaim pushes
+// before removing it. The session does its work on its own `claude/*`
 // branch and opens its PR from there, so once provisioning settles both refs are dead names on
 // origin — one pair per web run, accumulating forever.
 //
@@ -30,7 +30,8 @@ import { startProjectPass, type ProjectPass, type ProjectsSource } from './proje
 //   separates a web run's empty scratch branch from a local run's branch holding unmerged commits —
 //   the one thing this sweep must never delete.
 // - **No open PR**, so a deletion can never close one.
-// - **Not a live agent's**, the same `busy` guard the worktree sweep takes.
+// - **Not a live agent's**: a run the caller names as `busy` keeps its branch. The daemon names
+//   none, since it runs no agent.
 //
 // Never throws, and conservative on every unprovable case: a ref it cannot prove dead simply
 // stays, and the next sweep asks again.

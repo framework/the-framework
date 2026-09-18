@@ -2,7 +2,7 @@ The device's [1] side of the relay [2]: the endpoints a daemon exposes under `/_
 
 ## Context
 
-**User story**: the user saved this machine as a device [1] in another machine's dashboard and starts agents [3] here from there; the other dashboard shows whether this machine is reachable, renders the agent's events as they happen, and after the agent ends still reads its diff and pushes or opens its pull request from there.
+**User story**: the user saved this machine as a device [1] in another machine's dashboard and starts agents [3] here from there; the other dashboard shows whether this machine is reachable, renders the agent's events as they happen, and after the agent ends still reads its diff and opens or merges its pull request from there.
 
 **Problem**: a daemon that starts processes on request must accept only what a local start accepts, must never let a relayed agent relay onward to a third machine, and must never let the caller name which project is worked: the agent runs in this device's own home checkout [4].
 
@@ -12,7 +12,7 @@ The device's [1] side of the relay [2]: the endpoints a daemon exposes under `/_
 [2] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
 [3] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [4] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch. The user's own working copy is "the project's checkout".
-[6] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local`, `push`, `pr`, `merge`.
+[6] handoff: what becomes of an agent's work once the agent has ended: its branch pushed, a pull request opened for it, the pull request merged. The agent does it itself; on a finished agent's page the "Open PR" and "Merge" buttons do it by hand.
 
 ## Business logic — TL;DR
 
@@ -20,7 +20,7 @@ The device's [1] side of the relay [2]: the endpoints a daemon exposes under `/_
 - **A daemon that enabled no relay** - answers 404 "relay not enabled" to every other relay route.
 - **The start** - takes a prompt and start options as JSON, strips any further device from the options, starts an ordinary local agent in this device's own home checkout, and answers with the start's result.
 - **The events** - streams one agent's events as newline-delimited JSON until the agent ends or the caller goes away.
-- **The agent-scoped call** - runs one whitelisted read, diff, steer, handoff, push or pull-request call against this device's own checkout and answers with its result.
+- **The agent-scoped call** - runs one whitelisted read, diff, steer, pull-request or merge call against this device's own checkout and answers with its result.
 
 ## Business logic
 
@@ -68,7 +68,7 @@ Only a GET is accepted. The agent's id is required as the `run` query parameter;
 
 #### Context
 
-**User story**: after a relayed agent [3] ends, the other machine's dashboard still opens its diff, pushes its branch and opens its pull request: the work is here, so the call runs here.
+**User story**: after a relayed agent [3] ends, the other machine's dashboard still opens its diff and opens or merges its pull request: the work is here, so the call runs here.
 
 #### Business logic
 

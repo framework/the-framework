@@ -392,7 +392,7 @@ describe('TicketsPage add the shown set to the AI queue', () => {
 })
 
 // The plan sibling of the queue-add: one `Create tickets/<stem>.plan.md` entry per shown ticket
-// still to plan — the Plan tickets preset's own ask, placed by the ticket's priority — and no
+// still to plan, placed by the ticket's priority — and no
 // agent starts here either.
 describe('TicketsPage queue plans for the shown set', () => {
   test('every shown ticket still to plan gets its plan queued, and the button rests as Plans queued', async () => {

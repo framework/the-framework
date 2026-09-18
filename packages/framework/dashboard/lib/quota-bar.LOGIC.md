@@ -2,7 +2,7 @@ Works out everything the quota [1] bar draws and says: where each calendar day o
 
 ## Context
 
-**User story**: the user looks at one bar and answers three questions at a glance — how much of this week's allowance is gone, whether that is fast or slow for the day it is, and how much more The Framework may spend on its own before it stands down. Dragging the bar's dim right edge moves that last line.
+**User story**: the user looks at one bar and answers three questions at a glance — how much of this week's allowance is gone, whether that is fast or slow for the day it is, and how much more unattended [4] work may spend before it stands down. Dragging the bar's dim right edge moves that last line.
 
 **Problem**: a bare percentage of the week says almost nothing about whether today's pace is sustainable. "53% used" on day two and on day six are opposite situations. Everything here exists to turn one percentage into readings a person can act on: a duration, a share of the pace, and a position on a week that is drawn as real days.
 
@@ -10,7 +10,7 @@ Works out everything the quota [1] bar draws and says: where each calendar day o
 
 [1] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
 [2] quota boundary: the share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
-[3] spend offset: the user's adjustment of the quota boundary, in percentage points of the week.
+[3] spend offset: the user's adjustment of the quota boundary, in percentage points of the week: how far past it unattended work may start. Each project's scheduler holds its own, as `spendOffset` in its state file.
 [4] unattended: said of an agent nobody is watching: one the scheduler started rather than a person. It is not answered any faster: a question it ends on waits for a human like any other.
 
 ## Business logic — TL;DR
@@ -76,11 +76,11 @@ The week's consumption is in one of four states:
 
 **User story**: the user drags the dim segment's right edge, labeled "Unattended work stops at", and the bar follows the finger.
 
-**Problem**: the daemon works out the same line and its answer is the one that actually gates work, but the dashboard only learns it on the next reading. A line drawn only from the daemon's answer would trail the control by up to half a minute, which reads as a broken control.
+**Problem**: the daemon works out the same line from the spend offset the schedulers hold, but the dashboard only learns it on the next reading, and the schedulers only hold a new offset once the control's write has gone through. A line drawn only from the daemon's answer would trail the control by up to half a minute, which reads as a broken control.
 
 #### Business logic
 
-The line is the quota boundary [2] plus the user's spend offset [3], and it is clamped to the week: never below zero, never above one hundred. Computing it in the browser is what lets the bar redraw the moment the control moves; the daemon's own answer remains the one that decides whether unattended [4] work may start.
+The line is the quota boundary [2] plus the user's spend offset [3], and it is clamped to the week: never below zero, never above one hundred. Computing it in the browser is what lets the bar redraw the moment the control moves; what decides whether unattended [4] work may start is each project's scheduler, against the spend offset it holds.
 
 ### A day's worth of pace
 

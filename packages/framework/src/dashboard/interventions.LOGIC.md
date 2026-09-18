@@ -1,4 +1,4 @@
-Builds the cross-project "needs you" list, the interventions [1] feed: every registered project's open pull requests waiting for review, every running agent [2] parked on a gate [3], and every recently finished agent whose branch holds commits that never left the machine, newest first, each with one stable identity so the notification sweep announces it exactly once. It also reports which projects it could read completely, and it phrases the items for Discord and posts them there as one message.
+Builds the cross-project "needs you" list, the interventions [1] feed: every registered project's open pull requests waiting for review, every agent [2] waiting on the gate [3] it ended on, and every recently finished agent whose branch holds commits that never left the machine, newest first, each with one stable identity so the notification sweep announces it exactly once. It also reports which projects it could read completely, and it phrases the items for Discord and posts them there as one message.
 
 ## Context
 
@@ -11,18 +11,17 @@ Builds the cross-project "needs you" list, the interventions [1] feed: every reg
 [1] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds. The other is activity: an agent started or finished.
 [2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [3] gate: a question with options an agent's turn ended on: the agent ends waiting for the answer, the dashboard shows the question as a card, and the answer resumes the agent.
-[4] sweep: a background job the daemon runs on its clock: the CI watch, the notification watchers, the sweep that reclaims checkouts, the branch-links sweep, the cloud scratch sweep, cloud work adoption.
+[4] sweep: a background job the daemon runs on its clock: the data sync, the notification watchers, the cloud scratch sweep, cloud work adoption. None of them starts an agent.
 [5] the Overview: the dashboard's cross-project page at `/`.
-[6] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it).
+[6] handoff: what becomes of an agent's work once the agent has ended: its branch pushed, a pull request opened for it, the pull request merged. The agent does it itself; on a finished agent's page the "Open PR" and "Merge" buttons do it by hand.
 [7] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
-[8] unattended: said of an agent nobody is watching: one the scheduler started rather than a person. It is not answered any faster: a question it ends on waits for a human like any other.
 [9] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
 [10] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 
 ## Business logic — TL;DR
 
-- **Open pull requests to review** - every open pull request of every project is an item, except a draft opened by hand; a draft on an agent's branch stays, because that is how an unattended handoff hands work back.
-- **Agents parked on a gate** - a running agent with an unanswered gate is an item carrying the question's title, one item per parked agent.
+- **Open pull requests to review** - every open pull request of every project is an item, except a draft opened by hand; a draft on an agent's branch stays, because a draft is how an agent's work may ask for a first look.
+- **Agents parked on a gate** - an agent that ended `waiting` on a gate is an item carrying the question's title, read off the agent's own diary, one item per parked agent.
 - **Finished agents with unpushed work** - among a project's 5 most recent finished agents, one whose branch still exists, holds real commits, is neither merged nor on the remote, and has a remote to push to, is an item naming what was asked, the branch and the commit count.
 - **Newest first, one item per identity** - items sort by when the pull request was opened or the agent last updated, and a pull request seen through two projects registered on the same repository appears once.
 - **Which projects were read whole** - alongside the items comes the list of projects every source answered for, so a silence caused by an unreachable project is never mistaken for "nothing waiting".
@@ -38,7 +37,7 @@ See `## Context`.
 
 #### Business logic
 
-For each registered project, the open pull requests of its repository (read through `gh.ts`, at most 50) each become one item with the pull request's number, title, URL and opening time; the URL is where to act, on GitHub. A draft pull request is left out, because a draft is not asking for review, with one exception: a draft whose head branch is an agent's [2] branch (a branch named `agent-…`, other than the `agent-data` branch [7] itself) is kept. An unattended [8] handoff [6] opens its pull request as a draft precisely so it does not ping reviewers, and if the feed dropped it too, nothing would tell anyone the work exists. A draft with no head branch recorded counts as opened by hand, so an answer that lacks the branch never turns every draft in the repository into a "needs you". A project whose pull requests cannot be read (no remote, `gh` missing or logged out, GitHub unreachable) contributes no pull request items.
+For each registered project, the open pull requests of its repository (read through `gh.ts`, at most 50) each become one item with the pull request's number, title, URL and opening time; the URL is where to act, on GitHub. A draft pull request is left out, because a draft is not asking for review, with one exception: a draft whose head branch is an agent's [2] branch (a branch named `agent-…`, other than the `agent-data` branch [7] itself) is kept. An agent publishes its pull request as a draft when a person should look at it first, and cloud work adoption opens its pull requests as drafts so they do not ping reviewers; if the feed dropped them too, nothing would tell anyone the work exists. A draft with no head branch recorded counts as opened by hand, so an answer that lacks the branch never turns every draft in the repository into a "needs you". A project whose pull requests cannot be read (no remote, `gh` missing or logged out, GitHub unreachable) contributes no pull request items.
 
 ### Agents parked on a gate
 
@@ -48,13 +47,13 @@ For each registered project, the open pull requests of its repository (read thro
 
 #### Business logic
 
-For each project, every live agent [2] whose status is still running and which has a gate [3] nobody has answered is one item: its title is the question's title, and it links to the dashboard's own URL when the daemon knows it (only the daemon does; the dashboard's card locates the project itself and needs no URL), else its link is empty. An agent parks on one gate at a time, but a project may have several agents running at once, so each parked agent contributes its own item, identified by the project, the agent and the gate: every agent's first gate carries the same gate id, so without the agent in the identity two parked agents would count as one and only one would be announced. A gate left on an agent that is no longer running is ignored. When the project's live agents cannot be read, no such items are contributed.
+For each project, every agent [2] with a checkout whose status is `waiting` is looked at: it ended on a gate [3] and waits for the answer, its checkout kept. The gate is read off the agent's own diary by the same rule the run page and the open-questions list use (`open-choices.ts`): the last question still open. One item per such agent: its title is the question's title, and it links to the dashboard's own URL when the daemon knows it (only the daemon does; the dashboard's card locates the project itself and needs no URL), else its link is empty. A project may have several agents waiting at once, so each contributes its own item, identified by the project, the agent and the gate: every agent's first gate can carry the same gate id, so without the agent in the identity two parked agents would count as one and only one would be announced. An agent that is not `waiting`, or whose diary cannot be read or shows no open question, contributes nothing. When the project's live agents cannot be read, no such items are contributed.
 
 ### Finished agents with unpushed work
 
 #### Context
 
-**Problem**: an agent [2] that committed real code and stopped without pushing produces neither a pull request nor a gate, and nothing would tell anyone. Agents usually push themselves, so what reaches here is the remainder: the handoff [6] turned off for the project or for that agent, or a handoff that tried and failed. The feed only says that a decision is waiting; it does not take it.
+**Problem**: an agent [2] that committed real code and stopped without pushing produces neither a pull request nor a gate, and nothing would tell anyone. Agents usually push themselves as part of their handoff [6], so what reaches here is the remainder: an agent told that whoever started it publishes for it, or a handoff that failed or never ran. The feed only says that a decision is waiting; it does not take it.
 
 #### Business logic
 

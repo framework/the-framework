@@ -2,13 +2,13 @@ Keeps a project's shared custom presets [1], the ones saved into the repository 
 
 ## Context
 
-**User story**: the user saves a custom preset from the composer either privately, so it follows the person across every project and stays in the registry [2] in the home directory, or for the project, so it lands in the repository and everyone who clones the repository gets it. The presets menu on project home offers both.
+**User story**: the user saves a custom preset from the composer either privately, so it follows the person across every project and stays in the registry [2] in the home directory, or for the project, so it lands in the repository and everyone who clones the repository gets it. The launcher's Commands menu lists both, under "Your saved prompts" and "Project saved prompts", below the project's commands.
 
-**Problem**: `.the-framework/` ignores everything but a short allowlist, so without an explicit un-ignore line git would never see the shared presets and they could not be shared.
+**Problem**: `.the-framework/` ignores everything but its own `.gitignore`, so without an explicit un-ignore line git would never see the shared presets and they could not be shared.
 
 ## Glossary
 
-[1] custom preset: a preset the user saved, as opposed to the built-in ones.
+[1] custom preset: a prompt the user saved under a label, to load into the composer again; the dashboard shows it as a saved prompt.
 [2] registry: `~/.the-framework.json`, which keeps the user's preferences and lists the projects.
 
 ## Business logic — TL;DR
@@ -43,7 +43,7 @@ A file that is missing or cannot be read yields no presets; so does one that is 
 
 #### Context
 
-**Problem**: `.the-framework/.gitignore` ignores everything (`*`) and un-ignores only a short allowlist, so a file written there is invisible to git unless it is un-ignored by name.
+**Problem**: `.the-framework/.gitignore` ignores everything (`*`) and un-ignores only itself, so a file written there is invisible to git unless it is un-ignored by name.
 
 #### Business logic
 

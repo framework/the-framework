@@ -5,7 +5,7 @@ import { cn } from '../../lib/utils.js'
 import { ScrollArea } from './scroll-area.js'
 
 // The shadcn "base" dropdown menu (built on Base UI, not Radix) — trimmed to what the Start
-// form's preset + agent/model menus need (#649/#650). Themed with the dashboard's CSS-var tokens
+// form's Commands + agent/model menus need (#649/#650). Themed with the dashboard's CSS-var tokens
 // (there is no --color-popover, so the card surface stands in). Item highlight state is
 // `data-highlighted`; an open submenu trigger is `data-popup-open`.
 
@@ -31,7 +31,7 @@ export const DropdownMenuGroup = Menu.Group
 export const DropdownMenuSub = Menu.SubmenuRoot
 
 // Keep a trigger lit while its menu is open (#1046), matching the hover state Base UI marks it with.
-// One place so every menu button (presets, agent/model, gear, Context, notifications) behaves the same.
+// One place so every menu button (Commands, agent/model, gear, notifications) behaves the same.
 const TRIGGER_OPEN_HIGHLIGHT =
   'data-[popup-open]:bg-[var(--color-accent)] data-[popup-open]:text-[var(--color-accent-foreground)]'
 

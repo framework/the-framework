@@ -9,7 +9,7 @@ Serves the dashboard's RPC surface at `/_rpc`: a call is a `POST /_rpc/<name>` w
 ## Glossary
 
 [1] event stream: everything an agent does, one event per line of the agent's diary — the file `<id>.jsonl` the tool that runs the agent writes under `.the-framework/` in the agent's checkout, copied onto the `agent-data` branch when the agent ends. Every surface (dashboard, terminal, replay) is a projection of it.
-[2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps. Started from the dashboard by the user, or by the daemon.
+[2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [3] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
 [4] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 [5] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).

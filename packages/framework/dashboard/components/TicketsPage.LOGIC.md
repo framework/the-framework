@@ -12,7 +12,7 @@ Shows every registered project's tickets on one page, the dashboard's Tickets vi
 [2] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down. An item on it is a queue entry. The dashboard labels it "AI queue".
 [3] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [4] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
-[5] holder: who a claim names: the agent's id when the daemon started the agent, else the branch the `tickets` command ran on.
+[5] holder: who a claim names: the agent's id when the tool that started the agent put it in the agent's environment, else the branch the `tickets` command ran on.
 [6] plan: a ticket's `.plan.md`: effort and uncertainty ratings and how to implement it.
 [7] the Overview: the dashboard's cross-project page at `/`.
 [10] launcher: the Start form on a project's own page (its project home).

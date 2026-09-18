@@ -1,8 +1,8 @@
-The repository's three GitHub workflows: the check every push and every pull request from a fork gets, the deploy that keeps the marketing website live, and the workflow that runs one turn [2] of an agent [1] on a GitHub-hosted runner for The Framework's `github-actions` driver [3]. The first two serve this repository's own development; the third is a piece of the product, carried by any repository that wants its agents to run on GitHub's runners, this one included.
+The repository's three GitHub workflows: the check every push and every pull request from a fork gets, the deploy that keeps the marketing website live, and the workflow that runs one turn [2] of an agent [1] on a GitHub-hosted runner for `agent-driver`'s `github-actions` driver [3]. The first two serve this repository's own development; the third is a piece of the product, carried by any repository that wants its agents to run on GitHub's runners, this one included.
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent under The Framework's control, in its own checkout, on its own branch, streaming events, handed off when it ends.
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] turn: one prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
 [3] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later. The driver implementations are `claude-code`, `codex`, `github-actions`, `claude-web` and `fake`.
 

@@ -27,7 +27,7 @@ function QueueCard({ title, icon, children, style }: { title: string; icon: Emoj
 export function Queues() {
   return (
     <section id="queues" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <h3 style={h3Style}>2. Queues</h3>
+      <h3 style={h3Style}>Queues</h3>
       <div
         style={{
           display: 'grid',

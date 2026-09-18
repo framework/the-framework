@@ -3,8 +3,8 @@ import { CircleHelp } from 'lucide-react'
 import type { DriverQuotaWindow, QuotaBoundaryStatus, QuotaView } from '../../src/index.js'
 import { MAX_SPEND_OFFSET, DEFAULT_SPEND_OFFSET } from '../../src/client.js'
 import { useQuota } from '../lib/quota.js'
+import { sendSpendOffset } from '../rpc/quota.js'
 import { formatRelative, formatResetDay, formatResetTooltip, formatDuration, formatDurationLong } from '../lib/format-date.js'
-import { updatePreferences } from '../lib/preferences.js'
 import {
   weekDays,
   quotaTone,
@@ -100,8 +100,8 @@ function LegendItem({ swatch, children }: { swatch: ReactNode; children: ReactNo
  * amount plus a handle floating apart from it. Dragging the dim segment's own right edge is what
  * moves that stop, so the control is the bar's shape rather than a slider laid over it.
  *
- * The boundary is drawn exactly where it gates the pace — continuous, the same value the daemon
- * acts on (#960 Edit), not a value that jumps once a day, so its position on the bar always names
+ * The boundary is drawn exactly where it gates the pace — continuous, the same value the schedulers
+ * act on (#960 Edit), not a value that jumps once a day, so its position on the bar always names
  * the actual instant `now` falls on. The limit is continuous too — it is a handle, not a reading.
  */
 function WeekBar({
@@ -331,8 +331,8 @@ function WeekBar({
             </TooltipTrigger>
             <TooltipContent className="max-w-64">
               {enabled
-                ? 'Autonomous AI enabled means that the daemon may start an agent on its own — today, a fix on a pull request whose checks fail — while the account is under the line.'
-                : "Autonomous AI disabled means that the daemon starts no agent on its own — every new agentic work is triggered by you manually."}
+                ? "Autonomous AI enabled means that each project's scheduler may start the commands its agent-schedule.md lists while the account is under the line."
+                : "Autonomous AI disabled means that no scheduler starts an agent on its own — every new agentic work is triggered by you manually."}
             </TooltipContent>
           </Tooltip>
         </div>
@@ -390,18 +390,25 @@ function unavailableNote(view: QuotaView): string | undefined {
   }
 }
 
+/** How long the slider rests before its value is written: a drag is many changes, each a hook line per project. */
+const OFFSET_WRITE_DELAY_MS = 500
+
 /**
- * The slider's position, held here rather than read straight off the poll.
+ * The slider's position, held here rather than read straight off the poll, and written through
+ * the projects' `offset` hooks once it rests (#960).
  *
  * The stored value only comes back on the next quota read (30s), so a slider bound directly to it
  * snapped back after every keypress and each keypress recomputed from the same stale number:
  * twenty presses of the arrow key moved the limit by one. This keeps the user's value until the
- * daemon's catches up with it, which is the point at which the two agree anyway.
+ * schedulers' catches up with it, which is the point at which the two agree anyway. A write that
+ * fails says why, and the slider follows the schedulers' value again.
  */
-function useSpendOffset(serverOffset: number | undefined): [number, (offset: number) => void] {
+export function useSpendOffset(serverOffset: number | undefined): [number, (offset: number) => void, string | undefined] {
   const [local, setLocal] = useState(serverOffset ?? DEFAULT_SPEND_OFFSET)
+  const [error, setError] = useState<string | undefined>()
   // What we last wrote, while the poll is still behind it. `null` means "follow the server".
   const pending = useRef<number | null>(null)
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   useEffect(() => {
     if (serverOffset === undefined) return
@@ -409,20 +416,31 @@ function useSpendOffset(serverOffset: number | undefined): [number, (offset: num
     pending.current = null
     setLocal(serverOffset)
   }, [serverOffset])
+  useEffect(() => () => clearTimeout(timer.current), [])
 
   return [
     local,
     (offset: number) => {
       setLocal(offset)
+      setError(undefined)
       pending.current = offset
-      void updatePreferences({ autoSpendOffset: offset })
+      clearTimeout(timer.current)
+      timer.current = setTimeout(() => {
+        void sendSpendOffset(offset).then(result => {
+          if (result.ok || pending.current !== offset) return
+          pending.current = null
+          setError(result.error)
+          if (serverOffset !== undefined) setLocal(serverOffset)
+        })
+      }, OFFSET_WRITE_DELAY_MS)
     },
+    error,
   ]
 }
 
 export function Quota() {
   const view = useQuota()
-  const [offset, setOffset] = useSpendOffset(view?.boundary?.limit.offset)
+  const [offset, setOffset, offsetError] = useSpendOffset(view?.boundary?.limit.offset)
   const note = view ? unavailableNote(view) : undefined
   // When the newest attempt failed but earlier numbers are still on screen, say how old they are.
   // A retained reading can now outlive several failures (#960), and an undated bar claims to be now.
@@ -445,7 +463,14 @@ export function Quota() {
             a reset phrasing the parser didn't know just made the panel quietly plainer, and nothing
             anywhere said the boundary was gone. Quote the text that failed: it is the bug report. */}
         {view?.boundary && week ? (
-          <WeekBar status={view.boundary} percentUsed={week.percentUsed} offset={offset} onChangeOffset={setOffset} others={others} />
+          <>
+            <WeekBar status={view.boundary} percentUsed={week.percentUsed} offset={offset} onChangeOffset={setOffset} others={others} />
+            {offsetError && (
+              <p role="alert" className="text-xs text-danger">
+                The limit was not saved: {offsetError}
+              </p>
+            )}
+          </>
         ) : view && view.windows.length ? (
           <p role="alert" className="text-sm text-danger">
             {unplaceableWeek(week, others)}

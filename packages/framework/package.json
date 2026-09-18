@@ -1,7 +1,7 @@
 {
   "name": "framework",
   "version": "0.7.0",
-  "description": "The (AI) Framework: turnkey, zero-config AI orchestration that wraps a coding-agent CLI (Claude Code) as a black box and takes you from an idea to a running app. Vite for AI.",
+  "description": "The (AI) Framework: a local dashboard and daemon for coding agents. It starts an agent through the project's own start hook and shows every agent from the files it keeps; it runs no coding agent itself.",
   "keywords": [
     "ai",
     "agent",

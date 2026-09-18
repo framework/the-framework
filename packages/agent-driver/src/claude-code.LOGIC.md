@@ -18,7 +18,7 @@ Drives Claude Code as a driver [1]: each turn [2] is one non-interactive invocat
 [4] coding agent: the CLI doing the actual work: Claude Code or Codex.
 [5] usage: what one turn spent, as the coding agent reports it: token counts, and a notional price in US dollars when the coding agent prices its turns.
 [6] rate limit: the coding agent's per-turn reading of whether the account may still spend against one quota window, and when that window resets.
-[7] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[7] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [8] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
 [9] live chat: the user's own messages to a running agent, each continuing the same driver session. One of them is a message.
 [10] framing: the standing instructions a caller gives a driver session, plus any extra instructions for one turn; the driver delivers them as the coding agent's system prompt, or ahead of the prompt when the coding agent has no system prompt flag.
@@ -62,7 +62,7 @@ Every turn [2] spawns the `claude` command, found on `PATH` unless the driver [1
 
 #### Business logic
 
-Unless told otherwise, Claude Code runs with the `acceptEdits` permission mode, so file writes need no approval; installs, builds and tests still would, and are denied. The driver [1] can be configured with `bypassPermissions` for a fully autonomous agent [7] that also installs and runs things, with `plan`, or with `default`. Configured to skip permission checks altogether, the driver passes `--dangerously-skip-permissions` instead of a permission mode; that is meant only for a sandbox with no network. The product's own choice for every agent is `bypassPermissions` (`packages/framework/src/cli.ts`).
+Unless told otherwise, Claude Code runs with the `acceptEdits` permission mode, so file writes need no approval; installs, builds and tests still would, and are denied. The driver [1] can be configured with `bypassPermissions` for a fully autonomous agent [7] that also installs and runs things, with `plan`, or with `default`. Configured to skip permission checks altogether, the driver passes `--dangerously-skip-permissions` instead of a permission mode; that is meant only for a sandbox with no network. The product's own choice for every agent is `bypassPermissions` (`packages/agent-scheduler/src/scheduler.ts`).
 
 ### Framing becomes the system prompt
 
@@ -88,7 +88,7 @@ When the caller names a model, it is passed to Claude Code as is (`--model <id>`
 
 #### Context
 
-**User story**: the user starts an agent [7] with a browser; the browser reaches Claude Code as an MCP server (`packages/framework/src/browser.ts`).
+**User story**: a caller gives the agent [7] extra tools, each an MCP server that reaches Claude Code beside the user's own; the product configures none today.
 
 #### Business logic
 

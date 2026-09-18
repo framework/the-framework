@@ -1,9 +1,9 @@
-The shape shared by the daemon's background passes over the registered projects [1] — the sweep [2] that reclaims checkouts, the CI watch, the branch-links sweep, the cloud scratch sweep and cloud work adoption: no clock of their own, one walk over every registered project per tick [3] of the daemon's single clock, visiting each project's path in turn. What a pass does to one project is its own; the walking, the overlap rule and the stop are defined here once.
+The shape shared by the daemon's background passes over the registered projects [1] — the two sweeps [2] that walk the projects, the cloud scratch sweep and cloud work adoption: no clock of their own, one walk over every registered project per tick [3] of the daemon's single clock, visiting each project's path in turn. What a pass does to one project is its own; the walking, the overlap rule and the stop are defined here once.
 
 ## Glossary
 
 [1] project: a repository the user registered in the dashboard, identified by an id derived from its path.
-[2] sweep: a background job the daemon runs on its clock: the CI watch, the notification watchers, the sweep that reclaims checkouts, the branch-links sweep, the cloud scratch sweep, cloud work adoption.
+[2] sweep: a background job the daemon runs on its clock: the data sync, the notification watchers, the cloud scratch sweep, cloud work adoption. None of them starts an agent.
 [3] tick: one beat of the daemon's single background clock; each sweep says how many ticks it waits between turns.
 
 ## Business logic — TL;DR

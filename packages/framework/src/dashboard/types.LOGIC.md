@@ -1,4 +1,4 @@
-Fixes the vocabulary the dashboard and the daemon speak to each other for starting an agent [1], adding a project, running a project's preview, the onboarding suggestion, a driver's [2] readiness, an agent's checkout [3], and the outcomes of removing a checkout or deleting an agent. The shapes live here, on neither the HTTP server nor the RPC mount, so both and the RPCs themselves depend on this one leaf rather than on each other. No behavior lives here; the defaults below are what an absent field means to whoever reads it.
+Fixes the vocabulary the dashboard and the daemon speak to each other for starting an agent [1], adding a project, running a project's preview, the onboarding suggestion, an agent's checkout [3], and the outcomes of removing a checkout or deleting an agent. The shapes live here, on neither the HTTP server nor the RPC mount, so both and the RPCs themselves depend on this one leaf rather than on each other. No behavior lives here; the defaults below are what an absent field means to whoever reads it.
 
 ## Glossary
 
@@ -17,7 +17,6 @@ Fixes the vocabulary the dashboard and the daemon speak to each other for starti
 - **A start's result** - success, with the agent id [17] the start hook answered, which the dashboard needs to select the agent it just started; or failure, with the reason in words.
 - **Adding a project** - registered, together with whether it was already activated; or why not.
 - **The onboarding suggestion** - the daemon's own working directory, offered as the one-click first project, with its project id when it is already registered. Both are empty wherever adding projects is not wired, which is the case on the relay [20], so a daemon reached over the network never discloses its filesystem layout.
-- **A driver's readiness** - a shape for whether a driver [2] can start an agent: blocking problems, each naming its own fix, and non-blocking warnings. Nothing answers with it any more: a missing or logged-out coding agent shows as a failed agent with its reason.
 - **A project's preview** - success with the live URL and the command that serves it, or why not; and whether the preview is running, with its URL and command.
 - **An agent's checkout** - its absolute path; whether it is the agent's own checkout [3] or the fallback to the project's checkout; whether it holds uncommitted changes; its branch, absent when the path is not a git repository; its size on disk, read only once nothing is writing to it and best-effort even then; the pull request opened for its branch when there is one; or that the pull request is not known yet because the lookup is still running, as distinct from there being none.
 - **Removing a checkout, deleting an agent** - each succeeds or fails with a message.

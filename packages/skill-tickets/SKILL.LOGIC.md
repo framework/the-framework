@@ -4,18 +4,18 @@ The instructions every agent [1] reads before touching a ticket: where the ticke
 
 **User story**: an agent starting on a task finds the project's roadmap in its tickets, picks one it may work, claims it, plans or implements it, and hands the ticket's bookkeeping back in a state the user and the next agent can trust: a claim lifted, a ticket closed once merged, a queue entry [6] removed.
 
-**Business logic story**: everything the skill says the command does is enforced by the rules in `src/cli.ts`; the formats are what `src/tickets.ts` parses and `src/names.ts` judges; the daemon queues and claims tickets by the same rules with code of its own.
+**Business logic story**: everything the skill says the command does is enforced by the rules in `src/cli.ts`; the formats are what `src/tickets.ts` parses and `src/names.ts` judges; the dashboard queues a ticket by the same rules with code of its own.
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down.
 [3] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
 [4] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [5] skill: one of the four capabilities an agent is taught — `branches`, `tickets`, `queue`, `logs` — each a package with the instructions the agent reads (its `SKILL.md`), a command on the agent's PATH, and an API the product calls.
 [6] queue entry: an item on the agent queue.
-[7] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
-[8] holder: who a claim names: the agent's id when the daemon started the agent, else the branch the `tickets` command ran on.
+[7] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
+[8] holder: who a claim names: the agent's id when the program that started the agent set it in `AGENT_ID` (the scheduler does), else the branch the `tickets` command ran on.
 
 ## Business logic — TL;DR
 

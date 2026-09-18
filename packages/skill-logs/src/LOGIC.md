@@ -9,10 +9,10 @@ The `logs` skill's implementation: what a run [1] is (a card [2] and a diary [3]
 [1] run: the `logs` skill's record of one agent on the `agent-data` branch: a card and a diary. Never the unit of work.
 [2] card: the run's `<id>.json`: what was asked, the ticket, the branch, the pull request, how it ended, what it cost.
 [3] diary: the run's `<id>.jsonl`: what the agent said.
-[4] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
-[5] recording program: the program that ran an agent and records its run when the agent ends; in the product, the daemon.
+[4] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
+[5] recording program: the program that ran an agent and records its run when the agent ends; in the product, the scheduler (`agent-scheduler`).
 [6] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch. Also "the `agent-data` branch's checkout".
-[7] agent: the unit of work: one task worked by a coding agent under The Framework's control, in its own checkout, on its own branch, streaming events, handed off when it ends.
+[7] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 
 ## Business logic — TL;DR
 

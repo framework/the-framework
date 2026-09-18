@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { isAgentBranch } from '@gemstack/skill-branches'
-import { readAgentHandoff, resolveAgentPr, mergeAgentPr, agentBranchFor, openBranchPullRequest, openRemoteBranchPullRequest, openAgentPullRequest, prBaseName, type HandoffAgent } from './agent-handoff.js'
+import { readAgentHandoff, resolveAgentPr, mergeAgentPr, agentBranchFor, openBranchPullRequest, openRemoteBranchPullRequest, prBaseName, type HandoffAgent } from './agent-handoff.js'
 import { pickAgentPr } from './gh.js'
 import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
 
@@ -322,29 +322,6 @@ test('a real repo: a branch whose work is already in the base reports empty (#11
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
-})
-
-
-
-/** A branch with one commit, a remote, and no PR: the case a handoff should act on. */
-const READY = {
-  ...REPO,
-  'rev-parse --verify --quiet refs/heads/the-framework/x': 'abc123\n',
-  remote: 'origin\n',
-  'symbolic-ref': 'origin/main\n',
-  log: `abc123${SEP}abc${SEP}did the thing`,
-  diff: '1\t0\tsrc/app.ts',
-  'rev-parse --verify --quiet refs/remotes': '',
-  branch: '',
-}
-
-test('bookkeeping alongside real work does not make a branch empty (#1291)', async () => {
-  const { git } = fakeGit({
-    ...READY,
-    diff: '21\t0\t.the-framework/conversations/r1.md\n3\t1\tsrc/app.ts',
-  })
-  const handoff = await readAgentHandoff('/repo', 'the-framework/x', { git, pr: async () => undefined })
-  assert.equal(handoff?.empty, false)
 })
 
 test('a session branch is recognised by its prefix, a hand-made one is not (#1102)', () => {

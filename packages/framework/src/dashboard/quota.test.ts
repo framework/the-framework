@@ -126,27 +126,3 @@ test('the panel stays about the account: a spent model week is not the bar the u
   assert.equal(view.boundary?.reached, null)
 })
 
-test("naming the model the work will run on brings that model's own week into the gate (#1619)", async () => {
-  const { source, poller } = sourceOf([spentModelWeek()])
-  await poller.poll()
-  // The question a start asks, as against the question the panel asks: same reading, same slider,
-  // one more window in force — the one the work would actually spend.
-  const boundary = await source.boundaryFor('claude-fable-5')
-  assert.deepEqual(boundary?.windows.map(w => w.label), ['Current week (all models)', 'Current week (Fable)'])
-  assert.equal(boundary?.reached?.label, 'Current week (Fable)')
-  // And the account-wide answer is still the account-wide answer: this is a second question, not
-  // a replacement for the first.
-  assert.equal((await source.read()).boundary?.reached, null)
-})
-
-test('a model whose week the account never reported is gated on the account alone (#1619)', async () => {
-  const { source, poller } = sourceOf([spentModelWeek()])
-  await poller.poll()
-  // Opus has no window here, so there is nothing of its own to measure and the spent Fable week
-  // is none of its business: a window we cannot tie to the model must not stop work (#879).
-  const boundary = await source.boundaryFor('claude-opus-5')
-  assert.deepEqual(boundary?.windows.map(w => w.label), ['Current week (all models)'])
-  assert.equal(boundary?.reached, null)
-  // No model at all is the same answer as the panel's.
-  assert.deepEqual((await source.boundaryFor())?.windows, (await source.read()).boundary?.windows)
-})

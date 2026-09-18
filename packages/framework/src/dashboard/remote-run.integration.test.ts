@@ -54,7 +54,7 @@ test('a run submitted with options.remote is created on the other daemon and its
   const bStart = (prompt: string, options: StartAgentOptions, pid?: string): StartAgentResult => {
     bStarts.push({ prompt, options, ...(pid ? { projectId: pid } : {}) })
     const stream = new EventStream<FrameworkEvent>()
-    stream.push({ kind: 'log', message: 'hello from B' } as FrameworkEvent)
+    stream.push({ kind: 'session-update', sessionId: 'hello from B' } as FrameworkEvent)
     stream.push({ kind: 'end', ok: true } as FrameworkEvent)
     stream.close()
     bStreams.set(B_RUN, stream)
@@ -112,7 +112,7 @@ test('a run submitted with options.remote is created on the other daemon and its
     assert.ok(stream, 'A should expose a live stream for the relayed run')
     const events = await collectUntil(stream!, 'end')
     assert.deepEqual(
-      events.map(e => (e as { message?: string; kind?: string }).message ?? (e as { kind?: string }).kind),
+      events.map(e => (e as { sessionId?: string; kind?: string }).sessionId ?? (e as { kind?: string }).kind),
       ['hello from B', 'end'],
     )
 

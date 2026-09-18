@@ -1,6 +1,5 @@
 import { nodeGitRunner, type GitRunner, pushBranch } from '@gemstack/agent-data'
 import { agentBranchName, sessionNameOf, repoHasRemote } from '@gemstack/skill-branches'
-import { THE_FRAMEWORK_DIR } from '../framework-dir.js'
 import {
   cachedPrView,
   cachedPrsForBranch,
@@ -181,12 +180,9 @@ export async function resolveAgentPr(
 }
 
 /**
- * Merge a finished session's open PR (#1391): the Merge action, pressed by a human.
- *
- * The direct answer to the withheld-merge ending (#1363): a session whose agent never signalled
- * ready-for-merge leaves a draft PR behind, and this is the human saying "it's good, land it".
- * `ghMergePr` marks a draft ready on the way, for exactly that case. Refuses when the agent has no
- * PR or it is no longer open — "already merged" is an answer, not an action.
+ * Merge a finished session's open PR (#1391): the Merge action, pressed by a human saying "it's
+ * good, land it". `ghMergePr` marks a draft ready on the way. Refuses when the agent has no PR or
+ * it is no longer open — "already merged" is an answer, not an action.
  */
 export async function mergeAgentPr(
   cwd: string,
@@ -238,11 +234,6 @@ function parseCommits(out: string): HandoffCommit[] {
 /** `git diff --numstat` as {@link HandoffFile}s, via the shared parser in file-diff.ts. */
 function parseHandoffFiles(out: string): HandoffFile[] {
   return parseNumstat(out).map(({ path, added, removed, binary }) => ({ path, insertions: added, deletions: removed, binary }))
-}
-
-/** The framework's own paper trail (#1291): the agent archive, plus pre-B3 records (conversations, LOGS.md). */
-function isBookkeepingPath(path: string): boolean {
-  return path === THE_FRAMEWORK_DIR || path.startsWith(`${THE_FRAMEWORK_DIR}/`)
 }
 
 /**
@@ -325,12 +316,9 @@ export async function readAgentHandoff(
     insertions: files.reduce((sum, f) => sum + f.insertions, 0),
     deletions: files.reduce((sum, f) => sum + f.deletions, 0),
     // A session that changed nothing is a real outcome, not an error: it gets said, not shown as
-    // an empty branch with buttons that would push nothing. Bookkeeping-only counts as nothing
-    // (#1291): every agent's branch carries the framework's own records — the pre-work (#326) commit
-    // sweeps in the conversation file the daemon just wrote — and publishing those alone produced
-    // junk PRs of pure paper trail. The files decide, not the commits: a branch of bookkeeping
-    // sweeps has commits and still nothing to hand off.
-    empty: commits.length === 0 || files.every(file => isBookkeepingPath(file.path)),
+    // an empty branch with buttons that would push nothing. The files decide as well as the
+    // commits: commits that net to no change leave nothing to hand off.
+    empty: commits.length === 0 || files.length === 0,
     hasRemote,
     pushed: remoteTip.trim() === tip,
     merged: mergedOut.trim().length > 0,
@@ -384,8 +372,8 @@ export interface PullRequestDraft {
   body: string
   base?: string
   /**
-   * Open it as a GitHub draft (#1102). What auto-handoff uses: opening a PR by itself at the end
-   * of every session should not put a review request in anyone's inbox.
+   * Open it as a GitHub draft (#1102): a PR opened with nobody asking for review should not put
+   * a review request in anyone's inbox. The button never asks for one.
    *
    * Safe to do only because the interventions queue was taught to keep listing a draft on a
    * session branch. Left off, a draft would be invisible in both places at once.
@@ -397,7 +385,7 @@ export interface PullRequestDraft {
  * Open a PR for a finished session's branch, pushing it first when the remote does not have it.
  *
  * The button opens it ready for review, because a PR a human asked for by name is asking for
- * review. {@link PullRequestDraft.draft} is the auto-handoff case, which is not.
+ * review. {@link PullRequestDraft.draft} is for a caller that is not asking for review.
  */
 export async function openBranchPullRequest(
   cwd: string,
@@ -441,9 +429,8 @@ function createdPr(out: string, cwd: string, branch: string): HandoffResult {
  * Open a draft PR for a branch that exists only on the remote (#1601): a cloud session's own
  * `claude/*` branch was pushed from a VM this machine never sees, so there is nothing to push
  * here — `gh pr create --head` against the remote branch is the whole action, and gh's default
- * base (the repo's default branch) is the right one. Draft for the same reason the auto-handoff
- * opens drafts: a PR the framework opens by itself must not put a review request in anyone's
- * inbox, and the interventions queue keeps listing a session's draft.
+ * base (the repo's default branch) is the right one. Draft because a PR the framework opens by
+ * itself must not put a review request in anyone's inbox, and the interventions queue keeps listing a session's draft.
  */
 export async function openRemoteBranchPullRequest(
   cwd: string,
@@ -488,7 +475,7 @@ export async function openAgentPullRequest(
   const branch = agentBranchFor(agent)
   // `latest` order (#1512), because the `movedPastPr` decision below compares the branch tip
   // against a PR's head: against the *first* PR, work a second one already landed reads as
-  // unlanded and this opens a third for it. The same reason the automatic handoff picks latest.
+  // unlanded and this opens a third for it.
   const handoff = await readAgentHandoff(cwd, branch, { since: agent.startedAt, order: 'latest' }).catch(() => undefined)
   // The agent's PR first, even when its branch is gone locally: a hands-off web agent's branch only
   // ever existed on the remote, and its PR is the answer the button exists to give (#1255).
@@ -508,8 +495,8 @@ export async function openAgentPullRequest(
 
 /**
  * The little a handoff needs to know about the agent it is for: which branch, and what to say on
- * the PR. Narrower than {@link AgentMeta} so the agent process can call this before its meta is
- * final, and so a caller cannot quietly start depending on the rest of the agent's state.
+ * the PR. Narrower than {@link AgentMeta} so a caller cannot quietly start depending on the rest
+ * of the agent's state. The optional fields below are honored when given; no caller gives them today.
  */
 export type HandoffAgent = Pick<AgentMeta, 'id' | 'branch' | 'intent'> &
   Partial<Pick<AgentMeta, 'startedAt'>> & {
@@ -520,13 +507,11 @@ export type HandoffAgent = Pick<AgentMeta, 'id' | 'branch' | 'intent'> &
      */
     fixes?: string
     /**
-     * The agent's own name for the work (#1618), from an `open-pr` block's first line: the PR
-     * title when it wrote one. Absent, the title falls back to the session's name.
+     * The agent's own name for the work (#1618): the PR title when given. Absent, the title falls back to the session's name.
      */
     prTitle?: string
     /**
-     * The agent's own description of the work (#1567), from an `open-pr` block: the PR body
-     * when it wrote one. Absent, the body describes what was asked for instead — which is all
+     * The agent's own description of the work (#1567): the PR body when given. Absent, the body describes what was asked for instead — which is all
      * the framework knows on its own.
      */
     description?: string
@@ -535,8 +520,7 @@ export type HandoffAgent = Pick<AgentMeta, 'id' | 'branch' | 'intent'> &
 /**
  * The PR title for a session (#1102), with the ticket's issue reference riding along (#1334).
  *
- * Three rungs, each a name for the work the session did: what the agent called it in its
- * `open-pr` block (#1618), else the session's own name (its branch minus the prefix, #1725), else
+ * Three rungs, each a name for the work the session did: what the agent called it (#1618), else the session's own name (its branch minus the prefix, #1725), else
  * the session id — which says little, but says it honestly.
  *
  * The prompt the session was given is not among them. It used to be, cut to 72 characters, and a

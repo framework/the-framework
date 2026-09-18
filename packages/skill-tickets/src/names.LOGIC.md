@@ -2,17 +2,16 @@ Fixes where tickets live on the `agent-data` branch [1] and how a ticket's plan 
 
 ## Context
 
-**User story**: an agent pastes a queue entry's link target (`tickets/2042-01-01_some-ticket.md`) straight into `npx tickets show`, `claim` or `close` and names the same ticket the entry does; the user queues a ticket from the dashboard and it lands in the priority section its own `Priority:` names; the daemon's drain [5] reads the queue entry back and claims that very ticket for the agent it starts; a pull request opened for a ticket closes the GitHub issue the ticket tracks.
+**User story**: an agent pastes a queue entry's link target (`tickets/2042-01-01_some-ticket.md`) straight into `npx tickets show`, `claim` or `close` and names the same ticket the entry does; the user queues a ticket from the dashboard and it lands in the priority section its own `Priority:` names; the dashboard reads the queue entry back as the ticket it names, and the agent working the entry claims that very ticket; a pull request opened for a ticket closes the GitHub issue the ticket tracks.
 
 **Problem**: a filename that comes from outside (a command's argument, a browser) could reach another directory (`../x.md`, an absolute path), a hidden file, or a ticket's own plan or claim; every reader and writer must refuse the same names, in both spellings a name has (bare, or under `tickets/`).
 
 ## Glossary
 
-[1] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
+[1] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [2] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
 [3] queue entry: an item on the agent queue.
 [4] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down.
-[5] drain: starting an agent on the agent queue's first open entry — the half of Auto PM that spends existing work.
 [6] sibling: a ticket's plan file (`<name>.plan.md`) or claim file (`<name>.lock.md`), written about the ticket and never a ticket of its own.
 
 ## Business logic — TL;DR
@@ -60,7 +59,7 @@ A string names a ticket by path only when it starts with `tickets/` and what fol
 
 #### Context
 
-**User story**: see `## Context`. The package itself never reads or writes the agent queue [4]; a caller that queues a ticket writes the entry as a markdown link to the ticket with the ticket's title as the label, and the drain [5] reads the link back.
+**User story**: see `## Context`. The package itself never reads or writes the agent queue [4]; a caller that queues a ticket writes the entry as a markdown link to the ticket with the ticket's title as the label, and the dashboard reads the link back.
 
 #### Business logic
 

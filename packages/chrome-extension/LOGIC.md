@@ -3,7 +3,7 @@ The Chrome extension half of the Claude web bridge [1]. It keeps one pinned clau
 ## Context
 
 **User story**:
-- The user starts a hands-off [4] agent [5] from the dashboard. Its work runs in a cloud session [3] on claude.ai, so when the session stops to ask something, nothing streams back to this machine. The user still finds the question in the dashboard, as the same card a local agent's gate [6] gets, multi-select included, answers it there, and the answer is typed into the session. The dashboard shows whether the answer was sent, and a queued answer can be withdrawn until the extension collects it.
+- The user starts a hands-off [4] agent [5]. Nothing starts one today: web runs left the dashboard's launcher, and the bridge stays for their return. Its work runs in a cloud session [3] on claude.ai, so when the session stops to ask something, nothing streams back to this machine. The user still finds the question in the dashboard, as the same card a local agent's gate [6] gets, multi-select included, answers it there, and the answer is typed into the session. The dashboard shows whether the answer was sent, and a queued answer can be withdrawn until the extension collects it.
 - The daemon needs the cloud session created through claude.ai's own repository picker, on the branch the agent pushed and on the model the user chose: only a session bound to a repository can push and open a pull request. The user sees the session link in the dashboard within about a minute of starting the agent.
 - The user sets the bridge up once. The bridge is switched on in the dashboard's Settings, which mints the bridge token [9]. Then either the bridge browser [10] is switched on too, in which case the daemon installs this extension into its own Chrome for Testing, hands it the token, and the user signs in to claude.ai in that window once; or the user loads the extension unpacked into their own Chrome, grants it site access, and pastes the token into its options page.
 - The user reads a session's transcript in the dashboard, and sees that a session is still waiting on them even when it asked in prose rather than with options.
@@ -18,7 +18,7 @@ The Chrome extension half of the Claude web bridge [1]. It keeps one pinned clau
 [2] Driver tab: the extension's one pinned tab that reads claude.ai's session list, visits sessions and types answers.
 [3] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
 [4] hands-off: said of an agent whose work leaves this machine, so its first prompt is the whole agent: an agent whose location is `web`.
-[5] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[5] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [6] gate: a question with options at which an agent stops and waits for an answer: it emits the question in its turn's final message, the dashboard shows it as a card, and the answer re-prompts the agent.
 [7] pick: the answer to a gate: the option or options chosen, by the user or automatically.
 [8] worker: the extension's background service worker: the half of the extension that holds the bridge token and talks to the daemon; Chrome runs it without any page and ends it when idle.

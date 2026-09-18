@@ -8,12 +8,6 @@ const onOpenQuestions = vi.hoisted(() => vi.fn())
 vi.mock('../rpc/reads.js', () => ({ onOpenQuestions }))
 const sendChoice = vi.hoisted(() => vi.fn())
 vi.mock('../rpc/control.js', () => ({ sendChoice }))
-// Preferences plumbing is not under test; autopilot reads ON so the never-accepted contract below
-// is observable (a hub must never tick down, however the preference is set).
-vi.mock('../lib/preferences.js', () => ({
-  usePreferences: () => ({ autopilot: true }),
-  updatePreferences: vi.fn(),
-}))
 
 const { OpenQuestions } = await import('./OpenQuestions.js')
 
@@ -86,7 +80,7 @@ describe('OpenQuestions (#1455 item 4)', () => {
     await waitFor(() => expect(screen.getByText('fix the flaky test')).toBeTruthy())
   })
 
-  test('the hub never answers a question for the user, even with autopilot on', async () => {
+  test('the hub never answers a question for the user', async () => {
     onOpenQuestions.mockResolvedValue([question()])
     render(<OpenQuestions onOpenAgent={vi.fn()} />)
     await waitFor(() => expect(screen.getByText('Start the next backlog item?')).toBeTruthy())

@@ -1,4 +1,4 @@
-Makes a checkout [1] as an agent [2] gets it, in one sequence whichever surface asks for it (the daemon starting an agent, or the `branches` command line): the git worktree itself, then `.branches/` hidden from git, the user's installed dependency trees linked in, the skills [3] linked in where the coding agent [4] looks for them, and the branch links [5] under `.branches/` brought up to date. A new agent gets a fresh branch of its own; a continued agent gets back the branch its work is on.
+Makes a checkout [1] as an agent [2] gets it, in one sequence whichever surface asks for it (the scheduler starting a run, or the `branches` command line): the git worktree itself, then `.branches/` hidden from git, the user's installed dependency trees linked in, the skills [3] linked in where the coding agent [4] looks for them, and the branch links [5] under `.branches/` brought up to date. A new agent gets a fresh branch of its own; a continued agent gets back the branch its work is on.
 
 ## Context
 
@@ -9,7 +9,7 @@ Makes a checkout [1] as an agent [2] gets it, in one sequence whichever surface 
 ## Glossary
 
 [1] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch. The user's own working copy is "the project's checkout" or "the user's checkout".
-[2] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [3] skill: one of the four capabilities an agent is taught — `branches`, `tickets`, `queue`, `logs` — each a package with the instructions the agent reads (its `SKILL.md`, linked into the checkout where the coding agent's harness looks for skills), a command on the agent's PATH, and an API the product calls.
 [4] coding agent: the CLI doing the actual work: Claude Code or Codex.
 [5] branch link: a symbolic link under `.branches/`, named as the branch a checkout is on now and pointing at that checkout's directory, so `.branches/<branch>` reaches the checkout by its current branch name.

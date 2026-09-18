@@ -1,4 +1,4 @@
-The `branches` executable's home: the one file here, `branches`, is what the package registers as the `branches` command, so `npx branches` in a checkout and the PATH the daemon gives every agent both reach it.
+The `branches` executable's home: the one file here, `branches`, is what the package registers as the `branches` command, so `npx branches` in a checkout reaches it.
 
 ## Business logic — TL;DR
 

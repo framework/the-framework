@@ -2,7 +2,7 @@ Computes the quota boundary [1]: the share of the account's quota [2] week that 
 
 ## Context
 
-**User story**: the account's week is meant to be spent evenly: a quiet week still gets spent instead of expiring unused, and a burst of unattended agents [6] on Monday cannot leave nothing for the work the user asks for on Friday. In the dashboard's quota panel the user sees where the boundary sits and moves the line unattended work stops at with the spend offset. The status computed here is what the quota panel draws. The Framework starts no unattended work itself: the tool that starts agents on a schedule keeps its own line against the same boundary.
+**User story**: the account's week is meant to be spent evenly: a quiet week still gets spent instead of expiring unused, and a burst of unattended agents [6] on Monday cannot leave nothing for the work the user asks for on Friday. In the dashboard's quota panel the user sees where the boundary sits and moves the line unattended work stops at with the spend offset [4]. The status computed here is what the quota panel draws. The Framework starts no unattended work itself: the tool that starts agents on a schedule, the scheduler, keeps its own copy of this rule and obeys its own line against the same boundary; the panel draws its line from the spend offset the schedulers hold.
 
 **Problem**: The Framework never calls a model itself, so it knows the account's allowance only as the coding agent reports it: windows with a percentage used and a reset time written as prose, without a year. There is nothing to configure. A fixed limit would either strand allowance in a quiet week or run dry early in a busy one, while a boundary derived from the week itself reaches the full allowance exactly as the week resets, so nothing is left on the floor. Work the user asks for borrows against the days still to come; unattended work stands down once it passes the line, so low-priority work cannot starve high-priority work.
 
@@ -11,16 +11,16 @@ Computes the quota boundary [1]: the share of the account's quota [2] week that 
 [1] quota boundary: the share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
 [2] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
 [3] coding agent: the CLI doing the actual work: Claude Code or Codex.
-[4] spend offset: the user's adjustment of the quota boundary, in percentage points of the week.
+[4] spend offset: the user's adjustment of the quota boundary, in percentage points of the week: how far past it unattended work may start. Each project's scheduler holds its own, as `spendOffset` in its state file.
 [5] unattended: said of an agent nobody is watching: one the scheduler started rather than a person. It is not answered any faster: a question it ends on waits for a human like any other.
-[6] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps. Started from the dashboard by the user, or by the daemon.
+[6] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps. Started from the dashboard by the user, or by the scheduler.
 
 ## Business logic — TL;DR
 
 - **Reading the week's reset time** - the coding agent's prose ("Jul 25 at 7am (Asia/Jerusalem)", or "Jul 25, 7am") is placed in the one year that lands within reach of now; text that cannot be read means "unknown", never a boundary of zero.
 - **The boundary rises with the clock** - the week starts seven days before it resets; the boundary is the elapsed share of those seven days as a continuous percentage, and the day of the week, 1 to 7, steps at the exact moment each day rolls over.
 - **The spend offset moves the line** - the line in force is the boundary plus the offset in percentage points, clamped to the week's two ends; the boundary and the line are reported side by side so moving the line never redraws the boundary.
-- **Which windows are in force** - the account's week always; the selected model's own week only when the window's label names a model that the selected model's name contains; the session window and unrecognized windows never gate.
+- **Which windows are in force** - the account's week always; the selected model's own week only when a model is given and the window's label names a model that the selected model's name contains; the session window and unrecognized windows never gate. The dashboard's panel gives no model, so only the account's week is in force there.
 - **Reached** - a window is reached when its percentage used is at or past the line; the first reached window, in the order the coding agent reported them, is the one that stops the work, and there is room while none is reached.
 - **Unknown is not zero** - with no week window, no reset time, or an unreadable one, there is no status at all, and the caller decides what "unknown" means.
 
@@ -58,7 +58,7 @@ The quota [2] week is the seven days ending at the reset time, so it starts seve
 
 #### Business logic
 
-The line in force is the boundary's percentage plus the spend offset [4] in percentage points, clamped to 0 and 100. An omitted offset counts as 0, and with an offset of 0 the line is the boundary itself. The offset the user chose is passed in; its default, a half-day cushion, and its cap are set in `preference-defaults.ts`. The clamp exists so that a line dragged past either end of the week stops at the week's end rather than becoming unreachable, which would read as "never stop", or negative, which would read as "always stopped". The line is reported as two values, where it sits and how far it is from the boundary, and the boundary is reported beside it: the panel draws both, and moving the line must never silently redraw the boundary it is measured against.
+The line in force is the boundary's percentage plus the spend offset [4] in percentage points, clamped to 0 and 100. An omitted offset counts as 0, and with an offset of 0 the line is the boundary itself. The offset is passed in by the caller (the dashboard's quota reading passes the schedulers' offset, or its default, a half-day cushion, set in `preference-defaults.ts` with the offset's cap). The clamp exists so that a line dragged past either end of the week stops at the week's end rather than becoming unreachable, which would read as "never stop", or negative, which would read as "always stopped". The line is reported as two values, where it sits and how far it is from the boundary, and the boundary is reported beside it: the panel draws both, and moving the line must never silently redraw the boundary it is measured against.
 
 ### Which windows are in force
 
@@ -68,7 +68,7 @@ The line in force is the boundary's percentage plus the spend offset [4] in perc
 
 #### Business logic
 
-The account's week is always in force. The selected model's own week joins it only when a model was given and the window's label carries a name in parentheses, such as "Current week (Fable)", that the selected model's name contains, compared without regard to case: `claude-fable-5` contains `fable`. A per-model window whose label names no model, or names a model the selected model's name does not contain, is left out. The session window and windows the driver could not recognize never gate. Every window in force is measured against the same line, and both weekly windows bind at once: whichever reaches the line first is the one that stops the work.
+The account's week is always in force. The selected model's own week joins it only when a model was given and the window's label carries a name in parentheses, such as "Current week (Fable)", that the selected model's name contains, compared without regard to case: `claude-fable-5` contains `fable`. A per-model window whose label names no model, or names a model the selected model's name does not contain, is left out. The session window and windows the driver could not recognize never gate. The dashboard's quota reading gives no model: the bar is about the account, so there only the account's week is in force. Every window in force is measured against the same line, and both weekly windows bind at once: whichever reaches the line first is the one that stops the work.
 
 ### Reached
 
@@ -88,4 +88,4 @@ Each window in force is reported with its label exactly as the coding agent [3] 
 
 #### Business logic
 
-There is no status at all when the coding agent [3] reported no weekly window for the account, when that window carries no reset time, or when the reset time cannot be read. "No status" means "we do not know where the week is". What to do with it is the caller's decision, not this file's: the daemon's quota reading in `dashboard/quota.ts` is where an unknown status is turned into a decision.
+There is no status at all when the coding agent [3] reported no weekly window for the account, when that window carries no reset time, or when the reset time cannot be read. "No status" means "we do not know where the week is". What to do with it is the caller's decision, not this file's: the daemon's quota reading in `dashboard/quota.ts` turns it into a view with no boundary, which the usage panel reports as a week it cannot draw.

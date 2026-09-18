@@ -20,7 +20,7 @@ export function ticketsDir(root: string): string {
 export type TicketFiles = BranchFileFs
 
 /**
- * A caller's write funnel: apply `op` to a checkout of the branch, commit, push. The daemon's is
+ * A caller's write funnel: apply `op` to a checkout of the branch, commit, push. The default is
  * the persistent checkout's serialized cycle; a test's fake stands in.
  */
 export type TicketsFunnel = (root: string, message: CommitMessage, op: (dir: string) => Promise<void>) => Promise<FileBranchWrite>

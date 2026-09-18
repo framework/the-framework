@@ -3,9 +3,9 @@ import type { AgentMeta } from './store/index.js'
 
 /**
  * The ask for one ticket's plan (#685): `Create tickets/<stem>.plan.md`, the `.md` swapped for the
- * sibling `.plan.md` the plan views read. The one wording for plan work wherever it is asked —
- * the sentence the [Plan tickets] preset queues, the plan column starts an attended agent with,
- * and the dashboard's bulk queue-add writes as entries — so the surfaces cannot drift apart
+ * sibling `.plan.md` the plan views read. The one wording for plan work wherever the dashboard
+ * asks for it — the sentence the plan column starts an attended agent with, and the queue-add
+ * writes as entries — so the surfaces cannot drift apart
  * (#1187) and a queued copy is recognizable by exact text.
  */
 export function planTicketPrompt(file: string): string {

@@ -8,18 +8,19 @@ Every call the dashboard makes to the daemon [1], as one table the daemon answer
 
 ## Glossary
 
-[1] the daemon: the one foreground process per machine: serves the dashboard, starts agents, runs the sweeps.
+[1] the daemon: the one foreground process per machine: serves the dashboard and runs the sweeps; it starts no agent itself, it runs a project's start hook when the user presses Start.
 [2] event stream: everything an agent does, one event per line of the agent's diary — the file `<id>.jsonl` the tool that runs the agent writes under `.the-framework/` in the agent's checkout, copied onto the `agent-data` branch when the agent ends. Every surface (dashboard, terminal, replay) is a projection of it.
 [3] projection: an answer computed on demand from the files the daemon and its agents write, never from state kept in memory.
 [4] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [5] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 [6] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
+[7] spend offset: the user's adjustment of the quota boundary, in percentage points of the week: how far past it unattended work may start. Each project's scheduler holds its own, as `spendOffset` in its state file. The offset hook, the one shell line under `offset` in a project's `.the-framework/hooks.yml`, sets it.
 
 ## Business logic — TL;DR
 
 - **The table of calls** (`index.ts`, `context.ts`, `test-context.ts`) - every call the daemon [1] answers, assembled once when it starts, together with what each call may reach and the two resolutions they all share: which project a project id names, and which checkout [4] an agent id names.
 - **Reading** (`reads.ts`, `reads.test.ts`) - everything the pages show about a project or an agent: its history, one agent's replay, the surfaced documents, the tickets, the cross-project rollups, the changed files and their diffs, the branch's state and the handoff.
-- **Acting** (`control.ts`, `control.test.ts`, `agent-addressing.test.ts`) - every action on an agent or a project: stop, answer a gate, send a chat message, move the handoff, start an agent with its full set of options, push, open a pull request, merge, remove a checkout, delete an agent, open something on this machine, and the ticket and agent-queue actions.
+- **Acting** (`control.ts`, `control.test.ts`, `agent-addressing.test.ts`) - every action on an agent or a project: stop, answer a gate, send a chat message, start an agent through the project's start hook with the user's picks, open a pull request, merge, remove a checkout, delete an agent, open something on this machine, and the ticket and agent-queue actions.
 - **Following an agent live** (`events.ts`, `events-tail.ts`, `events-tail.test.ts`) - one selected agent's event stream [2] served to the browser: what is already logged is replayed, the end of the replay is marked once, and everything new follows as it is written.
-- **Settings** (`preferences.ts`, `preferences.test.ts`, `projects.ts`, `projects.test.ts`, `quota.ts`, `quota.test.ts`, `devices.ts`, `devices.test.ts`) - reading and saving the user's preferences without a stale tab reverting what it never touched, adding and removing projects, the quota reading behind the usage panel, and the health check behind each saved device's [5] status dot.
+- **Settings** (`preferences.ts`, `preferences.test.ts`, `projects.ts`, `projects.test.ts`, `quota.ts`, `quota.test.ts`, `devices.ts`, `devices.test.ts`) - reading and saving the user's preferences without a stale tab reverting what it never touched, adding and removing projects, the quota reading behind the usage panel and the spend offset [7] it writes through every project's offset hook, and the health check behind each saved device's [5] status dot.
 - **Calls about an agent elsewhere** (`relay-agent.ts`, `relay-dispatch.ts`, `relay-dispatch.test.ts`, `stream-forward.ts`, `stream-forward.test.ts`) - both ends of the relay [6]: the fixed set of calls a device will run on another daemon's behalf, and the forwarding that makes a remote agent's stream arrive like a local one.

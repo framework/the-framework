@@ -74,9 +74,8 @@ export function notifies(preferences: Preferences, method: NotifyMethod, categor
 /**
  * How far either way the automatic-consumption slider reaches, in percentage points (#960).
  *
- * Here rather than in `registry.ts` for the reason this module exists: the slider that writes the
- * value is in the browser and the sanitizer that clamps it is in the daemon, so the bound has to
- * be one number both can import.
+ * Here because the browser clamps to it, in the usage panel's slider and in Settings, and the
+ * daemon's quota source falls back to the default below: one number both sides import.
  */
 export const MAX_SPEND_OFFSET = 50
 

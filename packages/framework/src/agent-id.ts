@@ -12,7 +12,7 @@ export function agentIdFromStartedAt(startedAt: string): string {
 
 /**
  * The inverse of {@link agentIdFromStartedAt}, for a caller that has the id but not the meta
- * (#1251): the CLI's end-of-run handoff needs the start time to tell the agent's own PR from a
+ * (#1251): picking which PR is the agent's needs the start time to tell the agent's own PR from a
  * predecessor's on the same branch name. Undefined for an id that is not one of ours.
  */
 export function startedAtFromAgentId(id: string): string | undefined {

@@ -35,7 +35,7 @@ Renders an agent's [1] event stream [2] in a terminal, one human-readable line p
 - **Why a handoff or the extra turn was skipped** - every reason as a sentence in the reader's terms.
 - **Usage** - the spend in dollars over the turns, or the tokens when no price was reported, never a zero that reads as free.
 - **The driver's own events** - the prompt, the text, the actions, the turn boundary, quota warnings only when the quota is tight, errors, notices, and the question a turn ended on.
-- **The end** - "✓ finished", "■ stopped", or "✗ failed" with the detail.
+- **The end** - "✓ finished", "■ stopped", "? waiting for an answer", or "✗ failed" with the detail.
 
 ## Business logic
 
@@ -130,4 +130,4 @@ See `## Context`.
 
 #### Business logic
 
-The last line is "✓ finished" for an agent [1] that ended well, "■ stopped" for one that was stopped [15], and otherwise "✗ failed: <detail>", or "✗ failed: unknown error" when the end carried no detail.
+The last line is "✓ finished" for an agent [1] that ended well, "■ stopped" for one that was stopped [15], "? waiting for an answer" for one that ended on a question and waits for the user's answer, and otherwise "✗ failed: <detail>", or "✗ failed: unknown error" when the end carried no detail.

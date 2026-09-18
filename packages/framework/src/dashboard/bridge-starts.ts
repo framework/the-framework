@@ -45,7 +45,7 @@ export const START_CLAIM_TTL_MS = 90_000
 const REPO = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/
 const DOTS_ONLY = /^\.+$/
 const BRANCH = /^[A-Za-z0-9._\-/]{1,255}$/
-/** The hand-off prompt carries the whole framing (system prompt, formats, protocols), so it is long. */
+/** The hand-off prompt is the session's whole task and everything it needs to know, so it can be long. */
 export const MAX_START_PROMPT = 200_000
 /** A model is a short name or id the extension matches against claude.ai's model menu (#1697). */
 export const MAX_START_MODEL = 100

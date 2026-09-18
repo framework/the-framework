@@ -14,7 +14,7 @@ Names the one set of rules the dashboard [1] runs in the browser: every decision
 [4] event: everything an agent does, one event per line appended to its event stream; every surface is a projection of it.
 [5] pick: the answer to a gate: the option or options chosen, by the user or automatically.
 [6] driver session: the coding agent's own conversation for one agent, which the driver can resume by its session id.
-[7] spend offset: the user's adjustment of the quota boundary — the share of the account's subscription allowance that may be spent by now — in percentage points of the week.
+[7] spend offset: the user's adjustment of the quota boundary — the share of the account's subscription allowance that may be spent by now — in percentage points of the week: how far past it unattended work may start. Each project's scheduler holds its own, as `spendOffset` in its state file.
 [8] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds. The other is activity: an agent started or finished.
 [9] the Claude web bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session.
 [10] gate: a question with options an agent's turn ended on: the agent ends waiting for the answer, the dashboard shows the question as a card, and the answer resumes the agent.

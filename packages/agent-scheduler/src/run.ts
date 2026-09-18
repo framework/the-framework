@@ -12,7 +12,7 @@ import { acquireRunLock, isPidAlive, releaseRunLock } from './run-lock.js'
 
 /**
  * One run (#1774): a checkout from the branches package, a session from agent-driver, the prompt
- * once, and the agent's own loop to the end. No system prompt, no gates, no steering: the
+ * once, and the agent's own loop to the end. No system prompt and no gates: the
  * command's skill file is the whole instruction, and the agent publishes its own work through
  * the skills in its checkout. This process records the run and reclaims the checkout when the
  * agent stops; a run that dies is caught by the sweep on a later tick.

@@ -2,7 +2,6 @@ import { basename, dirname, join, resolve } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { isDriverName } from './driver-names.js'
 import { nodeFs } from './node-fs.js'
-import { MAX_SPEND_OFFSET, DEFAULT_SPEND_OFFSET } from './preference-defaults.js'
 
 /**
  * The multi-project registry (#390): the list of projects the user has
@@ -32,9 +31,9 @@ export interface ProjectRecord {
 
 /**
  * A user-defined preset (#626): a named prompt the user saved to re-run their own high-signal
- * prompts, sitting beside the built-in presets in the Start form. Just data — the label is the
- * button, the prompt is loaded verbatim into the editor and run as a `prompt` kind (unlike the
- * built-ins, whose text is a compiled render function). `id` is stable so edits/deletes address one.
+ * prompts, listed as a saved prompt in the launcher's Commands menu beside the project's commands.
+ * Just data — the label is the menu item, the prompt is loaded verbatim into the editor. `id` is
+ * stable so edits/deletes address one.
  */
 export interface CustomPreset {
   id: string
@@ -94,17 +93,7 @@ export interface Preferences {
    * claude.ai session on disk, neither of which should happen unasked. Needs {@link bridge}.
    */
   bridgeBrowser?: boolean
-  /**
-   * How far the automatic-consumption limit sits from the quota boundary, in percentage points
-   * (#960). Absent defaults to {@link DEFAULT_SPEND_OFFSET} — a half-day cushion ahead of the
-   * boundary — rather than sitting exactly on it (#960 Edit).
-   *
-   * Negative holds unattended work back further; positive lets it borrow into the days still to
-   * come. It is an *offset* rather than an absolute percentage so the limit travels with the
-   * boundary as the week goes on, instead of being overtaken by it on day two.
-   */
-  autoSpendOffset?: number
-  /** User-defined presets (#626): the user's own saved prompts, shown beside the built-in presets. */
+  /** User-defined presets (#626): the user's own saved prompts, shown in the Commands menu beside the project's commands. */
   customPresets?: CustomPreset[]
   /**
    * Whether the Overview's Onboarding checklist has been dismissed (#958). Absent = show it,
@@ -113,14 +102,6 @@ export interface Preferences {
    */
   onboardingDismissed?: boolean
 }
-
-// The bounds the browser's controls and this file's sanitizer both need live in the leaf
-// `preference-defaults.ts`; re-exported so this stays the import site for everything that
-// already reads them beside `Preferences`.
-export {
-  MAX_SPEND_OFFSET,
-  DEFAULT_SPEND_OFFSET,
-} from './preference-defaults.js'
 
 /**
  * The credentials the daemon needs to reach a third party, set from the dashboard (#1095).
@@ -308,11 +289,6 @@ function sanitizePreferences(value: unknown): Preferences {
   // `system`, so it is simply dropped rather than persisted.
   if (typeof input['theme'] === 'string' && (KNOWN_THEMES as readonly string[]).includes(input['theme']))
     preferences.theme = input['theme'] as (typeof KNOWN_THEMES)[number]
-  // `autoSpendOffset` (#960) is the one numeric preference: a slider position in percentage
-  // points, clamped so a hand-edited file cannot push the limit somewhere the slider could not.
-  const offset = input['autoSpendOffset']
-  if (typeof offset === 'number' && Number.isFinite(offset))
-    preferences.autoSpendOffset = Math.round(Math.min(Math.max(offset, -MAX_SPEND_OFFSET), MAX_SPEND_OFFSET))
   const customPresets = sanitizeCustomPresets(input['customPresets'])
   if (customPresets.length) preferences.customPresets = customPresets
   return preferences

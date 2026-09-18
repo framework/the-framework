@@ -1,15 +1,15 @@
-Fixes what an unset preference [1] means and the bounds that the controls writing them share, in one place the daemon and the dashboard both read: the notification defaults as a two-by-two of method (browser, Discord) by category (needs a human, new activity) and the rule that a notification is delivered only when both its method and its category are on; the spend offset [2], reaching 50 percentage points either way and sitting half a day of the quota week ahead of the quota boundary [3] until the user moves it.
+Fixes what an unset preference [1] means, and the spend offset's [2] reach and default, in one place the daemon and the dashboard both read: the notification defaults as a two-by-two of method (browser, Discord) by category (needs a human, new activity) and the rule that a notification is delivered only when both its method and its category are on; the spend offset, reaching 50 percentage points either way and sitting half a day of the quota week ahead of the quota boundary [3] until someone sets it. The spend offset is not a preference: each project's scheduler holds it; only its bound and its default live here.
 
 ## Context
 
 **User story**: the user opens Settings and finds the browser bell and the "needs you" notifications on, Discord and plain activity off; the quota panel's line sits a little ahead of the boundary. Whatever the user changes is stored; whatever is left alone means exactly this.
 
-**Problem**: a default that lives in one place cannot be spelled three ways. Each notification default was once a predicate in the dashboard and open-coded at each daemon call site, and one call site got a category's polarity wrong by copying its sibling; the control that writes the spend offset is in the browser while the check that clamps it is in the daemon, so its bound has to be one number both import.
+**Problem**: a default that lives in one place cannot be spelled three ways. Each notification default was once a predicate in the dashboard and open-coded at each daemon call site, and one call site got a category's polarity wrong by copying its sibling; the controls that write the spend offset (the usage panel's slider and the Settings number) are in the browser while the default the daemon's quota reading falls back to is in the daemon, so the bound and the default have to be numbers both import.
 
 ## Glossary
 
 [1] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
-[2] spend offset: the user's adjustment of the quota boundary, in percentage points of the week.
+[2] spend offset: the user's adjustment of the quota boundary, in percentage points of the week: how far past it unattended work may start. Each project's scheduler holds its own, as `spendOffset` in its state file.
 [3] quota boundary: the share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
 [4] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds. The other is activity: an agent started or finished.
 [5] unattended: said of an agent nobody is watching: one the scheduler started rather than a person. It is not answered any faster: a question it ends on waits for a human like any other.
@@ -18,7 +18,7 @@ Fixes what an unset preference [1] means and the bounds that the controls writin
 
 - **Notifications are a two-by-two** - four preference keys form two axes, how a notification reaches the user (browser, Discord) and what it is about (an intervention, new activity), and a notification is delivered only when both its method and its category are on.
 - **The notification defaults** - browser on and Discord off; interventions on and new activity off: what fires unless turned off is the browser bell and the "needs you" baseline, while anything that reaches outward or is merely informative is opt-in.
-- **The spend offset** - reaches 50 points either way, and before anyone touches it sits 100/14 points, about 7.1, ahead of the boundary: half a day of the week, so unattended work is not stopped the moment the account is exactly on pace.
+- **The spend offset** - the dashboard's controls reach 50 points either way, and when no scheduler names one it sits 100/14 points, about 7.1, ahead of the boundary: half a day of the week, so unattended work is not stopped the moment the account is exactly on pace.
 
 ## Business logic
 
@@ -50,4 +50,4 @@ Unset, the browser method is on and the Discord method is off; the intervention 
 
 #### Business logic
 
-The spend offset [2] reaches at most 50 percentage points either side of the boundary; the control in the dashboard and the clamp in the daemon share that bound. Before the user touches it, the offset is one fourteenth of the week's allowance, 100/14 or about 7.1 percentage points ahead of the boundary: a half-day cushion that gives unattended work room to breathe without meaningfully loosening the policy that the boundary is the line.
+The dashboard's two controls for the spend offset [2], the usage panel's slider and the Settings number, reach at most 50 percentage points either side of the boundary and share that bound; the daemon does not clamp what they send. When no scheduler names an offset, the daemon's quota reading uses the default, and the dashboard's controls show it until the first reading arrives: one fourteenth of the week's allowance, 100/14 or about 7.1 percentage points ahead of the boundary, a half-day cushion that gives unattended work room to breathe without meaningfully loosening the policy that the boundary is the line.

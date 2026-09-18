@@ -1,12 +1,12 @@
-Gives an agent [1] in a shell, and the user, the `branches` command over this package: `create`, `attach`, `name`, `status`, `publish`, `list`, `remove` and `prune`, the same operations the daemon calls, so one implementation serves every surface. Every run prints one JSON document on stdout, at most one line for a person on stderr, and exits with a code that says how it went: 0 for a result, 1 for a refusal or a git failure, 2 for a command line that could not be read.
+Gives an agent [1] in a shell, and the user, the `branches` command over this package: `create`, `attach`, `name`, `status`, `publish`, `list`, `remove` and `prune`, the same operations the scheduler and the dashboard's server call as a library, so one implementation serves every surface. Every run prints one JSON document on stdout, at most one line for a person on stderr, and exits with a code that says how it went: 0 for a result, 1 for a refusal or a git failure, 2 for a command line that could not be read.
 
 ## Context
 
-**User story**: an agent [1] runs `npx branches status` to learn its branch and whether its checkout [2] is clean, `npx branches name <name>` to name its work, and `npx branches publish` to push it and open its pull request, as its `branches` skill [3] instructs. The user, or the daemon on the user's behalf, runs `create`, `attach`, `list`, `remove` and `prune` from the project's checkout or from inside any agent's checkout. A program parsing stdout learns the outcome and its reason; a person reading stderr learns why in one line.
+**User story**: an agent [1] runs `npx branches status` to learn its branch and whether its checkout [2] is clean, `npx branches name <name>` to name its work, and `npx branches publish` to push it and open its pull request, as its `branches` skill [3] instructs. The user runs `create`, `attach`, `list`, `remove` and `prune` from the project's checkout or from inside any agent's checkout. A program parsing stdout learns the outcome and its reason; a person reading stderr learns why in one line.
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch. The user's own working copy is "the project's checkout" or "the user's checkout".
 [3] skill: one of the four capabilities an agent is taught — `branches`, `tickets`, `queue`, `logs` — each a package with the instructions the agent reads (its `SKILL.md`), a command on the agent's PATH, and an API the product calls.
 [4] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
@@ -113,7 +113,7 @@ See `## Context`.
 
 #### Business logic
 
-`name <name>` renames the branch of the checkout [2] the command runs in to `agent-<name>`, suffixed `-2`, `-3`, and so on when the name is taken (the naming rules are in `worktree.ts`), and prints the branch it got as `branch`. Four refusals: `invalid-name` ("<name> is not a session name: use [a-z0-9-]+"); `not-a-worktree` ("<checkout> is not a git worktree"); `no-branch` ("<checkout> is on no branch"); `not-an-agent-branch` ("<checkout> is not on an agent branch; only agent-* branches are renamed"), so an agent that somehow runs in the user's own checkout never renames `main`. After a rename the branch links [6] under `.branches/` are reconciled at once, so `.branches/agent-<name>` reaches the checkout now and not at the daemon's next pass.
+`name <name>` renames the branch of the checkout [2] the command runs in to `agent-<name>`, suffixed `-2`, `-3`, and so on when the name is taken (the naming rules are in `worktree.ts`), and prints the branch it got as `branch`. Four refusals: `invalid-name` ("<name> is not a session name: use [a-z0-9-]+"); `not-a-worktree` ("<checkout> is not a git worktree"); `no-branch` ("<checkout> is on no branch"); `not-an-agent-branch` ("<checkout> is not on an agent branch; only agent-* branches are renamed"), so an agent that somehow runs in the user's own checkout never renames `main`. After a rename the branch links [6] under `.branches/` are reconciled at once, so `.branches/agent-<name>` reaches the checkout now and not at the next reconcile.
 
 ### `status`: where the agent is and whether it may finish
 

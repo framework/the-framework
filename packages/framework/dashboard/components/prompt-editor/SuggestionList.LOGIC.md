@@ -1,4 +1,4 @@
-Renders the floating menu a trigger opens in the composer [1]'s prompt editor: a list of entries, each with a label and a hint, grouped under headers ("Presets", "Actions", "Tags", "Projects", "Files"), with one entry highlighted; the arrow keys move the highlight, Enter or Tab picks it, and the mouse hovers and clicks the same way. The list is steered from the editor, where the keyboard focus stays, so it reads to assistive technology as a list box whose highlighted entry the editor points at.
+Renders the floating menu a trigger opens in the composer [1]'s prompt editor: a list of entries, each with a label and a hint, grouped under headers ("Commands", "Saved prompts", "Projects", "Files"), with one entry highlighted; the arrow keys move the highlight, Enter or Tab picks it, and the mouse hovers and clicks the same way. The list is steered from the editor, where the keyboard focus stays, so it reads to assistive technology as a list box whose highlighted entry the editor points at.
 
 ## Glossary
 

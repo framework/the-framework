@@ -14,7 +14,7 @@ import { isSafeAgentId, worktreePath } from '@gemstack/skill-branches'
 import { withAgentLock } from '../agent-locks.js'
 import { removeProjectWorktree, deleteProjectAgent } from '../worktrees.js'
 import { patchRun } from '@gemstack/skill-logs'
-import { mergeAgentPr, openAgentPullRequest, agentBranchFor, type HandoffResult } from '../dashboard/agent-handoff.js'
+import { mergeAgentPr, openAgentPullRequest, type HandoffResult } from '../dashboard/agent-handoff.js'
 import { pendingChoices } from '../open-choices.js'
 import type {
   DeleteAgentResult,
@@ -22,7 +22,6 @@ import type {
   StartAgentOptions,
   StartAgentResult,
 } from '../dashboard/types.js'
-import type { DashboardContext } from '../dashboard/rpc-serve.js'
 import type { Preferences } from '../registry.js'
 
 // The write side behind the dashboard (#405, #1774). The daemon runs no agent, so every write here
@@ -133,9 +132,9 @@ async function withWorktreeRemoval<T>(
 ): Promise<T | { ok: false; error: string }> {
   const cwd = await resolveProjectPath(projectId)
   if (!cwd) return { ok: false, error: 'this project has no local path on this server' }
-  // Under the agent lock: a Remove/Delete clicked the moment an agent ends races teardown's own
-  // archive-commit-remove of the same checkout; serialized, whichever runs second finds the
-  // state the first one left and acts on that.
+  // Under the agent lock: a Remove/Delete and an Open PR on the same finished run each run their
+  // own git in its checkout; serialized, whichever runs second finds the state the first one left
+  // and acts on that.
   return withAgentLock(worktreePath(cwd, agentId), () => remove(cwd, { beforeRemove: async () => {} }))
 }
 
@@ -143,8 +142,7 @@ async function withWorktreeRemoval<T>(
  * Delete a session (#1032): remove it from the dashboard, records and all — the sibling of
  * {@link sendRemoveWorktree}, and the one destructive-of-history action, so its surface confirms
  * first. The checks, the worktree removal and what it leaves behind (the branch and its
- * commits) are all {@link deleteProjectAgent}'s; this adds only the
- * daemon step of stopping a preview that may be serving the worktree before it comes off disk.
+ * commits) are all {@link deleteProjectAgent}'s; this adds only the agent lock around them.
  */
 export async function sendDeleteAgent(projectId: string, agentId: string): Promise<DeleteAgentResult> {
   return withWorktreeRemoval(projectId, agentId, (cwd, opts) => deleteProjectAgent(cwd, agentId, opts))
@@ -254,16 +252,16 @@ export interface QueuedTicket {
 }
 
 /**
- * Put a ticket on the project's agent queue (#697), so the next drain agent works it.
+ * Put a ticket on the project's agent queue (#697), so the next queued-work agent takes it.
  *
  * A direct write rather than an agent: the queue is a plain file the dashboard already reads,
  * and asking an agent to append one line would cost a turn and could do anything else besides.
- * It writes the project checkout's flat backlog specifically, which is the durable queue #624
- * settled on and the one a worktree agent's queue is promoted into (#852).
+ * It writes the queue file on the `agent-data` branch through the `queue` skill, as one committed,
+ * pushed change.
  *
  * Given a `ticket`, the entry is placed in the matching `## Priority N` section rather than
  * appended to the end of the file, and it links back to the ticket it came from. Both halves of
- * #1164: the entry used to land last in a file the drain preset works front to back, and it
+ * #1164: the entry used to land last in a file the queued work takes top-down, and it
  * carried nothing but a title, so the ticket it came from was lost the moment it was queued.
  */
 /**
@@ -289,7 +287,7 @@ export async function sendQueueTicket(
   if (!trimmed) return { ok: false, error: 'a ticket is required' }
   const cwd = await resolveProjectPath(projectId)
   if (!cwd) return { ok: false, error: 'no such project' }
-  // A markdown link, so the file reads well and the agent draining it has the ticket to open;
+  // A markdown link, so the file reads well and the agent that takes it has the ticket to open;
   // the queue keeps the line verbatim, so the reference travels with the entry.
   const text = ticket ? `[${trimmed}](${TICKETS_DIR}/${ticket.file})` : trimmed
   const result = await queueAdd(cwd, text, ticket ? queuePriorityForTicket(ticket.priority) : undefined)
@@ -297,14 +295,14 @@ export async function sendQueueTicket(
 }
 
 /**
- * Put a ticket's PLAN on the project's agent queue: the [Plan tickets] preset's own entry —
+ * Put a ticket's PLAN on the project's agent queue: the `/plan-tickets` command's own entry —
  * `Create tickets/<stem>.plan.md` ({@link planTicketPrompt}) — placed by the ticket's priority
- * like any queued pick (#1164), so a drain agent reaching it writes the plan.
+ * like any queued pick (#1164), so the queued-work agent reaching it writes the plan.
  *
  * A sibling of {@link sendQueueTicket} rather than a flag on it, because the two write different
  * lines on purpose: a queued ticket is a leading link back to the ticket, which is exactly what
  * every reader (`ticketFromQueueEntry`, the hot-tickets lane, the dashboard's dedupe) takes as
- * "queued for implementation" — a plan ask must not read as that, so it stays the preset's plain
+ * "queued for implementation" — a plan ask must not read as that, so it stays the command's plain
  * sentence.
  */
 export async function sendQueueTicketPlan(projectId: string, ticket: QueuedTicket): Promise<QueueTicketResult> {

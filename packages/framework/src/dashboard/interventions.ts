@@ -1,8 +1,10 @@
-import { listAgents, readLiveMetas, type LiveAgent, type AgentMeta } from '../store/index.js'
+import { listAgents, loadAgentEvents, readLiveMetas, type LiveAgent, type AgentMeta } from '../store/index.js'
+import { pendingChoices } from '../open-choices.js'
+import type { FrameworkEvent } from '../events.js'
 import type { ProjectSummary, ProjectionRead } from './projects.js'
 import { isAgentBranch } from '@gemstack/skill-branches'
 import { readAgentHandoff, agentBranchFor, type AgentHandoff } from './agent-handoff.js'
-import { ghPrList, type OpenPr, type PrLister } from './gh.js'
+import { ghPrList, type PrLister } from './gh.js'
 import { interventionKey } from './keys.js'
 import { postDiscordWebhook } from './discord-webhook.js'
 
@@ -13,8 +15,8 @@ export { interventionKey } from './keys.js'
 // Rom's design (#624): proposals and finished work are both just PRs, so the bulk of what
 // needs a human is the set of open PRs across the registered projects — merge to confirm,
 // close to reject. This rolls those up, the same way overview.ts rolls up running runs. The
-// second source (#636) is an agent paused at an await gate — a live agent whose latest state is an
-// unresolved choice, waiting for the user's answer. #627 notifications ride this whole set.
+// second source (#636) is a run waiting on the question it ended on (#1774), until the user
+// answers. #627 notifications ride this whole set.
 
 /**
  * One item awaiting the human. Two kinds: an open `pr` to review/merge or close, and an
@@ -25,7 +27,7 @@ export interface Intervention {
   projectId: string
   projectName: string
   /**
-   * `pr` = an open PR to review/merge or close; `awaiting` = an agent paused on a choice gate (#636);
+   * `pr` = an open PR to review/merge or close; `awaiting` = a run waiting on the question it ended on (#636/#1774);
    * `unpushed` = a finished agent whose branch has commits that were never pushed (#860).
    */
   kind: 'pr' | 'awaiting' | 'unpushed'
@@ -34,7 +36,7 @@ export interface Intervention {
   url: string
   /** The PR number (`pr` only). */
   number?: number
-  /** The parked gate's id (`awaiting` only) — its stable identity, so it notifies exactly once. */
+  /** The question's id (`awaiting` only) — its stable identity, so it notifies exactly once. */
   awaitId?: string
   /** Which run this is about (`awaiting` #738 / `unpushed`): a project has several agents. */
   agentId?: string
@@ -49,8 +51,10 @@ export interface Intervention {
 /** Injectable seam so {@link buildInterventions} is unit-testable off disk. */
 export interface InterventionsDeps {
   prs?: PrLister
-  /** The live-agent reader (default {@link readLiveMetas}); drives the `awaiting` source (#636). */
+  /** The reader of the runs that have a checkout (default {@link readLiveMetas}): a waiting run keeps its own; drives the `awaiting` source (#636). */
   liveAgents?: (cwd: string) => Promise<LiveAgent[]>
+  /** One run's events, by the project's path and the run's id (default {@link loadAgentEvents}): where a waiting run's question is read. */
+  events?: (cwd: string, agentId: string) => Promise<FrameworkEvent[] | undefined>
   /** The finished-agent reader (default {@link listAgents}); drives the `unpushed` source (#860). */
   agents?: (cwd: string) => Promise<AgentMeta[]>
   /** Reads a branch's state (default {@link readAgentHandoff}); drives the `unpushed` source (#860). */
@@ -76,8 +80,8 @@ const HANDOFF_LIMIT = 5
  * Build the cross-project interventions queue: every registered project's open PRs, plus any run
  * currently paused on a choice gate (#636), newest first. Forgiving — a project with no remote
  * (or an unreadable one) simply contributes nothing. Hand-opened draft PRs are excluded: they are
- * not yet asking for review. A session's own draft is not (#1102), because that is how
- * auto-handoff hands work back.
+ * not yet asking for review. A draft on an agent's branch is not (#1102): an agent publishes a
+ * draft when a person should look first, and cloud work adoption opens its PRs as drafts.
  *
  * Which projects were read whole comes back alongside the items (#1623): forgiveness here is what
  * lets one unreachable project keep the queue useful, and it is also what would let that project's
@@ -90,6 +94,7 @@ export async function buildInterventions(
 ): Promise<ProjectionRead<Intervention>> {
   const prs = deps.prs ?? ghPrList
   const liveAgents = deps.liveAgents ?? readLiveMetas
+  const events = deps.events ?? loadAgentEvents
   const items: Intervention[] = []
   const whole: string[] = []
   for (const project of projects) {
@@ -102,9 +107,9 @@ export async function buildInterventions(
     }
     const open = await prs(project.path).catch(unread)
     for (const pr of open) {
-      // A draft opened by hand is not asking for review, so it stays off the queue. A draft the
-      // framework opened for a session is the opposite (#1102): auto-handoff opens it as a draft
-      // precisely so it does not ping reviewers, and if the queue then dropped it too, nothing
+      // A draft opened by hand is not asking for review, so it stays off the queue. A draft on an
+      // agent's branch is the opposite (#1102): the agent, or cloud work adoption, opened it as a
+      // draft so it does not ping reviewers, and if the queue then dropped it too, nothing
       // would tell anyone the work exists — which is the whole of #860 again.
       if (pr.isDraft && !(pr.headRefName !== undefined && isAgentBranch(pr.headRefName))) continue
       items.push({
@@ -117,19 +122,23 @@ export async function buildInterventions(
         ...(pr.createdAt ? { createdAt: pr.createdAt } : {}),
       })
     }
-    // An agent paused mid-flight to ask the user is a "needs you" too (#636): a live agent that is
-    // still `running` and has an unresolved choice gate. An agent parks on one gate at a time, but
-    // a project now has several concurrent agents (#736), so each parked agent contributes its own
-    // item — keyed on the gate id, plus the agent id so two agents are told apart.
+    // A run that ended on a question waits for the user, a "needs you" too (#636): it ended
+    // `waiting`, its checkout kept for the answer (#1774). The question is read off the run's own
+    // diary by the rule the run page and the open-questions list use, so the ping names the question
+    // they offer; a waiting run whose diary shows none is skipped. A project has several runs
+    // (#736), so each waiting run contributes its own item — keyed on the question's id, plus the
+    // agent id so two runs are told apart.
     for (const meta of await liveAgents(project.path).catch(unread)) {
-      if (meta.status !== 'running' || !meta.pendingChoice) continue
+      if (meta.status !== 'waiting') continue
+      const choice = pendingChoices((await events(project.path, meta.id).catch(() => undefined)) ?? []).at(-1)
+      if (!choice) continue
       items.push({
         projectId: project.id,
         projectName: project.name,
         kind: 'awaiting',
-        title: meta.pendingChoice.title,
+        title: choice.title,
         url: deps.dashboardUrl ?? '',
-        awaitId: meta.pendingChoice.id,
+        awaitId: choice.id,
         agentId: meta.id,
         ...(meta.updatedAt ? { createdAt: meta.updatedAt } : {}),
       })
@@ -140,8 +149,8 @@ export async function buildInterventions(
     // drops it (it filters on `running`) and the handoff panel is behind clicking into that agent.
     //
     // Surfacing only: this says there is a decision waiting, it does not take it. Since #1102 a
-    // session usually pushes itself, so what reaches here is the remainder — auto-handoff turned
-    // off for the project, or turned off for that session, or tried and failed.
+    // session usually pushes itself, so what reaches here is the remainder — an agent told that
+    // whoever started it publishes for it, or a publish that failed or never ran.
     for (const item of await unpushedFor(project, deps, unread).catch(unread)) items.push(item)
     if (sawEverything) whole.push(project.id)
   }

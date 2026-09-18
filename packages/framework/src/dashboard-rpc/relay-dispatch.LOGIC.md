@@ -20,7 +20,7 @@ The device [1] side of the relay [2]: the fixed set of calls a daemon that relay
 
 ## Business logic — TL;DR
 
-- **A whitelist, nothing else** - only the reads about an agent [3] and the steering of it can be relayed; starting an agent, deleting one, removing a checkout [4] and the browser preview cannot.
+- **A whitelist, nothing else** - only the reads about an agent [3] and the steering of it can be relayed; starting an agent, deleting one and removing a checkout [4] cannot.
 - **Only the device's home project** - the caller's project id is replaced with this device's [1] home project id, so a relayed call can never address another registered project.
 - **An unknown name is refused** - a call not on the list fails as an unknown relay call, and the list inherits nothing, so names every object carries are unknown too.
 - **No onward relay** - a relayed call runs as local on the device: the agent is local here, and forwarding it again would loop.

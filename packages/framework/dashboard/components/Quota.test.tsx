@@ -15,8 +15,8 @@ function mainFigureTrigger(): HTMLElement {
   return screen.getByText(/^resets /).closest('p')!.querySelector('.cursor-default')!
 }
 
-const updatePreferences = vi.hoisted(() => vi.fn())
-vi.mock('../lib/preferences.js', () => ({ updatePreferences }))
+const sendSpendOffset = vi.hoisted(() => vi.fn(async (_points: number): Promise<{ ok: true } | { ok: false; error: string }> => ({ ok: true })))
+vi.mock('../rpc/quota.js', () => ({ sendSpendOffset }))
 
 let view: QuotaView | undefined
 vi.mock('../lib/quota.js', () => ({ useQuota: () => view }))
@@ -50,7 +50,8 @@ function readingAt(day: number, percentUsed: number, limitOffset = 0): QuotaView
 
 beforeEach(() => {
   view = undefined
-  updatePreferences.mockReset()
+  sendSpendOffset.mockClear()
+  sendSpendOffset.mockImplementation(async () => ({ ok: true }))
 })
 afterEach(cleanup)
 
@@ -92,7 +93,7 @@ describe('Quota (#960)', () => {
     expect(screen.getByText('Current session')).toBeTruthy()
   })
 
-  test('the handle is valued on the bar\'s own scale, but stores an offset from the boundary (#960)', () => {
+  test('the handle is valued on the bar\'s own scale, but writes an offset from the boundary through the offset hooks (#960)', async () => {
     view = reading(20)
     render(<Quota />)
     const slider = screen.getByLabelText('Unattended work stops at') as HTMLInputElement
@@ -100,7 +101,7 @@ describe('Quota (#960)', () => {
     // At rest it sits exactly on the boundary tick beneath it, not at some offset-scale zero.
     expect(Number(slider.value)).toBeCloseTo(boundaryPercent, 5)
     fireEvent.change(slider, { target: { value: String(boundaryPercent + 15) } })
-    expect(updatePreferences).toHaveBeenCalledWith({ autoSpendOffset: 15 })
+    await waitFor(() => expect(sendSpendOffset).toHaveBeenCalledWith(15))
   })
 
   test('an unreadable quota explains itself instead of showing a zeroed bar', () => {
@@ -192,7 +193,7 @@ describe('Quota (#960)', () => {
   // The bug this test exists for: the slider used to be bound straight to the polled value, which
   // only refreshes every 30s. Each keypress recomputed from the same stale number and the thumb
   // snapped back, so twenty presses of an arrow key moved the limit by one.
-  test('successive moves accumulate instead of snapping back to the last poll (#960)', () => {
+  test('successive moves accumulate instead of snapping back to the last poll, and one write goes out once the handle rests (#960)', async () => {
     view = reading(20, 0)
     render(<Quota />)
     const slider = screen.getByLabelText('Unattended work stops at') as HTMLInputElement
@@ -201,7 +202,20 @@ describe('Quota (#960)', () => {
     expect(Number(slider.value)).toBeCloseTo(boundaryPercent + 5, 5)
     fireEvent.change(slider, { target: { value: String(boundaryPercent + 12) } })
     expect(Number(slider.value)).toBeCloseTo(boundaryPercent + 12, 5)
-    expect(updatePreferences).toHaveBeenLastCalledWith({ autoSpendOffset: 12 })
+    await waitFor(() => expect(sendSpendOffset).toHaveBeenCalledWith(12))
+    // A drag is many changes; each write is a hook line per project, so only the resting value goes out.
+    expect(sendSpendOffset).toHaveBeenCalledTimes(1)
+  })
+
+  test('a write that fails says why, and the handle goes back to the value the schedulers hold (#960)', async () => {
+    sendSpendOffset.mockImplementation(async () => ({ ok: false, error: 'no project has an offset hook in .the-framework/hooks.yml' }))
+    view = reading(20, 0)
+    render(<Quota />)
+    const slider = screen.getByLabelText('Unattended work stops at') as HTMLInputElement
+    const boundaryPercent = (4 / 7) * 100
+    fireEvent.change(slider, { target: { value: String(boundaryPercent + 10) } })
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toMatch(/not saved: no project has an offset hook/))
+    expect(Number(slider.value)).toBeCloseTo(boundaryPercent, 5)
   })
 
   test('the drawn limit follows the handle, not the poll (#960)', () => {
@@ -220,20 +234,20 @@ describe('Quota (#960)', () => {
   // a native thumb's position is always (value - min) / (max - min) of the box, so min/max have to
   // stay 0/100 for the thumb to land where the boundary tick does. That leaves the ±50 the offset
   // is allowed to mean unenforced by the input itself, so the change handler has to clamp it.
-  test('dragged to the far end of the bar, the stored offset still clamps to +50 (#960 Edit)', () => {
+  test('dragged to the far end of the bar, the stored offset still clamps to +50 (#960 Edit)', async () => {
     // A boundary early in the week, so the bar's far (right) end is more than 50 points away.
     view = readingAt(1, 20, 0)
     render(<Quota />)
     fireEvent.change(screen.getByLabelText('Unattended work stops at'), { target: { value: '100' } })
-    expect(updatePreferences).toHaveBeenLastCalledWith({ autoSpendOffset: 50 })
+    await waitFor(() => expect(sendSpendOffset).toHaveBeenLastCalledWith(50))
   })
 
-  test('dragged to the near end of the bar, the stored offset still clamps to -50 (#960 Edit)', () => {
+  test('dragged to the near end of the bar, the stored offset still clamps to -50 (#960 Edit)', async () => {
     // A boundary late in the week, so the bar's near (left) end is more than 50 points away.
     view = readingAt(6, 20, 0)
     render(<Quota />)
     fireEvent.change(screen.getByLabelText('Unattended work stops at'), { target: { value: '0' } })
-    expect(updatePreferences).toHaveBeenLastCalledWith({ autoSpendOffset: -50 })
+    await waitFor(() => expect(sendSpendOffset).toHaveBeenLastCalledWith(-50))
   })
 
   test('the bar splits into used and projected segments, not a used amount plus a floating mark (#960 Edit)', () => {
@@ -279,7 +293,7 @@ describe('Quota (#960)', () => {
     await openTooltip(screen.getByText('enabled', { selector: 'em' }).closest('span')!)
     expect(
       screen.getByText(
-        'Autonomous AI enabled means that the daemon may start an agent on its own — today, a fix on a pull request whose checks fail — while the account is under the line.',
+        "Autonomous AI enabled means that each project's scheduler may start the commands its agent-schedule.md lists while the account is under the line.",
       ),
     ).toBeTruthy()
   })
@@ -290,7 +304,7 @@ describe('Quota (#960)', () => {
     await openTooltip(screen.getByText('disabled', { selector: 'em' }).closest('span')!)
     expect(
       screen.getByText(
-        "Autonomous AI disabled means that the daemon starts no agent on its own — every new agentic work is triggered by you manually."
+        "Autonomous AI disabled means that no scheduler starts an agent on its own — every new agentic work is triggered by you manually."
       ),
     ).toBeTruthy()
   })

@@ -21,6 +21,7 @@ The browser's side of the daemon's call surface: one module of typed stubs per g
 [11] quota: The account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
 [12] quota boundary: The share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
 [13] device: Another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
+[14] spend offset: the user's adjustment of the quota boundary, in percentage points of the week: how far past it unattended work may start. Each project's scheduler holds its own, as `spendOffset` in its state file. The offset hook, under `offset:` in `.the-framework/hooks.yml`, sets it.
 
 ## Business logic — TL;DR
 
@@ -30,7 +31,7 @@ The browser's side of the daemon's call surface: one module of typed stubs per g
 - **The live event stream** (`events.ts`) - the subscription to one agent's events [7] as they are written, re-exported from the transport because a stream is not a call.
 - **Actions** (`control.ts`) - everything the user does to an agent or a project: what the user says to an agent (stop, pick [8], message), the bridge's answer and its browser, starting an agent, pull request and merge, removing a checkout or deleting an agent, opening a checkout in an app, and the ticket and agent queue [9] actions.
 - **Preferences** (`preferences.ts`) - reading, replacing or patching the preferences [10], a project's shared saved prompts, the installed editors, and whether the Discord credentials are set and saving them.
-- **Quota** (`quota.ts`) - the quota [11] reading against the quota boundary [12].
+- **Quota** (`quota.ts`) - the quota [11] reading against the quota boundary [12], and setting the spend offset [14] through every project's offset hook.
 - **Devices** (`devices.ts`) - whether each saved device [13] answers, checked by the daemon with the token the browser holds and never keeps.
 
 ## Business logic

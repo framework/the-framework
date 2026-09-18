@@ -1,4 +1,4 @@
-The executable the package installs: `queue`, which the daemon puts on every agent's PATH and which `npx queue` resolves to in a repository depending on the package. It carries no rule of its own; every rule of the command lives in `../src/cli.ts`.
+The executable the package installs: `queue`, which `npx queue` resolves to in a repository depending on the package. It carries no rule of its own; every rule of the command lives in `../src/cli.ts`.
 
 ## Business logic — TL;DR
 

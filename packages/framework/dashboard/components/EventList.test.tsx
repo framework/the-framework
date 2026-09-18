@@ -95,6 +95,13 @@ describe('EventList row colour', () => {
     expect(screen.getByText(/stopped/).className).not.toContain('text-danger')
   })
 
+  test('a run waiting on its question is not a failure: it says so, and is not red (#1774)', () => {
+    render(<EventList events={[{ kind: 'end', ok: false, waiting: true }]} stick={false} />)
+    const row = screen.getByText(/waiting for an answer/)
+    expect(row.className).not.toContain('text-danger')
+    expect(screen.queryByText(/failed/)).toBeNull()
+  })
+
   test('a finished run is not red (#1199)', () => {
     render(<EventList events={[{ kind: 'end', ok: true }]} stick={false} />)
     expect(screen.getByText(/finished/).className).not.toContain('text-danger')

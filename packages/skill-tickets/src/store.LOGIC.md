@@ -1,14 +1,14 @@
-Binds the tickets to the `agent-data` branch [1] for a long-lived process, the daemon: where the branch's persistent checkout [2] sits under a project (`<root>/.branches/agent-data`, the tickets in its `tickets/`), the write cycle every claim, release and import lands through (apply to that checkout, commit, push), and the sync that brings the daemon's view of the branch up to date: a `tickets` link at the repository root pointing into the checkout, hidden from git, and the branch converging with origin.
+Binds the tickets to the `agent-data` branch [1] for a long-lived process (no program in the repository calls it): where the branch's persistent checkout [2] sits under a project (`<root>/.branches/agent-data`, the tickets in its `tickets/`), the write cycle every claim, release and import lands through (apply to that checkout, commit, push), and the sync that brings that process's view of the branch up to date: a `tickets` link at the repository root pointing into the checkout, hidden from git, and the branch converging with origin.
 
 ## Context
 
-**User story**: the user opens the project's own checkout and finds a `tickets` directory at its root listing the roadmap, one listing away, without switching branches; the dashboard shows the tickets other machines and cloud sessions [3] pushed, and a change the daemon made reaches every other machine.
+**User story**: the user opens the project's own checkout and finds a `tickets` directory at its root listing the roadmap, one listing away, without switching branches; the dashboard shows the tickets other machines and cloud sessions [3] pushed, and a change made on this machine reaches every other machine.
 
 **Business logic story**: the branch's birth, its sync with origin and the commit-and-push cycle are the `agent-data` package's rules; this file only binds them to the tickets. The `tickets` command in `cli.ts` does not use the persistent checkout: it writes through a throwaway checkout at origin's tip.
 
 ## Glossary
 
-[1] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks. Born as an orphan, written through one sync → commit → push cycle.
+[1] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs. Born as an orphan, written through one sync → commit → push cycle.
 [2] checkout: a git worktree under the project's `.branches/` directory, named as its branch: here "the `agent-data` branch's checkout".
 [3] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
 
@@ -30,13 +30,13 @@ See `## Context`.
 
 #### Business logic
 
-The branch's persistent checkout [2] is `<root>/.branches/agent-data` under the project's root, the place the `agent-data` package gives every branch it checks out, and the tickets are the `tickets/` directory inside it. That directory is where the daemon reads tickets from and where each write cycle applies its change.
+The branch's persistent checkout [2] is `<root>/.branches/agent-data` under the project's root, the place the `agent-data` package gives every branch it checks out, and the tickets are the `tickets/` directory inside it. That directory is where the product reads tickets from and where each write cycle applies its change.
 
 ### The write cycle
 
 #### Context
 
-**Problem**: the daemon writes the branch from several places at once (claims for the agents it starts, releases, an import of issues), and each write must reach origin as one commit or other machines read stale claims.
+**Problem**: a long-lived caller writes the branch from several places at once (claims for the agents it starts, releases), and each write must reach origin as one commit or other machines read stale claims.
 
 #### Business logic
 

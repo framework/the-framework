@@ -2,13 +2,13 @@ The daemon's one background clock: a single interval that fires every 30 seconds
 
 ## Context
 
-**Business logic story**: every background job of the daemon (the CI watch, the notification watchers, the sweep that reclaims checkouts, the branch-links sweep, the cloud scratch sweep, cloud work adoption, the data sync) is wired as one job on this clock in `daemon-services.ts`. The clock decides when each job's turn comes, what happens when a turn is slow or fails, and how the daemon's shutdown waits for the turn in flight.
+**Business logic story**: every background job of the daemon (the data sync, the notification watchers, the cloud scratch sweep, cloud work adoption) is wired as one job on this clock in `daemon-services.ts`. The clock decides when each job's turn comes, what happens when a turn is slow or fails, and how the daemon's shutdown waits for the turn in flight.
 
 **Problem**: one timer per sweep means timers that drift apart, turns that overlap, and failures nobody sees. A sweep failing silently is indistinguishable from one that was never scheduled at all.
 
 ## Glossary
 
-[1] sweep: a background job the daemon runs on its clock: the CI watch, the notification watchers, the sweep that reclaims checkouts (the daemon's log calls it the "worktree sweep"), the branch-links sweep, the cloud scratch sweep, cloud work adoption.
+[1] sweep: a background job the daemon runs on its clock: the data sync, the notification watchers, the cloud scratch sweep, cloud work adoption. None of them starts an agent.
 [2] tick: one beat of the daemon's single background clock; each sweep says how many ticks it waits between turns.
 
 ## Business logic — TL;DR
@@ -17,7 +17,7 @@ The daemon's one background clock: a single interval that fires every 30 seconds
 - **The first tick fires at start-up** - the clock runs a tick the moment it starts, and every job takes that turn unless it opted out, in which case its first turn comes one cadence later.
 - **A slow turn holds the tick; missed turns are skipped, never queued** - jobs run in order, one at a time; a tick that comes round while a turn is in flight counts as elapsed time but starts nothing, and a job that missed several ticks takes one turn next time, not one per missed tick.
 - **A failing job costs only its own turn** - a job that throws is logged by name, the other jobs of the same tick still run, and the failed turn still counts as taken.
-- **A tick asked for by hand joins the one in flight** - the shutdown and on-demand callers can run a tick now; one asked for mid-turn waits for that turn instead of starting another, so awaiting it means the tick finished.
+- **A tick asked for by hand joins the one in flight** - a caller can run a tick now; one asked for mid-turn waits for that turn instead of starting another, so awaiting it means the tick finished.
 - **Stopping waits out the turn in flight** - after a stop nothing runs again, and the stop resolves only once the job in flight has finished; the clock never keeps the process alive on its own.
 
 ## Business logic
@@ -36,7 +36,7 @@ Each job says how many ticks [2] it wants between its turns; the default is one,
 
 #### Context
 
-**Problem**: the case most sweeps [1] exist for is a machine that was off, or a daemon that was down, while something happened: a push that could not land, a setting switched on, a pull request that went green. Waiting one full interval before looking would leave that case unattended for as long as the slowest cadence.
+**Problem**: the case most sweeps [1] exist for is a machine that was off, or a daemon that was down, while something happened: a push that could not land, a setting switched on, a branch a cloud session pushed. Waiting one full interval before looking would leave that case unattended for as long as the slowest cadence.
 
 #### Business logic
 
@@ -66,7 +66,7 @@ When a job throws, the failure is logged once as "<job name> failed this tick: <
 
 #### Context
 
-**Business logic story**: the daemon's shutdown and the dashboard's on-demand sweep [1] need to run a tick now and know when it is done.
+**Business logic story**: the tests drive the clock by hand: they run a tick now and need to know when it is done.
 
 #### Business logic
 
@@ -76,7 +76,7 @@ Besides the interval, a tick [2] can be asked for directly. A tick asked for whi
 
 #### Context
 
-**Problem**: the sweeps [1] commit and push; a shutdown that only stopped the next turn would tear the repository down under a sweep mid-commit.
+**Problem**: the sweeps [1] commit and push, the data sync most of all; a shutdown that only stopped the next turn would tear the repository down under a sweep mid-commit.
 
 #### Business logic
 

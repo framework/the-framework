@@ -94,7 +94,10 @@ export function formatFrameworkEvent(event: FrameworkEvent): string {
     case 'intent':
       return `▶ "${truncate(event.text)}"`
     case 'end':
-      return event.ok ? '✓ finished' : event.stopped ? '■ stopped' : `✗ failed: ${event.detail ?? 'unknown error'}`
+      if (event.ok) return '✓ finished'
+      if (event.stopped) return '■ stopped'
+      if (event.waiting) return '? waiting for an answer'
+      return `✗ failed: ${event.detail ?? 'unknown error'}`
   }
 }
 

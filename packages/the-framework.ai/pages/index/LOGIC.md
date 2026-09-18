@@ -1,4 +1,4 @@
-The landing page of https://the-framework.ai and the pieces every page of the site is built from. The page is one scroll that makes the product's argument in order: the pitch and how to run it, why babysitting a coding agent [1] is the problem, what runs without a human, the two building blocks behind that, the features, what the visitor keeps control of, and where to join. `styles.css` holds the site's stylesheet and carries no business logic.
+The landing page of https://the-framework.ai and the pieces every page of the site is built from. The page is one scroll that makes the product's argument in order: the pitch and how to run it, why babysitting a coding agent [1] is the problem, what runs without a human, the building block behind that, the features, what the visitor keeps control of, and where to join. `styles.css` holds the site's stylesheet and carries no business logic.
 
 ## Context
 
@@ -17,8 +17,8 @@ The landing page of https://the-framework.ai and the pieces every page of the si
 - **Navigating the chapters** (`SectionNav.tsx`) - a bar of links to the five chapters that sticks to the top while scrolling, highlights the chapter being read, and keeps the address bar's fragment in step so a link can be copied mid-page.
 - **The problem** (`StopBabysitting.tsx`) - the site's core argument: five ways a coding agent [1] lets its user down, the bad fix people try, and The Framework's solution for each.
 - **What runs without a human** (`AutonomousAi.tsx`) - the claims about what AI does on its own under The Framework, followed by the reassurances that bound them.
-- **The two building blocks** (`HowItWorks.tsx`, `EnhancedSystemPrompt.tsx`, `Queues.tsx`, `Prompts.tsx`) - the enhanced system prompt and the queues, side by side, closed by the note that the prompts are open source and can be replaced with the visitor's own.
-- **The features** (`Features.tsx`) - nine cards, each a claim with a one-sentence explanation, from bringing your own subscription to a headless browser the agents control; none is marked "Coming soon".
+- **The building block** (`HowItWorks.tsx`, `Queues.tsx`, `Prompts.tsx`) - the queues, closed by the note that the prompts are open source and can be replaced with the visitor's own.
+- **The features** (`Features.tsx`) - eight cards, each a claim with a one-sentence explanation, from bringing your own subscription to a Discord bot; none is marked "Coming soon".
 - **What the visitor keeps** (`YourFramework.tsx`) - the promises that it is the visitor's framework: only the features they pick, and nothing forced.
 - **The invitation** (`Cta.tsx`, `TopNav.tsx`, `Footer.tsx`) - the closing call to join the Discord server or star the repository, and the navigation and footer that carry the same three addresses on every page of the site.
 - **The shared vocabulary** (`ui.tsx`, `icons.tsx`, `copy.ts`) - the visual pieces the sections are drawn from and the three addresses the whole site links to, the Discord, GitHub and npm logos, and the click-to-copy behavior behind every command chip and the hero's "Try:" box.

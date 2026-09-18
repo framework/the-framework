@@ -1,10 +1,10 @@
-The Settings page: every preference [1] the user can set, on one page, each change applied the moment it is made and saved to the daemon in the background, with the Onboarding checklist kept at the top. Everything written here goes to the user's own preferences, so a value on this page always means "my default, everywhere".
+The Settings page: every preference [1] the user can set, on one page, each change applied the moment it is made and saved to the daemon in the background, with the Onboarding checklist kept at the top, plus the spend offset [19], which is not a preference. Everything else written here goes to the user's own preferences, so a value on this page always means "my default, everywhere"; the spend offset goes to every project's scheduler, the one place it is kept.
 
 ## Context
 
 **User story**: the user opens Settings (the address `/settings`) to look up or change a setting without hunting through the header's menus, and follows the Overview's [2] hint that the onboarding can be resumed on the settings page. The heading is "Settings" and the line under it reads "Your defaults, everywhere."
 
-**Business logic story**: the same preferences feed the launcher on a project home [3], the notifications bell and the daemon's sweeps [4]. This page is the one surface that lists all of them, so what it shows must match what those surfaces act on.
+**Business logic story**: the same preferences feed the launcher on a project home [3], the notifications bell and the daemon's sweeps [4]. This page is the one surface that lists all of them, so what it shows must match what those surfaces act on. The spend offset [19] is the usage panel's handle as a number, read and written exactly as the handle does.
 
 ## Glossary
 
@@ -19,22 +19,20 @@ The Settings page: every preference [1] the user can set, on one page, each chan
 [9] relay: running an agent on a device: the local daemon forwards the start to the device and streams the events back.
 [10] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 [16] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds. The other is activity: an agent started or finished.
-[17] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
-[18] quota boundary: the share of the quota week that may be spent by now, rising with the clock.
-[19] spend offset: the user's adjustment of the quota boundary, in percentage points of the week.
-[20] unattended work: agents nobody started by hand.
-[21] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
-[22] the Claude web bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge token is the secret the extension presents; the bridge browser is the Chrome for Testing the daemon runs for it.
+[17] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
+[18] the Claude web bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge token is the secret the extension presents; the bridge browser is the Chrome for Testing the daemon runs for it.
+[19] spend offset: the user's adjustment of the quota boundary, in percentage points of the week: how far past it unattended work (an agent the scheduler started rather than a person) may start. Each project's scheduler holds its own, as `spendOffset` in its state file; the quota boundary is the share of the quota week that may be spent by now, rising with the clock.
+[20] offset hook: the one shell line under `offset` in a project's `.the-framework/hooks.yml`, given the spend offset in `POINTS`; for example `npx agent-scheduler offset -- "$POINTS"`.
 
 ## Business logic — TL;DR
 
-- **One page, one destination** - every control reads and writes the user's own preferences, applied at once and saved in the background.
+- **One page, one destination** - every control but the spend offset reads and writes the user's own preferences, applied at once and saved in the background.
 - **The Onboarding checklist stays on this page** - it sits above every section, cannot be dismissed here, and its two navigating steps lead to an agent's page or a project's launcher.
 - **Appearance: theme and editor** - "Theme" follows the system by default; "Editor" offers "Auto-detect" plus the editors found on the daemon's machine.
 - **Agent: which coding agent, which model** - "Agent" (Claude Code by default) and "Model" (empty means the coding agent's own default); both are handed to a project's start hook [8] with every start.
 - **Devices, after "Agent"** - the saved devices follow directly, because a device is the other place an agent can run.
 - **Notifications: how they reach you, and what about** - two delivery rows ("Browser", "Discord") and two category rows ("Human Queue", "New activity"), each showing both the preference and whether delivery can happen, with Discord's setup one button away.
-- **Automation: the spend offset** - "Spend offset" is a whole number within ±50 that shows the default in force (7.1) when untouched.
+- **Automation: the spend offset** - "Spend offset" is the number the usage panel's handle moves, from −50 to 50 percentage points, read off the projects' schedulers and written through every project's offset hook [20]; a write that fails says why.
 - **Claude web: the bridge, and which browser does its work** - "Browser bridge" is off by default; while on, one exclusive choice decides whether the daemon runs the bridge browser or the user's own Chrome does the work, each option carrying its own setup.
 - **A list with nothing to pick is not shown** - a drop-down row with no choices is left out rather than rendered empty.
 
@@ -48,7 +46,7 @@ The Settings page: every preference [1] the user can set, on one page, each chan
 
 #### Business logic
 
-Every control on the page reads and writes the user's own preferences [1], which the daemon keeps in the registry file `~/.the-framework.json`. The page belongs to no project. A change takes effect on the page the instant it is made and is saved to the daemon in the background; a failed save is not reported, and a value another tab changed is adopted when the daemon answers (the write rules are in `lib/preferences.ts`).
+Every control on the page but one reads and writes the user's own preferences [1], which the daemon keeps in the registry file `~/.the-framework.json`. The exception is the spend offset [19], which is kept by each project's scheduler and nowhere else (see "Automation: the spend offset"). The page belongs to no project. A change takes effect on the page the instant it is made and is saved to the daemon in the background; a failed save is not reported, and a value another tab changed is adopted when the daemon answers (the write rules are in `lib/preferences.ts`).
 
 ### The Onboarding checklist stays on this page
 
@@ -119,17 +117,17 @@ The "Notifications" section has four rows. Two say how a notification reaches th
 
 #### Context
 
-**Problem**: a typed offset beyond the allowed range must not be clamped on save while the box keeps showing what was typed, and an untouched offset must show the default actually in force rather than a zero that is not.
+**User story**: the user wants unattended work to spend exactly so far ahead of the week's pace, and types the number rather than dragging the usage panel's handle to it.
 
 #### Business logic
 
-The "Automation" section has one row, "Spend offset" ("How far unattended work sits from the quota [17] boundary, in percentage points (max 50). Negative holds it back; positive lets it borrow from the days ahead."): a number field. The spend offset [19] moves the quota boundary [18] the usage panel draws for unattended work [20], in percentage points of the quota week: negative holds it back, positive lets it borrow from the days ahead. A typed value is rounded to a whole number and clamped into -50 to 50 before it is saved, so the box never shows a value that will not be used; a saved value is always a whole number. When nothing is stored, the box shows the default in force, half a day's share of the week (100 divided by 14, shown to one decimal as 7.1), not zero.
+The "Automation" section, right after "Notifications", has one row, "Spend offset" ("How far each project's scheduler may start work past the quota boundary, in percentage points (max 50). Negative holds it back; positive lets it borrow from the days ahead. Set through each project's offset hook."): a number box bounded to −50 and 50. It shows the spend offset [19] the usage panel's reading carries (the loosest one any project's scheduler holds, or the half-day default of about 7.1 when none names one), rounded to one decimal; before the first reading it shows the default. A typed value is rounded to whole points and clamped to −50..50, the same bound as the handle; an empty or non-numeric entry counts as 0. The value is kept on the page until the reading catches up with it, and written once it has rested for half a second, through the same daemon call the handle uses, which runs every registered project's offset hook [20]. A write that fails shows, under the row, as an alert: "The offset was not saved: <why>" (for example "no project has an offset hook in .the-framework/hooks.yml"), and the box goes back to the value the schedulers held. The rules for reading, holding and writing the value are the usage panel's own (`Quota.tsx`).
 
 ### Claude web: the bridge, and which browser does its work
 
 #### Context
 
-**Problem**: an agent [5] whose location [9] is `web` hands its task to a cloud session [21] and ends, so the questions the cloud session asks would never reach the dashboard. The Claude web bridge [22] carries them back and types the answers into the cloud session, and it needs a browser signed in to claude.ai to do so. Two toggles named "Browser bridge" and "Bridge browser" would read as anagrams of each other; the one real decision is which browser does the work.
+**Problem**: an agent [5] whose location [9] is `web` hands its task to a cloud session [17] and ends, so the questions the cloud session asks would never reach the dashboard. The Claude web bridge [18] carries them back and types the answers into the cloud session, and it needs a browser signed in to claude.ai to do so. Two toggles named "Browser bridge" and "Bridge browser" would read as anagrams of each other; the one real decision is which browser does the work.
 
 #### Business logic
 

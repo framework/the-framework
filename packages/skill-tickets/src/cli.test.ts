@@ -7,7 +7,7 @@ import { nodeGitRunner, DATA_BRANCH } from '@gemstack/agent-data'
 import { runCli, USAGE } from './cli.js'
 
 const git = nodeGitRunner()
-// The command reads AGENT_ID from the real environment, and a daemon sets it for every agent it
+// The command reads AGENT_ID from the real environment, and the scheduler sets it for every run it
 // starts, this test run included: drop it, so only the one test that sets it on purpose sees it.
 delete process.env['AGENT_ID']
 const RETRIED_RM = { recursive: true, force: true, maxRetries: 10 } as const
@@ -137,7 +137,7 @@ test('the holder is AGENT_ID when the process that started the agent set it, the
   const [a] = agents
   const id = '2026-08-30T10-00-00-000Z'
   try {
-    // An agent checkout under `.branches/`, as a daemon lays it out; the folder name means nothing
+    // An agent checkout under `.branches/`, as the scheduler lays it out; the folder name means nothing
     // to the command, only the environment and the branch do.
     const wt = join(a!, '.branches', `agent-${id}`)
     await git(['worktree', 'add', wt, '-b', `agent-${id}`], a!)

@@ -21,10 +21,3 @@ docs/.vitepress/cache/
 
 # The Framework
 ANALYSIS_RESULT.md
-
-# The Framework writes run state into .the-framework/ when its daemon runs against a repo
-# in-tree (dev). Transient, mirroring the .gitignore the framework seeds on install; LOGS.md
-# stays the only committed part, so it is never ignored here.
-**/.the-framework/events.jsonl
-**/.the-framework/run.json
-**/.the-framework/runs/

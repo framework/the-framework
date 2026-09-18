@@ -76,14 +76,15 @@ function isTurnBoundary(e: FrameworkEvent): boolean {
 /**
  * Whether a row reports a failure, which reads in red (#1199). Two shapes say it: the agent (or
  * its transport) erroring mid-run, and the agent settling badly. A *stopped* run is neither, since
- * the user asked for that, so it stays neutral rather than being coloured like a fault.
+ * the user asked for that, and neither is a run *waiting* on the question it ended on (#1774): both
+ * stay neutral rather than being coloured like a fault.
  */
 function isFailure(e: FrameworkEvent): boolean {
   if (e.kind === 'driver') return e.event.type === 'error'
   // An error the agent reported itself (#1500) is a failure like any other: the log already has
   // one red lane, and a second vocabulary for the same thing would only make both quieter.
   if (e.kind === 'error') return true
-  return e.kind === 'end' && !e.ok && !e.stopped
+  return e.kind === 'end' && !e.ok && !e.stopped && !e.waiting
 }
 
 /**

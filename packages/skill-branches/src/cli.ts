@@ -22,7 +22,7 @@ import { reclaimWorktree, type ReclaimOutcome, type ReclaimRefusal } from './rec
 import { publishCheckout, type PublishOutcome } from './publish.js'
 
 /**
- * The command line over the package (#1725): the same functions a daemon calls, for an agent
+ * The command line over the package (#1725): the same functions a caller's code calls, for an agent
  * (and a person) in a shell. One implementation, every surface a caller.
  *
  * The contract: JSON on stdout, one line for a person on stderr, and the exit code says how it
@@ -123,7 +123,7 @@ const COMMANDS: Record<string, Command> = {
     const checkout = await inRepo(() => checkoutRoot(cwd, git))
     const outcome = await nameBranch(checkout, name, git)
     if (!outcome.ok) throw new Refused(outcome, NAME_REFUSALS[outcome.reason](name, checkout))
-    // The `.branches/<name>` link follows the rename now, not at a daemon's next pass.
+    // The `.branches/<name>` link follows the rename now, not at the next reconcile.
     await reconcileBranchLinks(await projectRoot(checkout, git), { git })
     return outcome
   },

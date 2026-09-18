@@ -1,8 +1,8 @@
-The driver [1] seam of The Framework: one contract under which a coding agent [2] is a black box, started in a directory, prompted for one turn [3] at a time, streamed as progress events [4] and resumed later, and four implementations of it: Claude Code on this machine, Codex on this machine, Claude Code on a GitHub Actions runner, and a scripted fake. The product's agent [5] lifecycle in `packages/framework` speaks only this contract, so a fifth implementation, Claude Code in a cloud session [6] (`packages/framework/src/driver/cloud.ts`), slots in behind it without touching anything above. Everything here runs on the user's own login to the coding agent: The Framework never holds a model key and never calls a model itself.
+The driver [1] seam of The Framework: one contract under which a coding agent [2] is a black box, started in a directory, prompted for one turn [3] at a time, streamed as progress events [4] and resumed later, and four implementations of it: Claude Code on this machine, Codex on this machine, Claude Code on a GitHub Actions runner, and a scripted fake. Its callers speak only this contract: the scheduler (`packages/agent-scheduler`) runs every agent [5] through it, and the product (`packages/framework`) reads the account's quota and writes to a run's inbox through it, so a further implementation slots in behind it without touching anything above. Everything here runs on the user's own login to the coding agent: The Framework never holds a model key and never calls a model itself.
 
 ## Context
 
-**User story**: the user picks `claude` or `codex` as the driver [1] for an agent [5], and a location [7] for it; the agent view then shows what the coding agent [2] says, which tools it uses, what it spent, and, for Claude Code, where the account's quota [8] stands. Stopping the agent, or closing The Framework with Ctrl-C, leaves no coding agent process running on the machine.
+**User story**: the user picks `claude` or `codex` as the driver [1] for an agent [5]; the agent view then shows what the coding agent [2] says, which tools it uses, what it spent, and, for Claude Code, where the account's quota [8] stands. Stopping the agent, or closing The Framework with Ctrl-C, leaves no coding agent process running on the machine.
 
 **Business logic story**: the seam is deliberately the prompt, the final message and the code left in the directory, never the coding agent's individual tool calls. Each coding agent keeps its own subscription login and its own loop; The Framework prompts it, reads its output for text, tool names, a session id, usage [9] and rate limit [10] readings, and decides a turn's [3] success from the process's exit code or the run's conclusion, never from streamed text.
 
@@ -12,9 +12,7 @@ The driver [1] seam of The Framework: one contract under which a coding agent [2
 [2] coding agent: the CLI doing the actual work: Claude Code or Codex.
 [3] turn: one prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
 [4] progress event: what a driver reports while a turn runs, for a caller to show and never to decide on: the prompt sent, the session id, streamed text, a tool used, the final result, a rate limit reading, an error, a notice, a question.
-[5] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
-[6] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
-[7] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
+[5] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [8] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
 [9] usage: what one turn spent, as the coding agent reports it: token counts, and a notional price in US dollars when the coding agent prices its turns.
 [10] rate limit: the coding agent's per-turn reading of whether the account may still spend against one quota window, and when that window resets.
@@ -53,7 +51,7 @@ The driver [1] seam of The Framework: one contract under which a coding agent [2
 
 #### Context
 
-**User story**: the user starts an agent [5] with location [7] `local` and follows it in the agent view; the user stops it, or closes The Framework, and nothing of the coding agent [2] survives.
+**User story**: the user starts an agent [5] on this machine and follows it in the agent view; the user stops it, or closes The Framework, and nothing of the coding agent [2] survives.
 
 #### Business logic
 

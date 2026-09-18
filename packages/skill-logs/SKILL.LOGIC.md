@@ -4,13 +4,13 @@ The instructions the `logs` skill gives an agent [1], as business logic: where t
 
 **User story**: an agent about to plan or work a ticket learns what earlier agents did on it: a run that stopped or failed tells it what to avoid, and a run that finished with a pull request tells it the work may already be there, so the same work is not done twice and the same mistake not made twice.
 
-**Business logic story**: the daemon hands the coding agent this skill by its name, `logs`, and puts the `logs` command on the agent's PATH; the command's rules are in `src/cli.ts`, the record's shapes in `src/run.ts`.
+**Business logic story**: the coding agent finds this skill by its name, `logs`, where its harness looks for skills, and runs the command through `npx logs`; the command's rules are in `src/cli.ts`, the record's shapes in `src/run.ts`.
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent under The Framework's control, in its own checkout, on its own branch, streaming events, handed off when it ends.
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] run: the `logs` skill's record of one agent on the `agent-data` branch: a card and a diary. Never the unit of work.
-[3] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
+[3] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [4] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [5] card: the run's `<id>.json`: what was asked, the ticket, the branch, the pull request, how it ended, what it cost.
 [6] diary: the run's `<id>.jsonl`: what the agent said.

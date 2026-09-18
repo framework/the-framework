@@ -3,10 +3,9 @@ import { errorMessage } from './error-message.js'
 /**
  * The daemon's one background clock (E4).
  *
- * Every sweep used to own a timer: the CI watch on a minute, the worktree sweep on ten,
- * the session committer's debounce on thirty seconds, the two Discord watchers on a minute each.
- * Six intervals with six `setInterval`s, six unref calls and six overlap guards, and no single
- * place to look when the answer to "why is nothing happening" is that a sweep is not running.
+ * Every sweep used to own a timer: one `setInterval`, one unref call and one overlap guard
+ * each, and no single place to look when the answer to "why is nothing happening" is that a
+ * sweep is not running.
  *
  * One interval fires, and each job says how often it wants a turn. A job's cadence stops being a
  * duration it has to reason about and becomes a small integer: how many ticks between turns.
@@ -40,7 +39,7 @@ export interface TickJob {
 
 /** The running clock. */
 export interface DaemonTick {
-  /** Run one tick now, awaiting it. The daemon's shutdown and the tests drive it through this. */
+  /** Run one tick now, awaiting it. The tests drive the clock through this. */
   tick: () => Promise<void>
   /**
    * Stop the clock, and resolve when the turn already in flight has finished. Awaiting it is how

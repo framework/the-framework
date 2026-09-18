@@ -31,7 +31,7 @@ Holds the browser's view of the user's preferences [1]: loads them from the daem
 
 #### Context
 
-**Problem**: the launcher's [4] toggles, the notification menu, the gate countdown and Settings [3] all read the same settings. If each fetched its own copy, a change made on one would leave the others showing the old value until they happened to refetch.
+**Problem**: the launcher's [4] toggles, the notification menu and Settings [3] all read the same settings. If each fetched its own copy, a change made on one would leave the others showing the old value until they happened to refetch.
 
 #### Business logic
 

@@ -1,18 +1,18 @@
-Reads and edits the agent queue [1], `TODO_AGENTS.md` on the `agent-data` branch [2]: which lines of the file are open queue entries [3] and in what order they are worked, where an entry lands when it is added with a priority or without one, how an entry is removed once done, and how every edit lands on the branch as one commit through the caller's write cycle. The same rules serve the `queue` command an agent [4] runs and the daemon that drains the queue.
+Reads and edits the agent queue [1], `TODO_AGENTS.md` on the `agent-data` branch [2]: which lines of the file are open queue entries [3] and in what order they are worked, where an entry lands when it is added with a priority or without one, how an entry is removed once done, and how the library's add lands on the branch as one commit through the caller's write cycle. The same rules serve the `queue` command an agent [4] runs and the framework that queues work from the dashboard.
 
 ## Context
 
-**User story**: the user, or an agent, puts a task on the agent queue and sees it in the dashboard's queue under the priority it was given; the daemon starts the next agent on the first open entry; when the task is done its entry disappears and the queue is only the remaining work. The file stays a readable markdown document the user can also edit by hand.
+**User story**: the user, or an agent, puts a task on the agent queue and sees it in the dashboard's queue under the priority it was given; when the task is done its entry disappears and the queue is only the remaining work. The file stays a readable markdown document the user can also edit by hand.
 
 **Business logic story**: the write cycle, the branch and the file's name are the rules of `store.ts`, `names.ts` and the `agent-data` package; this file holds the queue's own rules. The queue does not know tickets: a caller that queues a ticket writes the entry itself as a markdown link to the ticket, and reads the link back to claim the ticket for the agent it starts.
 
 ## Glossary
 
 [1] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down.
-[2] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs, routine locks.
+[2] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [3] queue entry: an item on the agent queue.
-[4] agent: the unit of work: one task worked by a coding agent under The Framework's control — in its own checkout, on its own branch, streaming events, handed off when it ends.
-[5] drain: starting an agent on the agent queue's first open entry — the half of Auto PM that spends existing work.
+[4] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
+[5] drain: working the agent queue from its first open entry down, one entry per agent: what an agent started with `/work-queue` does.
 [6] run: only the `logs` skill's record of one agent on the `agent-data` branch: a card (what was asked, the ticket, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said).
 
 ## Business logic — TL;DR
@@ -22,8 +22,8 @@ Reads and edits the agent queue [1], `TODO_AGENTS.md` on the `agent-data` branch
 - **Placing an entry by priority** - the entry joins the end of its `## Priority N` section; without one, a new section is created before the first lower-priority section, or last when every section outranks it, or above the file's first heading when the file has no priority section at all, or at the file's end when it has no headings.
 - **An entry with no priority goes at the end** - as a plain bullet at the end of the file, in whatever section ends it.
 - **Done means deleted** - the first open line whose text is exactly the entry is deleted whole; a checked line is never matched; an entry the queue does not have changes nothing.
-- **Reading the queue** - from anywhere in the repository, the file as it stands on the branch, or nothing when the branch has no queue; a long-lived process about to act fetches first.
-- **An edit lands as one commit** - the repository root is resolved, the file read (a missing queue reads as empty), the edit applied, the file written only when it changed, then committed and pushed as "queue add: <entry>" or "queue done: <entry>"; an edit never throws, and reports whether it landed and whether it changed anything.
+- **Reading the queue** - from anywhere in the repository, the file as it stands on the branch, or nothing when the branch has no queue; a caller that asks for a fresh read fetches first.
+- **An add lands as one commit** - the repository root is resolved, the file read (a missing queue reads as empty), the entry placed, the file written only when it changed, then committed and pushed as "queue add: <entry>"; an add never throws, and reports whether it landed and whether it changed anything.
 
 ## Business logic
 
@@ -85,14 +85,14 @@ Removing an entry deletes the first list item line, with or without an unchecked
 
 #### Business logic
 
-The queue is read from anywhere in the repository, an agent's checkout included, as the file stands on the `agent-data` branch [2]; a branch with no queue reads as no queue, and its entries as none. A caller about to act on the queue, the daemon's drain [5], asks for a fresh read, which fetches origin first; a plain read does not fetch.
+The queue is read from anywhere in the repository, an agent's checkout included, as the file stands on the `agent-data` branch [2]; a branch with no queue reads as no queue. A caller about to act on the queue asks for a fresh read, which fetches origin first; a plain read does not fetch.
 
-### An edit lands as one commit
+### An add lands as one commit
 
 #### Context
 
-**Problem**: the daemon may queue a note while it is already unwinding after a failure, and an error while queueing must not mask why it stopped.
+**Problem**: a task queued from the dashboard must land on the branch every machine reads, and an error while queueing must be an answer, not a crash.
 
 #### Business logic
 
-Adding and removing are each one edit of the file: the repository root is resolved from wherever the caller is, an agent's checkout included; the file is read from the branch's checkout, a missing queue reading as empty; the edit is applied; the file is written only when the edit changed it; and the write cycle of `store.ts` commits and pushes it, an addition as "queue add: <entry>" and a removal as "queue done: <entry>". An edit never throws: it answers that it landed, and whether it changed anything, or that it did not land, which is also the answer when no repository root can be resolved or the cycle did not push. Removing an entry that is already gone lands, changing nothing. Adding creates the queue file when the branch has none.
+Adding is one edit of the file: the repository root is resolved from wherever the caller is, an agent's checkout included; the file is read from the branch's checkout, a missing queue reading as empty; the entry is placed by the rules above; the file is written only when the edit changed it; and the write cycle of `store.ts` commits and pushes it as "queue add: <entry>". An add never throws: it answers that it landed, and whether it changed anything, or that it did not land, which is also the answer when no repository root can be resolved or the cycle did not push. Adding creates the queue file when the branch has none. Taking an entry off is the `queue done` command's (`cli.ts`), which applies the removal rule above through its own write.

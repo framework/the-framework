@@ -43,6 +43,8 @@ export interface SchedulerState {
   running: boolean
   /** The model every run starts on. */
   model?: string
+  /** How far past the quota boundary this project's unattended runs may start, in percentage points. */
+  spendOffset?: number
   lastTick?: SchedulerTick
 }
 
@@ -80,6 +82,7 @@ export async function readSchedulerState(cwd: string, isAlive: (pid: number) => 
     keepAlive: state['keepAlive'] === true,
     running: pid !== undefined && isAlive(pid),
     ...(typeof state['model'] === 'string' ? { model: state['model'] } : {}),
+    ...(typeof state['spendOffset'] === 'number' && Number.isFinite(state['spendOffset']) ? { spendOffset: state['spendOffset'] } : {}),
     ...(tick ? { lastTick: tick } : {}),
   }
 }
@@ -110,4 +113,15 @@ export async function collectSchedulers(
     rows.push({ projectId: project.id, projectName: project.name, ...state })
   }
   return rows
+}
+
+/**
+ * The spend offset the usage panel draws (#960), read off the projects' schedulers: the loosest
+ * one, since it is the one that lets unattended work spend the furthest; `undefined` when no
+ * scheduler names one. The panel's slider writes it back through each project's `offset` hook,
+ * so the schedulers agree unless one was set by hand.
+ */
+export function loosestSpendOffset(states: readonly SchedulerState[]): number | undefined {
+  const offsets = states.flatMap(state => (state.spendOffset !== undefined ? [state.spendOffset] : []))
+  return offsets.length ? Math.max(...offsets) : undefined
 }

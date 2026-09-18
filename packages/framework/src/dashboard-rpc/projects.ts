@@ -4,7 +4,6 @@ import { readProjectHooks } from '../project-hooks.js'
 import { pickDirectory, type PickDirectoryResult } from '../pick-directory.js'
 import type { ProjectSummary } from '../dashboard/projects.js'
 import type { AddProjectResult, OnboardingSuggestion } from '../dashboard/types.js'
-import type { DashboardContext } from '../dashboard/rpc-serve.js'
 
 // The Projects sidebar behind the new dashboard (#405): the global registry (#390) the
 // daemon and CLI write — id, path, name, activated, last activity. The per-agent

@@ -6,6 +6,5 @@ What the tests cover:
 - **No reading is not an empty reading** - an account with no subscription quota shows no windows and no boundary at all, rather than a boundary of zero.
 - **An unplaceable week** - a week whose reset cannot be placed in time is shown as a window but yields no boundary rather than a guessed one.
 - **Stopping** - stopping the source ends the polling.
-- **The default spend offset** - with no slider position, the limit sits the default half-day cushion above the boundary.
+- **The default spend offset** - with no spend offset given, the limit sits the default half-day cushion above the boundary.
 - **The panel stays about the account** - every reported window is shown, a model's week included, but only the account's week is measured, so a fully spent model week nobody named does not make the bar say the account is out.
-- **Naming the model** - brings that model's own week into the gate, where it is the window reached, while the account-wide answer is still unreached; a model whose week the account never reported is gated on the account's week alone; asking with no model answers the same as the panel.

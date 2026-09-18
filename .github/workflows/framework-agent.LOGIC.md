@@ -1,8 +1,8 @@
-Runs one turn [2] of an agent [1] on a GitHub-hosted runner instead of on the user's machine: The Framework's `github-actions` driver [3] dispatches this workflow with the prompt, and the workflow run, "the run" below, checks the repository out, runs Claude Code on that prompt with every permission granted, pushes whatever the coding agent [4] left behind to the branch the driver named, and uploads the coding agent's transcript together with that branch name as one artifact keyed by the driver's correlation id [5]. The run is the far end of the driver in `packages/agent-driver/src/actions.ts`: the driver never sees the runner, only what the run pushes and uploads.
+Runs one turn [2] of an agent [1] on a GitHub-hosted runner instead of on the user's machine: `agent-driver`'s `github-actions` driver [3] dispatches this workflow with the prompt, and the workflow run, "the run" below, checks the repository out, runs Claude Code on that prompt with every permission granted, pushes whatever the coding agent [4] left behind to the branch the driver named, and uploads the coding agent's transcript together with that branch name as one artifact keyed by the driver's correlation id [5]. The run is the far end of the driver in `packages/agent-driver/src/actions.ts`: the driver never sees the runner, only what the run pushes and uploads.
 
 ## Context
 
-**User story**: the user starts an agent whose location [6] is `actions`, so the agent's turns run on GitHub's runners and cost nothing on this machine; the agent's events, its final message and its branch still show up in the dashboard, and the next turn continues where the previous one stopped.
+**User story**: an agent driven by the `github-actions` driver [3] has its turns run on GitHub's runners, at no cost to this machine; its events, its final message and its branch come back through the driver, and the next turn continues where the previous one stopped. The dashboard's launcher starts no such agent: only a program that picks this driver from `agent-driver` does.
 
 **Business logic story**: the driver starts a driver session [7] for the agent, and each prompt of that session is one dispatch of this workflow. The runner is discarded when the run ends, so everything the driver needs afterwards has to leave the runner before that: the work as a pushed branch, the transcript as an uploaded artifact.
 
@@ -10,12 +10,11 @@ Runs one turn [2] of an agent [1] on a GitHub-hosted runner instead of on the us
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent under The Framework's control, in its own checkout, on its own branch, streaming events, handed off when it ends.
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] turn: one prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
 [3] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later. The driver implementation here is `github-actions`.
 [4] coding agent: the CLI doing the actual work: Claude Code or Codex. Only Claude Code runs on this workflow.
 [5] correlation id: the id the driver mints for one turn, unique across driver processes, that the run echoes into its display name and its artifact name so the driver can find them.
-[6] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
 [7] driver session: the coding agent's own conversation for one agent, which the driver can resume by its session id.
 
 ## Business logic — TL;DR
@@ -39,7 +38,7 @@ See `## Context`.
 
 The workflow, named "framework-agent", never runs on a push or a pull request: it runs only when dispatched by hand or through GitHub's API, which is how the driver [3] starts it. It takes five inputs:
 
-- `prompt` (required): what the agent [1] should do this turn [2]. The driver sends The Framework's system prompt and the user's prompt as one text, the system prompt first.
+- `prompt` (required): what the agent [1] should do this turn [2]. The driver sends the driver session's framing (its standing instructions) and the prompt as one text, the framing first.
 - `correlation_id` (required): the correlation id [5]. The run's display name is "framework-agent " followed by it.
 - `model` (optional): the model id to run on; empty means the action's default.
 - `resume_session_id` (optional): the session id of a prior driver session [7] to continue instead of starting fresh.
@@ -81,7 +80,7 @@ The prompt is handed to the action as an input, verbatim and never through a she
 
 #### Context
 
-**Problem**: the runner and its checkout vanish when the job ends, so the only way the driver [3] can read the agent's work, or run the next turn on top of it, is a branch on the remote. The action creates no branch for a dispatched run, so the workflow pushes one itself, to the name the driver chose. This mirrors the local flow: The Framework pushes the agent's branch, the coding agent [4] only commits.
+**Problem**: the runner and its checkout vanish when the job ends, so the only way the driver [3] can read the agent's work, or run the next turn on top of it, is a branch on the remote. The action creates no branch for a dispatched run, so the workflow pushes one itself, to the name the driver chose. On this machine it is the other way round: the agent pushes its own branch, with the `branches` skill.
 
 #### Business logic
 

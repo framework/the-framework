@@ -29,7 +29,7 @@ Carries out every action the user takes on an agent [1] or a project from the da
 [26] run: only the `logs` skill's record of one agent on the `agent-data` branch: a card (what was asked, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said).
 [27] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [29] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
-[31] holder: who a claim names: the agent's id when the daemon started the agent, else the branch the `tickets` command ran on.
+[31] holder: who a claim names: the agent's id when the process that started the agent set it as `AGENT_ID`, else the branch the `tickets` command ran on.
 
 ## Business logic — TL;DR
 
@@ -42,7 +42,7 @@ Carries out every action the user takes on an agent [1] or a project from the da
 - **Deleting an agent** - refused while the agent is still going; the checkout goes with whatever it holds, the agent's record on the `agent-data` branch goes, and its branch stays.
 - **Opening a checkout in the file manager or an editor** - a local command against the agent's own checkout, or the project's; the editor is the one the preferences name, else the environment's, else VS Code.
 - **Opening a pull request** - the agent's existing pull request is returned when it has one; a gone branch or an agent that committed nothing is refused; otherwise the branch is pushed if needed and a pull request opened ready for review and recorded on the agent's run.
-- **Merging** - an ended agent's open pull request is merged directly, and "already merged" is an answer, not an action; an agent still going has no Merge.
+- **Merging** - an ended agent's open pull request is merged, by GitHub's auto-merge where it can be armed and directly where not, and "already merged" is an answer, not an action; an agent still going has no Merge.
 - **Putting a ticket on the agent queue** - the entry lands in the priority section the ticket's own priority earns, as a link back to the ticket, on the `agent-data` branch.
 - **Putting a ticket's plan on the agent queue** - the plan sentence for that ticket lands by the same priority rule, deliberately not as a ticket link.
 - **Releasing a ticket's claim** - only a bare ticket filename is accepted; the lock is removed as one committed, pushed change, and "no lock" is an honest answer.
@@ -91,7 +91,7 @@ Same refusals as a message ("unknown session"). The agent's events are read (`st
 
 #### Business logic
 
-The pick is not a control-file write: it goes to the bridge's store of parked questions, keyed by the cloud session's id. The id must look like a cloud session id (`session_` followed by up to 128 letters or digits), else the answer is refused as "unknown session"; the labels must be a list of non-blank strings, else "answer labels are required". The store then accepts only labels of the question that session is actually parked on, each at most once, and exactly one of them unless the question allows several; a refusal comes back with the store's reason ("that session has no parked question", "every label must be one of the question options", "pick exactly one option"). The text typed into the session is composed by the daemon from the chosen labels (the rules are `dashboard/bridge-store.ts`'s), so nothing arbitrary is ever put in front of another product's agent. A queued answer can be withdrawn; that is a no-op once the extension has delivered it or a Driver tab has collected it, and an id that is not a cloud session id is ignored. These two calls are never relayed [11]: the bridge lives on the daemon the extension talks to.
+The pick goes neither to an inbox [14] nor to a resume hook [4]: it goes to the bridge's store of parked questions, keyed by the cloud session's id. The id must look like a cloud session id (`session_` followed by up to 128 letters or digits), else the answer is refused as "unknown session"; the labels must be a list of non-blank strings, else "answer labels are required". The store then accepts only labels of the question that session is actually parked on, each at most once, and exactly one of them unless the question allows several; a refusal comes back with the store's reason ("that session has no parked question", "every label must be one of the question options", "pick exactly one option"). The text typed into the session is composed by the daemon from the chosen labels (the rules are `dashboard/bridge-store.ts`'s), so nothing arbitrary is ever put in front of another product's agent. A queued answer can be withdrawn; that is a no-op once the extension has delivered it or a Driver tab has collected it, and an id that is not a cloud session id is ignored. These two calls are never relayed [11]: the bridge lives on the daemon the extension talks to.
 
 ### Starting an agent
 
@@ -153,7 +153,7 @@ The agent must be known in a known project, by a path-safe id, else the answer i
 
 #### Business logic
 
-Same target rule ("unknown session"). An agent that is still running has no Merge: it publishes its own work, and the call answers "that session is still going". For an agent that has ended, its pull request is merged directly (`dashboard/agent-handoff.ts`), a draft being marked ready on the way: refused when the agent has no pull request ("this session has no pull request to merge") or when it is no longer open ("this session's PR is already merged", or closed), since "already merged" is an answer, not an action; and the answer carries the pull request's number and URL.
+Same target rule ("unknown session"). An agent that is still running has no Merge: it publishes its own work, and the call answers "that session is still going". For an agent that has ended, its pull request is merged by the merge rule in `dashboard/gh.ts` (GitHub's auto-merge first, directly where GitHub cannot arm it; `dashboard/agent-handoff.ts`), a draft being marked ready on the way: refused when the agent has no pull request ("this session has no pull request to merge") or when it is no longer open ("this session's PR is already merged", or closed), since "already merged" is an answer, not an action; and the answer carries the pull request's number and URL.
 
 ### Putting a ticket on the agent queue
 
@@ -161,17 +161,17 @@ Same target rule ("unknown session"). An agent that is still running has no Merg
 
 **User story**: from a ticket, the user queues it so the next queued work [22] takes it, without spending an agent turn on appending one line.
 
-**Problem**: the drain works the agent queue [7] front to back, so an entry appended at the end would wait behind everything; and an entry carrying only a title loses the ticket it came from the moment it is queued.
+**Problem**: the queued work [22] takes the agent queue [7] top-down, so an entry appended at the end would wait behind everything; and an entry carrying only a title loses the ticket it came from the moment it is queued.
 
 #### Business logic
 
-The entry text is trimmed and must not be empty ("a ticket is required"); the project must be known ("no such project"). When the entry comes from a ticket, it is written as a markdown link to `tickets/<file>` so the agent draining it has the ticket to open, and it is placed in the `## Priority N` section the ticket's own priority earns: the ticket's priority as written when it is a whole number from 0 to 10, and 5 for anything else (unmarked, a word, out of range), so a typo is not hidden by a guess. Without a ticket the entry is appended at the end. The queue is the project's `TODO_AGENTS.md` on the `agent-data` branch [27], written as one committed and pushed change; a write that cannot land is "the queue could not be written", and a success names the file written.
+The entry text is trimmed and must not be empty ("a ticket is required"); the project must be known ("no such project"). When the entry comes from a ticket, it is written as a markdown link to `tickets/<file>` so the agent that takes it has the ticket to open, and it is placed in the `## Priority N` section the ticket's own priority earns: the ticket's priority as written when it is a whole number from 0 to 10, and 5 for anything else (unmarked, a word, out of range), so a typo is not hidden by a guess. Without a ticket the entry is appended at the end. The queue is the project's `TODO_AGENTS.md` on the `agent-data` branch [27], written as one committed and pushed change; a write that cannot land is "the queue could not be written", and a success names the file written.
 
 ### Putting a ticket's plan on the agent queue
 
 #### Context
 
-**User story**: the user asks for a ticket's plan to be written by the next drain, the way the plan-tickets preset would ask for it.
+**User story**: the user asks for a ticket's plan to be written by the next queued work [22], the way the `/plan-tickets` command would ask for it.
 
 #### Business logic
 

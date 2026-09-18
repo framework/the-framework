@@ -113,12 +113,6 @@ export async function readQueue(cwd: string, opts: { fresh?: boolean } = {}): Pr
   return readBranchFile(cwd, DATA_BRANCH, QUEUE_FILE, opts)
 }
 
-/** The queue's open entries, in order of work; `[]` when there is no queue or nothing open. */
-export async function readQueueEntries(cwd: string, opts: { fresh?: boolean } = {}): Promise<string[]> {
-  const md = await readQueue(cwd, opts)
-  return md === undefined ? [] : parseQueueEntries(md)
-}
-
 /** What a queue edit did: landed (and whether it changed anything), or did not land. */
 export type QueueEdit = { ok: true; changed: boolean } | { ok: false }
 
@@ -145,7 +139,3 @@ export async function queueAdd(cwd: string, entry: string, priority?: number, de
   return editQueue(cwd, `queue add: ${entry}`, md => (priority === undefined ? appendQueueEntry(md, entry) : insertQueueEntry(md, entry, priority)), deps)
 }
 
-/** Take `entry` off the queue — it is done, or no longer wanted. Landed too when it was already gone, changing nothing. */
-export async function queueDone(cwd: string, entry: string, deps: QueueDeps = {}): Promise<QueueEdit> {
-  return editQueue(cwd, `queue done: ${entry}`, md => removeQueueEntry(md, entry), deps)
-}

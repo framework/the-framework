@@ -1,4 +1,3 @@
-import type { AgentLocation } from '../agent-location.js'
 import { join } from 'node:path'
 import type { AutoHandoffSkip, FrameworkEvent } from '../events.js'
 import { nodeFs } from '../node-fs.js'

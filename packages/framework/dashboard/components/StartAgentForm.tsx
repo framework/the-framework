@@ -11,7 +11,8 @@ import { Composer, type ComposerHandle } from './Composer.js'
 // Start a run in the selected project (#405, #1774): a free-text box, where `/` lists the project's
 // commands, and Start, which is the project's own start hook (posted over `sendStart`). The editor +
 // control row are the shared Composer (#721); this form owns the submit.
-// A project without a start hook cannot start a run from here, and the form says how to add one.
+// A project without a start hook cannot start a run from here, and the form says how to add one:
+// the scheduler's `init` writes its lines, or a person writes a `start:` line of their own.
 // What would stop the run (a coding agent not installed or logged out) is said before the Start,
 // from the project's check hook.
 export function StartAgentForm({
@@ -100,7 +101,8 @@ export function StartAgentForm({
       ))}
       {noStartHook && (
         <p role="alert" className="mt-2 text-xs text-danger">
-          This project has no start hook. Add a <code className="font-mono">start:</code> line to{' '}
+          This project has no start hook. Run <code className="font-mono">npx agent-scheduler init</code> in the
+          project, or add a <code className="font-mono">start:</code> line to{' '}
           <code className="font-mono">.the-framework/hooks.yml</code>.
         </p>
       )}

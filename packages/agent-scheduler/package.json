@@ -35,7 +35,8 @@
     "@gemstack/agent-data": "workspace:*",
     "@gemstack/skill-branches": "workspace:*",
     "@gemstack/skill-logs": "workspace:*",
-    "agent-driver": "workspace:*"
+    "agent-driver": "workspace:*",
+    "yaml": "^2.5.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

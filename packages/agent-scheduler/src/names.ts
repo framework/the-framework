@@ -33,3 +33,9 @@ export const TICK_MS = 60_000
 
 /** How long a command's check may run before it counts as failed. */
 export const CHECK_TIMEOUT_MS = 60_000
+
+/** The dashboard's directory in a project it knows: made and hidden from git when the project is added. */
+export const DASHBOARD_DIR = '.the-framework'
+
+/** The dashboard's hooks file, the lines it runs for the project: where `init` writes this tool's. */
+export const DASHBOARD_HOOKS = `${DASHBOARD_DIR}/hooks.yml`

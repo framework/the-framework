@@ -1,0 +1,17 @@
+{
+  "name": "@gemstack/skill-ux",
+  "version": "0.0.1",
+  "description": "The ux command for coding agents: review every UI flow of a part of the product, rate its user experience, improve the badly rated flows, and open a pull request for a person to review. A skill file only, no code.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/framework/the-framework.git",
+    "directory": "packages/skill-ux"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "SKILL.md"
+  ]
+}

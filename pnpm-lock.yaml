@@ -202,6 +202,12 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
 
+  packages/skill-maintainability: {}
+
+  packages/skill-maintenance: {}
+
+  packages/skill-market-research: {}
+
   packages/skill-plan-tickets: {}
 
   packages/skill-queue:
@@ -216,6 +222,18 @@ importers:
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
+
+  packages/skill-readability: {}
+
+  packages/skill-research: {}
+
+  packages/skill-security-audit: {}
+
+  packages/skill-suggest-new-features: {}
+
+  packages/skill-suggest-new-tickets: {}
+
+  packages/skill-suggest-tickets-to-work-on: {}
 
   packages/skill-tickets:
     dependencies:
@@ -235,6 +253,8 @@ importers:
   packages/skill-triage-quick: {}
 
   packages/skill-update-tickets: {}
+
+  packages/skill-ux: {}
 
   packages/skill-work-queue: {}
 

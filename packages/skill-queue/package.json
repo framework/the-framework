@@ -23,6 +23,9 @@
   "bin": {
     "queue": "bin/queue"
   },
+  "framework": {
+    "queue": "queue"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

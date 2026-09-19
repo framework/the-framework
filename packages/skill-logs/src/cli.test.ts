@@ -62,6 +62,9 @@ async function rig(clones: number, runs: Record<string, string> = RUNS) {
     const clone = join(parent, 'clone')
     await git(['clone', bare, clone], parent)
     await git(['checkout', '-b', `agent-a${i}`], clone)
+    // `delete` and `patch` commit: a runner with no git identity (Linux CI) refuses to.
+    await git(['config', 'user.email', `a${i}@a`], clone)
+    await git(['config', 'user.name', `a${i}`], clone)
     agents.push(clone)
   }
   const cleanup = async () => {

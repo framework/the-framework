@@ -1,0 +1,8 @@
+{"kind":"start","prompt":"/triage-quick"}
+{"kind":"session","sessionId":"c5eb9519-22c5-48c7-b079-b250698ef89a"}
+{"kind":"action","label":"Skill"}
+{"kind":"action","label":"Skill"}
+{"kind":"rate-limit","limit":{"status":"allowed","window":"five_hour","resetsAt":1789864200000}}
+{"kind":"action","label":"Bash"}
+{"kind":"action","label":"Bash"}
+{"kind":"ended","status":"failed","detail":"its process died before the run ended"}

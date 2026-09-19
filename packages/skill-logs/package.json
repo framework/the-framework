@@ -23,6 +23,9 @@
   "bin": {
     "logs": "bin/logs"
   },
+  "framework": {
+    "runs": "logs"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

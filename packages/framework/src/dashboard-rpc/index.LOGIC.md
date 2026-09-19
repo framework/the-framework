@@ -1,4 +1,4 @@
-The table of every call the daemon answers by name, plus the live event stream [1] as a separate subscription. The table is built from what the read, control, projects, preferences, quota and devices modules export, so an exported call is reachable under exactly its own name and nothing has to be registered by hand; the mount that serves them is `dashboard/rpc-serve.ts`.
+The table of every call the daemon answers by name, plus the live event stream [1] as a separate subscription. The table is built from what the read, control, projects, preferences, quota, devices and widgets modules export, so an exported call is reachable under exactly its own name and nothing has to be registered by hand; the mount that serves them is `dashboard/rpc-serve.ts`.
 
 ## Glossary
 

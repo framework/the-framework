@@ -1,4 +1,4 @@
-The dashboard's left column, present on every page: the brand mark, the "New agent" button, the "Overview", "Tickets" and "Projects" destinations, the "Recent agents" list, and a footer with the connection indicator, the theme toggle, the notifications menu and "Settings". The list shows a project's own agents [1] when a project is selected, and every project's agents pooled newest-first on the Overview [2]; each row says in one word what its agent is doing, when it started, where it runs and which coding agent [3] runs it, and a stand-in row says "starting…" the instant Start is clicked.
+The dashboard's left column, present on every page: the brand mark, the "New agent" button, the "Overview" and "Tickets" destinations, one row per page the installed widgets [15] add, the "Projects" destination, the "Recent agents" list, and a footer with the connection indicator, the theme toggle, the notifications menu and "Settings". The list shows a project's own agents [1] when a project is selected, and every project's agents pooled newest-first on the Overview [2]; each row says in one word what its agent is doing, when it started, where it runs and which coding agent [3] runs it, and a stand-in row says "starting…" the instant Start is clicked.
 
 ## Context
 
@@ -19,12 +19,13 @@ The dashboard's left column, present on every page: the brand mark, the "New age
 [12] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 [13] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
 [14] driver: a coding agent wrapped as a black box. The user's driver choice is `claude-code` or `codex`; the driver implementations are `claude-code`, `codex`, `github-actions`, `claude-web` and `fake`.
+[15] widget: a browser module one of a project's packages brings to the dashboard, named by the package's `exports["./dashboard"]`; it adds pages to the dashboard and reads its data through its own package's command.
 
 ## Business logic — TL;DR
 
 - **One column on every page** - brand mark, the navigation group, the agents list and the footer controls, in a fixed-width column that never disappears, on the Overview and on an agent's page alike.
 - **"New agent"** - starts an agent where it can: in the open project, in the only project, from a picker when there are several, or, with no project at all, by offering to add one first.
-- **"Overview" and "Tickets"** - the two cross-project destinations, "Overview" carrying the count of items in the "Human Queue"; only the current view carries the active fill, never both.
+- **"Overview", "Tickets" and the widgets' pages** - the cross-project destinations, "Overview" carrying the count of items in the "Human Queue", then one row per page a widget [15] adds, labelled by the widget; only the current view carries the active fill, never two.
 - **"Projects"** - an expandable list of every registered project with a dot saying whether it is activated or in error, the error named on hover, and an "Add project" entry at its end.
 - **Which agents are listed** - a selected project's own agents, or on the Overview every project's recent agents pooled, each row naming its project; "No agents yet." when there is nothing.
 - **The starting row** - a dimmed "starting…" stand-in appears the instant Start is clicked and retires when the real agent lands, whatever its status, or after 20 seconds without one.
@@ -43,7 +44,7 @@ See `## Context`.
 
 #### Business logic
 
-The column holds, top to bottom: the brand mark and word mark, which lead to the Overview [2] and animate while any agent [1] is working; the "New agent" button; the "Overview" row; the "Tickets" row when the caller can route to the tickets view; the "Projects" row; the scrolling "Recent agents" list under a heading that stays pinned at the top of the scroll and is shown even when the list is empty, so "No agents yet." reads as the state of this list; and a footer with the connection indicator (which daemon this dashboard talks to), the theme toggle, the notifications menu (`NotificationsMenu.tsx`), and a gear button whose hover and accessible name read "Settings" and which opens the Settings page.
+The column holds, top to bottom: the brand mark and word mark, which lead to the Overview [2] and animate while any agent [1] is working; the "New agent" button; the "Overview" row; the "Tickets" row when the caller can route to the tickets view; one row per widget page; the "Projects" row; the scrolling "Recent agents" list under a heading that stays pinned at the top of the scroll and is shown even when the list is empty, so "No agents yet." reads as the state of this list; and a footer with the connection indicator (which daemon this dashboard talks to), the theme toggle, the notifications menu (`NotificationsMenu.tsx`), and a gear button whose hover and accessible name read "Settings" and which opens the Settings page.
 
 ### "New agent"
 
@@ -61,7 +62,7 @@ One button, always labeled "New agent" with a plus icon, whose behavior depends 
 
 The button carries the active fill only when the project's launcher is the current view: a project selected, no agent picked, not following a just-started agent, and not on the tickets view. Elsewhere it is plain, because "New agent" is an action, not a place.
 
-### "Overview" and "Tickets"
+### "Overview", "Tickets" and the widgets' pages
 
 #### Context
 
@@ -69,8 +70,10 @@ The button carries the active fill only when the project's launcher is the curre
 
 #### Business logic
 
-- "Overview" leads to the Overview [2]. When the count of interventions [6] is above zero, the row carries a filled badge with the count, whose hover reads "<N> item in your Human Queue" or "<N> items in your Human Queue". The row is the active one when no project is selected and the tickets view is not current.
-- "Tickets" opens the cross-project tickets view. It is offered only when the caller can route to it, and it is the active row while the tickets view or one ticket's page is current. Because both rows correspond to pages with no project selected, the tickets view's activeness is what keeps "Overview" from claiming the active fill at the same time.
+- "Overview" leads to the Overview [2]. When the count of interventions [6] is above zero, the row carries a filled badge with the count, whose hover reads "<N> item in your Human Queue" or "<N> items in your Human Queue". The row is the active one when no project is selected and neither the tickets view nor a widget's page is current.
+- "Tickets" opens the cross-project tickets view. It is offered only when the caller can route to it, and it is the active row while the tickets view or one ticket's page is current.
+- Below "Tickets", one row per page the installed widgets [15] add, in the order the shell hands them, each with the widget's own label and icon (a generic blocks icon when the widget gives none); a row opens its page and is the active one while that page is current.
+- All of these rows correspond to pages with no project selected, so "Overview" is the active one only when neither the tickets view nor a widget's page is current.
 
 ### "Projects"
 

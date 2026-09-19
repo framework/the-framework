@@ -1,4 +1,4 @@
-The daemon's one HTTP server on its port. It serves the built dashboard, mounts the dashboard's RPC surface with its live event stream [1], and hosts two more surfaces: the relay [2] endpoints another device [3] calls, and the Claude web bridge [4] together with the web-start endpoints. On a non-loopback bind every route sits behind a shared token; on a loopback bind the same-origin and Host checks keep a web page the user merely visited from starting or steering an agent.
+The daemon's one HTTP server on its port. It serves the built dashboard and the files of the projects' widgets [9], mounts the dashboard's RPC surface with its live event stream [1], and hosts two more surfaces: the relay [2] endpoints another device [3] calls, and the Claude web bridge [4] together with the web-start endpoints. On a non-loopback bind every route sits behind a shared token; on a loopback bind the same-origin and Host checks keep a web page the user merely visited from starting or steering an agent.
 
 ## Context
 
@@ -16,11 +16,12 @@ The daemon's one HTTP server on its port. It serves the built dashboard, mounts 
 [6] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 [7] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
 [8] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
+[9] widget: a browser module one of a project's packages brings to the dashboard, named by the package's `exports["./dashboard"]`; it adds pages to the dashboard and reads its data through its own package's command.
 
 ## Business logic — TL;DR
 
 - **A broken install answers 503 everywhere** - without a built dashboard, every request gets 503 "the dashboard bundle is not installed" and nothing else is mounted.
-- **One route order for every request** - an unparseable request target is 400; the bridge and the web-start routes come first; then the shared-token guard; then the relay, the RPC mount, and finally the built dashboard.
+- **One route order for every request** - an unparseable request target is 400; the bridge and the web-start routes come first; then the shared-token guard; then the relay, the RPC mount, the widgets' files, and finally the built dashboard.
 - **The shared token on a non-loopback bind** - a valid `?token=` sets the `fw_daemon` cookie and redirects to the clean URL, a valid cookie is admitted, anything else is 401, the comparison is constant-time, and with no token configured the guard does not exist.
 - **The same-origin and Host guards on a loopback bind** - the relay refuses a cross-origin or rebound-Host request with 403, exactly as the RPC mount does, because on loopback nothing else guards it.
 - **The bridge and the web-start routes carry their own token** - both are 404 unless a bridge token is configured, both authenticate with it as a bearer token, and both are reached before the shared-token guard.
@@ -54,6 +55,7 @@ Every request is dispatched in this order:
 - When a shared token is configured, the request must pass the shared-token guard (next section).
 - A path at or under `/_relay` must pass the browser-origin guard, then goes to the relay [2] endpoints (`relay-endpoints.ts`).
 - A path at or under `/_rpc` goes to the RPC mount, which applies its own same-origin and Host guards (`rpc-serve.ts`).
+- A path under `/_widgets/` is one of a project's widgets' [9] files, served only when the project is registered, the package is a widget of that project and the file lies inside the widget module's own directory, else 404 (`widget-serve.ts`); a failure while reading it answers 500 rather than taking the daemon down.
 - Everything else is served from the built dashboard: the file when it exists, else the app shell (`static.ts`).
 
 The RPC surface acts through what the daemon wires into it, all of it required: the daemon's own start and add-project closures, the events source and the lookup for agents [5] relayed from a device [3], the preferences [6] store, the Discord credentials store, the quota [7] source, each project's current errors, and the daemon's own bridge browser. The mount is also told the bound host, so it can reject a rebound `Host`.

@@ -32,8 +32,15 @@
   "bin": {
     "the-framework": "dist/bin.js"
   },
+  "exports": {
+    "./widget": {
+      "types": "./dist/widget-types/dashboard/widget/index.d.ts"
+    },
+    "./widget.css": "./dist/widget.css",
+    "./package.json": "./package.json"
+  },
   "scripts": {
-    "build": "pnpm -C ../skill-branches build && pnpm -C ../skill-tickets build && pnpm -C ../skill-queue build && pnpm -C ../skill-logs build && pnpm -C ../agent-driver build && tsc -p tsconfig.build.json && node scripts/copy-extension.mjs && cd dashboard && vite build",
+    "build": "pnpm -C ../skill-branches build && pnpm -C ../skill-tickets build && pnpm -C ../skill-queue build && pnpm -C ../skill-logs build && pnpm -C ../agent-driver build && tsc -p tsconfig.build.json && tsc -p dashboard/tsconfig.widget.json && cp dashboard/widget/theme.css dist/widget.css && node scripts/copy-extension.mjs && cd dashboard && vite build",
     "preview": "pnpm build && node dist/bin.js",
     "dev": "pnpm -C ../skill-branches build && pnpm -C ../skill-tickets build && pnpm -C ../skill-queue build && pnpm -C ../skill-logs build && pnpm -C ../agent-driver build && tsc -p tsconfig.build.json --watch",
     "dev:dashboard": "cd dashboard && vite",

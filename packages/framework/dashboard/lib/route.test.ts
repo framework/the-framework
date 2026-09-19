@@ -156,8 +156,20 @@ describe('formatRoute', () => {
       { view: 'tickets' as const, projectId: 'my-repo', agentId: null, ticketSlug: null },
       { view: 'tickets' as const, projectId: 'my-repo', agentId: null, ticketSlug: '2026-07-20_thing.md' },
       { view: 'tickets' as const, projectId: 'my-repo', agentId: null, ticketSlug: '2026-07-20_thing.md', plan: true },
+      { projectId: null, agentId: null, page: 'logs', pagePath: [] },
+      { projectId: null, agentId: null, page: 'logs', pagePath: ['a b', 'c'] },
     ]) {
       expect(parseRoute(formatRoute(route))).toEqual(route)
     }
+  })
+
+  it('a first segment with no dash names a widget\'s page, never a project (#1774)', () => {
+    expect(parseRoute('/logs')).toEqual({ projectId: null, agentId: null, page: 'logs', pagePath: [] })
+    expect(parseRoute('/logs/run-1')).toEqual({ projectId: null, agentId: null, page: 'logs', pagePath: ['run-1'] })
+    // A project id always has its `-<hash>`, and the two view words stay views.
+    expect(parseRoute('/my-repo')).toEqual({ projectId: 'my-repo', agentId: null })
+    expect(parseRoute('/settings')).toEqual({ view: 'settings', projectId: null, agentId: null })
+    expect(parseRoute('/tickets').view).toBe('tickets')
+    expect(formatRoute({ projectId: null, agentId: null, page: 'logs' })).toBe('/logs')
   })
 })

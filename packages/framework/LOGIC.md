@@ -20,11 +20,13 @@ The product itself, published as the npm package `framework`: one command, `the-
 [10] inbox: `.the-framework/inbox.jsonl` in an agent's checkout: one JSON line per message or answer, which the agent's session takes when a turn ends.
 [11] resume hook: the one shell line under `resume` in a project's `.the-framework/hooks.yml`, given an agent [3] and either the user's words or their answer to the question it stopped on, which continues that agent.
 [12] coding agent: the CLI doing the actual work: Claude Code or Codex.
+[13] widget: a browser module one of a project's packages brings to the dashboard, named by the package's `exports["./dashboard"]`; it adds pages to the dashboard and reads its data through its own package's command.
 
 ## Business logic — TL;DR
 
 - **The dashboard is a projection, never a peer** - an agent [3] writes its card [7] and diary [8] in its own checkout [6] and talks to nothing; the daemon [1] tails those files to the browser, so every surface shows the same record and an agent working on another machine needs only its lines carried home.
 - **The Framework names no tool** - Start runs one shell line the project itself names, and the agent [3] belongs to whatever that line begins; The Framework ships no prompt text and no runner of its own.
+- **A package brings its own pages** - a dependency of a project whose package exports `./dashboard` is a widget [13]: the dashboard shows its pages and sidebar rows, loads it at run time and lets it run only its own package's command for its data, so The Framework names no skill's page either; the package publishes `framework/widget` (types) and `framework/widget.css` for widget authors.
 - **The CLI is four options and no verbs** - the bare command serves the dashboard [2]; only the port and the bind address, plus help and version, are flags, and every decision about an agent [3] is made in the dashboard.
 - **Everything that executes in Node** (`src/`) - the command, the daemon [1], the reading of a project's agents, the hooks, and the server side of the dashboard [2].
 - **The browser app** (`dashboard/`) - the single page the daemon serves: a pure projection of the files the agents write, reading over the daemon's calls and one live event stream, and steering agents back through the same daemon.

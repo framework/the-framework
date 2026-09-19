@@ -36,6 +36,16 @@ const TICKETS_SEGMENT = 'tickets'
  */
 const PLAN_SEGMENT = 'plan'
 
+/**
+ * Whether a first segment names a page a widget adds (#1774) rather than a project: a lowercase
+ * letter, then lowercase letters and digits. Never a project's id, which always carries a
+ * `-<hash>` suffix, so the router reserves no widget's word: whichever widget claims the segment
+ * gets it, and the shell says "no such page" when none does.
+ */
+export function isPageSegment(segment: string): boolean {
+  return /^[a-z][a-z0-9]*$/.test(segment)
+}
+
 /** What the dashboard is looking at, as carried by the URL. */
 export interface Route {
   /** A top-level view belonging to no project (#958), or the Tickets view (#1144). */
@@ -51,14 +61,20 @@ export interface Route {
   /** One ticket's plan view: its `<slug-stem>.plan.md` rendered as markdown. Only meaningful
    *  alongside a `ticketSlug`, since a plan belongs to a ticket. */
   plan?: boolean
+  /** A widget's page (#1774), by its segment; no project and no agent is selected there. */
+  page?: string
+  /** The segments after a widget page's own, decoded: `/logs/a` carries `['a']`. */
+  pagePath?: string[]
 }
 
 /** Read the route out of a path. Anything unparseable is the Overview, and extra segments are ignored. */
 export function parseRoute(pathname: string): Route {
-  const [first, second, third, fourth] = pathname.split('/').filter(Boolean).map(decodeSegment)
+  const segments = pathname.split('/').filter(Boolean).map(decodeSegment)
+  const [first, second, third, fourth] = segments
   if (first === SETTINGS_SEGMENT) return { view: 'settings', projectId: null, agentId: null }
   if (first === TICKETS_SEGMENT) return { view: 'tickets', projectId: null, agentId: null }
   if (!first) return { projectId: null, agentId: null }
+  if (isPageSegment(first)) return { projectId: null, agentId: null, page: first, pagePath: segments.slice(1) }
   if (second === TICKETS_SEGMENT)
     return {
       view: 'tickets',
@@ -72,8 +88,9 @@ export function parseRoute(pathname: string): Route {
 }
 
 /** The path for a route — the inverse of {@link parseRoute}. */
-export function formatRoute({ view, projectId, agentId: agentId, ticketSlug, plan }: Route): string {
+export function formatRoute({ view, projectId, agentId: agentId, ticketSlug, plan, page, pagePath }: Route): string {
   if (view === 'settings') return `/${SETTINGS_SEGMENT}`
+  if (page) return ['', page, ...(pagePath ?? [])].map(encodeURIComponent).join('/')
   if (view === 'tickets' && !projectId) return `/${TICKETS_SEGMENT}`
   if (!projectId) return '/'
   const project = encodeURIComponent(projectId)

@@ -7,4 +7,4 @@ One line per command. The command is the project's `.claude/skills/<command>`. `
 - plan-tickets: every 6h, when `npx tickets list | jq '[.[] | select(.planned or .locked | not)]'`
 - triage-quick: every 6h
 - triage-consensual: every 7d
-- post-merge-cleanup: every 1d, off
+- post-merge-cleanup: every 1h, when `gh pr list --state merged --limit 50 --json number,body --search "merged:>=$(npx logs --limit 200 | jq -r '[.[] | select(.intent == "/post-merge-cleanup" and .status == "done")][0].startedAt // (now - 86400 | todate)')" | jq '[.[] | select(.body | contains("Post-merge cleanup done.") | not) | .number]'`, off

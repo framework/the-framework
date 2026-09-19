@@ -14,6 +14,8 @@ import { AgentView } from './components/AgentView.js'
 import { agentLabel } from './lib/agent-label.js'
 import { RightRail } from './components/RightRail.js'
 import { NotFound } from './components/NotFound.js'
+import { WidgetPageView } from './components/WidgetPageView.js'
+import { useWidgetPages } from './lib/use-widgets.js'
 import { useLiveEvents } from './lib/use-live-events.js'
 import { useAgents } from './lib/use-agents.js'
 import { usePolled } from './lib/use-async.js'
@@ -60,6 +62,10 @@ const EMPTY_RECENT: RecentAgent[] = []
 export function App() {
   const { route, go } = useRoute()
   const { view, projectId, agentId: agentId, ticketSlug, plan } = route
+  // A widget's page (#1774): the route names it by its segment, with no project selected.
+  const pageSegment = route.page ?? null
+  const { pages: widgetPages, loaded: widgetsLoaded } = useWidgetPages()
+  const widgetPage = pageSegment ? widgetPages.find(page => page.segment === pageSegment) : undefined
 
   // A just-started run: bump the tick so the Sessions rail shows an optimistic "starting…" row
   // with the typed prompt at once, before the run's tool writes its card. `id` is the one the
@@ -201,6 +207,11 @@ export function App() {
     go({ view: 'tickets', projectId: null, agentId: null })
   }
 
+  // A widget's page (#1774): its own segment, cross-project like the Overview.
+  const showPage = (segment: string) => {
+    go({ projectId: null, agentId: null, page: segment })
+  }
+
   // One ticket's own page (#1144), by the same slug as its filename — what a one-liner row opens
   // into, since Queue and the rest of its detail no longer fit on the list row.
   const openTicket = (id: string, slug: string) => {
@@ -244,6 +255,20 @@ export function App() {
   const renderMain = () => {
     if (view === 'settings')
       return <SettingsPage onAgentStarted={agentStarted} onSelectProject={selectProject} onDone={showDashboard} />
+    if (pageSegment) {
+      if (widgetPage)
+        return <WidgetPageView page={widgetPage} projects={projects} path={route.pagePath ?? []} onOpenAgent={selectAgentInProject} />
+      // Not loaded yet is not "no such page": the widgets are imported after the first read.
+      if (!widgetsLoaded) return null
+      return (
+        <NotFound
+          title="No such page"
+          detail={`No installed package adds a page at "/${pageSegment}".`}
+          actionLabel="Go to the Overview"
+          onAction={showDashboard}
+        />
+      )
+    }
     // A ticket's plan view is the same shape plus the `plan` flag (#685): its `.plan.md` on its own
     // page, checked before the detail page since the flag only rides alongside a slug.
     if (view === 'tickets' && projectId && ticketSlug && plan)
@@ -306,7 +331,7 @@ export function App() {
       return (
         <NotFound
           title="This agent is gone"
-          detail="It is not in this project's agents. An agent disappears when its worktree is removed."
+          detail="There is no record of this agent. Once its checkout is removed, a finished agent is kept only when the project has a logs skill installed."
           actionLabel="Back to the project"
           onAction={() => selectAgent(null)}
         />
@@ -380,12 +405,15 @@ export function App() {
           onSettings={showSettings}
           onTickets={showTickets}
           ticketsActive={view === 'tickets'}
+          pages={widgetPages}
+          activePage={pageSegment}
+          onPage={showPage}
           interventionCount={interventions.length}
         />
         <main className="flex min-w-0 flex-1 flex-col">{renderMain()}</main>
         {/* The tickets page takes the full width itself (#1144): no rail beside it, the way
-            Settings takes the whole main pane with none either. */}
-        {view !== 'tickets' && (
+            Settings takes the whole main pane with none either. A widget's page does the same. */}
+        {view !== 'tickets' && !pageSegment && (
           <RightRail
             projectId={projectId}
             agentId={agentId}

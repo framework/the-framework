@@ -23,6 +23,9 @@
   "bin": {
     "logs": "bin/logs"
   },
+  "framework": {
+    "runs": "logs"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -32,11 +35,12 @@
       "types": "./dist/names.d.ts",
       "default": "./dist/names.js"
     },
-    "./SKILL.md": "./SKILL.md"
+    "./SKILL.md": "./SKILL.md",
+    "./dashboard": "./dist/dashboard/dashboard.js"
   },
   "scripts": {
-    "build": "pnpm -C ../agent-data build && tsc -p tsconfig.build.json",
-    "typecheck": "pnpm -C ../agent-data build && tsc --noEmit",
+    "build": "pnpm -C ../agent-data build && tsc -p tsconfig.build.json && vite build -c dashboard/vite.config.ts",
+    "typecheck": "pnpm -C ../agent-data build && tsc --noEmit && tsc --noEmit -p dashboard/tsconfig.json",
     "test": "pnpm build && tsc -p tsconfig.test.json && node --test --test-timeout=60000 'dist-test/**/*.test.js'",
     "clean": "rm -rf dist dist-test"
   },
@@ -44,7 +48,13 @@
     "@gemstack/agent-data": "workspace:*"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.0.0",
     "@types/node": "^20.0.0",
-    "typescript": "^7.0.2"
+    "@types/react": "^19.2.0",
+    "lucide-react": "^0.469.0",
+    "react": "^19.2.0",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.0.0"
   }
 }

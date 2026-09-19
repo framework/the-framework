@@ -1,12 +1,19 @@
 import { parseArgs } from 'node:util'
 import { checkoutRoot, gitReason, nodeGitRunner, openBranchReader, type BranchReader, type GitRunner, DATA_BRANCH } from '@gemstack/agent-data'
 import { RUNS_DIR } from './names.js'
-import { agentLines, isRunId, newestFirst, parseDiary, parseRunCard, publicCard, runCardFile, runDiaryFile, runIdOfFile, workedTicket, type RunCard } from './run.js'
+import { agentLines, isRunId, newestFirst, parseDiary, parseRunCard, publicCard, runCardFile, runDiaryFile, runIdOfFile, workedTicket, type RunCard, type RunPatch } from './run.js'
+import { deleteRun, findRun, listRuns, patchRun, readDiary, runFiles } from './store.js'
 
 /**
  * The command line over the package: the reads a daemon's pages do, for an agent (and a person)
- * in a shell, in any clone of the repository. Read-only: an agent's run is recorded by the
+ * in a shell, in any clone of the repository. An agent only reads: its run is recorded by the
  * process that ran it, not by the agent.
+ *
+ * A dashboard that shows the runs reads and changes them through the same command, so it needs
+ * no code of this package: `--local` reads the persistent checkout the writer keeps at
+ * `.branches/agent-data` instead of origin (no fetch, fast enough to poll), `--full` prints the
+ * whole record (the writer's `caller` key, every diary line), and `delete` / `patch` are its
+ * Delete and Open-PR buttons, written through that checkout like the writer's own records.
  *
  * The contract: JSON on stdout, one line for a person on stderr, and the exit code says how it
  * went — 0 for a result, 1 for a refusal or a git failure, 2 for a command that could not be
@@ -28,6 +35,15 @@ export const USAGE = `usage: logs [command]
                                      --branch the runs on one branch
   show <id>                          one run: its card, and what the agent said, its result,
                                      how it ended, what it cost
+
+  For a dashboard that shows the runs, not for an agent:
+  --local                            with either read: read the checkout kept at .branches/agent-data,
+                                     no fetch from origin
+  --full                             with either read: the whole card (with the writer's caller key)
+                                     and, for show, every diary line
+  delete <id>                        remove a run, card and diary, as one commit
+  patch <id> [--branch <name>] [--pr <number> --pr-url <url>]
+                                     set the branch the work landed on, and its pull request
 
 JSON on stdout. Exit code 1 for a refusal or a git failure (the reason on stderr), 2 for a usage error.`
 
@@ -87,34 +103,87 @@ type Command = (args: string[], io: CliIo, git: GitRunner) => Promise<unknown>
 
 /** The bare command: the runs, newest first, filtered and capped. */
 const list: Command = async (args, io, git) => {
-  const { values } = parse(args, { ticket: { type: 'string' }, branch: { type: 'string' }, limit: { type: 'string' } }, 0)
+  const { values } = parse(args, { ticket: { type: 'string' }, branch: { type: 'string' }, limit: { type: 'string' }, ...READ_FLAGS }, 0)
   const limit = values.limit === undefined ? DEFAULT_LIMIT : limitArg(values.limit)
+  const keep = (card: RunCard): boolean =>
+    (values.ticket === undefined || workedTicket(card, values.ticket)) && (values.branch === undefined || card.branch === values.branch)
+  const shown = values.full ? (card: RunCard) => card : publicCard
+  if (values.local) {
+    const root = await inRepo(() => checkoutRoot(io.cwd, git))
+    return (await listRuns(root, {}, { git })).filter(keep).slice(0, limit).map(shown)
+  }
   const reader = await open(io.cwd, git)
   const cards: RunCard[] = []
   // Newest first, and no further than the cap: the cards past it are never read.
   for (const { person, id } of await runEntries(reader)) {
     if (cards.length >= limit) break
     const card = parseRunCard((await reader.read(`${RUNS_DIR}/${person}/${runCardFile(id)}`)) ?? '')
-    if (!card) continue
-    if (values.ticket !== undefined && !workedTicket(card, values.ticket)) continue
-    if (values.branch !== undefined && card.branch !== values.branch) continue
+    if (!card || !keep(card)) continue
     cards.push(card)
   }
-  return cards.map(publicCard)
+  return cards.map(shown)
 }
+
+/** The two flags either read takes: where it reads, and how much it prints. */
+const READ_FLAGS = { local: { type: 'boolean' }, full: { type: 'boolean' } } as const
 
 const COMMANDS: Record<string, Command> = {
   async show(args, io, git) {
-    const { positionals } = parse(args, {}, 1)
-    const id = positionals[0]!
-    if (!isRunId(id)) throw new Usage(`not a run id: ${id}`)
-    const reader = await open(io.cwd, git)
-    const entry = (await runEntries(reader)).find(e => e.id === id)
-    const card = entry ? parseRunCard((await reader.read(`${RUNS_DIR}/${entry.person}/${runCardFile(id)}`)) ?? '') : undefined
-    if (!entry || !card) throw new Refused({ ok: false, reason: 'no-run', id }, `no run is named ${id}`)
-    const diary = parseDiary((await reader.read(`${RUNS_DIR}/${entry.person}/${runDiaryFile(id)}`)) ?? '')
-    return { ...publicCard(card), diary: agentLines(diary) }
+    const { values, positionals } = parse(args, READ_FLAGS, 1)
+    const id = runIdArg(positionals[0]!)
+    let card: RunCard | undefined
+    let diary: ReturnType<typeof parseDiary> = []
+    if (values.local) {
+      const root = await inRepo(() => checkoutRoot(io.cwd, git))
+      card = await findRun(root, id, { git })
+      diary = card ? ((await readDiary(root, id, { git })) ?? []) : []
+    } else {
+      const reader = await open(io.cwd, git)
+      const entry = (await runEntries(reader)).find(e => e.id === id)
+      card = entry ? parseRunCard((await reader.read(`${RUNS_DIR}/${entry.person}/${runCardFile(id)}`)) ?? '') : undefined
+      if (entry && card) diary = parseDiary((await reader.read(`${RUNS_DIR}/${entry.person}/${runDiaryFile(id)}`)) ?? '')
+    }
+    if (!card) throw noRun(id)
+    return values.full ? { ...card, diary } : { ...publicCard(card), diary: agentLines(diary) }
   },
+
+  async delete(args, io, git) {
+    const { positionals } = parse(args, {}, 1)
+    const id = runIdArg(positionals[0]!)
+    const root = await inRepo(() => checkoutRoot(io.cwd, git))
+    // The run is looked for inside the write cycle, after it synced the checkout: a run another
+    // machine recorded is deletable here, and one that is nowhere commits nothing.
+    const written = await deleteRun(root, id, { git })
+    if (!written.ok && !written.committed) throw new Refused({ ok: false, reason: 'write-failed', id, detail: written.error }, written.error)
+    if (written.ok && !written.changed) throw noRun(id)
+    return { ok: true, id }
+  },
+
+  async patch(args, io, git) {
+    const { values, positionals } = parse(args, { branch: { type: 'string' }, pr: { type: 'string' }, 'pr-url': { type: 'string' } }, 1)
+    const id = runIdArg(positionals[0]!)
+    if ((values.pr === undefined) !== (values['pr-url'] === undefined)) throw new Usage('--pr and --pr-url go together')
+    if (values.pr !== undefined && !/^\d+$/.test(values.pr)) throw new Usage(`--pr takes the pull request's number, got ${values.pr}`)
+    const patch: RunPatch = {
+      ...(values.branch !== undefined ? { branch: values.branch } : {}),
+      ...(values.pr !== undefined ? { pr: { number: Number(values.pr), url: values['pr-url']! } } : {}),
+    }
+    if (Object.keys(patch).length === 0) throw new Usage('patch needs --branch or --pr')
+    const root = await inRepo(() => checkoutRoot(io.cwd, git))
+    if (await patchRun(root, id, patch, { git })) return { ok: true, id }
+    // Not patched: the cycle synced the checkout first, so a run it does not hold is no run at all.
+    if (!(await runFiles(root, id, { git }))) throw noRun(id)
+    throw new Refused({ ok: false, reason: 'write-failed', id }, 'the patch did not land')
+  },
+}
+
+function runIdArg(id: string): string {
+  if (!isRunId(id)) throw new Usage(`not a run id: ${id}`)
+  return id
+}
+
+function noRun(id: string): Refused {
+  return new Refused({ ok: false, reason: 'no-run', id }, `no run is named ${id}`)
 }
 
 /** Every run on the branch by person and id, newest first, from the directory listings alone. */

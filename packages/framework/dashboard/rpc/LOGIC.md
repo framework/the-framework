@@ -23,6 +23,7 @@ The browser's side of the daemon's call surface: one module of typed stubs per g
 [13] device: Another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 [14] spend offset: the user's adjustment of the quota boundary, in percentage points of the week: how far past it unattended work may start. Each project's scheduler holds its own, as `spendOffset` in its state file. The offset hook, under `offset:` in `.the-framework/hooks.yml`, sets it.
 [15] schedule switch: a person's choice, on one machine, whether a scheduled command (a line of the project's `agent-schedule.md`) runs there; the project's scheduler keeps it in its state file. The switch hook, under `switch:` in `.the-framework/hooks.yml`, sets it.
+[16] widget: a browser module one of a project's packages brings to the dashboard, named by the package's `exports["./dashboard"]`; it adds pages to the dashboard and reads its data through its own package's command.
 
 ## Business logic — TL;DR
 
@@ -34,6 +35,7 @@ The browser's side of the daemon's call surface: one module of typed stubs per g
 - **Preferences** (`preferences.ts`) - reading, replacing or patching the preferences [10], a project's shared saved prompts, the installed editors, and whether the Discord credentials are set and saving them.
 - **Quota** (`quota.ts`) - the quota [11] reading against the quota boundary [12], and setting the spend offset [14] through every project's offset hook.
 - **Devices** (`devices.ts`) - whether each saved device [13] answers, checked by the daemon with the token the browser holds and never keeps.
+- **Widgets** (`widgets.ts`) - which widgets [16] the registered projects bring, and a widget running one of its own package's commands in one project.
 
 ## Business logic
 

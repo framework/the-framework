@@ -3,7 +3,7 @@
 // names `fake-run-bin.js` as its start and resume lines, so a Start goes the whole production
 // way (the RPC, the hook, a detached run writing the files the dashboard reads) offline.
 import { mkdtempSync } from 'node:fs'
-import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { appendFile, mkdir, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { PROJECT_HOOKS_FILE } from '../project-hooks.js'
 import { execFile } from 'node:child_process'
 import { tmpdir } from 'node:os'
@@ -14,11 +14,9 @@ import { setDashboardContext } from '../dashboard-rpc/context.js'
 import { createProjectRuntime, type ProjectRuntime } from '../daemon-runtime.js'
 import { registryPreferencesStore, projectId } from '../registry.js'
 import { registryDiscordCredentialsStore } from '../discord-credentials-store.js'
-import { fromDiaryLine, resolveAgentEventsPath, type AgentMeta, type AgentStatus } from '../store/index.js'
-import type { AnyDiaryLine } from '@gemstack/skill-logs'
+import { fromDiaryLine, projectRuns, resolveAgentDiary, type AgentMeta, type AgentStatus, type AnyDiaryLine } from '../store/index.js'
 import { withFileBranch, DATA_BRANCH } from '@gemstack/agent-data'
 import { worktreePath } from '@gemstack/skill-branches'
-import { runFiles } from '@gemstack/skill-logs'
 import { TICKETS_DIR } from '@gemstack/skill-tickets'
 import { QUEUE_FILE } from '@gemstack/skill-queue'
 import { tailAgentEvents } from '../dashboard-rpc/events-tail.js'
@@ -28,6 +26,10 @@ import { onAgents } from '../dashboard-rpc/reads.js'
 import type { FrameworkEvent } from '../events.js'
 import type { StartAgentOptions } from '../dashboard/types.js'
 import type { QuotaView } from '../dashboard/quota.js'
+
+/** The records package every fixture project depends on, linked from this workspace's own install. */
+const LOGS_PACKAGE = '@gemstack/skill-logs'
+const logsPackageDir = resolve(dirname(fileURLToPath(import.meta.resolve(LOGS_PACKAGE))), '..')
 
 // Re-home the process-global config home FIRST: the registry, preferences, and daemon state all
 // resolve through $XDG_CONFIG_HOME at call time, and run-tests.mjs gives the whole suite ONE
@@ -205,8 +207,14 @@ export async function makeWorld(): Promise<StoryWorld> {
         await mkdir(dirname(join(cwd, file)), { recursive: true })
         await writeFile(join(cwd, file), text)
       }
+      // The project records its runs the way a real one does: the logs package is one of its
+      // dependencies, and declares itself the runs provider the dashboard reads finished runs from.
+      await writeFile(join(cwd, 'package.json'), JSON.stringify({ name: 'story-fixture', private: true, devDependencies: { [LOGS_PACKAGE]: '*' } }, null, 2) + '\n')
       await git(cwd, 'add', '-A')
       await git(cwd, 'commit', '-q', '-m', 'seed')
+      await mkdir(join(cwd, 'node_modules', '@gemstack'), { recursive: true })
+      await symlink(logsPackageDir, join(cwd, 'node_modules', LOGS_PACKAGE))
+      await appendFile(join(cwd, '.git', 'info', 'exclude'), 'node_modules\n')
       if (onBranch.length) {
         const result = await withFileBranch(cwd, DATA_BRANCH, 'seed', async dir => {
           for (const [file, text] of onBranch) {
@@ -261,7 +269,7 @@ export async function makeWorld(): Promise<StoryWorld> {
 
     async waitRecorded(project, agentId, timeoutMs = 30_000) {
       await waitFor(
-        async () => ((await runFiles(project.cwd, agentId).catch(() => undefined)) ? true : undefined),
+        async () => ((await (await projectRuns(project.cwd))?.show(agentId)) ? true : undefined),
         `run ${agentId} to be recorded on the data branch`,
         timeoutMs,
       )
@@ -270,10 +278,10 @@ export async function makeWorld(): Promise<StoryWorld> {
     async tailAgent(project, agentId) {
       const events: FrameworkEvent[] = []
       // The relocating tail — the same seam the dashboard's onEvents rides: when the run's tool
-      // records the run and reclaims the checkout, the tail re-resolves the diary and carries its
-      // offset, so the feed keeps the final lines even when their fs.watch signal was lost.
+      // records the run and reclaims the checkout, the tail asks again and sends the finished run's
+      // lines it had not sent, so the feed keeps the final lines even when their fs.watch signal was lost.
       const stop = tailAgentEvents<AnyDiaryLine>(
-        () => resolveAgentEventsPath(project.cwd, agentId),
+        () => resolveAgentDiary(project.cwd, agentId),
         line => events.push(fromDiaryLine(line)),
       )
       const tail = { events, stop }

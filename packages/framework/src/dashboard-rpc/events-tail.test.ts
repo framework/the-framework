@@ -118,12 +118,18 @@ test('tailEvents reports the replay boundary even when the log does not exist ye
   }
 })
 
-// The relocating tail: an agent's journal is copied verbatim into the archive at teardown and the
-// worktree is removed. tailAgentEvents re-resolves the path when the tailed file disappears and
-// carries the read offset across the move, so the feed gets exactly the lines the move would
-// have swallowed — once, with no replay of what was already delivered.
+// The relocating tail: while a run has its checkout, its diary is a file there; when the run is
+// recorded and the checkout removed, the diary is the finished run's lines, read whole from the
+// project's runs provider. tailAgentEvents asks again when the tailed file disappears and sends
+// the finished lines past the count it already delivered — once, with no replay.
 
-test('tailAgentEvents follows the journal into the archive: missed lines arrive exactly once', async () => {
+/** A finished run's lines, as the runs provider answers them: the diary file's lines, in order. */
+async function finished(path: string): Promise<{ finished: FrameworkEvent[] }> {
+  const { readFile } = await import('node:fs/promises')
+  return { finished: (await readFile(path, 'utf8')).split('\n').filter(Boolean).map(l => JSON.parse(l) as FrameworkEvent) }
+}
+
+test('tailAgentEvents follows the diary into the finished run: missed lines arrive exactly once', async () => {
   const cwd = await tmpWorkspace()
   const live = join(cwd, 'worktree-events.jsonl')
   const archive = join(cwd, 'archived-events.jsonl')
@@ -132,14 +138,14 @@ test('tailAgentEvents follows the journal into the archive: missed lines arrive 
   let sync = 0
   const { rename } = await import('node:fs/promises')
   const stop = tailAgentEvents<FrameworkEvent>(
-    async () => ((await import('node:fs')).existsSync(live) ? live : archive),
+    async () => ((await import('node:fs')).existsSync(live) ? { file: live } : finished(archive)),
     e => void (e.kind === 'log' && seen.push(e.message)),
     () => sync++,
   )
   try {
     await sleep(200)
     assert.deepEqual(seen, ['one', 'two'])
-    // The retirement, compressed: the final lines land and the journal moves in one breath, so
+    // The retirement, compressed: the final lines land and the diary moves in one breath, so
     // whether the watcher saw the appends before the move is scheduling luck — exactly the
     // window that used to swallow a fast agent's `end`. Either way the tail must deliver
     // everything, each line once.
@@ -155,7 +161,7 @@ test('tailAgentEvents follows the journal into the archive: missed lines arrive 
   }
 })
 
-test('tailAgentEvents does not replay a fully-consumed journal after the move', async () => {
+test('tailAgentEvents does not replay a fully-consumed diary once the run is finished', async () => {
   const cwd = await tmpWorkspace()
   const live = join(cwd, 'worktree-events.jsonl')
   const archive = join(cwd, 'archived-events.jsonl')
@@ -163,20 +169,42 @@ test('tailAgentEvents does not replay a fully-consumed journal after the move', 
   const seen: string[] = []
   const { copyFile, rm: rmFile } = await import('node:fs/promises')
   const stop = tailAgentEvents<FrameworkEvent>(
-    async () => ((await import('node:fs')).existsSync(live) ? live : archive),
+    async () => ((await import('node:fs')).existsSync(live) ? { file: live } : finished(archive)),
     e => void (e.kind === 'log' && seen.push(e.message)),
   )
   try {
     await sleep(200)
     assert.deepEqual(seen, ['one', 'two'])
-    await sleep(20) // let the copy's mtime land visibly later than the seeding read
-    // The archive path: a same-content copy with a NEWER mtime and the SAME length as what was
-    // consumed — the exact shape the same-length-rewrite (#567) detection resets on. The retarget
-    // must adopt the copy's mtime instead, or every line would be delivered twice.
     await copyFile(live, archive)
     await rmFile(live)
     await sleep(1600)
     assert.deepEqual(seen, ['one', 'two'])
+  } finally {
+    stop()
+    await rm(cwd, { recursive: true, force: true })
+  }
+})
+
+test('tailAgentEvents still follows a diary that moves to another file, carrying its offset', async () => {
+  const cwd = await tmpWorkspace()
+  const first = join(cwd, 'first.jsonl')
+  const second = join(cwd, 'second.jsonl')
+  await writeFile(first, line('one'))
+  const seen: string[] = []
+  const { rename } = await import('node:fs/promises')
+  const { existsSync } = await import('node:fs')
+  const stop = tailAgentEvents<FrameworkEvent>(
+    async () => ({ file: existsSync(first) ? first : second }),
+    e => void (e.kind === 'log' && seen.push(e.message)),
+  )
+  try {
+    await sleep(200)
+    await appendFile(first, line('two'))
+    await rename(first, second)
+    await sleep(1600)
+    await appendFile(second, line('three'))
+    await sleep(1600)
+    assert.deepEqual(seen, ['one', 'two', 'three'])
   } finally {
     stop()
     await rm(cwd, { recursive: true, force: true })
@@ -192,10 +220,10 @@ test('tailAgentEvents stays put while the resolver has no better answer', async 
   const { copyFile, rm: rmFile } = await import('node:fs/promises')
   let archiveVisible = false
   const stop = tailAgentEvents<FrameworkEvent>(
-    // The window where the live file is gone but the archive is not resolvable yet: the
+    // The window where the live file is gone but the finished run is not readable yet: the
     // resolver answers undefined (a deleted session resolves like this forever), and the tail
-    // must idle rather than hop somewhere wrong — then catch up once the archive appears.
-    async () => ((await import('node:fs')).existsSync(live) ? live : archiveVisible ? archive : undefined),
+    // must idle rather than hop somewhere wrong — then catch up once the finished run appears.
+    async () => ((await import('node:fs')).existsSync(live) ? { file: live } : archiveVisible ? finished(archive) : undefined),
     e => void (e.kind === 'log' && seen.push(e.message)),
   )
   try {
@@ -214,7 +242,7 @@ test('tailAgentEvents stays put while the resolver has no better answer', async 
   }
 })
 
-test('tailAgentEvents finds a diary it never saw at its first home: a short run, started and recorded between two polls (#1774)', async () => {
+test('tailAgentEvents finds a diary it never saw in its checkout: a short run, started and recorded between two polls (#1774)', async () => {
   const cwd = await tmpWorkspace()
   const checkout = join(cwd, 'checkout', 'diary.jsonl') // never exists: the run came and went
   const recorded = join(cwd, 'recorded-diary.jsonl')
@@ -222,7 +250,7 @@ test('tailAgentEvents finds a diary it never saw at its first home: a short run,
   let sync = 0
   const { existsSync } = await import('node:fs')
   const stop = tailAgentEvents<FrameworkEvent>(
-    async () => (existsSync(recorded) ? recorded : checkout),
+    async () => (existsSync(recorded) ? finished(recorded) : { file: checkout }),
     e => void (e.kind === 'log' && seen.push(e.message)),
     () => sync++,
   )
@@ -236,5 +264,22 @@ test('tailAgentEvents finds a diary it never saw at its first home: a short run,
   } finally {
     stop()
     await rm(cwd, { recursive: true, force: true })
+  }
+})
+
+test('tailAgentEvents on a run already finished: every line, then the replay marker, and nothing follows', async () => {
+  const seen: string[] = []
+  let sync = 0
+  const stop = tailAgentEvents<FrameworkEvent>(
+    async () => ({ finished: [{ kind: 'log', message: 'one' }, { kind: 'log', message: 'two' }] as FrameworkEvent[] }),
+    e => void (e.kind === 'log' && seen.push(e.message)),
+    () => sync++,
+  )
+  try {
+    await sleep(100)
+    assert.deepEqual(seen, ['one', 'two'])
+    assert.equal(sync, 1)
+  } finally {
+    stop()
   }
 })

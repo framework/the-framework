@@ -1,10 +1,10 @@
-The read side of a project's agents [1]. The Framework runs no agent and writes no agent's record: the tool that runs an agent keeps the agent's card and diary [2] in the agent's checkout [3] while it works, and the `logs` skill's copy of both on the `agent-data` branch [4] is the one place a finished agent lives. This file reads both places and composes them into what every dashboard surface lists and replays.
+The read side of a project's agents [1]. The Framework runs no agent and writes no agent's record: the tool that runs an agent keeps the agent's card and diary [2] in the agent's checkout [3] while it works, and a finished agent is whatever the project's runs provider [4] answers. This file reads both places and composes them into what every dashboard surface lists and replays.
 
 ## Context
 
 **User story**:
 - The user starts an agent [1] and follows it live; closing the browser tab or restarting the daemon and coming back shows the same agent with the same events and status.
-- The Overview lists every agent of a project, working and ended, newest first, including the ones recorded by other machines and other people on the `agent-data` branch [4].
+- The Overview lists every agent of a project, working and ended, newest first, including the ones other machines and other people recorded, when the project has a runs provider [4].
 - The user answers the question an agent ended on, and the agent stays one row that reads as working again, with its whole history.
 
 **Business logic story**: the dashboard is a projection of files it does not write. An agent's card says who runs it (the process id and the host), so Stop can signal it; an agent whose process died is not repaired here, because the tool that started it sweeps its own dead agents.
@@ -12,39 +12,39 @@ The read side of a project's agents [1]. The Framework runs no agent and writes 
 ## Glossary
 
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. The Framework starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
-[2] card / diary: an agent's record in the `logs` skill's two shapes: the card `<id>.json` (what was asked, the branch, the pull request, how it ended, what it cost) and the diary `<id>.jsonl` (what the agent said, one line per event). While the agent has a checkout they sit under the checkout's `.the-framework/`, written by the tool that runs it; a finished agent's are on the `agent-data` branch.
+[2] card / diary: an agent's record in two shapes, whose definition is The Framework's (`runs.ts`): the card `<id>.json` (what was asked, the branch, the pull request, how it ended, what it cost) and the diary `<id>.jsonl` (what the agent said, one line per event). While the agent has a checkout they sit under the checkout's `.the-framework/`, written by the tool that runs it; a finished agent's are what the runs provider [4] answers.
 [3] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, in a directory named `agent-<agent id>`. The user's own working copy is "the project's checkout".
-[4] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the recorded agents.
+[4] runs provider: the command, among the commands of a project's dependencies, that a package declares as answering for the project's finished agents, in its own package.json under `"framework": { "runs": "<command>" }` (the `logs` skill's package declares its `logs` command).
 [5] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its card and diary.
 [6] status: how an agent stands: `running`, `done`, `stopped`, `failed`, or `waiting` (it ended on a question, its checkout kept, and the answer resumes it).
 
 ## Business logic — TL;DR
 
-- **The recorded agents** - every person's agents on the `agent-data` branch, newest first, each card unfolded into the fields the dashboard reads; optionally only those started since a moment.
+- **The finished agents** - what the runs provider answers, newest first, each card unfolded into the fields the dashboard reads; optionally only those started since a moment; read fresh when an agent just left its checkout.
 - **The agent in a checkout** - a checkout's card read as it stands, whatever its status, with the branch the checkout has checked out now; the project's own checkout holds no agent; nothing is ever repaired on read.
 - **Every agent that has a checkout** - each `agent-<id>` directory under `.branches/`, newest first; anything else in there is skipped.
-- **All agents, and one by id** - the ones with a checkout first, then the recorded ones; an agent in both is listed once, from its checkout.
-- **One agent's events for replay** - the diary in the agent's checkout while it has one, else the recorded diary, each line turned into the event the dashboard draws.
-- **Where a recorded agent's files are** - the paths of its card and diary on the branch's checkout, or none.
+- **All agents, and one by id** - the ones with a checkout first, then the finished ones; an agent in both is listed once, from its checkout.
+- **One agent's events for replay** - the diary in the agent's checkout while it has one, else the finished agent's diary, each line turned into the event the dashboard draws.
+- **A finished agent's diary** - every line, from the runs provider; none for an agent whose record still says `running`.
 - **Whether a process is alive** - a process id on this machine is probed without signaling it.
 
 ## Business logic
 
-### The recorded agents
+### The finished agents
 
 #### Context
 
-See `## Context`. The files are the `logs` skill's; this is its reader, turned into the dashboard's shape by `run-record.ts`.
+See `## Context`. The answer is the runs provider's (`runs.ts`), turned into the dashboard's shape by `run-record.ts`.
 
 #### Business logic
 
-The recorded agents of a project are read through the `logs` skill from the `agent-data` branch's [4] checkout, every person's directory included, and listed newest first by agent id [5], which sorts as time. Each card [2] becomes the dashboard's record of the agent: the skill's own fields as they are, the fields the running tool filed under the card's `caller` key (the process id, the host, the checkout path and whatever else it recorded) unfolded beside them, and the time of the last update taken as the end time, else the start time. A caller may ask only for agents started at or after a moment. A project with no such branch, or a branch that cannot be read, has no recorded agents; nothing is thrown.
+The finished agents of a project are what its runs provider [4] lists, newest first by agent id [5], which sorts as time. Each card [2] becomes the dashboard's record of the agent: the card's own fields as they are, the fields the running tool filed under the card's `caller` key (the process id, the host, the checkout path and whatever else it recorded) unfolded beside them, and the time of the last update taken as the end time, else the start time. A caller may ask only for agents started at or after a moment. A project with no runs provider, or one whose provider fails, has no finished agents; nothing is thrown.
 
 ### The agent in a checkout
 
 #### Context
 
-**Problem**: an agent that is working is not on the branch yet, or is there only as its first leg; its current state is in its checkout. And the agent renames its branch itself while it works, while its card learns the new name only when the agent ends; the name the dashboard labels the agent by is read off that branch.
+**Problem**: an agent that is working is not finished yet, or is finished only as its first leg; its current state is in its checkout. And the agent renames its branch itself while it works, while its card learns the new name only when the agent ends; the name the dashboard labels the agent by is read off that branch.
 
 #### Business logic
 
@@ -64,11 +64,11 @@ Every `agent-<id>` directory under the project's `.branches/` is read as above, 
 
 #### Context
 
-**Problem**: an agent the user continued has a record from its first leg on the branch and is working again in its checkout; the record alone would show a working agent as ended.
+**Problem**: an agent the user continued has a record from its first leg and is working again in its checkout; the record alone would show a working agent as ended. And an agent that just finished leaves its checkout a moment after it is recorded: a list of finished agents read a few seconds earlier would not have it, and its row would blink out.
 
 #### Business logic
 
-A project's agents are the ones that have a checkout followed by the recorded ones; an agent present in both is listed once, as its checkout's card says. Either side that cannot be read contributes nothing. Finding one agent by its id applies the same rule to a single row.
+A project's agents are the ones that have a checkout followed by the finished ones; an agent present in both is listed once, as its checkout's card says. Either side that cannot be read contributes nothing. When an agent that had a checkout at the project's previous read has none now, the finished agents are read fresh rather than reused (`runs.ts` shares reads for five seconds). Finding one agent by its id applies the same rule to a single row.
 
 ### One agent's events for replay
 
@@ -78,9 +78,9 @@ A project's agents are the ones that have a checkout followed by the recorded on
 
 #### Business logic
 
-An unsafe agent id has no events. When the agent has a checkout and its diary [2] `<agent id>.jsonl` is there, that diary is read, since it is the newer of the two; a trailing line torn by a write in flight is dropped. Otherwise the recorded diary is read through the `logs` skill. Each diary line is turned into the event the dashboard draws (`run-record.ts`): what the agent said, its actions, its cost, a question a turn ended on, and its end, which says `waiting` when it ended on a question. An agent in neither place has no events.
+An unsafe agent id has no events. When the agent has a checkout and its diary [2] `<agent id>.jsonl` is there, that diary is read, since it is the newer of the two; a trailing line torn by a write in flight is dropped. Otherwise the finished agent's diary is read from the runs provider [4] (below). Each diary line is turned into the event the dashboard draws (`run-record.ts`): what the agent said, its actions, its cost, a question a turn ended on, and its end, which says `waiting` when it ended on a question. An agent in neither place has no events.
 
-### Where a recorded agent's files are
+### A finished agent's diary
 
 #### Context
 
@@ -88,7 +88,7 @@ See `## Context`; the live feed uses this to follow an agent's diary once its ch
 
 #### Business logic
 
-For a safe agent id the `logs` skill is asked where the agent's card and diary sit on the `agent-data` branch's checkout; the answer is the two paths, or none when the branch has no such agent.
+For a safe agent id the runs provider [4] is asked for the agent with its whole diary; the answer is every line, in order. There is none for an unsafe id, a project with no provider, an agent the provider does not have, and an agent whose record still says `running`: the tool that runs an agent may record it as it starts, before its checkout exists, and that agent's diary is still to come in the checkout.
 
 ### Whether a process is alive
 

@@ -21,7 +21,7 @@ The instructions the `logs` skill gives an agent [1], as business logic: where t
 ## Business logic — TL;DR
 
 - **Where the record lives** - every run is two files under `agents/<who>/` on the `agent-data` branch, never on a code branch and not in the agent's checkout.
-- **How to read it** - the `logs` command, a dependency of the repository, run as `npx logs` after installing with the lockfile's package manager; it only reads, refuses with exit 1 and a line on stderr, and answers a wrong command line with the usage and exit 2.
+- **How to read it** - the `logs` command, a dependency of the repository, run as `npx logs` after installing with the lockfile's package manager; the agent only reads (the command's dashboard verbs are not its own); it refuses with exit 1 and a line on stderr, and answers a wrong command line with the usage and exit 2.
 - **The two reads** - the list of cards newest first, the newest 20 unless `--limit` says otherwise, narrowed by `--ticket` or `--branch`; and `show <id>` for one run with what the agent said.
 - **Before planning or working a ticket, read its runs** - `npx logs --ticket <file>`: a `stopped` or `failed` run says what to avoid, a `done` run with a `pr` says to read the pull request before doing the work again, and a run with no ticket is found by `--branch` or in the list.
 - **The card** - the fields and their meaning, the four statuses, cost in US dollars, absent when unknown; `caller` is the writing program's and never printed.
@@ -47,7 +47,7 @@ See `## Context`.
 
 #### Business logic
 
-The agent [1] reads the record with the `logs` command, a dependency of the repository (`@gemstack/skill-logs`): with no `node_modules` it installs first with the lockfile's package manager (`npm install` for a `package-lock.json`), then runs `npx logs`. The agent is told that the command only reads, since the program that ran an agent records its run [2] at its end; that a refusal exits 1 with a line on stderr; and that a wrong command line exits 2 with the usage.
+The agent [1] reads the record with the `logs` command, a dependency of the repository (`@gemstack/skill-logs`): with no `node_modules` it installs first with the lockfile's package manager (`npm install` for a `package-lock.json`), then runs `npx logs`. The agent is told that it only reads, since the program that ran an agent records its run [2] at its end, and that the command's `delete` and `patch` and its `--local` and `--full` flags are for the dashboard that shows the runs, never for it; that a refusal exits 1 with a line on stderr; and that a wrong command line exits 2 with the usage.
 
 ### The two reads
 
@@ -77,7 +77,7 @@ See `## Context`.
 
 #### Business logic
 
-The agent [1] is shown a card [5] and told its fields: `id`; `startedAt` and `endedAt`; `status`, one of `running`, `done`, `stopped` or `failed`; `intent`, what the agent was asked to do; `driver` [8] and `model`; `branch`; `pr`, a number and a URL; `ticket`, a path; and `cost`, in US dollars. Every field but `id`, `startedAt` and `status` is absent when unknown. The program that wrote the card may keep its own bookkeeping under one more key, `caller`, which the command never prints.
+The agent [1] is shown a card [5] and told its fields: `id`; `startedAt` and `endedAt`; `status`, one of `running`, `done`, `stopped`, `failed` or `waiting` (ended on a question the agent asked, until it is answered); `intent`, what the agent was asked to do; `driver` [8] and `model`; `branch`; `pr`, a number and a URL; `ticket`, a path; and `cost`, in US dollars. Every field but `id`, `startedAt` and `status` is absent when unknown. The program that wrote the card may keep its own bookkeeping under one more key, `caller`, which the command never prints to it.
 
 ### The diary
 

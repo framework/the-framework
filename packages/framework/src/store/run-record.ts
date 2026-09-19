@@ -1,18 +1,17 @@
 import type { DriverEvent } from 'agent-driver'
-import type { AnyDiaryLine, RunCard } from '@gemstack/skill-logs'
+import type { AnyDiaryLine, RunCard } from './runs.js'
 import type { ChoiceOption, FrameworkEvent } from '../events.js'
 import type { AgentMeta } from './agent-store.js'
 
 /**
- * A recorded run, read as the framework's own shapes (#1769). The `logs` skill owns what a run's
- * card says (eleven plain fields) and four kinds of diary line; whoever wrote the run keeps the
- * rest of what it knows under the one key the skill stores and never reads, `caller`, and writes
- * its other lines as they are. This module is the reading half of that mapping: the card as the
- * meta every list shows, the diary as the events the run page replays and tails. The framework
- * records no run of its own (#1774), so there is no other half.
+ * A run's card and diary (`runs.ts`), read as the framework's own shapes (#1769): the card as the
+ * meta every list shows, the diary as the events the run page replays and tails. The card's
+ * eleven plain fields and four kinds of diary line are the shape; whoever ran the agent keeps the
+ * rest of what it knows under one key, `caller`, and writes its other lines as they are. The
+ * framework records no run of its own (#1774), so there is no writing half.
  */
 
-/** The skill's card as the framework's meta: `caller` unfolded, the skill's fields winning. */
+/** A card as the framework's meta: `caller` unfolded, the card's own fields winning. */
 export function fromRunCard(card: RunCard): AgentMeta {
   const { caller, ...own } = card
   return { updatedAt: card.endedAt ?? card.startedAt, ...(caller as Partial<AgentMeta>), ...own } as AgentMeta
@@ -20,7 +19,7 @@ export function fromRunCard(card: RunCard): AgentMeta {
 
 /**
  * One diary line as one framework event: what the agent said, its result, the run's end and its
- * cost are the skill's four kinds; a line of any other kind is a framework event as written.
+ * cost are the shape's four kinds; a line of any other kind is a framework event as written.
  */
 export function fromDiaryLine(line: AnyDiaryLine): FrameworkEvent {
   switch (line.kind) {

@@ -8,21 +8,21 @@ Serves the live event stream [1] for one selected agent [2] to the browser: ever
 
 ## Glossary
 
-[1] event stream / diary: everything an agent does, as the browser receives it, one event per line of the agent's diary: `<id>.jsonl`, written by the tool that runs the agent under the `.the-framework/` of the agent's checkout while it works, and recorded on the `agent-data` branch by the `logs` skill once it has ended.
+[1] event stream / diary: everything an agent does, as the browser receives it, one event per line of the agent's diary: `<id>.jsonl`, written by the tool that runs the agent under the `.the-framework/` of the agent's checkout while it works, and answered whole by the project's runs provider [7] once it has ended.
 [2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. The Framework starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
 [3] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
 [4] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [5] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
-[7] run: only the `logs` skill's record of one agent on the `agent-data` branch: a card (what was asked, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said).
+[7] runs provider: the command, among the commands of a project's dependencies, that a package declares as answering for the project's finished agents (`../store/runs.ts`).
 [8] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 [9] end-of-replay marker: the one wire-only event the stream sends after the events already on disk have been delivered and before any live event; it is not an agent event, is never written to any file, and the browser swallows it.
 
 ## Business logic — TL;DR
 
-- **Which agent's events, from where** - the agent's own diary, in its checkout while it has one and on the `agent-data` branch once it is recorded; an unknown project, or no agent id, has nothing to stream and the stream ends cleanly.
+- **Which agent's events, from where** - the agent's own diary, in its checkout while it has one and from the runs provider [7] once it is finished; an unknown project, or no agent id, has nothing to stream and the stream ends cleanly.
 - **A relayed agent streams from memory** - the in-memory stream the daemon receives from the device wins over any file: its buffered history is replayed, then it is followed, and the stream ends when the relayed agent ends.
 - **The end of the replay is marked once** - after the on-disk replay and before any live event, so a reconnecting browser can rebuild its feed atomically; only the on-disk stream sends it.
-- **The stream follows the diary when it moves** - the diary moves onto the `agent-data` branch when the agent ends, and the tail follows it there carrying its position.
+- **The stream follows the diary when it moves** - when the agent ends, its diary becomes the finished agent's, and the tail sends the lines it had not sent yet.
 
 ## Business logic
 
@@ -34,7 +34,7 @@ Serves the live event stream [1] for one selected agent [2] to the browser: ever
 
 #### Business logic
 
-The file tailed is the agent's own diary, resolved by `store/agent-checkout.ts`: in the agent's checkout [4] while the checkout exists, else its run's [7] diary on the `agent-data` branch, else the place in the checkout where the diary will appear, for an agent started a moment ago. Each line is turned into the event it records on the way out. When the project id names no project here, or no agent id [5] is given, there is nothing to stream, and the stream ends cleanly rather than failing, which the browser reads as "done" and not as a lost connection.
+The file tailed is the agent's own diary, resolved by `store/agent-checkout.ts`: in the agent's checkout [4] while the checkout exists, else the finished agent's lines from the runs provider [7], else the place in the checkout where the diary will appear, for an agent started a moment ago. Each line is turned into the event it records on the way out. When the project id names no project here, or no agent id [5] is given, there is nothing to stream, and the stream ends cleanly rather than failing, which the browser reads as "done" and not as a lost connection.
 
 ### A relayed agent streams from memory
 
@@ -60,8 +60,8 @@ After everything already on disk has been delivered, and before any live event, 
 
 #### Context
 
-**Problem**: an agent's diary [1] does not sit still. When the agent ends, the tool that runs it records the diary on the `agent-data` branch and reclaims the checkout, and a stream fixed on the old path that missed the final appends went silent without ever delivering the agent's end.
+**Problem**: an agent's diary [1] does not sit still. When the agent ends, the tool that runs it records the diary and reclaims the checkout, and a stream fixed on the old path that missed the final appends went silent without ever delivering the agent's end.
 
 #### Business logic
 
-The stream tails through the relocating tail (`events-tail.ts`): whenever the file it follows is not there, the diary is re-resolved, and on a new answer the tail carries its position across the move, so the browser gets exactly the lines the move would have swallowed, once. A relocation is not a new replay.
+The stream tails through the relocating tail (`events-tail.ts`): whenever the file it follows is not there, the diary is resolved again; once it is the finished agent's lines, the tail sends the ones past what it already sent, so the browser gets exactly the lines the move would have swallowed, once. A relocation is not a new replay.

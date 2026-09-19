@@ -1,5 +1,4 @@
-import { fromDiaryLine, resolveAgentEventsPath } from '../store/index.js'
-import type { AnyDiaryLine } from '@gemstack/skill-logs'
+import { fromDiaryLine, resolveAgentDiary, type AgentDiarySource, type AnyDiaryLine } from '../store/index.js'
 import { contextEventsSource, resolveProjectPath } from './context.js'
 import type { FrameworkEvent } from '../events.js'
 import { tailAgentEvents } from './events-tail.js'
@@ -9,10 +8,10 @@ import { forwardStream } from './stream-forward.js'
 // tool writes as the agent works. Each new line becomes one `send(event)`, which the mount writes
 // out as one SSE frame. Runs, docs, and the project log come over the read-model RPCs (reads.ts).
 
-/** The diary to tail, or undefined when the project or the run is unknown. */
-async function resolveEventsPath(projectId: string, agentId?: string): Promise<string | undefined> {
+/** The diary to follow, or undefined when the project or the run is unknown. */
+async function resolveEventsDiary(projectId: string, agentId?: string): Promise<AgentDiarySource | undefined> {
   const cwd = await resolveProjectPath(projectId)
-  return cwd ? resolveAgentEventsPath(cwd, agentId) : undefined
+  return cwd ? resolveAgentDiary(cwd, agentId) : undefined
 }
 
 /**
@@ -54,13 +53,13 @@ export async function streamAgentEvents(
   if (stream) return forwardStream(stream, send, onDone)
 
   // Everywhere else: tail the run's diary. The relocating tail, because the diary moves
-  // mid-subscription: when the run ends its tool records it on the data branch and reclaims the
-  // checkout, and a fixed-path tail whose fs.watch missed the final appends went silent without
-  // the run's `end`. On the move it re-resolves and carries its offset, so the feed gets exactly
-  // the lines the move would have swallowed.
-  if ((await resolveEventsPath(projectId, agentId)) === undefined) return undefined
+  // mid-subscription: when the run ends its tool records it and reclaims the checkout, and a
+  // fixed-path tail whose fs.watch missed the final appends went silent without the run's `end`.
+  // On the move it asks again and sends the finished run's lines it had not sent, so the feed
+  // gets exactly the lines the move would have swallowed.
+  if ((await resolveEventsDiary(projectId, agentId)) === undefined) return undefined
   return tailAgentEvents<AnyDiaryLine>(
-    () => resolveEventsPath(projectId, agentId),
+    () => resolveEventsDiary(projectId, agentId),
     line => send(fromDiaryLine(line)),
     () => send({ kind: 'stream-sync' }),
   )

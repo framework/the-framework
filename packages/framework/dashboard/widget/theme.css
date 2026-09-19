@@ -1,0 +1,50 @@
+/* The dashboard's theme as Tailwind sees it (#1774): the dark variant, the fonts, and the utilities
+   (`bg-card`, `text-muted-foreground`, …) that read the page's own tokens. The dashboard imports
+   it, and so does a widget's stylesheet, so a widget's classes read the tokens the page defines in
+   tailwind.css — its colours follow the theme and the theme toggle without a copy of either. */
+
+/* The theme is the `.dark` class LayoutDefault toggles, not the OS preference. Without this,
+   Tailwind v4 compiles `dark:` to `@media (prefers-color-scheme: dark)`, so the `dark:` utilities
+   disagreed with the tokens: picking Dark on a light OS applied the dark tokens but left
+   `dark:text-*-400` unapplied, and picking Light on a dark OS applied them when it should not. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* The page is squarer than the old UI, so the radius tightens to ~2px to match. */
+@theme {
+  --radius: 0.125rem;
+  /* The landing page's typeface (#1118), loaded in pages/+Head.tsx. Overriding these two theme
+     keys retargets Tailwind's default body font and every `font-mono` to IBM Plex. */
+  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+
+  /* The shadcn sidebar reads its own `--sidebar-*` family so a sidebar can be themed apart from
+     the page. We keep it in step with the rest of the palette (the rail is the app's own surface,
+     not a contrasting slab): background canvas, accent for the hover/active fill, the shared border
+     and the primary ring. */
+  --color-sidebar: var(--background);
+  --color-sidebar-foreground: var(--foreground);
+  --color-sidebar-primary: var(--primary);
+  --color-sidebar-primary-foreground: var(--primary-foreground);
+  --color-sidebar-accent: var(--accent);
+  --color-sidebar-accent-foreground: var(--accent-foreground);
+  --color-sidebar-border: var(--border);
+  --color-sidebar-ring: var(--primary);
+}

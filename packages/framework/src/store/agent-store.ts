@@ -3,14 +3,15 @@ import type { FrameworkEvent } from '../events.js'
 import { nodeFs } from '../node-fs.js'
 import { agentBranchName, isSafeAgentId, worktreeDirEntries } from '@gemstack/skill-branches'
 import { THE_FRAMEWORK_DIR } from '../framework-dir.js'
-import { listRuns, parseRunCard, readDiary, runFiles, type AnyDiaryLine, type LogsDeps } from '@gemstack/skill-logs'
+import { parseRunCard, projectRuns, type AnyDiaryLine, type RunsFor } from './runs.js'
 import { eventsOf, fromRunCard } from './run-record.js'
 
 /**
  * The read side of a project's runs (#1774). The daemon runs no agent and writes no run: a run's
  * tool keeps the run's card (`<id>.json`) and diary (`<id>.jsonl`) under the `.the-framework/`
- * of the run's own checkout while it works, and the `logs` skill's copy of both on the data
- * branch is the one place a finished run lives. The dashboard is a projection of those files.
+ * of the run's own checkout while it works, and a finished run is whatever the project's runs
+ * provider answers (`runs.ts`), when one of its packages provides them. The dashboard is a
+ * projection of those files and that answer.
  */
 
 export type AgentStatus = 'running' | 'done' | 'stopped' | 'failed' | 'waiting'
@@ -172,42 +173,35 @@ export interface StoreFs {
   subdirs(path: string): Promise<string[]>
 }
 
-/** The `logs` skill's file seam over a {@link StoreFs}. */
-function runDeps(fs: StoreFs): LogsDeps {
-  return {
-    read: path => fs.read(path),
-    list: path => fs.readdir(path),
-    write: async (path, content) => {
-      await fs.mkdir(join(path, '..'))
-      await fs.write(path, content)
-    },
-  }
-}
-
-/**
- * The card + diary paths of one finished run on the data branch's checkout, or `[]` when the
- * branch has no such run. For a caller that needs the file itself: the tail of an ended run.
- */
-export async function archivedAgentPaths(cwd: string, agentId: string, fs: StoreFs = nodeStoreFs()): Promise<string[]> {
-  if (!isSafeAgentId(agentId)) return []
-  const files = await runFiles(cwd, agentId, runDeps(fs)).catch(() => undefined)
-  return files ? [files.card, files.diary] : []
-}
-
 /** Newest run first: an id sorts chronologically, so the id order IS the time order (no parse). */
 const byIdDesc = (a: { id: string }, b: { id: string }): number => (a.id < b.id ? 1 : a.id > b.id ? -1 : 0)
 
 /**
- * A project's recorded runs, most-recent first: the runs on the data branch (every person's),
- * read through the `logs` skill and unfolded into the framework's meta. An unreadable branch is
- * no runs, never a throw.
+ * A project's finished runs, most-recent first: what its runs provider answers, unfolded into the
+ * framework's meta. No provider, or one that cannot be read, is no runs, never a throw.
  *
  * `since` (epoch ms) is for a caller that only wants recent runs — a poll on a cadence, not the
- * history list.
+ * history list. `fresh` asks the provider past its last answer: the caller knows a run just finished.
  */
-export async function listAgents(cwd: string, fs: StoreFs = nodeStoreFs(), since?: number): Promise<AgentMeta[]> {
-  const runs = await listRuns(cwd, since === undefined ? {} : { since }, runDeps(fs)).catch((): never[] => [])
-  return runs.map(fromRunCard).sort(byIdDesc)
+export async function listAgents(cwd: string, runs: RunsFor = projectRuns, opts: { since?: number; fresh?: boolean } = {}): Promise<AgentMeta[]> {
+  const { since, fresh } = opts
+  const cards = (await (await runs(cwd).catch(() => undefined))?.list(fresh ? { fresh } : {}).catch(() => [])) ?? []
+  return cards
+    .filter(card => since === undefined || Date.parse(card.startedAt) >= since)
+    .map(fromRunCard)
+    .sort(byIdDesc)
+}
+
+/**
+ * One finished run's whole diary, from the project's runs provider: for a reader that follows a
+ * run past its checkout. `undefined` for an unknown or unsafe id, a project with no provider, and
+ * a record that still says `running` — the marker a run's tool may leave as it starts, before its
+ * checkout exists: that run is not finished, its diary is still to come in the checkout.
+ */
+export async function readFinishedDiary(cwd: string, agentId: string, runs: RunsFor = projectRuns): Promise<AnyDiaryLine[] | undefined> {
+  if (!isSafeAgentId(agentId)) return undefined
+  const run = await (await runs(cwd).catch(() => undefined))?.show(agentId).catch(() => undefined)
+  return run && run.card.status !== 'running' ? run.diary : undefined
 }
 
 /**
@@ -300,15 +294,15 @@ function parseDiary(raw: string): AnyDiaryLine[] {
 
 /**
  * One run's events, for a reader that replays them: the diary in the run's checkout while it has
- * one (it is the newer of the two), else the run's diary on the data branch. `undefined` for an
- * unknown or unsafe id.
+ * one (it is the newer of the two), else the finished run's diary from the runs provider.
+ * `undefined` for an unknown or unsafe id.
  */
-export async function loadAgentEvents(cwd: string, id: string, fs: StoreFs = nodeStoreFs()): Promise<FrameworkEvent[] | undefined> {
+export async function loadAgentEvents(cwd: string, id: string, fs: StoreFs = nodeStoreFs(), runs: RunsFor = projectRuns): Promise<FrameworkEvent[] | undefined> {
   if (!isSafeAgentId(id)) return undefined
   const live = (await readLiveMetas(cwd, fs).catch((): LiveAgent[] => [])).find(agent => agent.id === id)
   const liveDiary = live ? join(live.cwd, THE_FRAMEWORK_DIR, `${id}.jsonl`) : undefined
   if (liveDiary && (await fs.exists(liveDiary))) return eventsOf(parseDiary(await fs.read(liveDiary).catch(() => '')))
-  const diary = await readDiary(cwd, id, runDeps(fs)).catch(() => undefined)
+  const diary = await readFinishedDiary(cwd, id, runs)
   return diary ? eventsOf(diary) : undefined
 }
 
@@ -320,22 +314,29 @@ export function nodeStoreFs(): StoreFs {
   return { read, write, append, exists, mkdir, readdir, subdirs }
 }
 
+/** The runs each project had a checkout for at its last {@link readAllAgents}, by project path. */
+const liveSeen = new Map<string, Set<string>>()
+
 /**
- * A project's runs: the ones with a checkout prepended to the recorded history, newest-first.
+ * A project's runs: the ones with a checkout prepended to the finished ones, newest-first.
  * Forgiving — a side that cannot be read simply contributes nothing.
  *
  * The checkout's card wins over the recorded one (#768): a resumed run has a record from its
  * first leg AND is going again, and the record alone would show a running agent as finished.
  */
-export async function readAllAgents(cwd: string, fs: StoreFs = nodeStoreFs()): Promise<AgentMeta[]> {
-  const [archived, live] = await Promise.all([
-    listAgents(cwd, fs).catch(() => [] as AgentMeta[]),
-    readLiveMetas(cwd, fs).catch(() => [] as LiveAgent[]),
-  ])
+export async function readAllAgents(cwd: string, fs: StoreFs = nodeStoreFs(), runs: RunsFor = projectRuns): Promise<AgentMeta[]> {
+  const live = await readLiveMetas(cwd, fs).catch(() => [] as LiveAgent[])
+  // A run that left its checkout since the last read was recorded a moment before: the provider's
+  // list read before that would not have it, and its row would blink out until the next read.
+  const ids = new Set(live.map(agent => agent.id))
+  const before = liveSeen.get(cwd)
+  liveSeen.set(cwd, ids)
+  const fresh = before !== undefined && [...before].some(id => !ids.has(id))
+  const archived = await listAgents(cwd, runs, { fresh }).catch(() => [] as AgentMeta[])
   return [...live, ...archived.filter(agent => !live.some(l => l.id === agent.id))]
 }
 
 /** One run's meta by id, the checkout's card winning over the record: {@link readAllAgents}'s rule for a single row. */
-export async function findAgent(cwd: string, agentId: string, fs: StoreFs = nodeStoreFs()): Promise<AgentMeta | undefined> {
-  return (await readAllAgents(cwd, fs)).find(agent => agent.id === agentId)
+export async function findAgent(cwd: string, agentId: string, fs: StoreFs = nodeStoreFs(), runs: RunsFor = projectRuns): Promise<AgentMeta | undefined> {
+  return (await readAllAgents(cwd, fs, runs)).find(agent => agent.id === agentId)
 }

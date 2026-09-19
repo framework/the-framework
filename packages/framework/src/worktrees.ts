@@ -1,6 +1,5 @@
 import { errorMessage } from './error-message.js'
-import { listAgents, readLiveMetas, type AgentStatus } from './store/index.js'
-import { deleteRun, runFiles } from '@gemstack/skill-logs'
+import { listAgents, projectRuns, readLiveMetas, type AgentStatus, type RunsFor } from './store/index.js'
 import { agentBranchName, listWorktreeDirs, isSafeAgentId, reclaimWorktree, removeWorktree, pruneWorktrees, worktreePath, worktreeSize, type ReclaimOutcome } from '@gemstack/skill-branches'
 
 /** A retained worktree and the agent that left it behind (#752). */
@@ -133,6 +132,8 @@ export type DeleteAgentResult = { ok: true } | { ok: false; error: string }
 export interface DeleteAgentOptions {
   /** Run before the worktree comes off disk (stop a preview serving it, as removal does). */
   beforeRemove?: (agentId: string) => Promise<void>
+  /** Where the project's finished runs are read and removed; the project's runs provider by default. */
+  runs?: RunsFor
 }
 
 /**
@@ -171,12 +172,13 @@ export async function deleteProjectAgent(cwd: string, agentId: string, opts: Del
       await removeWorktree(cwd, worktreePath(cwd, agentId))
       await pruneWorktrees(cwd)
     }
-    // Then the record that put the row in the list: the run on the data branch, deleted by the
-    // `logs` skill as one committed, pushed change (#1582/#1769). Tolerant of an absent record, so
-    // a half-deleted session (its worktree already gone) still finishes cleanly.
-    if (await runFiles(cwd, agentId)) {
-      const removed = await deleteRun(cwd, agentId)
-      if (!removed.ok && !removed.committed) return { ok: false, error: removed.error }
+    // Then the record that put the row in the list: the finished run, removed through the
+    // project's runs provider (#1582/#1769). Tolerant of an absent record, and of a project with
+    // no provider, so a half-deleted session (its worktree already gone) still finishes cleanly.
+    const runs = await (opts.runs ?? projectRuns)(cwd).catch(() => undefined)
+    if (runs && (await runs.list()).some(card => card.id === agentId)) {
+      const removed = await runs.remove(agentId)
+      if (!removed.ok) return { ok: false, error: removed.error }
     }
     return { ok: true }
   } catch (err) {

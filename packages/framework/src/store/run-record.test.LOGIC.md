@@ -1,5 +1,5 @@
 What the tests cover:
 
-- **The card** - a card unfolds into the status snapshot: the `logs` skill's fields on top, whatever the run's writer kept under `caller` (last-updated time, process id, host, flow, checkout) beside them; a card with no `caller` takes its last-updated time from its end, else from its start.
+- **The card** - a card unfolds into the status snapshot: the card's own fields on top, whatever the run's writer kept under `caller` (last-updated time, process id, host, flow, checkout) beside them; a card with no `caller` takes its last-updated time from its end, else from its start.
 - **The diary** - a diary reads as events: a `said` line is the coding agent's text, a `result` line a turn's final answer keeping its session id and usage, a `cost` line a usage event whether or not it carries a price, an `ended` line an end (done, stopped with its detail, failed with its detail); every other line is the event as written.
 - **A diary agent-driver's own log wrote** - its start, action, notice and error lines read as the driver's events, while an error line carrying a headline reads as the agent's own error report with its headline and detail, its session line as the session id, its question line as the gate the dashboard shows (title, options, recommendation), and an `ended` line saying waiting as an end that waits.

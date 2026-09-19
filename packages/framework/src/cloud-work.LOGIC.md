@@ -13,9 +13,8 @@ Cloud work adoption [1]: the sweep [2] that, once per tick [3] of the daemon's c
 [3] tick: one beat of the daemon's single background clock; each sweep says how many ticks it waits between turns.
 [4] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
 [5] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps. A web agent is one whose location is `web`.
-[6] run: only the `logs` skill's record of one agent on the `agent-data` branch: a card (what was asked, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said).
+[6] run: only the record of one finished agent, as the project's runs provider answers it (`store/runs.ts`): a card (what was asked, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said).
 [7] cloud anchor: an empty commit a web agent pushes before its task leaves this machine, unique to the agent: the branch the cloud session later pushes descends from it, which is how the daemon recognises that branch as the agent's.
-[9] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [11] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
 [12] handoff: what becomes of an agent's work once the agent has ended: its branch pushed, a pull request opened for it, the pull request merged. The agent does it itself; on a finished agent's page the "Open PR" and "Merge" buttons do it by hand. A web agent's record may say what its handoff was armed to do: push, open a pull request, merge.
 
@@ -26,7 +25,7 @@ Cloud work adoption [1]: the sweep [2] that, once per tick [3] of the daemon's c
 - **Matching by descent from the anchor** - exactly one `claude/*` branch descending from the agent's cloud anchor is the agent's; none or several means retry next pass; an agent whose record names some other branch is not this sweep's to answer.
 - **The pull request the session opened** - the branch's pull request history is read and the latest since the agent's start taken; a listing that fails opens nothing this pass and is reported.
 - **Opening the armed draft pull request** - when no pull request exists, the agent was armed for one, it ended done, and the branch carries more than the anchor, a draft pull request is opened against the remote branch; a failure is reported.
-- **Recording onto the run** - the branch (first time) and the pull request (once known) are written to the agent's run as one commit on the `agent-data` branch; nothing learned means nothing written and nothing said.
+- **Recording onto the run** - the branch (first time) and the pull request (once known) are set on the agent's run through the project's runs provider; nothing learned means nothing written and nothing said.
 - **What is reported** - every adoption is logged with its branch and pull request; every failure is logged; a session that has not pushed yet is silence, not a failure.
 - **The pass lifecycle** - no timer of its own: one pass over every registered project per tick, and a project whose pass fails adopts nothing this tick.
 
@@ -36,7 +35,7 @@ Cloud work adoption [1]: the sweep [2] that, once per tick [3] of the daemon's c
 
 #### Context
 
-**Business logic story**: the agent's process pushed the cloud anchor [7] and recorded it on the agent [5]'s record before its task left the machine; the agent's record is read here from the runs [6] on the `agent-data` branch [9] (`store/`), asking only for records started within the window so an ever-growing history is never read whole.
+**Business logic story**: the agent's process pushed the cloud anchor [7] and recorded it on the agent [5]'s record before its task left the machine; the agent's record is read here from the runs [6] the project's runs provider answers (`store/`), asking only for records started within the window so an ever-growing history is never read whole.
 
 #### Business logic
 
@@ -90,7 +89,7 @@ See `## Context`.
 
 #### Business logic
 
-What the pass learned is written onto the agent [5]'s run [6] as one commit on the `agent-data` branch [9]: the branch, only when the record still carried the birth branch, and the pull request's number and URL, only when the record had none. When nothing new was learned, nothing is written and nothing is announced. A run that cannot be patched, because no such run exists on the branch, is reported as "could not record <branch> on the run's archive".
+What the pass learned is set on the agent [5]'s run [6] through the project's runs provider: the branch, only when the record still carried the birth branch, and the pull request's number and URL, only when the record had none. When nothing new was learned, nothing is written and nothing is announced. A run that cannot be patched — no such run, a refusal, or a project with no runs provider — is reported as "could not record <branch> on the run's archive".
 
 ### What is reported
 

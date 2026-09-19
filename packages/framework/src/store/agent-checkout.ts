@@ -1,5 +1,6 @@
 import { join } from 'node:path'
-import { archivedAgentPaths, readLiveMetas } from './agent-store.js'
+import { readFinishedDiary, readLiveMetas } from './agent-store.js'
+import { projectRuns, type AnyDiaryLine, type RunsFor } from './runs.js'
 import { isSafeAgentId, worktreePath } from '@gemstack/skill-branches'
 import { THE_FRAMEWORK_DIR } from '../framework-dir.js'
 import { nodeFs } from '../node-fs.js'
@@ -30,23 +31,30 @@ export async function resolveAgentCheckout(projectCwd: string, agentId: string |
 }
 
 /**
- * The diary a run-scoped subscribe should tail (#1472, #1774): the run's own `<id>.jsonl`.
- * While the run has a checkout it is there, under the checkout's `.the-framework/`, written by
- * the run's tool as the agent works. Once the run is recorded and its checkout reclaimed, it is
- * the `logs` skill's copy on the data branch. A run that has neither yet was started a moment
- * ago: its tool has not made the checkout, so the answer is where the diary will appear, and the
- * tail waits for it there.
+ * Where a run's diary is, for a reader that follows it: a file while the run has a checkout, or
+ * the finished run's lines once it has none.
+ */
+export type AgentDiarySource = { file: string } | { finished: AnyDiaryLine[] }
+
+/**
+ * The diary a run-scoped subscribe should follow (#1472, #1774): the run's own `<id>.jsonl`.
+ * While the run has a checkout it is a file there, under the checkout's `.the-framework/`,
+ * written by the run's tool as the agent works. Once the run is recorded and its checkout
+ * reclaimed, it is the finished run's diary, whole, from the project's runs provider. A run that
+ * has neither yet was started a moment ago: its tool has not made the checkout, so the answer is
+ * the file where the diary will appear, and the tail waits for it there. A project with no runs
+ * provider answers the same for a finished run: the file that is gone, where nothing more comes.
  *
  * Only the events tails resolve here; every other run-addressed surface keeps
  * {@link resolveAgentCheckout}'s root fallback, where the project's own state is the sane
  * thing to act on.
  */
-export async function resolveAgentEventsPath(projectCwd: string, agentId: string | undefined): Promise<string | undefined> {
+export async function resolveAgentDiary(projectCwd: string, agentId: string | undefined, runs: RunsFor = projectRuns): Promise<AgentDiarySource | undefined> {
   if (!agentId || !isSafeAgentId(agentId)) return undefined
   const live = await readLiveMetas(projectCwd).catch(() => [])
   const checkout = live.find(agent => agent.id === agentId)?.cwd ?? worktreePath(projectCwd, agentId)
   const liveDiary = join(checkout, THE_FRAMEWORK_DIR, `${agentId}.jsonl`)
-  if (await nodeFs().isDirectory(checkout)) return liveDiary
-  const [, recorded] = await archivedAgentPaths(projectCwd, agentId)
-  return recorded !== undefined && (await nodeFs().exists(recorded)) ? recorded : liveDiary
+  if (await nodeFs().isDirectory(checkout)) return { file: liveDiary }
+  const finished = await readFinishedDiary(projectCwd, agentId, runs)
+  return finished ? { finished } : { file: liveDiary }
 }

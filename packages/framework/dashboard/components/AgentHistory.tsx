@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Plus, ChevronDown, Cloud, Laptop, MonitorSmartphone, Settings, LayoutDashboard, FolderGit2, Ticket } from 'lucide-react'
+import { Plus, ChevronDown, Cloud, Laptop, MonitorSmartphone, Settings, LayoutDashboard, FolderGit2, Ticket, Blocks } from 'lucide-react'
+import type { ComponentType } from 'react'
 import type { AgentMeta, AgentStatus, RecentAgent, ProjectSummary } from '../../src/index.js'
 import { DRIVER_LABELS, driverFromImpl, cloudRunState, type CloudRunState } from '../../src/client.js'
 import { Button, buttonVariants } from './ui/button.js'
@@ -64,6 +65,9 @@ export function AgentHistory({
   onSettings = () => {},
   onTickets,
   ticketsActive = false,
+  pages = [],
+  activePage = null,
+  onPage = () => {},
   interventionCount = 0,
 }: {
   projectId: string | null
@@ -85,6 +89,12 @@ export function AgentHistory({
   /** Whether the Tickets view is the current one (list or a ticket's own page), so the row can
    *  carry the active fill — and so Overview does not also claim it (both share `projectId === null`). */
   ticketsActive?: boolean
+  /** The pages the installed widgets add (#1774), one nav row each, below Tickets. */
+  pages?: readonly { segment: string; label: string; icon?: ComponentType<{ className?: string; 'aria-hidden'?: boolean }> }[]
+  /** The widget page that is the current view, by its segment, or null. */
+  activePage?: string | null
+  /** Open a widget's page by its segment. */
+  onPage?: (segment: string) => void
   /** Human Queue count, shown on the Overview item and the picker (#632). */
   interventionCount?: number
   /** Cross-project recents for the Overview (no project selected): every project's sessions pooled. */
@@ -201,10 +211,15 @@ export function AgentHistory({
         />
         {/* Overview: the way home, its own nav item directly under New and above the session list,
             more prominent than a menu row. Only this — the current view — carries the active fill. */}
-        <OverviewButton active={projectId === null && !ticketsActive} count={interventionCount} onClick={onDashboard} />
+        <OverviewButton active={projectId === null && !ticketsActive && activePage === null} count={interventionCount} onClick={onDashboard} />
         {/* Tickets: every project's backlog, one section each (#1144), not a rail tab — below
             Overview, since it is the same kind of cross-project destination. */}
         {onTickets && <TicketsButton active={ticketsActive} onClick={onTickets} />}
+        {/* The installed widgets' pages (#1774): the same kind of cross-project destination, named
+            by the widget, never by the dashboard. */}
+        {pages.map(page => (
+          <NavRow key={page.segment} icon={page.icon ?? Blocks} label={page.label} active={activePage === page.segment} onClick={() => onPage(page.segment)} />
+        ))}
         {/* Projects: its own nav item under Overview, same row style, expanding to an indented list
             of projects (not a dropdown). Selecting one navigates into it — the interim, until the
             filter-vs-navigate call is made. */}
@@ -288,7 +303,7 @@ export function AgentHistory({
   )
 }
 
-// One rail destination — Overview, Tickets. Same box as New (px-2 py-1.5 gap-2) so every row's
+// One rail destination — Overview, Tickets, a widget's page. Same box as New (px-2 py-1.5 gap-2) so every row's
 // icon and label line up exactly, and only the current view carries the active fill.
 function NavRow({
   icon: Icon,
@@ -297,7 +312,7 @@ function NavRow({
   onClick,
   children,
 }: {
-  icon: typeof LayoutDashboard
+  icon: ComponentType<{ className?: string; 'aria-hidden'?: boolean }>
   label: string
   active: boolean
   onClick: () => void

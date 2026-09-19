@@ -7,7 +7,7 @@ description: The record of every run agents made on this project — what was as
 
 Every run an agent made on this project leaves a record on the branch `agent-data`, never on a code branch; your checkout does not contain it. A run is two files under `agents/<who>/`: the card, `<id>.json` — what was asked, the ticket, the branch, the pull request, how it ended, what it cost — and the diary, `<id>.jsonl` — what the agent said along the way, its result.
 
-Read them with the `logs` command, a dependency of this repository (`@gemstack/skill-logs`), run as `npx logs`. When that fails for a missing `node_modules`, install with the lockfile's package manager (`npm install` for `package-lock.json`) and run it again. The command only reads: the program that ran an agent records its run, at its end. A refusal exits 1 with a line on stderr; a wrong command line exits 2 with the usage.
+Read them with the `logs` command, a dependency of this repository (`@gemstack/skill-logs`), run as `npx logs`. When that fails for a missing `node_modules`, install with the lockfile's package manager (`npm install` for `package-lock.json`) and run it again. You only read: the program that ran an agent records its run, at its end. The command's `delete` and `patch`, and its `--local` and `--full` flags, are for the dashboard that shows the runs; never use them. A refusal exits 1 with a line on stderr; a wrong command line exits 2 with the usage.
 
 ## Read
 
@@ -47,7 +47,7 @@ A ticket, or a queue entry that links one, may have been worked before. A `stopp
 }
 ```
 
-`status` is `running`, `done`, `stopped`, `failed` or `waiting` (ended on a question the agent asked, until it is answered). `cost` is in US dollars. Every field but `id`, `startedAt` and `status` is absent when unknown. The program that wrote the card may keep its own bookkeeping under one more key, `caller`; the command never prints it.
+`status` is `running`, `done`, `stopped`, `failed` or `waiting` (ended on a question the agent asked, until it is answered). `cost` is in US dollars. Every field but `id`, `startedAt` and `status` is absent when unknown. The program that wrote the card may keep its own bookkeeping under one more key, `caller`; the command never prints it to you.
 
 ## The diary
 

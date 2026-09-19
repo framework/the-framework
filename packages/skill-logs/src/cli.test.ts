@@ -62,6 +62,9 @@ async function rig(clones: number, runs: Record<string, string> = RUNS) {
     const clone = join(parent, 'clone')
     await git(['clone', bare, clone], parent)
     await git(['checkout', '-b', `agent-a${i}`], clone)
+    // `delete` and `patch` commit: a runner with no git identity (Linux CI) refuses to.
+    await git(['config', 'user.email', `a${i}@a`], clone)
+    await git(['config', 'user.name', `a${i}`], clone)
     agents.push(clone)
   }
   const cleanup = async () => {
@@ -186,5 +189,68 @@ test('a repository with no remote reads its local branch; outside a repository i
     assert.deepEqual(outside.json, { ok: false, reason: 'not-a-repo' })
   } finally {
     await rm(solo, RETRIED_RM)
+  }
+})
+
+test('--local reads the checkout kept at .branches/agent-data, no fetch; --full prints caller and every diary line', async () => {
+  const { agents, seed, cleanup } = await rig(1)
+  const [a] = agents
+  try {
+    assert.deepEqual((await run(a!, ['--local'])).json, [], 'no checkout yet: nothing local, and nothing fetched')
+    // The writer's persistent checkout, made the way a writer makes it: a patch through the funnel.
+    assert.equal((await run(a!, ['patch', R3, '--branch', 'agent-r3b'])).code, 0)
+    // A run pushed to origin afterwards is not in the local copy until the writer syncs.
+    await git(['checkout', DATA_BRANCH], seed)
+    await git(['pull', '--rebase', 'origin', DATA_BRANCH], seed)
+    const R4 = '2026-07-07T00-00-00-000Z'
+    await mkdir(join(seed, RUNS_DIR, 'b@b'), { recursive: true })
+    await writeFile(join(seed, RUNS_DIR, 'b@b', `${R4}.json`), JSON.stringify(card(R4)))
+    await git(['add', '-A'], seed)
+    await git(['commit', '-m', 'r4'], seed)
+    await git(['push', 'origin', DATA_BRANCH], seed)
+    const local = await run(a!, ['--local'])
+    assert.deepEqual(local.json.map((c: { id: string }) => c.id), [R3, R2, R1])
+    assert.equal(local.json[0].branch, 'agent-r3b')
+    assert.equal(local.json[2].caller, undefined, 'caller only with --full')
+    const full = await run(a!, ['--local', '--full', '--limit', '5'])
+    assert.deepEqual(full.json[2].caller, { pid: 1, host: 'laptop' })
+    assert.deepEqual((await run(a!, [])).json.map((c: { id: string }) => c.id), [R4, R3, R2, R1], 'without --local: origin, as before')
+    const shown = await run(a!, ['show', R1, '--local', '--full'])
+    assert.equal(shown.code, 0)
+    assert.deepEqual(shown.json.caller, { pid: 1, host: 'laptop' })
+    assert.deepEqual(shown.json.diary.map((l: { kind: string }) => l.kind), ['session', 'said', 'action', 'result', 'cost', 'ended'], 'every line, the writer\'s too')
+    assert.deepEqual((await run(a!, ['show', R1, '--full'])).json.diary.length, 6, '--full off origin too')
+    assert.equal((await run(a!, ['show', R4, '--local'])).code, 1, 'not in the local copy yet')
+  } finally {
+    await cleanup()
+  }
+})
+
+test('delete removes a run as one commit; patch sets the branch and the pull request; an unknown run is refused', async () => {
+  const { agents, bare, cleanup } = await rig(1)
+  const [a] = agents
+  try {
+    const patched = await run(a!, ['patch', R1, '--branch', 'agent-r1-fix', '--pr', '9', '--pr-url', 'https://x/pull/9'])
+    assert.equal(patched.code, 0)
+    assert.deepEqual(patched.json, { ok: true, id: R1 })
+    const card1 = (await run(a!, ['show', R1])).json
+    assert.equal(card1.branch, 'agent-r1-fix')
+    assert.deepEqual(card1.pr, { number: 9, url: 'https://x/pull/9' })
+    const deleted = await run(a!, ['delete', R2])
+    assert.equal(deleted.code, 0)
+    assert.deepEqual((await run(a!, [])).json.map((c: { id: string }) => c.id), [R3, R1], 'gone from origin too: pushed')
+    assert.match(await git(['log', '-1', '--format=%s', DATA_BRANCH], bare), /delete run/)
+    const missing = await run(a!, ['delete', R2])
+    assert.equal(missing.code, 1)
+    assert.deepEqual(missing.json, { ok: false, reason: 'no-run', id: R2 })
+    assert.equal((await run(a!, ['patch', R2, '--branch', 'x'])).code, 1)
+    // A malformed command line is a usage error.
+    assert.equal((await run(a!, ['patch', R1])).code, 2, 'nothing to set')
+    assert.equal((await run(a!, ['patch', R1, '--pr', '9'])).code, 2, 'a pull request needs its url')
+    assert.equal((await run(a!, ['patch', R1, '--pr', 'nine', '--pr-url', 'u'])).code, 2)
+    assert.equal((await run(a!, ['delete'])).code, 2)
+    assert.equal((await run(a!, ['delete', '../x'])).code, 2)
+  } finally {
+    await cleanup()
   }
 })

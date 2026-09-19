@@ -10,13 +10,14 @@ Decides which checkout [1] an agent id [2] addresses, and which diary [3] file a
 
 [1] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, in a directory named `agent-<agent id>`. The user's own working copy is "the project's checkout".
 [2] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its card and diary.
-[3] card / diary: an agent's record in the `logs` skill's two shapes: the card `<id>.json` (what was asked, the branch, the pull request, how it ended, what it cost) and the diary `<id>.jsonl` (what the agent said, one line per event). While the agent has a checkout they sit under the checkout's `.the-framework/`, written by the tool that runs it; a finished agent's are on the `agent-data` branch.
+[3] card / diary: an agent's record in two shapes, whose definition is The Framework's (`runs.ts`): the card `<id>.json` (what was asked, the branch, the pull request, how it ended, what it cost) and the diary `<id>.jsonl` (what the agent said, one line per event). While the agent has a checkout they sit under the checkout's `.the-framework/`, written by the tool that runs it; a finished agent's are what the runs provider [5] answers.
 [4] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. The Framework starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
+[5] runs provider: the command, among the commands of a project's dependencies, that a package declares as answering for the project's finished agents (`runs.ts`).
 
 ## Business logic — TL;DR
 
 - **The checkout an agent id resolves to** - the checkout whose card names the agent [4], else the checkout directory named for the id when it exists, else the project root.
-- **The diary a tail follows** - the diary [3] in the agent's checkout [1] while the checkout exists; else the recorded diary on the `agent-data` branch when it is there; else the place in the checkout where the diary will appear.
+- **The diary a tail follows** - the diary [3] file in the agent's checkout [1] while the checkout exists; else the finished agent's lines from the runs provider [5]; else the place in the checkout where the diary will appear.
 
 ## Business logic
 
@@ -37,13 +38,13 @@ See `## Context`.
 
 #### Context
 
-**Problem**: an agent's diary [3] moves. While the agent works it is in the agent's checkout [1]; when the agent ends, the tool that runs it records it on the `agent-data` branch and reclaims the checkout; a resumed agent writes on in a checkout again.
+**Problem**: an agent's diary [3] moves. While the agent works it is a file in the agent's checkout [1]; when the agent ends, the tool that runs it records it and reclaims the checkout, and from then on the runs provider [5] answers it; a resumed agent writes on in a checkout again.
 
 #### Business logic
 
 - No agent id [2], or an id that is not path-safe, has no diary to tail.
 - The agent's checkout is the one whose card names it, else the directory named for the id under `.branches/`. While that checkout exists as a directory, the diary is `<agent id>.jsonl` under its `.the-framework/`, whether or not the file is there yet.
-- With no checkout, the recorded diary on the `agent-data` branch is the answer when that file exists (the lookup in `agent-store.ts`).
-- With neither, the agent was started a moment ago and its checkout is not made yet, even if its card is already on the branch: the answer is the place in the checkout where the diary will appear, and the tail waits for it there (`../dashboard-rpc/events-tail.ts`).
+- With no checkout, the finished agent's diary, every line, is the answer when the runs provider [5] has the agent finished (the lookup in `agent-store.ts`).
+- With neither, the agent was started a moment ago and its checkout is not made yet, even if its record already says `running`: the answer is the place in the checkout where the diary will appear, and the tail waits for it there (`../dashboard-rpc/events-tail.ts`). A project with no runs provider answers the same for a finished agent: the file that is gone, where nothing more comes.
 
 Only the event tails resolve this way; every other agent-addressed surface keeps the checkout resolution's root fallback.

@@ -26,6 +26,7 @@ interface PackageJson {
   version?: unknown
   exports?: unknown
   bin?: unknown
+  framework?: unknown
   dependencies?: unknown
   devDependencies?: unknown
 }
@@ -66,35 +67,53 @@ function within(dir: string, path: string): boolean {
   return path === dir || path.startsWith(dir + sep)
 }
 
+/** A dependency of the project, resolved: its directory (symlinks followed) and its package.json. */
+interface ProjectPackage {
+  name: string
+  dir: string
+  manifest: PackageJson
+}
+
 /**
- * The widgets a project's packages bring: each dependency of the project's own package.json (both
- * `dependencies` and `devDependencies`), resolved from the project's `node_modules` with symlinks
- * followed (a pnpm workspace link reads like any install), kept when its package.json exports
- * `./dashboard` to a file that exists inside the package. A project with no package.json, an
- * uninstalled dependency or a package that exports no widget contributes nothing. Sorted by name.
+ * The project's installed dependencies: each name its own package.json lists (both
+ * `dependencies` and `devDependencies`, in that order, a name listed twice read once), resolved
+ * from the project's `node_modules` with symlinks followed, so a pnpm workspace link reads like
+ * any install. A project with no package.json, a name that is not a package name and an
+ * uninstalled dependency contribute nothing.
  */
-export async function readProjectWidgets(root: string): Promise<ProjectWidget[]> {
+async function projectPackages(root: string): Promise<ProjectPackage[]> {
   const manifest = await readJson(join(root, 'package.json'))
   if (!manifest) return []
   const names = new Set<string>()
   for (const field of [manifest.dependencies, manifest.devDependencies]) {
     if (field && typeof field === 'object' && !Array.isArray(field)) for (const name of Object.keys(field)) names.add(name)
   }
-  const widgets: ProjectWidget[] = []
-  for (const name of [...names].sort()) {
-    const widget = await readWidget(root, name)
-    if (widget) widgets.push(widget)
+  const packages: ProjectPackage[] = []
+  for (const name of names) {
+    // A name that is not a package name (a path, `..`) is never looked up.
+    if (!/^(@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*$/i.test(name)) continue
+    const dir = await realpath(join(root, 'node_modules', name)).catch(() => undefined)
+    const pkg = dir ? await readJson(join(dir, 'package.json')) : undefined
+    if (dir && pkg) packages.push({ name, dir, manifest: pkg })
   }
-  return widgets
+  return packages
 }
 
-async function readWidget(root: string, name: string): Promise<ProjectWidget | undefined> {
-  // A name that is not a package name (a path, `..`) is never looked up.
-  if (!/^(@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*$/i.test(name)) return undefined
-  const pkgDir = await realpath(join(root, 'node_modules', name)).catch(() => undefined)
-  if (!pkgDir) return undefined
-  const pkg = await readJson(join(pkgDir, 'package.json'))
-  const target = pkg && dashboardExport(pkg.exports)
+/**
+ * The widgets a project's packages bring: each of the project's dependencies whose package.json
+ * exports `./dashboard` to a file that exists inside the package. Sorted by name.
+ */
+export async function readProjectWidgets(root: string): Promise<ProjectWidget[]> {
+  const widgets: ProjectWidget[] = []
+  for (const pkg of await projectPackages(root)) {
+    const widget = await readWidget(pkg)
+    if (widget) widgets.push(widget)
+  }
+  return widgets.sort((a, b) => a.package.localeCompare(b.package))
+}
+
+async function readWidget({ name, dir: pkgDir, manifest: pkg }: ProjectPackage): Promise<ProjectWidget | undefined> {
+  const target = dashboardExport(pkg.exports)
   if (!target) return undefined
   const file = await realpath(join(pkgDir, target)).catch(() => undefined)
   if (!file || !within(pkgDir, file) || !(await stat(file).then(s => s.isFile()).catch(() => false))) return undefined
@@ -105,6 +124,32 @@ async function readWidget(root: string, name: string): Promise<ProjectWidget | u
     entry: file.slice(dirname(file).length + 1),
     bins: binsOf(name, pkg.bin, pkgDir),
   }
+}
+
+/** The command of a project's package that provides one kind of the framework's data, by the package's declaration. */
+export interface ProvidedCommand {
+  /** The package that declares it. */
+  package: string
+  /** The command's name, one of the package's own commands. */
+  name: string
+  /** The command's script, an absolute path inside the package. */
+  bin: string
+}
+
+/**
+ * The command that provides `kind` of the framework's data in this project (#1774): the first of
+ * the project's dependencies, in its package.json's order, whose own package.json declares
+ * `"framework": { "<kind>": "<command>" }` naming one of its commands. The framework names no
+ * package: whoever declares the kind provides it. `undefined` when no dependency does.
+ */
+export async function readProvidedCommand(root: string, kind: string): Promise<ProvidedCommand | undefined> {
+  for (const { name, dir, manifest } of await projectPackages(root)) {
+    const declared = manifest.framework && typeof manifest.framework === 'object' && !Array.isArray(manifest.framework) ? (manifest.framework as Record<string, unknown>)[kind] : undefined
+    if (typeof declared !== 'string') continue
+    const bin = binsOf(name, manifest.bin, dir)[declared]
+    if (bin !== undefined) return { package: name, name: declared, bin }
+  }
+  return undefined
 }
 
 /** The one widget of this project that `name` names, or undefined. */
@@ -158,6 +203,17 @@ export async function runWidgetCommand(
     return { ok: false, error: command !== undefined ? `${widget.package} has no command ${command}` : `${widget.package} has ${names.length === 0 ? 'no command' : 'several commands; name one'}` }
   if (args.length > MAX_ARGS || args.some(arg => typeof arg !== 'string' || arg.length > MAX_ARG_LENGTH))
     return { ok: false, error: 'too many or too long arguments' }
+  return runPackageCommand(root, { name: name!, bin }, args)
+}
+
+/**
+ * Run one package command in the project and read its standard output as JSON: with Node (a
+ * package's commands are Node scripts), in the project root, never through a shell, bounded in
+ * time and output. A command that exits non-zero answers its last stderr line; one that prints no
+ * JSON says so.
+ */
+export async function runPackageCommand(root: string, command: { name: string; bin: string }, args: readonly string[]): Promise<WidgetCommandResult> {
+  const { name, bin } = command
   const run = await new Promise<{ failed?: string; stdout: string }>(resolvePromise => {
     execFile(
       process.execPath,

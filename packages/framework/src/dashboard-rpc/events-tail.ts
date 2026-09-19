@@ -40,28 +40,32 @@ export function tailEvents<T = unknown>(path: string, onEvent: (event: T) => voi
   }
 }
 
+/** Where a relocating tail reads now: a file it follows, or a finished run's lines, whole. */
+export type TailTarget<T> = { file: string } | { finished: T[] }
+
 /**
  * Tail a run's diary across its relocations: the same read-then-follow as {@link tailEvents},
- * but the path is re-resolved whenever the tailed file is not there.
+ * but where the diary is is asked again whenever the tailed file is not there.
  *
- * A run's diary does not sit still. While the run works it is in the run's checkout; when the
- * run ends its tool records it on the data branch and reclaims the checkout; a resumed run
- * writes on in a checkout again. A fixed-path tail whose file was retired went silent *without
- * the final lines* whenever the last `fs.watch` signal was lost — the 1s poll then found the
- * file gone and had nothing to read, so the feed never learned the run ended. This tail treats
- * a missing file as the question it is: it asks `resolvePath` where the diary lives now
- * (`resolveAgentEventsPath` answers the record once the checkout is gone, #1472), and on a
- * new answer retargets the same tailer — the copy is content-identical, so the offset carries
- * and nothing is replayed — and follows the new home. The same answer means the run has not
- * made its checkout yet, and the tail keeps waiting there. Asking even when the file was never
- * seen matters for a short run (#1774): started, ended and reclaimed between two polls, its
- * diary was only ever visible at its second home.
+ * A run's diary does not sit still. While the run works it is a file in the run's checkout; when
+ * the run ends its tool records it and reclaims the checkout, and from then on the diary is the
+ * finished run's, read whole from the project's runs provider. A fixed-path tail whose file was
+ * retired went silent *without the final lines* whenever the last `fs.watch` signal was lost —
+ * the 1s poll then found the file gone and had nothing to read, so the feed never learned the run
+ * ended. This tail treats a missing file as the question it is: it asks `resolve` where the diary
+ * is now (`resolveAgentDiary` answers the finished run once the checkout is gone, #1472). A new
+ * file retargets the same tailer and follows it. A finished run's lines are the same lines the
+ * file had, in the same order, so the ones past the count already delivered are sent and the tail
+ * ends: a finished diary does not grow. The same file means the run has not made its checkout
+ * yet, and the tail keeps waiting there. Asking even when the file was never seen matters for a
+ * short run (#1774): started, ended and reclaimed between two polls, its diary was only ever
+ * visible as a finished run.
  *
  * `onReplayed` keeps {@link tailEvents}' once-per-subscription contract: a relocation is not a
  * new replay boundary, so it never fires twice.
  */
 export function tailAgentEvents<T = unknown>(
-  resolvePath: () => Promise<string | undefined>,
+  resolve: () => Promise<TailTarget<T> | undefined>,
   onEvent: (event: T) => void,
   onReplayed?: () => void,
 ): () => void {
@@ -70,6 +74,17 @@ export function tailAgentEvents<T = unknown>(
   let path: string | undefined
   let tailer: JsonlTailer<T> | undefined
   let relocating = false
+  let delivered = 0
+  const deliver = (event: T): void => {
+    delivered++
+    onEvent(event)
+  }
+  /** The finished run's lines the feed has not had yet; nothing follows them. */
+  const finish = (lines: T[]): void => {
+    stopFollow?.()
+    stopFollow = undefined
+    for (const line of lines.slice(delivered)) deliver(line)
+  }
 
   const follow = (): void => {
     if (stopped || path === undefined) return
@@ -77,12 +92,14 @@ export function tailAgentEvents<T = unknown>(
   }
 
   const relocate = async (): Promise<void> => {
-    const next = await resolvePath()
-    // Same answer or none: not moved (or not visible yet) — keep polling the current home.
-    if (stopped || !tailer || next === undefined || next === path) return
+    const next = await resolve()
+    // No answer, or the same file: not moved (or not visible yet) — keep polling the current home.
+    if (stopped || !tailer || next === undefined) return
+    if ('finished' in next) return finish(next.finished)
+    if (next.file === path) return
     stopFollow?.()
-    path = next
-    tailer.retarget(next)
+    path = next.file
+    tailer.retarget(next.file)
     await tailer.pull()
     follow()
   }
@@ -102,7 +119,7 @@ export function tailAgentEvents<T = unknown>(
     }
   }
 
-  void resolvePath().then(
+  void resolve().then(
     initial => {
       if (stopped) return
       // No journal to speak of (unknown project): honor the replay contract and stay silent.
@@ -110,8 +127,13 @@ export function tailAgentEvents<T = unknown>(
         onReplayed?.()
         return
       }
-      path = initial
-      tailer = new JsonlTailer<T>(initial, onEvent)
+      if ('finished' in initial) {
+        finish(initial.finished)
+        onReplayed?.()
+        return
+      }
+      path = initial.file
+      tailer = new JsonlTailer<T>(initial.file, deliver)
       const replayed = (): void => {
         if (stopped) return
         onReplayed?.()

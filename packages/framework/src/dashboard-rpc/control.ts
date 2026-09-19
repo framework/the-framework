@@ -9,11 +9,10 @@ import { planTicketPrompt } from '../tickets.js'
 import { isTicketFile, queuePriorityForTicket, releaseTicket, TICKETS_DIR } from '@gemstack/skill-tickets'
 import { QUEUE_FILE, queueAdd } from '@gemstack/skill-queue'
 import { hostname } from 'node:os'
-import { findAgent, isPidAlive, loadAgentEvents, readLiveMeta, type AgentMeta } from '../store/index.js'
+import { findAgent, isPidAlive, loadAgentEvents, projectRuns, readLiveMeta, type AgentMeta } from '../store/index.js'
 import { isSafeAgentId, worktreePath } from '@gemstack/skill-branches'
 import { withAgentLock } from '../agent-locks.js'
 import { removeProjectWorktree, deleteProjectAgent } from '../worktrees.js'
-import { patchRun } from '@gemstack/skill-logs'
 import { mergeAgentPr, openAgentPullRequest, type HandoffResult } from '../dashboard/agent-handoff.js'
 import { pendingChoices } from '../open-choices.js'
 import type {
@@ -211,11 +210,12 @@ export async function sendOpenPullRequest(projectId: string, agentId: string): P
     // Under the agent lock, so the push inside `openAgentPullRequest` cannot race a Remove of the
     // same checkout.
     const opened = await withAgentLock(target.checkout, () => openAgentPullRequest(target.cwd, target.agent))
-    // Record it on the agent (E6). The session's own process is gone by now, so there is no event
-    // stream to carry the fact — but it is the same fact, and every surface reads it from the same
-    // place either way rather than re-deriving it from branch names.
+    // Record it on the finished run (E6), through the project's runs provider. The session's own
+    // process is gone by now, so there is no event stream to carry the fact — but it is the same
+    // fact, and every surface reads it from the same place either way rather than re-deriving it
+    // from branch names. No provider: there is no record to carry it, and the PR is still open.
     if (opened.ok && opened.number !== undefined && opened.url) {
-      await patchRun(target.cwd, agentId, { pr: { number: opened.number, url: opened.url } })
+      await (await projectRuns(target.cwd).catch(() => undefined))?.patch(agentId, { pr: { number: opened.number, url: opened.url } })
     }
     return opened
   }, { ok: false, error: 'could not reach the device' })

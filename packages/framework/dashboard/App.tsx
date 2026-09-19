@@ -331,7 +331,7 @@ export function App() {
       return (
         <NotFound
           title="This agent is gone"
-          detail="It is not in this project's agents. An agent disappears when its worktree is removed."
+          detail="There is no record of this agent. Once its checkout is removed, a finished agent is kept only when the project has a logs skill installed."
           actionLabel="Back to the project"
           onAction={() => selectAgent(null)}
         />

@@ -1,8 +1,9 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { tmpdir } from 'node:os'
-import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, realpath, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { deleteProjectAgent, removeProjectWorktree } from './worktrees.js'
 import { nodeGitRunner } from '@gemstack/agent-data'
 import { runFiles, writeRun } from '@gemstack/skill-logs'
@@ -118,8 +119,15 @@ test('an unknown session is refused before any git runs (#982)', async () => {
 // #1032: delete removes the session from the dashboard, records and all — where remove-worktree
 // keeps it. Against real git, because "did the branch survive" is the whole distinction.
 
-/** Record a run on the data branch, the way a run's tool does: the two files that put its row in the rail. */
+/**
+ * Record a run the way a run's tool does, with the logs package, and make that package the
+ * project's runs provider the way a project does: a dependency, installed. The two files that put
+ * its row in the rail.
+ */
 async function recordRun(repo: string, id: string): Promise<{ card: string; diary: string }> {
+  await writeFile(join(repo, 'package.json'), JSON.stringify({ devDependencies: { '@gemstack/skill-logs': '*' } }))
+  await mkdir(join(repo, 'node_modules', '@gemstack'), { recursive: true })
+  await symlink(resolve(dirname(fileURLToPath(import.meta.resolve('@gemstack/skill-logs'))), '..'), join(repo, 'node_modules', '@gemstack', 'skill-logs'))
   const written = await writeRun(repo, { id, startedAt: '2026-01-01T00:00:00.000Z', status: 'stopped' }, [{ kind: 'ended', status: 'stopped' }])
   assert.ok(written.ok || written.committed, 'the record landed')
   return (await runFiles(repo, id))!
@@ -132,6 +140,8 @@ test('deleting a record-only session (its worktree already gone) still clears th
     // No worktree on disk — a clean finished agent, or one already removed. Delete must not need one.
     assert.deepEqual(await deleteProjectAgent(repo, 'run-x'), { ok: true })
     await assert.rejects(() => stat(meta), 'the record is gone')
+    // Deleted through the runs provider: the second delete finds no record and is still fine.
+    assert.deepEqual(await deleteProjectAgent(repo, 'run-x'), { ok: true })
   } finally {
     await rm(repo, { recursive: true, force: true })
   }

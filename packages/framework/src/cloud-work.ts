@@ -2,8 +2,7 @@ import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
 import { agentBranchName } from '@gemstack/skill-branches'
 import { ghPrsForBranchOrThrow, pickAgentPr, type LinkedPr } from './dashboard/gh.js'
 import { openRemoteBranchPullRequest, type HandoffResult } from './dashboard/agent-handoff.js'
-import { listAgents, nodeStoreFs, startedAtFromAgentId, type AgentMeta } from './store/index.js'
-import { patchRun, type RunPatch } from '@gemstack/skill-logs'
+import { listAgents, projectRuns, startedAtFromAgentId, type AgentMeta, type RunPatch } from './store/index.js'
 import { errorMessage } from './error-message.js'
 import { startProjectPass, type ProjectPass, type ProjectsSource } from './project-pass.js'
 
@@ -139,6 +138,12 @@ async function headsDescendingFrom(git: GitRunner, cwd: string, anchor: string):
   return heads
 }
 
+/** The default {@link CloudWorkDeps.patch}: the late facts onto the run, through the project's runs provider. */
+async function patchProvidedRun(cwd: string, agentId: string, patch: RunPatch): Promise<boolean> {
+  const runs = await projectRuns(cwd).catch(() => undefined)
+  return runs ? (await runs.patch(agentId, patch)).ok : false
+}
+
 /**
  * Adopt one project's cloud work (#1601): match each waiting web run to the `claude/*` head
  * descending from its hand-off anchor, and record the branch and its PR onto the run's archive —
@@ -148,8 +153,8 @@ async function headsDescendingFrom(git: GitRunner, cwd: string, anchor: string):
 export async function adoptCloudWork(cwd: string, deps: CloudWorkDeps = {}): Promise<CloudWorkResult> {
   const git = deps.git ?? nodeGitRunner()
   const prs = deps.prs ?? ghPrsForBranchOrThrow
-  const agents = deps.agents ?? ((project: string, since: number) => listAgents(project, nodeStoreFs(), since))
-  const patchArchive = deps.patch ?? patchRun
+  const agents = deps.agents ?? ((project: string, since: number) => listAgents(project, projectRuns, { since }))
+  const patchArchive = deps.patch ?? patchProvidedRun
   const openPr = deps.openPr ?? openRemoteBranchPullRequest
   const now = deps.now ? deps.now() : Date.now()
   const result: CloudWorkResult = { adopted: [], failed: [] }

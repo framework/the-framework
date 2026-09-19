@@ -7,12 +7,13 @@ export {
   readLiveMeta,
   loadAgentEvents,
   readLiveMetas,
-  archivedAgentPaths,
+  readFinishedDiary,
   type StoreFs,
   type AgentMeta,
   type LiveAgent,
   type AgentStatus,
 } from './agent-store.js'
-export { resolveAgentCheckout, resolveAgentEventsPath } from './agent-checkout.js'
+export { resolveAgentCheckout, resolveAgentDiary, type AgentDiarySource } from './agent-checkout.js'
+export { projectRuns, providedRuns, noRuns, parseRunCard, isRunId, type RunsFor, type RunsSource, type RunsWrite, type RunCard, type RunPatch, type RunStatus, type AnyDiaryLine, type FinishedRun } from './runs.js'
 export { fromRunCard, fromDiaryLine, eventsOf } from './run-record.js'
 export { agentIdFromStartedAt, startedAtFromAgentId } from '../agent-id.js'

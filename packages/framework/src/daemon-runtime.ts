@@ -1,7 +1,6 @@
 import { resolve } from 'node:path'
 import { stat } from 'node:fs/promises'
-import { fromDiaryLine, resolveAgentEventsPath, type AgentMeta } from './store/index.js'
-import type { AnyDiaryLine } from '@gemstack/skill-logs'
+import { fromDiaryLine, resolveAgentDiary, type AgentMeta, type AnyDiaryLine } from './store/index.js'
 import type { FrameworkEvent } from './events.js'
 import type { StartAgentOptions, StartAgentResult, AddProjectResult } from './dashboard/index.js'
 import type { EventsSource, RemoteAgents } from './dashboard/rpc-serve.js'
@@ -135,9 +134,9 @@ export function createProjectRuntime({ cwd, env }: ProjectRuntimeOptions): Proje
 
   // Tail a relay-started run's own log (#1067) for the `/_relay/events` endpoint: the diary the
   // run's tool keeps, its lines turned into events. The relocating tail, for the same reason as
-  // the dashboard's onEvents: the diary moves onto the data branch when the run ends.
+  // the dashboard's onEvents: the diary becomes the finished run's when the run ends.
   const tailRelayEvents = (agentId: string, onEvent: (event: FrameworkEvent) => void): (() => void) =>
-    tailAgentEvents<AnyDiaryLine>(() => resolveAgentEventsPath(cwd, agentId), line => onEvent(fromDiaryLine(line)))
+    tailAgentEvents<AnyDiaryLine>(() => resolveAgentDiary(cwd, agentId), line => onEvent(fromDiaryLine(line)))
 
   const dispose = async (): Promise<void> => {
     relayedAgents.dispose()

@@ -14,8 +14,7 @@ The browser's typed stubs for every action the dashboard takes on an agent [1], 
 [10] the user's picks: the coding agent and the model chosen in the preferences, and the device chosen in "Run on".
 [11] agent id: an agent's stable id, answered by the start hook; it names the agent's checkout directory, its branch until the agent names it, and its record.
 [12] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
-[13] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down.
-[14] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
+[13] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
 
 ## Business logic — TL;DR
 
@@ -26,4 +25,4 @@ The browser's typed stubs for every action the dashboard takes on an agent [1], 
 - **Landing an ended agent's work** - open a pull request for the agent's branch, or merge the pull request it has, each answering success, the pull request's number and URL, or the reason it was refused; a merge asked of an agent still working is refused.
 - **Removing what an agent left** - remove the checkout [12] an ended agent kept, or delete the agent together with its records; both are refused while the agent is going, and a removal never destroys work that is not on the remote.
 - **Opening a checkout in an app** - open the project's checkout, or one agent's, in the file manager or in the user's editor.
-- **Tickets and the agent queue** - put a ticket, or a ticket's plan, on the agent queue [13] in the section its priority earns, and release the claim [14] an agent left on a ticket.
+- **Tickets** - release the claim [13] an agent left on a ticket. Putting a ticket on a queue is no action of the daemon's any more: it is the queue widget's own, through its package's command (`components/LinkActions.tsx`).

@@ -1,8 +1,8 @@
-One ticket's own page: its whole markdown rather than the one line the list shows, everything known about it (age, priority, the GitHub issue it tracks, its topics, whether it is planned, who holds it, its effort and uncertainty ratings, its file name), a button that puts it on the agent queue [1], and, when an agent [2] holds it, a button that lifts that claim [3].
+One ticket's own page: its whole markdown rather than the one line the list shows, everything known about it (age, priority, the GitHub issue it tracks, its topics, whether it is planned, who holds it, its effort and uncertainty ratings, its file name), the ticket as a link [7] with whatever the installed widgets [8] offer on one (an "Add to queue" button when the project has a queue package), and, when an agent [2] holds it, a button that lifts that claim [3].
 
 ## Context
 
-**User story**: the user opens a ticket from the backlog to read what it actually asks for, decides it should be worked next and queues it from there, or sees that an agent [2] has held it since long after that agent died and lifts the claim [3] so somebody else can take it.
+**User story**: the user opens a ticket from the backlog to read what it actually asks for, decides it should be worked next and, the project having the queue package, adds it to the queue from there, or sees that an agent [2] has held it since long after that agent died and lifts the claim [3] so somebody else can take it.
 
 **Business logic story**: a ticket is a markdown file under `tickets/` on the project's `agent-data` branch [4]. The page reads that one file by its name — the same name the list row and the page's own address carry — so it never needs the list it was opened from.
 
@@ -14,12 +14,14 @@ One ticket's own page: its whole markdown rather than the one line the list show
 [4] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [5] holder: who a claim names: the agent's id when the tool that started the agent put it in the agent's environment, else the branch the `tickets` command ran on.
 [6] session name: the name an agent gives its own work; the dashboard labels the agent by it.
+[7] link: the name of some work and where it points, as a dashboard page shows it: a text, a target and a priority from 0 to 10.
+[8] widget: a browser module one of a project's packages brings to the dashboard; it adds pages, offers actions on the links pages show, and acts through its own package's command.
 
 ## Business logic — TL;DR
 
 - **The ticket as it is written** - the whole file rendered as markdown, re-read every 10 seconds, with a plain answer when there is no such ticket.
 - **What is known about the ticket** - one line of facts under the summary, in a fixed order, ending with the ticket's file name.
-- **Queueing the ticket** - one button puts the ticket on its project's agent queue at its own priority, and then says so.
+- **Acting on the ticket** - the ticket is offered as a link to the actions the installed widgets offer on links; with the queue package that is one "Add to queue" button, which then says "Queued"; without any such package, no button.
 - **Lifting a claim** - a claimed ticket offers to release the claim, because nothing else ever will.
 
 ## Business logic
@@ -50,19 +52,19 @@ Each of these appears only when the ticket has it, so a bare ticket shows only i
 
 The claim badge reads "claimed" in the warning color, followed by the holder [5] when the claim names one. The holder reads as the agent's session name [6] when the claim names one of this project's agents, and clicking it opens that agent's page; any other holder is shown exactly as the claim wrote it and opens nothing.
 
-### Queueing the ticket
+### Acting on the ticket
 
 #### Context
 
 **User story**: the user has read the ticket and wants it worked, but not right now: it goes on the agent queue [1], where the scheduler's unattended work or the user picks it up later.
 
+**Problem**: the queue is a package a project may or may not have; the ticket page must offer the queue when the project has it and nothing when it does not, without naming the queue.
+
 #### Business logic
 
-A "Queue" button adds the ticket to its project's agent queue [1] as one entry: the ticket's title, linked back to the ticket's file, placed by the ticket's own `Priority:` when it has one. It starts no agent [2].
+The page hands the ticket as a link [7] (its title, pointing at its file, at the priority its own `Priority:` earns on the 0–10 scale, 5 when it has none; `lib/ticket-link.ts`) to the slot for the installed widgets' [8] link actions (`LinkActions.tsx`), beside the release button. Each widget of the ticket's project that offers an action on links puts one button there; the queue package's widget offers "Add to queue", which writes the ticket's title, linked back to its file, in the section its priority earns. No agent [2] is started. A project whose packages offer no action on links shows no button.
 
-After a successful click the button reads "Queued" with a check mark and stays disabled for as long as the page is open, so the same ticket is not queued twice from the same reading. A refusal shows the daemon's reason, or "The ticket could not be queued." when it gives none, as red text above the ticket's content.
-
-The button is disabled while either action on the page is in flight.
+What the button says once done ("Queued" with a check mark), that it then stays disabled while the same ticket is shown, and how a refusal is shown (the action's reason, as an alert line), are the slot's rules. The buttons are disabled while the release is in flight.
 
 ### Lifting a claim
 
@@ -72,6 +74,6 @@ The button is disabled while either action on the page is in flight.
 
 #### Business logic
 
-While the ticket is claimed, a "Release lock" button sits beside "Queue", with "Claimed by <holder>" on hover when the claim names a holder [5]. Clicking it removes the ticket's claim.
+While the ticket is claimed, a "Release lock" button sits before the link actions, with "Claimed by <holder>" on hover when the claim names a holder [5]. Clicking it removes the ticket's claim.
 
 The page treats the claim as lifted as soon as the release succeeds — the claim badge and the button both go — rather than waiting for the next read to catch up. A refusal shows the daemon's reason, or "The lock could not be released." when it gives none, and the ticket stays claimed.

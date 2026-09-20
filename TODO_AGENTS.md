@@ -2,7 +2,6 @@
 
 
 ## Priority 6
-- Write the plan for [Working with no forge, and with GitLab, Bitbucket or a custom one: the forge is the packages' business](tickets/2026-09-20_forge-is-the-packages-business.md) — write tickets/2026-09-20_forge-is-the-packages-business.plan.md
 
 
 ## Priority 5

@@ -42,9 +42,9 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   message to the run: a stop that has to be read is not a stop.
 
 ## A run's record
-- One place: a run's card and diary in its own checkout while it works, and on the data
-  branch once it has ended. Picked over The Framework keeping a copy of its own, which is
-  what made a run's history a question with two answers.
+- One place: a run's card and diary in its own checkout while it works, and, once it has
+  ended, what the project's runs provider answers. Picked over The Framework keeping a
+  copy of its own, which is what made a run's history a question with two answers.
 - A read never writes. A run whose process is gone is its tool's to sweep. Picked over the
   dashboard ending a run it did not start.
 - A question stays open while the run waits on it, and closes when the agent goes on or

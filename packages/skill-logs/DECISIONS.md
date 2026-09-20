@@ -7,10 +7,13 @@ in SPEC.md; a choice made while implementing is the implementer's judgment, not 
 decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 
 ## The logs
-- Two callers: the command an agent runs, which only reads, and a long-lived program that
-  keeps the branch checked out, records every run it drives through this package's
-  functions when the run is over, and shows the runs in pages of its own. The executable
-  is `logs`. The package ships `SKILL.md`, the agent's instructions.
+- Three callers: the command an agent runs, which only reads; the program that ran an
+  agent, which records the run through this package's functions when it is over; and a
+  dashboard, which reads, deletes and patches runs through the command (`--local`,
+  `--full`, `delete`, `patch`), found by the package's `framework.runs` declaration. A
+  dashboard importing the package was the alternative and was not taken: the dashboard
+  names no skill. The executable is `logs`. The package ships `SKILL.md`, the agent's
+  instructions.
 - A run is two files on `agent-data`, the branch `@gemstack/agent-data` names, never on a
   code branch: `agents/<who>/<id>.json`, the card, and `agents/<who>/<id>.jsonl`, the
   diary. Both are pushed. Keeping the diary on the machine that ran it was considered and
@@ -43,20 +46,23 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   caller nobody would ever read the logs.
 
 ## Flow: the command
-- `logs` lists newest first and prints the package's fields only, never `caller`: the
-  writer's bookkeeping is not the agent's business.
+- `logs` lists newest first and prints the package's fields only, never `caller`, except
+  with `--full`, the dashboard's flag: the writer's bookkeeping is not the agent's
+  business.
 - `logs` prints the newest 20 runs unless `--limit` says otherwise: a list of every run,
   each with its prompt, is more than an agent should read for a look back.
 - `--ticket <file>` matches a card whose ticket is that path or ends with `/<file>`, so a
   ticket's filename and the path a queue entry links to both find it. The package does
   not know where tickets live.
-- `show` prints the card with the four kinds of diary line, never the whole diary: an
-  agent cannot read a hundred kilobytes of a writer's bookkeeping, and the writer's own
-  pages replay the whole file themselves.
+- `show` prints the card with the four kinds of diary line, never the whole diary,
+  except with `--full`: the dashboard replays the whole diary through the command. An
+  agent cannot read a hundred kilobytes of a writer's bookkeeping.
 - A read fetches origin once and reads everything from that copy: only origin has every
-  writer's pushes. With no origin the local branch is read. Outside a repository a
-  command refuses `not-a-repo`; only git's own "not a git repository" reads as that. An
-  id no run has refuses `no-run`.
+  writer's pushes. Except with `--local`, the dashboard's: it reads the checkout at
+  `.branches/agent-data` with no fetch, because the dashboard polls and the writer on
+  that machine keeps the checkout synced. With no origin the local branch is read.
+  Outside a repository a command refuses `not-a-repo`; only git's own "not a git
+  repository" reads as that. An id no run has refuses `no-run`.
 - Every command that runs prints one JSON document. A refusal also puts one line on
   stderr and exits 1. A malformed command line (an unknown flag, the wrong argument
   count, a `--limit` that is not a whole number above 0, an id that is not one) is
@@ -70,5 +76,5 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   writer left marked running is recorded again by the next writer that notices, ended,
   where it already sits. Nothing else on a card changes after it lands.
 - The writer's persistent checkout is `.branches/agent-data`, and its writes go through
-  that checkout's serialized cycle, the same as the other skills'. The command never
-  touches it.
+  that checkout's serialized cycle, the same as the other skills'. The command reads it
+  only with `--local`, and writes through its cycle only for `delete` and `patch`.

@@ -7,9 +7,13 @@ in SPEC.md; a choice made while implementing is the implementer's judgment, not 
 decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 
 ## The queue
-- Two callers: the command an agent runs, and a long-lived program that keeps the branch
-  checked out and drains the queue through this package's functions. The executable is
-  `queue`. The package ships `SKILL.md`, the agent's instructions.
+- Three callers: the command an agent runs; a long-lived program that keeps the branch
+  checked out and drains the queue through this package's functions; and a dashboard,
+  which reads the queue through the command (`--local`, `--full`) and adds to it through
+  the command as its widget's action, found by the package's `framework.queue`
+  declaration. A dashboard importing the package was the alternative and was not taken:
+  the dashboard names no skill. The executable is `queue`. The package ships `SKILL.md`,
+  the agent's instructions.
 - The queue is one markdown file on the branch, `TODO_AGENTS.md`: sections `## Priority
   10` down to `## Priority 0`, any `## Priority N` counts, in any case; any `-`, `*` or
   `N.` list item with text is an entry, wherever it sits. Entries are placed to keep the
@@ -24,9 +28,12 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   `- [ ]` line is, printed without its box and deleted whole.
 
 ## Flow: the command
-- A read fetches origin once and reads everything from that copy (the library's queue read
-  fetches only when asked): only origin has every writer's pushes, this command's own
-  included. With no origin the local branch is read: writes are refused there, so nobody
+- A read fetches origin once and reads everything from that copy (the library's queue
+  read fetches only when asked): only origin has every writer's pushes, this command's
+  own included. Except with `--local`, the dashboard's: it reads this machine's copy
+  (the persistent checkout at `.branches/agent-data`, else the local branch) with no
+  fetch, because the dashboard polls and the writer on that machine keeps the checkout
+  synced. With no origin the local branch is read: writes are refused there, so nobody
   else can have moved it.
 - Every command that runs prints one JSON document, the result or the refusal. A refusal
   also puts one line on stderr and exits 1. A malformed command line (an unknown flag, the
@@ -34,8 +41,9 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   rejected first: the usage on stderr, nothing on stdout, exit 2. Anything a command
   throws refuses with `git-failed`. Outside a repository a command refuses `not-a-repo`;
   only git's own "not a git repository" reads as that.
-- A bare `queue` answers with a JSON array; every other result and every refusal is an
-  object with `ok`.
+- A bare `queue` answers with a JSON array of strings; with `--full`, of objects, each
+  entry with the priority section it sits in, for the dashboard's page. Every other
+  result and every refusal is an object with `ok`.
 - The command's write is one commit per command, pushed straight to origin through a
   throwaway worktree at origin's tip; a push that loses a race is re-applied on the new
   tip by `@gemstack/agent-data`. The program's writes go through its persistent checkout's

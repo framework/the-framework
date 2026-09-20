@@ -169,7 +169,8 @@ test('deleting an agent whose checkout holds uncommitted work discards the work 
     assert.deepEqual(await deleteProjectAgent(repo, RUN_ID), { ok: true })
     await assert.rejects(() => stat(path), 'the checkout is gone, uncommitted edit and all')
     assert.equal((await git(['rev-parse', '--verify', `refs/heads/${branch}`], repo)).trim().length, 40, 'the branch stays: it is git\'s, not the dashboard\'s')
-    assert.equal((await git(['ls-remote', '--heads', 'origin'], repo)).trim(), '', 'nothing was pushed on the way out')
+    // The record's deletion is a pushed change on the data branch; the work itself is not: the agent's branch never reaches origin.
+    assert.equal((await git(['ls-remote', '--heads', 'origin', branch], repo)).trim(), '', 'the branch was not pushed on the way out')
   } finally {
     await rm(repo, { recursive: true, force: true })
   }

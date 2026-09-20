@@ -15,10 +15,10 @@
 
 ## Business logic — TL;DR
 
-- **What a widget exports** - by default, a definition: its pages (each a URL segment, a sidebar label, an optional icon, the page component), its link actions [4], and an optional stylesheet beside its module.
+- **What a widget exports** - by default, a definition: its pages (each a URL segment, a sidebar label, an optional icon, the page component), its cards for the Overview (each an id, an optional order, the card component), its link actions [4], and an optional stylesheet beside its module.
 - **A link action** - a verb the dashboard shows as a button beside any link [3] whose project has the widget's package; the widget acts on the links, in order, through its own command, and a batch stops at its first failure with the reason.
 - **What a page is given** - the registered projects whose dependencies include the widget's package, and the URL segments after its own; a link into a project's files opens the page named by the link's first segment, with the project and the rest of the path as that page's segments.
-- **What a page may ask the dashboard** - run one of its own package's commands [2] in one project and get the JSON, or act with one so what it wrote shows at once; open an agent's page or a widget's page; start a run with a prompt and land on it, or open the launcher with the prompt drafted; and list a project's runs. None of it names a skill: what a widget composes out of them is its own.
+- **What a page may ask the dashboard** - run one of its own package's commands [2] in one project and get the JSON, or act with one so what it wrote shows at once; open an agent's page or a widget's page; start a run with a prompt and land on it, or not land when the widget says so, or open the launcher with the prompt drafted; and list a project's runs. None of it names a skill: what a widget composes out of them is its own.
 - **What a widget may draw with** - the dashboard's buttons, badge, card, skeleton, checkbox, input, popover, range slider, separator, scroll area, tooltip and dropdown menu, its markdown renderer, its split start button, its link-actions slot, its class-name joiner, its date, age and duration formatting, its polling and loading hooks, and its action hook.
 
 ## Business logic
@@ -31,7 +31,7 @@ See `## Context`.
 
 #### Business logic
 
-The widget module's default export is its definition. `pages` lists the pages it adds; each has a `segment`, its URL `/<segment>`, which is a lowercase letter followed by lowercase letters and digits and so can never be a project's id (a project's id always carries a dash); a `label` for its sidebar row; an optional `icon` component for that row (a generic icon otherwise); and the `Page` component. `linkActions` lists the link actions [4] it offers. `stylesheet` names a file relative to the widget module's own URL, loaded once with the module. `defineWidget` only types the definition; it changes nothing.
+The widget module's default export is its definition. `pages` lists the pages it adds; each has a `segment`, its URL `/<segment>`, which is a lowercase letter followed by lowercase letters and digits and so can never be a project's id (a project's id always carries a dash); a `label` for its sidebar row; an optional `icon` component for that row (a generic icon otherwise); and the `Page` component. `cards` lists the cards it adds to the Overview: each has an `id`, for the shell's key and its error line, never shown as a title; an optional `order`, its place among every installed package's cards, lower first, 50 when unsaid, ties by package name; and the `Card` component, given the registered projects that have the widget's package, by id and name, and nothing else: a card has no URL and no sub-path. A project none of whose packages declares a card sees none. `linkActions` lists the link actions [4] it offers. `stylesheet` names a file relative to the widget module's own URL, loaded once with the module. `defineWidget` only types the definition; it changes nothing.
 
 ### A link action
 
@@ -72,7 +72,7 @@ The link convention: a link [3] whose target is a path inside a project's reposi
 - `act(projectId, args, command?)`, the same for a command that changes the project's data (a claim released, an entry added): the daemon then syncs the project's data with origin and forgets what it had read, so the change shows at once instead of at the next sync;
 - `openAgent(projectId, agentId)`, which navigates the dashboard to that agent's page;
 - `openPage(segment, path?)`, which navigates to a widget's page (this widget's or another's) at a sub-path, such as `openPage('tickets', [projectId, file])`;
-- `startRun(projectId, prompt)`, which starts a run in that project with the prompt and the user's own picks (which coding agent, which model, where it runs), lands the dashboard on the run, and answers the run's id or in words why there is none;
+- `startRun(projectId, prompt, opts?)`, which starts a run in that project with the prompt and the user's own picks (which coding agent, which model, where it runs), lands the dashboard on the run unless `opts.land` is false (then the dashboard stays where it is and only the sidebar learns of the run: for a widget that starts several runs in a row), and answers the run's id or in words why there is none;
 - `configureRun(projectId, prompt)`, which opens that project's launcher with the prompt drafted in, so the user sets it up before sending ("Configure first, then run");
 - `agents(projectId)`, the project's runs the dashboard knows — the running ones, and the recorded ones when the project records them — each as its id, its branch as its name when it has one, what it was asked, its status and when it started; enough for a page to say who holds a claim, or which run wrote a plan, and to link to it.
 

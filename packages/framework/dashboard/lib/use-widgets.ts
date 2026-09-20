@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { onWidgets, type DashboardWidget } from '../rpc/widgets.js'
-import type { LinkAction, WidgetDefinition, WidgetPage } from '../widget/index.js'
+import type { LinkAction, WidgetCard, WidgetDefinition, WidgetPage } from '../widget/index.js'
 import { usePolled } from './use-async.js'
 import { isPageSegment } from './route.js'
 
@@ -16,15 +16,26 @@ export interface MountedLinkAction extends LinkAction {
   projects: string[]
 }
 
-/** What the installed widgets bring, once loaded: their pages and their link actions. */
+/** A card as the shell mounts it (#1818): the card, plus the package it came from and the projects that have it. */
+export interface MountedCard extends WidgetCard {
+  package: string
+  projects: string[]
+}
+
+/** The place of a card that names none. */
+const DEFAULT_CARD_ORDER = 50
+
+/** What the installed widgets bring, once loaded: their pages, their cards and their link actions. */
 export interface MountedWidgets {
   pages: MountedPage[]
+  /** The Overview's cards, in the order they are drawn: by `order`, then by package name. */
+  cards: MountedCard[]
   linkActions: MountedLinkAction[]
   /** True once the widget list was read and every module in it imported or skipped. */
   loaded: boolean
 }
 
-const NOTHING_MOUNTED: MountedWidgets = { pages: [], linkActions: [], loaded: false }
+const NOTHING_MOUNTED: MountedWidgets = { pages: [], cards: [], linkActions: [], loaded: false }
 
 /** Each widget module, imported once per page load, by URL; a module that fails to load is skipped. */
 const modules = new Map<string, Promise<WidgetDefinition | undefined>>()
@@ -59,7 +70,7 @@ const NO_WIDGETS: DashboardWidget[] = []
 
 /**
  * What the registered projects' widgets add (#1774), in package order: the pages, a segment two
- * widgets claim going to the first, and the link actions, every one of them, each carrying the
+ * widgets claim going to the first, the cards (#1818), sorted by their order then their package, and the link actions, every one of them, each carrying the
  * package it came from and the projects that have it. `loaded` is false until the widget list has
  * been read and every module in it imported, so the shell can tell "no such page" from "not
  * loaded yet".
@@ -73,17 +84,23 @@ export function useWidgets(): MountedWidgets {
     void Promise.all(widgets.map(async widget => ({ widget, definition: await load(widget.url) }))).then(loadedWidgets => {
       if (!live) return
       const pages: MountedPage[] = []
+      const cards: MountedCard[] = []
       const linkActions: MountedLinkAction[] = []
       for (const { widget, definition } of loadedWidgets) {
         for (const page of definition?.pages ?? []) {
           if (!isPageSegment(page.segment) || pages.some(p => p.segment === page.segment)) continue
           pages.push({ ...page, package: widget.package, projects: widget.projects })
         }
+        for (const card of definition?.cards ?? []) {
+          cards.push({ ...card, package: widget.package, projects: widget.projects })
+        }
         for (const action of definition?.linkActions ?? []) {
           linkActions.push({ ...action, package: widget.package, projects: widget.projects })
         }
       }
-      setState({ pages, linkActions, loaded: true })
+      // Numbers, not a list the shell keeps: a third package sits between two others without the shell knowing it exists.
+      cards.sort((a, b) => (a.order ?? DEFAULT_CARD_ORDER) - (b.order ?? DEFAULT_CARD_ORDER) || a.package.localeCompare(b.package))
+      setState({ pages, cards, linkActions, loaded: true })
     })
     return () => {
       live = false

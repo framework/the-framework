@@ -41,7 +41,7 @@ export function fakeHost(answers: Answers = {}, agents: Record<string, WidgetAge
 }
 
 /** No widget offers anything on links: the default for pages whose tests are not about the slot. */
-export const NO_WIDGETS: MountedWidgets = { pages: [], linkActions: [], loaded: true }
+export const NO_WIDGETS: MountedWidgets = { pages: [], cards: [], linkActions: [], loaded: true }
 
 /** Render a page inside the fake host, and inside whatever link actions installed widgets offer. */
 export function renderWithHost(ui: ReactElement, host: WidgetHost, widgets: MountedWidgets = NO_WIDGETS): RenderResult {

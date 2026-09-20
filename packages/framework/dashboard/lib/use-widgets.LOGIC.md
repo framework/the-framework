@@ -1,4 +1,4 @@
-Loads the widgets [1] the registered projects bring and gives the shell their pages and their link actions [2], and hands both to every component of the shell.
+Loads the widgets [1] the registered projects bring and gives the shell their pages, their Overview cards and their link actions [2], and hands all three to every component of the shell.
 
 ## Context
 
@@ -12,5 +12,7 @@ Loads the widgets [1] the registered projects bring and gives the shell their pa
 ## Business logic
 
 The list of widgets is read from the daemon now and every 30 seconds. Each widget's module is imported once per page load, by its URL; a module that fails to load is skipped with a console warning and adds nothing; a module whose default export is not an object adds nothing. When a module's definition names a stylesheet, it is linked into the page once, resolved against the module's URL. The pages are the definitions' pages in the order of the widget list (package order), each carrying the package it came from and the projects that have it. A page whose segment is not a lowercase letter followed by lowercase letters and digits is dropped, and a segment already taken by an earlier page is dropped too: the first widget to claim it keeps it. The link actions [2] are every definition's link actions in the same order, each carrying its package and its projects; none is dropped. The result says whether loading is complete, meaning the list was read and every module in it was imported or skipped, so the shell can tell "no such page" from "not loaded yet".
+
+The cards are the definitions' cards, each carrying the package it came from and the projects that have it, sorted by their `order` (50 when unsaid), then by package name: numbers rather than a list the shell keeps, so a third package's card sits between two others without the shell knowing it exists.
 
 The shell reads all of this once and provides it to every component in it (`WidgetsContext`, read with `useMountedWidgets`), so a page deep in the tree finds the link actions without being handed them; outside the shell, nothing is mounted and nothing is loaded.

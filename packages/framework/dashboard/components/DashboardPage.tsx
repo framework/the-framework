@@ -11,6 +11,8 @@ import { OnboardingChecklist } from './OnboardingChecklist.js'
 import { HotTickets } from './HotTickets.js'
 import { Agents } from './Agents.js'
 import { AiQueue } from './AiQueue.js'
+import { WidgetCards } from './WidgetCards.js'
+import type { ProjectSummary } from '../../src/index.js'
 import { SchedulerCard } from './SchedulerCard.js'
 import { ScrollArea } from './ui/scroll-area.js'
 
@@ -33,6 +35,7 @@ export function DashboardPage({
   onOpenLink,
   onAgentStarted,
   interventions,
+  projects,
 }: {
   onSelectProject: (id: string) => void
   /** Open one session (project + run): the Agents and hot-ticket rows link straight to a session. */
@@ -43,6 +46,8 @@ export function DashboardPage({
   /** Where a session the onboarding checklist starts lands (#1169): on that session. */
   onAgentStarted: (projectId: string, intent: string, agentId: string) => void
   interventions: Intervention[]
+  /** The registered projects, for the cards the installed packages declare: each is given the ones that have its package. */
+  projects: ProjectSummary[]
 }) {
   const { value: data } = usePolled<DashboardData | null>(onDashboard, null, 5000, [])
   // Dismissing only hides it here (#958); the settings page keeps it, which is what the
@@ -67,6 +72,9 @@ export function DashboardPage({
           <HumanQueue items={interventions} onSelectProject={onSelectProject} onSelectAgent={onSelectAgent} />
           <div className="space-y-4">
             <Agents working={data?.active ?? []} loading={loading} onSelectAgent={onSelectAgent} />
+            {/* The cards the installed packages declare (#1818), under the agents at work: a package's own
+                summary of its data, only where a project has the package. */}
+            <WidgetCards projects={projects} />
             <AiQueue
               queue={data?.queue ?? []}
               loading={loading}

@@ -30,7 +30,7 @@ Composes the dashboard: reads what is selected off the URL, keeps the sidebar, t
 ## Business logic — TL;DR
 
 - **The URL is the selection** - every page, project and agent [1] the dashboard can show is a path, so Back, reload, bookmarks and side-by-side tabs all work and no two parts of the page can disagree about what is selected.
-- **The shell's services for widgets** - every widget page and link action is handed the same services, none naming a skill: open an agent, open a page a widget adds, start a run with the user's picks and land on it, open a project's launcher with a prompt drafted in, and list a project's runs (`lib/host-services.ts`).
+- **The shell's services for widgets** - every widget page and link action is handed the same services, none naming a skill: open an agent, open a page a widget adds, start a run with the user's picks and land on it (or, when the widget asks not to land, stay put and only refresh the sidebar), open a project's launcher with a prompt drafted in, and list a project's runs (`lib/host-services.ts`).
 - **The frames around every page** - the sidebar is on every page, the right rail only while a project is selected and never beside a widget's page, and a warning bar sits above everything while the daemon is not answering.
 - **What the main pane shows** - the URL resolves, in order, to Settings [3], a widget's [19] page (or "No such page"), the Overview [4], "No such project", the project home [5], "This agent is gone", or the agent view [6], which is one and the same page for a running and a finished agent.
 - **Starting an agent from any page** - a start goes to the new agent at once, on the strength of the id the project's start hook answered, before the agent's record exists.

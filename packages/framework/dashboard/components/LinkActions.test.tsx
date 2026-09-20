@@ -17,7 +17,7 @@ const mounted = (run: MountedLinkAction['run'], over: Partial<MountedLinkAction>
   ...over,
 })
 
-const widgets = (linkActions: MountedLinkAction[]): MountedWidgets => ({ pages: [], linkActions, loaded: true })
+const widgets = (linkActions: MountedLinkAction[]): MountedWidgets => ({ pages: [], cards: [], linkActions, loaded: true })
 
 const LINK = { text: 'Do the thing', href: 'tickets/t.md', priority: 7 }
 

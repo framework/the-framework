@@ -15,7 +15,7 @@ The Overview [1], the dashboard's landing page shown while no project is selecte
 
 ## Business logic — TL;DR
 
-- **The board's order** - onboarding checklist (until dismissed), the quota card, then the "Human Queue" beside the "Agents" card stacked on the "AI Queue" card stacked on the "Scheduler" card, then the hot tickets.
+- **The board's order** - onboarding checklist (until dismissed), the quota card, then the "Human Queue" beside the "Agents" card stacked on the cards the installed packages declare (`WidgetCards.tsx`, in their declared order) stacked on the "AI Queue" card stacked on the "Scheduler" card, then the hot tickets.
 - **The Human Queue** - the interventions across every project, three kinds of row: "Awaiting" opens the agent parked on a gate, "Unpushed" opens the agent whose commits never left the machine, and a pull request row opens it on GitHub; "AI doesn't need you." when empty.
 - **Dismissing the checklist** - hides it on the Overview only; the Settings page keeps it.
 

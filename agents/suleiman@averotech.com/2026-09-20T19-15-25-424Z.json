@@ -1,14 +1,22 @@
 {
   "id": "2026-09-20T19-15-25-424Z",
-  "startedAt": "2026-09-20T19:15:25.424Z",
-  "status": "running",
+  "startedAt": "2026-09-20T19:15:27.935Z",
+  "endedAt": "2026-09-20T19:16:14.189Z",
+  "status": "failed",
   "intent": "/update-tickets",
   "driver": "claude-code",
   "model": "opus",
+  "branch": "agent-2026-09-20T19-15-25-424Z",
   "caller": {
     "scheduler": {
       "command": "update-tickets",
-      "host": "Suleimans-MacBook-Pro.local"
-    }
+      "host": "Suleimans-MacBook-Pro.local",
+      "pid": 96185
+    },
+    "pid": 96185,
+    "host": "Suleimans-MacBook-Pro.local",
+    "kind": "prompt",
+    "workspace": "/Users/suleiman/Projects/gemstack/.branches/agent-2026-09-20T19-15-25-424Z",
+    "sessionId": "8bbb0495-4466-4aaa-a8a2-9d5032bee256"
   }
 }

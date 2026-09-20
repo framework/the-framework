@@ -18,7 +18,7 @@ The Overview's [1] "AI Queue" card: every project's open queue entries [2], grou
 
 ## Business logic — TL;DR
 
-- **What the card shows** - "AI Queue", "Tasks AI will work on next", then every project with at least one open entry: its name, its open count, and all of its open entries; "Loading…" or "Nothing queued." otherwise.
+- **What the card shows** - "AI Queue", "Tasks AI will work on next", then every project with at least one entry: its name, its count, and all of its entries; "Loading…" or "Nothing queued." otherwise.
 - **An entry's title opens what it names** - a queued ticket's title opens that ticket's page, a web link opens in a new tab, anything else is plain text; the raw queue line is the tooltip.
 - **The play button starts one agent on one entry** - an agent told to work that entry only and take it off the queue when published, with the coding agent and model the user picked; the dashboard then goes to that agent.
 - **The fan-out button and its count** - a number box (3 by default, never below 1) and a button that promises exactly what a click starts, capped at the open entries: one agent per top entry, started one after another, stopping at the first refusal, with no navigation.
@@ -35,7 +35,7 @@ See `## Context`.
 
 #### Business logic
 
-The card is titled "AI Queue" with the subtitle "Tasks AI will work on next". While the queues are still loading it says "Loading…". A project is listed only when it has at least one open entry; when no project does, the card says "Nothing queued.". Each listed project shows its name, a pill with its number of open entries, the fan-out [4] count box and button, and then every open entry as a bulleted row, all of them: there is no "+N more", since a collapsed plan is one the user cannot read. Done entries are not shown. What counts as an entry of the agent queue [2], and which are open, is decided in `src/dashboard/queue.ts`.
+The card is titled "AI Queue" with the subtitle "Tasks AI will work on next". While the queues are still loading it says "Loading…". A project is listed only when it has at least one entry; when no project does, the card says "Nothing queued.". Each listed project shows its name, a pill with its number of entries, the fan-out [4] count box and button, and then every entry as a bulleted row, all of them: there is no "+N more", since a collapsed plan is one the user cannot read. The entries are the open ones, in order of work, as the project's queue provider answers them (`src/dashboard/queue.ts`); a project without a queue is not in the list at all.
 
 ### An entry's title opens what it names
 

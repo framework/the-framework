@@ -42,7 +42,7 @@ Answers everything the dashboard reads about a project or an agent [1]: the agen
 - **The files of a checkout and their status** - every file git sees, and each file's untracked/modified/deleted status, from the agent's own checkout when an agent id is given.
 - **One file's diff, one file's content, and what the agent changed** - the diff of a changed file, the content of an unchanged one, and every changed file with its line counts, always read from the checkout's own git state.
 - **The project's GitHub URL and git status** - the URL from the `origin` remote; the branch, dirty flag and linked pull request of the project or of one agent's checkout, filtered to that agent's lifetime.
-- **What an agent's handoff left behind** - read from the project's checkout against the agent's own branch, with uncommitted work counted only from the agent's own checkout.
+- **What an agent's handoff left behind** - the agent's own branch, as the project's branches provider answers it, plus the agent's pull request; an agent that recorded no branch has no handoff.
 - **The bridge's state** - the question a cloud session is parked on, where the picked answer stands, what the session has said, whether anything reached the bridge and how, the bridge token while the bridge is on, and the bridge browser's state.
 - **Reads about a relayed agent go to the device** - the reads that are about one agent's checkout are answered by the device that runs the agent, and an unreachable device answers the read's empty shape.
 
@@ -172,7 +172,7 @@ The GitHub URL is derived from the `origin` remote, nothing when there is no rem
 
 #### Business logic
 
-The project must be known, the id safe, and the agent found in the project's records, else nothing. The handoff [4] is read from the project's checkout against the agent's own branch (the branch it recorded, else `agent-<id>`), limited to what happened since the agent started (`dashboard/agent-handoff.ts`). Uncommitted work is the one thing the branch cannot answer, and it is counted only when the agent's checkout is a checkout of its own, never from the project's root.
+The project must be known, the id safe, and the agent found in the project's records, else nothing. The handoff [4] is read for the branch the agent recorded, through the project's branches provider, with the agent's pull request picked from what happened since the agent started (`dashboard/agent-handoff.ts`); an agent whose record carries no branch, or a project with no branches provider, answers nothing.
 
 ### The bridge's state
 

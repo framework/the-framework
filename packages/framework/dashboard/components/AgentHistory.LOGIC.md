@@ -15,7 +15,6 @@ The dashboard's left column, present on every page: the brand mark, the "New age
 [7] publishing: the window after an agent ended clean in which the tool that runs it still records the agent on the data branch and pushes its branch. The daemon marks an agent's record publishing while its status is done and its process is still alive on this machine (`src/dashboard-rpc/reads.ts`).
 [9] the Claude web bridge / the bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session.
 [10] cloud work adoption: how the daemon recognises the branch a cloud session pushed as the agent's, by the cloud anchor it descends from.
-[11] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
 [12] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 [13] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
 [14] driver: a coding agent wrapped as a black box. The user's driver choice is `claude-code` or `codex`; the driver implementations are `claude-code`, `codex`, `github-actions`, `claude-web` and `fake`.
@@ -137,7 +136,7 @@ The first line, left to right:
 - the subtitle: on the Overview [2], "<project name> · <when it started>"; within a project, just when it started, as "just now", "<N>m ago", "<N>h ago", "<N>d ago" up to a week, and the local date beyond it (the rule in `lib/format-date.ts`);
 - at the right end, a cluster of small glyphs, each with a hover: a laptop glyph named "Started on <host>" with the hover "Started on <host>, by that machine's daemon." when another machine's daemon started the agent, since the shared record lists every machine's agents here; a device glyph named "Runs on <device>" (or "Runs on a connected device" when the device has no label) when the agent is relayed [13]; a cloud glyph named "Runs as a Claude Code cloud session" with the hover "Runs as a Claude Code cloud session; it works and opens its PR over there." for a web agent; and the coding agent's logo, named "Claude Code" or "Codex". The logo names the driver [14] the agent recorded, and every surface Claude runs on — the local CLI, the cloud session, the Actions runner — is still "Claude Code": where it runs is the glyph beside it, not the logo.
 
-The second line is the title: what the user typed as the prompt; failing that, the session name [11] its branch carries; failing that, the branch itself; failing that, the moment it started as a short local date and time (the rule in `lib/agent-label.ts`).
+The second line is the title: what the user typed as the prompt; failing that, the branch itself; failing that, the moment it started as a short local date and time (the rule in `lib/agent-label.ts`).
 
 ### The status word
 

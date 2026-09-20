@@ -1,6 +1,6 @@
 What the tests cover:
 
-- **A waiting agent's question** - an agent that ended waiting yields one card carrying the project, the agent's id, its session name when its branch carries one, what it was asked, when its card was last updated and the whole question; the question is read from the agent's own diary, asked for by the project's path and the agent's id.
+- **A waiting agent's question** - an agent that ended waiting yields one card carrying the project, the agent's id, what it was asked, when its card was last updated and the whole question; the question is read from the agent's own diary, asked for by the project's path and the agent's id.
 - **What yields nothing** - an agent that is working, an agent that ended for good, and a waiting agent whose diary shows it went on after the question each contribute no card.
 - **Longest waiting first** - the agent that last spoke the longest ago is listed first.
 - **Failed reads** - a project whose agents cannot be read and an agent whose diary cannot be read contribute nothing, and the read itself does not fail.

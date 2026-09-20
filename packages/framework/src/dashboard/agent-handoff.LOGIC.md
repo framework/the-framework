@@ -1,4 +1,4 @@
-Decides what becomes of an agent's [1] work once the agent has ended, its handoff [2]: reads what the agent left on its branch (commits, changed files, whether the branch is pushed or merged, which pull request is the agent's, and what it left uncommitted in its checkout [3]), and backs the "Open PR" and "Merge" buttons on a finished agent's page. It publishes nothing on its own: an agent publishes its own work, and the automatic handoff the daemon's former run process ran when an agent ended is gone with that process. Nothing here commits on the agent's behalf, and every read is forgiving: a project that is not a git repository, has no remote or has no `gh` yields a handoff with less in it, never an error.
+Decides what becomes of an agent's [1] work once the agent has ended, its handoff [2]: reads what the agent left on its branch (commits, changed files, whether the branch is pushed or merged, what it left uncommitted in its checkout [3]) through the project's branches provider [14], works out which pull request is the agent's, and backs the "Open PR" and "Merge" buttons on a finished agent's page. It runs no git and no `gh` write itself: pushing a branch, opening its pull request and landing it are the branches provider's, asked through the command the provider's package declares. It publishes nothing on its own: an agent publishes its own work, and the automatic handoff the daemon's former run process ran when an agent ended is gone with that process. Nothing here commits on the agent's behalf, and every read is forgiving: a project with no branches provider, no remote or no `gh` yields a handoff with less in it, never an error.
 
 ## Context
 
@@ -6,7 +6,7 @@ Decides what becomes of an agent's [1] work once the agent has ended, its handof
 - The user starts an agent [1] and walks away. The agent publishes its own work: it pushes its branch and opens its pull request itself. Nothing here does it for the agent.
 - On a finished agent's page the user sees what the agent produced — its commits, the files it changed, the files it left uncommitted — and opens the pull request ("Open PR") or merges it ("Merge") with one press. The user is never handed an empty pull request or a second pull request for the same branch.
 
-**Business logic story**: the dashboard's buttons run the manual actions on a finished agent (`../dashboard-rpc/control.ts`); cloud work adoption opens the pull request for a branch that exists only on the remote (`../cloud-work.ts`); the intervention [8] feed reads a branch's state to list unpushed work (`interventions.ts`). Every pull request read, creation and merge goes through GitHub's `gh` command by the rules in `gh.ts`.
+**Business logic story**: the dashboard's buttons run the manual actions on a finished agent (`../dashboard-rpc/control.ts`); cloud work adoption opens the pull request for a branch that exists only on the remote (`../cloud-work.ts`); the intervention [8] feed reads branch states through the same provider to list unpushed work (`interventions.ts`). Every pull request read goes through GitHub's `gh` command by the rules in `gh.ts`; every push, pull request creation and merge goes through the branches provider [14] by the contract in `../store/branches.ts`.
 
 ## Glossary
 
@@ -18,23 +18,23 @@ Decides what becomes of an agent's [1] work once the agent has ended, its handof
 [9] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
 [10] hands-off: said of an agent whose work leaves this machine, so its first prompt is the whole agent: an agent whose location is `web`.
 [12] run: only the `logs` skill's record of one agent on the `agent-data` branch: a card (what was asked, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said).
-[13] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
+[14] branches provider: the package of the project that declares it provides the checkouts and branches; The Framework reads a branch's state and moves branches through the command that package declares (`../store/branches.ts`).
 [18] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
 
 ## Business logic — TL;DR
 
-- **The branch an agent's work is on** - the branch recorded on the agent, because the agent renames its branch itself; the birth branch `agent-<agent id>` only for an agent that recorded none.
-- **What a finished agent left behind** - read by branch name from the project's own repository, so it reads the same whether or not the checkout still exists: the base, the branch's own commits, the change since the branch point, whether the branch is pushed and merged, its pull request, and a gone branch as a fact rather than an error.
+- **The branch an agent's work is on** - the branch recorded on the agent, because the agent renames its branch itself; an agent that recorded none has no branch to hand off.
+- **What a finished agent left behind** - the branch's git facts as the branches provider answers them, so the read is the same whether or not the checkout still exists: the base, the branch's own commits, the change since the branch point, whether the branch is pushed and merged, the uncommitted work in the checkout on that branch, and a gone branch as a fact rather than an error; plus the agent's pull request from the dashboard's own lookup.
 - **Nothing to hand off** - a branch with no commit the base lacks, or whose commits change no file, is empty, and every step that would publish it refuses.
-- **Uncommitted work is named, never committed** - what the agent left uncommitted in its checkout is listed by path, absent when nobody asked, and nothing commits it on the agent's behalf.
+- **Uncommitted work is named, never committed** - what the agent left uncommitted in the checkout on its branch is listed by path, as the provider names it, and nothing commits it on the agent's behalf.
 - **Which pull request is the agent's** - out of the branch's whole pull request history: an open one always, a closed one only when created after the agent started; the first for identity, the latest for handoff decisions.
 - **The pull request the agent recorded** - the number the agent wrote down is the fact; its state is read live, and when nothing live is known the record stands on its own.
-- **Opening a pull request for a branch** - push first, the base named as GitHub wants it, draft or ready for review, the URL and number read off what `gh` prints, and the cached "no pull request" forgotten.
-- **The "Open PR" button** - the agent's existing pull request first, even for a gone branch, unless the agent moved past it; a gone branch and an empty branch are refused with a reason; otherwise a pull request ready for review.
-- **A pull request for a branch only the remote has** - a cloud session's own branch gets a draft pull request with nothing pushed and `gh`'s default base.
-- **The "Merge" button on a finished agent** - refused when the agent has no pull request or it is no longer open; otherwise merged, a draft marked ready on the way, directly where GitHub cannot arm auto-merge.
-- **The pull request's title** - the agent's session name, else "Session <agent id>"; never the prompt. A title and an issue reference the caller hands over would win, but no caller hands one over.
-- **The pull request's body** - what was asked for, then which agent did it. A description the caller hands over would replace what was asked for, but no caller hands one over.
+- **Publishing a branch** - the branches provider pushes the branch and opens its pull request, or answers the open one it already has; the answer's URL and number come back, and the cached "no pull request" is forgotten.
+- **The "Open PR" button** - the agent's existing pull request first, even for a gone branch, unless the agent moved past it; a gone branch and an empty branch are refused with a reason; otherwise the branch is published ready for review.
+- **A pull request for a branch only the remote has** - a cloud session's own branch is published as a draft, through the same provider.
+- **The "Merge" button on a finished agent** - refused when the agent has no pull request or it is no longer open; otherwise the branches provider lands the pull request.
+- **The pull request's title** - the agent's own title, else its branch, else "Session <agent id>"; never the prompt.
+- **The pull request's body** - what the agent said about the work, else what was asked for, then which agent did it.
 - **What a handoff reports** - a button answers with success (and the pull request's URL and number) or one error line, and the number rides along so it gets recorded on the agent.
 
 ## Business logic
@@ -47,7 +47,7 @@ Decides what becomes of an agent's [1] work once the agent has ended, its handof
 
 #### Business logic
 
-The branch is the one recorded on the agent's [1] record while it ran. An agent whose record carries no branch falls back to its birth branch, `agent-<agent id [9]>`, the branch its checkout [3] was created on. That is the only fallback.
+The branch is the one recorded on the agent's [1] record while it ran. An agent whose record carries no branch has no branch: nothing is guessed, and every read and action below that needs the branch answers nothing or refuses ("this session recorded no branch to open a PR from").
 
 ### What a finished agent left behind
 
@@ -55,16 +55,12 @@ The branch is the one recorded on the agent's [1] record while it ran. An agent 
 
 **User story**: a finished agent's [1] page shows what the agent produced and offers the next step, whether or not the agent's checkout [3] still exists.
 
-**Problem**: a finished agent's checkout is usually gone, removed once its work is on the remote. A read addressed by checkout would fall back to the project's own working copy and report the project's branch as if it were the agent's. So the read is addressed by branch name and made from the project's own repository, and every answer degrades rather than fails.
+**Problem**: a finished agent's checkout is usually gone, removed once its work is on the remote. A read addressed by checkout would fall back to the project's own working copy and report the project's branch as if it were the agent's. So the read is addressed by branch name, and every answer degrades rather than fails.
 
 #### Business logic
 
-- A project directory that is not a git repository, or where git cannot run, yields no handoff [2] at all: nothing about it is answerable.
-- The base the branch is measured against is the branch the remote's default points at (`origin/<default branch>`), else the first of `main` and `master` that exists locally, else none.
-- The commits are the branch's own commits since the base, each with its full and seven-character id and its subject. Commits that are only on the base never count: counting them would make a branch whose work is already merged report commits it did not make, and offer a pull request that GitHub refuses with "No commits between main and <branch>".
-- The files are the change since the branch point (not a comparison against a base that moved on), per file with lines inserted, lines deleted and whether the file is binary, read with the shared parser in `file-diff.ts`; the totals sum the files.
-- The branch is pushed when the repository has a remote and the remote's copy of the branch is at the very same commit. It is merged when git reports it merged into the base.
-- Without a base, no commits and no files can be read: the branch reads as empty and not merged.
+- The branch's git facts are asked of the project's branches provider [14], for that one branch. A project with no branches provider, or a provider that does not answer for the branch, yields no handoff [2] at all: nothing about it is answerable.
+- The provider answers whether the branch exists on this machine, the base it is measured against when one was found, its own commits beyond the base (newest first, each with its full id and its subject), the files it changed since the branch point (each with lines inserted, lines deleted and whether it is binary), whether the repository has a remote, whether the remote holds the branch at the very same commit, whether the base already contains it, and the uncommitted paths in the checkout [3] that is on the branch, when one is. Each commit gets a seven-character id for display, and the line totals sum the files.
 - A branch that no longer exists locally still yields a handoff, marked as gone, with no commits and no files. Its pull request is still looked up: a hands-off [10] agent pushes its branch and opens its pull request from the cloud, and a merged branch gets deleted, so the pull request is the one thing left worth showing.
 - The pull request is looked up through the dashboard's read cache and allowed to arrive late: while the lookup is still warming the handoff says "not known yet" rather than "no pull request", so the git answers never wait on `gh` and the caller can ask again.
 
@@ -86,7 +82,7 @@ A branch is empty when it has no commit the base does not already have, or when 
 
 #### Business logic
 
-When the caller names the agent's [1] checkout [3], every file changed there and not committed is listed by path, read with the shared parser in `file-status.ts`. Those files are not on the branch: they are not among the commits and they do not make an empty branch non-empty. The list is absent, rather than empty, when no checkout was named or git could not answer: "nobody asked" and "asked, and the tree is clean" are different answers, and only the second may be shown as a clean tree. The paths are listed, not counted, so the page can name what is waiting.
+When a checkout [3] is on the branch, the branches provider [14] names every file changed there and not committed, by path, and the handoff carries the list as given. Those files are not on the branch: they are not among the commits and they do not make an empty branch non-empty. The list is absent, rather than empty, when no checkout is on the branch: "no checkout" and "a checkout, and the tree is clean" are different answers, and only the second may be shown as a clean tree. The paths are listed, not counted, so the page can name what is waiting.
 
 ### Which pull request is the agent's
 
@@ -108,15 +104,15 @@ The branch's whole pull request history is read — through the dashboard's read
 
 An agent [1] with no recorded pull request has none. For an agent with one, the pull request's current state is read live through the dashboard's read cache, because it changes without the agent doing anything: a pull request merges, a human closes it. When the live read returns the recorded number, its state, title and URL are the answer. A different number on the branch is some other pull request and never this agent's answer. When the live read has nothing to say — the lookup still warming, `gh` missing, or a branch on a repository this machine cannot see — the recorded number and URL stand on their own, with state "OPEN" while the lookup is still pending (the caller may ask again) and "UNKNOWN" otherwise, and no title.
 
-### Opening a pull request for a branch
+### Publishing a branch
 
 #### Context
 
-**Problem**: GitHub refuses to open a pull request for a branch the remote has never seen, so the push must be part of the action rather than something the user has to remember first. GitHub also wants the base as a branch on the remote ("Base ref must be a branch"), while the base the read detected is git's remote-tracking name.
+**Problem**: GitHub refuses to open a pull request for a branch the remote has never seen, so the push must be part of the action rather than something the user has to remember first. How a branch is pushed, against which base its pull request opens, and what a checkout must look like before it may be published are the branches provider's [14] rules, not the dashboard's.
 
 #### Business logic
 
-The branch is pushed to `origin` first, setting its upstream. A failed push ends the action with git's own reason — the `fatal:`, `error:` or `remote:` line, never a stack trace. The pull request is then created for that head branch with the given title and body, against the given base with any `origin/` prefix removed, and as a draft when asked. A pull request a human asked for by name — the "Open PR" button — opens ready for review, because asking for it is asking for review. The new pull request's URL is the last line `gh` prints and its number is that URL's last path segment; an output with no URL still counts as success, since the pull request is open. The branch's cached "no pull request" answers — the single view and the history — are forgotten, so the page stops offering to open one. A `gh` failure is returned as its own message.
+The branches provider [14] is asked to publish the branch with the given title and body, and as a draft when asked; a project with no branches provider refuses with "this project has no branches provider to publish with". The provider pushes the branch when the remote lacks it and opens the pull request, or answers the open pull request the branch already has; a refusal of its own (a checkout on the branch holding uncommitted work, a push that failed, a pull request GitHub refused) ends the action with the provider's own line as the error. The pull request's URL and number come back from the provider. The branch's cached "no pull request" answers — the single view and the history — are forgotten, so the page stops offering to open one.
 
 ### The "Open PR" button
 
@@ -126,7 +122,7 @@ The branch is pushed to `origin` first, setting its upstream. A failed push ends
 
 #### Business logic
 
-The branch's state is read with the agent's [1] start time, picking the latest pull request that saw the branch. The agent's pull request is the answer first, even when the branch is gone locally — a hands-off [10] agent's branch only ever existed on the remote, and its pull request is what the button exists to give — unless the agent demonstrably moved past it. An agent has moved past its pull request when the pull request is merged or closed and its head commit is known and differs from the branch tip; never for an open pull request (pushed commits still land on it), never when the lookup carried no head commit (a duplicate pull request is not risked on a guess), and never for a gone branch (no tip to compare, so the pull request stays the best answer). Then a branch that no longer exists is refused with "branch <branch> no longer exists", and an empty branch with "this session produced no commits to open a PR for". Otherwise a pull request is opened by the rule above, ready for review unless the caller asks for a draft, with the title and body rules below and the detected base. The dashboard records the number and URL it gets back on the agent's run [12] card (`../dashboard-rpc/control.ts`).
+An agent [1] that recorded no branch is refused with "this session recorded no branch to open a PR from". Otherwise the branch's state is read with the agent's start time, picking the latest pull request that saw the branch. The agent's pull request is the answer first, even when the branch is gone locally — a hands-off [10] agent's branch only ever existed on the remote, and its pull request is what the button exists to give — unless the agent demonstrably moved past it. An agent has moved past its pull request when the pull request is merged or closed and its head commit is known and differs from the branch tip; never for an open pull request (pushed commits still land on it), never when the lookup carried no head commit (a duplicate pull request is not risked on a guess), and never for a gone branch (no tip to compare, so the pull request stays the best answer). Then a branch that no longer exists is refused with "branch <branch> no longer exists", and an empty branch with "this session produced no commits to open a PR for". Otherwise the branch is published by the rule above, ready for review unless the caller asks for a draft, with the title and body rules below. A pull request a human asked for by name is asking for review. The dashboard records the number and URL it gets back on the agent's run [12] card (`../dashboard-rpc/control.ts`).
 
 ### A pull request for a branch only the remote has
 
@@ -136,7 +132,7 @@ The branch's state is read with the agent's [1] start time, picking the latest p
 
 #### Business logic
 
-Nothing is pushed: creating the pull request for the remote branch is the whole action, against `gh`'s default base (the repository's default branch), with the title and body rules below, and always as a draft — a pull request The Framework opens by itself must not request anyone's review, and the intervention [8] feed keeps listing it. The URL and number are read the same way as above, and the branch's cached answers are forgotten.
+The branch is published by the rule above, always as a draft — a pull request The Framework opens by itself must not request anyone's review, and the intervention [8] feed keeps listing it — with the title and body rules below. The branches provider [14] finds nothing to push for a branch only the remote has and opens the pull request against its own default base.
 
 ### The "Merge" button on a finished agent
 
@@ -146,7 +142,7 @@ Nothing is pushed: creating the pull request for the remote branch is the whole 
 
 #### Business logic
 
-The agent's [1] recorded pull request is resolved by the rule above. No pull request: refused with "this session has no pull request to merge". A pull request that is not open: refused with "this session's PR is already merged" (or "closed"), because that is an answer, not an action. Otherwise the pull request is merged by the merge rule in `gh.ts`: GitHub's auto-merge first, a draft marked ready on the way, and where GitHub cannot arm auto-merge the pull request is merged directly, because a human just said to land it. A refusal is returned as the error. On success the branch's cached pull request answers are forgotten, so the page stops offering a merge for a pull request that landed, and the pull request's URL and number are returned.
+The agent's [1] recorded pull request is resolved by the rule above. No pull request: refused with "this session has no pull request to merge". A pull request that is not open: refused with "this session's PR is already merged" (or "closed"), because that is an answer, not an action. A project with no branches provider [14]: refused with "this project has no branches provider to merge with". Otherwise the branches provider is asked to land the pull request by its number — armed on GitHub to merge on green, merged at once where it is already green, or watched by the provider where the repository allows no auto-merge, a draft marked ready on the way — and a refusal is returned as the provider's own error. On success the branch's cached pull request answers are forgotten, so the page stops offering a merge for a pull request that landed, and the pull request's URL and number are returned.
 
 ### The pull request's title
 
@@ -156,7 +152,7 @@ The agent's [1] recorded pull request is resolved by the rule above. No pull req
 
 #### Business logic
 
-Three rungs, each a name for the work the agent [1] did: a title the caller hands over as the agent's own, else the agent's session name [13] (its branch minus the `agent-` prefix, when the agent named its work), else "Session <agent id [9]>", which says little but says it honestly. The prompt the agent was given is never the title. When the caller hands over the GitHub issue the agent's ticket tracks, the reference rides along as "(fix #42)", so the squash-merge commit, which inherits the title, closes the issue. No caller hands over a title or an issue today: the "Open PR" button and cloud work adoption both pass the agent's record, which carries neither.
+Three rungs, each a name for the work the agent [1] did: a title the caller hands over as the agent's own, else the agent's branch (the name the agent gave its work, as `branches name` spelled it), else "Session <agent id [9]>", which says little but says it honestly. The prompt the agent was given is never the title. When the caller hands over the GitHub issue the agent's ticket tracks, the reference rides along as "(fix #42)", so the squash-merge commit, which inherits the title, closes the issue. No caller hands over a title or an issue today: the "Open PR" button and cloud work adoption both pass the agent's record, which carries neither.
 
 ### The pull request's body
 
@@ -166,7 +162,7 @@ See `## Context`.
 
 #### Business logic
 
-A description of the work the caller hands over as the agent's [1] own, because it describes what the change turned out to be; else what the agent was asked for at the start, which is all The Framework knows on its own. No caller hands over a description today. Then, after a blank line, "Opened from The Framework session `<session name [13]>`." — the agent id [9] standing in when the agent never named its work. Nothing else.
+A description of the work the caller hands over as the agent's [1] own, because it describes what the change turned out to be; else what the agent was asked for at the start, which is all The Framework knows on its own. No caller hands over a description today. Then, after a blank line, "Opened from The Framework session `<agent id [9]>`." Nothing else.
 
 ### What a handoff reports
 

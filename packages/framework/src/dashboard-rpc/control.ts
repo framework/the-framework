@@ -194,18 +194,19 @@ async function handoffTargetFor(
 }
 
 /**
- * Open a PR for a finished session's branch (#799), pushing it first if the remote lacks it.
+ * Open a PR for a finished session's branch (#799): the project's branches provider pushes it
+ * first if the remote lacks it (#1774).
  *
- * The title and body come from what the agent already recorded: the session name the agent chose
- * and the intent the user asked for. Nothing new is invented and nothing extra is asked of the
- * user, which is the point of "offer the next step rather than describe it".
+ * The title and body come from what the agent already recorded: the branch the agent named its
+ * work with and the intent the user asked for. Nothing new is invented and nothing extra is asked
+ * of the user, which is the point of "offer the next step rather than describe it".
  */
 export async function sendOpenPullRequest(projectId: string, agentId: string): Promise<HandoffResult> {
   return relayOr(agentId, 'sendOpenPullRequest', [projectId, agentId], async () => {
     const target = await handoffTargetFor(projectId, agentId)
     if (!target) return { ok: false, error: 'unknown session' }
-    // Under the agent lock, so the push inside `openAgentPullRequest` cannot race a Remove of the
-    // same checkout.
+    // Under the agent lock, so the provider's push inside `openAgentPullRequest` cannot race a
+    // Remove of the same checkout.
     const opened = await withAgentLock(target.checkout, () => openAgentPullRequest(target.cwd, target.agent))
     // Record it on the finished run (E6), through the project's runs provider. The session's own
     // process is gone by now, so there is no event stream to carry the fact — but it is the same

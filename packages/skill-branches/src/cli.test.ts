@@ -457,3 +457,26 @@ test("remove <name>: a link's name reaches the checkout, and the birth branch is
     await rm(repo, { recursive: true, force: true })
   }
 })
+
+test('remove --discard: a dirty checkout goes whatever it holds, nothing is pushed, and the branch stays', async () => {
+  const repo = await repoWithOrigin()
+  try {
+    await run(repo, 'create', 'd1')
+    const path = worktreePath(repo, 'd1')
+    await commitWork(path)
+    await writeFile(join(path, 'draft.txt'), 'uncommitted\n')
+    const kept = await run(repo, 'remove', 'd1')
+    assert.equal(kept.code, 1, 'the reclaim rule keeps it')
+    const gone = await run(repo, 'remove', 'd1', '--discard')
+    assert.equal(gone.code, 0, gone.err)
+    assert.deepEqual(gone.out, { ok: true })
+    assert.equal(await stat(path).then(() => true, () => false), false, 'the checkout is gone')
+    assert.equal((await git(['rev-parse', '--verify', 'refs/heads/agent-d1'], repo)).trim().length, 40, 'the branch and its commit stay')
+    assert.equal(await git(['rev-parse', '--verify', '--quiet', 'refs/remotes/origin/agent-d1'], repo).then(() => true, () => false), false, 'nothing was pushed')
+    const missing = await run(repo, 'remove', 'd1', '--discard')
+    assert.deepEqual(missing.out, { ok: false, reason: 'no-checkout', agentId: 'd1' })
+    assert.equal(missing.code, 1)
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})

@@ -15,14 +15,14 @@ Builds the cross-project "needs you" list, the interventions [1] feed: every reg
 [5] the Overview: the dashboard's cross-project page at `/`.
 [6] handoff: what becomes of an agent's work once the agent has ended: its branch pushed, a pull request opened for it, the pull request merged. The agent does it itself; on a finished agent's page the "Open PR" and "Merge" buttons do it by hand.
 [7] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
-[9] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
+[9] branches provider: the package of the project that declares it provides the checkouts and branches; The Framework reads a branch's state and moves branches through the command that package declares (`../store/branches.ts`).
 [10] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 
 ## Business logic — TL;DR
 
-- **Open pull requests to review** - every open pull request of every project is an item, except a draft opened by hand; a draft on an agent's branch stays, because a draft is how an agent's work may ask for a first look.
+- **Open pull requests to review** - every open pull request of every project is an item, except a draft opened by hand; a draft on a branch one of the project's agents is on stays, because a draft is how an agent's work may ask for a first look.
 - **Agents parked on a gate** - an agent that ended `waiting` on a gate is an item carrying the question's title, read off the agent's own diary, one item per parked agent.
-- **Finished agents with unpushed work** - among a project's 5 most recent finished agents, one whose branch still exists, holds real commits, is neither merged nor on the remote, and has a remote to push to, is an item naming what was asked, the branch and the commit count.
+- **Finished agents with unpushed work** - among a project's 5 most recent finished agents, their branches read in one ask of the branches provider [9], one whose branch still exists, holds real commits, is neither merged nor on the remote, and has a remote to push to, is an item naming what was asked, the branch and the commit count.
 - **Newest first, one item per identity** - items sort by when the pull request was opened or the agent last updated, and a pull request seen through two projects registered on the same repository appears once.
 - **Which projects were read whole** - alongside the items comes the list of projects every source answered for, so a silence caused by an unreachable project is never mistaken for "nothing waiting".
 - **How the feed reads on Discord** - one line per item shaped by its kind, posted as one "Needs you" message, or nothing at all when there is nothing to say.
@@ -37,7 +37,7 @@ See `## Context`.
 
 #### Business logic
 
-For each registered project, the open pull requests of its repository (read through `gh.ts`, at most 50) each become one item with the pull request's number, title, URL and opening time; the URL is where to act, on GitHub. A draft pull request is left out, because a draft is not asking for review, with one exception: a draft whose head branch is an agent's [2] branch (a branch named `agent-…`, other than the `agent-data` branch [7] itself) is kept. An agent publishes its pull request as a draft when a person should look at it first, and cloud work adoption opens its pull requests as drafts so they do not ping reviewers; if the feed dropped them too, nothing would tell anyone the work exists. A draft with no head branch recorded counts as opened by hand, so an answer that lacks the branch never turns every draft in the repository into a "needs you". A project whose pull requests cannot be read (no remote, `gh` missing or logged out, GitHub unreachable) contributes no pull request items.
+For each registered project, the open pull requests of its repository (read through `gh.ts`, at most 50) each become one item with the pull request's number, title, URL and opening time; the URL is where to act, on GitHub. A draft pull request is left out, because a draft is not asking for review, with one exception: a draft whose head branch is an agent's [2] branch, the branch a finished agent's record names or a working agent's checkout is on, is kept. An agent publishes its pull request as a draft when a person should look at it first, and cloud work adoption opens its pull requests as drafts so they do not ping reviewers; if the feed dropped them too, nothing would tell anyone the work exists. A draft with no head branch recorded counts as opened by hand, so an answer that lacks the branch never turns every draft in the repository into a "needs you". A project whose pull requests cannot be read (no remote, `gh` missing or logged out, GitHub unreachable) contributes no pull request items.
 
 ### Agents parked on a gate
 
@@ -57,9 +57,9 @@ For each project, every agent [2] with a checkout whose status is `waiting` is l
 
 #### Business logic
 
-For each project, only the 5 most recent finished agents [2] (every agent whose status is not running, newest by start time first) are inspected, since each inspection costs several git reads and the feed is re-read on a poll: work that has sat unpushed for dozens of agents is not news, and the agent list remains the record of it. For each of those agents the branch is the one recorded for it, or, when no record exists, the branch its agent id [9] names. The branch's state is read as for the handoff summary (`agent-handoff.ts`), except that the pull request lookup is skipped: an open pull request means the branch was pushed, which already excludes it, and the pull request kind above is what surfaces it, so an 8-second network call per agent on every poll would buy nothing.
+For each project, only the 5 most recent finished agents [2] (every agent whose status is not running, newest by start time first) are inspected, since the feed is re-read on a poll: work that has sat unpushed for dozens of agents is not news, and the agent list remains the record of it. An agent whose record carries no branch is not inspected: it has no branch to push. The branches of those agents are read in one ask of the project's branches provider [9], which answers each branch's git facts (whether it exists, its commits and changed files since the base branch, whether it is pushed and merged, whether the repository has a remote) and no pull request: an open pull request means the branch was pushed, which already excludes it, and the pull request kind above is what surfaces it, so a network call per agent on every poll would buy nothing. A project with no branches provider has no checkouts and nothing unpushed.
 
-The agent is an item only when none of these holds, each being a reason nobody is waited on: the branch is gone, the agent wrote nothing (no commit beyond what the base branch already has), the branch is already merged, the branch is already on the remote at the same commit, or the repository has no remote to push to. The item's title is what the agent was asked to do, or the branch name when no request was recorded; it names the branch and how many commits are waiting, links to the dashboard's URL when known, is identified by the project and the agent, and carries the agent's last update time. A branch that cannot be read is skipped rather than failing the feed.
+The agent is an item only when none of these holds, each being a reason nobody is waited on: the provider did not answer for the branch, the branch is gone, the agent wrote nothing (no commit beyond what the base branch already has, or commits that change no file), the branch is already merged, the branch is already on the remote at the same commit, or the repository has no remote to push to. The item's title is what the agent was asked to do, or the branch name when no request was recorded; it names the branch and how many commits are waiting, links to the dashboard's URL when known, is identified by the project and the agent, and carries the agent's last update time. A provider read that fails leaves the project with no such items, and the project does not count as read whole.
 
 ### Newest first, one item per identity
 
@@ -79,7 +79,7 @@ Items across all projects sort newest first, by the pull request's opening time 
 
 #### Business logic
 
-A project is read whole only when every one of its sources answered: its open pull requests, its live agents [2], its finished agents, and the branch state of each inspected finished agent. Any source that failed makes the project contribute what the other sources found, but not count as read whole. The list of projects read whole comes back beside the items. The dashboard's card ignores it; the notification sweep [4] is the caller that cannot, because it must not take "could not look" for "nothing there".
+A project is read whole only when every one of its sources answered: its open pull requests, its live agents [2], its finished agents, and the branch states of the inspected finished agents. Any source that failed makes the project contribute what the other sources found, but not count as read whole. The list of projects read whole comes back beside the items. The dashboard's card ignores it; the notification sweep [4] is the caller that cannot, because it must not take "could not look" for "nothing there".
 
 ### How the feed reads on Discord
 

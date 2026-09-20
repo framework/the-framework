@@ -109,7 +109,7 @@ export function defineWidget(definition: WidgetDefinition): WidgetDefinition {
 export interface WidgetAgent {
   /** The run's id, the one {@link WidgetHost.openAgent} takes. */
   id: string
-  /** The session name the run's branch carries, when it has one. */
+  /** The run's branch, the name the agent gave its work, when its record carries one. */
   name?: string
   /** What the run was asked, as typed or as queued; absent when its record carries none. */
   ask?: string

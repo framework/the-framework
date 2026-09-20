@@ -1,10 +1,10 @@
-Publishing an agent's [1] checkout [2]: push its branch, open its pull request with the title and body the agent wrote, and arm the merge when the agent was told the work may land on its own, unless the checkout is under a hold [4], in which case the merge is only recorded as wanted and armed later by a release. The agent's own last step, since the agent publishes its own work.
+Publishing an agent's [1] checkout [2]: push its branch, open its pull request with the title and body the agent wrote, and arm the merge when the agent was told the work may land on its own, unless the checkout is under a hold [4], in which case the merge is only recorded as wanted and armed later by a release. The agent's own last step, since the agent publishes its own work. A person goes through the same door for a run that did not publish: a branch published by name, and a request landed by number.
 
 ## Context
 
 **User story**: an agent [1] finishes its work, runs `npx branches publish --title … --body …`, and the user finds the branch on the remote and a pull request open for it; with `--merge`, the request merges by itself once its checks pass, and the user only sees the merged result, in a repository that allows GitHub's auto-merge and in one that does not. When whoever started the agent has more work coming on its branch, the request stays open with a line in its body saying the merge is held, and merges on green only once that work is done.
 
-**Problem**: what is published is what is committed, and nothing is committed on the agent's behalf; a request opened twice for one branch would be noise; a merge armed on a draft is refused by GitHub.
+**Problem**: what is published is what is committed, and nothing is committed on the agent's behalf; a request opened twice for one branch would be noise; a merge armed on a draft is refused by GitHub. A person publishing a finished run's work usually finds its checkout gone, reclaimed once the work reached the remote, and sometimes finds work that only the remote has.
 
 ## Glossary
 
@@ -22,6 +22,8 @@ Publishing an agent's [1] checkout [2]: push its branch, open its pull request w
 - **Merge on green, on request** - with the merge asked for, GitHub is told to merge the request by squash once its checks pass (`auto-armed`); a request GitHub calls already green is merged at once (`merged`); where the repository does not allow auto-merge, this tool's merge watcher [3] is started for the request (`watching`); any other refusal is reported beside the opened request (`failed`, with gh's line), never as a failed publish.
 - **Under a hold, the merge waits** - a checkout under a hold [4] asked to merge opens the request as always, arms nothing, records the held merge [5], puts the held line in the request's body, and answers `held`.
 - **The release arms a held merge** - arms the merge exactly as `publish --merge` does, then takes the held line out of the body; `not-held` when no held merge [5] is recorded, `closed` when the request is no longer open; a failed arming keeps the record and the line, so the release can be tried again.
+- **A branch published by name** - a person's publish, from the project: through the checkout on the branch when one is, under its clean rule; else the branch itself, pushed when this machine has it, left as it is when only `origin` has it; a branch nowhere is `no-branch`; no hold applies without a checkout.
+- **A request landed by number** - a person's merge: a draft is marked ready, then the merge is armed exactly as `publish --merge` arms it; a request no longer open is `not-open` with its state.
 - **Every refusal names why** - not a worktree, no branch, dirty, the push did not land (with git's line), the request could not be opened (with gh's line).
 
 ## Business logic
@@ -78,6 +80,26 @@ Whether the checkout is under a hold [4] is read only when the merge is asked fo
 - for a request already open, reads its body and appends the held line when the body lacks it, so the line is there once however many times the publish runs; an edit gh refuses is ignored, since the line is only for a person;
 - records the held merge [5] under the project's `.branches/merge-held/<number>`, out of git's sight and outside the checkout, so the record outlives the checkout;
 - arms nothing, and answers the merge outcome `held`.
+
+### A branch published by name
+
+#### Context
+
+**User story**: a run ended without opening its pull request; the user presses "Open PR" on its page, and the dashboard's server publishes the branch the run worked on, the title and body composed from what the run was asked and what it said.
+
+#### Business logic
+
+Given the project and a branch name, the checkouts [2] under `.branches/` are read and the one on that branch, when there is one, is published exactly as the agent's own publish would publish it, clean rule, push, request and hold [4] included. When no checkout is on the branch: a branch this machine has is pushed to `origin` first, a push that does not land being `push-failed` with git's line; a branch only `origin` has (`origin/<branch>` with no local branch) is left as it is, since there is nothing here to push; a branch neither has is the refusal `no-branch`, naming it. Then the open request is reused or a new one opened, and the merge armed on request, all as for a checkout, except that no hold applies: a hold is a checkout's.
+
+### A request landed by number
+
+#### Context
+
+**User story**: the user presses "Merge PR" on a finished run whose request is open; a draft counts, since asking for the merge is the statement that its review happened.
+
+#### Business logic
+
+Given the project and a pull request number, the request's state and whether it is a draft are read; gh unable to answer is the outcome `failed` with its line. A request that is not open is `not-open` with GitHub's state, nothing done: already merged is an answer, not an action. A draft is marked ready first; gh refusing that is `failed`. Then the merge is armed exactly as `publish --merge` arms it: `auto-armed`, `merged`, `watching` or `failed`.
 
 ### The release arms a held merge
 

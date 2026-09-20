@@ -18,8 +18,9 @@ import {
 } from './worktree.js'
 import { createCheckout, attachCheckout } from './checkout.js'
 import { reconcileBranchLinks } from './branch-links.js'
-import { reclaimWorktree, type ReclaimOutcome, type ReclaimRefusal } from './reclaim.js'
-import { nodeGhRunner, publishCheckout, releaseMerge, type PublishOutcome } from './publish.js'
+import { discardWorktree, reclaimWorktree, type ReclaimOutcome, type ReclaimRefusal } from './reclaim.js'
+import { mergePr, nodeGhRunner, publishBranch, publishCheckout, releaseMerge, type PublishOutcome } from './publish.js'
+import { readBranchStates } from './branch-state.js'
 import { watchAndMerge } from './merge-watch.js'
 
 /**
@@ -33,10 +34,10 @@ import { watchAndMerge } from './merge-watch.js'
  * on stderr so a person does.
  *
  * Where the project is comes from the working directory: for every command that acts on the
- * project (`create`, `attach`, `list`, `remove`, `prune`) it is the checkout whose `.branches/`
- * the working directory is under, else the checkout itself — so the
- * same command works from inside an agent's checkout; the commands that act on one checkout
- * (`name`, `status`) act on the one the working directory is in.
+ * project (`create`, `attach`, `show`, `merge`, `list`, `remove`, `prune`, and `publish --branch`)
+ * it is the checkout whose `.branches/` the working directory is under, else the checkout
+ * itself — so the same command works from inside an agent's checkout; the commands that act on
+ * one checkout (`name`, `status`, a bare `publish`) act on the one the working directory is in.
  */
 
 export const USAGE = `usage: branches <command>
@@ -45,12 +46,15 @@ export const USAGE = `usage: branches <command>
   attach <id> <branch>         a checkout for agent <id>, on an existing branch
   name <name>                  rename this checkout's branch to agent-<name>; prints the name it got
   status [path]                the checkout's branch, whether it is clean, whether it is on the remote
-  publish --title <t> [--body <b>] [--merge] [--draft]
-                               push this checkout's branch and open its pull request; --merge lands it on green
+  show <branch>...             what each branch holds and where it stands: its commits and files beyond the base, whether it is pushed, merged, and what its checkout left uncommitted
+  publish [--branch <b>] --title <t> [--body <b>] [--merge] [--draft]
+                               push this checkout's branch, or branch <b>, and open its pull request; --merge lands it on green
+  merge <number>               land pull request <number>: a draft is marked ready, then the merge is armed as --merge arms it
   merge-on-green <number>      wait for pull request <number>'s checks and merge it once they pass; what --merge starts where the repository has no auto-merge
   release <number>             arm the merge a publish held for pull request <number>, as --merge would have
   list [--sizes]               every agent checkout under .branches/
   remove <id> [--no-push]      reclaim agent <id>'s checkout, once the remote has everything it holds
+         [--discard]           ... or drop it whatever it holds, nothing pushed; the branch stays
   prune [--no-push]            remove, for every checkout
 
 JSON on stdout. Exit code 1 for a refusal or a git failure (the reason on stderr), 2 for a usage error.`
@@ -141,19 +145,43 @@ const COMMANDS: Record<string, Command> = {
     return { ok: true, path, ...(branch ? { branch } : {}), clean, onRemote }
   },
 
+  async show(args, cwd, git) {
+    const { positionals } = parse(args, {}, 1, Infinity)
+    const repo = await project(cwd, git)
+    return readBranchStates(repo, positionals, git)
+  },
+
   async publish(args, cwd, git) {
-    const { values } = parse(args, { title: { type: 'string' }, body: { type: 'string' }, merge: { type: 'boolean' }, draft: { type: 'boolean' } }, 0)
+    const { values } = parse(args, { branch: { type: 'string' }, title: { type: 'string' }, body: { type: 'string' }, merge: { type: 'boolean' }, draft: { type: 'boolean' } }, 0)
     if (!values.title?.trim()) throw new Usage('--title is required: one line naming what the change does')
-    const checkout = await inRepo(() => checkoutRoot(cwd, git))
-    const outcome = await publishCheckout(checkout, {
+    const opts = {
       title: values.title.trim(),
       ...(values.body !== undefined ? { body: values.body } : {}),
       ...(values.merge ? { merge: true } : {}),
       ...(values.draft ? { draft: true } : {}),
       git,
-    })
+    }
+    if (values.branch !== undefined) {
+      if (!values.branch.trim()) throw new Usage('--branch names a branch')
+      const outcome = await publishBranch(await project(cwd, git), values.branch, opts)
+      if (!outcome.ok) throw new Refused(outcome, publishRefusalLine(values.branch, outcome))
+      return outcome
+    }
+    const checkout = await inRepo(() => checkoutRoot(cwd, git))
+    const outcome = await publishCheckout(checkout, opts)
     if (!outcome.ok) throw new Refused(outcome, publishRefusalLine(checkout, outcome))
     return outcome
+  },
+
+  async merge(args, cwd, git) {
+    const { positionals } = parse(args, {}, 1)
+    const number = Number(positionals[0])
+    if (!Number.isInteger(number) || number <= 0) throw new Usage(`${positionals[0]} is not a pull request number`)
+    const repo = await project(cwd, git)
+    const outcome = await mergePr(repo, number)
+    if (outcome.outcome === 'not-open') throw new Refused({ ok: false, reason: 'not-open', number, state: outcome.state }, `pull request ${number} is ${outcome.state.toLowerCase()}, not open`)
+    if (outcome.outcome === 'failed') throw new Refused({ ok: false, reason: 'merge-failed', number, detail: outcome.error }, `pull request ${number} could not be landed: ${outcome.error}`)
+    return { ok: true, number, merge: outcome }
   },
 
   async 'merge-on-green'(args, cwd, git) {
@@ -189,10 +217,10 @@ const COMMANDS: Record<string, Command> = {
   },
 
   async remove(args, cwd, git) {
-    const { positionals, values } = parse(args, { 'no-push': { type: 'boolean' } }, 1)
+    const { positionals, values } = parse(args, { 'no-push': { type: 'boolean' }, discard: { type: 'boolean' } }, 1)
     const agentId = agentIdArg(positionals[0]!)
     const repo = await project(cwd, git)
-    const outcome = await reclaim(repo, agentId, !values['no-push'], git)
+    const outcome = values.discard ? await discard(repo, agentId, git) : await reclaim(repo, agentId, !values['no-push'], git)
     if (!outcome.ok) throw new Refused(outcome, refusalLine(agentId, outcome))
     // A link named after a branch that just went with its checkout is stale from this moment.
     await reconcileBranchLinks(repo, { git })
@@ -231,6 +259,13 @@ async function reclaim(repo: string, agentId: string, mayPush: boolean, git: Git
   return reclaimWorktree(repo, checkout, { birthBranch: agentBranchName(agentIdFromWorktreeDir(basename(checkout))), mayPush, git })
 }
 
+/** One agent's checkout dropped whatever it holds; a missing checkout is its own refusal. */
+async function discard(repo: string, agentId: string, git: GitRunner): Promise<ReclaimOutcome | RemoveRefusal> {
+  const path = worktreePath(repo, agentId)
+  if (!(await stat(path).then(s => s.isDirectory(), () => false))) return { ok: false, reason: 'no-checkout', agentId }
+  return discardWorktree(repo, await realpath(path), { git })
+}
+
 /** Why a checkout stayed, as one line for a person. */
 function refusalLine(agentId: string, outcome: (ReclaimOutcome & { ok: false }) | RemoveRefusal): string {
   const reason: ReclaimRefusal | 'no-checkout' = outcome.reason
@@ -252,12 +287,12 @@ const branchOf = (outcome: object): string => String((outcome as { branch?: stri
 const detailOf = (outcome: object): string | undefined => (outcome as { detail?: string }).detail
 
 /** Why a checkout was not published, as one line for a person. */
-function publishRefusalLine(checkout: string, outcome: PublishOutcome & { ok: false }): string {
+function publishRefusalLine(subject: string, outcome: PublishOutcome & { ok: false }): string {
   switch (outcome.reason) {
     case 'not-a-worktree':
-      return `${checkout} is not a git worktree`
+      return `${subject} is not a git worktree`
     case 'no-branch':
-      return `${checkout} is on no branch`
+      return outcome.branch !== undefined ? `no branch ${outcome.branch}, here or on origin` : `${subject} is on no branch`
     case 'dirty':
       return `${outcome.branch} has uncommitted work; commit or delete it, then publish`
     case 'push-failed':
@@ -305,7 +340,7 @@ type Options = Record<string, { type: 'string' | 'boolean' }>
 function parse<O extends Options>(args: string[], options: O, min: number, max: number = min) {
   try {
     const parsed = parseArgs({ args, options, allowPositionals: true, strict: true })
-    if (parsed.positionals.length < min || parsed.positionals.length > max) throw new Usage(`expected ${max === min ? min : `${min} to ${max}`} argument(s), got ${parsed.positionals.length}`)
+    if (parsed.positionals.length < min || parsed.positionals.length > max) throw new Usage(`expected ${max === min ? min : max === Infinity ? `at least ${min}` : `${min} to ${max}`} argument(s), got ${parsed.positionals.length}`)
     return parsed
   } catch (err) {
     throw err instanceof Usage ? err : new Usage(err instanceof Error ? err.message : String(err))

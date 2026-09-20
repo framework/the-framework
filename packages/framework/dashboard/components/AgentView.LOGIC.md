@@ -17,7 +17,6 @@ Shows one agent [1] on its own page, the agent view [2], in one frame that stays
 [7] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [8] archive: the transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
 [9] next step: what a person can do with an ended agent's work from the dashboard: open a pull request for its branch, or merge the pull request it has.
-[10] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
 [11] driver session: the coding agent's own conversation for one agent, which the driver can resume by its session id.
 [12] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 [13] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
@@ -50,7 +49,7 @@ See `## Context`.
 
 The page for one agent [1] always holds, top to bottom: the action bar (`AgentActionBar.tsx`), the optional details strip and the changes or the branch detail behind the bar's disclosure, the notices for work that runs elsewhere, the feed of events [4] (`AgentFeed.tsx`), and the composer [5] (`AgentComposer.tsx`). None of these parts is replaced when the agent's state changes; each is told whether the agent is still running and what it has to show, and adapts its contents.
 
-The agent's name leads the bar: the label the caller passes, the same label the history rail shows (what the user typed, else the session name [10], else the branch, else the start time). The project's name is shown beside it as a `project / session` breadcrumb.
+The agent's name leads the bar: the label the caller passes, the same label the history rail shows (what the user typed, else the branch, else the start time). The project's name is shown beside it as a `project / session` breadcrumb.
 
 ### Which events are shown
 

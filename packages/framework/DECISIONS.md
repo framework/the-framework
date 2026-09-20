@@ -20,6 +20,15 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   planning, claiming and releasing a ticket is the package's own widget, through its
   command. Picked over the dashboard's own ticket pages fed by the provider, which would
   have kept a reserved route and a hand-written sidebar row.
+- The checkouts are a package's: The Framework finds a run's checkout, and pushes, opens,
+  lands and reclaims its branch, through the command the package declares
+  (`framework.branches`: `list`, `show`, `publish --branch`, `merge`, `remove`); it
+  composes a pull request's title and body from the run, and keeps the rule that says
+  which pull request is a run's, and its own reads of pull requests. Picked over the
+  framework's own git and gh handoff, which was a second way to publish.
+- A run is named by its intent, else its branch as the agent named it; the framework
+  derives no session name from a branch. Picked over stripping the package's prefix here,
+  which was the framework knowing how the package names a branch.
 
 ## Starting a run
 - A Start runs the project's own `start` line, in the project's hooks file, and the line
@@ -56,3 +65,9 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - A question stays open while the run waits on it, and closes when the agent goes on or
   the run ends for good. Picked over a run's end closing it, which left a waiting run's
   question on screen as text nobody could answer.
+
+## Sweeping origin's scratch refs
+- A branch on origin is a run's, and may be swept once landed, unclaimed by a pull request,
+  old and idle, when a run's record names it, aged by that record. Picked over a naming
+  pattern, `agent-<timestamp>`, which was the framework knowing how the package names a
+  branch and missed a branch the agent renamed.

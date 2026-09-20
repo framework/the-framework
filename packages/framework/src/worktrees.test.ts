@@ -8,7 +8,8 @@ import { deleteProjectAgent, removeProjectWorktree } from './worktrees.js'
 import { nodeGitRunner } from '@gemstack/agent-data'
 import { runFiles, writeRun } from '@gemstack/skill-logs'
 import { addWorktree, agentBranchName } from '@gemstack/skill-branches'
-// The dashboard's side of reclaiming a checkout: when it may be asked for, and how a refusal is said. The rule itself is tested where it lives, in the `skill-branches` package.
+import { linkBranchesProvider } from './store/test-branches.js'
+// The dashboard's side of reclaiming a checkout: when it may be asked for, and whose refusal is answered. The rule itself lives in the branches package, the project's branches provider here (#1774), and is tested there.
 // Against real git, because "was the diff actually destroyed" is not a question a fake answers.
 
 const RUN_ID = 'run1'
@@ -33,6 +34,7 @@ async function repoWithDirtyWorktree(opts: { remote?: boolean } = {}): Promise<{
   }
   const { path, branch } = await addWorktree(repo, { agentId: RUN_ID, branch: agentBranchName(RUN_ID) }, git)
   await writeFile(join(path, 'index.html'), '<h1>Welcome!</h1>\n')
+  await linkBranchesProvider(repo)
   return { repo, path, branch }
 }
 
@@ -103,14 +105,25 @@ test('the run-id branch the agent branched away from goes with the checkout when
   }
 })
 
-test('an unknown session is refused before any git runs (#982)', async () => {
+test('an unknown session is refused, in the provider\'s words, before any git runs (#982)', async () => {
   const { repo, path } = await repoWithDirtyWorktree()
   try {
     assert.deepEqual(await removeProjectWorktree(repo, 'nosuchrun'), {
       ok: false,
-      error: 'no worktree for session nosuchrun',
+      error: 'no checkout for agent nosuchrun',
     })
     assert.equal((await stat(path)).isDirectory(), true, 'the real worktree is untouched')
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})
+
+test('a project none of whose packages provides its checkouts has nothing to remove (#1774)', async () => {
+  const { repo, path } = await repoWithDirtyWorktree()
+  try {
+    await rm(join(repo, 'node_modules'), { recursive: true, force: true })
+    assert.deepEqual(await removeProjectWorktree(repo, RUN_ID), { ok: false, error: 'no package of this project provides its checkouts' })
+    assert.equal((await stat(path)).isDirectory(), true, 'the checkout is untouched')
   } finally {
     await rm(repo, { recursive: true, force: true })
   }
@@ -125,7 +138,8 @@ test('an unknown session is refused before any git runs (#982)', async () => {
  * its row in the rail.
  */
 async function recordRun(repo: string, id: string): Promise<{ card: string; diary: string }> {
-  await writeFile(join(repo, 'package.json'), JSON.stringify({ devDependencies: { '@gemstack/skill-logs': '*' } }))
+  const manifest = JSON.parse(await readFile(join(repo, 'package.json'), 'utf8').catch(() => '{}')) as { devDependencies?: Record<string, string> }
+  await writeFile(join(repo, 'package.json'), JSON.stringify({ ...manifest, devDependencies: { ...manifest.devDependencies, '@gemstack/skill-logs': '*' } }))
   await mkdir(join(repo, 'node_modules', '@gemstack'), { recursive: true })
   await symlink(resolve(dirname(fileURLToPath(import.meta.resolve('@gemstack/skill-logs'))), '..'), join(repo, 'node_modules', '@gemstack', 'skill-logs'))
   const written = await writeRun(repo, { id, startedAt: '2026-01-01T00:00:00.000Z', status: 'stopped' }, [{ kind: 'ended', status: 'stopped' }])
@@ -142,6 +156,21 @@ test('deleting a record-only session (its worktree already gone) still clears th
     await assert.rejects(() => stat(meta), 'the record is gone')
     // Deleted through the runs provider: the second delete finds no record and is still fine.
     assert.deepEqual(await deleteProjectAgent(repo, 'run-x'), { ok: true })
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})
+
+test('deleting an agent whose checkout holds uncommitted work discards the work with the checkout and keeps the branch (#1032/#1774)', async () => {
+  const { repo, path, branch } = await repoWithDirtyWorktree()
+  const git = nodeGitRunner()
+  try {
+    await recordRun(repo, RUN_ID)
+    assert.deepEqual(await deleteProjectAgent(repo, RUN_ID), { ok: true })
+    await assert.rejects(() => stat(path), 'the checkout is gone, uncommitted edit and all')
+    assert.equal((await git(['rev-parse', '--verify', `refs/heads/${branch}`], repo)).trim().length, 40, 'the branch stays: it is git\'s, not the dashboard\'s')
+    // The record's deletion is a pushed change on the data branch; the work itself is not: the agent's branch never reaches origin.
+    assert.equal((await git(['ls-remote', '--heads', 'origin', branch], repo)).trim(), '', 'the branch was not pushed on the way out')
   } finally {
     await rm(repo, { recursive: true, force: true })
   }

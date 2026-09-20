@@ -1,8 +1,8 @@
-Derives what the dashboard shows about an agent [1] from its event stream [2]: the errors it hit and the driver session [5] behind it (driver, checkout [6], session id and link, model); and, from the agent's record, the session name [3] a row built from that record carries. Every derivation from the events is a fold over them, so the live agent view [7] and the replay of a finished agent show the identical summary.
+Derives what the dashboard shows about an agent [1] from its event stream [2]: the errors it hit and the driver session [5] behind it (driver, checkout [6], session id and link, model). Every derivation is a fold over the events, so the live agent view [7] and the replay of a finished agent show the identical summary.
 
 ## Context
 
-**User story**: the session name a row built from an agent's record is labeled by, the agent view's error count and the latest headline beside it, and the "open session" and "Resume" affordances are all read from these projections.
+**User story**: the agent view's error count and the latest headline beside it, and the "open session" and "Resume" affordances are all read from these projections.
 
 **Business logic story**: nothing here is state of its own. An error is an event that happened, so the list only grows; the session behind the agent is the latest leg's.
 
@@ -10,32 +10,17 @@ Derives what the dashboard shows about an agent [1] from its event stream [2]: t
 
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] event stream: everything an agent does, one event per line of the agent's diary — the file `<id>.jsonl` the tool that runs the agent writes under `.the-framework/` in the agent's checkout, copied onto the `agent-data` branch when the agent ends. Every surface (dashboard, terminal, replay) is a projection of it.
-[3] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
 [5] driver session: the coding agent's own conversation for one agent, which the driver can resume by its session id.
 [6] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [7] agent view: one agent's page.
-[8] the Overview: the dashboard's cross-project page at `/`.
-[9] open question: a question nobody has answered yet, as the dashboard lists them across projects.
-[10] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
 [11] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later.
 
 ## Business logic — TL;DR
 
-- **The session name of a view built from the record** - a name is present only when the agent's branch carries one, so an unnamed agent has no name rather than an empty one.
 - **The errors the agent hit** - every error the agent reported and every error the tool that runs it wrote in its diary, oldest first, each with its headline and its detail when there is one.
 - **The driver session behind the agent** - nothing before the session opening; then the driver, the checkout, the link and the model of the latest leg, plus the id and link of the latest session update.
 
 ## Business logic
-
-### The session name of a view built from the record
-
-#### Context
-
-**Business logic story**: the Overview [8] and the list of open questions [9] build their rows from an agent's record (its branch and its agent id [10]) rather than from its event stream [2], and every such row must spell the name the same way.
-
-#### Business logic
-
-The name is derived from the branch by the `branches` skill's rule: an `agent-<name>` branch that is not the agent's birth branch (the one named by the agent id) yields `<name>`; any other branch, or no branch, yields no name. The field is present only when there is a name, so a view of an unnamed agent carries no name rather than an empty one.
 
 ### The errors the agent hit
 

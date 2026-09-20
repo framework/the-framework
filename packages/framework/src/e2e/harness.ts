@@ -14,7 +14,7 @@ import { setDashboardContext } from '../dashboard-rpc/context.js'
 import { createProjectRuntime, type ProjectRuntime } from '../daemon-runtime.js'
 import { registryPreferencesStore, projectId } from '../registry.js'
 import { registryDiscordCredentialsStore } from '../discord-credentials-store.js'
-import { fromDiaryLine, projectRuns, resolveAgentDiary, type AgentMeta, type AgentStatus, type AnyDiaryLine } from '../store/index.js'
+import { fromDiaryLine, projectBranches, projectRuns, resolveAgentDiary, type AgentMeta, type AgentStatus, type AnyDiaryLine } from '../store/index.js'
 import { withFileBranch, DATA_BRANCH } from '@gemstack/agent-data'
 import { worktreePath } from '@gemstack/skill-branches'
 import { TICKETS_DIR } from '@gemstack/skill-tickets'
@@ -28,15 +28,22 @@ import type { StartAgentOptions } from '../dashboard/types.js'
 import type { QuotaView } from '../dashboard/quota.js'
 
 /**
- * The three provider packages every fixture project depends on, linked from this workspace's own
- * install: the records package (the runs provider), the queue package (the queue provider) and
- * the tickets package (the tickets provider).
+ * The four provider packages every fixture project depends on, linked from this workspace's own
+ * install: the records package (the runs provider), the queue package (the queue provider), the
+ * tickets package (the tickets provider) and the branches package (the branches provider, which
+ * lists the checkouts the stand-in tool makes with that same package's library).
  */
 const LOGS_PACKAGE = '@gemstack/skill-logs'
 const QUEUE_PACKAGE = '@gemstack/skill-queue'
 const TICKETS_PACKAGE = '@gemstack/skill-tickets'
+const BRANCHES_PACKAGE = '@gemstack/skill-branches'
 const packageDir = (name: string): string => resolve(dirname(fileURLToPath(import.meta.resolve(name))), '..')
-const PROVIDER_PACKAGES: Record<string, string> = { [LOGS_PACKAGE]: packageDir(LOGS_PACKAGE), [QUEUE_PACKAGE]: packageDir(QUEUE_PACKAGE), [TICKETS_PACKAGE]: packageDir(TICKETS_PACKAGE) }
+const PROVIDER_PACKAGES: Record<string, string> = {
+  [LOGS_PACKAGE]: packageDir(LOGS_PACKAGE),
+  [QUEUE_PACKAGE]: packageDir(QUEUE_PACKAGE),
+  [TICKETS_PACKAGE]: packageDir(TICKETS_PACKAGE),
+  [BRANCHES_PACKAGE]: packageDir(BRANCHES_PACKAGE),
+}
 
 // Re-home the process-global config home FIRST: the registry, preferences, and daemon state all
 // resolve through $XDG_CONFIG_HOME at call time, and run-tests.mjs gives the whole suite ONE
@@ -267,9 +274,11 @@ export async function makeWorld(): Promise<StoryWorld> {
     },
 
     async waitRetired(project, agentId, timeoutMs = 30_000) {
-      const worktree = worktreePath(project.cwd, agentId)
+      // Through the product's own read of the checkouts, the branches provider's list shared for a
+      // few seconds (#1774): what a story asserts or acts on next reads the same list, so "retired"
+      // means gone from there, not merely gone from disk.
       await waitFor(
-        async () => ((await stat(worktree).catch(() => undefined)) ? undefined : true),
+        async () => ((await (await projectBranches(project.cwd))?.list().catch(() => []))?.some(checkout => checkout.id === agentId) ? undefined : true),
         `run ${agentId}'s worktree to be retired`,
         timeoutMs,
       )

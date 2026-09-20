@@ -1,4 +1,4 @@
-Decides whether a finished agent's [1] checkout [2] may be removed, and removes it: the one implementation behind every surface that reclaims [3] a checkout (the scheduler at a run's end and in its sweep [4], the dashboard's "Remove" button, the `branches remove` and `branches prune` commands). One rule governs it: only what is on the remote may go, a clean tree whose tip the remote has, pushed here when the caller allows, so every deletion is recoverable and nothing local is ever the last copy of anything. Every refusal says why the checkout stays.
+Decides whether a finished agent's [1] checkout [2] may be removed, and removes it: the one implementation behind every surface that reclaims [3] a checkout (the scheduler at a run's end and in its sweep [4], the dashboard's "Remove" button, the `branches remove` and `branches prune` commands). One rule governs it: only what is on the remote may go, a clean tree whose tip the remote has, pushed here when the caller allows, so every deletion is recoverable and nothing local is ever the last copy of anything. Every refusal says why the checkout stays. Beside it, one way out for a person: discarding a checkout whatever it holds.
 
 ## Context
 
@@ -30,6 +30,7 @@ Decides whether a finished agent's [1] checkout [2] may be removed, and removes 
 - **Otherwise the branch must be on the remote** - pushed to `origin` here when the caller allows; refusal `not-on-remote` when it may not be pushed or the push did not land, with git's own words.
 - **The birth branch goes when the branch that stays contains it** - an agent that branched away leaves `agent-<agent id>` behind, and it goes once judged, before anything is deleted.
 - **How the removal runs and what it reports** - hook, worktree, stale records, then the branches; success lists the branches that went, and only a git failure past the decision is raised.
+- **Discarding a checkout** - a person's call: the checkout goes whatever it holds, nothing pushed, no branch deleted; only a directory git does not know as a worktree is left alone.
 
 ## Business logic
 
@@ -144,3 +145,13 @@ See `## Context`.
 #### Business logic
 
 Once removal is decided, in this order: the caller's hook runs, to stop whatever serves the tree; the worktree is removed, and git's records of worktrees whose directories are gone are pruned (both in `worktree.ts`); then the branches are deleted, the checkout's [2] own when it held nothing, and the birth branch [7] when it goes, only now, because git refuses to delete a branch a worktree still has checked out. Success reports the branches that went, in that order, or no list at all when none went. Every refusal is an outcome handed back, not an error; only a git failure past the decision, in the removal itself, is raised to the caller.
+
+### Discarding a checkout
+
+#### Context
+
+**User story**: the user deletes a run from the dashboard, or runs `branches remove --discard`, for a run they are throwing away: its checkout [2] holds uncommitted work the rule above keeps, and the user has decided it is not worth keeping.
+
+#### Business logic
+
+A person may discard a checkout [2]: it goes whatever it holds, uncommitted work included, and nothing is pushed. The branch and its commits stay: deleting a branch that may carry an open pull request is git's business, never this tool's on the way out of a checkout. One guard applies, the same as above: a directory git does not know as a worktree root [8] is left alone, `not-a-worktree`, decided before anything runs in it. Then the caller's hook runs, the worktree is removed by force, and git's records of gone worktrees are pruned.

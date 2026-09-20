@@ -12,7 +12,6 @@ The "Waiting on you" section: every open question [1] across all projects, longe
 [2] gate: a question with options an agent's turn ended on: the agent ends waiting for the answer, the dashboard shows the question as a card, and the answer resumes the agent.
 [3] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [4] pick: the answer to a gate: the option or options the user chose.
-[5] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
 [6] agent view: one agent's page.
 [7] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
 [8] the Claude web bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session.
@@ -47,7 +46,7 @@ See `## Context`.
 
 The section is titled "Waiting on you · <count of open questions>". Cards scroll inside their own area, capped at 70% of the viewport's height. Each open card has:
 
-- A header button (tooltip "Open this session") showing the agent's [3] label — its session name [5], else the first line of its intent cut at 80 characters, else its agent id — and the project's name, with "Open session →" on the right. Clicking it opens that agent's agent view [6], switching project when the agent belongs to another project.
+- A header button (tooltip "Open this session") showing the agent's [3] label — the first line of its intent cut at 80 characters, else its agent id — and the project's name, with "Open session →" on the right. Clicking it opens that agent's agent view [6], switching project when the agent belongs to another project.
 - The gate [2] card itself (`ChoicePanel.tsx`: the question, its options, the recommended one). Nothing here is ever accepted automatically: every gate waits for a person's pick.
 
 ### Answering

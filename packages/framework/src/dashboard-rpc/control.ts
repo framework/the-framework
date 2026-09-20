@@ -6,8 +6,7 @@ import { contextBridgeBrowser, contextPreferences, contextStartAgent, resolvePro
 import type { BridgeBrowserAction } from '../bridge-browser.js'
 import { relayOr } from './relay-agent.js'
 import { hostname } from 'node:os'
-import { findAgent, isPidAlive, loadAgentEvents, projectRuns, readLiveMeta, type AgentMeta } from '../store/index.js'
-import { isSafeAgentId, worktreePath } from '@gemstack/skill-branches'
+import { findAgent, isPidAlive, isRunId, loadAgentEvents, projectRuns, readLiveMetas, type AgentMeta } from '../store/index.js'
 import { withAgentLock } from '../agent-locks.js'
 import { removeProjectWorktree, deleteProjectAgent } from '../worktrees.js'
 import { mergeAgentPr, openAgentPullRequest, type HandoffResult } from '../dashboard/agent-handoff.js'
@@ -19,6 +18,17 @@ import type {
   StartAgentResult,
 } from '../dashboard/types.js'
 import type { Preferences } from '../registry.js'
+
+/**
+ * The key every action on one run locks under (`agent-locks.ts`): a Remove, a Delete and an Open
+ * PR on the same run each run their own git; serialized, whichever runs second finds the state
+ * the first one left and acts on that. The project and the run's id, not the checkout's path:
+ * the path is the branches provider's to know, and an Open PR on a run whose checkout is gone
+ * still locks the run.
+ */
+export function agentLockKey(cwd: string, agentId: string): string {
+  return `${cwd}\0${agentId}`
+}
 
 // The write side behind the dashboard (#405, #1774). The daemon runs no agent, so every write here
 // reaches a run through what the run's tool reads: Start is the project's `start` hook line; what
@@ -34,9 +44,9 @@ import type { Preferences } from '../registry.js'
  */
 export async function sendStop(projectId: string, agentId?: string): Promise<void> {
   return relayOr(agentId, 'sendStop', [projectId, agentId], async () => {
-    const cwd = await resolveAgentPath(projectId, agentId)
-    if (!cwd) return
-    const meta = await readLiveMeta(cwd)
+    const cwd = await resolveProjectPath(projectId)
+    if (!cwd || !agentId) return
+    const meta = (await readLiveMetas(cwd).catch(() => [])).find(agent => agent.id === agentId)
     if (!meta || meta.status !== 'running' || meta.pid === undefined || meta.host !== hostname() || !isPidAlive(meta.pid)) return
     try {
       process.kill(meta.pid, 'SIGINT')
@@ -54,7 +64,7 @@ export async function sendStop(projectId: string, agentId?: string): Promise<voi
 export async function sendChoice(projectId: string, id: string, pick: string | string[], agentId?: string): Promise<SteerResult> {
   return relayOr(agentId, 'sendChoice', [projectId, id, pick, agentId], async (): Promise<SteerResult> => {
     const cwd = await resolveProjectPath(projectId)
-    if (!cwd || !agentId || !isSafeAgentId(agentId)) return { ok: false, error: 'unknown session' }
+    if (!cwd || !agentId || !isRunId(agentId)) return { ok: false, error: 'unknown session' }
     const question = pendingChoices((await loadAgentEvents(cwd, agentId).catch(() => undefined)) ?? []).find(choice => choice.id === id)
     if (!question) return { ok: false, error: 'that question is no longer open' }
     const picked = [pick].flat()
@@ -98,7 +108,7 @@ export async function sendMessage(projectId: string, text: string, agentId?: str
   if (!message) return { ok: true }
   return relayOr(agentId, 'sendMessage', [projectId, text, agentId], async (): Promise<SteerResult> => {
     const cwd = await resolveProjectPath(projectId)
-    if (!cwd || !agentId || !isSafeAgentId(agentId)) return { ok: false, error: 'unknown session' }
+    if (!cwd || !agentId || !isRunId(agentId)) return { ok: false, error: 'unknown session' }
     return sayToRun(cwd, agentId, { kind: 'message', text: message })
   }, { ok: false, error: 'could not reach the device' })
 }
@@ -107,31 +117,24 @@ export async function sendMessage(projectId: string, text: string, agentId?: str
  * Remove a retained worktree (#737). An agent that failed or was stopped keeps its checkout so you
  * can inspect it; this is the explicit cleanup for one, since nothing removes them on a timer.
  *
- * The checks and the commit-first removal are {@link removeProjectWorktree}'s, shared with the
- * removal path (#982) so the surfaces cannot drift again. All this adds is
- * the daemon-only step: a retained worktree can still be serving (#797), and that dev server
- * holds the tree being removed, so it is stopped rather than having the directory pulled out
- * from under it.
+ * The checks and the removal are {@link removeProjectWorktree}'s, shared with the CLI's removal
+ * path (#982) so the surfaces cannot drift again; this adds only the agent lock around them.
  */
 export async function sendRemoveWorktree(projectId: string, agentId: string): Promise<RemoveWorktreeResult> {
-  return withWorktreeRemoval(projectId, agentId, (cwd, opts) => removeProjectWorktree(cwd, agentId, opts))
+  return withWorktreeRemoval(projectId, agentId, cwd => removeProjectWorktree(cwd, agentId))
 }
 
 /**
- * Shared body of the two worktree-removing writes (#982/#1032): resolve the local checkout and
- * refuse when there is none. Only the removal action and its result shape differ.
+ * Shared body of the two worktree-removing writes (#982/#1032): resolve the project and refuse
+ * when it has no local path. Only the removal action and its result shape differ.
  */
-async function withWorktreeRemoval<T>(
-  projectId: string,
-  agentId: string,
-  remove: (cwd: string, opts: { beforeRemove: (id: string) => Promise<void> }) => Promise<T>,
-): Promise<T | { ok: false; error: string }> {
+async function withWorktreeRemoval<T>(projectId: string, agentId: string, remove: (cwd: string) => Promise<T>): Promise<T | { ok: false; error: string }> {
   const cwd = await resolveProjectPath(projectId)
   if (!cwd) return { ok: false, error: 'this project has no local path on this server' }
   // Under the agent lock: a Remove/Delete and an Open PR on the same finished run each run their
   // own git in its checkout; serialized, whichever runs second finds the state the first one left
   // and acts on that.
-  return withAgentLock(worktreePath(cwd, agentId), () => remove(cwd, { beforeRemove: async () => {} }))
+  return withAgentLock(agentLockKey(cwd, agentId), () => remove(cwd))
 }
 
 /**
@@ -141,7 +144,7 @@ async function withWorktreeRemoval<T>(
  * commits) are all {@link deleteProjectAgent}'s; this adds only the agent lock around them.
  */
 export async function sendDeleteAgent(projectId: string, agentId: string): Promise<DeleteAgentResult> {
-  return withWorktreeRemoval(projectId, agentId, (cwd, opts) => deleteProjectAgent(cwd, agentId, opts))
+  return withWorktreeRemoval(projectId, agentId, cwd => deleteProjectAgent(cwd, agentId))
 }
 
 /**
@@ -185,7 +188,7 @@ async function handoffTargetFor(
   agentId: string,
 ): Promise<{ cwd: string; agent: AgentMeta; checkout: string } | undefined> {
   const cwd = await resolveProjectPath(projectId)
-  if (!cwd || !isSafeAgentId(agentId)) return undefined
+  if (!cwd || !isRunId(agentId)) return undefined
   const agent = await findAgent(cwd, agentId).catch(() => undefined)
   // The branch is read from the project repo; the tree the agent edited is its own checkout (#453),
   // and for a session that has not committed, that is the only place its work exists.
@@ -194,19 +197,20 @@ async function handoffTargetFor(
 }
 
 /**
- * Open a PR for a finished session's branch (#799), pushing it first if the remote lacks it.
+ * Open a PR for a finished session's branch (#799): the project's branches provider pushes it
+ * first if the remote lacks it (#1774).
  *
- * The title and body come from what the agent already recorded: the session name the agent chose
- * and the intent the user asked for. Nothing new is invented and nothing extra is asked of the
- * user, which is the point of "offer the next step rather than describe it".
+ * The title and body come from what the agent already recorded: the branch the agent named its
+ * work with and the intent the user asked for. Nothing new is invented and nothing extra is asked
+ * of the user, which is the point of "offer the next step rather than describe it".
  */
 export async function sendOpenPullRequest(projectId: string, agentId: string): Promise<HandoffResult> {
   return relayOr(agentId, 'sendOpenPullRequest', [projectId, agentId], async () => {
     const target = await handoffTargetFor(projectId, agentId)
     if (!target) return { ok: false, error: 'unknown session' }
-    // Under the agent lock, so the push inside `openAgentPullRequest` cannot race a Remove of the
-    // same checkout.
-    const opened = await withAgentLock(target.checkout, () => openAgentPullRequest(target.cwd, target.agent))
+    // Under the agent lock, so the provider's push inside `openAgentPullRequest` cannot race a
+    // Remove of the same checkout.
+    const opened = await withAgentLock(agentLockKey(target.cwd, agentId), () => openAgentPullRequest(target.cwd, target.agent))
     // Record it on the finished run (E6), through the project's runs provider. The session's own
     // process is gone by now, so there is no event stream to carry the fact — but it is the same
     // fact, and every surface reads it from the same place either way rather than re-deriving it

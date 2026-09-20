@@ -1,4 +1,4 @@
-The cloud scratch sweep [1]: the sweep [2] that, once per tick [3] of the daemon's clock, deletes from origin the two dead refs every web agent [4] leaves behind, the slash-free `cloud-*` ref its cloud session [5] cloned at and the empty `agent-<id>` branch it was born on, once four gates are cleared: the ref is at least a day old, its agent is not one the caller names as busy, it provably holds no work, and no open pull request is on it. A ref the sweep cannot prove dead simply stays for a later pass.
+The cloud scratch sweep [1]: the sweep [2] that, once per tick [3] of the daemon's clock, deletes from origin the two dead refs every web agent [4] leaves behind, the slash-free `cloud-*` ref its cloud session [5] cloned at and the empty branch it was born on, the one its run's record names, once four gates are cleared: the ref is at least a day old, its agent is not one the caller names as busy, it provably holds no work, and no open pull request is on it. A ref the sweep cannot prove dead simply stays for a later pass.
 
 ## Context
 
@@ -20,9 +20,9 @@ The cloud scratch sweep [1]: the sweep [2] that, once per tick [3] of the daemon
 
 ## Business logic — TL;DR
 
-- **Which refs are candidates** - only refs named `cloud-<number>-<8 hex digits>` and `agent-<agent id>` branches whose id carries a start time; every other branch on origin is never considered.
-- **Old enough** - a candidate is left alone for 24 hours: a `cloud-*` ref from the moment this machine first saw it, remembered in `.the-framework/cloud-refs.json`; an `agent-*` branch from the start time in its name.
-- **Not a live agent's** - an `agent-*` branch whose agent the caller names as busy is kept; the daemon names none, since it runs no agent.
+- **Which refs are candidates** - only refs named `cloud-<number>-<8 hex digits>` and the branches a run's record names; every other branch on origin is never considered.
+- **Old enough** - a candidate is left alone for 24 hours: a `cloud-*` ref from the moment this machine first saw it, remembered in `.the-framework/cloud-refs.json`; a run's branch from the start its record says.
+- **Not a live agent's** - a run's branch whose run the caller names as busy is kept; the daemon names none, since it runs no agent.
 - **Holds no work** - a ref goes only when its tip is already reachable from origin's default branch, or is an empty commit on a parent that is; anything unprovable keeps the ref.
 - **No open pull request** - a ref with an open pull request is kept, so a deletion never closes one.
 - **Deleting and remembering** - a cleared ref is deleted on origin; a failed deletion is reported and retried without restarting its day; the first-seen memory is rebuilt from what origin has so entries for vanished refs fall away.
@@ -39,7 +39,7 @@ The cloud scratch sweep [1]: the sweep [2] that, once per tick [3] of the daemon
 
 #### Business logic
 
-Origin's branches and its default branch are read in one listing (the default branch is what origin's HEAD points at, else `main` or `master` when present). A ref is a candidate only under one of two namings: exactly `cloud-<digits>-<eight hex digits>`, anchored tightly so a user's own `cloud-…` branch is never a candidate; or `agent-<agent id>` where the agent id [6] carries a readable start time, so an `agent-<session name>` branch, whose name carries no time, is never a candidate. The default branch, `claude/*` branches and everything else are not even listed as kept.
+Origin's branches and its default branch are read in one listing (the default branch is what origin's HEAD points at, else `main` or `master` when present). A ref is a candidate only in one of two ways: named exactly `cloud-<digits>-<eight hex digits>`, anchored tightly so a user's own `cloud-…` branch is never a candidate; or the branch a run's record names (the project's finished agents, as its runs provider answers them; a record whose start cannot be read makes its branch no candidate). A branch no record names, the default branch, `claude/*` branches and everything else are not even listed as kept. A branch a run named itself is a run's branch like any other once its record names it, and goes only when every gate below says it holds nothing.
 
 ### Old enough
 
@@ -49,7 +49,7 @@ Origin's branches and its default branch are read in one listing (the default br
 
 #### Business logic
 
-A candidate is kept as "young" until it is 24 hours old. An `agent-*` branch is aged from the start time in its name. A `cloud-*` ref is aged from when this machine's sweep first saw it: the first sighting, or a sighting whose remembered time is unreadable, starts the day now and keeps the ref. The first-seen times live in `.the-framework/cloud-refs.json` of the project, which is not tracked by git; a missing, unreadable or malformed file means nothing seen yet. Because each machine only deletes what it has itself watched for a day, a ref another machine pushed yesterday is not deleted by this one today.
+A candidate is kept as "young" until it is 24 hours old. A run's branch is aged from the start its record says. A `cloud-*` ref is aged from when this machine's sweep first saw it: the first sighting, or a sighting whose remembered time is unreadable, starts the day now and keeps the ref. The first-seen times live in `.the-framework/cloud-refs.json` of the project, which is not tracked by git; a missing, unreadable or malformed file means nothing seen yet. Because each machine only deletes what it has itself watched for a day, a ref another machine pushed yesterday is not deleted by this one today.
 
 ### Not a live agent's
 
@@ -59,7 +59,7 @@ See `## Context`.
 
 #### Business logic
 
-An `agent-*` branch whose agent id [6] the caller names as busy is kept as "busy". The check comes before the age check, so a busy agent's branch is never a candidate however old. The daemon's clock names no agent as busy, since the daemon runs no agent.
+A run's branch whose run the caller names as busy, by its agent id [6], is kept as "busy". The check comes before the age check, so a busy agent's branch is never a candidate however old. The daemon's clock names no agent as busy, since the daemon runs no agent.
 
 ### Holds no work
 

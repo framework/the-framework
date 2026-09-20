@@ -17,19 +17,17 @@ export { readSchedulerState, collectSchedulers, SCHEDULER_STATE_FILE, type Sched
 export { buildOverview, buildRecentAgents, buildHotTickets, ticketBucket, type Overview, type ActiveAgent as ActiveAgent, type RecentProject, type RecentAgent as RecentAgent, type HotTicket, type HotBucket, type OverviewDeps, type HotTicketsDeps } from './overview.js'
 export { buildDashboard, type DashboardData, type ProjectStat, type DashboardDeps } from './dashboard.js'
 export { readGitStatus, type GitStatus } from './git-status.js'
-export { ghPrView, ghPrList, ghJson, nodeGhRunner, type LinkedPr, type OpenPr, type PrLookup, type BranchPrLookup, type PrLister, type GhRunner } from './gh.js'
+export { ghPrView, ghPrList, ghJson, type LinkedPr, type OpenPr, type PrLookup, type BranchPrLookup, type PrLister, type GhRunner } from './gh.js'
 export { readFileDiff, readFileChanges, safeRepoPath, type FileDiff, type FileChange } from './file-diff.js'
 export { readFileContent, type FileContent } from './file-read.js'
 export {
   readAgentHandoff,
   agentBranchFor,
-  openBranchPullRequest,
   openAgentPullRequest,
   type AgentHandoff,
   type HandoffCommit,
   type HandoffFile,
   type HandoffResult,
-  type PullRequestDraft,
   type AgentHandoffDeps,
 } from './agent-handoff.js'
 export {

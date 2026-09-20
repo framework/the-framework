@@ -19,7 +19,7 @@ What the daemon does for a project: starting an agent [1] through the project's 
 ## Business logic — TL;DR
 
 - **Which project a request is for** - no project id, or the home project's [7], is the daemon's own directory; any other id is looked up in the registry.
-- **Starting an agent** - the project's start hook [2] is run with the prompt, the user's picks and the follow-up when there is one; the id it answers is the Start's answer; a refusal is its words.
+- **Starting an agent** - the project's start hook [2] is run with the prompt, the user's picks and the follow-up when there is one; the id it answers is the Start's answer; a refusal is its words; the project's checkouts are read again on the next look, so the new agent's checkout is found at once.
 - **Starting an agent on a device** - the start is forwarded to the device, which runs its own project's hook; a memory-only row stands for the agent here.
 - **Adding a project** - the directory is checked, installed and registered, and its `open` hooks [6] run.
 - **Relaying a device's agent** - the events of an agent relayed from a device stream from memory; an agent a device relayed here is tailed off its diary [5]; one whitelisted read or write is run against the home project for the relaying daemon.
@@ -46,7 +46,7 @@ A request with no project id, or with the home project's [7] id, addresses the d
 
 #### Business logic
 
-A Start for an unknown project is refused with "unknown project: <id>". Otherwise the project's start hook [2] is run in the project, with the prompt in `PROMPT` and, only when the user made the pick, the coding agent in `DRIVER` and the model in `MODEL`, and, only when the Start carries one, the follow-up in `THEN` (the launcher's "Post-merge cleanup" box: a fresh agent on the branch before the pull request merges); how the line is run, bounded and read is `project-hooks.ts`'s. The id the line answers is returned as the started agent's id. When the project has no start line the Start is refused with "this project has no start hook"; when the line fails, its own last line on stderr is the refusal. Nothing else happens here: the daemon allocates no checkout, holds no slot for the agent, applies no cap (a person's click is the brake) and never stops the agent, which goes on after the dashboard closes.
+A Start for an unknown project is refused with "unknown project: <id>". Otherwise the project's start hook [2] is run in the project, with the prompt in `PROMPT` and, only when the user made the pick, the coding agent in `DRIVER` and the model in `MODEL`, and, only when the Start carries one, the follow-up in `THEN` (the launcher's "Post-merge cleanup" box: a fresh agent on the branch before the pull request merges); how the line is run, bounded and read is `project-hooks.ts`'s. The id the line answers is returned as the started agent's id, and what The Framework kept of the project's checkouts (the branches provider's list, shared for a few seconds, `store/branches.ts`) is forgotten, so the new agent's checkout is found on the next look rather than a few seconds later. When the project has no start line the Start is refused with "this project has no start hook"; when the line fails, its own last line on stderr is the refusal. Nothing else happens here: the daemon allocates no checkout, holds no slot for the agent, applies no cap (a person's click is the brake) and never stops the agent, which goes on after the dashboard closes.
 
 ### Starting an agent on a device
 

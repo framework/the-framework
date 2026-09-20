@@ -40,8 +40,8 @@ export function tailEvents<T = unknown>(path: string, onEvent: (event: T) => voi
   }
 }
 
-/** Where a relocating tail reads now: a file it follows, or a finished run's lines, whole. */
-export type TailTarget<T> = { file: string } | { finished: T[] }
+/** Where a relocating tail reads now: a file it follows, a finished run's lines, whole, or nowhere yet (`pending`: ask again shortly). */
+export type TailTarget<T> = { file: string } | { finished: T[] } | { pending: true }
 
 /**
  * Tail a run's diary across its relocations: the same read-then-follow as {@link tailEvents},
@@ -56,8 +56,11 @@ export type TailTarget<T> = { file: string } | { finished: T[] }
  * is now (`resolveAgentDiary` answers the finished run once the checkout is gone, #1472). A new
  * file retargets the same tailer and follows it. A finished run's lines are the same lines the
  * file had, in the same order, so the ones past the count already delivered are sent and the tail
- * ends: a finished diary does not grow. The same file means the run has not made its checkout
- * yet, and the tail keeps waiting there. Asking even when the file was never seen matters for a
+ * ends: a finished diary does not grow. The same file, or no answer, means the diary has not
+ * moved, and the tail keeps waiting where it is. A diary that is nowhere yet (`pending`: the run
+ * was started a moment ago and its tool has not made the checkout) is asked for again on the
+ * same cadence until it has a home, and only then followed; the replay boundary is reported at
+ * once, since there is nothing to replay. Asking even when the file was never seen matters for a
  * short run (#1774): started, ended and reclaimed between two polls, its diary was only ever
  * visible as a finished run.
  *
@@ -74,6 +77,7 @@ export function tailAgentEvents<T = unknown>(
   let path: string | undefined
   let tailer: JsonlTailer<T> | undefined
   let relocating = false
+  let waiting: NodeJS.Timeout | undefined
   let delivered = 0
   const deliver = (event: T): void => {
     delivered++
@@ -93,8 +97,8 @@ export function tailAgentEvents<T = unknown>(
 
   const relocate = async (): Promise<void> => {
     const next = await resolve()
-    // No answer, or the same file: not moved (or not visible yet) — keep polling the current home.
-    if (stopped || !tailer || next === undefined) return
+    // No answer, nowhere yet, or the same file: not moved (or not visible yet) — keep polling the current home.
+    if (stopped || !tailer || next === undefined || 'pending' in next) return
     if ('finished' in next) return finish(next.finished)
     if (next.file === path) return
     stopFollow?.()
@@ -119,6 +123,36 @@ export function tailAgentEvents<T = unknown>(
     }
   }
 
+  /** Follow `file` from its start: what is there is the replay, and appends follow. */
+  const begin = (file: string, onReplayedOnce: () => void): void => {
+    path = file
+    tailer = new JsonlTailer<T>(file, deliver)
+    const replayed = (): void => {
+      if (stopped) return
+      onReplayedOnce()
+      follow()
+    }
+    void tailer.pull().then(replayed, replayed)
+  }
+
+  /** The diary is nowhere yet: ask again after a poll, until it has a home. The boundary was already reported. */
+  const awaitDiary = (): void => {
+    if (stopped) return
+    waiting = setTimeout(() => {
+      waiting = undefined
+      void resolve().then(
+        next => {
+          if (stopped) return
+          if (next === undefined || 'pending' in next) return awaitDiary()
+          if ('finished' in next) return finish(next.finished)
+          begin(next.file, () => {})
+        },
+        () => awaitDiary(),
+      )
+    }, POLL_MS)
+    waiting.unref?.()
+  }
+
   void resolve().then(
     initial => {
       if (stopped) return
@@ -132,20 +166,19 @@ export function tailAgentEvents<T = unknown>(
         onReplayed?.()
         return
       }
-      path = initial.file
-      tailer = new JsonlTailer<T>(initial.file, deliver)
-      const replayed = (): void => {
-        if (stopped) return
+      if ('pending' in initial) {
         onReplayed?.()
-        follow()
+        awaitDiary()
+        return
       }
-      void tailer.pull().then(replayed, replayed)
+      begin(initial.file, () => onReplayed?.())
     },
     () => onReplayed?.(),
   )
 
   return () => {
     stopped = true
+    if (waiting) clearTimeout(waiting)
     stopFollow?.()
   }
 }

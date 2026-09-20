@@ -29,7 +29,6 @@ Fixes the vocabulary of the event stream [1]: every kind of event an agent's [2]
 [18] ready for merge: the signal an agent emits when it believes its work is complete: it flips the agent's badge from building to ready and authorizes the handoff.
 [19] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [20] the queued work: one agent started with `/work-queue`, which takes one task off the agent queue by composing the skills in its checkout.
-[21] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
 [22] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
 [23] cloud anchor: an empty commit a web agent pushes before its task leaves this machine, unique to the agent: the branch the cloud session later pushes descends from it, which is how the daemon recognises that branch as the agent's (cloud work adoption).
 [24] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
@@ -45,7 +44,7 @@ Fixes the vocabulary of the event stream [1]: every kind of event an agent's [2]
 - **What the agent shows the user** - a view updates in place by title, a reported error stays in the log as history, a log line narrates, and the agent's browser travels as a page URL and a stream port only, never as frames.
 - **A gate and its pick** - a gate is a question, at least one option and, for a single-select gate, a recommended option; a checklist pre-checks options instead; the pick is one option id or the chosen subset, and says whether the user or nobody picked.
 - **Ready for merge and the pull request text** - the ready-for-merge signal flips the agent from building to ready without blocking it; the pull request title and description the agent wrote travel as an event the handoff uses, the latest one winning.
-- **Facts that must survive a reload** - what the handoff is armed to do, the branch and session name, the pull request once opened, and the cloud anchor each travel as events because only an event reaches a tab opened later.
+- **Facts that must survive a reload** - what the handoff is armed to do, the branch, the pull request once opened, and the cloud anchor each travel as events because only an event reaches a tab opened later.
 - **The on-before-mergeable outcome** - the follow-up queued its prompts, queued them without finishing cleanly, or declined for one of five reasons; it is silent when the option was off.
 - **The handoff outcome** - the handoff is done (pushed, a pull request, how the merge went), skipped for one of nine reasons that are not faults, or failed at the push or at the pull request.
 - **How a merge went, and why it is withheld** - GitHub's own auto-merge is preferred, a direct merge is the fallback, the CI watch takes a pull request whose checks are pending, a failed merge never fails the handoff, and a merge is withheld when the agent never said it was ready or its own to-do list is still open.
@@ -135,7 +134,7 @@ Both are read off a turn's [14] final message as turn signals [12]; the parsing 
 #### Business logic
 
 - What the handoff [5] is armed to do: whether a push and whether a pull request are armed, and whether a merge is. Emitted at the start and again whenever the dashboard's checkboxes change it, which is what makes the boxes survive a reload. The merge flag has no checkbox and never changes during the agent [2], so every re-emit repeats it; when it is absent it reads as off, the conservative display. It is carried so the armed line can say the most consequential half of the plan: without it, a merge-armed agent would advertise "open a draft PR" and then merge.
-- The branch the agent's work is on, observed off the checkout [9] rather than guessed: emitted at the start with the branch the agent actually begins on, and again whenever a later read finds it changed, since the agent renames its own branch through `branches name`. When the branch carries a session name [21], the event carries it too. The session name is read off the branch by the agent's process, the one writer that knows which branch the checkout was created on; a reader of the stream alone cannot tell that birth branch from a named one. Every surface resolves the branch and the session name from this event first.
+- The branch the agent's work is on, observed off the checkout [9] rather than guessed: emitted at the start with the branch the agent actually begins on, and again whenever a later read finds it changed, since the agent renames its own branch through `branches name`. Every surface resolves the branch from this event first.
 - The pull request the agent's work is on, its number and URL, the moment one is opened for it, so that no surface has to guess the pull request from the branch afterwards.
 - The cloud anchor [23]: the empty commit an agent whose location [22] is `web` pushed before its task left this machine, unique to the agent. The branch the cloud session [24] later works on is a `claude/*` name of the cloud's own choosing, never the agent's designated branch, and is recognized as the agent's by descending from this commit; the daemon's cloud work adoption matches the anchor against the remote's `claude/*` heads once the cloud session has pushed.
 
@@ -151,7 +150,7 @@ Emitted only when the option was on, so an agent [2] that never asked for the st
 
 - queued: the follow-up queued the quality prompts;
 - incomplete: it queued them but did not finish cleanly;
-- skipped, with the reason: the agent never signaled ready for merge [18], so there is nothing to follow up; the agent was stopped [25] rather than finished; the driver [13] is the fake driver, so there is no coding agent [7] to hand the follow-up to; the agent never named its work, so its branch is still the birth branch while every line of the follow-up prompt names the session name [21]; or The Framework cannot find its own program to start the follow-up with.
+- skipped, with the reason: the agent never signaled ready for merge [18], so there is nothing to follow up; the agent was stopped [25] rather than finished; the driver [13] is the fake driver, so there is no coding agent [7] to hand the follow-up to; the agent never named its work, so its branch is still the birth branch while every line of the follow-up prompt names the branch the agent chose; or The Framework cannot find its own program to start the follow-up with.
 
 The step itself is `on-before-mergeable-prompt.ts`'s.
 

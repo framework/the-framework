@@ -82,6 +82,9 @@ push.
 - `remove` and `prune` push by default; `--no-push` opts out. A removal judges the birth
   branch before anything goes, then removes the checkout, then the branches, since git
   will not delete a branch a worktree has out.
+- `remove --discard` drops a checkout whatever it holds, pushing nothing and deleting no
+  branch: the person's way past the reclaim rule for a run they throw away. Picked over
+  the dashboard forcing the removal through git itself.
 - The package reads no configuration and never asks whether an agent still runs: the
   caller says whether it may push, and may pass a hook that runs just before the checkout
   goes, to stop whatever serves the tree; the command line passes no hook.
@@ -95,6 +98,22 @@ push.
   say they publish for it; then the agent never does.
 - `publish` refuses a checkout that is not clean, opens no second request for a branch
   that has one open, and never opens a draft when the merge is armed.
+- A person publishes a finished agent's branch through the same `publish`, by name
+  (`--branch`): the checkout on it under the agent's clean rule, else the branch itself,
+  pushed when this machine has it and left as it is when only origin has it. Picked over
+  a second publish path in the dashboard, which duplicated the push and the request.
+- `merge <number>` lands a request for a person: a draft is marked ready, then the merge
+  is armed exactly as `--merge` arms it; a request no longer open is refused. Picked over
+  the dashboard merging with gh itself.
+- `show` answers a branch's git facts only, its commits and files beyond the base, whether
+  it is pushed and merged, what its checkout left uncommitted; its pull request is the
+  caller's question. Picked over the package asking GitHub, which would have put a gh call
+  inside every poll.
+- `list` and `show` never touch the network: they read the local refs and the checkouts on
+  disk, so a caller may poll them.
+- The command has a second caller, the dashboard, for `list`, `show`, `publish --branch`,
+  `merge` and `remove`, declared as the project's branches provider
+  (`"framework": { "branches": "branches" }`).
 - Before its first change the agent names its session, saying what the work is, unless its
   branch already differs from its folder name, as a continued agent's does: it is already
   named. The agent finishes only when `npx branches status` reports the checkout clean, or

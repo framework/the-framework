@@ -1,22 +1,7 @@
-import { nodeGitRunner, type GitRunner, pushBranch } from '@gemstack/agent-data'
-import { agentBranchName, sessionNameOf, repoHasRemote } from '@gemstack/skill-branches'
-import {
-  cachedPrView,
-  cachedPrsForBranch,
-  forgetBranchPrs,
-  forgetPr,
-  ghMergePr,
-  nodeGhRunner,
-  pickAgentPr,
-  type GhRunner,
-  type LinkedPr,
-  type BranchPrLookup,
-} from './gh.js'
+import { cachedPrView, cachedPrsForBranch, forgetBranchPrs, forgetPr, pickAgentPr, type LinkedPr, type BranchPrLookup } from './gh.js'
 import type { Cached } from './cache.js'
-import { parseNumstat } from './file-diff.js'
-import { parsePorcelain } from './file-status.js'
-import { errorMessage } from '../error-message.js'
 import type { AgentMeta } from '../store/index.js'
+import { projectBranches, type BranchesFor } from '../store/branches.js'
 // What a finished session produced, and what is left to do with it (#799).
 //
 // Everything up to "the agent is done" was covered; the handoff back to the human was not. A
@@ -29,7 +14,13 @@ import type { AgentMeta } from '../store/index.js'
 // the project repo is only where it is read from, so a finished session reads the same whether or
 // not its checkout still exists.
 //
-// Forgiving throughout: a project that is not a git repo, has no remote, or has no `gh` yields a
+// The branch's git facts, and every push, pull request creation and merge, are the project's
+// branches provider's (#1774): the framework asks the package the project picked, through the
+// command it declares (`store/branches.ts`), and never runs git or `gh` for them itself. What
+// stays here is what is about the *run*: which of the branch's pull requests is this run's, when
+// an existing pull request is the answer and when a new one is, and what the pull request says.
+//
+// Forgiving throughout: a project with no branches provider, no remote, or no `gh` yields a
 // handoff with less in it, never an error.
 
 /** One commit a session put on its branch. */
@@ -86,21 +77,17 @@ export interface AgentHandoff {
    * is not on the branch yet, so it is
    * not in {@link commits} and it does not make {@link empty} false. Paths rather than a count,
    * because a no-diff branch must *name* what is waiting instead of offering an Open PR that
-   * GitHub can only refuse. Absent when the caller did not say which checkout the session worked
-   * in — "nobody asked" and "asked, tree clean" are different answers.
+   * GitHub can only refuse. Absent when no checkout is on the branch any more — "no checkout"
+   * and "a checkout, tree clean" are different answers.
    */
   pendingFiles?: string[]
 }
 
-/** Injectable seams so the reader is unit-testable off disk, plus the checkout the session worked in. */
+/** Injectable seams so the reader is unit-testable off disk and off the provider. */
 export interface AgentHandoffDeps {
-  git?: GitRunner
   pr?: BranchPrLookup
-  /**
-   * The session's own checkout (#453), when it has one. The branch lives in the project repo and is
-   * read from there; uncommitted work does not, it sits in the tree the agent actually edited.
-   */
-  checkout?: string
+  /** The project's checkouts and branches (default the project's provider, {@link projectBranches}). */
+  branches?: BranchesFor
   /**
    * When the agent started (ISO), so the PR lookup can tell the agent's own PR from an earlier agent's
    * on the same branch name (#1251). Without it, only an open PR is trusted.
@@ -115,14 +102,12 @@ export interface AgentHandoffDeps {
 }
 
 /**
- * The branch an agent's work is on.
- *
- * What was recorded while the worktree existed (#799/#1277): the agent renames its branch itself
- * (#1725), so anything but the record is a guess. The birth branch stays as the one fallback, for
- * an archive that never recorded a branch.
+ * The branch an agent's work is on: what was recorded while the checkout existed (#799/#1277).
+ * The agent renames its branch itself (#1725), so anything but the record is a guess, and a run
+ * whose record carries no branch has none to hand off.
  */
-export function agentBranchFor(agent: { id: string; branch?: string }): string {
-  return agent.branch ?? agentBranchName(agent.id)
+export function agentBranchFor(agent: { id: string; branch?: string }): string | undefined {
+  return agent.branch
 }
 
 /**
@@ -181,136 +166,58 @@ export async function resolveAgentPr(
 
 /**
  * Merge a finished session's open PR (#1391): the Merge action, pressed by a human saying "it's
- * good, land it". `ghMergePr` marks a draft ready on the way. Refuses when the agent has no PR or
- * it is no longer open — "already merged" is an answer, not an action.
+ * good, land it". The landing itself is the branches provider's (`merge <number>`): armed on
+ * GitHub to merge on green, merged at once where it is already green, or watched by the
+ * provider where the repository allows no auto-merge; a draft is marked ready on the way. Refuses
+ * when the agent has no PR or it is no longer open — "already merged" is an answer, not an action.
  */
 export async function mergeAgentPr(
   cwd: string,
   agent: PrAgent,
-  deps: { gh?: GhRunner; prs?: CachedBranchPrLookup } = {},
+  deps: { branches?: BranchesFor; prs?: CachedBranchPrLookup } = {},
 ): Promise<HandoffResult> {
   const pr = (await resolveAgentPr(cwd, agent, deps.prs)).value
   if (!pr) return { ok: false, error: 'this session has no pull request to merge' }
   if (pr.state !== 'OPEN') return { ok: false, error: `this session's PR is already ${pr.state.toLowerCase()}` }
-  const merged = await ghMergePr(cwd, pr.number, deps.gh)
-  if (merged.outcome === 'failed') return { ok: false, error: merged.error }
+  const branches = await (deps.branches ?? projectBranches)(cwd).catch(() => undefined)
+  if (!branches) return { ok: false, error: 'this project has no branches provider to merge with' }
+  const merged = await branches.merge(pr.number)
+  if (!merged.ok) return { ok: false, error: merged.error }
   // The PR's cached state just changed, so the branch's cached read must go or the bar keeps
   // offering a merge for a PR that landed (#1028).
   const branch = agentBranchFor(agent)
   forgetPr(cwd, branch)
-  forgetBranchPrs(cwd, branch)
+  if (branch !== undefined) forgetBranchPrs(cwd, branch)
   return { ok: true, url: pr.url, number: pr.number }
 }
 
-/** `git` that resolves to '' instead of rejecting, for reads where "no answer" is a fine answer. */
-function soft(git: GitRunner, cwd: string): (args: string[]) => Promise<string> {
-  return args => git(args, cwd).catch(() => '')
-}
-
-/** The repo's default branch: what the remote points HEAD at, else the first local conventional one. */
-async function detectBase(agent: (args: string[]) => Promise<string>): Promise<string | undefined> {
-  const head = (await agent(['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'])).trim()
-  if (head) return head
-  for (const name of ['main', 'master']) {
-    if ((await agent(['rev-parse', '--verify', '--quiet', `refs/heads/${name}`])).trim()) return name
-  }
-  return undefined
-}
-
-/** A subject can hold anything, so the fields are unit-separated rather than space-split. */
-const SEP = String.fromCharCode(31)
-
-/** Parse `git log --format=%H%x1f%s`. */
-function parseCommits(out: string): HandoffCommit[] {
-  return out
-    .split('\n')
-    .filter(line => line.includes(SEP))
-    .map(line => {
-      const [sha = '', subject = ''] = line.split(SEP)
-      return { sha, short: sha.slice(0, 7), subject }
-    })
-}
-
-/** `git diff --numstat` as {@link HandoffFile}s, via the shared parser in file-diff.ts. */
-function parseHandoffFiles(out: string): HandoffFile[] {
-  return parseNumstat(out).map(({ path, added, removed, binary }) => ({ path, insertions: added, deletions: removed, binary }))
-}
-
 /**
- * Read what a finished session left behind, from the project repo, for `branch`.
+ * Read what a finished session left behind, for `branch`: the branch's git facts from the
+ * project's branches provider, and the run's own pull request from the framework's lookup.
  *
- * Returns undefined only when `cwd` is not a git repo at all. A branch that no longer exists
- * still returns a handoff (with `exists: false`), because "that branch is gone" is itself the
- * answer the dashboard needs to show.
+ * Returns undefined only when the project has no branches provider, or the provider did not
+ * answer for the branch. A branch that no longer exists still returns a handoff (with
+ * `exists: false`), because "that branch is gone" is itself the answer the dashboard needs to
+ * show — and its PR is a remote question, still answerable (#1255).
  */
 export async function readAgentHandoff(
   cwd: string,
   branch: string,
   deps: AgentHandoffDeps = {},
 ): Promise<AgentHandoff | undefined> {
-  const git = deps.git ?? nodeGitRunner()
-  const agent = soft(git, cwd)
-
-  // Not a repo (or git is unusable): nothing here is answerable.
-  if (!(await git(['rev-parse', '--git-dir'], cwd).then(() => true).catch(() => false))) return undefined
-
-  const tip = (await agent(['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`])).trim()
-  const hasRemote = await repoHasRemote(cwd, git)
-  const pending = await countPendingWork(git, deps.checkout)
-  if (!tip) {
-    // The branch being gone locally does not mean the work is: a hands-off web agent pushes its
-    // branch and opens its PR remotely, and a merged branch gets deleted. The PR is a remote
-    // question, so it is still answerable — and it is the one thing left worth showing (#1255).
-    const pr = await lookupAgentPr(cwd, branch, deps)
-    return {
-      branch,
-      exists: false,
-      commits: [],
-      files: [],
-      insertions: 0,
-      deletions: 0,
-      empty: true,
-      hasRemote,
-      pushed: false,
-      merged: false,
-      ...(pr.value ? { pr: pr.value } : {}),
-      ...(pr.pending ? { prPending: true } : {}),
-      ...pending,
-    }
-  }
-
-  const base = await detectBase(agent)
-  // Two ranges, because git's two spellings mean opposite things here and only one is right for
-  // each question (#1164/#1173).
-  //
-  // `base..branch` is the branch's OWN commits, which is what "what did this session produce"
-  // asks. `base...branch` in `git log` is the SYMMETRIC difference, so it also lists commits that
-  // are only on the base — exactly the thing the comment below says not to count. A session whose
-  // work is already merged then reported commits it did not make, `empty` stayed false, and the
-  // dashboard offered an Open PR that GitHub refuses with "No commits between main and <branch>".
-  //
-  // For the diff the three-dot form IS the right one: it is the change since the branch point,
-  // rather than a comparison against a base that has moved on since.
-  const logRange = base ? `${base}..${branch}` : undefined
-  const diffRange = base ? `${base}...${branch}` : undefined
-
-  const [commitsOut, numstatOut, remoteTip, mergedOut] = await Promise.all([
-    logRange ? agent(['log', '--format=%H%x1f%s', logRange]) : Promise.resolve(''),
-    diffRange ? agent(['diff', '--numstat', diffRange]) : Promise.resolve(''),
-    hasRemote ? agent(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${branch}`]) : Promise.resolve(''),
-    base ? agent(['branch', '--list', '--merged', base, branch]) : Promise.resolve(''),
-  ])
-
-  const commits = parseCommits(commitsOut)
-  const files = parseHandoffFiles(numstatOut)
-  // Read through the cache and allowed to arrive late (#1028): the commits, the files and
-  // whether the branch is pushed are all local git, and none of them should wait on `gh`.
+  const branches = await (deps.branches ?? projectBranches)(cwd).catch(() => undefined)
+  if (!branches) return undefined
+  const [state] = await branches.show([branch])
+  if (!state) return undefined
+  // Read through the cache and allowed to arrive late (#1028): the branch's facts are local
+  // git, and none of them should wait on `gh`.
   const pr = await lookupAgentPr(cwd, branch, deps)
-
+  const commits = state.commits.map(commit => ({ sha: commit.sha, short: commit.sha.slice(0, 7), subject: commit.subject }))
+  const files = state.files.map(file => ({ path: file.path, insertions: file.insertions, deletions: file.deletions, binary: file.binary }))
   return {
     branch,
-    exists: true,
-    ...(base ? { base } : {}),
+    exists: state.exists,
+    ...(state.base ? { base: state.base } : {}),
     commits,
     files,
     insertions: files.reduce((sum, f) => sum + f.insertions, 0),
@@ -319,132 +226,53 @@ export async function readAgentHandoff(
     // an empty branch with buttons that would push nothing. The files decide as well as the
     // commits: commits that net to no change leave nothing to hand off.
     empty: commits.length === 0 || files.length === 0,
-    hasRemote,
-    pushed: remoteTip.trim() === tip,
-    merged: mergedOut.trim().length > 0,
+    hasRemote: state.hasRemote,
+    pushed: state.pushed,
+    merged: state.merged,
     ...(pr.value ? { pr: pr.value } : {}),
     ...(pr.pending ? { prPending: true } : {}),
-    ...pending,
+    ...(state.pendingFiles ? { pendingFiles: state.pendingFiles } : {}),
   }
 }
 
 /**
- * The files the session left uncommitted in its own checkout, as a spreadable field.
- *
- * Absent rather than `[]` when no checkout was given (or git could not answer): "nobody asked" and
- * "asked, nothing pending" are different answers, and only the second one may be shown as a clean
- * tree.
- */
-async function countPendingWork(git: GitRunner, checkout: string | undefined): Promise<{ pendingFiles?: string[] }> {
-  if (!checkout) return {}
-  const status = await git(['status', '--porcelain'], checkout).catch(() => undefined)
-  if (status === undefined) return {}
-  return { pendingFiles: parsePorcelain(status).map(entry => entry.path) }
-}
-
-/** The outcome of a handoff action, in the `{ ok }` shape the dashboard's `useAction` understands. */
-/**
  * What a handoff action did. The PR's `number` rides along with its `url` (E6), because the number
  * is the fact worth *recording* — every surface that wants an agent's PR then reads it off the agent
- * rather than re-deriving it from branch names and timestamps.
+ * rather than re-deriving it later.
  */
 export type HandoffResult = { ok: true; url?: string; number?: number } | { ok: false; error: string }
 
 /**
- * {@link AgentHandoff.base} as a base a PR can actually be opened against.
- *
- * The field holds a git ref, because that is what every other use of it needs: `detectBase` reads
- * `refs/remotes/origin/HEAD`, so it is `origin/main`, and the log range and merged check are both
- * asking git a question about a remote-tracking ref. `gh pr create --base` is asking GitHub for a
- * *branch on the remote*, and rejects `origin/main` with "Base ref must be a branch".
- *
- * So the conversion belongs at the `gh` boundary rather than in the field. Stripping `origin/`
- * matches what the rest of this module already assumes: the remote is `origin` (`pushBranch`
- * pushes there, `detectBase` reads its HEAD).
+ * Open a PR for a branch through the branches provider: the push, the request and its
+ * base are the provider's (`publish --branch`). A branch that already has an open request is
+ * answered as it is. The branch has a PR now, so the cached "no PR" must go or the bar would
+ * keep offering to open one for the next minute (#1028) — both caches: the single-PR view and
+ * the history.
  */
-export function prBaseName(base: string): string {
-  return base.startsWith('origin/') ? base.slice('origin/'.length) : base
-}
-
-/** What to put on the PR. */
-export interface PullRequestDraft {
-  title: string
-  body: string
-  base?: string
-  /**
-   * Open it as a GitHub draft (#1102): a PR opened with nobody asking for review should not put
-   * a review request in anyone's inbox. The button never asks for one.
-   *
-   * Safe to do only because the interventions queue was taught to keep listing a draft on a
-   * session branch. Left off, a draft would be invisible in both places at once.
-   */
-  draft?: boolean
-}
-
-/**
- * Open a PR for a finished session's branch, pushing it first when the remote does not have it.
- *
- * The button opens it ready for review, because a PR a human asked for by name is asking for
- * review. {@link PullRequestDraft.draft} is for a caller that is not asking for review.
- */
-export async function openBranchPullRequest(
-  cwd: string,
-  branch: string,
-  draft: PullRequestDraft,
-  deps: { git?: GitRunner; gh?: GhRunner } = {},
-): Promise<HandoffResult> {
-  const git = deps.git ?? nodeGitRunner()
-  const gh = deps.gh ?? nodeGhRunner()
-  // gh refuses to open a PR for a branch the remote has never seen, so the push is part of the
-  // action rather than a thing the user has to remember to do first.
-  const pushed = await pushBranch(cwd, branch, git)
-  if (!pushed.ok) return pushed
-  try {
-    const args = ['pr', 'create', '--head', branch, '--title', draft.title, '--body', draft.body]
-    if (draft.base) args.push('--base', prBaseName(draft.base))
-    if (draft.draft) args.push('--draft')
-    return createdPr(await gh(args, cwd), cwd, branch)
-  } catch (err) {
-    return { ok: false, error: errorMessage(err) }
-  }
-}
-
-/**
- * What a `gh pr create` left behind. gh prints the new PR's URL as its last line, and the number is
- * that URL's last path segment; an output with no URL still reports success, since the PR is open.
- *
- * The branch has a PR now, so the cached "no PR" must go or the bar would keep offering to open one
- * for the next minute (#1028) — both caches: the single-PR view and the history.
- */
-function createdPr(out: string, cwd: string, branch: string): HandoffResult {
+async function publishBranch(cwd: string, branch: string, draft: { title: string; body: string; draft?: boolean }, branches: BranchesFor): Promise<HandoffResult> {
+  const source = await branches(cwd).catch(() => undefined)
+  if (!source) return { ok: false, error: 'this project has no branches provider to publish with' }
+  const published = await source.publish(branch, { title: draft.title, body: draft.body, ...(draft.draft ? { draft: true } : {}) })
+  if (!published.ok) return { ok: false, error: published.error }
   forgetPr(cwd, branch)
   forgetBranchPrs(cwd, branch)
-  const url = out.trim().split('\n').filter(Boolean).at(-1)
-  if (!url) return { ok: true }
-  const number = prNumberFromUrl(url)
-  return { ok: true, url, ...(number !== undefined ? { number } : {}) }
+  return { ok: true, url: published.pr.url, number: published.pr.number }
 }
 
 /**
  * Open a draft PR for a branch that exists only on the remote (#1601): a cloud session's own
  * `claude/*` branch was pushed from a VM this machine never sees, so there is nothing to push
- * here — `gh pr create --head` against the remote branch is the whole action, and gh's default
- * base (the repo's default branch) is the right one. Draft because a PR the framework opens by
- * itself must not put a review request in anyone's inbox, and the interventions queue keeps listing a session's draft.
+ * here — the provider publishes the branch as the remote has it. Draft because a PR the
+ * framework opens by itself must not put a review request in anyone's inbox, and the
+ * interventions queue keeps listing a session's draft.
  */
 export async function openRemoteBranchPullRequest(
   cwd: string,
   agent: HandoffAgent,
   branch: string,
-  deps: { gh?: GhRunner } = {},
+  deps: { branches?: BranchesFor } = {},
 ): Promise<HandoffResult> {
-  const gh = deps.gh ?? nodeGhRunner()
-  try {
-    const args = ['pr', 'create', '--head', branch, '--title', agentPrTitle(agent), '--body', agentPrBody(agent), '--draft']
-    return createdPr(await gh(args, cwd), cwd, branch)
-  } catch (err) {
-    return { ok: false, error: errorMessage(err) }
-  }
+  return publishBranch(cwd, branch, { title: agentPrTitle(agent), body: agentPrBody(agent), draft: true }, deps.branches ?? projectBranches)
 }
 
 /**
@@ -463,20 +291,23 @@ function movedPastPr(state: Pick<AgentHandoff, 'pr' | 'commits'>): boolean {
  * Open a PR for a finished session, deciding from what the agent recorded which cases should not
  * open one. Reads the branch's handoff first: a branch that no longer exists, or a session that
  * changed nothing, is a clear error rather than an empty PR, and a branch that already has a PR
- * returns that one. Title is the session name (else the intent's first line, else the id); body
- * is the intent plus which session did it. This is the handoff decision the dashboard's
- * open-PR button offers; the RPC layer only resolves which run it is about.
+ * returns that one. Title is the agent's own, else its branch, else the id; body is the agent's
+ * description, else the intent, plus which session did it. This is the handoff decision the
+ * dashboard's open-PR button offers; the RPC layer only resolves which run it is about, and the
+ * branches provider does the publishing.
  */
 export async function openAgentPullRequest(
   cwd: string,
   agent: AgentMeta,
-  options: { draft?: boolean } = {},
+  options: { draft?: boolean; branches?: BranchesFor; pr?: BranchPrLookup } = {},
 ): Promise<HandoffResult> {
   const branch = agentBranchFor(agent)
+  if (branch === undefined) return { ok: false, error: 'this session recorded no branch to open a PR from' }
+  const branches = options.branches ?? projectBranches
   // `latest` order (#1512), because the `movedPastPr` decision below compares the branch tip
   // against a PR's head: against the *first* PR, work a second one already landed reads as
   // unlanded and this opens a third for it.
-  const handoff = await readAgentHandoff(cwd, branch, { since: agent.startedAt, order: 'latest' }).catch(() => undefined)
+  const handoff = await readAgentHandoff(cwd, branch, { since: agent.startedAt, order: 'latest', branches, ...(options.pr ? { pr: options.pr } : {}) }).catch(() => undefined)
   // The agent's PR first, even when its branch is gone locally: a hands-off web agent's branch only
   // ever existed on the remote, and its PR is the answer the button exists to give (#1255).
   // Unless the session demonstrably kept committing after that PR merged or closed (#1512) —
@@ -485,12 +316,7 @@ export async function openAgentPullRequest(
   if (handoff && !handoff.exists) return { ok: false, error: `branch ${branch} no longer exists` }
   // Refuse rather than open an empty PR: a session that changed nothing has nothing to hand off.
   if (handoff?.empty) return { ok: false, error: 'this session produced no commits to open a PR for' }
-  return openBranchPullRequest(cwd, branch, {
-    title: agentPrTitle(agent),
-    body: agentPrBody(agent),
-    ...(handoff?.base ? { base: handoff.base } : {}),
-    ...(options.draft ? { draft: true } : {}),
-  })
+  return publishBranch(cwd, branch, { title: agentPrTitle(agent), body: agentPrBody(agent), ...(options.draft ? { draft: true } : {}) }, branches)
 }
 
 /**
@@ -507,7 +333,7 @@ export type HandoffAgent = Pick<AgentMeta, 'id' | 'branch' | 'intent'> &
      */
     fixes?: string
     /**
-     * The agent's own name for the work (#1618): the PR title when given. Absent, the title falls back to the session's name.
+     * The agent's own name for the work (#1618): the PR title when given. Absent, the title falls back to the branch.
      */
     prTitle?: string
     /**
@@ -520,27 +346,17 @@ export type HandoffAgent = Pick<AgentMeta, 'id' | 'branch' | 'intent'> &
 /**
  * The PR title for a session (#1102), with the ticket's issue reference riding along (#1334).
  *
- * Three rungs, each a name for the work the session did: what the agent called it (#1618), else the session's own name (its branch minus the prefix, #1725), else
- * the session id — which says little, but says it honestly.
+ * Three rungs, each a name for the work the session did: what the agent called it (#1618), else
+ * the branch the agent named its work with (#1725), else the session id — which says little, but
+ * says it honestly.
  *
  * The prompt the session was given is not among them. It used to be, cut to 72 characters, and a
  * squash merge made that permanent: `main` ended up carrying instructions truncated mid-sentence
  * as commit subjects, which describe neither what changed nor even a whole thought (#1618).
  */
 function agentPrTitle(agent: Pick<HandoffAgent, 'id' | 'branch' | 'prTitle' | 'fixes'>): string {
-  const title = agent.prTitle ?? sessionNameOf(agent.branch, agent.id) ?? `Session ${agent.id}`
+  const title = agent.prTitle ?? agent.branch ?? `Session ${agent.id}`
   return agent.fixes ? `${title} (fix ${agent.fixes})` : title
-}
-
-/**
- * The PR number out of the URL `gh pr create` prints, e.g. `…/pull/123` (#1216).
- *
- * Parsed rather than asked for in a second `gh` call: the create already told us, and E6 is about
- * recording the number we were told rather than re-deriving it later.
- */
-function prNumberFromUrl(url: string | undefined): number | undefined {
-  const match = url?.match(/\/pull\/(\d+)(?:$|[/?#])/)
-  return match ? Number(match[1]) : undefined
 }
 
 /**
@@ -555,6 +371,6 @@ function agentPrBody(agent: HandoffAgent): string {
   const lines: string[] = []
   const opening = agent.description?.trim() || agent.intent?.trim()
   if (opening) lines.push(opening, '')
-  lines.push(`Opened from The Framework session \`${sessionNameOf(agent.branch, agent.id) ?? agent.id}\`.`)
+  lines.push(`Opened from The Framework session \`${agent.id}\`.`)
   return lines.join('\n')
 }

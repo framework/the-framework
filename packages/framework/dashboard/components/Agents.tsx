@@ -114,5 +114,5 @@ function AgentRow({
 // start time to fall back to, but a live session almost always has an intent or a chosen name; its
 // project is the last resort.
 function activeLabel(a: ActiveAgent): string {
-  return a.intent?.trim() || a.sessionName?.trim() || a.scope?.trim() || a.projectName
+  return a.intent?.trim() || a.scope?.trim() || a.projectName
 }

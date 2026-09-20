@@ -3,7 +3,9 @@ import { test } from 'node:test'
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { worktreePath } from '@gemstack/skill-branches'
+import { addWorktree, agentBranchName, worktreePath } from '@gemstack/skill-branches'
+import { nodeGitRunner } from '@gemstack/agent-data'
+import { linkBranchesProvider } from '../store/test-branches.js'
 import { THE_FRAMEWORK_DIR } from '../framework-dir.js'
 import { PROJECT_HOOKS_FILE } from '../project-hooks.js'
 import { RUN_INBOX_FILE, sayToRun } from './run-inbox.js'
@@ -17,6 +19,16 @@ test('a line written to a run that ended meanwhile is taken back out of the inbo
   const checkout = worktreePath(cwd, RUN)
   const inbox = join(checkout, THE_FRAMEWORK_DIR, RUN_INBOX_FILE)
   try {
+    // A real checkout in a real repository: the run's inbox is found through the project's branches provider (#1774).
+    const git = nodeGitRunner()
+    await git(['init', '-q'], cwd)
+    await git(['config', 'user.email', 't@t'], cwd)
+    await git(['config', 'user.name', 't'], cwd)
+    await writeFile(join(cwd, 'README'), 'x\n')
+    await git(['add', '-A'], cwd)
+    await git(['commit', '-q', '-m', 'init'], cwd)
+    await addWorktree(cwd, { agentId: RUN, branch: agentBranchName(RUN) }, git)
+    await linkBranchesProvider(cwd)
     await mkdir(join(checkout, THE_FRAMEWORK_DIR), { recursive: true })
     await mkdir(join(cwd, THE_FRAMEWORK_DIR), { recursive: true })
     await writeFile(join(cwd, PROJECT_HOOKS_FILE), `resume: 'printf "%s|%s|%s\\n" "$RUN_ID" "\${TEXT-}" "\${ANSWER-}" >> resumed.txt; echo "{\\"id\\":\\"$RUN_ID\\"}"'\n`)

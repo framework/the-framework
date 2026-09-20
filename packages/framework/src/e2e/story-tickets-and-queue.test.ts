@@ -8,12 +8,13 @@ import {
   onHotTickets,
   onQueue,
 } from '../dashboard-rpc/reads.js'
-import { sendQueueTicket } from '../dashboard-rpc/control.js'
 
-// The roadmap stories (README.md): tickets are proposals, the flat TODO queue holds confirmed
-// work — the propose -> decide half of the loop the Tickets and Queue pages drive. Working the
-// queue is the daemon's (#1774): it starts an agent when the branch moves, and that agent reads
-// the skills itself.
+// The roadmap stories (README.md): tickets are proposals, the agent queue holds confirmed work —
+// the propose -> decide half of the loop the Tickets page and the AI Queue card drive. The queue
+// itself is a project package's (#1774): the framework reads it through the command that package
+// declares, and writes it never (the package's own widget does, in the browser). Working the
+// queue is the scheduler's: it starts an agent when the branch moves, and that agent reads the
+// skills itself.
 
 const TICKET_FILE = '2026-08-01_login-page.md'
 const TICKET = [
@@ -59,28 +60,26 @@ test('browse the ticket backlog: list, detail, and the cross-project pages (#697
   }
 })
 
-test('queue a ticket, and the boards show it queued (#1164)', async () => {
+test('a queued ticket is read through the project\'s queue provider, and the boards show it queued (#1164/#1774)', async () => {
   const world = await makeWorld()
   const rpc = world.rpc
   try {
+    // The queue as the queue package's own "Add to queue" writes it: a link back to the ticket in
+    // the priority section the ticket's own priority earns, on the `agent-data` branch.
     const project = await world.addProject({
       'README.md': '# fixture\n',
       [`tickets/${TICKET_FILE}`]: TICKET,
+      'TODO_AGENTS.md': `## Priority 8\n\n- [Login page](tickets/${TICKET_FILE})\n`,
     })
 
-    // The ticket page's Queue action: the entry lands in the flat backlog, linking back to the
-    // ticket, and the Queue page counts it as open work.
-    const queued = await rpc(sendQueueTicket)(project.id, 'Login page', { file: TICKET_FILE, priority: '8' })
-    assert.equal(queued.ok, true, `queueing failed: ${queued.error ?? ''}`)
-    assert.equal(queued.file, 'TODO_AGENTS.md')
+    // The framework reads it by running the provider the fixture's package declares (`queue --local`).
     const queue = await rpc(onQueue)()
     const projectQueue = queue.find(q => q.projectId === project.id)
-    assert.equal(projectQueue?.open, 1)
-    assert.ok(projectQueue?.items[0]?.text.includes(`tickets/${TICKET_FILE}`), 'the entry links back to its ticket')
+    assert.deepEqual(projectQueue?.entries, [`[Login page](tickets/${TICKET_FILE})`], 'the entry, as the command prints it')
 
-    // The queued ticket shows on the hot-tickets rail.
+    // The queued ticket shows on the hot-tickets rail, in the AI Queue lane.
     const hotQueued = await rpc(onHotTickets)()
-    assert.ok(hotQueued.some(h => h.projectId === project.id && h.ticket.file === TICKET_FILE))
+    assert.ok(hotQueued.some(h => h.projectId === project.id && h.ticket.file === TICKET_FILE && h.bucket === 'ai-queue'))
   } finally {
     await world.close()
   }

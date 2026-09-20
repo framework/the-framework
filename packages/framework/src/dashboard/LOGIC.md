@@ -9,7 +9,7 @@ The daemon's [1] dashboard-serving side: the one HTTP server that hosts the brow
 [1] the daemon: the one foreground process per machine: serves the dashboard and runs the sweeps; it starts no agent itself, it runs a project's start hook when the user presses Start.
 [2] projection: an answer computed on demand from the files the daemon and its agents write, never from state kept in memory.
 [3] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
-[4] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down.
+[4] the agent queue: every task agents will work next, in the order they will be taken, kept by a project package (the `queue` skill keeps it as `TODO_AGENTS.md` on the `agent-data` branch, in priority sections) and read through the command that package declares.
 [5] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
 [6] handoff: what becomes of an agent's work once the agent has ended: its branch pushed, a pull request opened for it, the pull request merged. The agent does it itself; on a finished agent's page the "Open PR" and "Merge" buttons do it by hand.
 [7] gate: a question with options an agent's turn ended on: the agent ends waiting for the answer, the dashboard shows the question as a card, and the answer resumes the agent.

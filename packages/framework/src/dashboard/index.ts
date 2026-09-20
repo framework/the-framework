@@ -13,7 +13,7 @@ export { makeRpcMount, RPC_PREFIX, isSameOriginRequest, isExpectedHost, type Eve
 export { serveClientBundle } from './static.js'
 export { readDocs, DOC_CATEGORIES, type WorkspaceDoc } from './docs.js'
 export { readTickets, readTicket, readTicketsMeta, type WorkspaceTicket, type WorkspaceTicketDetail, type TicketsMeta, type TicketGithubLink } from './tickets.js'
-export { collectQueue, parseTodoItems, type ProjectQueue, type QueueItem } from './queue.js'
+export { collectQueue, type ProjectQueue } from './queue.js'
 export { readSchedulerState, collectSchedulers, SCHEDULER_STATE_FILE, type SchedulerState, type SchedulerTick, type SchedulerDecision, type ProjectScheduler } from './scheduler-state.js'
 export { buildOverview, buildRecentAgents, buildHotTickets, collectAllTickets, ticketBucket, type Overview, type ActiveAgent as ActiveAgent, type RecentProject, type RecentAgent as RecentAgent, type HotTicket, type HotBucket, type OverviewDeps, type ProjectTickets, type AllTicketsDeps } from './overview.js'
 export { buildDashboard, type DashboardData, type ProjectStat, type DashboardDeps } from './dashboard.js'

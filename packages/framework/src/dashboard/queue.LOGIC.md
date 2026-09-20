@@ -1,24 +1,22 @@
-Rolls the agent queue [1] of every project up into the dashboard's cross-project Queue: the entries parsed out of each project's surfaced `TODO` documents, with how many are still open and how many there are in all, one block per project, the project with the most open entries first. The rule for what counts as a queue entry is the `queue` skill's own, so the card and the agents never disagree about the same file.
+Collects the agent queue [1] of every project into the dashboard's cross-project queue: one block per project that has a queue, with its open entries [2] in order of work, the project with the most entries first. Each project's queue is read through the queue provider [3] one of its packages declares (`../store/queue.ts`); this file knows no queue file and no queue package.
 
 ## Context
 
-**User story**: with no project selected, the user sees how much work waits for agents across every project, and which project has the most, without opening each project's `TODO_AGENTS.md`. On the Overview, the count of open entries is the sum of these blocks.
-
-**Problem**: two readers of one file with two ideas of what an entry is make the dashboard say "Nothing queued" while the queued work [2] takes entries off that very file. Triage agents write entries as a ticket link followed by a note, with no checkbox; a reader that only counts checkboxes reads such a queue as empty.
+**User story**: with no project selected, the user sees on the Overview what agents will work on next in every project, and which project has the most waiting; a ticket the queue links to shows in the hot tickets' AI Queue lane; the tickets page's "add to queue" skips what is already queued. A project without a queue package appears in none of it.
 
 ## Glossary
 
-[1] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down. An item on it is a queue entry.
-[2] the queued work: one agent started with `/work-queue`, which takes one task off the agent queue by composing the skills in its checkout.
+[1] the agent queue: every task agents will work next, in the order they will be taken, kept by a project package (the `queue` skill keeps it as `TODO_AGENTS.md` on the `agent-data` branch, in priority sections).
+[2] entry: one task on the agent queue [1], as the provider's command prints it: the text a future agent is started with.
+[3] queue provider: the command, among the commands of a project's dependencies, that a package declares as answering for the project's agent queue [1], in its own package.json under `"framework": { "queue": "<command>" }`.
 
 ## Business logic — TL;DR
 
-- **What counts as a queue entry** - every markdown list item is an entry, open unless it starts with a checked checkbox; headings, prose and blank lines are not entries.
-- **One block per project, most open first** - each project's `TODO` documents are parsed, a project with no entries is left out, a project that cannot be read is skipped, and the blocks are ordered by open entries, descending.
+- **One block per project that has a queue, most entries first** - a project whose package provides a queue is listed even when nothing is queued; a project with no provider is left out; a provider that cannot be looked up is left out and one whose read fails lists no entries; the blocks are ordered by their number of entries, descending.
 
 ## Business logic
 
-### What counts as a queue entry
+### One block per project that has a queue, most entries first
 
 #### Context
 
@@ -26,14 +24,4 @@ See `## Context`.
 
 #### Business logic
 
-Each line of a document is read on its own. A line that is a markdown list item, with `-`, `*` or a number followed by a period as its marker and any indentation before it, is one queue entry [1]; every other line, whether a heading, prose or blank, is ignored. When the item's text starts with a GitHub-style checkbox, `[ ]` makes the entry open and `[x]` or `[X]` makes it done, and the text after the checkbox is the entry's text; an item whose text after the checkbox is empty is dropped. An item with no checkbox is an open entry whose text is the whole item. This is deliberately the rule of the `queue` skill's own parser, which the queued work [2] reads the queue by.
-
-### One block per project, most open first
-
-#### Context
-
-See `## Context`.
-
-#### Business logic
-
-For each project, its surfaced documents are read (the rules in `docs.ts`) and those whose file name starts with `TODO` are parsed for entries, in document order. A project with no such document, or none with entries, contributes no block; a project whose documents cannot be read is skipped. A block carries the project's id and name, the count of open entries, the count of all entries and the entries themselves. The blocks are ordered by their open count, highest first.
+For each project, its queue provider [3] is looked up. A project with no provider has no queue and contributes no block: the dashboard says nothing about a queue the project does not keep. A project with a provider contributes a block even when its queue is empty, so the Overview's card can name the projects it speaks for. The block carries the project's id and name and its open entries [2], in the order the provider prints them, which is the order of work. A provider lookup that fails is treated as no provider; a read that fails gives a block with no entries. The blocks are ordered by their number of entries, highest first.

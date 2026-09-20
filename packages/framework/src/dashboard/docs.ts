@@ -1,6 +1,5 @@
 import { readFile, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { QUEUE_FILE, readQueue } from '@gemstack/skill-queue'
 
 /**
  * The plan/backlog document categories the dashboard surfaces in its sidebar
@@ -9,15 +8,16 @@ import { QUEUE_FILE, readQueue } from '@gemstack/skill-queue'
  * These are written per session as `PLAN_<SESSION>.agent.md` (the plan for now) and
  * `TODO_<SESSION>.agent.md` (the backlog), where SESSION is a git-branch slug — by
  * The Framework's own system prompt back when it ran the agent (#323/#326), and by
- * whatever a project's own skills tell an agent to write now. The flat fallbacks are `PLAN.md`
- * (root) and the flat backlog (`backlog: true` reads `TODO_AGENTS.md` off the data
- * branch, its one location since #1582). Scoped and flat-root names are matched
- * against a flat readdir of the root, never taken from user input, so there is no
- * path traversal to guard against.
+ * whatever a project's own skills tell an agent to write now. The flat fallback is `PLAN.md`
+ * at the root; the `TODO` category has no flat file: the agent queue is not a document of the
+ * checkout but a project package's data, and the dashboard shows it on that package's own page
+ * and the Overview's AI Queue card (#1774), not here. Scoped and flat-root names are matched
+ * against a flat readdir of the root, never taken from user input, so there is no path
+ * traversal to guard against.
  */
 export const DOC_CATEGORIES = [
   { flat: 'PLAN.md', scoped: /^PLAN_[a-z0-9-]+\.agent\.md$/ },
-  { flat: 'TODO_AGENTS.md', backlog: true, scoped: /^TODO_[a-z0-9-]+\.agent\.md$/ },
+  { scoped: /^TODO_[a-z0-9-]+\.agent\.md$/ },
 ] as const
 
 /** One surfaced document: its filename and current contents. */
@@ -36,10 +36,10 @@ const MAX_DOC_BYTES = 200_000
  * empty when the workspace is missing or unreadable.
  */
 /**
- * Read the surfaced plan/backlog docs, in sidebar order: per category the flat file (if present)
- * then its session-scoped files (sorted). The flat backlog comes off the data branch (#1582);
- * everything else is a workspace-root file. Missing or blank files are skipped; a file over the
- * size cap is truncated. Never throws — a read error just omits that doc.
+ * Read the surfaced plan/todo docs, in sidebar order: per category the flat file (if the
+ * category has one and it is present) then its session-scoped files (sorted), every one a
+ * workspace-root file. Missing or blank files are skipped; a file over the size cap is
+ * truncated. Never throws — a read error just omits that doc.
  */
 export async function readDocs(cwd: string): Promise<WorkspaceDoc[]> {
   let entries: string[]
@@ -55,8 +55,7 @@ export async function readDocs(cwd: string): Promise<WorkspaceDoc[]> {
     docs.push({ name, content: content.length > MAX_DOC_BYTES ? content.slice(0, MAX_DOC_BYTES) + '\n\n… (truncated)' : content })
   }
   for (const cat of DOC_CATEGORIES) {
-    if ('backlog' in cat) push(QUEUE_FILE, await readQueue(cwd))
-    else if (present.has(cat.flat)) push(cat.flat, await readFile(join(cwd, cat.flat), 'utf8').catch(() => undefined))
+    if ('flat' in cat && present.has(cat.flat)) push(cat.flat, await readFile(join(cwd, cat.flat), 'utf8').catch(() => undefined))
     for (const name of entries.filter(e => cat.scoped.test(e)).sort()) {
       push(name, await readFile(join(cwd, name), 'utf8').catch(() => undefined))
     }

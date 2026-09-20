@@ -41,8 +41,8 @@ test('buildOverview sums the open queue and lists recent projects newest-first (
     project(`p${i}`, `/p${i}`, `2026-07-${String(10 + i).padStart(2, '0')}T00:00:00Z`),
   )
   const queues: ProjectQueue[] = [
-    { projectId: 'p0', projectName: 'p0', open: 3, total: 4, items: [] },
-    { projectId: 'p1', projectName: 'p1', open: 2, total: 2, items: [] },
+    { projectId: 'p0', projectName: 'p0', entries: ['a', 'b', 'c'] },
+    { projectId: 'p1', projectName: 'p1', entries: ['d', 'e'] },
   ]
   const overview = await buildOverview(projects, { liveAgents: async () => [], queue: async () => queues })
   assert.equal(overview.active.length, 0)
@@ -140,7 +140,7 @@ test('buildHotTickets pools every project, buckets each, drops the rest, and ord
     // beta's b1 is linked from its TODO_AGENTS.md, so it lands in the AI-Queue lane; b2 is in no
     // lane and drops off the card entirely.
     queue: async () => [
-      { projectId: 'beta', projectName: 'beta', open: 1, total: 1, items: [{ text: '[b one](tickets/b1.md) — a note', done: false }] },
+      { projectId: 'beta', projectName: 'beta', entries: ['[b one](tickets/b1.md) — a note'] },
     ],
   })
   assert.deepEqual(

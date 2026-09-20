@@ -30,7 +30,7 @@ export interface DashboardData {
   active: ActiveAgent[]
   /** Every registered project, most-recently-active first. */
   projects: ProjectStat[]
-  /** The per-project open TODO backlog (from {@link collectQueue}). */
+  /** The per-project agent queue (from {@link collectQueue}): the projects that have one, with their open entries. */
   queue: ProjectQueue[]
 }
 

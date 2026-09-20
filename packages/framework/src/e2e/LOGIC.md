@@ -2,7 +2,7 @@ The backend end-to-end stories: what the user sees between registering a project
 
 ## Context
 
-**User story**: the stories are the product's own user stories end to end: register a repository, set preferences, start an agent, watch it, answer its question, write to it, stop it, remove its checkout, delete it, and queue a ticket.
+**User story**: the stories are the product's own user stories end to end: register a repository, set preferences, start an agent, watch it, answer its question, write to it, stop it, remove its checkout, delete it, and see a queued ticket on the boards.
 
 ## Glossary
 
@@ -17,8 +17,8 @@ The backend end-to-end stories: what the user sees between registering a project
 
 ## Business logic — TL;DR
 
-- **The simulated world** (`harness.ts`, `fake-run-bin.ts`) - one daemon runtime per story on throwaway state, wired as in production, with real git repositories as projects (each with a bare `origin`, its tickets and agent queue seeded on the `agent-data` branch [5], and a hooks file naming the stand-in tool), and agents that are real detached processes writing a real card and diary [4], reading a real inbox [7], recorded through the `logs` skill and reclaimed by the branches rule.
+- **The simulated world** (`harness.ts`, `fake-run-bin.ts`) - one daemon runtime per story on throwaway state, wired as in production, with real git repositories as projects (each with a bare `origin`, its tickets and agent queue seeded on the `agent-data` branch [5], and a hooks file naming the stand-in tool), and agents that are real detached processes writing a real card and diary [4], reading a real inbox [7], recorded through the `logs` skill and reclaimed by the branches rule; the `logs` and `queue` packages are each fixture's dependencies, so the runs and the queue are read the way a real project's are, through the commands those packages declare.
 - **Projects and settings** (`story-projects-and-settings.test.ts`) - registering a repository installs and lists it, unknown projects degrade quietly, the picks set in Settings read back, and the usage panel shows what the daemon reports.
 - **The agent lifecycle** (`story-session-lifecycle.test.ts`) - what the user sees between Start and the recorded row: the hook handed the prompt and the picks, the live feed up to the end, the finished row, the checkout reclaimed and the branch on the remote, the replay and the cross-project surfaces; two agents at once each in its own checkout [8]; a project without a start hook, and a hook that fails, refusing in words.
 - **Steering and questions** (`story-steering-and-gates.test.ts`) - answering a waiting agent's question [6] from the questions hub resumes the same agent; a message to a working agent becomes its next turn, and to an ended one resumes it; a stop ends the agent stopped, its checkout reclaimed, then a delete removes the row; a waiting agent's kept checkout is removed by hand.
-- **Tickets and the queue** (`story-tickets-and-queue.test.ts`) - browsing the ticket backlog, and queueing a ticket so the boards show it queued.
+- **Tickets and the queue** (`story-tickets-and-queue.test.ts`) - browsing the ticket backlog, and a queued ticket read through the project's queue provider so the boards show it queued.

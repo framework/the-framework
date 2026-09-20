@@ -51,14 +51,35 @@ export type CommandResult = { ok: true; output: unknown } | { ok: false; error: 
 /** What the action did: every link queued, or stopped at the first that was not, with why. */
 export type AddOutcome = { ok: true } | { ok: false; error: string }
 
+/** The target of an entry's leading link, when it leads with one: where a queued link points. */
+export function entryTarget(entry: string): string | undefined {
+  return LEADING_LINK.exec(entry)?.[2]
+}
+
 /**
- * Queue the links, in order, in one project, each as one `queue add`. Stops at the first failure:
- * a command that could not run, or one that answered a refusal (`{ ok: false, reason }`), whose
- * reason is the error. A link already queued is queued again: the caller decides what is a
- * duplicate, since only it knows what its links name.
+ * Whether a link is already on the queue: a link that points somewhere is queued when an open
+ * entry leads with a link to the same target, whatever its text or the note after it; plain text
+ * is queued when an open entry is exactly that text. The queue knows nothing of what a target
+ * names, only that two entries pointing at the same place are the same work.
+ */
+export function alreadyQueued(entries: readonly string[], link: LinkToQueue): boolean {
+  return link.href !== undefined ? entries.some(entry => entryTarget(entry) === link.href) : entries.some(entry => entry.trim() === link.text.trim())
+}
+
+/**
+ * Queue the links, in order, in one project, each as one `queue add`, after one read of the open
+ * entries (the bare command, origin's copy) so that a link already queued is left as it is: "add"
+ * means the set ends up queued, and a second entry would outlive the first's check-off as open
+ * work naming something done. Stops at the first failure: a command that could not run, or one
+ * that answered a refusal (`{ ok: false, reason }`), whose reason is the error.
  */
 export async function addToQueue(run: (args: string[]) => Promise<CommandResult>, links: readonly LinkToQueue[]): Promise<AddOutcome> {
+  if (links.length === 0) return { ok: true }
+  const listed = await run([])
+  if (!listed.ok) return { ok: false, error: listed.error }
+  const entries = Array.isArray(listed.output) ? listed.output.filter((entry): entry is string => typeof entry === 'string') : []
   for (const link of links) {
+    if (alreadyQueued(entries, link)) continue
     const result = await run(addArgs(link))
     if (!result.ok) return { ok: false, error: result.error }
     const refusal = result.output as { ok?: unknown; reason?: unknown } | null

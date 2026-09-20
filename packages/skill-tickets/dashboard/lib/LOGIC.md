@@ -1,0 +1,1 @@
+The list page's model, apart from React: what a ticket is on the pages (`types.ts`), the filter, sort, grouping and address rules of the backlog view (`ticket-filter.ts`), and how a ticket's priority reads (`ticket-priority.ts`). Each file has a `LOGIC.md` of its own.

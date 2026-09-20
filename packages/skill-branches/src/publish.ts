@@ -1,5 +1,5 @@
 import { nodeGitRunner, pushBranch, type GitRunner } from '@gemstack/agent-data'
-import { currentBranch, isWorktreeRoot, projectRoot, worktreeClean } from './worktree.js'
+import { currentBranch, isWorktreeRoot, projectRoot, worktreeBranch, worktreeClean, worktreeDirEntries } from './worktree.js'
 import { spawnMergeWatch } from './merge-watch.js'
 import { dropHeldMerge, heldMergeRecorded, MERGE_HELD_NOTE, mergeHeld, recordHeldMerge, withHeldNote, withoutHeldNote } from './merge-hold.js'
 
@@ -18,6 +18,12 @@ import { dropHeldMerge, heldMergeRecorded, MERGE_HELD_NOTE, mergeHeld, recordHel
  *
  * A checkout under a hold (`merge-hold.ts`) arms nothing: the merge is recorded as wanted, the
  * request's body says it is held, and the caller who put the hold releases it (`releaseMerge`).
+ *
+ * A person publishes a finished agent's work through the same door (#1774), by branch
+ * (`publishBranch`): the agent's checkout when one is still on the branch, under the same clean
+ * rule; else the branch itself, pushed when this machine has it, as it is when only the remote
+ * does. And lands its request (`mergePr`): a draft is marked ready first, then the merge is
+ * armed exactly as `--merge` arms it.
  */
 
 /** A `gh` runner: the standard output of one invocation; rejects with gh's own line on failure. */
@@ -78,7 +84,9 @@ export type PublishOutcome =
        */
       merge?: MergeArming | { outcome: 'held' }
     }
-  | { ok: false; reason: 'not-a-worktree' | 'no-branch' }
+  | { ok: false; reason: 'not-a-worktree' }
+  /** The checkout is on no branch; or, published by name, neither this machine nor the remote has the branch. */
+  | { ok: false; reason: 'no-branch'; branch?: string }
   | { ok: false; reason: 'dirty' | 'push-failed' | 'pr-failed'; branch: string; detail?: string }
 
 /** How arming a merge went. */
@@ -96,18 +104,47 @@ export async function publishCheckout(path: string, opts: PublishOptions): Promi
   const held = opts.merge === true && (await mergeHeld(path, git))
   const pushed = await pushBranch(repo, branch, git)
   if (!pushed.ok) return { ok: false, reason: 'push-failed', branch, detail: pushed.error }
+  return openAndArm(repo, path, branch, opts, held, gh)
+}
 
-  let pr = await openPr(path, branch, gh)
+/**
+ * Publish a branch by name, from the project (#1774): the caller's form, for a person landing a
+ * finished agent's work. The checkout under `.branches/` that is on the branch, when one is,
+ * is published as the agent would publish it, its clean rule included. Without one, the branch
+ * itself: pushed when this machine has it; left as it is when only `origin` has it (a branch
+ * pushed from elsewhere, with nothing here to push). Neither: `no-branch`. No hold applies
+ * without a checkout: a hold is a checkout's.
+ */
+export async function publishBranch(repo: string, branch: string, opts: PublishOptions): Promise<PublishOutcome> {
+  const git = opts.git ?? nodeGitRunner()
+  const gh = opts.gh ?? nodeGhRunner()
+  for (const entry of await worktreeDirEntries(repo)) {
+    if ((await worktreeBranch(entry.path, git)) === branch) return publishCheckout(entry.path, opts)
+  }
+  const local = await git(['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`], repo).then(out => out.trim() !== '', () => false)
+  if (local) {
+    const pushed = await pushBranch(repo, branch, git)
+    if (!pushed.ok) return { ok: false, reason: 'push-failed', branch, detail: pushed.error }
+  } else {
+    const remote = await git(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${branch}`], repo).then(out => out.trim() !== '', () => false)
+    if (!remote) return { ok: false, reason: 'no-branch', branch }
+  }
+  return openAndArm(repo, repo, branch, opts, false, gh)
+}
+
+/** The half after the push: the open request or a new one, then the merge arming, the hold honored. */
+async function openAndArm(repo: string, cwd: string, branch: string, opts: PublishOptions, held: boolean, gh: GhRunner): Promise<PublishOutcome> {
+  let pr = await openPr(cwd, branch, gh)
   let existing = true
   if (!pr) {
     existing = false
     try {
       const args = ['pr', 'create', '--head', branch, '--title', opts.title, '--body', held ? withHeldNote(opts.body ?? '') : (opts.body ?? '')]
       if (opts.draft && !opts.merge) args.push('--draft')
-      const out = await gh(args, path)
+      const out = await gh(args, cwd)
       const url = out.trim().split('\n').filter(Boolean).at(-1)
       const number = prNumber(url)
-      pr = url && number !== undefined ? { number, url } : await openPr(path, branch, gh)
+      pr = url && number !== undefined ? { number, url } : await openPr(cwd, branch, gh)
       if (!pr) return { ok: false, reason: 'pr-failed', branch, detail: 'gh printed no pull request URL' }
     } catch (err) {
       return { ok: false, reason: 'pr-failed', branch, detail: errorMessage(err) }
@@ -117,12 +154,47 @@ export async function publishCheckout(path: string, opts: PublishOptions): Promi
   const outcome: PublishOutcome = { ok: true, branch, pr, existing }
   if (held) {
     await recordHeldMerge(repo, pr.number)
-    if (existing) await noteHeld(path, pr.number, gh)
+    if (existing) await noteHeld(cwd, pr.number, gh)
     outcome.merge = { outcome: 'held' }
   } else if (opts.merge) {
     outcome.merge = await armMerge(repo, pr.number, gh, opts.watch ?? spawnMergeWatch)
   }
   return outcome
+}
+
+/** What landing a request for a person did: armed as `--merge` arms, or why not. */
+export type MergePrOutcome = MergeArming | { outcome: 'not-open'; state: string }
+
+export interface MergePrOptions {
+  gh?: GhRunner
+  /** Start the merge watcher for a request (default {@link spawnMergeWatch}). For tests. */
+  watch?: (repo: string, number: number) => Promise<void>
+}
+
+/**
+ * Land a pull request for a person (#1774): "it is good, land it". A draft is marked ready
+ * first, since asking for the merge is the statement that its review happened; then the merge
+ * is armed exactly as `publish --merge` arms it. A request that is not open is `not-open` with
+ * its state: already merged is an answer, not an action.
+ */
+export async function mergePr(repo: string, number: number, opts: MergePrOptions = {}): Promise<MergePrOutcome> {
+  const gh = opts.gh ?? nodeGhRunner()
+  let view: { state?: unknown; isDraft?: unknown }
+  try {
+    view = JSON.parse(await gh(['pr', 'view', String(number), '--json', 'state,isDraft'], repo)) as typeof view
+  } catch (err) {
+    return { outcome: 'failed', error: errorMessage(err) }
+  }
+  const state = typeof view.state === 'string' ? view.state : 'OPEN'
+  if (state !== 'OPEN') return { outcome: 'not-open', state }
+  if (view.isDraft === true) {
+    try {
+      await gh(['pr', 'ready', String(number)], repo)
+    } catch (err) {
+      return { outcome: 'failed', error: errorMessage(err) }
+    }
+  }
+  return armMerge(repo, number, gh, opts.watch ?? spawnMergeWatch)
 }
 
 /** An open request's body gains the held note, once. The note is for a person: an edit gh refuses never fails the publish. */

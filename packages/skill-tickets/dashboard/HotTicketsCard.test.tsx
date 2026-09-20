@@ -1,0 +1,77 @@
+import { afterEach, describe, expect, test, vi } from 'vitest'
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
+import type { LinkAction } from 'framework/widget'
+import type { MountedWidgets } from '../../framework/dashboard/lib/use-widgets.js'
+import { HotTicketsCard } from './HotTicketsCard.js'
+import { fakeHost, renderWithHost, NO_WIDGETS, type Answers, type FakeHost } from './test-host.js'
+
+// The card on the Overview, rendered from nothing but this package: a host answering the tickets
+// command and the project's runs, and, unless a test mounts one, no other widget. Whether a row
+// leads to a queue is the installed widgets' business, not the card's.
+
+const alpha = { id: 'p1', name: 'alpha' }
+const beta = { id: 'p2', name: 'beta' }
+
+const ticket = (file: string, over: Record<string, unknown> = {}) => ({ file, title: file.replace(/\.md$/, ''), summary: '', date: '2026-08-01T00:00:00.000Z', planned: false, ...over })
+
+let host: FakeHost
+const render = (answers: Answers, agents: Parameters<typeof fakeHost>[1] = {}, widgets: MountedWidgets = NO_WIDGETS) => {
+  host = fakeHost(answers, agents)
+  return renderWithHost(<HotTicketsCard projects={[alpha, beta]} />, host, widgets)
+}
+
+afterEach(cleanup)
+
+describe('HotTicketsCard', () => {
+  test('pools every project: a claimed ticket in the Claimed lane, an unclaimed one at 7+ in High priority, the rest off the card', async () => {
+    render({
+      p1: { 'list --local': [ticket('held.md', { locked: true, lockedBy: 'someone', priority: '2' }), ticket('urgent.md', { priority: '9' }), ticket('later.md', { priority: '3' })] },
+      p2: { 'list --local': [ticket('also-urgent.md', { priority: '7' })] },
+    })
+    expect(await screen.findByText('held')).toBeTruthy()
+    expect(screen.getByText('urgent')).toBeTruthy()
+    expect(screen.getByText('also-urgent')).toBeTruthy()
+    expect(screen.queryByText('later')).toBeNull()
+    expect(screen.getByText('someone')).toBeTruthy()
+    expect(screen.getAllByText('alpha')).toHaveLength(2)
+    expect(screen.getByText('beta')).toBeTruthy()
+    expect(host.runCommand).toHaveBeenCalledWith('p1', ['list', '--local'])
+    expect(host.agents).toHaveBeenCalledWith('p2')
+  })
+
+  test('a row opens the ticket\'s page; a claim held by one of the project\'s runs opens that run', async () => {
+    render(
+      { p1: { 'list --local': [ticket('held.md', { locked: true, lockedBy: 'run-1' })] }, p2: { 'list --local': [] } },
+      { p1: [{ id: 'run-1', name: 'login-page', status: 'running', startedAt: '2026-08-01T00:00:00.000Z' }] },
+    )
+    fireEvent.click(await screen.findByText('held'))
+    expect(host.openPage).toHaveBeenCalledWith('tickets', ['p1', 'held.md'])
+    fireEvent.click(screen.getByText('login-page'))
+    expect(host.openAgent).toHaveBeenCalledWith('p1', 'run-1')
+  })
+
+  test('with no other widget installed the rows offer nothing on the ticket; with a link action mounted, each row offers it on the ticket as a link', async () => {
+    const answers: Answers = { p1: { 'list --local': [ticket('urgent.md', { priority: '8' })] }, p2: { 'list --local': [] } }
+    render(answers)
+    await screen.findByText('urgent')
+    expect(screen.queryByRole('button', { name: /Add to queue/ })).toBeNull()
+    cleanup()
+
+    const run = vi.fn<LinkAction['run']>(async () => ({ ok: true as const }))
+    render(answers, {}, { ...NO_WIDGETS, linkActions: [{ label: 'Add to queue', doneLabel: 'Queued', run, package: '@x/queue', projects: ['p1'] }] })
+    fireEvent.click(await screen.findByRole('button', { name: 'Add to queue' }))
+    await waitFor(() => expect(run).toHaveBeenCalledTimes(1))
+    expect(run.mock.calls[0]![1]).toBe('p1')
+    expect(run.mock.calls[0]![2]).toEqual([{ text: 'urgent', href: 'tickets/urgent.md', priority: 8 }])
+    expect(await screen.findByRole('button', { name: 'Queued' })).toBeTruthy()
+  })
+
+  test('says what the empty state means, and names a project whose command failed while the others show', async () => {
+    render({ p1: { 'list --local': [] }, p2: { 'list --local': [] } })
+    expect(await screen.findByText('Nothing claimed or high priority.')).toBeTruthy()
+    cleanup()
+    render({ p1: { 'list --local': [ticket('urgent.md', { priority: '8' })] } })
+    expect((await screen.findByRole('alert')).textContent).toBe('Could not read the tickets of beta: no answer for p2: tickets list --local')
+    expect(screen.getByText('urgent')).toBeTruthy()
+  })
+})

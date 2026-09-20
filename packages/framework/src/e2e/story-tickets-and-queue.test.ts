@@ -3,12 +3,12 @@ import { test } from 'node:test'
 import { makeWorld } from './harness.js'
 import { runWidgetCommand } from '../dashboard-rpc/widgets.js'
 import { DATA_BRANCH, pullFileBranch } from '@gemstack/agent-data'
-import { onDashboard, onHotTickets, onQueue } from '../dashboard-rpc/reads.js'
+import { onDashboard, onQueue } from '../dashboard-rpc/reads.js'
 
 // The roadmap stories (README.md): tickets are proposals, the agent queue holds confirmed work —
 // the propose -> decide half of the loop the Tickets page and the AI Queue card drive. Both are a
 // project package's (#1774): the framework reads each through the command that package declares,
-// for what it composes across them (the hot-tickets card, the onboarding step), and writes
+// for what it composes across them (the onboarding step, the queue total), and writes
 // neither; the packages' own widgets read and change them in the browser through the same
 // commands. Working the queue is the scheduler's: it starts an agent when the branch moves, and
 // that agent reads the skills itself.
@@ -67,12 +67,10 @@ test('browse the ticket backlog: the widget reads the list and one ticket throug
     assert.equal(escaped.ok, false, 'a path that is no ticket filename is refused')
 
     // The framework itself reads only what it composes: the onboarding step sees the project
-    // provides tickets and has some; the hot-tickets card sees the high-priority one.
+    // provides tickets and has some.
     const dashboard = await rpc(onDashboard)()
     const stat = dashboard.projects.find(p => p.projectId === project.id)
     assert.deepEqual({ has: stat?.hasTickets, provides: stat?.providesTickets }, { has: true, provides: true })
-    const hot = await rpc(onHotTickets)()
-    assert.ok(hot.some(h => h.projectId === project.id && h.ticket.file === TICKET_FILE && h.bucket === 'high-priority'))
   } finally {
     await world.close()
   }
@@ -104,10 +102,11 @@ test("a claim released by hand from the widget is the tickets command's own act,
     assert.equal(released.ok, true, `the release failed: ${released.ok ? '' : released.error}`)
     assert.deepEqual(released.output, { ok: true, file: `tickets/${TICKET_FILE}` })
     assert.equal(await holderOf(), undefined, "the lock is gone from this machine's copy at once")
-    // Released, the ticket still lists for the framework, unclaimed.
-    const hot = await rpc(onHotTickets)()
-    const row = hot.find(h => h.projectId === project.id && h.ticket.file === TICKET_FILE)
-    assert.equal(row?.ticket.lockedBy, undefined)
+    // Released, the ticket still lists, unclaimed.
+    const listed = await rpc(runWidgetCommand)(project.id, TICKETS_PACKAGE, ['list', '--local'])
+    assert.equal(listed.ok, true)
+    const row = (listed.output as { file: string; lockedBy?: string }[]).find(t => t.file === TICKET_FILE)
+    assert.deepEqual({ listed: row !== undefined, holder: row?.lockedBy }, { listed: true, holder: undefined })
   } finally {
     await world.close()
   }
@@ -132,10 +131,6 @@ test('the queue is read through the project\'s queue provider, the boards show a
     const queue = await rpc(onQueue)()
     const projectQueue = queue.find(q => q.projectId === project.id)
     assert.deepEqual(projectQueue?.entries, [`[Login page](tickets/${TICKET_FILE})`], 'the entry, as the command prints it')
-
-    // The queued ticket shows on the hot-tickets rail, in the AI Queue lane.
-    const hotQueued = await rpc(onHotTickets)()
-    assert.ok(hotQueued.some(h => h.projectId === project.id && h.ticket.file === TICKET_FILE && h.bucket === 'ai-queue'))
 
     // The queue package's "Add to queue" action, as the dashboard runs it: the package's own
     // command, marked as an act. The command writes as a remote writer, straight to origin; the

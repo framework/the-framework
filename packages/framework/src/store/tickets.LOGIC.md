@@ -3,9 +3,9 @@ How The Framework reads a project's tickets [1]: through the tickets provider [2
 ## Context
 
 **User story**:
-- The user opens the Overview and sees, on the hot-tickets card, which tickets are being worked on, which the agent queue holds, and which are flagged high priority; the onboarding checklist offers to populate the tickets of a project that can have them, and ticks the step once it has some.
-- A project that installed no tickets package has no tickets: the card shows none of it, and the onboarding step about tickets does not apply.
-- Browsing, planning, claiming and releasing tickets are not The Framework's: the tickets package brings its own widget [4] for that, which reads and changes them through the same command.
+- The user opens the Overview and the onboarding checklist offers to populate the tickets of a project that can have them, and ticks the step once it has some.
+- A project that installed no tickets package has no tickets: the onboarding step about tickets does not apply.
+- Browsing, planning, claiming and releasing tickets, and the Overview's hot-tickets card, are not The Framework's: the tickets package brings its own widget [4] for that, which reads and changes them through the same command.
 
 **Business logic story**: The Framework names no skill. A project picks the package that keeps its tickets by listing it as a dependency; that package says, in its own package.json, which of its commands answers for the tickets (`"framework": { "tickets": "tickets" }` for the `tickets` skill's package). The Framework only reads, and only for what it composes across skills.
 

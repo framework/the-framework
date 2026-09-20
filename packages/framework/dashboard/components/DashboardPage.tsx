@@ -8,20 +8,18 @@ import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import { usePolled } from '../lib/use-async.js'
 import { usePreferences } from '../lib/preferences.js'
 import { OnboardingChecklist } from './OnboardingChecklist.js'
-import { HotTickets } from './HotTickets.js'
 import { Agents } from './Agents.js'
-import { AiQueue } from './AiQueue.js'
 import { WidgetCards } from './WidgetCards.js'
 import type { ProjectSummary } from '../../src/index.js'
 import { SchedulerCard } from './SchedulerCard.js'
 import { ScrollArea } from './ui/scroll-area.js'
 
 // The Overview landing page (#1139): a focused at-a-glance board — usage first, then what needs a
-// human (Human Queue) beside the agents working now stacked on what the AI takes up next (AI
-// Queue), and the hot tickets across every project. Each section is a projection
-// of the same .the-framework files over the `onDashboard` RPC, polled so it stays live;
-// selecting a row jumps into its project or straight into a session. Shown by the shell when no
-// project is picked.
+// human (Human Queue) beside the agents working now stacked on the cards the installed packages
+// declare (#1818: the queue package's AI Queue, the tickets package's hot tickets) and each
+// project's scheduler. The framework's own cards are projections of the same .the-framework files
+// over the `onDashboard` RPC, polled so they stay live; selecting a row jumps into its project or
+// straight into a session. Shown by the shell when no project is picked.
 //
 // It replaced the denser board this started as (#471) — KPI tiles, a two-week activity chart, agent
 // outcomes, and a projects table — cut here as redundant (#1139). The chart and the outcomes dial
@@ -31,18 +29,13 @@ import { ScrollArea } from './ui/scroll-area.js'
 export function DashboardPage({
   onSelectProject,
   onSelectAgent,
-  canOpenLink,
-  onOpenLink,
   onAgentStarted,
   interventions,
   projects,
 }: {
   onSelectProject: (id: string) => void
-  /** Open one session (project + run): the Agents and hot-ticket rows link straight to a session. */
+  /** Open one session (project + run): the Agents rows link straight to a session. */
   onSelectAgent: (projectId: string, agentId: string) => void
-  /** Whether the shell has a page for a link into a project's files (#1774), and open it: a queued entry links to its ticket, so its row does too. */
-  canOpenLink: (href: string) => boolean
-  onOpenLink: (projectId: string, href: string) => void
   /** Where a session the onboarding checklist starts lands (#1169): on that session. */
   onAgentStarted: (projectId: string, intent: string, agentId: string) => void
   interventions: Intervention[]
@@ -66,8 +59,8 @@ export function DashboardPage({
         <Quota />
 
         {/* The two queues side by side (#1139), with the agents working now sitting to the Human
-            Queue's right on top of the AI Queue: what needs you, who is on it, and what the AI
-            takes up next. */}
+            Queue's right on top of the packages' cards: what needs you, who is on it, and what the
+            packages say comes next. */}
         <div className="grid items-start gap-4 lg:grid-cols-2">
           <HumanQueue items={interventions} onSelectProject={onSelectProject} onSelectAgent={onSelectAgent} />
           <div className="space-y-4">
@@ -75,21 +68,11 @@ export function DashboardPage({
             {/* The cards the installed packages declare (#1818), under the agents at work: a package's own
                 summary of its data, only where a project has the package. */}
             <WidgetCards projects={projects} />
-            <AiQueue
-              queue={data?.queue ?? []}
-              loading={loading}
-              canOpenLink={canOpenLink}
-              onOpenLink={onOpenLink}
-              onAgentStarted={onAgentStarted}
-              onSelectProject={onSelectProject}
-            />
             {/* What runs while nobody is at the keyboard (#1774): each project's scheduler, below
                 the queue it works. */}
             <SchedulerCard onSelectAgent={onSelectAgent} />
           </div>
         </div>
-
-        <HotTickets onSelectProject={onSelectProject} />
       </div>
     </ScrollArea>
   )

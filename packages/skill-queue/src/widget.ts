@@ -1,6 +1,7 @@
 // The rules of the package's dashboard widget (`../dashboard/`), kept apart from React so they
-// are unit-tested like the rest of the package: how a queue entry reads on screen, and what the
-// "Add to queue" action runs for the links a dashboard page hands it.
+// are unit-tested like the rest of the package: how a queue entry reads on screen, what the
+// "Add to queue" action runs for the links a dashboard page hands it, and how the Overview card
+// starts agents on entries.
 
 /** How one queue entry reads on a dashboard: what to show, and where it points, if anywhere. */
 export interface EntryLabel {
@@ -87,4 +88,46 @@ export async function addToQueue(run: (args: string[]) => Promise<CommandResult>
       return { ok: false, error: typeof refusal.reason === 'string' ? `the queue refused: ${refusal.reason}` : 'the queue refused' }
   }
   return { ok: true }
+}
+
+/**
+ * The prompt an agent is started with for one open entry, from the card's play button and its
+ * fan-out: work that one entry through the `queue` skill, take it off the queue once the work is
+ * published, and start no other. The raw entry line, not its label: the agent must name exactly
+ * this entry to take it off, and the line's link is how it opens what the entry names.
+ */
+export function workOnEntryPrompt(entry: string): string {
+  return `Use the \`queue\` skill: work on this one open queue entry only, and when the work is done and published run \`queue done "<the entry>"\`. Do not start any other entry. The entry:\n\n${entry}`
+}
+
+/** How many agents a project's fan-out starts until its count says otherwise. */
+export const DEFAULT_FAN_OUT_COUNT = 3
+
+/** The entries a fan-out takes: the top of the queue, as many as the count says, never more than there are. */
+export function topEntries(entries: readonly string[], count: number): string[] {
+  return entries.slice(0, Math.max(1, count))
+}
+
+/** What the fan-out button promises, sized to what a click would actually start. */
+export function fanOutLabel(count: number): string {
+  return count === 1 ? 'Spin up an agent working on the top entry' : `Spin up ${count} agents working on the top ${count} entries`
+}
+
+/** What starting one run answered: the framework's `StartRunResult`, by structure. */
+export type StartOutcome = { ok: true; agentId: string } | { ok: false; error: string }
+
+/**
+ * Start one run per entry, in order, each pinned to its own entry: several agents told "the first
+ * open entry" would all implement the same one. One after another, since each start answers an id
+ * of its own; the batch ends at the first refusal, whose reason is the outcome's, and whatever
+ * refused this start is not going to take the next one a moment later.
+ */
+export async function fanOut(start: (prompt: string) => Promise<StartOutcome>, entries: readonly string[]): Promise<{ started: string[]; error?: string }> {
+  const started: string[] = []
+  for (const entry of entries) {
+    const result = await start(workOnEntryPrompt(entry))
+    if (!result.ok) return { started, error: result.error }
+    started.push(result.agentId)
+  }
+  return { started }
 }

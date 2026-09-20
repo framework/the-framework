@@ -66,7 +66,7 @@ Where each control lands:
 
 - Selecting a project in the sidebar's picker lands on its project home, never on one of its agents.
 - "New" in the sidebar lands on the named project's home, even when that project is already the selected one.
-- A row naming an agent of another project (the Overview's recent agents, its agents, its hot tickets) lands on that agent directly, without passing through its project's launcher.
+- A row naming an agent of another project (the Overview's recent agents, its agents, the packages' cards) lands on that agent directly, without passing through its project's launcher.
 - The brand mark and "Overview" land on the Overview; the sidebar's "Settings" gear lands on Settings; a widget's row lands on its page. A link into a project's files (a queued entry's `tickets/<file>`) lands on the widget page named by the link's first segment, at `/<segment>/<project>/<rest>`, when an installed widget brings such a page, and is plain text otherwise (`lib/data-link.ts`).
 
 ### The frames around every page

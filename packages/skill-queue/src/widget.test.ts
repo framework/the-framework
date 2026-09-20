@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { addArgs, addToQueue, alreadyQueued, entryLabel, queueLine, type CommandResult } from './widget.js'
+import { DEFAULT_FAN_OUT_COUNT, addArgs, addToQueue, alreadyQueued, entryLabel, fanOut, fanOutLabel, queueLine, topEntries, workOnEntryPrompt, type CommandResult } from './widget.js'
 
 test('entryLabel shows a leading link\'s text, opens only an absolute http(s) target, and keeps anything else whole', () => {
   assert.deepEqual(entryLabel('[Login page](tickets/2026-08-01_login-page.md) — needs the cookie first'), { text: 'Login page' })
@@ -73,4 +73,39 @@ test('a link already on the queue is left as it is: by its target when it points
     { ok: true },
   )
   assert.deepEqual(seen, [['add', '[Other](tickets/2026-08-02_b.md)', '--priority', '3'], ['add', 'Create tickets/2026-08-03_c.plan.md']])
+})
+
+test('the prompt for one entry carries the raw entry line and forbids any other', () => {
+  const prompt = workOnEntryPrompt('[Login page](tickets/2026-08-01_login-page.md) — cookie first')
+  assert.ok(prompt.endsWith('The entry:\n\n[Login page](tickets/2026-08-01_login-page.md) — cookie first'))
+  assert.ok(prompt.includes('Do not start any other entry'))
+  assert.ok(prompt.includes('queue done'))
+})
+
+test('a fan-out takes the top of the queue, at least one and never more than there are, and its label says how many', () => {
+  assert.deepEqual(topEntries(['a', 'b', 'c'], 2), ['a', 'b'])
+  assert.deepEqual(topEntries(['a', 'b'], 5), ['a', 'b'])
+  assert.deepEqual(topEntries(['a', 'b'], 0), ['a'])
+  assert.equal(DEFAULT_FAN_OUT_COUNT, 3)
+  assert.equal(fanOutLabel(1), 'Spin up an agent working on the top entry')
+  assert.equal(fanOutLabel(3), 'Spin up 3 agents working on the top 3 entries')
+})
+
+test('fanOut starts one run per entry in order, each on its own entry, and stops at the first refusal with its reason', async () => {
+  const prompts: string[] = []
+  const ok = await fanOut(async prompt => {
+    prompts.push(prompt)
+    return { ok: true, agentId: `run-${prompts.length}` }
+  }, ['a', 'b'])
+  assert.deepEqual(ok, { started: ['run-1', 'run-2'] })
+  assert.deepEqual(prompts, [workOnEntryPrompt('a'), workOnEntryPrompt('b')])
+
+  const seen: string[] = []
+  const stopped = await fanOut(async prompt => {
+    seen.push(prompt)
+    return seen.length === 2 ? { ok: false, error: 'the daemon refused' } : { ok: true, agentId: `run-${seen.length}` }
+  }, ['a', 'b', 'c'])
+  assert.deepEqual(stopped, { started: ['run-1'], error: 'the daemon refused' })
+  assert.equal(seen.length, 2, 'the third entry is never tried')
+  assert.deepEqual(await fanOut(async () => ({ ok: true, agentId: 'x' }), []), { started: [] })
 })

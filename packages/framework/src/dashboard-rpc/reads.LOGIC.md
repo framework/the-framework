@@ -38,7 +38,7 @@ Answers everything the dashboard reads about a project or an agent [1]: the agen
 - **Retained checkouts** - the ids of ended agents whose checkout is still on disk, live agents excluded.
 - **Where an agent is working** - its checkout's path, whether that checkout is its own, its branch, whether it holds uncommitted changes, its size once nothing writes to it, and the pull request that belongs to this agent and not a predecessor's.
 - **Documents** - the surfaced documents at the project root.
-- **Cross-project rollups** - the aggregated agent queue, the Overview, recent agents, hot tickets, interventions, open questions, activity, the dashboard page and every project's scheduler state, each built over every project the registry lists.
+- **Cross-project rollups** - the aggregated agent queue, the Overview, recent agents, interventions, open questions, activity, the dashboard page and every project's scheduler state, each built over every project the registry lists.
 - **The files of a checkout and their status** - every file git sees, and each file's untracked/modified/deleted status, from the agent's own checkout when an agent id is given.
 - **One file's diff, one file's content, and what the agent changed** - the diff of a changed file, the content of an unchanged one, and every changed file with its line counts, always read from the checkout's own git state.
 - **The project's GitHub URL and git status** - the URL from the `origin` remote; the branch, dirty flag and linked pull request of the project or of one agent's checkout, filtered to that agent's lifetime.
@@ -124,7 +124,7 @@ The surfaced documents are read at the project root in sidebar order (`dashboard
 
 #### Context
 
-**User story**: the Overview [2] shows what is running now across every project, the size of the agent queue [16], recent agents, hot tickets, the pull requests that need review, every agent's open question [18] with its full gate [19], and the "New activity" feed.
+**User story**: the Overview [2] shows what is running now across every project, the size of the agent queue [16], recent agents, the pull requests that need review, every agent's open question [18] with its full gate [19], and the "New activity" feed.
 
 #### Business logic
 

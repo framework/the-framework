@@ -13,8 +13,8 @@ import { readProvidedCommand, runPackageCommand, type ProvidedCommand } from '..
  * `--local` reads the copy on this machine, no network: the framework polls.
  *
  * That is the whole contract. The framework reads tickets for what it composes across skills: the
- * Overview's hot-tickets card, the onboarding step, a queued link's title. Showing them, planning
- * them, claiming and releasing them is the tickets package's own widget, through its own command.
+ * onboarding step, a queued link's title. Showing them, planning them, claiming and releasing them,
+ * and the Overview's hot-tickets card, are the tickets package's own widget, through its own command.
  *
  * The shape, owned here: {@link Ticket}, the row a ticket lists as.
  */

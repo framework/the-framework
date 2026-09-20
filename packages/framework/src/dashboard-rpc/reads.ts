@@ -4,7 +4,7 @@ import { listProjectWorktrees } from '../worktrees.js'
 import { readDocs, type WorkspaceDoc } from '../dashboard/docs.js'
 import { collectQueue, type ProjectQueue } from '../dashboard/queue.js'
 import { collectSchedulers, type ProjectScheduler } from '../dashboard/scheduler-state.js'
-import { buildOverview, buildRecentAgents, buildHotTickets, type Overview, type RecentAgent, type HotTicket } from '../dashboard/overview.js'
+import { buildOverview, buildRecentAgents, type Overview, type RecentAgent } from '../dashboard/overview.js'
 import { buildInterventions, type Intervention } from '../dashboard/interventions.js'
 import type { ProjectionRead } from '../dashboard/projects.js'
 import { buildOpenQuestions, type OpenQuestion } from '../dashboard/open-questions.js'
@@ -234,10 +234,6 @@ export async function onRecentAgents(): Promise<RecentAgent[]> {
   return recent.map(row => ({ ...row, agent: forDashboard(row.agent) }))
 }
 
-/** Hot tickets across every project (#1112): being worked on, likely next, and queued. */
-export async function onHotTickets(): Promise<HotTicket[]> {
-  return withProjects(projects => buildHotTickets(projects))
-}
 
 /**
  * The cross-project interventions queue (#632, Queue #624): open PRs that need review, newest first,

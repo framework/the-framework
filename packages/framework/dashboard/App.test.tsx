@@ -86,7 +86,6 @@ describe('widget cards on the Overview (#1818)', () => {
   /** The Overview's own reads, answered empty: the shell's stub answers null otherwise, and a null list is not an empty one. */
   function answerOverview(widgets: unknown[]): void {
     answerShell(widgets)
-    answers.set('onHotTickets', () => [])
     answers.set('onSchedulers', () => [])
     answers.set('onQuota', () => null)
     answers.set('onDashboard', () => null)

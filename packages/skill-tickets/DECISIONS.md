@@ -97,3 +97,8 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   throwaway worktree at origin's tip; a push that loses a race is re-applied on the new
   tip by `@gemstack/agent-data`. The program's writes go through its persistent checkout's
   cycle instead.
+- The Overview's Hot tickets card is this package's, reading `list --local` like the page, with
+  two lanes: claimed, and unclaimed at priority 7 or up. Picked over the dashboard's own card
+  fed by the tickets provider, which also had a lane for queued tickets: that lane was the
+  dashboard knowing both this package and the queue's. A row's way onto the queue is the
+  action the queue package offers on links, drawn beside the row where a project has it.

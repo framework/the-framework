@@ -1,8 +1,8 @@
-Builds the data behind the dashboard's cross-project Overview [1] and its shared sidebar: the agents [2] working right now across every project, telling apart the ones another machine's daemon started; the total of open entries on the agent queue [3]; the most recently active projects; the recent agents pooled across projects; the "hot tickets" card with its three lanes.
+Builds the data behind the dashboard's cross-project Overview [1] and its shared sidebar: the agents [2] working right now across every project, telling apart the ones another machine's daemon started; the total of open entries on the agent queue [3]; the most recently active projects; the recent agents pooled across projects.
 
 ## Context
 
-**User story**: the user opens the dashboard at `/` with no project selected and sees at a glance which agents are working at this moment and on what, how much work waits on the agent queue [3], which projects were touched recently, which tickets are hot, and, in the sidebar, the latest agents of every project. Selecting a row jumps into that project's agent.
+**User story**: the user opens the dashboard at `/` with no project selected and sees at a glance which agents are working at this moment and on what, how much work waits on the agent queue [3], which projects were touched recently, and, in the sidebar, the latest agents of every project. Selecting a row jumps into that project's agent.
 
 **Problem**: every trace an agent [2] leaves is filed per project, in that project's own files. The Overview [1] rolls those files up across the whole registry, and a project whose files cannot be read must not blank the page, so such a project simply contributes nothing.
 
@@ -17,8 +17,6 @@ Builds the data behind the dashboard's cross-project Overview [1] and its shared
 [9] the record: the `logs` skill's copy of a finished agent's card and diary on the `agent-data` branch, which is the one place a finished agent lives.
 [10] the Claude web bridge (the bridge): the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session.
 [11] the queued work: one agent started with `/work-queue`, which takes one task off the agent queue by composing the skills in its checkout.
-[12] plan: a ticket's `.plan.md`: effort and uncertainty ratings and how to implement it.
-[13] tickets provider: the command, among the commands of a project's dependencies, that a package declares as answering for the project's tickets, in its own package.json under `"framework": { "tickets": "<command>" }` (`../store/tickets.ts`).
 
 ## Business logic — TL;DR
 
@@ -27,7 +25,6 @@ Builds the data behind the dashboard's cross-project Overview [1] and its shared
 - **Open queue entries, summed** - one number: the open entries of every project's agent queue added up.
 - **Recent projects** - the projects with any activity, newest first, at most 5.
 - **Recent agents across projects** - every project's agents pooled newest first, at most 30, each agent once even when two projects share its record.
-- **Hot tickets** - every project's tickets, read through the tickets provider [13] its packages declare, placed in one of three lanes, in progress, on the agent queue, high priority, in that precedence; everything else is left off; at most 60 pooled, lane order first.
 
 ## Business logic
 
@@ -80,21 +77,3 @@ The projects that have a last-activity time are ordered by it, newest first, and
 #### Business logic
 
 Every project's agents, the record [9] included, are pooled and ordered by their start time, newest first. An agent appears once: two projects that are working copies of one repository share their agents' records, and the first project to list an agent keeps it. At most 30 rows are kept. A project whose agents cannot be read contributes nothing.
-
-### Hot tickets
-
-#### Context
-
-**User story**: the Overview's [1] hot-tickets card is a shortlist, not the whole backlog: what is being worked on, what The Framework will pick up on its own, and what a human would likely queue next.
-
-**Problem**: a ticket's plan [12] says that someone planned it at some point. Which ticket an agent is implementing right now is the ticket's own claim to say; The Framework no longer records it on the run, and the lane that read it will come back from the claim.
-
-#### Business logic
-
-Every project's tickets are read through the tickets provider [13] one of its packages declares (`../store/tickets.ts`); a project with no provider has none. Each ticket is placed in the first lane that applies, or left off the card when none does:
-
-- **in progress**: the ticket has a plan [12].
-- **on the agent queue** (the card's "AI Queue" lane): an open entry of the project's agent queue [3] begins with a markdown link, and that link points at this ticket's file under `tickets/`. A link elsewhere in the entry does not count, and neither does a link to something other than a ticket.
-- **high priority**: the ticket's `Priority:` reads 7 or more on the ticket format's 10-to-0 scale, where 10 is critical and 0 is only-if-capacity. Word spellings such as `high`, `urgent`, `p0` or `p1` are not on that scale and never qualify.
-
-A ticket's file name is only unique inside its own repository, so the queued match is made per project: another project's queue never lights up a same-named ticket. The word `tickets/` in the link is the dashboard's link convention (a link into a project's files opens the page named by its first segment), not a package's: The Framework imports no tickets package. The pooled list is ordered lane first, in progress, then the agent queue, then high priority, with the tickets' own order kept inside a lane, and at most 60 tickets are pooled; the card itself trims each lane further. A project whose tickets or agents cannot be read contributes nothing. The whole backlog, per project, is the tickets package's own page (its widget), not The Framework's.

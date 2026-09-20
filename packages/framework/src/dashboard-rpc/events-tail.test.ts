@@ -267,6 +267,35 @@ test('tailAgentEvents finds a diary it never saw in its checkout: a short run, s
   }
 })
 
+test('tailAgentEvents on a diary that is nowhere yet: the replay marker at once, then the file once it has a home (#1774)', async () => {
+  const cwd = await tmpWorkspace()
+  const live = join(cwd, 'diary.jsonl')
+  const seen: string[] = []
+  let sync = 0
+  let home = false
+  const stop = tailAgentEvents<FrameworkEvent>(
+    async () => (home ? { file: live } : { pending: true }),
+    e => void (e.kind === 'log' && seen.push(e.message)),
+    () => sync++,
+  )
+  try {
+    await sleep(200)
+    assert.equal(sync, 1, 'nothing to replay is an empty replay, reported at once')
+    assert.deepEqual(seen, [])
+    await writeFile(live, line('one'))
+    home = true
+    await sleep(1600) // one poll: the diary is asked for again, and found
+    assert.deepEqual(seen, ['one'])
+    await appendFile(live, line('two'))
+    await sleep(1600)
+    assert.deepEqual(seen, ['one', 'two'], 'and followed from there')
+    assert.equal(sync, 1, 'the boundary is reported once')
+  } finally {
+    stop()
+    await rm(cwd, { recursive: true, force: true })
+  }
+})
+
 test('tailAgentEvents on a run already finished: every line, then the replay marker, and nothing follows', async () => {
   const seen: string[] = []
   let sync = 0

@@ -1,67 +1,66 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { join } from 'node:path'
-import { tmpdir } from 'node:os'
-import { mkdtemp, mkdir, rm } from 'node:fs/promises'
-import { resolveAgentDiary } from './agent-checkout.js'
-import { worktreePath } from '@gemstack/skill-branches'
+import { resolveAgentCheckout, resolveAgentDiary } from './agent-checkout.js'
+import type { BranchesFor, Checkout } from './branches.js'
 import { THE_FRAMEWORK_DIR } from '../framework-dir.js'
 import { noRuns } from './runs.js'
 import { testRuns } from './test-runs.js'
-// resolveAgentDiary probes the real filesystem for the checkout (same as resolveAgentCheckout), so
-// these tests build a throwaway project directory; the finished runs come from a test provider.
+import { testBranches } from './test-branches.js'
+// Both resolutions ask the project's branches provider for the checkouts (#1774), and the finished
+// runs come from a test provider: nothing here touches disk.
 
+const CWD = '/ws'
 const RUN_ID = '2026-07-04T00-00-00-000Z'
 const DIARY = [{ kind: 'said', text: 'Reading.' }, { kind: 'ended', status: 'done' }]
-
-async function makeProject(): Promise<string> {
-  const cwd = await mkdtemp(join(tmpdir(), 'agent-run-checkout-'))
-  await mkdir(join(cwd, THE_FRAMEWORK_DIR), { recursive: true })
-  return cwd
-}
+const CHECKOUT: Checkout = { id: RUN_ID, path: join(CWD, '.branches', `agent-${RUN_ID}`), branch: `agent-${RUN_ID}` }
 
 /** Where the run's diary is while it has a checkout: written there by the run's tool. */
-const liveDiary = (cwd: string): string => join(worktreePath(cwd, RUN_ID), THE_FRAMEWORK_DIR, `${RUN_ID}.jsonl`)
+const liveDiary = join(CHECKOUT.path, THE_FRAMEWORK_DIR, `${RUN_ID}.jsonl`)
 
-const finishedRun = (cwd: string, status: 'done' | 'running' = 'done') => testRuns({ [cwd]: [{ card: { id: RUN_ID, status }, diary: status === 'done' ? DIARY : [] }] })
+const withCheckout = () => testBranches({ [CWD]: [CHECKOUT] })
+const noCheckout = () => testBranches({ [CWD]: [] })
+const finishedRun = (status: 'done' | 'running' = 'done') => testRuns({ [CWD]: [{ card: { id: RUN_ID, status }, diary: status === 'done' ? DIARY : [] }] })
+
+test('resolveAgentCheckout: the checkout the provider lists for the run, else the project root; no id, an unsafe id and a project with no provider resolve to the root', async () => {
+  assert.equal(await resolveAgentCheckout(CWD, RUN_ID, withCheckout()), CHECKOUT.path)
+  assert.equal(await resolveAgentCheckout(CWD, RUN_ID, noCheckout()), CWD)
+  assert.equal(await resolveAgentCheckout(CWD, RUN_ID, testBranches({})), CWD)
+  assert.equal(await resolveAgentCheckout(CWD, undefined, withCheckout()), CWD)
+  assert.equal(await resolveAgentCheckout(CWD, '../escape', withCheckout()), CWD)
+})
+
+test('resolveAgentCheckout: a run missing from the shared list is asked for once more, fresh (#766/#1774)', async () => {
+  // The provider's list is a few seconds old; the run started since. The second, fresh ask finds it.
+  const asks: boolean[] = []
+  const branches: BranchesFor = async () => ({
+    ...(await withCheckout()(CWD))!,
+    async list(opts = {}) {
+      asks.push(opts.fresh === true)
+      return opts.fresh ? [CHECKOUT] : []
+    },
+  })
+  assert.equal(await resolveAgentCheckout(CWD, RUN_ID, branches), CHECKOUT.path)
+  assert.deepEqual(asks, [false, true], 'the shared read first, then one fresh read')
+})
 
 test('resolveAgentDiary: no run id, and an unsafe one, have no diary', async () => {
-  const cwd = await makeProject()
-  try {
-    assert.equal(await resolveAgentDiary(cwd, undefined, finishedRun(cwd)), undefined)
-    assert.equal(await resolveAgentDiary(cwd, '../escape', finishedRun(cwd)), undefined)
-  } finally {
-    await rm(cwd, { recursive: true, force: true })
-  }
+  assert.equal(await resolveAgentDiary(CWD, undefined, finishedRun(), withCheckout()), undefined)
+  assert.equal(await resolveAgentDiary(CWD, '../escape', finishedRun(), withCheckout()), undefined)
 })
 
 test('resolveAgentDiary: a run with a checkout resolves to the diary file in it, even when it has a record (a resumed run)', async () => {
-  const cwd = await makeProject()
-  try {
-    await mkdir(worktreePath(cwd, RUN_ID), { recursive: true })
-    assert.deepEqual(await resolveAgentDiary(cwd, RUN_ID, noRuns), { file: liveDiary(cwd) })
-    assert.deepEqual(await resolveAgentDiary(cwd, RUN_ID, finishedRun(cwd)), { file: liveDiary(cwd) })
-  } finally {
-    await rm(cwd, { recursive: true, force: true })
-  }
+  assert.deepEqual(await resolveAgentDiary(CWD, RUN_ID, noRuns, withCheckout()), { file: liveDiary })
+  assert.deepEqual(await resolveAgentDiary(CWD, RUN_ID, finishedRun(), withCheckout()), { file: liveDiary })
 })
 
-test('resolveAgentDiary: an ended run (checkout gone) resolves to the finished run\'s lines, from the runs provider (#1472/#1769)', async () => {
-  const cwd = await makeProject()
-  try {
-    assert.deepEqual(await resolveAgentDiary(cwd, RUN_ID, finishedRun(cwd)), { finished: DIARY })
-  } finally {
-    await rm(cwd, { recursive: true, force: true })
-  }
+test("resolveAgentDiary: an ended run (checkout gone) resolves to the finished run's lines, from the runs provider (#1472/#1769)", async () => {
+  assert.deepEqual(await resolveAgentDiary(CWD, RUN_ID, finishedRun(), noCheckout()), { finished: DIARY })
 })
 
-test('resolveAgentDiary: a run started a moment ago, with no checkout and no finished record, resolves to where its diary will appear (#1774)', async () => {
-  const cwd = await makeProject()
-  try {
-    assert.deepEqual(await resolveAgentDiary(cwd, RUN_ID, noRuns), { file: liveDiary(cwd) })
-    // The start's marker may be recorded already, a card still `running`: not finished, still the checkout's.
-    assert.deepEqual(await resolveAgentDiary(cwd, RUN_ID, finishedRun(cwd, 'running')), { file: liveDiary(cwd) })
-  } finally {
-    await rm(cwd, { recursive: true, force: true })
-  }
+test('resolveAgentDiary: a run started a moment ago, with no checkout and no finished record, is nowhere yet, and the tail asks again (#1774)', async () => {
+  assert.deepEqual(await resolveAgentDiary(CWD, RUN_ID, noRuns, noCheckout()), { pending: true })
+  // The start's marker may be recorded already, a card still `running`: not finished, still to come in a checkout.
+  assert.deepEqual(await resolveAgentDiary(CWD, RUN_ID, finishedRun('running'), noCheckout()), { pending: true })
+  assert.deepEqual(await resolveAgentDiary(CWD, RUN_ID, noRuns, testBranches({})), { pending: true }, 'a project with no branches provider has no checkout to answer with')
 })

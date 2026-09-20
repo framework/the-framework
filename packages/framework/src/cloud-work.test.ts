@@ -224,14 +224,11 @@ test('a PR listing that fails records the branch but opens nothing: "none" and "
   assert.match(result.failed[0]!.error, /could not list the PRs/)
 })
 
-test('a run whose record names a branch that is neither its birth branch nor the matched head is left alone (#1601)', async () => {
-  // Its PR would otherwise be opened from the claude/* head and recorded against a branch it
-  // does not live on.
+test('a run whose record names another branch of its own, not a cloud session\'s, is adopted all the same: the anchor\'s descent is the proof, and the record then names the branch the pull request lives on (#1601/#1774)', async () => {
   const { d, recorded } = deps([webRun({ branch: 'agent-renamed-by-hand' })])
   const result = await adoptCloudWork(CWD, d)
-  assert.deepEqual(recorded.branches, [])
-  assert.deepEqual(recorded.opened, [])
-  assert.deepEqual(result.adopted, [])
+  assert.deepEqual(recorded.branches, [{ agentId: ID, branch: 'claude/fix-it' }])
+  assert.deepEqual(result.adopted.map(a => a.branch), ['claude/fix-it'])
 })
 
 /**

@@ -14,7 +14,7 @@ import { setDashboardContext } from '../dashboard-rpc/context.js'
 import { createProjectRuntime, type ProjectRuntime } from '../daemon-runtime.js'
 import { registryPreferencesStore, projectId } from '../registry.js'
 import { registryDiscordCredentialsStore } from '../discord-credentials-store.js'
-import { fromDiaryLine, projectRuns, resolveAgentDiary, type AgentMeta, type AgentStatus, type AnyDiaryLine } from '../store/index.js'
+import { fromDiaryLine, projectBranches, projectRuns, resolveAgentDiary, type AgentMeta, type AgentStatus, type AnyDiaryLine } from '../store/index.js'
 import { withFileBranch, DATA_BRANCH } from '@gemstack/agent-data'
 import { worktreePath } from '@gemstack/skill-branches'
 import { TICKETS_DIR } from '@gemstack/skill-tickets'
@@ -274,9 +274,11 @@ export async function makeWorld(): Promise<StoryWorld> {
     },
 
     async waitRetired(project, agentId, timeoutMs = 30_000) {
-      const worktree = worktreePath(project.cwd, agentId)
+      // Through the product's own read of the checkouts, the branches provider's list shared for a
+      // few seconds (#1774): what a story asserts or acts on next reads the same list, so "retired"
+      // means gone from there, not merely gone from disk.
       await waitFor(
-        async () => ((await stat(worktree).catch(() => undefined)) ? undefined : true),
+        async () => ((await (await projectBranches(project.cwd))?.list().catch(() => []))?.some(checkout => checkout.id === agentId) ? undefined : true),
         `run ${agentId}'s worktree to be retired`,
         timeoutMs,
       )

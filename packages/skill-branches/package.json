@@ -23,6 +23,9 @@
   "bin": {
     "branches": "bin/branches"
   },
+  "framework": {
+    "branches": "branches"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

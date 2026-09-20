@@ -2,7 +2,7 @@ Loads the widgets [1] the registered projects bring and gives the shell their pa
 
 ## Context
 
-**User story**: the user opens the dashboard; a moment later the sidebar shows a Logs row under Tickets, because one of the registered projects depends on the logs package, and a ticket's page shows an "Add to queue" button, because that ticket's project depends on the queue package. Installing a widget's package in a project adds its row and its buttons within half a minute, with no restart.
+**User story**: the user opens the dashboard; a moment later the sidebar shows a Logs row and a Tickets row under Overview, because one of the registered projects depends on the logs package and one on the tickets package, and a ticket's page shows an "Add to queue" button, because that ticket's project depends on the queue package. Installing a widget's package in a project adds its row and its buttons within half a minute, with no restart.
 
 ## Glossary
 

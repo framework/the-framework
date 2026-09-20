@@ -40,14 +40,15 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('AiQueue', () => {
-  test('a queued ticket reads as its title and opens its ticket page (#1144)', async () => {
+  test('a queued ticket reads as its title and opens the page the shell has for its path (#1144/#1774)', async () => {
     const opened: unknown[][] = []
     const entry = '[Improve tooltip](tickets/2026-07-25_improve-tooltip.md) — agent note'
     render(
       <AiQueue
         queue={[queue([entry])]}
         loading={false}
-        onOpenTicket={(...args) => opened.push(args)}
+        canOpenLink={href => href.startsWith('tickets/')}
+        onOpenLink={(...args) => opened.push(args)}
         onAgentStarted={() => {}}
         onSelectProject={() => {}}
       />,
@@ -56,8 +57,17 @@ describe('AiQueue', () => {
     // The whole line stays on the row as its hint, agent note and all.
     expect(row.getAttribute('title')).toBe(entry)
     fireEvent.click(row)
-    // The bare filename — the same slug the tickets route carries.
-    expect(opened).toEqual([['p1', '2026-07-25_improve-tooltip.md']])
+    // The path as the link wrote it: the shell resolves it to the page.
+    expect(opened).toEqual([['p1', 'tickets/2026-07-25_improve-tooltip.md']])
+  })
+
+  test('a queued link into the files is plain text when the shell has no page for it (#1774)', () => {
+    const entry = '[Improve tooltip](tickets/2026-07-25_improve-tooltip.md)'
+    render(
+      <AiQueue queue={[queue([entry])]} loading={false} canOpenLink={() => false} onOpenLink={() => {}} onAgentStarted={() => {}} onSelectProject={() => {}} />,
+    )
+    expect(screen.queryByRole('button', { name: 'Improve tooltip' })).toBeNull()
+    expect(screen.getByText('Improve tooltip')).toBeTruthy()
   })
 
   test('an entry linking out of the workspace is a real link in a new tab', () => {
@@ -66,7 +76,7 @@ describe('AiQueue', () => {
       <AiQueue
         queue={[queue([`[Fix the publish job](${url})`])]}
         loading={false}
-        onOpenTicket={() => {}}
+        canOpenLink={() => true} onOpenLink={() => {}}
         onAgentStarted={() => {}}
         onSelectProject={() => {}}
       />,
@@ -82,7 +92,7 @@ describe('AiQueue', () => {
       <AiQueue
         queue={[queue(['Apply the maintainability preset'])]}
         loading={false}
-        onOpenTicket={() => {}}
+        canOpenLink={() => true} onOpenLink={() => {}}
         onAgentStarted={() => {}}
         onSelectProject={() => {}}
       />,
@@ -102,7 +112,7 @@ describe('AiQueue', () => {
       <AiQueue
         queue={[queue(['first entry', entry])]}
         loading={false}
-        onOpenTicket={() => {}}
+        canOpenLink={() => true} onOpenLink={() => {}}
         onAgentStarted={(...args) => started.push(args)}
         onSelectProject={() => {}}
       />,
@@ -122,7 +132,7 @@ describe('AiQueue', () => {
 
   test('the play button says what it does on hover', async () => {
     render(
-      <AiQueue queue={[queue(['entry'])]} loading={false} onOpenTicket={() => {}} onAgentStarted={() => {}} onSelectProject={() => {}} />,
+      <AiQueue queue={[queue(['entry'])]} loading={false} canOpenLink={() => true} onOpenLink={() => {}} onAgentStarted={() => {}} onSelectProject={() => {}} />,
     )
     const button = screen.getByRole('button', { name: RUN_LABEL })
     expect((await hoverTooltip(button)).textContent).toBe(RUN_LABEL)
@@ -135,7 +145,7 @@ describe('AiQueue', () => {
       <AiQueue
         queue={[queue(['entry'])]}
         loading={false}
-        onOpenTicket={() => {}}
+        canOpenLink={() => true} onOpenLink={() => {}}
         onAgentStarted={(...args) => started.push(args)}
         onSelectProject={() => {}}
       />,
@@ -153,7 +163,7 @@ describe('AiQueue', () => {
       <AiQueue
         queue={[queue(['entry'])]}
         loading={false}
-        onOpenTicket={() => {}}
+        canOpenLink={() => true} onOpenLink={() => {}}
         onAgentStarted={(...args) => started.push(args)}
         onSelectProject={() => {}}
       />,
@@ -170,7 +180,7 @@ describe('AiQueue', () => {
       <AiQueue
         queue={[queue(['one', 'two'])]}
         loading={false}
-        onOpenTicket={() => {}}
+        canOpenLink={() => true} onOpenLink={() => {}}
         onAgentStarted={() => {}}
         onSelectProject={() => {}}
       />,
@@ -195,7 +205,7 @@ describe('AiQueue', () => {
       <AiQueue
         queue={[queue(['one', 'two', 'three', 'four', 'five'])]}
         loading={false}
-        onOpenTicket={() => {}}
+        canOpenLink={() => true} onOpenLink={() => {}}
         onAgentStarted={(...args) => started.push(args)}
         onSelectProject={() => {}}
       />,
@@ -223,7 +233,7 @@ describe('AiQueue', () => {
       <AiQueue
         queue={[queue(['one', 'two', 'three'])]}
         loading={false}
-        onOpenTicket={() => {}}
+        canOpenLink={() => true} onOpenLink={() => {}}
         onAgentStarted={() => {}}
         onSelectProject={() => {}}
       />,
@@ -239,7 +249,7 @@ describe('AiQueue', () => {
       <AiQueue
         queue={[queue(['one', 'two'])]}
         loading={false}
-        onOpenTicket={() => {}}
+        canOpenLink={() => true} onOpenLink={() => {}}
         onAgentStarted={() => {}}
         onSelectProject={() => {}}
       />,
@@ -251,7 +261,7 @@ describe('AiQueue', () => {
 
   test('a single open entry makes the fan-out read singular', () => {
     render(
-      <AiQueue queue={[queue(['only'])]} loading={false} onOpenTicket={() => {}} onAgentStarted={() => {}} onSelectProject={() => {}} />,
+      <AiQueue queue={[queue(['only'])]} loading={false} canOpenLink={() => true} onOpenLink={() => {}} onAgentStarted={() => {}} onSelectProject={() => {}} />,
     )
     expect(fanOutLabel(1)).toBe('Spin up an agent working on the top entry')
     expect(screen.getByRole('button', { name: fanOutLabel(1) })).toBeTruthy()
@@ -264,7 +274,7 @@ describe('AiQueue', () => {
       <AiQueue
         queue={[queue(['one', 'two', 'three'])]}
         loading={false}
-        onOpenTicket={() => {}}
+        canOpenLink={() => true} onOpenLink={() => {}}
         onAgentStarted={() => {}}
         onSelectProject={() => {}}
       />,
@@ -284,7 +294,7 @@ describe('AiQueue', () => {
       <AiQueue
         queue={[queue(['one', 'two'])]}
         loading={false}
-        onOpenTicket={() => {}}
+        canOpenLink={() => true} onOpenLink={() => {}}
         onAgentStarted={() => {}}
         onSelectProject={() => {}}
       />,
@@ -317,7 +327,7 @@ describe('AiQueue', () => {
       <AiQueue
         queue={[queue(['first entry', entry])]}
         loading={false}
-        onOpenTicket={() => {}}
+        canOpenLink={() => true} onOpenLink={() => {}}
         onAgentStarted={() => {}}
         onSelectProject={id => selected.push(id)}
       />,
@@ -336,7 +346,7 @@ describe('AiQueue', () => {
       <AiQueue
         queue={[queue(['one', 'two', 'three'])]}
         loading={false}
-        onOpenTicket={() => {}}
+        canOpenLink={() => true} onOpenLink={() => {}}
         onAgentStarted={() => {}}
         onSelectProject={id => selected.push(id)}
       />,
@@ -360,7 +370,7 @@ describe('AiQueue', () => {
           queue(['beta entry'], { projectId: 'p2', projectName: 'other' }),
         ]}
         loading={false}
-        onOpenTicket={() => {}}
+        canOpenLink={() => true} onOpenLink={() => {}}
         onAgentStarted={() => {}}
         onSelectProject={id => selected.push(id)}
       />,
@@ -374,7 +384,7 @@ describe('AiQueue', () => {
       <AiQueue
         queue={[queue(['open entry']), queue([], { projectId: 'p2', projectName: 'rudder' })]}
         loading={false}
-        onOpenTicket={() => {}}
+        canOpenLink={() => true} onOpenLink={() => {}}
         onAgentStarted={() => {}}
         onSelectProject={() => {}}
       />,
@@ -385,10 +395,10 @@ describe('AiQueue', () => {
 
   test('loading and empty read as themselves', () => {
     const { rerender } = render(
-      <AiQueue queue={[]} loading={true} onOpenTicket={() => {}} onAgentStarted={() => {}} onSelectProject={() => {}} />,
+      <AiQueue queue={[]} loading={true} canOpenLink={() => true} onOpenLink={() => {}} onAgentStarted={() => {}} onSelectProject={() => {}} />,
     )
     expect(screen.getByText('Loading…')).toBeTruthy()
-    rerender(<AiQueue queue={[]} loading={false} onOpenTicket={() => {}} onAgentStarted={() => {}} onSelectProject={() => {}} />)
+    rerender(<AiQueue queue={[]} loading={false} canOpenLink={() => true} onOpenLink={() => {}} onAgentStarted={() => {}} onSelectProject={() => {}} />)
     expect(screen.getByText('Nothing queued.')).toBeTruthy()
   })
 })

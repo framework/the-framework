@@ -63,7 +63,7 @@ const clickImport = async () => {
 
 describe('OnboardingChecklist (#1139)', () => {
   test('the steps nothing breaks without are marked optional, and the two essentials are not', async () => {
-    onDashboard.mockResolvedValue(EMPTY)
+    onDashboard.mockResolvedValue(WITH_PROJECT)
     onOnboarding.mockResolvedValue(null)
     render(<OnboardingChecklist onAgentStarted={vi.fn()} onSelectProject={() => {}} />)
     await waitFor(() => expect(screen.getByText('Add a project')).toBeTruthy())
@@ -82,6 +82,14 @@ describe('OnboardingChecklist (#1139)', () => {
     render(<OnboardingChecklist onAgentStarted={vi.fn()} onSelectProject={() => {}} />)
     await waitFor(() => expect(screen.getByText('Add a project')).toBeTruthy())
     expect(screen.queryByText('Populate the queue of AI tasks')).toBeNull()
+  })
+
+  test('the tickets step is on the board only while some project provides tickets at all (#1774)', async () => {
+    onDashboard.mockResolvedValue({ ...WITH_PROJECT, projects: [{ projectId: 'p1', hasTickets: false, providesTickets: false }] } as DashboardData)
+    onOnboarding.mockResolvedValue(null)
+    render(<OnboardingChecklist onAgentStarted={vi.fn()} onSelectProject={() => {}} />)
+    await waitFor(() => expect(screen.getByText('Add a project')).toBeTruthy())
+    expect(screen.queryByText('Populate tickets/')).toBeNull()
   })
 
   test('an unticked step is a checkbox, not a radio button', async () => {
@@ -146,14 +154,11 @@ describe('the GitHub import lands on the session it starts (#1169)', () => {
     expect(takePendingDraft()).toBe('/update-tickets')
   })
 
-  test('with no project yet, neither half of the import button can be pressed', async () => {
+  test('with no project yet, there is no import to offer: no project provides tickets', async () => {
     onDashboard.mockResolvedValue(EMPTY)
     onOnboarding.mockResolvedValue(null)
     render(<OnboardingChecklist onAgentStarted={vi.fn()} onSelectProject={vi.fn()} />)
-    // There is no project to start in and none to open a launcher for, so the chevron is out too.
-    const start = await screen.findByRole('button', { name: 'Update from GitHub' })
-    expect((start as HTMLButtonElement).disabled).toBe(true)
-    const chevron = screen.getByRole('button', { name: 'Other ways to update from GitHub' })
-    expect((chevron as HTMLButtonElement).disabled).toBe(true)
+    await waitFor(() => expect(screen.getByText('Add a project')).toBeTruthy())
+    expect(screen.queryByRole('button', { name: 'Update from GitHub' })).toBeNull()
   })
 })

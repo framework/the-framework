@@ -1,0 +1,11 @@
+{"kind":"start","prompt":"/work-queue"}
+{"kind":"session","sessionId":"52746b1c-e727-4595-9382-8ab02cef20ee"}
+{"kind":"said","text":"I'll start by reading the project's queue and tickets skills to know how this works."}
+{"kind":"action","label":"Bash"}
+{"kind":"action","label":"Skill"}
+{"kind":"rate-limit","limit":{"status":"allowed","window":"five_hour","resetsAt":1789947600000}}
+{"kind":"action","label":"Bash"}
+{"kind":"action","label":"Skill"}
+{"kind":"said","text":"One task queued: write the plan for the agent-browser ticket. Claiming it and reading the ticket."}
+{"kind":"action","label":"Bash"}
+{"kind":"ended","status":"failed","detail":"its process died before the run ended"}

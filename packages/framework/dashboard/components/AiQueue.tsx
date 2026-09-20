@@ -8,8 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import { StartAgentButton } from './StartAgentButton.js'
 
-// The Overview's AI Queue card (#1139): every project's open `TODO_AGENTS.md` entries — the work the
-// framework picks up on its own — grouped by project and shown in full. No "+N more": this is the
+// The Overview's AI Queue card (#1139): every project's open queue entries — the work the framework
+// picks up on its own, read through the queue provider a project's package declares (#1774) —
+// grouped by project and shown in full. No "+N more": this is the
 // plan, and a collapsed plan is one you cannot read.
 //
 // Two ways to act on an entry, and they are different acts. Its title opens what the entry NAMES:
@@ -90,11 +91,7 @@ export function AiQueue({
    * button says. One reading of "the top", shared by the click and by the "Configure first, then
    * run" beside it — which sends the first of them, since a launcher can only ever send one agent.
    */
-  const topEntries = (project: ProjectQueue) =>
-    project.items
-      .filter(item => !item.done)
-      .slice(0, fanOutCount(project.projectId))
-      .map(item => item.text)
+  const topEntries = (project: ProjectQueue) => project.entries.slice(0, fanOutCount(project.projectId))
 
   const agentEntry = async (projectId: string, entry: string) => {
     if (inFlight) return
@@ -126,7 +123,7 @@ export function AiQueue({
     // sitting right above this one.
   }
 
-  const withOpen = queue.filter(q => q.open > 0)
+  const withOpen = queue.filter(q => q.entries.length > 0)
   return (
     <Card>
       <CardHeader>
@@ -147,7 +144,7 @@ export function AiQueue({
               <li key={q.projectId}>
                 <div className="flex w-full items-center gap-2">
                   <span className="truncate text-sm font-medium">{q.projectName}</span>
-                  <span className="ml-auto shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs tabular-nums text-muted-foreground">{q.open}</span>
+                  <span className="ml-auto shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs tabular-nums text-muted-foreground">{q.entries.length}</span>
                   {/* The project's batch act: how many, then the button the count qualifies. */}
                   <Tooltip>
                     <TooltipTrigger
@@ -185,9 +182,9 @@ export function AiQueue({
                     variant="ghost"
                     size="icon-sm"
                     icon={<FastForward className="h-3.5 w-3.5" aria-hidden />}
-                    ariaLabel={fanOutLabel(Math.min(fanOutCount(q.projectId), q.open))}
+                    ariaLabel={fanOutLabel(Math.min(fanOutCount(q.projectId), q.entries.length))}
                     menuAriaLabel={`Other ways to spin up agents on ${q.projectName}'s queue`}
-                    tooltip={fanOutLabel(Math.min(fanOutCount(q.projectId), q.open))}
+                    tooltip={fanOutLabel(Math.min(fanOutCount(q.projectId), q.entries.length))}
                     busy={inFlight}
                     starting={fanningOut === q.projectId}
                     onStart={() => void fanOutProject(q)}
@@ -198,14 +195,12 @@ export function AiQueue({
                   />
                 </div>
                 <ul className="mt-1.5 space-y-1 pl-0.5">
-                  {q.items
-                    .filter(i => !i.done)
-                    .map((item, i) => {
+                  {q.entries.map((entry, i) => {
                       // The line is markdown, and a queued ticket is written as a link to it
                       // (#1164), so print the title rather than the source; the whole line stays
                       // in the tooltip.
-                      const label = queueEntryLabel(item.text)
-                      const key = `${q.projectId}\n${item.text}`
+                      const label = queueEntryLabel(entry)
+                      const key = `${q.projectId}\n${entry}`
                       return (
                         <li key={i} className="flex items-center gap-2 text-sm text-muted-foreground">
                           <span aria-hidden className="text-muted-foreground/50">•</span>
@@ -216,7 +211,7 @@ export function AiQueue({
                               type="button"
                               onClick={() => onOpenTicket(q.projectId, label.ticket!)}
                               className="min-w-0 flex-1 truncate text-left hover:text-foreground hover:underline"
-                              title={item.text}
+                              title={entry}
                             >
                               {label.text}
                             </button>
@@ -226,12 +221,12 @@ export function AiQueue({
                               target="_blank"
                               rel="noreferrer"
                               className="min-w-0 flex-1 truncate hover:text-foreground hover:underline"
-                              title={item.text}
+                              title={entry}
                             >
                               {label.text}
                             </a>
                           ) : (
-                            <span className="min-w-0 flex-1 truncate" title={item.text}>
+                            <span className="min-w-0 flex-1 truncate" title={entry}>
                               {label.text}
                             </span>
                           )}
@@ -244,9 +239,9 @@ export function AiQueue({
                             tooltip="Spin up an agent working on this entry"
                             busy={inFlight}
                             starting={starting === key}
-                            onStart={() => void agentEntry(q.projectId, item.text)}
+                            onStart={() => void agentEntry(q.projectId, entry)}
                             onConfigure={() => onSelectProject(q.projectId)}
-                            prompt={workOnEntryPrompt(item.text)}
+                            prompt={workOnEntryPrompt(entry)}
                             configureDescription="Opens the launcher with this entry's prompt, so you can set the model and where it runs."
                             className="text-muted-foreground hover:text-foreground"
                           />

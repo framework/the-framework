@@ -1,14 +1,15 @@
 import { useMemo, useState } from 'react'
-import { Check, ClipboardPlus, ListPlus } from 'lucide-react'
 import type { ProjectTickets, WorkspaceTicket } from '../../src/index.js'
 import { planTicketPrompt } from '../../src/client.js'
 import { onAllTickets, onQueue } from '../rpc/reads.js'
-import { sendQueueTicket, sendQueueTicketPlan, sendStart } from '../rpc/control.js'
+import { sendStart } from '../rpc/control.js'
 import { usePolled } from '../lib/use-async.js'
 import { useAction } from '../lib/use-action.js'
 import { usePreferences } from '../lib/preferences.js'
 import { startPicks } from '../lib/use-start-agent.js'
 import { queueEntryLabel } from '../lib/queue-entry.js'
+import { planLink, ticketLink } from '../lib/ticket-link.js'
+import type { WidgetLink as WidgetLinkOf } from '../widget/index.js'
 import {
   defaultView,
   filterRows,
@@ -21,8 +22,8 @@ import {
 } from '../lib/ticket-filter.js'
 import { ScrollArea } from './ui/scroll-area.js'
 import { Button } from './ui/button.js'
-import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import { TicketFilterBar } from './TicketFilterBar.js'
+import { LinkActions, type ProjectLinks } from './LinkActions.js'
 import { TicketsPanel, TicketRow, workOnTicketPrompt } from './TicketsPanel.js'
 
 /** Stable initial for the cross-project tickets poll, so it does not churn on every render. */
@@ -111,69 +112,61 @@ export function TicketsPage({
     )
     if (outcome.ok) onAgentStarted?.(projectId, prompt, outcome.value.agentId)
   }
-  // The page-wide queue-adds: every unclaimed shown ticket joins the AI queue — the work the
-  // framework picks up on its own — as an implementation entry, or as a plan ask. Both walk the shown order, so within a priority section entries keep
-  // the order the reader saw; both read the queue at click time and leave alone what is already
-  // there ("add" means the set ends up queued — a duplicate entry would outlive its agent's
-  // check-off as an open entry naming a closed ticket, costing an agent). No agent starts
-  // here — the queue is what the queue card's play buttons work, one entry at a time or fanned
-  // out (#855/#1204). Each stops at the first failure; the
-  // daemon's own reason lands in `error`, and everything already queued stays.
+  // The page-wide adds: every unclaimed shown ticket handed, as a link, to the actions the
+  // installed widgets offer on links (#1774) — "Add to queue" when a project has a queue package —
+  // as the ticket itself, or as the ask for its plan. Both walk the shown order, so within a
+  // priority section entries keep the order the reader saw; both read the queue at click time and
+  // leave alone what is already there ("add" means the set ends up queued — a duplicate entry
+  // would outlive its agent's check-off as an open entry naming a closed ticket, costing an
+  // agent). No agent starts here — the queue is what the queue card's play buttons work, one entry
+  // at a time or fanned out (#855/#1204). Each stops at the first failure, whose reason lands
+  // under the buttons, and everything already queued stays.
 
-  /** The open queue as both queue-adds dedupe against it, read at click time: every open
-   *  entry's exact text, and the tickets implementation entries link to — per project. */
+  /** The open queue as both adds dedupe against it, read at click time: every open entry's exact
+   *  text, and the tickets entries link to — per project. */
   const readOpenQueue = async () => {
     const texts = new Set<string>()
     const tickets = new Set<string>()
     for (const q of await onQueue())
-      for (const item of q.items) {
-        if (item.done) continue
-        texts.add(`${q.projectId}\n${item.text.trim()}`)
-        const file = queueEntryLabel(item.text).ticket
+      for (const entry of q.entries) {
+        texts.add(`${q.projectId}\n${entry.trim()}`)
+        const file = queueEntryLabel(entry).ticket
         if (file) tickets.add(`${q.projectId}\n${file}`)
       }
     return { texts, tickets }
   }
 
-  // Queue the tickets themselves, exactly as the detail page's Queue action queues one (#1164):
-  // title as the entry, linked back to the ticket, its priority picking the section.
-  const [queuedKey, setQueuedKey] = useState<string | null>(null)
-  const queueShownTickets = async (targets: { projectId: string; ticket: WorkspaceTicket }[], key: string) => {
-    const outcome = await run(async () => {
-      const open = await readOpenQueue()
-      for (const { projectId, ticket } of targets) {
-        if (open.tickets.has(`${projectId}\n${ticket.file}`)) continue
-        const queued = await sendQueueTicket(projectId, ticket.title, {
-          file: ticket.file,
-          ...(ticket.priority ? { priority: ticket.priority } : {}),
-        })
-        if (!queued.ok) return { ok: false as const, error: queued.error ?? 'The tickets could not be queued.' }
-      }
-      return { ok: true as const }
-    }, 'The tickets could not be queued.')
-    if (outcome.ok) setQueuedKey(key)
+  /** The links grouped by project, in the shown order, one group per project in order of first appearance. */
+  const grouped = (rows: { projectId: string; link: WidgetLinkOf }[]): ProjectLinks[] => {
+    const groups: ProjectLinks[] = []
+    for (const { projectId, link } of rows) {
+      const group = groups.find(g => g.projectId === projectId)
+      if (group) group.links.push(link)
+      else groups.push({ projectId, links: [link] })
+    }
+    return groups
   }
 
-  // Queue the tickets' PLANS: one `Create tickets/<stem>.plan.md` entry each, recognized by its
-  // exact text, so the agent that works the entry writes the plan. A ticket whose plan ask is already queued is skipped by that text;
-  // one queued for implementation is skipped too, since its work would land before a trailing
-  // plan could matter.
-  const [plansQueuedKey, setPlansQueuedKey] = useState<string | null>(null)
-  const queueShownPlans = async (targets: { projectId: string; ticket: WorkspaceTicket }[], key: string) => {
-    const outcome = await run(async () => {
-      const open = await readOpenQueue()
-      for (const { projectId, ticket } of targets) {
-        if (open.texts.has(`${projectId}\n${planTicketPrompt(ticket.file)}`)) continue
-        if (open.tickets.has(`${projectId}\n${ticket.file}`)) continue
-        const queued = await sendQueueTicketPlan(projectId, {
-          file: ticket.file,
-          ...(ticket.priority ? { priority: ticket.priority } : {}),
-        })
-        if (!queued.ok) return { ok: false as const, error: queued.error ?? 'The plans could not be queued.' }
-      }
-      return { ok: true as const }
-    }, 'The plans could not be queued.')
-    if (outcome.ok) setPlansQueuedKey(key)
+  // The tickets themselves, exactly as the detail page hands its one ticket over (#1164): the
+  // title as the link, pointing back at the ticket, its priority picking the section.
+  const ticketTargets = (targets: { projectId: string; ticket: WorkspaceTicket }[]) => async () => {
+    const open = await readOpenQueue()
+    return grouped(
+      targets.filter(({ projectId, ticket }) => !open.tickets.has(`${projectId}\n${ticket.file}`)).map(({ projectId, ticket }) => ({ projectId, link: ticketLink(ticket) })),
+    )
+  }
+
+  // The tickets' PLANS: one `Create tickets/<stem>.plan.md` ask each, recognized by its exact text,
+  // so the agent that works the entry writes the plan. A ticket whose plan ask is already queued is
+  // skipped by that text; one queued for implementation is skipped too, since its work would land
+  // before a trailing plan could matter.
+  const planAsks = (targets: { projectId: string; ticket: WorkspaceTicket }[]) => async () => {
+    const open = await readOpenQueue()
+    return grouped(
+      targets
+        .filter(({ projectId, ticket }) => !open.texts.has(`${projectId}\n${planTicketPrompt(ticket.file)}`) && !open.tickets.has(`${projectId}\n${ticket.file}`))
+        .map(({ projectId, ticket }) => ({ projectId, link: planLink(ticket) })),
+    )
   }
 
   // A project deselected in the Project facet disappears entirely — its section would otherwise
@@ -208,38 +201,38 @@ export function TicketsPage({
   const claimedShown = scope.length - targets.length
   const planTargets = targets.filter(r => !r.ticket.planned)
   const planSkipped = scope.length - planTargets.length
-  // One flip per acted-on set and per button: once this exact set is queued the button says so and
+  // One flip per acted-on set and per button: once this exact set is added the button says so and
   // rests, and any change to the set — a filter, a poll bringing new tickets, a selection — arms
-  // it again.
+  // it again (the button's own rule, keyed by these).
   const queueKey = targets.map(r => `${r.projectId}/${r.ticket.file}`).join('\n')
-  const queuedShown = queuedKey === queueKey
   const planKey = planTargets.map(r => `${r.projectId}/${r.ticket.file}`).join('\n')
-  const plansQueuedShown = plansQueuedKey === planKey
   // The labels count what the click adds — saying "selected" while a selection narrows the
   // buttons, and stopping saying "all" the moment their count differs from the set's tally,
-  // never promising a ticket they will skip.
-  const queueLabel = hasSelection
+  // never promising a ticket they will skip. Each is the object of the widget's own verb:
+  // "Add to queue: all 5 tickets shown below".
+  const queueObject = hasSelection
     ? targets.length === 1
-      ? `Add the ${claimedShown > 0 ? 'one unclaimed ' : ''}selected ticket to the AI queue`
+      ? `the ${claimedShown > 0 ? 'one unclaimed ' : ''}selected ticket`
       : claimedShown > 0
-        ? `Add the ${targets.length} unclaimed selected tickets to the AI queue`
-        : `Add the ${targets.length} selected tickets to the AI queue`
+        ? `the ${targets.length} unclaimed selected tickets`
+        : `the ${targets.length} selected tickets`
     : targets.length === 1
-      ? `Add the ${claimedShown > 0 ? 'one unclaimed ' : ''}ticket shown below to the AI queue`
+      ? `the ${claimedShown > 0 ? 'one unclaimed ' : ''}ticket shown below`
       : claimedShown > 0
-        ? `Add the ${targets.length} unclaimed tickets shown below to the AI queue`
-        : `Add all ${targets.length} tickets shown below to the AI queue`
-  const planLabel = hasSelection
+        ? `the ${targets.length} unclaimed tickets shown below`
+        : `all ${targets.length} tickets shown below`
+  const planObject = hasSelection
     ? planTargets.length === 1
-      ? `Queue a plan for the ${planSkipped > 0 ? 'one unplanned ' : ''}selected ticket`
+      ? `a plan for the ${planSkipped > 0 ? 'one unplanned ' : ''}selected ticket`
       : planSkipped > 0
-        ? `Queue plans for the ${planTargets.length} unplanned selected tickets`
-        : `Queue plans for the ${planTargets.length} selected tickets`
+        ? `plans for the ${planTargets.length} unplanned selected tickets`
+        : `plans for the ${planTargets.length} selected tickets`
     : planTargets.length === 1
-      ? `Queue a plan for the ${planSkipped > 0 ? 'one unplanned ' : ''}ticket shown below`
+      ? `a plan for the ${planSkipped > 0 ? 'one unplanned ' : ''}ticket shown below`
       : planSkipped > 0
-        ? `Queue plans for the ${planTargets.length} unplanned tickets shown below`
-        : `Queue plans for all ${planTargets.length} tickets shown below`
+        ? `plans for the ${planTargets.length} unplanned tickets shown below`
+        : `plans for all ${planTargets.length} tickets shown below`
+  const projectsShown = [...new Set(scope.map(r => r.projectId))]
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -282,68 +275,38 @@ export function TicketsPage({
               </span>
             )}
             {loaded && planTargets.length > 0 && (
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="shrink-0 gap-1.5"
-                      disabled={busy || plansQueuedShown}
-                      onClick={() => void queueShownPlans(planTargets, planKey)}
-                    />
-                  }
-                >
-                  {plansQueuedShown ? (
-                    <>
-                      <Check className="h-3.5 w-3.5" aria-hidden /> Plans queued
-                    </>
-                  ) : (
-                    <>
-                      <ClipboardPlus className="h-3.5 w-3.5" aria-hidden />
-                      {planLabel}
-                    </>
-                  )}
-                </TooltipTrigger>
-                <TooltipContent>
-                  Each {hasSelection ? 'selected ' : ''}ticket gets its plan asked for on the AI queue — the same &quot;Create tickets/….plan.md&quot; entry the
-                  plan-tickets command queues — worked highest priority first and, within a priority, in the order shown below.
-                  Tickets already planned, already queued, or held by an agent stay as they are.
-                  {hasSelection && ' The rest of the shown set stays put.'}
-                </TooltipContent>
-              </Tooltip>
+              <LinkActions
+                projects={projectsShown}
+                targets={planAsks(planTargets)}
+                resetKey={`plans\n${planKey}`}
+                label={action => `${action.label}: ${planObject}`}
+                disabled={busy}
+                tooltip={
+                  <>
+                    Each {hasSelection ? 'selected ' : ''}ticket gets its plan asked for — the same &quot;Create tickets/….plan.md&quot; entry the plan-tickets
+                    command queues — worked highest priority first and, within a priority, in the order shown below. Tickets already planned, already queued, or
+                    held by an agent stay as they are.
+                    {hasSelection && ' The rest of the shown set stays put.'}
+                  </>
+                }
+              />
             )}
             {loaded && targets.length > 0 && (
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="shrink-0 gap-1.5"
-                      disabled={busy || queuedShown}
-                      onClick={() => void queueShownTickets(targets, queueKey)}
-                    />
-                  }
-                >
-                  {queuedShown ? (
-                    <>
-                      <Check className="h-3.5 w-3.5" aria-hidden /> Queued
-                    </>
-                  ) : (
-                    <>
-                      <ListPlus className="h-3.5 w-3.5" aria-hidden />
-                      {queueLabel}
-                    </>
-                  )}
-                </TooltipTrigger>
-                <TooltipContent>
-                  {`Every ${hasSelection ? 'selected ' : ''}ticket joins the AI queue — the work the framework picks up on its own, worked highest priority first and, within a priority, in the order shown below. A ticket already queued stays as it is.`}
-                  {hasSelection && ' The rest of the shown set stays put.'}
-                  {claimedShown === 1 && ` The claimed ticket ${hasSelection ? 'selected' : 'shown'} is left to the agent holding it.`}
-                  {claimedShown > 1 && ` The ${claimedShown} claimed tickets ${hasSelection ? 'selected' : 'shown'} are left to the agents holding them.`}
-                </TooltipContent>
-              </Tooltip>
+              <LinkActions
+                projects={projectsShown}
+                targets={ticketTargets(targets)}
+                resetKey={`tickets\n${queueKey}`}
+                label={action => `${action.label}: ${queueObject}`}
+                disabled={busy}
+                tooltip={
+                  <>
+                    {`Every ${hasSelection ? 'selected ' : ''}ticket joins the queue — the work the framework picks up on its own, worked highest priority first and, within a priority, in the order shown below. A ticket already queued stays as it is.`}
+                    {hasSelection && ' The rest of the shown set stays put.'}
+                    {claimedShown === 1 && ` The claimed ticket ${hasSelection ? 'selected' : 'shown'} is left to the agent holding it.`}
+                    {claimedShown > 1 && ` The ${claimedShown} claimed tickets ${hasSelection ? 'selected' : 'shown'} are left to the agents holding them.`}
+                  </>
+                }
+              />
             )}
           </div>
         </div>

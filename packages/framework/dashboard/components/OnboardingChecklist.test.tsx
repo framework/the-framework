@@ -37,12 +37,13 @@ afterEach(() => {
   takePendingDraft() // a draft left by one test would look like the next one's
 })
 
-/** A board with nothing set up: every row is open, which is when the marks have to be readable. */
+/** A board with nothing set up: every row is open, which is when the marks have to be readable.
+ *  One project has a queue (empty), so the queue step is on the board. */
 const EMPTY: DashboardData = {
   totals: { projects: 0, activeAgents: 0, openTodos: 0, totalAgents: 0 },
   projects: [],
   active: [],
-  queue: [],
+  queue: [{ projectId: 'p1', projectName: 'alpha', entries: [] }],
   activity: [],
   agentsByStatus: {},
 } as unknown as DashboardData
@@ -73,6 +74,14 @@ describe('OnboardingChecklist (#1139)', () => {
     expect(marked('Add a project')).toBe(false)
     expect(marked('Populate the queue of AI tasks')).toBe(false)
     expect(marked('Populate tickets/')).toBe(true)
+  })
+
+  test('the queue step is on the board only while some project has a queue at all (#1774)', async () => {
+    onDashboard.mockResolvedValue({ ...EMPTY, queue: [] } as DashboardData)
+    onOnboarding.mockResolvedValue(null)
+    render(<OnboardingChecklist onAgentStarted={vi.fn()} onSelectProject={() => {}} />)
+    await waitFor(() => expect(screen.getByText('Add a project')).toBeTruthy())
+    expect(screen.queryByText('Populate the queue of AI tasks')).toBeNull()
   })
 
   test('an unticked step is a checkbox, not a radio button', async () => {

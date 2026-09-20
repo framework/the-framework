@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import type { WorkspaceTicketDetail } from '../../src/index.js'
-import { Check, ListPlus, Github, LockOpen } from 'lucide-react'
+import { Github, LockOpen } from 'lucide-react'
 import { onTicket } from '../rpc/reads.js'
-import { sendQueueTicket, sendReleaseTicketLock } from '../rpc/control.js'
+import { sendReleaseTicketLock } from '../rpc/control.js'
 import { usePolled } from '../lib/use-async.js'
 import { useAction } from '../lib/use-action.js'
 import { Button } from './ui/button.js'
@@ -11,10 +11,14 @@ import { Markdown } from './Markdown.js'
 import { TicketPageShell, TicketPageNote } from './TicketPageShell.js'
 import { cn } from '../lib/utils.js'
 import { formatAge, formatDateTime } from '../lib/format-date.js'
+import { ticketLink } from '../lib/ticket-link.js'
+import { LinkActions } from './LinkActions.js'
 import { priorityTone } from '../lib/ticket-priority.js'
 
-// One ticket's own page (#1144): its entire markdown, not just the head the list row reads —
-// and where Queue lives now that the list is one-liners. `slug` is the same filename the list
+// One ticket's own page (#1144): its entire markdown, not just the head the list row reads — and
+// where the actions on the ticket live now that the list is one-liners: the ticket is shown as a
+// link, and the installed widgets' link actions (#1774, "Add to queue" when the project has a queue
+// package) sit beside it. `slug` is the same filename the list
 // row and the route carry, so this is a direct read by identity rather than a search through
 // the list the caller may not even have.
 export function TicketDetailPage({
@@ -32,17 +36,7 @@ export function TicketDetailPage({
   onOpenAgent?: ((agentId: string) => void) | undefined
 }) {
   const { value: ticket, loaded } = usePolled<WorkspaceTicketDetail | null>(() => onTicket(projectId, slug), null, 10_000, [projectId, slug])
-  const [queued, setQueued] = useState(false)
   const { busy, error, run } = useAction()
-
-  const queue = async () => {
-    if (!ticket) return
-    const outcome = await run(
-      () => sendQueueTicket(projectId, ticket.title, { file: ticket.file, ...(ticket.priority ? { priority: ticket.priority } : {}) }),
-      'The ticket could not be queued.',
-    )
-    if (outcome.ok) setQueued(true)
-  }
 
   // The manual lock release (#1420): nothing times a `.lock.md` out anymore, so a dead agent's
   // claim stands until a human lifts it here. `released` bridges the gap until the next poll.
@@ -79,17 +73,8 @@ export function TicketDetailPage({
                   <LockOpen className="h-3.5 w-3.5" /> Release lock
                 </Button>
               )}
-              <Button size="sm" variant="outline" disabled={busy || queued} onClick={() => void queue()} className="gap-1.5">
-                {queued ? (
-                  <>
-                    <Check className="h-3.5 w-3.5" /> Queued
-                  </>
-                ) : (
-                  <>
-                    <ListPlus className="h-3.5 w-3.5" /> Queue
-                  </>
-                )}
-              </Button>
+              {/* The ticket as a link, for whatever the installed widgets offer on one (#1774). */}
+              <LinkActions projects={[projectId]} targets={[{ projectId, links: [ticketLink(ticket)] }]} resetKey={ticket.file} disabled={busy} />
             </div>
           </div>
           {ticket.summary && <p className="mt-2 text-sm text-muted-foreground">{ticket.summary}</p>}

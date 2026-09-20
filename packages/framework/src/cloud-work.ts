@@ -1,5 +1,4 @@
 import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
-import { agentBranchName } from '@gemstack/skill-branches'
 import { ghPrsForBranchOrThrow, pickAgentPr, type LinkedPr } from './dashboard/gh.js'
 import { openRemoteBranchPullRequest, type HandoffResult } from './dashboard/agent-handoff.js'
 import { listAgents, projectRuns, startedAtFromAgentId, type AgentMeta, type RunPatch } from './store/index.js'
@@ -68,9 +67,12 @@ interface CloudHead {
   sha: string
 }
 
-/** Whether the run's record still carries the branch it was born on, i.e. no adoption happened. */
+/** Where a cloud session's own branches live: what an adopted run's record names. */
+const CLOUD_BRANCH_PREFIX = 'claude/'
+
+/** Whether the run's record still carries the branch it was born on, i.e. no adoption happened: no branch, or one that is not a cloud session's. */
 function onBirthBranch(meta: AgentMeta): boolean {
-  return meta.branch === undefined || meta.branch === agentBranchName(meta.id)
+  return !meta.branch?.startsWith(CLOUD_BRANCH_PREFIX)
 }
 
 /** Whether the run's handoff was armed to open a PR. Absent means armed, matching the agent. */

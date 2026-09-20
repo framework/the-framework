@@ -12,6 +12,7 @@ import { THE_FRAMEWORK_DIR } from '../framework-dir.js'
 import { RUN_INBOX_FILE } from '../dashboard/run-inbox.js'
 import { PROJECT_HOOKS_FILE } from '../project-hooks.js'
 import { provideTestContext } from './test-context.js'
+import { linkBranchesProvider } from '../store/test-branches.js'
 
 // #749, #1774: what is addressed at a RUN has to resolve the run's own checkout, not the project:
 // the run's card is there, and so is the inbox its tool reads. Addressed at the project root, a
@@ -36,6 +37,16 @@ async function projectWithWorktreeAgent(
 }> {
   const dir = await realpath(await mkdtemp(join(tmpdir(), 'framework-addressing-')))
   const agentId = '2026-07-19T10-00-00-000Z'
+  // A real repository with a real checkout: the project's branches provider lists the checkouts (#1774).
+  const git = nodeGitRunner()
+  await git(['init', '-q'], dir)
+  await git(['config', 'user.email', 't@t'], dir)
+  await git(['config', 'user.name', 't'], dir)
+  await writeFile(join(dir, 'index.html'), '<h1>Hello, world!</h1>\n')
+  await git(['add', '-A'], dir)
+  await git(['commit', '-q', '-m', 'init'], dir)
+  await addWorktree(dir, { agentId, branch: agentBranchName(agentId) }, git)
+  await linkBranchesProvider(dir)
   const worktree = worktreePath(dir, agentId)
   await mkdir(join(worktree, THE_FRAMEWORK_DIR), { recursive: true })
   // The run's card is what readLiveMetas discovers, and its id is what the caller addresses.
@@ -259,6 +270,7 @@ async function projectWithDirtyWorktree(): Promise<{
   const agentId = 'run1'
   const { path, branch } = await addWorktree(dir, { agentId, branch: agentBranchName(agentId) }, git)
   await writeFile(join(path, 'index.html'), '<h1>Welcome!</h1>\n')
+  await linkBranchesProvider(dir)
 
   const previous = process.env.XDG_CONFIG_HOME
   process.env.XDG_CONFIG_HOME = join(dir, 'cfg')
@@ -322,7 +334,7 @@ test('the dashboard Remove reports an unknown session instead of claiming succes
   try {
     const result = await sendRemoveWorktree(ctx.projectId, 'nosuchrun')
     assert.equal(result.ok, false)
-    assert.match(result.ok === false ? result.error : '', /no worktree for session nosuchrun/)
+    assert.match(result.ok === false ? result.error : '', /no checkout for agent nosuchrun/)
   } finally {
     ctx.restore()
     await rm(ctx.dir, { recursive: true, force: true })

@@ -20,7 +20,7 @@ if (args[0] === 'list') answer('list.json')
 else if (args[0] === 'show') answer('show.json')
 else if (args[0] === 'publish') answer('publish.json')
 else if (args[0] === 'merge') answer('merge.json')
-else if (args[0] === 'remove') { if (args[1] === 'kept') { process.stderr.write('agent-kept has uncommitted work; the checkout was kept\\n'); process.exit(1) } process.stdout.write('{"ok":true}') }
+else if (args[0] === 'remove') { if (args[1] === 'kept') { process.stderr.write('agent-kept has uncommitted work; the checkout was kept\\n'); process.exit(1) } process.stdout.write(args[1] === 'run-1' && !args.includes('--discard') ? '{"ok":true,"branchesDeleted":["agent-run-1"]}' : '{"ok":true}') }
 `
 
 const ROW = { agentId: 'run-1', path: '/p/.branches/agent-run-1', branch: 'agent-run-1' }
@@ -61,7 +61,7 @@ test('a project with no branches provider has no checkouts; one with a provider 
     assert.deepEqual(await branches.show([]), [], 'nothing asked is nothing run')
     assert.deepEqual(await branches.publish('agent-run-1', { title: 'T', body: 'B', draft: true }), { ok: true, pr: { number: 7, url: 'https://x/pull/7' }, existing: false })
     assert.deepEqual(await branches.merge(7), { ok: true, outcome: 'auto-armed' })
-    assert.deepEqual(await branches.remove('run-1'), { ok: true })
+    assert.deepEqual(await branches.remove('run-1'), { ok: true, branchesDeleted: ['agent-run-1'] }, 'the branches that went with the checkout ride along')
     assert.deepEqual(await branches.remove('run-1', { discard: true }), { ok: true })
     assert.deepEqual(await branches.remove('kept'), { ok: false, error: 'agent-kept has uncommitted work; the checkout was kept' }, "a refusal is the provider's own line")
     assert.deepEqual(await branches.remove('../x'), { ok: false, error: 'not a run id: ../x' })
@@ -94,7 +94,10 @@ test('reads within the window share one call; a write and changed() forget them;
     await branches.show(['agent-run-1'])
     assert.equal((await calls(root, 'branches')).length, 2, 'a read within the window is served from the last')
     await branches.list({ fresh: true })
-    assert.equal((await calls(root, 'branches')).length, 3, 'fresh runs the list again')
+    assert.equal((await calls(root, 'branches')).length, 2, 'a fresh ask within a second of a read is that read')
+    clock += 1_500
+    await branches.list({ fresh: true })
+    assert.equal((await calls(root, 'branches')).length, 3, 'past a second, fresh runs the list again')
     await branches.remove('run-1')
     await branches.list()
     assert.equal((await calls(root, 'branches')).length, 5, 'a write drops the reads')

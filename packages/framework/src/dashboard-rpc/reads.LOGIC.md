@@ -10,12 +10,12 @@ Answers everything the dashboard reads about a project or an agent [1]: the agen
 
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. The Framework starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
 [2] the Overview: the dashboard's cross-project page at `/`. project home: a project's own page with the launcher (the Start form) and its composer. agent view: one agent's page.
-[3] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
+[3] checkout: an agent's own working copy of the project, where it works; the project's branches provider (`../store/branches.ts`) says where it is and which branch it is on.
 [4] handoff: what becomes of an agent's work once the agent has ended: its branch pushed, a pull request opened for it, the pull request merged. The agent does it itself; on a finished agent's page the "Open PR" and "Merge" buttons do it by hand.
 [5] the Claude web bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge token is the secret the extension presents; the bridge browser is the Chrome for Testing the daemon runs for it; the Driver tab is the extension's one pinned tab that reads claude.ai's session list, visits sessions and types answers.
 [6] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
 [7] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
-[8] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
+[8] agent id: an agent's stable id, derived from the moment it started; it names the agent's card and diary, its branch until the agent names it, and its run.
 [9] run: only the `logs` skill's record of one agent on the `agent-data` branch: a card (what was asked, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said).
 [11] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [12] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
@@ -66,7 +66,7 @@ A read about a project resolves the id through the registry and, when no project
 
 #### Business logic
 
-A project's agents are the live ones prepended to the recorded ones, newest first. The live agents are read from the card in every agent checkout under `.branches/`; the recorded ones are the project's runs [9] on the `agent-data` branch [11] (the store's reads, `store/`). There is one row per id, and where both a live and a recorded copy exist the live one wins, so a resumed agent reads as running rather than as its recorded first leg. The status is not filtered on: an agent that ended waiting on a question, its checkout kept, keeps its row. The agents this daemon relays [6] to devices exist only in the daemon's memory, so their in-memory records are merged in first and win an id tie, being the live authority; that is what lets a reload re-open a relayed agent instead of losing it. Every local row is annotated as described next.
+A project's agents are the live ones prepended to the recorded ones, newest first. The live agents are read from the card in every checkout the project's branches provider lists; the recorded ones are the project's runs [9] on the `agent-data` branch [11] (the store's reads, `store/`). There is one row per id, and where both a live and a recorded copy exist the live one wins, so a resumed agent reads as running rather than as its recorded first leg. The status is not filtered on: an agent that ended waiting on a question, its checkout kept, keeps its row. The agents this daemon relays [6] to devices exist only in the daemon's memory, so their in-memory records are merged in first and win an id tie, being the live authority; that is what lets a reload re-open a relayed agent instead of losing it. Every local row is annotated as described next.
 
 ### What only the daemon knows about an agent
 
@@ -96,7 +96,7 @@ The replay is the agent's events [15]: the diary in its checkout while it has on
 
 #### Business logic
 
-The answer is the ids of the checkouts still on disk under the project's `.branches/` directory whose agent is not running; a live agent's checkout is in use, not retained [14], and is left out. An unknown project or an unreadable listing answers an empty list.
+The answer is the ids of the checkouts the project's branches provider lists whose agent is not running; a live agent's checkout is in use, not retained [14], and is left out. An unknown project, a project with no provider or an unreadable listing answers an empty list.
 
 ### Where an agent is working
 
@@ -108,7 +108,7 @@ The answer is the ids of the checkouts still on disk under the project's `.branc
 
 #### Business logic
 
-The project must be known and the id safe for a path, else the answer is nothing. The path is the checkout the agent id resolves to; whether it is the agent's own is whether it differs from the project's root, because in the root the uncommitted changes are the user's, not the agent's. The git status read there gives the branch and the dirty flag, and the pull request is filtered to the agent's lifetime: the agent's start time is derived from its id, and only an open pull request, or a closed one no older than the agent, counts. The size is read only for the agent's own checkout and only once the agent is no longer running, because a tree being written to has no size worth reporting. When the checkout is not the agent's own (the agent's checkout is gone and the read fell back to the root), the root's current branch has nothing to do with this agent, so the pull request is instead resolved from the agent's own record. The pull request may be reported as still being looked up rather than absent, so the bar asks again shortly.
+The project must be known and the id safe for a path, else the answer is nothing. The path is the checkout the agent id resolves to; whether it is the agent's own is whether it differs from the project's root, because in the root the uncommitted changes are the user's, not the agent's. The git status read there gives the branch and the dirty flag, and the pull request is filtered to the agent's lifetime: the agent's start time is derived from its id, and only an open pull request, or a closed one no older than the agent, counts. The size is the branches provider's sized listing's, read only for the agent's own checkout and only once the agent is no longer running, because a tree being written to has no size worth reporting. When the checkout is not the agent's own (the agent's checkout is gone and the read fell back to the root), the root's current branch has nothing to do with this agent, so the pull request is instead resolved from the agent's own record. The pull request may be reported as still being looked up rather than absent, so the bar asks again shortly.
 
 ### Documents
 

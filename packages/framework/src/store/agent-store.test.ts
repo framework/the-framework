@@ -5,6 +5,8 @@ import { findAgent, listAgents, loadAgentEvents, readAllAgents, readFinishedDiar
 import { agentIdFromStartedAt, startedAtFromAgentId } from '../agent-id.js'
 import { noRuns } from './runs.js'
 import { testRuns } from './test-runs.js'
+import { testBranches } from './test-branches.js'
+import type { Checkout } from './branches.js'
 
 // The store reads a project's runs from two places (#1774): a run's live card and diary in its own
 // checkout, written by the run's tool, and the finished runs the project's runs provider answers.
@@ -33,8 +35,7 @@ function memFs(seed: Record<string, string> = {}): StoreFs & { files: Map<string
     },
     async readdir(dir) {
       // Derive children from the flat path map: file basenames whose dirname is `dir`, plus
-      // the first segment of anything deeper (the real fs lists subdirectories too, which is
-      // how `readLiveMetas` finds the per-agent worktrees).
+      // the first segment of anything deeper.
       const prefix = dir.endsWith('/') ? dir : dir + '/'
       const names = new Set<string>()
       for (const p of files.keys()) {
@@ -45,25 +46,18 @@ function memFs(seed: Record<string, string> = {}): StoreFs & { files: Map<string
       }
       return [...names]
     },
-    async subdirs(dir) {
-      // A directory is a path segment with something under it.
-      const prefix = dir.endsWith('/') ? dir : dir + '/'
-      const names = new Set<string>()
-      for (const p of files.keys()) {
-        if (!p.startsWith(prefix)) continue
-        const rest = p.slice(prefix.length)
-        if (rest.includes('/')) names.add(rest.split('/')[0]!)
-      }
-      return [...names]
-    },
   }
 }
 
 const AT = '2026-07-04T00:00:00.000Z'
 const CWD = '/ws'
 
+/** A run's checkout, as the project's branches provider lists it. */
+const checkoutOf = (id: string, branch?: string): Checkout => ({ id, path: join(CWD, '.branches', `agent-${id}`), ...(branch ? { branch } : {}) })
 /** A file of a run's live record, in the run's own checkout. */
-const liveAt = (id: string, ext: string) => join(CWD, '.branches', `agent-${id}`, '.the-framework', `${id}.${ext}`)
+const liveAt = (id: string, ext: string) => join(checkoutOf(id).path, '.the-framework', `${id}.${ext}`)
+/** The project's branches provider, listing the given checkouts. */
+const branchesOf = (...checkouts: Checkout[]) => testBranches({ [CWD]: checkouts })
 const card = (id: string, status: string, more: Record<string, unknown> = {}) => JSON.stringify({ id, startedAt: AT, status, ...more })
 
 test('listAgents lists the finished runs the provider answers, newest first, each card unfolded into the meta', async () => {
@@ -91,82 +85,73 @@ test('a `since` keeps the runs started at or after it (#1607)', async () => {
   assert.deepEqual((await listAgents(CWD, runs, { since: Date.parse('2026-07-05T00:00:00.000Z') })).map(agent => agent.id), [recent])
 })
 
-test('readLiveMeta reads a checkout\'s card as the meta; the project root, a checkout with no card and a card that does not parse are no run', async () => {
+test('readLiveMeta reads a checkout\'s card as the meta; a checkout with no card and a card that does not parse are no run', async () => {
   const fs = memFs({
     [liveAt('r1', 'json')]: card('r1', 'running', { intent: 'a blog', caller: { pid: 4242, host: 'this-box' } }),
     [liveAt('r2', 'json')]: '{"id":',
-    // A card at the project root is nobody's: a run's checkout is `agent-<id>`, and the root is the person's.
-    [join(CWD, '.the-framework', 'r9.json')]: card('r9', 'running'),
   })
-  const meta = await readLiveMeta(join(CWD, '.branches', 'agent-r1'), fs)
+  const meta = await readLiveMeta(checkoutOf('r1'), fs)
   assert.equal(meta?.id, 'r1')
   assert.equal(meta?.status, 'running')
   assert.equal(meta?.pid, 4242)
   assert.equal(meta?.host, 'this-box')
-  assert.equal(await readLiveMeta(join(CWD, '.branches', 'agent-r2'), fs), undefined)
-  assert.equal(await readLiveMeta(join(CWD, '.branches', 'agent-r3'), fs), undefined)
-  assert.equal(await readLiveMeta(CWD, fs), undefined)
+  assert.equal(await readLiveMeta(checkoutOf('r2'), fs), undefined)
+  assert.equal(await readLiveMeta(checkoutOf('r3'), fs), undefined)
 })
 
-test('readLiveMeta gives a checkout\'s run the branch the checkout is on now: the agent renames it while the card keeps the first name', async () => {
-  const checkout = join(CWD, '.branches', 'agent-r1')
-  const gitdir = join(CWD, '.git', 'worktrees', 'agent-r1')
-  const fs = memFs({
-    [liveAt('r1', 'json')]: card('r1', 'running', { branch: 'agent-r1' }),
-    [join(checkout, '.git')]: `gitdir: ${gitdir}\n`,
-    [join(gitdir, 'HEAD')]: 'ref: refs/heads/agent-add-comments\n',
-  })
-  assert.equal((await readLiveMeta(checkout, fs))?.branch, 'agent-add-comments')
-  // A detached checkout, or git files that cannot be read, leave the card's branch.
-  fs.files.set(join(gitdir, 'HEAD'), '0123456789abcdef0123456789abcdef01234567\n')
-  assert.equal((await readLiveMeta(checkout, fs))?.branch, 'agent-r1')
-  fs.files.delete(join(checkout, '.git'))
-  assert.equal((await readLiveMeta(checkout, fs))?.branch, 'agent-r1')
+test('readLiveMeta gives a checkout\'s run the branch the checkout is on now, as the provider lists it: the agent renames it while the card keeps the first name', async () => {
+  const fs = memFs({ [liveAt('r1', 'json')]: card('r1', 'running', { branch: 'agent-r1' }) })
+  assert.equal((await readLiveMeta(checkoutOf('r1', 'agent-add-comments'), fs))?.branch, 'agent-add-comments')
+  // A checkout the provider lists on no branch leaves the card's branch.
+  assert.equal((await readLiveMeta(checkoutOf('r1'), fs))?.branch, 'agent-r1')
 })
 
 test('readLiveMeta never ends a run whose process is gone: the tool that started it sweeps its own', async () => {
   const fs = memFs({ [liveAt('r1', 'json')]: card('r1', 'running', { caller: { pid: 2 ** 22 - 1, host: 'this-box' } }) })
   const before = fs.files.get(liveAt('r1', 'json'))
-  assert.equal((await readLiveMeta(join(CWD, '.branches', 'agent-r1'), fs))?.status, 'running')
+  assert.equal((await readLiveMeta(checkoutOf('r1'), fs))?.status, 'running')
   assert.equal(fs.files.get(liveAt('r1', 'json')), before, 'a read writes nothing')
   assert.equal(fs.files.size, 1)
 })
 
-test('readLiveMetas finds the run in each checkout, newest first, a waiting one too; junk names are skipped (#738)', async () => {
+test('readLiveMetas finds the run in each checkout the branches provider lists, newest first, a waiting one too; a checkout with no card is skipped (#738/#1774)', async () => {
   const fs = memFs({
     [liveAt('r1', 'json')]: card('r1', 'running'),
     [liveAt('r2', 'json')]: card('r2', 'waiting'),
-    // Only the `agent-<id>` directories are read; anything else in there is not a run's checkout.
-    [join(CWD, '.branches', '.tmp-scratch', '.the-framework', 'x.json')]: card('x', 'running'),
   })
+  // The provider lists a third checkout whose tool has not written the card yet: not a run to show.
+  const branches = branchesOf(checkoutOf('r1', 'agent-r1'), checkoutOf('r2'), checkoutOf('r3'))
   assert.deepEqual(
-    (await readLiveMetas(CWD, fs)).map(r => ({ id: r.id, status: r.status, cwd: r.cwd })),
+    (await readLiveMetas(CWD, fs, branches)).map(r => ({ id: r.id, status: r.status, cwd: r.cwd, branch: r.branch })),
     [
-      { id: 'r2', status: 'waiting', cwd: join(CWD, '.branches', 'agent-r2') },
-      { id: 'r1', status: 'running', cwd: join(CWD, '.branches', 'agent-r1') },
+      { id: 'r2', status: 'waiting', cwd: join(CWD, '.branches', 'agent-r2'), branch: undefined },
+      { id: 'r1', status: 'running', cwd: join(CWD, '.branches', 'agent-r1'), branch: 'agent-r1' },
     ],
   )
-  assert.deepEqual(await readLiveMetas(CWD, memFs()), [])
+  assert.deepEqual(await readLiveMetas(CWD, fs, branchesOf()), [], 'a provider listing no checkout')
+  assert.deepEqual(await readLiveMetas(CWD, fs, testBranches({})), [], 'a project with no branches provider has no checkouts, whatever is on disk')
 })
 
 test('readAllAgents and findAgent: the checkout\'s card wins over the record of the same run (#768)', async () => {
   // A resumed run has a record from its first leg and is going again in its checkout.
   const fs = memFs({ [liveAt('r1', 'json')]: card('r1', 'running') })
+  const branches = branchesOf(checkoutOf('r1'))
   const runs = testRuns({ [CWD]: [{ card: { id: 'r1', status: 'waiting' } }, { card: { id: 'r0', status: 'done' } }] })
-  assert.deepEqual((await readAllAgents(CWD, fs, runs)).map(agent => [agent.id, agent.status]), [['r1', 'running'], ['r0', 'done']])
-  assert.equal((await findAgent(CWD, 'r1', fs, runs))?.status, 'running')
-  assert.equal((await findAgent(CWD, 'r0', fs, runs))?.status, 'done')
-  assert.equal(await findAgent(CWD, 'nope', fs, runs), undefined)
+  assert.deepEqual((await readAllAgents(CWD, fs, runs, branches)).map(agent => [agent.id, agent.status]), [['r1', 'running'], ['r0', 'done']])
+  assert.equal((await findAgent(CWD, 'r1', fs, runs, branches))?.status, 'running')
+  assert.equal((await findAgent(CWD, 'r0', fs, runs, branches))?.status, 'done')
+  assert.equal(await findAgent(CWD, 'nope', fs, runs, branches), undefined)
   // No runs provider: only the runs with a checkout.
-  assert.deepEqual((await readAllAgents(CWD, fs, noRuns)).map(agent => agent.id), ['r1'])
+  assert.deepEqual((await readAllAgents(CWD, fs, noRuns, branches)).map(agent => agent.id), ['r1'])
 })
 
 test('loadAgentEvents replays a run\'s diary as the framework\'s events: the checkout\'s while it has one, else the finished run\'s (#1769)', async () => {
   const diary = [{ kind: 'said', text: 'Reading.' }, { kind: 'result', text: 'Done.', sessionId: 's1' }, { kind: 'cost', usd: 0.5, turns: 1 }, { kind: 'ended', status: 'failed', detail: 'API 500' }]
   const recorded = diary.map(line => JSON.stringify(line)).join('\n') + '\n'
   const fs = memFs()
+  const branches = branchesOf(checkoutOf('r1'))
   const runs = testRuns({ [CWD]: [{ card: { id: 'r1', status: 'failed' }, diary }] })
-  assert.deepEqual(await loadAgentEvents(CWD, 'r1', fs, runs), [
+  assert.deepEqual(await loadAgentEvents(CWD, 'r1', fs, runs, branches), [
     { kind: 'driver', event: { type: 'text', text: 'Reading.' } },
     { kind: 'driver', event: { type: 'result', text: 'Done.', sessionId: 's1' } },
     { kind: 'usage', costUsd: 0.5, turns: 1 },
@@ -177,15 +162,15 @@ test('loadAgentEvents replays a run\'s diary as the framework\'s events: the che
   // line torn by a write in flight, which is dropped.
   fs.files.set(liveAt('r1', 'json'), card('r1', 'running'))
   fs.files.set(liveAt('r1', 'jsonl'), recorded + '{"kind":"question","title":"Which way?","options":[{"id":"a","label":"Left"}]}\n{"kind":"ended","status":"waiting"}\n{"kind":"sa')
-  const live = await loadAgentEvents(CWD, 'r1', fs, runs)
+  const live = await loadAgentEvents(CWD, 'r1', fs, runs, branches)
   assert.deepEqual(live?.slice(4), [
     { kind: 'choice', id: 'await-choices', title: 'Which way?', options: [{ id: 'a', label: 'Left' }] },
     { kind: 'end', ok: false, waiting: true },
   ])
 
-  assert.equal(await loadAgentEvents(CWD, 'unknown', fs, runs), undefined)
-  assert.equal(await loadAgentEvents(CWD, '../escape', fs, runs), undefined)
-  assert.equal(await loadAgentEvents(CWD, 'r0', memFs(), noRuns), undefined, 'no provider: a finished run has no diary')
+  assert.equal(await loadAgentEvents(CWD, 'unknown', fs, runs, branches), undefined)
+  assert.equal(await loadAgentEvents(CWD, '../escape', fs, runs, branches), undefined)
+  assert.equal(await loadAgentEvents(CWD, 'r0', memFs(), noRuns, branches), undefined, 'no provider: a finished run has no diary')
 })
 
 test('readFinishedDiary is the finished run\'s whole diary, and nothing for an unknown run, an unsafe id or a project with no provider', async () => {

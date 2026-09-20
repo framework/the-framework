@@ -2,7 +2,6 @@ import { listAgents, loadAgentEvents, readLiveMetas, type LiveAgent, type AgentM
 import { pendingChoices } from '../open-choices.js'
 import type { FrameworkEvent } from '../events.js'
 import type { ProjectSummary, ProjectionRead } from './projects.js'
-import { isAgentBranch } from '@gemstack/skill-branches'
 import { agentBranchFor } from './agent-handoff.js'
 import { projectBranches, type BranchesFor, type BranchState } from '../store/branches.js'
 import { ghPrList, type PrLister } from './gh.js'
@@ -107,12 +106,21 @@ export async function buildInterventions(
       return []
     }
     const open = await prs(project.path).catch(unread)
+    // The branches the project's runs are on, recorded or in a checkout (#1774): what tells a
+    // run's draft from one opened by hand. Read only when a draft asks.
+    let runBranches: Set<string> | undefined
+    const isRunBranch = async (branch: string): Promise<boolean> => {
+      runBranches ??= new Set(
+        [...(await (deps.agents ?? listAgents)(project.path).catch(() => [])), ...(await liveAgents(project.path).catch(() => []))].flatMap(agent => (agent.branch ? [agent.branch] : [])),
+      )
+      return runBranches.has(branch)
+    }
     for (const pr of open) {
-      // A draft opened by hand is not asking for review, so it stays off the queue. A draft on an
-      // agent's branch is the opposite (#1102): the agent, or cloud work adoption, opened it as a
+      // A draft opened by hand is not asking for review, so it stays off the queue. A draft on a
+      // run's branch is the opposite (#1102): the agent, or cloud work adoption, opened it as a
       // draft so it does not ping reviewers, and if the queue then dropped it too, nothing
       // would tell anyone the work exists — which is the whole of #860 again.
-      if (pr.isDraft && !(pr.headRefName !== undefined && isAgentBranch(pr.headRefName))) continue
+      if (pr.isDraft && !(pr.headRefName !== undefined && (await isRunBranch(pr.headRefName)))) continue
       items.push({
         projectId: project.id,
         projectName: project.name,

@@ -302,8 +302,14 @@ test("a session's own draft PR still reaches the queue; a hand-made draft does n
     { number: 9, title: 'session work', url: 'u9', isDraft: true, headRefName: 'agent-x', createdAt: '2026-07-16T00:00:00Z' },
     { number: 10, title: 'my own wip', url: 'u10', isDraft: true, headRefName: 'feat/mine', createdAt: '2026-07-17T00:00:00Z' },
   ]
-  const { items } = await buildInterventions([project('a', '/a')], { prs, liveAgents: noAgents, agents: async () => [] })
+  // A draft is a run's when its head is the branch a run's record, or a run's checkout, names (#1774).
+  const recorded: AgentMeta = { id: 'x', status: 'done', startedAt: '2026-07-16T00:00:00Z', updatedAt: '2026-07-16T01:00:00Z', branch: 'agent-x' }
+  const { items } = await buildInterventions([project('a', '/a')], { prs, liveAgents: noAgents, agents: async () => [recorded] })
   assert.deepEqual(items.map(i => i.number), [9])
+  const { items: live } = await buildInterventions([project('a', '/a')], { prs, liveAgents: async () => [{ ...recorded, status: 'running', cwd: '/a/.branches/agent-x' }], agents: async () => [] })
+  assert.deepEqual(live.map(i => i.number), [9], 'a running agent\'s draft counts too')
+  const { items: nobody } = await buildInterventions([project('a', '/a')], { prs, liveAgents: noAgents, agents: async () => [] })
+  assert.deepEqual(nobody, [], 'a draft on a branch no run names is hand-made')
 })
 
 test('a draft with no branch recorded is still treated as hand-made (#1102)', async () => {

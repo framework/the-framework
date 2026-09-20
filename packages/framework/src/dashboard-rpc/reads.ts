@@ -1,6 +1,5 @@
 import type { BridgeBrowserStatus } from '../bridge-browser.js'
-import { findAgent, readLiveMetas, readAllAgents, loadAgentEvents, startedAtFromAgentId, isPidAlive, type AgentMeta, type AgentStatus } from '../store/index.js'
-import { worktreeSize, isSafeAgentId } from '@gemstack/skill-branches'
+import { findAgent, readLiveMetas, readAllAgents, loadAgentEvents, startedAtFromAgentId, isPidAlive, type AgentMeta, type AgentStatus, isRunId, projectBranches } from '../store/index.js'
 import { listProjectWorktrees } from '../worktrees.js'
 import { readDocs, type WorkspaceDoc } from '../dashboard/docs.js'
 import { collectQueue, type ProjectQueue } from '../dashboard/queue.js'
@@ -159,7 +158,7 @@ export async function onRetainedWorktrees(projectId: string): Promise<string[]> 
 export async function onAgentWorktree(projectId: string, agentId: string): Promise<AgentWorktree | null> {
   return relayOr(agentId, 'onAgentWorktree', [projectId, agentId], async () => {
     const root = await resolveProjectPath(projectId)
-    if (!root || !isSafeAgentId(agentId)) return null
+    if (!root || !isRunId(agentId)) return null
     const path = await resolveAgentPath(projectId, agentId)
     if (!path) return null
     const own = path !== root
@@ -171,9 +170,10 @@ export async function onAgentWorktree(projectId: string, agentId: string): Promi
       readLiveMetas(root).catch(() => []),
     ])
     // Size is only read for a checkout nothing is writing to: a live agent's tree changes under the
-    // poll, and `du` over a build directory mid-build is a cost with no answer worth having.
+    // poll, and a size over a build directory mid-build is a cost with no answer worth having. The
+    // provider's sized listing is where a checkout's size comes from (#1774).
     const running = live.some(agent => agent.id === agentId && agent.status === 'running')
-    const size = own && !running ? await worktreeSize(path) : undefined
+    const size = own && !running ? (await (await projectBranches(root).catch(() => undefined))?.list({ sizes: true }).catch(() => []))?.find(checkout => checkout.id === agentId)?.sizeBytes : undefined
     // In the agent's own worktree, the checkout's branch is the agent's, so the (since-filtered)
     // status read's PR is right. Once the worktree is gone the checkout is the project root, and
     // its current branch has nothing to do with this agent (#1255) — resolve by the agent's own
@@ -385,7 +385,7 @@ export async function onGitStatus(projectId: string, agentId?: string): Promise<
 export async function onAgentHandoff(projectId: string, agentId: string): Promise<AgentHandoff | null> {
   return relayOr(agentId, 'onAgentHandoff', [projectId, agentId], async () => {
     const cwd = await resolveProjectPath(projectId)
-    if (!cwd || !isSafeAgentId(agentId)) return null
+    if (!cwd || !isRunId(agentId)) return null
     const agent = await findAgent(cwd, agentId).catch(() => undefined)
     const branch = agent && agentBranchFor(agent)
     if (!agent || branch === undefined) return null

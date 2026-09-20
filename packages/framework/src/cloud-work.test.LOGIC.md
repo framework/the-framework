@@ -9,5 +9,5 @@ What the tests cover, mostly against a scripted git and once against real reposi
 - **No remote** - a fetch that fails adopts nothing, fails nothing, and never throws.
 - **The pass over ticks** - adoptions and failures are said out loud, with the branch, the agent id and the opened draft named; overlapping ticks join the pass in flight; a stopped pass runs nothing.
 - **A listing that fails** - when the branch's pull requests cannot be listed, the branch is still recorded, no pull request is opened, and the failure is reported as "could not list the PRs", so "none" and "could not tell" never look alike.
-- **A record naming another branch** - an agent whose record names a branch that is neither its birth branch nor the matched head is left alone, with nothing recorded or opened.
+- **A record naming another branch of its own** - an agent whose record names a branch of its own that is not a cloud session's (renamed by hand, say) is adopted all the same, the anchor's descent being the proof, and its record then names the cloud branch.
 - **Against real git** - the pass fetches `claude/*` heads the checkout has never seen into remote-tracking refs (so they survive garbage collection), the anchor picks out exactly the branch that descends from it and not one forked before it, and an anchor no branch descends from matches nothing and is left for the next pass.

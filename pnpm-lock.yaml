@@ -78,9 +78,6 @@ importers:
       '@gemstack/agent-data':
         specifier: workspace:*
         version: link:../agent-data
-      '@gemstack/skill-branches':
-        specifier: workspace:*
-        version: link:../skill-branches
       '@puppeteer/browsers':
         specifier: 3.2.1
         version: 3.2.1
@@ -130,6 +127,9 @@ importers:
         specifier: ^2.5.0
         version: 2.9.0
     devDependencies:
+      '@gemstack/skill-branches':
+        specifier: workspace:*
+        version: link:../skill-branches
       '@gemstack/skill-logs':
         specifier: workspace:*
         version: link:../skill-logs

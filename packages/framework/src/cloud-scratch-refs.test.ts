@@ -11,6 +11,7 @@ import {
 } from './cloud-scratch-refs.js'
 import type { GitRunner } from '@gemstack/agent-data'
 import type { LinkedPr } from './dashboard/gh.js'
+import type { AgentMeta } from './store/index.js'
 
 const DAY = 24 * 60 * 60 * 1000
 /** The sweep's "now" for every test: refs age against this, never against the wall clock. */
@@ -24,6 +25,14 @@ const OLD_RUN = 'agent-2026-08-16T10-00-00-000Z'
 const OLD_RUN_ID = '2026-08-16T10-00-00-000Z'
 /** A run branch started one hour before {@link NOW}: inside the safe age. */
 const YOUNG_RUN = 'agent-2026-08-17T11-00-00-000Z'
+const YOUNG_RUN_ID = '2026-08-17T11-00-00-000Z'
+/** A branch a run named itself, recorded on the run that started 26 hours before {@link NOW}. */
+const NAMED_RUN = 'agent-some-session-name'
+
+/** A finished run's record, as the project's runs provider answers it (#1774): its id, its start, and the branch its work is on. */
+const run = (id: string, startedAt: string, branch: string): AgentMeta => ({ id, status: 'done', startedAt, updatedAt: startedAt, branch })
+/** The project's runs: the two run branches, and nothing for any other name on origin. */
+const RUNS = async (): Promise<AgentMeta[]> => [run(OLD_RUN_ID, '2026-08-16T10:00:00.000Z', OLD_RUN), run(YOUNG_RUN_ID, '2026-08-17T11:00:00.000Z', YOUNG_RUN)]
 /** An aged run branch under the pre-#1581 slashed spelling: still on remotes, still swept. */
 /** The shape the cloud driver pushes (#1320): counter + 8-hex tag, slash-free. */
 const CLOUD_REF = 'cloud-1-3955352b'
@@ -122,7 +131,7 @@ test('the driver ref shape matches the real leftovers and nothing looser (#1547)
 test('an aged run branch whose work is on the default branch is deleted from origin (#1547)', async () => {
   const { git, deleted } = fakeGit({ heads: { main: MAIN_SHA, [OLD_RUN]: SHA } })
   const { fs } = memFs()
-  const result = await sweepCloudScratchRefs('/repo', { git, fs, prs: noPrs, now: () => NOW })
+  const result = await sweepCloudScratchRefs('/repo', { agents: RUNS, git, fs, prs: noPrs, now: () => NOW })
   assert.deepEqual(result.deleted, [OLD_RUN])
   assert.deepEqual(deleted, [OLD_RUN])
   assert.deepEqual(result.failed, [])
@@ -131,7 +140,7 @@ test('an aged run branch whose work is on the default branch is deleted from ori
 test('a run branch inside the safe age is kept: its run may still be provisioning (#1547)', async () => {
   const { git, deleted } = fakeGit({ heads: { main: MAIN_SHA, [YOUNG_RUN]: SHA } })
   const { fs } = memFs()
-  const result = await sweepCloudScratchRefs('/repo', { git, fs, prs: noPrs, now: () => NOW })
+  const result = await sweepCloudScratchRefs('/repo', { agents: RUNS, git, fs, prs: noPrs, now: () => NOW })
   assert.deepEqual(result.deleted, [])
   assert.deepEqual(deleted, [])
   assert.deepEqual(result.kept, [{ ref: YOUNG_RUN, reason: 'young' }])
@@ -140,7 +149,7 @@ test('a run branch inside the safe age is kept: its run may still be provisionin
 test('a busy agent keeps its run branch however old the run is', async () => {
   const { git, deleted } = fakeGit({ heads: { main: MAIN_SHA, [OLD_RUN]: SHA } })
   const { fs } = memFs()
-  const result = await sweepCloudScratchRefs('/repo', { git, fs, prs: noPrs, now: () => NOW, busy: new Set([OLD_RUN_ID]) })
+  const result = await sweepCloudScratchRefs('/repo', { agents: RUNS, git, fs, prs: noPrs, now: () => NOW, busy: new Set([OLD_RUN_ID]) })
   assert.deepEqual(deleted, [])
   assert.deepEqual(result.kept, [{ ref: OLD_RUN, reason: 'busy' }])
 })
@@ -150,6 +159,7 @@ test('a tip not provably on the default branch may hold work: kept, and no PR lo
   const { fs } = memFs()
   let prLookups = 0
   const result = await sweepCloudScratchRefs('/repo', {
+    agents: RUNS,
     git,
     fs,
     prs: async () => {
@@ -165,12 +175,12 @@ test('a tip not provably on the default branch may hold work: kept, and no PR lo
 
 test('an open PR keeps the ref — a deletion must never close one; a closed PR does not', async () => {
   const open = fakeGit({ heads: { main: MAIN_SHA, [OLD_RUN]: SHA } })
-  const kept = await sweepCloudScratchRefs('/repo', { git: open.git, fs: memFs().fs, prs: async () => [pr('OPEN')], now: () => NOW })
+  const kept = await sweepCloudScratchRefs('/repo', { agents: RUNS, git: open.git, fs: memFs().fs, prs: async () => [pr('OPEN')], now: () => NOW })
   assert.deepEqual(open.deleted, [])
   assert.deepEqual(kept.kept, [{ ref: OLD_RUN, reason: 'open-pr' }])
 
   const closed = fakeGit({ heads: { main: MAIN_SHA, [OLD_RUN]: SHA } })
-  const swept = await sweepCloudScratchRefs('/repo', { git: closed.git, fs: memFs().fs, prs: async () => [pr('CLOSED')], now: () => NOW })
+  const swept = await sweepCloudScratchRefs('/repo', { agents: RUNS, git: closed.git, fs: memFs().fs, prs: async () => [pr('CLOSED')], now: () => NOW })
   assert.deepEqual(closed.deleted, [OLD_RUN])
   assert.deepEqual(swept.deleted, [OLD_RUN])
 })
@@ -178,7 +188,7 @@ test('an open PR keeps the ref — a deletion must never close one; a closed PR 
 test('a cloud-* ref is only recorded on first sight — its name carries no age to trust (#1547)', async () => {
   const { git, deleted } = fakeGit({ heads: { main: MAIN_SHA, [CLOUD_REF]: SHA } })
   const { files, fs } = memFs()
-  const result = await sweepCloudScratchRefs('/repo', { git, fs, prs: noPrs, now: () => NOW })
+  const result = await sweepCloudScratchRefs('/repo', { agents: RUNS, git, fs, prs: noPrs, now: () => NOW })
   assert.deepEqual(deleted, [])
   assert.deepEqual(result.kept, [{ ref: CLOUD_REF, reason: 'young' }])
   const state = JSON.parse(files.get(cloudRefsStatePath('/repo'))!) as { firstSeen: Record<string, string> }
@@ -189,7 +199,7 @@ test('a cloud-* ref goes once it has been watched past the safe age, and its rec
   const { git, deleted } = fakeGit({ heads: { main: MAIN_SHA, [CLOUD_REF]: SHA } })
   const { files, fs } = memFs()
   seenState(files, { [CLOUD_REF]: new Date(NOW - SCRATCH_REF_SAFE_AGE_MS).toISOString() })
-  const result = await sweepCloudScratchRefs('/repo', { git, fs, prs: noPrs, now: () => NOW })
+  const result = await sweepCloudScratchRefs('/repo', { agents: RUNS, git, fs, prs: noPrs, now: () => NOW })
   assert.deepEqual(result.deleted, [CLOUD_REF])
   assert.deepEqual(deleted, [CLOUD_REF])
   const state = JSON.parse(files.get(cloudRefsStatePath('/repo'))!) as { firstSeen: Record<string, string> }
@@ -200,7 +210,7 @@ test('a cloud-* ref watched for less than the safe age is kept', async () => {
   const { git, deleted } = fakeGit({ heads: { main: MAIN_SHA, [CLOUD_REF]: SHA } })
   const { files, fs } = memFs()
   seenState(files, { [CLOUD_REF]: new Date(NOW - DAY / 2).toISOString() })
-  const result = await sweepCloudScratchRefs('/repo', { git, fs, prs: noPrs, now: () => NOW })
+  const result = await sweepCloudScratchRefs('/repo', { agents: RUNS, git, fs, prs: noPrs, now: () => NOW })
   assert.deepEqual(deleted, [])
   assert.deepEqual(result.kept, [{ ref: CLOUD_REF, reason: 'young' }])
 })
@@ -220,7 +230,7 @@ test('a hand-off anchor tip still counts as holding no work: empty commit, lande
   })
   const { files, fs } = memFs()
   seenState(files, { [CLOUD_REF]: new Date(NOW - SCRATCH_REF_SAFE_AGE_MS).toISOString() })
-  const result = await sweepCloudScratchRefs('/repo', { git, fs, prs: noPrs, now: () => NOW })
+  const result = await sweepCloudScratchRefs('/repo', { agents: RUNS, git, fs, prs: noPrs, now: () => NOW })
   assert.deepEqual(result.deleted, [CLOUD_REF])
   assert.deepEqual(deleted, [CLOUD_REF])
 })
@@ -237,7 +247,7 @@ test('a tip that changes something against its parent is not an anchor: kept as 
   })
   const { files, fs } = memFs()
   seenState(files, { [CLOUD_REF]: new Date(NOW - SCRATCH_REF_SAFE_AGE_MS).toISOString() })
-  const result = await sweepCloudScratchRefs('/repo', { git, fs, prs: noPrs, now: () => NOW })
+  const result = await sweepCloudScratchRefs('/repo', { agents: RUNS, git, fs, prs: noPrs, now: () => NOW })
   assert.deepEqual(deleted, [])
   assert.deepEqual(result.kept, [{ ref: CLOUD_REF, reason: 'holds-work' }])
 })
@@ -246,12 +256,23 @@ test('a record for a ref no longer on origin is pruned — someone else already 
   const { git } = fakeGit({ heads: { main: MAIN_SHA } })
   const { files, fs } = memFs()
   seenState(files, { 'cloud-9-deadbeef': new Date(NOW - 2 * DAY).toISOString() })
-  await sweepCloudScratchRefs('/repo', { git, fs, prs: noPrs, now: () => NOW })
+  await sweepCloudScratchRefs('/repo', { agents: RUNS, git, fs, prs: noPrs, now: () => NOW })
   const state = JSON.parse(files.get(cloudRefsStatePath('/repo'))!) as { firstSeen: Record<string, string> }
   assert.deepEqual(state.firstSeen, {})
 })
 
-test('every other branch is never even a candidate', async () => {
+test('a branch a run named itself is a run branch too, when the run\'s record names it: aged from the run\'s start (#1774)', async () => {
+  const { git, deleted } = fakeGit({ heads: { main: MAIN_SHA, [NAMED_RUN]: SHA } })
+  const named = async (): Promise<AgentMeta[]> => [run(OLD_RUN_ID, '2026-08-16T10:00:00.000Z', NAMED_RUN)]
+  const result = await sweepCloudScratchRefs('/repo', { agents: named, git, fs: memFs().fs, prs: noPrs, now: () => NOW })
+  assert.deepEqual(result.deleted, [NAMED_RUN])
+  assert.deepEqual(deleted, [NAMED_RUN])
+  // The same name with no record naming it, or a record whose start cannot be read, is nobody's to delete.
+  const unread = async (): Promise<AgentMeta[]> => [run(OLD_RUN_ID, 'yesterday-ish', NAMED_RUN)]
+  assert.deepEqual(await sweepCloudScratchRefs('/repo', { agents: unread, git: fakeGit({ heads: { main: MAIN_SHA, [NAMED_RUN]: SHA } }).git, fs: memFs().fs, prs: noPrs, now: () => NOW }), { deleted: [], kept: [], failed: [] })
+})
+
+test('every other branch is never even a candidate: a name no run\'s record names is nobody\'s to delete', async () => {
   const heads = {
     main: MAIN_SHA,
     'claude/implement-something-abc123': SHA,
@@ -262,7 +283,7 @@ test('every other branch is never even a candidate', async () => {
     'feature/cloud-1-3955352b': SHA,
   }
   const { git, deleted } = fakeGit({ heads })
-  const result = await sweepCloudScratchRefs('/repo', { git, fs: memFs().fs, prs: noPrs, now: () => NOW })
+  const result = await sweepCloudScratchRefs('/repo', { agents: RUNS, git, fs: memFs().fs, prs: noPrs, now: () => NOW })
   assert.deepEqual(deleted, [])
   assert.deepEqual(result, { deleted: [], kept: [], failed: [] })
 })
@@ -270,7 +291,7 @@ test('every other branch is never even a candidate', async () => {
 test('a repo with no reachable remote sweeps nothing and never throws', async () => {
   const { git } = fakeGit({ heads: {}, noRemote: true })
   const { files, fs } = memFs()
-  const result = await sweepCloudScratchRefs('/repo', { git, fs, prs: noPrs, now: () => NOW })
+  const result = await sweepCloudScratchRefs('/repo', { agents: RUNS, git, fs, prs: noPrs, now: () => NOW })
   assert.deepEqual(result, { deleted: [], kept: [], failed: [] })
   assert.equal(files.size, 0)
 })
@@ -280,7 +301,7 @@ test('a deletion the remote refuses is reported and its record kept, so the retr
   const { files, fs } = memFs()
   const seenAt = new Date(NOW - 2 * DAY).toISOString()
   seenState(files, { [CLOUD_REF]: seenAt })
-  const result = await sweepCloudScratchRefs('/repo', { git, fs, prs: noPrs, now: () => NOW })
+  const result = await sweepCloudScratchRefs('/repo', { agents: RUNS, git, fs, prs: noPrs, now: () => NOW })
   assert.deepEqual(result.deleted, [])
   assert.equal(result.failed.length, 1)
   assert.equal(result.failed[0]!.ref, CLOUD_REF)
@@ -290,7 +311,7 @@ test('a deletion the remote refuses is reported and its record kept, so the retr
 
 test('the remote symref names the default branch, so a repo defaulting to neither main nor master still works', async () => {
   const { git, deleted } = fakeGit({ heads: { trunk: MAIN_SHA, [OLD_RUN]: SHA }, defaultBranch: 'trunk' })
-  const result = await sweepCloudScratchRefs('/repo', { git, fs: memFs().fs, prs: noPrs, now: () => NOW })
+  const result = await sweepCloudScratchRefs('/repo', { agents: RUNS, git, fs: memFs().fs, prs: noPrs, now: () => NOW })
   assert.deepEqual(result.deleted, [OLD_RUN])
   assert.deepEqual(deleted, [OLD_RUN])
 })

@@ -13,16 +13,17 @@ The read side of a project's agents [1]. The Framework runs no agent and writes 
 
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. The Framework starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
 [2] card / diary: an agent's record in two shapes, whose definition is The Framework's (`runs.ts`): the card `<id>.json` (what was asked, the branch, the pull request, how it ended, what it cost) and the diary `<id>.jsonl` (what the agent said, one line per event). While the agent has a checkout they sit under the checkout's `.the-framework/`, written by the tool that runs it; a finished agent's are what the runs provider [4] answers.
-[3] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, in a directory named `agent-<agent id>`. The user's own working copy is "the project's checkout".
+[3] checkout: an agent's own working copy of the project, where it works; the project's branches provider [7] says where it is and which branch it is on. The user's own working copy is "the project's checkout".
 [4] runs provider: the command, among the commands of a project's dependencies, that a package declares as answering for the project's finished agents, in its own package.json under `"framework": { "runs": "<command>" }` (the `logs` skill's package declares its `logs` command).
 [5] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its card and diary.
 [6] status: how an agent stands: `running`, `done`, `stopped`, `failed`, or `waiting` (it ended on a question, its checkout kept, and the answer resumes it).
+[7] branches provider: the command, among the commands of a project's dependencies, that a package declares as answering for the project's checkouts, in its own package.json under `"framework": { "branches": "<command>" }` (the `branches` skill's package declares its `branches` command); it lists the checkouts, tells what a branch holds, pushes and opens a branch's pull request, lands one, and reclaims a checkout (`store/branches.ts`).
 
 ## Business logic — TL;DR
 
 - **The finished agents** - what the runs provider answers, newest first, each card unfolded into the fields the dashboard reads; optionally only those started since a moment; read fresh when an agent just left its checkout.
-- **The agent in a checkout** - a checkout's card read as it stands, whatever its status, with the branch the checkout has checked out now; the project's own checkout holds no agent; nothing is ever repaired on read.
-- **Every agent that has a checkout** - each `agent-<id>` directory under `.branches/`, newest first; anything else in there is skipped.
+- **The agent in a checkout** - a checkout's card read as it stands, whatever its status, with the branch the checkout is on now as the branches provider lists it; nothing is ever repaired on read.
+- **Every agent that has a checkout** - each checkout the branches provider lists, newest first; a checkout with no card is skipped; a project with no provider has none.
 - **All agents, and one by id** - the ones with a checkout first, then the finished ones; an agent in both is listed once, from its checkout.
 - **One agent's events for replay** - the diary in the agent's checkout while it has one, else the finished agent's diary, each line turned into the event the dashboard draws.
 - **A finished agent's diary** - every line, from the runs provider; none for an agent whose record still says `running`.
@@ -44,11 +45,11 @@ The finished agents of a project are what its runs provider [4] lists, newest fi
 
 #### Context
 
-**Problem**: an agent that is working is not finished yet, or is finished only as its first leg; its current state is in its checkout. And the agent renames its branch itself while it works, while its card learns the new name only when the agent ends; the name the dashboard labels the agent by is read off that branch.
+**Problem**: an agent that is working is not finished yet, or is finished only as its first leg; its current state is in its checkout. And the agent renames its branch itself while it works, while its card learns the new name only when the agent ends.
 
 #### Business logic
 
-The agent a checkout [3] holds is read off the card `<agent id>.json` under the checkout's `.the-framework/`, the agent id [5] being the checkout directory's name without its `agent-` prefix. The card is read as it stands, `running` or not: an agent that ended `waiting` [6] keeps its checkout and is read the same way. The branch is the exception: it is the branch the checkout has checked out right now, read off the checkout's git files (its `.git` file names the checkout's git directory, whose `HEAD` names the branch). When those files cannot be read, or the checkout is on no branch, the card's branch stands. A directory whose name is not an agent's, a checkout with no card, and a card that does not parse are no agent. The project's own checkout is never an agent's, whatever files sit in it. A read never writes: an agent whose card says `running` while its process is gone stays as it is, since the tool that started it sweeps its own.
+The agent a checkout [3] holds is read off the card `<agent id>.json` under the checkout's `.the-framework/`, the checkout and the agent id [5] being what the branches provider [7] listed. The card is read as it stands, `running` or not: an agent that ended `waiting` [6] keeps its checkout and is read the same way. The branch is the exception: it is the branch the provider lists the checkout on right now; a checkout the provider lists on no branch keeps the card's branch. A checkout with no card, and a card that does not parse, are no agent. A read never writes: an agent whose card says `running` while its process is gone stays as it is, since the tool that started it sweeps its own.
 
 ### Every agent that has a checkout
 
@@ -58,7 +59,7 @@ See `## Context`.
 
 #### Business logic
 
-Every `agent-<id>` directory under the project's `.branches/` is read as above, each agent reported together with the path of its checkout, newest first. The links beside the checkouts, and any directory that is not an agent's, are skipped; a checkout that cannot be read is skipped rather than failing the list.
+Every checkout the project's branches provider [7] lists is read as above, each agent reported together with the path of its checkout, newest first. A project with no provider, or whose provider cannot be read, has no agent with a checkout; a checkout that cannot be read is skipped rather than failing the list. The provider's list is shared for five seconds (`branches.ts`), so a checkout that just appeared is seen within that time, or at once where a caller asks fresh (`agent-checkout.ts`, and the daemon after a Start).
 
 ### All agents, and one by id
 

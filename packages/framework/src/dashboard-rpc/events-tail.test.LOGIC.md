@@ -9,4 +9,5 @@ What the tests cover, against real files on disk and finished agents' lines hand
 - **Following a file that moves to another file** - the tail keeps its position across the move and follows appends at the new path.
 - **Waiting for the new answer** - while the file is gone and nothing can be resolved yet, the tail idles rather than hopping somewhere wrong, then catches up once the finished agent appears.
 - **A diary never seen in the checkout** - an agent started and recorded between two polls gets every finished line, and the boundary is still reported once.
+- **A diary nowhere yet** - the boundary is reported at once with nothing to replay; the tail asks again each poll, still nowhere, then once the diary has a file it delivers that file from its first line and follows appends, the boundary reported only once.
 - **An agent already finished** - every line, then the boundary, and nothing follows.

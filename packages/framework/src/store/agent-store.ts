@@ -1,9 +1,9 @@
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
 import type { FrameworkEvent } from '../events.js'
 import { nodeFs } from '../node-fs.js'
-import { agentBranchName, isSafeAgentId, worktreeDirEntries } from '@gemstack/skill-branches'
 import { THE_FRAMEWORK_DIR } from '../framework-dir.js'
-import { parseRunCard, projectRuns, type AnyDiaryLine, type RunsFor } from './runs.js'
+import { projectBranches, type BranchesFor, type Checkout } from './branches.js'
+import { isRunId, parseRunCard, projectRuns, type AnyDiaryLine, type RunsFor } from './runs.js'
 import { eventsOf, fromRunCard } from './run-record.js'
 
 /**
@@ -52,13 +52,12 @@ export interface AgentMeta {
   sessionLink?: string
   /**
    * The branch the agent's work is on: the card's, and for a run with a checkout the branch that
-   * checkout has checked out right now, since the agent renames its branch itself while the card
-   * learns the new name only when the run ends. The session name is this branch minus its prefix
-   * (#1725) — read off it by every surface, never stored beside it.
+   * checkout has checked out right now (the branches provider reads it), since the agent renames
+   * its branch itself while the card learns the new name only when the run ends.
    *
-   * Not reliably derivable instead of recorded: a clean agent loses its checkout, and the agent
-   * renames its branch itself (#1725), so the run-id branch is not guaranteed to be the one
-   * holding the commits.
+   * Recorded, not derived: a clean agent loses its checkout, and the agent renames its branch
+   * itself (#1725), so no name built from the run's id is guaranteed to be the one holding the
+   * commits.
    */
   branch?: string
   /**
@@ -169,8 +168,6 @@ export interface StoreFs {
   mkdir(path: string): Promise<void>
   /** List a directory's entries (names only). Missing dir yields `[]`. */
   readdir(path: string): Promise<string[]>
-  /** The names of the *directories* under `path` — a symlink is not one. Missing dir yields `[]`. */
-  subdirs(path: string): Promise<string[]>
 }
 
 /** Newest run first: an id sorts chronologically, so the id order IS the time order (no parse). */
@@ -199,7 +196,7 @@ export async function listAgents(cwd: string, runs: RunsFor = projectRuns, opts:
  * checkout exists: that run is not finished, its diary is still to come in the checkout.
  */
 export async function readFinishedDiary(cwd: string, agentId: string, runs: RunsFor = projectRuns): Promise<AnyDiaryLine[] | undefined> {
-  if (!isSafeAgentId(agentId)) return undefined
+  if (!isRunId(agentId)) return undefined
   const run = await (await runs(cwd).catch(() => undefined))?.show(agentId).catch(() => undefined)
   return run && run.card.status !== 'running' ? run.diary : undefined
 }
@@ -220,40 +217,20 @@ export function isPidAlive(pid: number): boolean {
   }
 }
 
-/** The id of the run a checkout is for: the directory is `agent-<id>`. The project root is no run's. */
-function checkoutAgentId(cwd: string): string | undefined {
-  const name = cwd.split('/').pop() ?? ''
-  const prefix = agentBranchName('')
-  return name.startsWith(prefix) ? name.slice(prefix.length) : undefined
-}
-
 /**
  * The run a checkout holds, off its live card, `<id>.json` under the checkout's `.the-framework/`:
  * the shape agent-driver's log writes, read as the meta the card unfolds to, `running` or not (a
- * run that ended waiting on a question keeps its checkout), with the branch the checkout is on
- * now. `undefined` when there is none.
+ * run that ended waiting on a question keeps its checkout), on the branch the checkout is on now
+ * (the provider read it), since the agent renames its branch itself while its card learns the new
+ * name only when the run ends. `undefined` when there is no card.
  * Never healed here: the tool that started the run sweeps its own dead runs.
  */
-export async function readLiveMeta(cwd: string, fs: StoreFs = nodeStoreFs()): Promise<AgentMeta | undefined> {
-  const id = checkoutAgentId(cwd)
-  if (id === undefined) return undefined
-  const path = join(cwd, THE_FRAMEWORK_DIR, `${id}.json`)
+export async function readLiveMeta(checkout: Checkout, fs: StoreFs = nodeStoreFs()): Promise<AgentMeta | undefined> {
+  const path = join(checkout.path, THE_FRAMEWORK_DIR, `${checkout.id}.json`)
   if (!(await fs.exists(path))) return undefined
   const card = parseRunCard(await fs.read(path).catch(() => ''))
   if (!card) return undefined
-  const branch = await checkoutBranch(cwd, fs)
-  return fromRunCard(branch ? { ...card, branch } : card)
-}
-
-/**
- * The branch a checkout has checked out, off its git files: a worktree's `.git` file names the
- * worktree's git directory, whose `HEAD` names the branch. `undefined` when either cannot be read
- * or the checkout is on no branch.
- */
-async function checkoutBranch(cwd: string, fs: StoreFs): Promise<string | undefined> {
-  const gitdir = /^gitdir: (.+)$/m.exec(await fs.read(join(cwd, '.git')).catch(() => ''))?.[1]?.trim()
-  if (!gitdir) return undefined
-  return /^ref: refs\/heads\/(.+)$/m.exec(await fs.read(join(resolve(cwd, gitdir), 'HEAD')).catch(() => ''))?.[1]?.trim()
+  return fromRunCard(checkout.branch ? { ...card, branch: checkout.branch } : card)
 }
 
 /** A run with a checkout, plus that checkout (#738): where to read the run's git and file status from. */
@@ -263,16 +240,16 @@ export interface LiveAgent extends AgentMeta {
 }
 
 /**
- * Every run of a project that has a checkout (#738): each `.branches/*` checkout's card, through
- * {@link readLiveMeta}. Newest first, by id. Never throws: an unreadable checkout is skipped.
+ * Every run of a project that has a checkout (#738): each checkout the project's branches
+ * provider lists, its card through {@link readLiveMeta}. Newest first, by id. Never throws: a
+ * project with no provider has no checkouts, and an unreadable checkout is skipped.
  */
-export async function readLiveMetas(cwd: string, fs: StoreFs = nodeStoreFs()): Promise<LiveAgent[]> {
-  // The checkouts under `.branches/`: the agent-branch-named directories, never the rename links beside them.
-  const candidates = (await worktreeDirEntries(cwd, path => fs.subdirs(path))).map(entry => entry.path)
+export async function readLiveMetas(cwd: string, fs: StoreFs = nodeStoreFs(), branches: BranchesFor = projectBranches): Promise<LiveAgent[]> {
+  const checkouts = (await (await branches(cwd).catch(() => undefined))?.list().catch(() => [])) ?? []
   const agents: LiveAgent[] = []
-  for (const candidate of candidates) {
-    const meta = await readLiveMeta(candidate, fs).catch(() => undefined)
-    if (meta) agents.push({ ...meta, cwd: candidate })
+  for (const checkout of checkouts) {
+    const meta = await readLiveMeta(checkout, fs).catch(() => undefined)
+    if (meta) agents.push({ ...meta, cwd: checkout.path })
   }
   return agents.sort(byIdDesc)
 }
@@ -297,9 +274,9 @@ function parseDiary(raw: string): AnyDiaryLine[] {
  * one (it is the newer of the two), else the finished run's diary from the runs provider.
  * `undefined` for an unknown or unsafe id.
  */
-export async function loadAgentEvents(cwd: string, id: string, fs: StoreFs = nodeStoreFs(), runs: RunsFor = projectRuns): Promise<FrameworkEvent[] | undefined> {
-  if (!isSafeAgentId(id)) return undefined
-  const live = (await readLiveMetas(cwd, fs).catch((): LiveAgent[] => [])).find(agent => agent.id === id)
+export async function loadAgentEvents(cwd: string, id: string, fs: StoreFs = nodeStoreFs(), runs: RunsFor = projectRuns, branches: BranchesFor = projectBranches): Promise<FrameworkEvent[] | undefined> {
+  if (!isRunId(id)) return undefined
+  const live = (await readLiveMetas(cwd, fs, branches).catch((): LiveAgent[] => [])).find(agent => agent.id === id)
   const liveDiary = live ? join(live.cwd, THE_FRAMEWORK_DIR, `${id}.jsonl`) : undefined
   if (liveDiary && (await fs.exists(liveDiary))) return eventsOf(parseDiary(await fs.read(liveDiary).catch(() => '')))
   const diary = await readFinishedDiary(cwd, id, runs)
@@ -310,8 +287,8 @@ export async function loadAgentEvents(cwd: string, id: string, fs: StoreFs = nod
 export function nodeStoreFs(): StoreFs {
   // Destructured rather than returned whole: the narrow interface is the contract,
   // so the object should not carry methods the store was never handed.
-  const { read, write, append, exists, mkdir, readdir, subdirs } = nodeFs()
-  return { read, write, append, exists, mkdir, readdir, subdirs }
+  const { read, write, append, exists, mkdir, readdir } = nodeFs()
+  return { read, write, append, exists, mkdir, readdir }
 }
 
 /** The runs each project had a checkout for at its last {@link readAllAgents}, by project path. */
@@ -324,8 +301,8 @@ const liveSeen = new Map<string, Set<string>>()
  * The checkout's card wins over the recorded one (#768): a resumed run has a record from its
  * first leg AND is going again, and the record alone would show a running agent as finished.
  */
-export async function readAllAgents(cwd: string, fs: StoreFs = nodeStoreFs(), runs: RunsFor = projectRuns): Promise<AgentMeta[]> {
-  const live = await readLiveMetas(cwd, fs).catch(() => [] as LiveAgent[])
+export async function readAllAgents(cwd: string, fs: StoreFs = nodeStoreFs(), runs: RunsFor = projectRuns, branches: BranchesFor = projectBranches): Promise<AgentMeta[]> {
+  const live = await readLiveMetas(cwd, fs, branches).catch(() => [] as LiveAgent[])
   // A run that left its checkout since the last read was recorded a moment before: the provider's
   // list read before that would not have it, and its row would blink out until the next read.
   const ids = new Set(live.map(agent => agent.id))
@@ -337,6 +314,6 @@ export async function readAllAgents(cwd: string, fs: StoreFs = nodeStoreFs(), ru
 }
 
 /** One run's meta by id, the checkout's card winning over the record: {@link readAllAgents}'s rule for a single row. */
-export async function findAgent(cwd: string, agentId: string, fs: StoreFs = nodeStoreFs(), runs: RunsFor = projectRuns): Promise<AgentMeta | undefined> {
-  return (await readAllAgents(cwd, fs, runs)).find(agent => agent.id === agentId)
+export async function findAgent(cwd: string, agentId: string, fs: StoreFs = nodeStoreFs(), runs: RunsFor = projectRuns, branches: BranchesFor = projectBranches): Promise<AgentMeta | undefined> {
+  return (await readAllAgents(cwd, fs, runs, branches)).find(agent => agent.id === agentId)
 }

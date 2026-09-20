@@ -35,8 +35,8 @@ The workflow, named "CI", runs on every push to any branch and on every pull req
 One job on the latest Ubuntu runner, with pnpm, Node 22 and pnpm's download cache, runs four commands at the repository root, each only if the previous one succeeded:
 
 1. `pnpm install`: every package's dependencies.
-2. `pnpm build`: the framework package's build, which builds the four skill packages and the `agent-driver` package, compiles the framework, copies the browser extension into it (`packages/framework/scripts/copy-extension.mjs`) and builds the dashboard.
-3. `pnpm typecheck`: the framework package, its dashboard, and the website package.
+2. `pnpm build`: every package the daemon runs, in dependency order, the same list `clean` and `test` name: `agent-data`, `skill-branches`, `skill-tickets`, `skill-queue`, `skill-logs`, `agent-driver`, `agent-scheduler`, then the framework, whose build compiles it, copies the browser extension into it (`packages/framework/scripts/copy-extension.mjs`) and builds the dashboard. A package the framework does not import, the scheduler, is built all the same: the daemon starts it.
+3. `pnpm typecheck`: the same eight packages (each skill package's dashboard included), then the website package.
 4. `pnpm test`: the tests of every package, in order: `agent-data`, `skill-branches`, `skill-tickets`, `skill-queue`, `skill-logs`, `agent-driver`, `agent-scheduler`, then `framework`.
 
 The first failing command fails the job; the later commands do not run.

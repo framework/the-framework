@@ -74,6 +74,9 @@ export type RunsWrite = { ok: true } | { ok: false; error: string }
 /** The finished runs of the project at `root`, or `undefined` when none of its packages provides them. */
 export type RunsFor = (root: string) => Promise<RunsSource | undefined>
 
+/** A {@link RunsFor} that also forgets what it read of one project, for when a widget just wrote there. */
+export type RunsReader = RunsFor & { changed(root: string): void }
+
 const STATUSES: readonly RunStatus[] = ['running', 'done', 'stopped', 'failed', 'waiting']
 
 /** Whether a string can name a run: letters, digits, `-` and `_`, nothing a path can climb out with. */
@@ -188,11 +191,12 @@ function commandRuns(root: string, command: ProvidedCommand, now: () => number):
  * The production {@link RunsFor}: the project's provider, looked up by its package.json, one
  * source per project kept while the same command provides — so the cache holds across the many
  * reads of one poll, and a project that installs, swaps or drops its provider is read the new way
- * within {@link CACHE_MS}.
+ * within {@link CACHE_MS}. `changed(root)` forgets that project's reads, so the next read runs the
+ * command again: a widget's command just ran there, and may have written.
  */
-export function providedRuns(now: () => number = Date.now): RunsFor {
+export function providedRuns(now: () => number = Date.now): RunsReader {
   const sources = new Map<string, { at: number; command?: ProvidedCommand; source?: ReturnType<typeof commandRuns> }>()
-  return async root => {
+  const reader: RunsFor = async root => {
     let known = sources.get(root)
     if (!known || now() - known.at >= CACHE_MS) {
       const command = await readProvidedCommand(root, 'runs').catch(() => undefined)
@@ -202,10 +206,11 @@ export function providedRuns(now: () => number = Date.now): RunsFor {
     }
     return known.source
   }
+  return Object.assign(reader, { changed: (root: string) => sources.get(root)?.source?.drop() })
 }
 
 /** The framework's one reader of finished runs, shared by every caller so they share its cache. */
-export const projectRuns: RunsFor = providedRuns()
+export const projectRuns: RunsReader = providedRuns()
 
 /** A {@link RunsFor} for a project with no provider: no finished runs. */
 export const noRuns: RunsFor = async () => undefined

@@ -22,13 +22,13 @@ export interface QueueEntryLabel {
 /** `[title](target)` at the start of a line, with the title allowed to contain anything but `]`. */
 const LEADING_LINK = /^\s*\[([^\]]+)\]\(([^)\s]+)\)\s*/
 
-/** Where a queued ticket's link points (#1164) — same prefix `sendQueueTicket` writes. */
+/** Where a queued ticket's link points (#1164) — the same prefix a ticket's link carries (`lib/ticket-link.ts`). */
 const TICKET_PREFIX = 'tickets/'
 
 /**
  * What one queue entry should read as, and where it points.
  *
- * Only a link at the START of the entry counts as its title: that is where {@link sendQueueTicket}
+ * Only a link at the START of the entry counts as its title: that is where a queued ticket's link
  * writes it, and a link further in is part of a sentence rather than the name of the work. Anything
  * after the link is the agent's own note, which is detail — it belongs in the tooltip, not in a
  * one-line list that would truncate the title away to show it.

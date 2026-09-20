@@ -1,13 +1,24 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react'
+import type { ReactElement } from 'react'
+import { WidgetsContext, type MountedWidgets } from '../lib/use-widgets.js'
 
 const onTicket = vi.hoisted(() => vi.fn())
 vi.mock('../rpc/reads.js', () => ({ onTicket }))
-const sendQueueTicket = vi.hoisted(() => vi.fn())
 const sendReleaseTicketLock = vi.hoisted(() => vi.fn())
-vi.mock('../rpc/control.js', () => ({ sendQueueTicket, sendReleaseTicketLock }))
+vi.mock('../rpc/control.js', () => ({ sendReleaseTicketLock }))
 
 const { TicketDetailPage } = await import('./TicketDetailPage.js')
+
+// The one link action an installed widget offers here (#1774): a queue package's "Add to queue",
+// present in project p1. Its `run` is the spy the queueing tests read.
+const addToQueue = vi.fn()
+const widgets = (projects: string[] = ['p1']): MountedWidgets => ({
+  pages: [],
+  linkActions: [{ label: 'Add to queue', doneLabel: 'Queued', run: addToQueue, package: '@x/queue', projects }],
+  loaded: true,
+})
+const render = (ui: ReactElement, mounted: MountedWidgets = widgets()) => rtlRender(<WidgetsContext.Provider value={mounted}>{ui}</WidgetsContext.Provider>)
 
 const ticket = (over: Record<string, unknown> = {}) => ({
   file: '2026-07-20_do-the-thing.md',
@@ -22,12 +33,12 @@ const ticket = (over: Record<string, unknown> = {}) => ({
 afterEach(() => {
   cleanup()
   onTicket.mockReset()
-  sendQueueTicket.mockReset()
+  addToQueue.mockReset()
   sendReleaseTicketLock.mockReset()
 })
 
 // One ticket's own page (#1144): the entire file, read by the same slug the list row and the
-// route carry, plus the Queue action the one-liner list no longer has room for.
+// route carry, plus the actions on it the one-liner list no longer has room for.
 describe('TicketDetailPage (#1144)', () => {
   test('reads the ticket by slug and renders its full content', async () => {
     onTicket.mockResolvedValue(ticket({ priority: '8', planned: true }))
@@ -74,35 +85,47 @@ describe('TicketDetailPage (#1144)', () => {
     expect(screen.getByText('Uncertainty: 0')).toBeTruthy()
   })
 
-  test('queueing writes it to the queue, with the ticket it came from (#1164)', async () => {
+  test('the ticket is handed as a link to the widget\'s action, at the priority its own says (#1164/#1774)', async () => {
     onTicket.mockResolvedValue(ticket({ priority: '8' }))
-    sendQueueTicket.mockResolvedValue({ ok: true, file: 'TODO_AGENTS.md' })
+    addToQueue.mockResolvedValue({ ok: true })
     render(<TicketDetailPage projectId="p1" slug="2026-07-20_do-the-thing.md" onBack={() => {}} />)
-    fireEvent.click(await screen.findByRole('button', { name: /queue/i }))
-    await waitFor(() =>
-      expect(sendQueueTicket).toHaveBeenCalledWith('p1', 'Do the thing', {
-        file: '2026-07-20_do-the-thing.md',
-        priority: '8',
-      }),
-    )
+    fireEvent.click(await screen.findByRole('button', { name: 'Add to queue' }))
+    // The title as the link, pointing back at the ticket's file, its priority as a number on the
+    // queue's own 0–10 scale.
+    await waitFor(() => expect(addToQueue).toHaveBeenCalledWith(expect.anything(), 'p1', [{ text: 'Do the thing', href: 'tickets/2026-07-20_do-the-thing.md', priority: 8 }]))
+  })
+
+  test('a ticket with no priority is handed over at 5, the middle of the scale', async () => {
+    onTicket.mockResolvedValue(ticket())
+    addToQueue.mockResolvedValue({ ok: true })
+    render(<TicketDetailPage projectId="p1" slug="2026-07-20_do-the-thing.md" onBack={() => {}} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Add to queue' }))
+    await waitFor(() => expect(addToQueue).toHaveBeenCalledWith(expect.anything(), 'p1', [{ text: 'Do the thing', href: 'tickets/2026-07-20_do-the-thing.md', priority: 5 }]))
   })
 
   test('a queued ticket says so and cannot be queued twice', async () => {
     onTicket.mockResolvedValue(ticket())
-    sendQueueTicket.mockResolvedValue({ ok: true, file: 'TODO_AGENTS.md' })
+    addToQueue.mockResolvedValue({ ok: true })
     render(<TicketDetailPage projectId="p1" slug="2026-07-20_do-the-thing.md" onBack={() => {}} />)
-    fireEvent.click(await screen.findByRole('button', { name: /queue/i }))
-    const queued = await screen.findByRole('button', { name: /queued/i })
+    fireEvent.click(await screen.findByRole('button', { name: 'Add to queue' }))
+    const queued = await screen.findByRole('button', { name: 'Queued' })
     expect((queued as HTMLButtonElement).disabled).toBe(true)
   })
 
-  test('a failed queue write surfaces and leaves the button addable', async () => {
+  test('a failed action surfaces its reason and leaves the button addable', async () => {
     onTicket.mockResolvedValue(ticket())
-    sendQueueTicket.mockResolvedValue({ ok: false, error: 'the queue could not be written' })
+    addToQueue.mockResolvedValue({ ok: false, error: 'the queue could not be written' })
     render(<TicketDetailPage projectId="p1" slug="2026-07-20_do-the-thing.md" onBack={() => {}} />)
-    fireEvent.click(await screen.findByRole('button', { name: /queue/i }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Add to queue' }))
     expect(await screen.findByText(/could not be written/i)).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /queued/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Queued' })).toBeNull()
+  })
+
+  test('no widget offering an action on links in this project, no button (#1774)', async () => {
+    onTicket.mockResolvedValue(ticket())
+    render(<TicketDetailPage projectId="p1" slug="2026-07-20_do-the-thing.md" onBack={() => {}} />, widgets(['p2']))
+    await screen.findByRole('heading', { name: 'Do the thing' })
+    expect(screen.queryByRole('button', { name: /queue/i })).toBeNull()
   })
 
   test('a missing ticket says so rather than rendering blank', async () => {

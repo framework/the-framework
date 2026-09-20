@@ -1,4 +1,4 @@
-The "Onboarding" card: the five things a new install needs, each shown in the state it is actually in. A step is ticked only because a fact holds — a registered project, a non-empty agent queue [2], a ticket on disk, a granted browser permission, a Discord webhook held by the daemon — never because it was clicked, and each open step carries the action that gets it done, including a one-click first project and a one-click import of the project's GitHub issues.
+The "Onboarding" card: the five things a new install needs (four while no project has a queue), each shown in the state it is actually in. A step is ticked only because a fact holds — a registered project, a non-empty agent queue [2], a ticket on disk, a granted browser permission, a Discord webhook held by the daemon — never because it was clicked, and each open step carries the action that gets it done, including a one-click first project and a one-click import of the project's GitHub issues.
 
 ## Context
 
@@ -20,7 +20,7 @@ The "Onboarding" card: the five things a new install needs, each shown in the st
 - **Every "done" is a fact** - the card re-reads the dashboard's state every 10 seconds and derives each tick from it; nothing is ticked by clicking, and a step done elsewhere shows ticked anyway.
 - **The card, its count and its dismissal** - "Onboarding" with "<n> of 5 set up."; on the Overview [4] an X hides it for good by writing the dismissal to the preferences [3], and the Settings [5] page always shows it.
 - **"Add a project"** - done once any project is registered; offers "Add <directory> as project" for the directory the daemon runs in when it is not registered yet, and "Select & add project directory".
-- **"Populate the queue of AI tasks"** - done once any project's agent queue [2] has an open entry; the one essential step with no button, it is done by agents.
+- **"Populate the queue of AI tasks"** - on the board only while some registered project has a queue at all (a queue comes from a package the project depends on); done once any project's agent queue [2] has an open entry; the one essential step with no button, it is done by agents.
 - **"Populate tickets/"** - optional; done once any project has tickets; "Update from GitHub" starts an agent [1] with the project's `update-tickets` command on the target project and lands the user on it, or, through its chevron, opens that project's launcher [6] with the prompt.
 - **"Add browser notifications"** - optional; done once the browser permission is granted and browser delivery is on; "Enable" turns delivery on and asks the browser for permission.
 - **"Add Discord notifications"** - optional; done once the daemon holds a Discord webhook; "Add the webhook" opens the dialog that saves one.
@@ -67,7 +67,7 @@ The card is titled "Onboarding" with "<done> of 5 set up." under it. On the Over
 
 #### Business logic
 
-Description: "TODO_AGENTS.md is the queue: each entry is work the agent picks up on its own, so a filled queue is what lets it keep going without you." Done once the open entries across all projects number more than zero. No action is offered.
+The step is listed only while at least one registered project has a queue, that is, depends on a package that provides one; with no such project the board has four steps and asks for no queue. Description: "The agent queue: each entry is work the agent picks up on its own, so a filled queue is what lets it keep going without you." Done once the open entries across all projects number more than zero. No action is offered.
 
 ### "Populate tickets/"
 

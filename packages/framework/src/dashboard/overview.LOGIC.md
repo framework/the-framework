@@ -10,7 +10,7 @@ Builds the data behind the dashboard's cross-project Overview [1] and its shared
 
 [1] the Overview: the dashboard's cross-project page at `/`.
 [2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps. Started from the dashboard by the user, or by the daemon.
-[3] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down. An item on it is a queue entry.
+[3] the agent queue: every task agents will work next, in the order they will be taken, kept by a project package and read through the command that package declares (`queue.ts`, `../store/queue.ts`). An item on it is a queue entry.
 [4] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [5] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
 [7] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
@@ -60,7 +60,7 @@ See `## Context`.
 
 #### Business logic
 
-Every project's agent queue [3] is read (the rules are in `queue.ts`) and the open entries of all of them are added into one number.
+Every project's agent queue [3] is read (the rules are in `queue.ts`; a project with no queue counts nothing) and the open entries of all of them are added into one number.
 
 ### Recent projects
 
@@ -95,7 +95,7 @@ Every project's agents, the record [9] included, are pooled and ordered by their
 Every project's tickets are read (`tickets.ts`) and each ticket is placed in the first lane that applies, or left off the card when none does:
 
 - **in progress**: the ticket has a plan [12].
-- **on the agent queue** (the card's "AI Queue" lane): an open entry of the project's agent queue [3] begins with a markdown link, and that link points at this ticket's file under `tickets/`. A link elsewhere in the entry does not count, and neither does a link to something other than a ticket. A finished entry does not count.
+- **on the agent queue** (the card's "AI Queue" lane): an open entry of the project's agent queue [3] begins with a markdown link, and that link points at this ticket's file under `tickets/`. A link elsewhere in the entry does not count, and neither does a link to something other than a ticket.
 - **high priority**: the ticket's `Priority:` reads 7 or more on the ticket format's 10-to-0 scale, where 10 is critical and 0 is only-if-capacity. Word spellings such as `high`, `urgent`, `p0` or `p1` are not on that scale and never qualify.
 
 A ticket's file name is only unique inside its own repository, so the implementing match is made per project: another project's agent never lights up a same-named ticket. The pooled list is ordered lane first, in progress, then the agent queue, then high priority, with the tickets' own order kept inside a lane, and at most 60 tickets are pooled; the card itself trims each lane further. A project whose tickets or agents cannot be read contributes nothing.

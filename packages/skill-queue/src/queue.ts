@@ -15,21 +15,46 @@ import { resolveQueueDeps, type QueueDeps } from './store.js'
  * order.
  */
 export function parseQueueEntries(md: string): string[] {
-  const entries: string[] = []
+  return parseQueueSections(md).map(placed => placed.entry)
+}
+
+/** An open entry with the `## Priority N` section it sits in; no `priority` for an entry outside any priority section. */
+export interface PlacedEntry {
+  entry: string
+  priority?: number
+}
+
+/**
+ * The open entries of the queue, in file order, each with the priority of the `## Priority N`
+ * section it sits in: what a dashboard shows as sections. The entry rules are
+ * {@link parseQueueEntries}'s; a section runs to the next second-level heading, and an entry
+ * before any priority section, or under a second-level heading that is not one, has no priority.
+ */
+export function parseQueueSections(md: string): PlacedEntry[] {
+  const placed: PlacedEntry[] = []
+  let priority: number | undefined
   for (const line of md.split('\n')) {
-    const item = /^\s*(?:[-*]|\d+\.)\s+(.*)$/.exec(line)
-    if (!item) continue
-    const text = item[1]!.trim()
-    if (!text) continue
-    const task = /^\[([ xX])\]\s*(.*)$/.exec(text)
-    if (task) {
-      if (task[1] !== ' ') continue
-      if (task[2]!.trim()) entries.push(task[2]!.trim())
-    } else {
-      entries.push(text)
+    if (SECTION_HEADING.test(line)) {
+      const heading = PRIORITY_HEADING.exec(line)
+      priority = heading ? Number(heading[1]) : undefined
+      continue
     }
+    const entry = openEntry(line)
+    if (entry !== undefined) placed.push(priority === undefined ? { entry } : { entry, priority })
   }
-  return entries
+  return placed
+}
+
+/** The open entry a line is, or `undefined`: a list item with text, its task box (only unchecked) dropped. */
+function openEntry(line: string): string | undefined {
+  const item = /^\s*(?:[-*]|\d+\.)\s+(.*)$/.exec(line)
+  if (!item) return undefined
+  const text = item[1]!.trim()
+  if (!text) return undefined
+  const task = /^\[([ xX])\]\s*(.*)$/.exec(text)
+  if (!task) return text
+  if (task[1] !== ' ') return undefined
+  return task[2]!.trim() || undefined
 }
 
 /** A `## Priority 7` heading, with whatever gloss the format's example puts after the number. */

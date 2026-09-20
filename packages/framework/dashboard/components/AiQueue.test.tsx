@@ -22,17 +22,12 @@ const { takePendingDraft } = await import('../lib/draft-handoff.js')
 const RUN_LABEL = 'Spin up an agent working on this entry'
 const COUNT_LABEL = 'How many agents to spin up'
 
-const queue = (items: { text: string; done?: boolean }[], over: Partial<ProjectQueue> = {}): ProjectQueue => {
-  const full = items.map(i => ({ text: i.text, done: i.done ?? false }))
-  return {
-    projectId: 'p1',
-    projectName: 'gemstack',
-    open: full.filter(i => !i.done).length,
-    total: full.length,
-    items: full,
-    ...over,
-  }
-}
+const queue = (entries: string[], over: Partial<ProjectQueue> = {}): ProjectQueue => ({
+  projectId: 'p1',
+  projectName: 'gemstack',
+  entries,
+  ...over,
+})
 
 beforeEach(() => {
   prefs = {}
@@ -50,7 +45,7 @@ describe('AiQueue', () => {
     const entry = '[Improve tooltip](tickets/2026-07-25_improve-tooltip.md) — agent note'
     render(
       <AiQueue
-        queue={[queue([{ text: entry }])]}
+        queue={[queue([entry])]}
         loading={false}
         onOpenTicket={(...args) => opened.push(args)}
         onAgentStarted={() => {}}
@@ -69,7 +64,7 @@ describe('AiQueue', () => {
     const url = 'https://github.com/gemstack-land/the-framework/issues/42'
     render(
       <AiQueue
-        queue={[queue([{ text: `[Fix the publish job](${url})` }])]}
+        queue={[queue([`[Fix the publish job](${url})`])]}
         loading={false}
         onOpenTicket={() => {}}
         onAgentStarted={() => {}}
@@ -85,7 +80,7 @@ describe('AiQueue', () => {
   test('a plain entry stays plain text: nothing to open, so nothing pretends to', () => {
     render(
       <AiQueue
-        queue={[queue([{ text: 'Apply the maintainability preset' }])]}
+        queue={[queue(['Apply the maintainability preset'])]}
         loading={false}
         onOpenTicket={() => {}}
         onAgentStarted={() => {}}
@@ -105,7 +100,7 @@ describe('AiQueue', () => {
     const entry = '[Improve tooltip](tickets/2026-07-25_improve-tooltip.md) — agent note'
     render(
       <AiQueue
-        queue={[queue([{ text: 'first entry' }, { text: entry }])]}
+        queue={[queue(['first entry', entry])]}
         loading={false}
         onOpenTicket={() => {}}
         onAgentStarted={(...args) => started.push(args)}
@@ -127,7 +122,7 @@ describe('AiQueue', () => {
 
   test('the play button says what it does on hover', async () => {
     render(
-      <AiQueue queue={[queue([{ text: 'entry' }])]} loading={false} onOpenTicket={() => {}} onAgentStarted={() => {}} onSelectProject={() => {}} />,
+      <AiQueue queue={[queue(['entry'])]} loading={false} onOpenTicket={() => {}} onAgentStarted={() => {}} onSelectProject={() => {}} />,
     )
     const button = screen.getByRole('button', { name: RUN_LABEL })
     expect((await hoverTooltip(button)).textContent).toBe(RUN_LABEL)
@@ -138,7 +133,7 @@ describe('AiQueue', () => {
     const started: unknown[][] = []
     render(
       <AiQueue
-        queue={[queue([{ text: 'entry' }])]}
+        queue={[queue(['entry'])]}
         loading={false}
         onOpenTicket={() => {}}
         onAgentStarted={(...args) => started.push(args)}
@@ -156,7 +151,7 @@ describe('AiQueue', () => {
     const started: unknown[][] = []
     render(
       <AiQueue
-        queue={[queue([{ text: 'entry' }])]}
+        queue={[queue(['entry'])]}
         loading={false}
         onOpenTicket={() => {}}
         onAgentStarted={(...args) => started.push(args)}
@@ -173,7 +168,7 @@ describe('AiQueue', () => {
     busy = true
     render(
       <AiQueue
-        queue={[queue([{ text: 'one' }, { text: 'two' }])]}
+        queue={[queue(['one', 'two'])]}
         loading={false}
         onOpenTicket={() => {}}
         onAgentStarted={() => {}}
@@ -195,10 +190,10 @@ describe('AiQueue', () => {
 
   test('the fan-out button starts one agent per top open entry, three by default', async () => {
     const started: unknown[][] = []
-    // A done entry sits second, so "the top three" is provably the top three OPEN entries.
+    // Five entries, so "the top three" is provably the top three in queue order.
     render(
       <AiQueue
-        queue={[queue([{ text: 'one' }, { text: 'skipped', done: true }, { text: 'two' }, { text: 'three' }, { text: 'four' }])]}
+        queue={[queue(['one', 'two', 'three', 'four', 'five'])]}
         loading={false}
         onOpenTicket={() => {}}
         onAgentStarted={(...args) => started.push(args)}
@@ -226,7 +221,7 @@ describe('AiQueue', () => {
   test('the count beside the button sets how many agents the click starts', async () => {
     render(
       <AiQueue
-        queue={[queue([{ text: 'one' }, { text: 'two' }, { text: 'three' }])]}
+        queue={[queue(['one', 'two', 'three'])]}
         loading={false}
         onOpenTicket={() => {}}
         onAgentStarted={() => {}}
@@ -242,7 +237,7 @@ describe('AiQueue', () => {
   test('the button promises only what is open: a two-entry queue caps the default three', async () => {
     render(
       <AiQueue
-        queue={[queue([{ text: 'one' }, { text: 'two' }])]}
+        queue={[queue(['one', 'two'])]}
         loading={false}
         onOpenTicket={() => {}}
         onAgentStarted={() => {}}
@@ -256,7 +251,7 @@ describe('AiQueue', () => {
 
   test('a single open entry makes the fan-out read singular', () => {
     render(
-      <AiQueue queue={[queue([{ text: 'only' }])]} loading={false} onOpenTicket={() => {}} onAgentStarted={() => {}} onSelectProject={() => {}} />,
+      <AiQueue queue={[queue(['only'])]} loading={false} onOpenTicket={() => {}} onAgentStarted={() => {}} onSelectProject={() => {}} />,
     )
     expect(fanOutLabel(1)).toBe('Spin up an agent working on the top entry')
     expect(screen.getByRole('button', { name: fanOutLabel(1) })).toBeTruthy()
@@ -267,7 +262,7 @@ describe('AiQueue', () => {
     start.mockResolvedValueOnce({ ok: true, agentId: 'run-1' }).mockResolvedValueOnce(undefined)
     render(
       <AiQueue
-        queue={[queue([{ text: 'one' }, { text: 'two' }, { text: 'three' }])]}
+        queue={[queue(['one', 'two', 'three'])]}
         loading={false}
         onOpenTicket={() => {}}
         onAgentStarted={() => {}}
@@ -287,7 +282,7 @@ describe('AiQueue', () => {
     start.mockImplementation(() => new Promise(resolve => releases.push(resolve)))
     render(
       <AiQueue
-        queue={[queue([{ text: 'one' }, { text: 'two' }])]}
+        queue={[queue(['one', 'two'])]}
         loading={false}
         onOpenTicket={() => {}}
         onAgentStarted={() => {}}
@@ -320,7 +315,7 @@ describe('AiQueue', () => {
     const entry = '[Improve tooltip](tickets/2026-07-25_improve-tooltip.md) — agent note'
     render(
       <AiQueue
-        queue={[queue([{ text: 'first entry' }, { text: entry }])]}
+        queue={[queue(['first entry', entry])]}
         loading={false}
         onOpenTicket={() => {}}
         onAgentStarted={() => {}}
@@ -339,7 +334,7 @@ describe('AiQueue', () => {
     const selected: string[] = []
     render(
       <AiQueue
-        queue={[queue([{ text: 'one' }, { text: 'two' }, { text: 'three' }])]}
+        queue={[queue(['one', 'two', 'three'])]}
         loading={false}
         onOpenTicket={() => {}}
         onAgentStarted={() => {}}
@@ -361,8 +356,8 @@ describe('AiQueue', () => {
     render(
       <AiQueue
         queue={[
-          queue([{ text: 'alpha entry' }]),
-          queue([{ text: 'beta entry' }], { projectId: 'p2', projectName: 'other' }),
+          queue(['alpha entry']),
+          queue(['beta entry'], { projectId: 'p2', projectName: 'other' }),
         ]}
         loading={false}
         onOpenTicket={() => {}}
@@ -374,13 +369,10 @@ describe('AiQueue', () => {
     await waitFor(() => expect(selected).toEqual(['p2']))
   })
 
-  test('done entries and projects with nothing open are not shown', () => {
+  test('a project with a queue but nothing on it is not shown', () => {
     render(
       <AiQueue
-        queue={[
-          queue([{ text: 'open entry' }, { text: 'finished entry', done: true }]),
-          queue([{ text: 'all done', done: true }], { projectId: 'p2', projectName: 'rudder' }),
-        ]}
+        queue={[queue(['open entry']), queue([], { projectId: 'p2', projectName: 'rudder' })]}
         loading={false}
         onOpenTicket={() => {}}
         onAgentStarted={() => {}}
@@ -388,7 +380,6 @@ describe('AiQueue', () => {
       />,
     )
     expect(screen.getByText('open entry')).toBeTruthy()
-    expect(screen.queryByText('finished entry')).toBeNull()
     expect(screen.queryByText('rudder')).toBeNull()
   })
 

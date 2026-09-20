@@ -1,9 +1,9 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { nodeGitRunner, DATA_BRANCH } from '@gemstack/agent-data'
+import { nodeGitRunner, withFileBranch, DATA_BRANCH } from '@gemstack/agent-data'
 import { runCli, USAGE } from './cli.js'
 import { QUEUE_FILE } from './names.js'
 
@@ -96,6 +96,33 @@ test('add creates the queue file when the branch has none', async () => {
     assert.equal((await run(a!, ['add', 'first ever', '--priority', '5'])).code, 0)
     assert.equal(await git(['show', `${DATA_BRANCH}:${QUEUE_FILE}`], bare), '## Priority 5\n\n- first ever\n')
     assert.deepEqual((await run(a!, [])).json, ['first ever'])
+  } finally {
+    await cleanup()
+  }
+})
+
+test('--full prints each entry with its section\'s priority; --local reads this machine\'s copy with no fetch, the persistent checkout first', async () => {
+  const { agents, seed, cleanup } = await rig(1, '## Priority 8\n\n- [Do A](tickets/2026-08-30_a.md)\n\n## Priority 5\n\n- Tidy the loader\n\n## Later\n\n- someday\n')
+  const [a] = agents
+  try {
+    const full = await run(a!, ['--full'])
+    assert.equal(full.code, 0)
+    assert.deepEqual(full.json, [{ entry: '[Do A](tickets/2026-08-30_a.md)', priority: 8 }, { entry: 'Tidy the loader', priority: 5 }, { entry: 'someday' }])
+
+    // A writer's persistent checkout (`.branches/agent-data`), as a daemon keeps it, is what --local reads.
+    await mkdir(join(seed, '.branches'), { recursive: true })
+    await withFileBranch(seed, DATA_BRANCH, 'noop', async () => {})
+    await git(['checkout', 'main'], seed)
+    const before = ['[Do A](tickets/2026-08-30_a.md)', 'Tidy the loader', 'someday']
+    assert.deepEqual((await run(seed, ['--local'])).json, before)
+    // Origin moves; a local read does not follow until this machine's copy is synced, while the bare read fetches.
+    assert.equal((await run(a!, ['add', 'fresh from another machine', '--priority', '9'])).code, 0)
+    assert.deepEqual((await run(seed, ['--local'])).json, before)
+    assert.deepEqual((await run(seed, [])).json, ['fresh from another machine', ...before])
+    assert.deepEqual((await run(seed, ['--local', '--full']))!.json![0], { entry: '[Do A](tickets/2026-08-30_a.md)', priority: 8 })
+    // The flags belong to the bare command only.
+    assert.equal((await run(a!, ['add', 'x', '--local'])).code, 2)
+    assert.equal((await run(a!, ['done', 'x', '--full'])).code, 2)
   } finally {
     await cleanup()
   }

@@ -40,10 +40,52 @@ export interface WidgetPage {
   Page: ComponentType<WidgetPageProps>
 }
 
+/**
+ * A link a dashboard page shows (#1774): the name of some work and where it points. What a
+ * {@link LinkAction} is given. The dashboard knows nothing of what the link names; the page that
+ * shows it does, and says so in these three fields.
+ */
+export interface WidgetLink {
+  /** The link's text: the name of the work. */
+  text: string
+  /**
+   * Where the link points: a path inside the project's repository (`tickets/2026-01-01_x.md`) or an
+   * absolute URL. Absent for plain text that names work without pointing anywhere.
+   */
+  href?: string
+  /** How urgent the page says the work is, 0 (only if capacity) to 10 (critical); absent when the page does not say. */
+  priority?: number
+}
+
+/** What a link action did: done, or stopped, with the reason the action or its command gave. */
+export type LinkActionResult = { ok: true } | { ok: false; error: string }
+
+/**
+ * An action a widget offers on the links dashboard pages show (#1774): one verb, done by the
+ * widget package's own command. The dashboard shows it as a button beside any link whose project
+ * has the widget's package, with no page naming the widget: the page shows links, the widget acts
+ * on links, the dashboard puts the two together.
+ */
+export interface LinkAction {
+  /** The button's label, a short verb phrase: "Add to queue". */
+  label: string
+  /** What the button says once the action is done: "Queued". The label with a check mark otherwise. */
+  doneLabel?: string
+  /** The button's icon; none otherwise. */
+  icon?: ComponentType<{ className?: string; 'aria-hidden'?: boolean }>
+  /**
+   * Act on the links, in the order given, all in one project. `host` runs the widget package's
+   * own commands in that project. A batch stops at its first failure and says why.
+   */
+  run(host: WidgetHost, projectId: string, links: WidgetLink[]): Promise<LinkActionResult>
+}
+
 /** What a widget module default-exports. */
 export interface WidgetDefinition {
   /** The pages the widget adds, each with a sidebar row. */
   pages?: WidgetPage[]
+  /** The actions the widget offers on the links dashboard pages show, wherever the link's project has the widget's package. */
+  linkActions?: LinkAction[]
   /** A stylesheet to load with the widget, relative to the widget module's own URL. */
   stylesheet?: string
 }
@@ -66,17 +108,29 @@ export interface WidgetHost {
   openAgent(projectId: string, agentId: string): void
 }
 
+/** What the dashboard knows about the widget it is serving: its package, and how to navigate. */
+export type WidgetHostBase = Pick<WidgetHost, 'package' | 'openAgent'>
+
+/**
+ * The host for one widget: the dashboard's navigation, and its commands bound to the widget's own
+ * package. `acts` marks every command as an action on the project rather than a page's read: the
+ * dashboard builds a link action's host with it, so what the action wrote is read back at once.
+ */
+export function widgetHost(base: WidgetHostBase, opts: { acts?: boolean } = {}): WidgetHost {
+  return {
+    ...base,
+    runCommand: (projectId, args, command) => runWidgetCommand(projectId, base.package, args, command, opts.acts ?? false),
+  }
+}
+
 /** Set by the dashboard around every widget page it renders: the widget's package and the navigation. */
-export const WidgetHostContext = createContext<Pick<WidgetHost, 'package' | 'openAgent'> | null>(null)
+export const WidgetHostContext = createContext<WidgetHostBase | null>(null)
 
 /** The dashboard's services for the widget being rendered. Only valid inside a widget page. */
 export function useWidgetHost(): WidgetHost {
   const host = useContext(WidgetHostContext)
   if (!host) throw new Error('useWidgetHost is only available inside a widget page')
-  return {
-    ...host,
-    runCommand: (projectId, args, command) => runWidgetCommand(projectId, host.package, args, command),
-  }
+  return widgetHost(host)
 }
 
 // The dashboard's own building blocks, so a widget looks like the rest of the page.

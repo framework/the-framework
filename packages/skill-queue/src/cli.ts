@@ -2,7 +2,7 @@ import { parseArgs } from 'node:util'
 import { join } from 'node:path'
 import { checkoutRoot, gitReason, nodeBranchFileFs, nodeGitRunner, openBranchReader, writeFileBranchDetached, type BranchReader, type GitRunner, DATA_BRANCH } from '@gemstack/agent-data'
 import { QUEUE_FILE } from './names.js'
-import { appendQueueEntry, insertQueueEntry, parseQueueEntries, removeQueueEntry } from './queue.js'
+import { appendQueueEntry, insertQueueEntry, parseQueueEntries, parseQueueSections, readQueue, removeQueueEntry } from './queue.js'
 
 /**
  * The command line over the package: the same operations a daemon calls, for an agent (and a
@@ -17,6 +17,13 @@ import { appendQueueEntry, insertQueueEntry, parseQueueEntries, removeQueueEntry
  * pushed — its own earlier writes included. Writes are a remote writer's: one commit each, on a
  * throwaway checkout of origin's tip, pushed straight to the branch; a rejected push is re-applied
  * on the new tip and pushed again. The persistent checkout a daemon keeps is never touched.
+ *
+ * A dashboard that shows the queue reads it through the same command, so it needs no code of this
+ * package: `--local` reads this machine's copy of the branch (the persistent checkout a writer keeps
+ * at `.branches/agent-data`, else the local branch) with no fetch, fast enough to poll, and `--full`
+ * prints each entry with the priority section it sits in, so the dashboard can show the sections.
+ * The package declares the command as the framework's queue provider (`"framework": { "queue":
+ * "queue" }`), which reads `queue --local`; the package's own widget reads `queue --local --full`.
  */
 
 export const USAGE = `usage: queue [command]
@@ -24,6 +31,12 @@ export const USAGE = `usage: queue [command]
   (no command)                       the queue's open entries, in order of work
   add <text> [--priority N]          put an entry on the queue, in its priority section
   done <text>                        take an entry off the queue
+
+  For a dashboard that shows the queue, not for an agent:
+  --local                            with the bare command: read this machine's copy of the branch,
+                                     no fetch from origin
+  --full                             with the bare command: each entry as {"entry", "priority"}, the
+                                     priority of the section it sits in (absent outside any)
 
 JSON on stdout. Exit code 1 for a refusal or a git failure (the reason on stderr), 2 for a usage error.`
 
@@ -53,13 +66,14 @@ class Usage extends Error {}
 /** Run the CLI: `argv` is everything after the program name. Resolves to the exit code. */
 export async function runCli(argv: string[], io: CliIo, git: GitRunner = nodeGitRunner()): Promise<number> {
   const [command, ...rest] = argv
-  const run = command === undefined ? list : Object.hasOwn(COMMANDS, command) ? COMMANDS[command] : undefined
+  const bare = command === undefined || command.startsWith('--')
+  const run = bare ? list : Object.hasOwn(COMMANDS, command) ? COMMANDS[command] : undefined
   if (!run) {
     io.stderr(USAGE)
     return 2
   }
   try {
-    io.stdout(JSON.stringify(await run(rest, io, git)))
+    io.stdout(JSON.stringify(await run(bare ? argv : rest, io, git)))
     return 0
   } catch (err) {
     if (err instanceof Usage) {
@@ -80,11 +94,21 @@ export async function runCli(argv: string[], io: CliIo, git: GitRunner = nodeGit
 
 type Command = (args: string[], io: CliIo, git: GitRunner) => Promise<unknown>
 
-/** The bare command: the open entries, in order of work. */
+/**
+ * The bare command: the open entries, in order of work. `--local` reads this machine's copy, no
+ * fetch; `--full` prints each entry with the priority of the section it sits in.
+ */
 const list: Command = async (args, io, git) => {
-  parse(args, {}, 0)
-  const reader = await open(io.cwd, git)
-  return parseQueueEntries((await reader.read(QUEUE_FILE)) ?? '')
+  const { values } = parse(args, { local: { type: 'boolean' }, full: { type: 'boolean' } }, 0)
+  let md: string
+  if (values.local) {
+    const root = await inRepo(() => checkoutRoot(io.cwd, git))
+    md = (await readQueue(root)) ?? ''
+  } else {
+    const reader = await open(io.cwd, git)
+    md = (await reader.read(QUEUE_FILE)) ?? ''
+  }
+  return values.full ? parseQueueSections(md) : parseQueueEntries(md)
 }
 
 const COMMANDS: Record<string, Command> = {

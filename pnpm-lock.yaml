@@ -81,9 +81,6 @@ importers:
       '@gemstack/skill-branches':
         specifier: workspace:*
         version: link:../skill-branches
-      '@gemstack/skill-queue':
-        specifier: workspace:*
-        version: link:../skill-queue
       '@gemstack/skill-tickets':
         specifier: workspace:*
         version: link:../skill-tickets
@@ -139,6 +136,9 @@ importers:
       '@gemstack/skill-logs':
         specifier: workspace:*
         version: link:../skill-logs
+      '@gemstack/skill-queue':
+        specifier: workspace:*
+        version: link:../skill-queue
       '@tailwindcss/vite':
         specifier: ^4.0.0
         version: 4.3.2(vite@8.1.4(@types/node@20.19.43)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))
@@ -239,12 +239,30 @@ importers:
         specifier: workspace:*
         version: link:../agent-data
     devDependencies:
+      '@tailwindcss/vite':
+        specifier: ^4.0.0
+        version: 4.3.2(vite@8.1.4(@types/node@20.19.43)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.43
+      '@types/react':
+        specifier: ^19.2.0
+        version: 19.2.17
+      lucide-react:
+        specifier: ^0.469.0
+        version: 0.469.0(react@19.2.7)
+      react:
+        specifier: ^19.2.0
+        version: 19.2.7
+      tailwindcss:
+        specifier: ^4.0.0
+        version: 4.3.2
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
+      vite:
+        specifier: ^8.0.0
+        version: 8.1.4(@types/node@20.19.43)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0)
 
   packages/skill-readability: {}
 

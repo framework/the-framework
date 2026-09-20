@@ -2,7 +2,7 @@ Every call the dashboard makes to the daemon [1], as one table the daemon answer
 
 ## Context
 
-**User story**: everything the user does in the dashboard beyond scrolling is one of these calls — answering an agent's [4] question, chatting with it, stopping it, starting a new one, queueing a ticket, changing a setting, saving a device [5] — and every one of them must either happen or say why it did not.
+**User story**: everything the user does in the dashboard beyond scrolling is one of these calls — answering an agent's [4] question, chatting with it, stopping it, starting a new one, running a widget's command, changing a setting, saving a device [5] — and every one of them must either happen or say why it did not.
 
 **Problem**: an agent may be running on this machine or on a device the user saved. The same call must work either way, so a call names the agent and the surface decides where it goes; the browser never talks to another machine itself, and a device's token never reaches it.
 
@@ -22,7 +22,7 @@ Every call the dashboard makes to the daemon [1], as one table the daemon answer
 
 - **The table of calls** (`index.ts`, `context.ts`, `test-context.ts`) - every call the daemon [1] answers, assembled once when it starts, together with what each call may reach and the two resolutions they all share: which project a project id names, and which checkout [4] an agent id names.
 - **Reading** (`reads.ts`, `reads.test.ts`) - everything the pages show about a project or an agent: its history, one agent's replay, the surfaced documents, the tickets, the cross-project rollups, the changed files and their diffs, the branch's state and the handoff.
-- **Acting** (`control.ts`, `control.test.ts`, `agent-addressing.test.ts`) - every action on an agent or a project: stop, answer a gate, send a chat message, start an agent through the project's start hook with the user's picks, open a pull request, merge, remove a checkout, delete an agent, open something on this machine, and the ticket and agent-queue actions.
+- **Acting** (`control.ts`, `control.test.ts`, `agent-addressing.test.ts`) - every action on an agent or a project: stop, answer a gate, send a chat message, start an agent through the project's start hook with the user's picks, open a pull request, merge, remove a checkout, delete an agent, open something on this machine, and releasing a ticket's claim.
 - **Following an agent live** (`events.ts`, `events-tail.ts`, `events-tail.test.ts`) - one selected agent's event stream [2] served to the browser: what is already logged is replayed, the end of the replay is marked once, and everything new follows as it is written.
 - **Settings** (`preferences.ts`, `preferences.test.ts`, `projects.ts`, `projects.test.ts`, `quota.ts`, `quota.test.ts`, `devices.ts`, `devices.test.ts`) - reading and saving the user's preferences without a stale tab reverting what it never touched, adding and removing projects, the quota reading behind the usage panel and the spend offset [7] it writes through every project's offset hook, a scheduled command's schedule switch [8] written through its project's switch hook, and the health check behind each saved device's [5] status dot.
 - **Widgets** (`widgets.ts`, `widgets.test.ts`) - which widgets [9] the registered projects bring, one per package, and a widget running one of its own package's commands in one project, never any other program.

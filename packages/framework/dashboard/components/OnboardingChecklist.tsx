@@ -134,13 +134,18 @@ export function OnboardingChecklist({
         </div>
       ),
     },
-    {
-      key: 'todos',
-      label: 'Populate the queue of AI tasks',
-      description:
-        'TODO_AGENTS.md is the queue: each entry is work the agent picks up on its own, so a filled queue is what lets it keep going without you.',
-      done: (data?.totals.openTodos ?? 0) > 0,
-    },
+    // Only when some project has a queue at all (#1774): a project gets one from a package it
+    // depends on, and a step asking to fill a queue no project has would ask for nothing.
+    ...((data?.queue.length ?? 0) > 0
+      ? [
+          {
+            key: 'todos',
+            label: 'Populate the queue of AI tasks',
+            description: 'The agent queue: each entry is work the agent picks up on its own, so a filled queue is what lets it keep going without you.',
+            done: (data?.totals.openTodos ?? 0) > 0,
+          },
+        ]
+      : []),
     {
       key: 'tickets',
       label: 'Populate tickets/',

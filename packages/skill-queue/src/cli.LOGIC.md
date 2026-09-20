@@ -1,4 +1,4 @@
-The `queue` command: the three operations an agent [1], or a person in a shell, runs from any checkout [2] of the repository over the agent queue [3] on the `agent-data` branch [4]: the bare `queue` to read it, `queue add` to put an entry on it, `queue done` to take one off. Reads come off origin's copy of the branch, fetched first; each write is one commit made on a throwaway checkout of origin's tip and pushed straight to the branch; every command answers with one JSON document on stdout, one line for a person on stderr, and an exit code that says how it went.
+The `queue` command: the three operations an agent [1], or a person in a shell, runs from any checkout [2] of the repository over the agent queue [3] on the `agent-data` branch [4]: the bare `queue` to read it, `queue add` to put an entry on it, `queue done` to take one off. Reads come off origin's copy of the branch, fetched first; each write is one commit made on a throwaway checkout of origin's tip and pushed straight to the branch; every command answers with one JSON document on stdout, one line for a person on stderr, and an exit code that says how it went. Two flags of the bare command are the dashboard's, not an agent's: `--local` reads this machine's copy of the branch with no fetch, and `--full` prints each entry with the priority of its section; the package declares the command as the framework's queue provider, which reads `queue --local`.
 
 ## Context
 
@@ -18,6 +18,7 @@ The `queue` command: the three operations an agent [1], or a person in a shell, 
 
 - **The contract: JSON out, a line for a person, an exit code** - every command prints one JSON document on stdout; a refusal adds one line on stderr and exits 1; a command line that cannot be read prints the usage on stderr, nothing on stdout, and exits 2; anything else that fails exits 1 as `git-failed`.
 - **The bare command reads the queue off origin** - `queue` alone answers the open entries in order of work as one JSON array, fetched from origin; with no origin the local branch is read; a branch with no queue answers an empty array; outside a repository every command refuses `not-a-repo`.
+- **The dashboard's reads: `--local` and `--full`** - `--local` reads this machine's copy of the branch (the persistent checkout at `.branches/agent-data` when there is one, else the local branch as it stands) with no fetch; `--full` prints each open entry as `{"entry", "priority"}`, the priority of the section it sits in, absent outside any; both are flags of the bare command only.
 - **Writes are one pushed commit each, on a throwaway checkout** - `add` and `done` each make one commit on a throwaway checkout of origin's tip and push it straight to the branch; nothing lands in the caller's checkout; with no remote the write is refused as `no-remote`.
 - **`queue add`** - puts the trimmed text on the queue, in its `## Priority N` section when `--priority` is given (0 to 10, else a usage error), at the end of the file otherwise, creating the queue file when the branch has none; an empty text is a usage error.
 - **`queue done`** - removes the first open entry whose text is exactly the argument, trimmed; an entry the queue does not have is refused as `no-entry`, decided inside the write.
@@ -43,6 +44,16 @@ The command is `queue [command]`; its usage names the bare command, `add` and `d
 #### Business logic
 
 `queue` with no command fetches origin once and reads `TODO_AGENTS.md` from origin's copy of the `agent-data` branch [4], by the `agent-data` package's reader, and answers its open entries in order of work as one JSON array, each queue entry [5] as `queue.ts` reads it (a task box dropped, the text trimmed). A branch with no queue file answers an empty array. With no origin, the local branch is read; writes are refused there, so nobody else can have moved it. Outside a repository, every command refuses `not-a-repo` before touching anything.
+
+### The dashboard's reads: `--local` and `--full`
+
+#### Context
+
+**Problem**: a dashboard polls the queue of every project every few seconds and shows its sections; a fetch on every read would be too slow and too much, and the bare read prints entries without their sections. On the dashboard's machine a writer keeps the branch checked out and synced, so that copy is current enough.
+
+#### Business logic
+
+`queue --local` answers the same open entries as the bare command, read from this machine's copy of the `agent-data` branch [4] with no fetch: the persistent checkout at `.branches/agent-data` when the repository has one, else the local branch as it stands (in a clone, the copy it cloned or last fetched); a write from this repository fetches, so it is seen by the next local read here, while another machine's push is not seen until this machine's copy is synced. `queue --full`, with or without `--local`, prints one object per open entry, `{"entry": <text>, "priority": <N>}`, the priority being that of the `## Priority N` section the entry sits in by the rule of `queue.ts`, and left out for an entry outside any priority section. Both are flags of the bare command only; on `add` or `done` they are a usage error. The package's `package.json` declares the command as the framework's queue provider (`"framework": { "queue": "queue" }`), and the framework reads `queue --local`; the package's own widget reads `queue --local --full`.
 
 ### Writes are one pushed commit each, on a throwaway checkout
 

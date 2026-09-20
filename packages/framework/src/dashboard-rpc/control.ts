@@ -5,9 +5,7 @@ import { openInApp, type OpenTarget, type OpenResult } from '../dashboard/open-i
 import { contextBridgeBrowser, contextPreferences, contextStartAgent, resolveProjectPath, resolveAgentPath } from './context.js'
 import type { BridgeBrowserAction } from '../bridge-browser.js'
 import { relayOr } from './relay-agent.js'
-import { planTicketPrompt } from '../tickets.js'
-import { isTicketFile, queuePriorityForTicket, releaseTicket, TICKETS_DIR } from '@gemstack/skill-tickets'
-import { QUEUE_FILE, queueAdd } from '@gemstack/skill-queue'
+import { isTicketFile, releaseTicket } from '@gemstack/skill-tickets'
 import { hostname } from 'node:os'
 import { findAgent, isPidAlive, loadAgentEvents, projectRuns, readLiveMeta, type AgentMeta } from '../store/index.js'
 import { isSafeAgentId, worktreePath } from '@gemstack/skill-branches'
@@ -235,35 +233,6 @@ export async function sendMerge(projectId: string, agentId: string): Promise<Han
   }, { ok: false, error: 'could not reach the device' })
 }
 
-/** What {@link sendQueueTicket} did: the backlog file written, or why it could not be. */
-export interface QueueTicketResult {
-  ok: boolean
-  /** The workspace-relative backlog the entry landed in, when it landed. */
-  file?: string
-  error?: string
-}
-
-/** Which ticket a queued entry came from (#1164), so the entry can point back at it. */
-export interface QueuedTicket {
-  /** The ticket's filename inside `tickets/`, which is its identity. */
-  file: string
-  /** Its own `priority:` key, when it has one, which decides the section the entry lands in. */
-  priority?: string
-}
-
-/**
- * Put a ticket on the project's agent queue (#697), so the next queued-work agent takes it.
- *
- * A direct write rather than an agent: the queue is a plain file the dashboard already reads,
- * and asking an agent to append one line would cost a turn and could do anything else besides.
- * It writes the queue file on the `agent-data` branch through the `queue` skill, as one committed,
- * pushed change.
- *
- * Given a `ticket`, the entry is placed in the matching `## Priority N` section rather than
- * appended to the end of the file, and it links back to the ticket it came from. Both halves of
- * #1164: the entry used to land last in a file the queued work takes top-down, and it
- * carried nothing but a title, so the ticket it came from was lost the moment it was queued.
- */
 /**
  * Release a ticket's `.lock.md` claim by hand (#1420): the dashboard's answer to a dead agent,
  * since no timer frees locks anymore. One committed, pushed change on the `agent-data` branch — a
@@ -276,41 +245,6 @@ export async function sendReleaseTicketLock(projectId: string, ticket: string): 
   const outcome = await releaseTicket(cwd, ticket)
   if (outcome === 'released') return { ok: true }
   return { ok: false, error: outcome === 'no-lock' ? 'this ticket holds no lock' : 'the release could not be committed' }
-}
-
-export async function sendQueueTicket(
-  projectId: string,
-  entry: string,
-  ticket?: QueuedTicket,
-): Promise<QueueTicketResult> {
-  const trimmed = entry.trim()
-  if (!trimmed) return { ok: false, error: 'a ticket is required' }
-  const cwd = await resolveProjectPath(projectId)
-  if (!cwd) return { ok: false, error: 'no such project' }
-  // A markdown link, so the file reads well and the agent that takes it has the ticket to open;
-  // the queue keeps the line verbatim, so the reference travels with the entry.
-  const text = ticket ? `[${trimmed}](${TICKETS_DIR}/${ticket.file})` : trimmed
-  const result = await queueAdd(cwd, text, ticket ? queuePriorityForTicket(ticket.priority) : undefined)
-  return result.ok ? { ok: true, file: QUEUE_FILE } : { ok: false, error: 'the queue could not be written' }
-}
-
-/**
- * Put a ticket's PLAN on the project's agent queue: the `/plan-tickets` command's own entry —
- * `Create tickets/<stem>.plan.md` ({@link planTicketPrompt}) — placed by the ticket's priority
- * like any queued pick (#1164), so the queued-work agent reaching it writes the plan.
- *
- * A sibling of {@link sendQueueTicket} rather than a flag on it, because the two write different
- * lines on purpose: a queued ticket is a leading link back to the ticket, which is exactly what
- * every reader (`ticketFromQueueEntry`, the hot-tickets lane, the dashboard's dedupe) takes as
- * "queued for implementation" — a plan ask must not read as that, so it stays the command's plain
- * sentence.
- */
-export async function sendQueueTicketPlan(projectId: string, ticket: QueuedTicket): Promise<QueueTicketResult> {
-  if (!isTicketFile(ticket.file)) return { ok: false, error: 'not a ticket filename' }
-  const cwd = await resolveProjectPath(projectId)
-  if (!cwd) return { ok: false, error: 'no such project' }
-  const result = await queueAdd(cwd, planTicketPrompt(ticket.file), queuePriorityForTicket(ticket.priority))
-  return result.ok ? { ok: true, file: QUEUE_FILE } : { ok: false, error: 'the queue could not be written' }
 }
 
 /**

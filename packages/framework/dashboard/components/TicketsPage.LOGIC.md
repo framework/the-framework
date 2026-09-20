@@ -1,4 +1,4 @@
-Shows every registered project's tickets on one page, the dashboard's Tickets view at `/tickets`: one backlog across projects, filtered, sorted and grouped by a view that lives in the page's address, with two heading buttons that put every shown ticket (or every selected one) on its project's agent queue [2], either to be implemented or to be planned, and with each row offering to open the ticket, its plan, or the agent holding it, and to start an agent [1] on it.
+Shows every registered project's tickets on one page, the dashboard's Tickets view at `/tickets`: one backlog across projects, filtered, sorted and grouped by a view that lives in the page's address, with two heading buttons that hand every shown ticket (or every selected one), as a link [8], to the actions the installed widgets [9] offer on links ("Add to queue" when a project has the queue package), either the ticket itself or the ask for its plan, and with each row offering to open the ticket, its plan, or the agent holding it, and to start an agent [1] on it.
 
 ## Context
 
@@ -11,6 +11,8 @@ Shows every registered project's tickets on one page, the dashboard's Tickets vi
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down. An item on it is a queue entry. The dashboard labels it "AI queue".
 [3] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
+[8] link: the name of some work and where it points, as a dashboard page shows it: a text, an optional target and a priority from 0 to 10.
+[9] widget: a browser module one of a project's packages brings to the dashboard; it adds pages, offers actions on the links pages show, and acts through its own package's command.
 [4] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
 [5] holder: who a claim names: the agent's id when the tool that started the agent put it in the agent's environment, else the branch the `tickets` command ran on.
 [6] plan: a ticket's `.plan.md`: effort and uncertainty ratings and how to implement it.
@@ -24,8 +26,8 @@ Shows every registered project's tickets on one page, the dashboard's Tickets vi
 - **Filtering and click-to-filter** - the filter bar narrows the rows; a row's topic badge adds its topic to the filter and a row's claim marker narrows to claimed tickets.
 - **Grouped by project or one flat list** - by default one section per project, each a project panel; in flat mode one cross-project list whose rows carry their project name, with its own hidden-count notice and empty messages.
 - **Selecting rows** - ticked rows narrow the heading's queue buttons to the selection, with an "N selected" readout and "Clear selection"; a selected row the filters hide does not count.
-- **Queue the shown tickets** - the "Add … to the AI queue" button puts every shown, or selected, unclaimed ticket on its project's agent queue, skipping what is already queued, and then reads "Queued".
-- **Queue plans for the unplanned ones** - the "Queue a plan …" button queues the plan ask for every shown, or selected, ticket that is neither planned, claimed nor already queued, and then reads "Plans queued".
+- **Add the shown tickets** - one button per link action the installed widgets offer ("Add to queue: all N tickets shown below") hands every shown, or selected, unclaimed ticket as a link to the action, skipping what is already queued, and then reads "Queued".
+- **Add plans for the unplanned ones** - a second button per action ("Add to queue: plans for all N tickets shown below") hands the plan ask for every shown, or selected, ticket that is neither planned, claimed nor already queued, and then reads "Queued"; without any widget offering an action on links, neither button exists.
 - **Starting an agent from a row** - a row starts a planning agent or a work agent on the ticket's own project, or sends the user to that project's launcher to configure first; the agent holding a claim opens from the row.
 
 ## Business logic
@@ -98,29 +100,29 @@ Every row can be ticked. A ticked row is remembered by its project and its file 
 
 While at least one shown row is ticked, the heading shows "N selected" and a "Clear selection" button that unticks everything, and both queue buttons act on the ticked rows instead of the whole shown list.
 
-### Queue the shown tickets
+### Add the shown tickets
 
 #### Context
 
 **User story**: the user has narrowed the list to what should be worked next and wants all of it on the agents' to-do list, without opening each ticket. Nothing starts right away: what is queued is worked later, one entry at a time, by the user from the Overview's [7] queue card.
 
-**Problem**: a ticket queued twice would leave an open entry naming a closed ticket after the first entry is worked off, and that stray entry costs an agent. So "add" means "make sure it is queued", never "append".
+**Problem**: a ticket queued twice would leave an open entry naming a closed ticket after the first entry is worked off, and that stray entry costs an agent. So "add" means "make sure it is queued", never "append". And the queue is a package a project may or may not have: the page must offer it without naming it.
 
 #### Business logic
 
 The button's set is the shown rows, in the order shown, narrowed to the ticked rows while any is ticked, minus every claimed [4] ticket: a ticket an agent [1] holds is being worked, and its entry would outlive that work as noise on the agent queue [2].
 
-The button appears only once the tickets are loaded and the set is not empty; an empty set, or one that is all claimed, is not an offer. Its label counts exactly what a click adds and stops saying "all" as soon as a claimed ticket is skipped:
-- Without a selection: "Add all N tickets shown below to the AI queue"; "Add the N unclaimed tickets shown below to the AI queue" when claimed tickets were skipped; for a single ticket "Add the ticket shown below to the AI queue" or "Add the one unclaimed ticket shown below to the AI queue".
-- With a selection: "Add the N selected tickets to the AI queue"; "Add the N unclaimed selected tickets to the AI queue" when claimed tickets were skipped; for a single ticket "Add the selected ticket to the AI queue" or "Add the one unclaimed selected ticket to the AI queue".
+The buttons are the slot for the installed widgets' [9] link actions (`LinkActions.tsx`), given the projects of the set: one button per action whose package at least one of those projects has, none when no widget offers an action on links. A button appears only once the tickets are loaded and the set is not empty; an empty set, or one that is all claimed, is not an offer. Its text is the action's own label, then the set: it counts exactly what a click adds and stops saying "all" as soon as a claimed ticket is skipped. With the queue package's "Add to queue":
+- Without a selection: "Add to queue: all N tickets shown below"; "Add to queue: the N unclaimed tickets shown below" when claimed tickets were skipped; for a single ticket "Add to queue: the ticket shown below" or "Add to queue: the one unclaimed ticket shown below".
+- With a selection: "Add to queue: the N selected tickets"; "Add to queue: the N unclaimed selected tickets" when claimed tickets were skipped; for a single ticket "Add to queue: the selected ticket" or "Add to queue: the one unclaimed selected ticket".
 
-Its tooltip reads "Every ticket joins the AI queue — the work the framework picks up on its own, worked highest priority first and, within a priority, in the order shown below. A ticket already queued stays as it is." ("Every selected ticket …" with a selection, followed by "The rest of the shown set stays put."). When one claimed ticket was skipped it adds "The claimed ticket shown is left to the agent holding it." (or "… selected …"); when several were, "The N claimed tickets shown are left to the agents holding them."
+Its tooltip reads "Every ticket joins the queue — the work the framework picks up on its own, worked highest priority first and, within a priority, in the order shown below. A ticket already queued stays as it is." ("Every selected ticket …" with a selection, followed by "The rest of the shown set stays put."). When one claimed ticket was skipped it adds "The claimed ticket shown is left to the agent holding it." (or "… selected …"); when several were, "The N claimed tickets shown are left to the agents holding them."
 
-A click first reads every project's agent queue as it is at that moment and notes, per project, which tickets an open entry already links to. Then, walking the set in the shown order, each ticket already linked from an open entry of its own project's queue is left alone, and every other ticket is added to its own project's agent queue as one entry: the ticket's title, linked back to the ticket file, placed by the ticket's `Priority:` when it has one (the daemon's placement rule for a ticket without one is in `src/dashboard-rpc/control.ts`). Each entry lands on the queue of the ticket's own project, so a cross-project list needs no special handling. The walk stops at the first failure: the daemon's own reason, or "The tickets could not be queued." when it gives none, appears in red above the filter bar, and everything queued before the failure stays queued.
+A click first reads every project's agent queue as it is at that moment and notes, per project, which tickets an open entry already links to. Then, walking the set in the shown order, each ticket already linked from an open entry of its own project's queue is left out, and every other ticket becomes a link [8]: its title, pointing at its file, at the priority its `Priority:` earns on the 0–10 scale, 5 when it has none (`lib/ticket-link.ts`). The links are grouped by project, in order of first appearance, and the slot hands each group to the action in that project; a project that lacks the action's package is skipped. The queue package's action writes each link as one entry of that project's queue, in the section its priority earns. The action stops at the first failure, whose reason appears as an alert line beside the buttons; everything added before it stays.
 
-After a successful click the button reads "Queued" with a check mark and is disabled; it is armed again the moment the set it acted on changes, whether by a filter, by a refresh bringing new tickets, or by a selection. The button is also disabled while any action on the page is in progress.
+After a successful click the button reads "Queued" with a check mark and is disabled; it is armed again the moment the set it acted on changes, whether by a filter, by a refresh bringing new tickets, or by a selection (the slot's rule, keyed by the set). The button is also disabled while any action on the page is in progress.
 
-### Queue plans for the unplanned ones
+### Add plans for the unplanned ones
 
 #### Context
 
@@ -128,15 +130,15 @@ After a successful click the button reads "Queued" with a check mark and is disa
 
 #### Business logic
 
-The button's set is the same as the ticket-queue button's, further narrowed to tickets that have no plan yet. It appears only once the tickets are loaded and the set is not empty. Its label counts what a click adds, and says "unplanned" as soon as the count is below the tally of the shown or selected set, that is whenever a ticket of the set is skipped as planned or as claimed:
-- Without a selection: "Queue plans for all N tickets shown below"; "Queue plans for the N unplanned tickets shown below" when some were skipped; for a single ticket "Queue a plan for the ticket shown below" or "Queue a plan for the one unplanned ticket shown below".
-- With a selection: "Queue plans for the N selected tickets"; "Queue plans for the N unplanned selected tickets" when some were skipped; for a single ticket "Queue a plan for the selected ticket" or "Queue a plan for the one unplanned selected ticket".
+The button's set is the same as the ticket button's, further narrowed to tickets that have no plan yet. It is the same slot, one button per link action, none without a widget offering one, and appears only once the tickets are loaded and the set is not empty. Its text is the action's label, then the set: it counts what a click adds, and says "unplanned" as soon as the count is below the tally of the shown or selected set, that is whenever a ticket of the set is skipped as planned or as claimed. With "Add to queue":
+- Without a selection: "Add to queue: plans for all N tickets shown below"; "Add to queue: plans for the N unplanned tickets shown below" when some were skipped; for a single ticket "Add to queue: a plan for the ticket shown below" or "Add to queue: a plan for the one unplanned ticket shown below".
+- With a selection: "Add to queue: plans for the N selected tickets"; "Add to queue: plans for the N unplanned selected tickets" when some were skipped; for a single ticket "Add to queue: a plan for the selected ticket" or "Add to queue: a plan for the one unplanned selected ticket".
 
-Its tooltip reads "Each ticket gets its plan asked for on the AI queue — the same "Create tickets/….plan.md" entry the plan-tickets command queues — worked highest priority first and, within a priority, in the order shown below. Tickets already planned, already queued, or held by an agent stay as they are." ("Each selected ticket …" and "The rest of the shown set stays put." with a selection).
+Its tooltip reads "Each ticket gets its plan asked for — the same "Create tickets/….plan.md" entry the plan-tickets command queues — worked highest priority first and, within a priority, in the order shown below. Tickets already planned, already queued, or held by an agent stay as they are." ("Each selected ticket …" and "The rest of the shown set stays put." with a selection).
 
-A click reads every project's agent queue [2] at that moment, noting per project the exact text of every open entry and the tickets open entries link to. Walking the set in the shown order, a ticket is skipped when its project's queue already holds an open entry with the exact plan ask text, `Create tickets/<stem>.plan.md`, and also when the ticket is already queued for implementation, since that work would land before a trailing plan could matter. Every other ticket gets that plan ask added to its own project's agent queue, placed by the ticket's `Priority:` when it has one. The walk stops at the first failure: the daemon's reason, or "The plans could not be queued." when it gives none, appears above the filter bar, and what was queued stays.
+A click reads every project's agent queue [2] at that moment, noting per project the exact text of every open entry and the tickets open entries link to. Walking the set in the shown order, a ticket is skipped when its project's queue already holds an open entry with the exact plan ask text, `Create tickets/<stem>.plan.md`, and also when the ticket is already queued for implementation, since that work would land before a trailing plan could matter. Every other ticket becomes a link [8] with no target: the plan ask's sentence at the ticket's priority (no target on purpose: a link to a ticket at the start of an entry reads as "queued for implementation", and a plan ask must not). Grouped by project and handed to the action as above, the queue package's action writes each as one entry placed by that priority. The action stops at the first failure, whose reason appears beside the buttons; what was added stays.
 
-After success the button reads "Plans queued" with a check mark and is disabled until the set it acted on changes. It is disabled while any action on the page is in progress.
+After success the button reads "Queued" with a check mark and is disabled until the set it acted on changes. It is disabled while any action on the page is in progress.
 
 ### Starting an agent from a row
 

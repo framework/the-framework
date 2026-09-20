@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
 import { onWidgets, type DashboardWidget } from '../rpc/widgets.js'
-import type { WidgetDefinition, WidgetPage } from '../widget/index.js'
+import type { LinkAction, WidgetDefinition, WidgetPage } from '../widget/index.js'
 import { usePolled } from './use-async.js'
 import { isPageSegment } from './route.js'
 
@@ -9,6 +9,22 @@ export interface MountedPage extends WidgetPage {
   package: string
   projects: string[]
 }
+
+/** A link action as the shell mounts it (#1774): the action, plus the package it came from and the projects that have it. */
+export interface MountedLinkAction extends LinkAction {
+  package: string
+  projects: string[]
+}
+
+/** What the installed widgets bring, once loaded: their pages and their link actions. */
+export interface MountedWidgets {
+  pages: MountedPage[]
+  linkActions: MountedLinkAction[]
+  /** True once the widget list was read and every module in it imported or skipped. */
+  loaded: boolean
+}
+
+const NOTHING_MOUNTED: MountedWidgets = { pages: [], linkActions: [], loaded: false }
 
 /** Each widget module, imported once per page load, by URL; a module that fails to load is skipped. */
 const modules = new Map<string, Promise<WidgetDefinition | undefined>>()
@@ -42,30 +58,49 @@ function load(url: string): Promise<WidgetDefinition | undefined> {
 const NO_WIDGETS: DashboardWidget[] = []
 
 /**
- * The pages the registered projects' widgets add (#1774), in package order; a segment two widgets
- * claim goes to the first. `loaded` is false until the widget list has been read and every module
- * in it imported, so the shell can tell "no such page" from "not loaded yet".
+ * What the registered projects' widgets add (#1774), in package order: the pages, a segment two
+ * widgets claim going to the first, and the link actions, every one of them, each carrying the
+ * package it came from and the projects that have it. `loaded` is false until the widget list has
+ * been read and every module in it imported, so the shell can tell "no such page" from "not
+ * loaded yet".
  */
-export function useWidgetPages(): { pages: MountedPage[]; loaded: boolean } {
+export function useWidgets(): MountedWidgets {
   const { value: widgets, loaded: listed } = usePolled(onWidgets, NO_WIDGETS, 30_000, [])
-  const [state, setState] = useState<{ pages: MountedPage[]; loaded: boolean }>({ pages: [], loaded: false })
+  const [state, setState] = useState<MountedWidgets>(NOTHING_MOUNTED)
   useEffect(() => {
     if (!listed) return
     let live = true
     void Promise.all(widgets.map(async widget => ({ widget, definition: await load(widget.url) }))).then(loadedWidgets => {
       if (!live) return
       const pages: MountedPage[] = []
+      const linkActions: MountedLinkAction[] = []
       for (const { widget, definition } of loadedWidgets) {
         for (const page of definition?.pages ?? []) {
           if (!isPageSegment(page.segment) || pages.some(p => p.segment === page.segment)) continue
           pages.push({ ...page, package: widget.package, projects: widget.projects })
         }
+        for (const action of definition?.linkActions ?? []) {
+          linkActions.push({ ...action, package: widget.package, projects: widget.projects })
+        }
       }
-      setState({ pages, loaded: true })
+      setState({ pages, linkActions, loaded: true })
     })
     return () => {
       live = false
     }
   }, [widgets, listed])
   return state
+}
+
+/**
+ * The mounted widgets, for any component in the shell (#1774): the shell reads them once with
+ * {@link useWidgets} and provides them here, so a page deep in the tree finds the link actions
+ * without the shell threading them through every prop. Outside the provider: nothing mounted,
+ * not loaded.
+ */
+export const WidgetsContext = createContext<MountedWidgets>(NOTHING_MOUNTED)
+
+/** The installed widgets' pages and link actions, as the shell mounted them. */
+export function useMountedWidgets(): MountedWidgets {
+  return useContext(WidgetsContext)
 }

@@ -158,7 +158,7 @@ function isHighPriority(priority: string): boolean {
  * - in-progress: an agent has planned it, so work is under way in the inferred sense. Which
  *   ticket an agent is implementing right now is the ticket's own claim to say (#1774); the
  *   framework no longer records it on the run.
- * - ai-queue: it sits in the AI Queue — an open `TODO_AGENTS.md` entry links to it — so the
+ * - ai-queue: it sits in the AI Queue — an open queue entry links to it — so the
  *   framework will pick it up on its own.
  * - high-priority: none of the above, but flagged high priority; what a human would likely queue next.
  *
@@ -194,27 +194,26 @@ const HOT_TICKETS_LIMIT = 60
 /** Injectable readers so {@link buildHotTickets} is unit-testable off disk. */
 export interface HotTicketsDeps {
   tickets?: (cwd: string) => Promise<WorkspaceTicket[]>
-  /** The cross-project TODO queue, for the AI-Queue lane (#1139). Defaults to {@link collectQueue}. */
+  /** The cross-project agent queue, for the AI-Queue lane (#1139). Defaults to {@link collectQueue}. */
   queue?: (projects: ProjectSummary[]) => Promise<ProjectQueue[]>
 }
 
 /**
  * Every project's tickets pooled and bucketed for the Overview's "hot tickets" card (#1139): what is
- * being worked on (planned), what sits in the AI Queue (an open `TODO_AGENTS.md` entry links to
- * it), and what is merely flagged high priority. Ordered lane-first (in-progress,
+ * being worked on (planned), what sits in the AI Queue (an open queue entry links to it), and
+ * what is merely flagged high priority. Ordered lane-first (in-progress,
  * ai-queue, high-priority), file order within a lane; a ticket in none of the three is dropped.
  * Forgiving — a project whose tickets cannot be read simply contributes nothing.
  */
 export async function buildHotTickets(projects: ProjectSummary[], deps: HotTicketsDeps = {}): Promise<HotTicket[]> {
   const readT = deps.tickets ?? readTickets
-  // The AI Queue: which tickets an open TODO_AGENTS.md entry links to, per project (#1139).
+  // The AI Queue: which tickets an open queue entry links to, per project (#1139).
   const queues = await (deps.queue ?? (p => collectQueue(p)))(projects)
   const queuedByProject = new Map<string, Set<string>>()
   for (const q of queues) {
     const files = new Set<string>()
-    for (const item of q.items) {
-      if (item.done) continue
-      const file = queuedTicketFile(item.text)
+    for (const entry of q.entries) {
+      const file = queuedTicketFile(entry)
       if (file) files.add(file)
     }
     queuedByProject.set(q.projectId, files)
@@ -249,7 +248,7 @@ export interface OverviewDeps {
 
 /**
  * Build the cross-project Overview: the running agents (every live agent of each project, one per
- * worktree since #736), the total open TODO count (from {@link collectQueue}), and the most
+ * worktree since #736), the total of open queue entries (from {@link collectQueue}), and the most
  * recently active projects (by {@link ProjectSummary.lastActivityAt}). Forgiving — a project
  * with no live run, or none running, simply contributes nothing to `active`.
  */
@@ -297,7 +296,7 @@ export async function buildOverview(projects: ProjectSummary[], deps: OverviewDe
   active.sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))
 
   const queues = await queue(projects)
-  const queueOpen = queues.reduce((sum, q) => sum + q.open, 0)
+  const queueOpen = queues.reduce((sum, q) => sum + q.entries.length, 0)
 
   const recent = projects
     .filter(p => p.lastActivityAt)

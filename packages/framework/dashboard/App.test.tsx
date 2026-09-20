@@ -78,6 +78,6 @@ describe('widget pages in the shell (#1774)', () => {
     window.history.replaceState(null, '', '/runs')
     render(<App />)
     fireEvent.click(await screen.findByText('read'))
-    await waitFor(() => expect(calls).toContainEqual({ name: 'runWidgetCommand', args: [PROJECT.id, '@acme/logs', ['--limit', '5'], undefined] }))
+    await waitFor(() => expect(calls).toContainEqual({ name: 'runWidgetCommand', args: [PROJECT.id, '@acme/logs', ['--limit', '5'], undefined, false] }))
   })
 })

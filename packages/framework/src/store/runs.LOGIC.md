@@ -22,7 +22,7 @@ How The Framework reads, and changes, a project's finished agents [1]: through t
 - **Which command provides** - the first of the project's dependencies, in its package.json's order, that declares a runs provider [2] naming one of its own commands; no dependency declares one, the project has no finished agents.
 - **The command line it answers** - the list of finished agents, one agent with its whole diary, a delete, and a patch of the two late facts; each prints one JSON document; `--local` reads the copy on this machine, with no network.
 - **The shape** - a card [3] is kept only with an id, a start time and a known status [4]; each field only with the right type; anything that fails to answer is read as "nothing", never an error.
-- **Reads are shared for five seconds** - the same list or the same agent read again within five seconds reuses the answer; reads at the same moment share one call; a change, or a caller that knows an agent just finished, reads fresh.
+- **Reads are shared for five seconds** - the same list or the same agent read again within five seconds reuses the answer; reads at the same moment share one call; a change, a widget's command having run in the project, or a caller that knows an agent just finished, reads fresh.
 
 ## Business logic
 
@@ -69,4 +69,4 @@ A card [3] is only a card with a string id made of letters, digits, `-` and `_`,
 
 #### Business logic
 
-Per project, the list is read once and the same answer reused for five seconds; reads made while a read is still running wait for it instead of starting another. One agent read with its diary is reused the same way, per agent. A read that failed is not kept, so the next read tries again. A delete or a patch drops everything kept for the project, so the next read sees the change. A caller that knows an agent just finished (its checkout disappeared since its last look) asks for the list fresh, past the five seconds (`agent-store.ts`).
+Per project, the list is read once and the same answer reused for five seconds; reads made while a read is still running wait for it instead of starting another. One agent read with its diary is reused the same way, per agent. A read that failed is not kept, so the next read tries again. A delete or a patch drops everything kept for the project, so the next read sees the change; so does being told the project changed (`provided.ts` says it after any widget command ran there). A caller that knows an agent just finished (its checkout disappeared since its last look) asks for the list fresh, past the five seconds (`agent-store.ts`).

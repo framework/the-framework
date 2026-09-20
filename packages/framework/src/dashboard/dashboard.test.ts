@@ -19,8 +19,8 @@ const agent = (status: AgentMeta['status'], startedAt: string): AgentMeta =>
 test('buildDashboard rolls up the totals and the working-now list its readers ask for', async () => {
   const projects = [project('a', '/a', '2026-07-13T00:00:00Z'), project('b', '/b', '2026-07-10T00:00:00Z')]
   const queues: ProjectQueue[] = [
-    { projectId: 'a', projectName: 'a', open: 2, total: 3, items: [] },
-    { projectId: 'b', projectName: 'b', open: 0, total: 1, items: [] },
+    { projectId: 'a', projectName: 'a', entries: ['one', 'two'] },
+    { projectId: 'b', projectName: 'b', entries: [] },
   ]
   const data = await buildDashboard(projects, {
     liveAgents: async cwd => (cwd === '/a' ? [{ ...agent('running', '2026-07-14T11:00:00Z'), cwd }] : []),

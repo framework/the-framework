@@ -1,4 +1,4 @@
-Reads and edits the agent queue [1], `TODO_AGENTS.md` on the `agent-data` branch [2]: which lines of the file are open queue entries [3] and in what order they are worked, where an entry lands when it is added with a priority or without one, how an entry is removed once done, and how the library's add lands on the branch as one commit through the caller's write cycle. The same rules serve the `queue` command an agent [4] runs and the framework that queues work from the dashboard.
+Reads and edits the agent queue [1], `TODO_AGENTS.md` on the `agent-data` branch [2]: which lines of the file are open queue entries [3], in what order they are worked and in which `## Priority N` section each sits, where an entry lands when it is added with a priority or without one, how an entry is removed once done, and how the library's add lands on the branch as one commit through the caller's write cycle. The same rules serve the `queue` command an agent [4] runs and the framework that queues work from the dashboard.
 
 ## Context
 
@@ -18,6 +18,7 @@ Reads and edits the agent queue [1], `TODO_AGENTS.md` on the `agent-data` branch
 ## Business logic — TL;DR
 
 - **Which lines are entries** - any `-`, `*` or `N.` list item with text is an open entry, wherever it sits; a task box counts only while unchecked, and its text is the entry without the box; headings, prose and blank lines are not entries.
+- **Which section an entry sits in** - the sectioned read gives each open entry the number of the `## Priority N` heading above it; an entry before any heading, or under a second-level heading that is not a priority, has no priority.
 - **The order of work is the file's order** - entries are taken top-down as they stand in the file, so a file sorted `## Priority 10` down to `## Priority 0` drains in priority order, first within a section first; nothing re-sorts on read.
 - **Placing an entry by priority** - the entry joins the end of its `## Priority N` section; without one, a new section is created before the first lower-priority section, or last when every section outranks it, or above the file's first heading when the file has no priority section at all, or at the file's end when it has no headings.
 - **An entry with no priority goes at the end** - as a plain bullet at the end of the file, in whatever section ends it.
@@ -36,6 +37,16 @@ Reads and edits the agent queue [1], `TODO_AGENTS.md` on the `agent-data` branch
 #### Business logic
 
 A line is a list item when, after any leading whitespace, it starts with `-`, `*` or a number followed by a period, then whitespace, then text; its text with surrounding whitespace removed is the entry, and an item with no text is skipped. When the text starts with a task box, `[ ]`, `[x]` or `[X]`, the box decides: a checked box (`[x]` or `[X]`) is not an open entry, and an unchecked box is one whose entry is the text after the box, trimmed, provided anything remains. Every other line, a heading, prose, a blank line, is not an entry. An entry is plain trimmed text: the task a future agent [4] is started with, or a markdown link back to the ticket it came from.
+
+### Which section an entry sits in
+
+#### Context
+
+**User story**: the dashboard's Queue page shows the entries under their priorities, as the file's sections have them.
+
+#### Business logic
+
+The sectioned read gives the same open entries, in the same order, each with the priority of the section it sits in: the number of the last `## Priority N` heading above it (any case, one or two digits, anything after the number allowed). An entry before any second-level heading, or below a second-level heading that is not a priority heading (`## Notes`), has no priority. The plain read is the sectioned read with the priorities dropped.
 
 ### The order of work is the file's order
 

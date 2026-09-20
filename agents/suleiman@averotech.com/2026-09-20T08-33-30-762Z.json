@@ -1,8 +1,8 @@
 {
   "id": "2026-09-20T08-33-30-762Z",
   "startedAt": "2026-09-20T08:40:12.072Z",
-  "endedAt": "2026-09-20T08:40:13.019Z",
-  "status": "failed",
+  "endedAt": "2026-09-20T09:06:25.213Z",
+  "status": "done",
   "intent": "/triage-quick",
   "driver": "claude-code",
   "model": "opus",

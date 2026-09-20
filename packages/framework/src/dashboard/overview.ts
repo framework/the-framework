@@ -2,8 +2,7 @@ import { readAllAgents, readLiveMetas, type LiveAgent, type AgentMeta, type Agen
 import { sessionNameField } from '../agent-view.js'
 import type { ProjectSummary } from './projects.js'
 import { collectQueue, type ProjectQueue } from './queue.js'
-import { readTickets, type WorkspaceTicket } from './tickets.js'
-import { TICKETS_DIR } from '@gemstack/skill-tickets/names'
+import { projectTickets, type Ticket } from '../store/tickets.js'
 import { cloudRunState } from '../cloud-run-state.js'
 import { bridgeQuestions } from './bridge-store.js'
 import { hostname } from 'node:os'
@@ -96,37 +95,6 @@ export async function buildRecentAgents(projects: ProjectSummary[], deps: Recent
   return all.filter(row => !seen.has(row.agent.id) && seen.add(row.agent.id)).slice(0, RECENT_RUNS_LIMIT)
 }
 
-/** One project's tickets, for the cross-project Tickets page (#1144). */
-export interface ProjectTickets {
-  projectId: string
-  projectName: string
-  tickets: WorkspaceTicket[]
-}
-
-/** Injectable reader so {@link collectAllTickets} is unit-testable off disk. */
-export interface AllTicketsDeps {
-  tickets?: (cwd: string) => Promise<WorkspaceTicket[]>
-}
-
-/**
- * Every registered project's tickets, one list per project (#1144) — the cross-project Tickets
- * page. Unlike {@link buildHotTickets} this does not pool or bucket: a ticket belongs to one
- * project, and the page's whole point is reading each project's backlog (and reaching its own
- * import/update) rather than one merged feed. Kept in registry order, project included even when
- * its list comes back empty, so import stays reachable there — the same read failing simply
- * leaves that project's list empty rather than dropping the section.
- */
-export async function collectAllTickets(projects: ProjectSummary[], deps: AllTicketsDeps = {}): Promise<ProjectTickets[]> {
-  const readT = deps.tickets ?? readTickets
-  return Promise.all(
-    projects.map(async project => ({
-      projectId: project.id,
-      projectName: project.name,
-      tickets: await readT(project.path).catch((): WorkspaceTicket[] => []),
-    })),
-  )
-}
-
 /** Which lane of the "hot tickets" overview (#1139) a ticket sits in. */
 export type HotBucket = 'in-progress' | 'ai-queue' | 'high-priority'
 
@@ -135,7 +103,7 @@ export interface HotTicket {
   projectId: string
   projectName: string
   bucket: HotBucket
-  ticket: WorkspaceTicket
+  ticket: Ticket
 }
 
 /** Where the ticket format's 10-0 scale starts reading as high. */
@@ -165,7 +133,7 @@ function isHighPriority(priority: string): boolean {
  * Precedence follows that order: work already under way outranks a queued ticket, which outranks a
  * bare priority flag. Everything else is dropped — the card is a shortlist, not the whole backlog.
  */
-export function ticketBucket(ticket: WorkspaceTicket, opts: { queued?: boolean } = {}): HotBucket | null {
+export function ticketBucket(ticket: Ticket, opts: { queued?: boolean } = {}): HotBucket | null {
   if (ticket.planned) return 'in-progress'
   if (opts.queued) return 'ai-queue'
   if (ticket.priority && isHighPriority(ticket.priority)) return 'high-priority'
@@ -176,16 +144,21 @@ export function ticketBucket(ticket: WorkspaceTicket, opts: { queued?: boolean }
 const QUEUE_LEADING_LINK = /^\s*\[[^\]]+\]\(([^)\s]+)\)/
 
 /**
+ * Where a link into a project's files points when it names a ticket: the dashboard's link
+ * convention (`framework/widget`), a path whose first segment is the page that shows it. The
+ * framework imports no tickets package; the word is the convention's, not a package's.
+ */
+const TICKET_LINK_PREFIX = 'tickets/'
+
+/**
  * The ticket file an open queue entry points at, or undefined when it is not a ticket link. Mirrors
  * the dashboard's `queueEntryLabel`: only a link at the START of the entry names the work, and only
- * one under `tickets/` is a ticket. Returned as the bare filename, the key {@link WorkspaceTicket.file}
- * uses.
+ * one under `tickets/` is a ticket. Returned as the bare filename, the key {@link Ticket.file} uses.
  */
 function queuedTicketFile(entry: string): string | undefined {
   const link = QUEUE_LEADING_LINK.exec(entry)
   if (!link) return undefined
-  const prefix = `${TICKETS_DIR}/`
-  return link[1]!.startsWith(prefix) ? link[1]!.slice(prefix.length) : undefined
+  return link[1]!.startsWith(TICKET_LINK_PREFIX) ? link[1]!.slice(TICKET_LINK_PREFIX.length) : undefined
 }
 
 /** How many hot tickets the Overview pools before the card trims per lane. */
@@ -193,7 +166,8 @@ const HOT_TICKETS_LIMIT = 60
 
 /** Injectable readers so {@link buildHotTickets} is unit-testable off disk. */
 export interface HotTicketsDeps {
-  tickets?: (cwd: string) => Promise<WorkspaceTicket[]>
+  /** A project's tickets (default: the provider its packages declare, none when no package does — #1774). */
+  tickets?: (cwd: string) => Promise<Ticket[]>
   /** The cross-project agent queue, for the AI-Queue lane (#1139). Defaults to {@link collectQueue}. */
   queue?: (projects: ProjectSummary[]) => Promise<ProjectQueue[]>
 }
@@ -206,7 +180,7 @@ export interface HotTicketsDeps {
  * Forgiving — a project whose tickets cannot be read simply contributes nothing.
  */
 export async function buildHotTickets(projects: ProjectSummary[], deps: HotTicketsDeps = {}): Promise<HotTicket[]> {
-  const readT = deps.tickets ?? readTickets
+  const readT = deps.tickets ?? providedTicketsOf
   // The AI Queue: which tickets an open queue entry links to, per project (#1139).
   const queues = await (deps.queue ?? (p => collectQueue(p)))(projects)
   const queuedByProject = new Map<string, Set<string>>()
@@ -231,6 +205,12 @@ export async function buildHotTickets(projects: ProjectSummary[], deps: HotTicke
   const lane: Record<HotBucket, number> = { 'in-progress': 0, 'ai-queue': 1, 'high-priority': 2 }
   all.sort((a, b) => lane[a.bucket] - lane[b.bucket])
   return all.slice(0, HOT_TICKETS_LIMIT)
+}
+
+/** A project's tickets through the provider one of its packages declares (#1774); none provided, none read. */
+async function providedTicketsOf(cwd: string): Promise<Ticket[]> {
+  const source = await projectTickets(cwd)
+  return source ? source.list() : []
 }
 
 /** Injectable readers so {@link buildOverview} is unit-testable off disk. */

@@ -23,7 +23,6 @@ Names the one set of rules the dashboard [1] runs in the browser: every decision
 ## Business logic — TL;DR
 
 - **Nothing server-only may be reached** - no rule shared here, and nothing any of them reaches in turn, may use a capability that exists only outside a browser; a rule with a server half keeps that half in a separate module.
-- **What an agent will be asked** - the ask that plans one ticket, shared with the daemon's queue write so the launcher's start and the queued entry carry the same sentence.
 - **Which questions an agent still waits on** - the one rule (`open-choices.ts`) the agent's page applies to its events, the same the daemon applies before it delivers an answer.
 - **How an agent's activity reads** - an agent [3]'s events [4] rendered as terminal text, which options a pick [5] chose, the driver session [6] behind the agent, the errors it hit, and where its handoff [2] stands.
 - **The defaults and limits the user adjusts** - the notification defaults, whether a notification method and category is on, and the default and maximum spend offset [7].

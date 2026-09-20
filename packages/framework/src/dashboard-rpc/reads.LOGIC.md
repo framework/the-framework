@@ -1,4 +1,4 @@
-Answers everything the dashboard reads about a project or an agent [1]: the agent history, one agent's replay, the project's surfaced documents, its tickets, the cross-project rollups the Overview [2] and the launcher show, the files of a checkout [3] with their git status, one file's diff or content, where an agent is working and what its handoff [4] left behind, and the state of the Claude web bridge [5]. Every read is forgiving: an unknown project or a failing read answers the empty shape (an empty list, an empty map, nothing) rather than an error, and a read about an agent relayed [6] to a device [7] is answered by that device.
+Answers everything the dashboard reads about a project or an agent [1]: the agent history, one agent's replay, the project's surfaced documents, the cross-project rollups the Overview [2] and the launcher show, the files of a checkout [3] with their git status, one file's diff or content, where an agent is working and what its handoff [4] left behind, and the state of the Claude web bridge [5]. Every read is forgiving: an unknown project or a failing read answers the empty shape (an empty list, an empty map, nothing) rather than an error, and a read about an agent relayed [6] to a device [7] is answered by that device.
 
 ## Context
 
@@ -37,8 +37,8 @@ Answers everything the dashboard reads about a project or an agent [1]: the agen
 - **An agent's replay** - the agent's events, from the diary in its checkout while it has one, else from its run on the `agent-data` branch; nothing when it is in neither.
 - **Retained checkouts** - the ids of ended agents whose checkout is still on disk, live agents excluded.
 - **Where an agent is working** - its checkout's path, whether that checkout is its own, its branch, whether it holds uncommitted changes, its size once nothing writes to it, and the pull request that belongs to this agent and not a predecessor's.
-- **Documents and tickets** - the surfaced documents at the project root, the project's tickets off the `agent-data` branch, one ticket's full text, the agent that wrote a ticket's plan, and when the tickets last caught up with GitHub.
-- **Cross-project rollups** - every registered project's tickets, the aggregated agent queue, the Overview, recent agents, hot tickets, interventions, open questions, activity, the dashboard page and every project's scheduler state, each built over every project the registry lists.
+- **Documents** - the surfaced documents at the project root.
+- **Cross-project rollups** - the aggregated agent queue, the Overview, recent agents, hot tickets, interventions, open questions, activity, the dashboard page and every project's scheduler state, each built over every project the registry lists.
 - **The files of a checkout and their status** - every file git sees, and each file's untracked/modified/deleted status, from the agent's own checkout when an agent id is given.
 - **One file's diff, one file's content, and what the agent changed** - the diff of a changed file, the content of an unchanged one, and every changed file with its line counts, always read from the checkout's own git state.
 - **The project's GitHub URL and git status** - the URL from the `origin` remote; the branch, dirty flag and linked pull request of the project or of one agent's checkout, filtered to that agent's lifetime.
@@ -110,15 +110,15 @@ The answer is the ids of the checkouts still on disk under the project's `.branc
 
 The project must be known and the id safe for a path, else the answer is nothing. The path is the checkout the agent id resolves to; whether it is the agent's own is whether it differs from the project's root, because in the root the uncommitted changes are the user's, not the agent's. The git status read there gives the branch and the dirty flag, and the pull request is filtered to the agent's lifetime: the agent's start time is derived from its id, and only an open pull request, or a closed one no older than the agent, counts. The size is read only for the agent's own checkout and only once the agent is no longer running, because a tree being written to has no size worth reporting. When the checkout is not the agent's own (the agent's checkout is gone and the read fell back to the root), the root's current branch has nothing to do with this agent, so the pull request is instead resolved from the agent's own record. The pull request may be reported as still being looked up rather than absent, so the bar asks again shortly.
 
-### Documents and tickets
+### Documents
 
 #### Context
 
-**User story**: the project home lists the surfaced planning documents and the project's tickets; a ticket has its own page; a plan page offers to open the agent that wrote the plan, where the composer continues that agent's conversation.
+**User story**: the project home lists the surfaced planning documents. (The project's tickets are no read of the daemon's any more: the tickets package's own widget reads them through its command, `widgets.ts`; the daemon reads tickets only for the rollups it composes, through the provider the package declares.)
 
 #### Business logic
 
-The surfaced documents are read at the project root in sidebar order (`dashboard/docs.ts`). The tickets are read off the `agent-data` branch [11] (`dashboard/tickets.ts`), an empty list when the project has none yet; one ticket's full text is nothing when the ticket does not exist. The agent that wrote a ticket's plan is the newest of the project's agents whose ask names that plan (the rule is `tickets.ts`'s), reported as its id and status, or nothing when no agent was asked for it. When the tickets last caught up with GitHub is whatever was recorded, or nothing.
+The surfaced documents are read at the project root in sidebar order (`dashboard/docs.ts`).
 
 ### Cross-project rollups
 

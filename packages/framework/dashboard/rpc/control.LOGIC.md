@@ -25,4 +25,4 @@ The browser's typed stubs for every action the dashboard takes on an agent [1], 
 - **Landing an ended agent's work** - open a pull request for the agent's branch, or merge the pull request it has, each answering success, the pull request's number and URL, or the reason it was refused; a merge asked of an agent still working is refused.
 - **Removing what an agent left** - remove the checkout [12] an ended agent kept, or delete the agent together with its records; both are refused while the agent is going, and a removal never destroys work that is not on the remote.
 - **Opening a checkout in an app** - open the project's checkout, or one agent's, in the file manager or in the user's editor.
-- **Tickets** - release the claim [13] an agent left on a ticket. Putting a ticket on a queue is no action of the daemon's any more: it is the queue widget's own, through its package's command (`components/LinkActions.tsx`).
+- **Tickets** - no action of the daemon's any more: putting a ticket on a queue is the queue widget's own, and releasing the claim [13] an agent left on a ticket the tickets widget's own, each through its package's command (`widgets.ts`).

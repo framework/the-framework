@@ -1,6 +1,5 @@
 import type { ProjectSummary } from './projects.js'
 import { collectQueue, type ProjectQueue } from './queue.js'
-import { hasTickets } from './tickets.js'
 import { projectTickets } from '../store/tickets.js'
 import { buildOverview, type ActiveAgent, type OverviewDeps } from './overview.js'
 
@@ -39,10 +38,20 @@ export interface DashboardData {
 
 /** Injectable readers so {@link buildDashboard} is unit-testable off disk. */
 export interface DashboardDeps extends OverviewDeps {
-  /** Whether a project has tickets (#958). Defaults to {@link hasTickets} (false on any error). */
+  /** Whether a project has tickets (#958). Defaults to the provider's list being non-empty (false on any error). */
   tickets?: (cwd: string) => Promise<boolean>
   /** Whether a project's packages provide tickets (#1774). Defaults to the provider lookup (false on any error). */
   providesTickets?: (cwd: string) => Promise<boolean>
+}
+
+/** Whether the provider one of the project's packages declares (#1774) lists any ticket; no provider, no tickets. */
+async function hasProvidedTickets(cwd: string): Promise<boolean> {
+  try {
+    const source = await projectTickets(cwd)
+    return source !== undefined && (await source.list()).length > 0
+  } catch {
+    return false
+  }
 }
 
 /**
@@ -51,7 +60,7 @@ export interface DashboardDeps extends OverviewDeps {
  * cannot be read simply contributes nothing.
  */
 export async function buildDashboard(projects: ProjectSummary[], deps: DashboardDeps = {}): Promise<DashboardData> {
-  const hasTicketsFor = deps.tickets ?? (cwd => hasTickets(cwd).catch(() => false))
+  const hasTicketsFor = deps.tickets ?? hasProvidedTickets
   const providesTicketsFor = deps.providesTickets ?? (cwd => projectTickets(cwd).then(source => source !== undefined, () => false))
 
   // Compute the queue once and hand it to buildOverview so the backlog is read a single time.

@@ -1,9 +1,9 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { buildOverview, buildRecentAgents, buildHotTickets, collectAllTickets, ticketBucket } from './overview.js'
+import { buildOverview, buildRecentAgents, buildHotTickets, ticketBucket } from './overview.js'
 import type { ProjectSummary } from './projects.js'
 import type { ProjectQueue } from './queue.js'
-import type { WorkspaceTicket } from './tickets.js'
+import type { Ticket } from '../store/tickets.js'
 import type { AgentMeta } from '../store/index.js'
 
 const project = (id: string, path: string, lastActivityAt?: string): ProjectSummary => ({
@@ -93,7 +93,7 @@ test('buildRecentAgents tolerates a project whose runs cannot be read', async ()
   assert.deepEqual(recent.map(r => r.agent.id), ['x'])
 })
 
-const ticket = (file: string, over: Partial<WorkspaceTicket> = {}): WorkspaceTicket => ({
+const ticket = (file: string, over: Partial<Ticket> = {}): Ticket => ({
   file,
   title: file,
   summary: '',
@@ -131,7 +131,7 @@ test('ticketBucket: the ticket format\'s 10-0 scale, high from 7 up', () => {
 })
 
 test('buildHotTickets pools every project, buckets each, drops the rest, and orders lane-first', async () => {
-  const tickets: Record<string, WorkspaceTicket[]> = {
+  const tickets: Record<string, Ticket[]> = {
     '/a': [ticket('a1.md', { planned: true }), ticket('a2.md', { priority: '8' })],
     '/b': [ticket('b1.md'), ticket('b2.md')],
   }
@@ -151,39 +151,6 @@ test('buildHotTickets pools every project, buckets each, drops the rest, and ord
       { p: 'alpha', f: 'a2.md', b: 'high-priority' },
     ],
   )
-})
-
-// collectAllTickets backs the cross-project Tickets page (#1144): one list per project, unpooled
-// and unbucketed — the opposite of buildHotTickets, which merges and filters for the Overview card.
-test('collectAllTickets keeps one list per project, in registry order', async () => {
-  const tickets: Record<string, WorkspaceTicket[]> = {
-    '/a': [ticket('a1.md'), ticket('a2.md')],
-    '/b': [ticket('b1.md')],
-  }
-  const all = await collectAllTickets([project('alpha', '/a'), project('beta', '/b')], {
-    tickets: async cwd => tickets[cwd] ?? [],
-  })
-  assert.deepEqual(
-    all.map(g => ({ id: g.projectId, files: g.tickets.map(t => t.file) })),
-    [
-      { id: 'alpha', files: ['a1.md', 'a2.md'] },
-      { id: 'beta', files: ['b1.md'] },
-    ],
-  )
-})
-
-test('collectAllTickets keeps a project with no tickets, so import stays reachable there (#1144)', async () => {
-  const all = await collectAllTickets([project('empty', '/e')], { tickets: async () => [] })
-  assert.deepEqual(all, [{ projectId: 'empty', projectName: 'empty', tickets: [] }])
-})
-
-test('collectAllTickets tolerates a project whose tickets cannot be read (#1144)', async () => {
-  const all = await collectAllTickets([project('bad', '/bad')], {
-    tickets: async () => {
-      throw new Error('nope')
-    },
-  })
-  assert.deepEqual(all, [{ projectId: 'bad', projectName: 'bad', tickets: [] }])
 })
 
 test('buildHotTickets tolerates a project whose tickets cannot be read', async () => {

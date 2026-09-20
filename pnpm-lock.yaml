@@ -81,9 +81,6 @@ importers:
       '@gemstack/skill-branches':
         specifier: workspace:*
         version: link:../skill-branches
-      '@gemstack/skill-tickets':
-        specifier: workspace:*
-        version: link:../skill-tickets
       '@puppeteer/browsers':
         specifier: 3.2.1
         version: 3.2.1
@@ -139,6 +136,9 @@ importers:
       '@gemstack/skill-queue':
         specifier: workspace:*
         version: link:../skill-queue
+      '@gemstack/skill-tickets':
+        specifier: workspace:*
+        version: link:../skill-tickets
       '@tailwindcss/vite':
         specifier: ^4.0.0
         version: 4.3.2(vite@8.1.4(@types/node@20.19.43)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))

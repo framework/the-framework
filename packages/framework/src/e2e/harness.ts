@@ -28,13 +28,15 @@ import type { StartAgentOptions } from '../dashboard/types.js'
 import type { QuotaView } from '../dashboard/quota.js'
 
 /**
- * The two provider packages every fixture project depends on, linked from this workspace's own
- * install: the records package (the runs provider) and the queue package (the queue provider).
+ * The three provider packages every fixture project depends on, linked from this workspace's own
+ * install: the records package (the runs provider), the queue package (the queue provider) and
+ * the tickets package (the tickets provider).
  */
 const LOGS_PACKAGE = '@gemstack/skill-logs'
 const QUEUE_PACKAGE = '@gemstack/skill-queue'
+const TICKETS_PACKAGE = '@gemstack/skill-tickets'
 const packageDir = (name: string): string => resolve(dirname(fileURLToPath(import.meta.resolve(name))), '..')
-const PROVIDER_PACKAGES: Record<string, string> = { [LOGS_PACKAGE]: packageDir(LOGS_PACKAGE), [QUEUE_PACKAGE]: packageDir(QUEUE_PACKAGE) }
+const PROVIDER_PACKAGES: Record<string, string> = { [LOGS_PACKAGE]: packageDir(LOGS_PACKAGE), [QUEUE_PACKAGE]: packageDir(QUEUE_PACKAGE), [TICKETS_PACKAGE]: packageDir(TICKETS_PACKAGE) }
 
 // Re-home the process-global config home FIRST: the registry, preferences, and daemon state all
 // resolve through $XDG_CONFIG_HOME at call time, and run-tests.mjs gives the whole suite ONE
@@ -212,9 +214,9 @@ export async function makeWorld(): Promise<StoryWorld> {
         await mkdir(dirname(join(cwd, file)), { recursive: true })
         await writeFile(join(cwd, file), text)
       }
-      // The project records its runs and keeps its queue the way a real one does: the logs and
-      // queue packages are among its dependencies, each declaring itself the provider the
-      // dashboard reads that data through.
+      // The project records its runs and keeps its tickets and queue the way a real one does: the
+      // logs, tickets and queue packages are among its dependencies, each declaring itself the
+      // provider the dashboard reads that data through.
       await writeFile(join(cwd, 'package.json'), JSON.stringify({ name: 'story-fixture', private: true, devDependencies: Object.fromEntries(Object.keys(PROVIDER_PACKAGES).map(name => [name, '*'])) }, null, 2) + '\n')
       await git(cwd, 'add', '-A')
       await git(cwd, 'commit', '-q', '-m', 'seed')

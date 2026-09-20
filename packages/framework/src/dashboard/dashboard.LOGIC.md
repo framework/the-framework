@@ -1,4 +1,4 @@
-Builds the data behind the Overview [1], the dashboard's cross-project page: how many projects are registered and how many open entries the agent queues [2] hold in total, the agents [3] working right now (most recently updated first), every registered project ordered most recently active first with whether it has any tickets, and each project's open queue. It is a pure projection of the same files the rest of the dashboard reads, computed on every poll, so it carries only what the page and its onboarding checklist actually display: a project whose state cannot be read contributes nothing, and a ticket read that fails counts as "no tickets".
+Builds the data behind the Overview [1], the dashboard's cross-project page: how many projects are registered and how many open entries the agent queues [2] hold in total, the agents [3] working right now (most recently updated first), every registered project ordered most recently active first with whether it can have tickets and whether it has any, and each project's open queue. It is a pure projection of the same files the rest of the dashboard reads, computed on every poll, so it carries only what the page and its onboarding checklist actually display: a project whose state cannot be read contributes nothing, and a ticket read that fails counts as "no tickets".
 
 ## Context
 
@@ -17,7 +17,7 @@ Builds the data behind the Overview [1], the dashboard's cross-project page: how
 
 - **One read of the queues, shared** - the per-project queues are collected once and handed to the "working now" rollup, so the agent queues are read a single time per poll.
 - **Totals and the working-now list** - the number of registered projects, the number of open queue entries across them, and the agents going right now, as `overview.ts` rolls them up.
-- **Projects most recently active first, with ticket presence** - the onboarding checklist acts on the first project of the list, so the order is an output; each project says whether it has any ticket at all, not how many, and a failed read reads as none.
+- **Projects most recently active first, with ticket presence** - the onboarding checklist acts on the first project of the list, so the order is an output; each project says whether one of its packages provides tickets at all, and whether it has any ticket, not how many; a failed read reads as none.
 - **Only what a reader asks for** - the payload has exactly these parts and nothing computed for nobody, since every extra field would cost a walk over every project's whole record [4] on each poll.
 
 ## Business logic
@@ -46,11 +46,11 @@ The totals are the number of registered projects and the number of open queue en
 
 #### Context
 
-**User story**: the Overview's [1] onboarding checklist tells a new user what to do next and acts on the most recently active project; whether that project has tickets decides what it shows.
+**User story**: the Overview's [1] onboarding checklist tells a new user what to do next and acts on the most recently active project; whether any project can have tickets decides whether the step to populate them is shown, and whether that project has tickets decides whether it is done.
 
 #### Business logic
 
-Every registered project appears once, sorted by its last activity, most recent first; a project with no recorded activity sorts last. For each, the page learns only whether the repository has any ticket in `tickets/` on the `agent-data` branch [5] (presence, not a count, by the rule in `tickets.ts`); when that read fails for a project, the project reads as having no tickets rather than failing the page.
+Every registered project appears once, sorted by its last activity, most recent first; a project with no recorded activity sorts last. For each, the page learns only two facts: whether one of the project's packages declares a tickets provider (`../store/tickets.ts`), and whether that provider lists any ticket (presence, not a count). A project with no provider provides none and has none; when either read fails for a project, the project reads as not providing, or as having no tickets, rather than failing the page.
 
 ### Only what a reader asks for
 
@@ -60,4 +60,4 @@ Every registered project appears once, sorted by its last activity, most recent 
 
 #### Business logic
 
-The payload carries exactly four parts: the totals (projects and open queue entries), the working-now list, the project list (each project's id and ticket presence, nothing else), and the queues. Adding a part is a decision, never a leftover.
+The payload carries exactly four parts: the totals (projects and open queue entries), the working-now list, the project list (each project's id, whether it provides tickets and whether it has any, nothing else), and the queues. Adding a part is a decision, never a leftover.

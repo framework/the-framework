@@ -8,5 +8,6 @@ What the tests cover, against a canned origin:
 - **Open pull request** - a ref with an open pull request is kept, so a deletion never closes one; a ref whose only pull request is closed is deleted.
 - **A refused deletion** - a deletion the remote rejects is reported with its error and the ref's first-seen record is left in place, so the retry does not restart its day.
 - **The default branch** - the default branch is taken from what origin's HEAD points at, so a repository defaulting to neither `main` nor `master` is swept correctly.
+- **A named branch clears every gate** - a branch a run named itself, recorded on the run, is kept like any run branch when the run is young, when it is busy, when its tip is not provably landed, and when an open pull request is on it; nothing is deleted.
 - **No reachable remote** - a project whose remote cannot be reached sweeps nothing, writes no first-seen record, and never fails.
 - **The pass over projects** - one turn visits every registered project in order; only deletions and failures are said out loud, kept refs stay quiet; a stopped sweep's next turn does nothing.

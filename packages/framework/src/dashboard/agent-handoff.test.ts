@@ -314,3 +314,13 @@ test('a Merge the provider refuses comes back as the error, not a success (#1391
   )
   assert.deepEqual(result, { ok: false, error: 'Pull request is not mergeable: the base branch requires review' })
 })
+
+test("the Open PR button titles the request by the name the provider answers for the branch, before the branch itself; the agent's own title still wins", async () => {
+  const { branches, calls } = fakeBranches({ 'agent-fix-login': state({ branch: 'agent-fix-login', name: 'fix-login' }), 'agent-r1': state({ branch: 'agent-r1' }) })
+  await openAgentPullRequest('/repo', agent({ branch: 'agent-fix-login' }), { branches })
+  assert.equal((calls.at(-1)![2] as { title: string }).title, 'fix-login')
+  await openAgentPullRequest('/repo', agent({ branch: 'agent-r1' }), { branches })
+  assert.equal((calls.at(-1)![2] as { title: string }).title, 'agent-r1', 'no name answered: the branch as it is')
+  await openRemoteBranchPullRequest('/repo', { id: 'r1', branch: 'agent-fix-login', prTitle: 'Fix the login redirect' }, 'agent-fix-login', { branches })
+  assert.equal((calls.at(-1)![2] as { title: string }).title, 'Fix the login redirect')
+})

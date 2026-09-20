@@ -2,7 +2,7 @@ import { parseArgs } from 'node:util'
 import { basename, resolve } from 'node:path'
 import { realpath, stat } from 'node:fs/promises'
 import { nodeGitRunner, checkoutRoot, gitReason, type GitRunner } from '@gemstack/agent-data'
-import { agentBranchName, agentIdFromWorktreeDir, isSafeAgentId } from './branch-names.js'
+import { agentBranchName, agentIdFromWorktreeDir, isSafeAgentId, sessionNameOf } from './branch-names.js'
 import {
   branchPushed,
   currentBranch,
@@ -211,7 +211,8 @@ const COMMANDS: Record<string, Command> = {
     for (const entry of await worktreeDirEntries(repo)) {
       const branch = await worktreeBranch(entry.path, git)
       const sizeBytes = values.sizes ? await worktreeSize(entry.path) : undefined
-      rows.push({ ...entry, ...(branch ? { branch } : {}), ...(sizeBytes === undefined ? {} : { sizeBytes }) })
+      const name = sessionNameOf(branch, entry.agentId)
+      rows.push({ ...entry, ...(branch ? { branch } : {}), ...(name ? { name } : {}), ...(sizeBytes === undefined ? {} : { sizeBytes }) })
     }
     return rows
   },

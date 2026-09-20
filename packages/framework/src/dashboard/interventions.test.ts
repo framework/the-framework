@@ -319,3 +319,11 @@ test('a draft with no branch recorded is still treated as hand-made (#1102)', as
   const { items } = await buildInterventions([project('a', '/a')], { prs, liveAgents: noAgents, agents: async () => [] })
   assert.deepEqual(items, [])
 })
+
+test('unpushed work of an agent that recorded no ask is titled by the name the provider answers for its branch, else the branch', async () => {
+  const { intent: _intent, ...unasked } = doneMeta({ branch: 'agent-fix-login' })
+  const named = await buildInterventions([project('p', '/p')], onlyUnpushed([unasked], showing(branch => waiting({ branch, name: 'fix-login' }))))
+  assert.deepEqual(named.items.map(i => [i.kind, i.title, i.branch]), [['unpushed', 'fix-login', 'agent-fix-login']])
+  const plain = await buildInterventions([project('p', '/p')], onlyUnpushed([unasked], showing(branch => waiting({ branch }))))
+  assert.deepEqual(plain.items.map(i => i.title), ['agent-fix-login'], 'no name answered: the branch as it is')
+})

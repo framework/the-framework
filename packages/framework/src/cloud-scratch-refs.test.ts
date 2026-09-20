@@ -352,3 +352,21 @@ test('a stopped service ticks as a no-op', async () => {
   await service.tick()
   assert.equal(sweeps, 1)
 })
+
+test('a branch a run named itself still has to clear every gate: young, busy, holding work, or under an open PR, it is kept', async () => {
+  const youngNamed = async (): Promise<AgentMeta[]> => [run(YOUNG_RUN_ID, '2026-08-17T11:00:00.000Z', NAMED_RUN)]
+  const young = await sweepCloudScratchRefs('/repo', { agents: youngNamed, git: fakeGit({ heads: { main: MAIN_SHA, [NAMED_RUN]: SHA } }).git, fs: memFs().fs, prs: noPrs, now: () => NOW })
+  assert.deepEqual(young.kept, [{ ref: NAMED_RUN, reason: 'young' }])
+
+  const oldNamed = async (): Promise<AgentMeta[]> => [run(OLD_RUN_ID, '2026-08-16T10:00:00.000Z', NAMED_RUN)]
+  const busy = await sweepCloudScratchRefs('/repo', { agents: oldNamed, git: fakeGit({ heads: { main: MAIN_SHA, [NAMED_RUN]: SHA } }).git, fs: memFs().fs, prs: noPrs, now: () => NOW, busy: new Set([OLD_RUN_ID]) })
+  assert.deepEqual(busy.kept, [{ ref: NAMED_RUN, reason: 'busy' }])
+
+  const work = await sweepCloudScratchRefs('/repo', { agents: oldNamed, git: fakeGit({ heads: { main: MAIN_SHA, [NAMED_RUN]: SHA }, landed: new Set() }).git, fs: memFs().fs, prs: noPrs, now: () => NOW })
+  assert.deepEqual(work.kept, [{ ref: NAMED_RUN, reason: 'holds-work' }])
+
+  const open = fakeGit({ heads: { main: MAIN_SHA, [NAMED_RUN]: SHA } })
+  const underPr = await sweepCloudScratchRefs('/repo', { agents: oldNamed, git: open.git, fs: memFs().fs, prs: async () => [pr('OPEN')], now: () => NOW })
+  assert.deepEqual(underPr.kept, [{ ref: NAMED_RUN, reason: 'open-pr' }])
+  assert.deepEqual(open.deleted, [])
+})

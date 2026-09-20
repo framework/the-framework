@@ -1,4 +1,6 @@
 import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
+import { basename } from 'node:path'
+import { agentIdFromWorktreeDir, sessionNameOf } from './branch-names.js'
 import { repoHasRemote, worktreeBranch, worktreeDirEntries } from './worktree.js'
 
 /**
@@ -31,6 +33,8 @@ export interface BranchFile {
 
 export interface BranchState {
   branch: string
+  /** The name the agent gave its work: the branch minus this package's prefix. Absent for a branch the package did not mint, and for a checkout still on the branch it was created on. */
+  name?: string
   /** The branch exists in the repository. Gone: every list below is empty. */
   exists: boolean
   /** What it is measured against: the remote's default branch, else a local `main` or `master`. Absent when none was found. */
@@ -74,7 +78,9 @@ async function readOne(repo: string, branch: string, reads: Reads): Promise<Bran
   const tip = (await ask(['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`])).trim()
   const checkout = reads.checkouts.get(branch)
   const pending = checkout ? await pendingFiles(reads.git, checkout) : {}
-  if (!tip) return { branch, exists: false, commits: [], files: [], hasRemote, pushed: false, merged: false, ...pending }
+  const name = sessionNameOf(branch, checkout ? agentIdFromWorktreeDir(basename(checkout)) : undefined)
+  const named = name ? { name } : {}
+  if (!tip) return { branch, ...named, exists: false, commits: [], files: [], hasRemote, pushed: false, merged: false, ...pending }
   // `base..branch` is the branch's own commits; `base...branch` is the change since it left the
   // base, whatever the base did since. Each spelling answers its own question.
   const [commitsOut, numstatOut, remoteTip, mergedOut] = await Promise.all([
@@ -85,6 +91,7 @@ async function readOne(repo: string, branch: string, reads: Reads): Promise<Bran
   ])
   return {
     branch,
+    ...named,
     exists: true,
     ...(base ? { base } : {}),
     commits: parseCommits(commitsOut),

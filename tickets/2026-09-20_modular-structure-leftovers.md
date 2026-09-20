@@ -5,9 +5,23 @@ GitHub: [#1818](https://github.com/framework/the-framework/issues/1818)
 
 ## TLDR
 
-After the four module pull requests — #1812 (logs), #1813 (queue), #1815 (tickets), #1817 (branches) — the dashboard reads every skill through the command its package declares and imports none of them. This ticket collects, in one list, the features those pull requests dropped and the work they left for later. Nothing here is started.
+After the four module pull requests — #1812 (logs), #1813 (queue), #1815 (tickets), #1817 (branches) — the dashboard reads every skill through the command its package declares and imports none of them. This ticket collects, in one list, the features those pull requests dropped and the work they left for later.
 
 Suleiman's picks so far: the Overview cards belong to the package that provides them; the onboarding steps stay the framework's; Discord as a module is a later thought.
+
+## Scope: the work stops after two pull requests
+
+The plan's five pull requests are cut to two.
+
+- Pull request 1, the root build: #1822.
+- Pull request 2, the name the agent gave its work, answered by the branches package and drawn by the framework: #1823. The framework strips no prefix; no `publish --base`.
+- Pull request 3, the Overview-card slot, is built and held on a branch, not opened.
+- Pull request 4, the two cards moving into the packages, and the launcher's gear options: not built.
+- Pull request 5, the housekeeping, is folded into whatever comes next.
+
+Why: the dashboard is secondary for now, and losing a feature in the refactor is acceptable. The direction is a handful of polished skills, then a drastically simpler dashboard. Restoring cards and options runs against that.
+
+Still true from the plan: the clean rule stays the package's; a plan ask may be queued twice; "Plan truncated" does not come back; AGENTS.md's `FEATURES-SPEC.md` rule still needs to go.
 
 ## Why it matters
 

@@ -1,0 +1,8 @@
+{"kind":"start","prompt":"/triage-quick"}
+{"kind":"session","sessionId":"b55f1a52-54e6-4db5-b6ec-d6c6e77456f7"}
+{"kind":"action","label":"Bash"}
+{"kind":"rate-limit","limit":{"status":"allowed","window":"five_hour","resetsAt":1789947600000}}
+{"kind":"action","label":"Bash"}
+{"kind":"action","label":"Bash"}
+{"kind":"action","label":"Bash"}
+{"kind":"ended","status":"failed","detail":"its process died before the run ended"}

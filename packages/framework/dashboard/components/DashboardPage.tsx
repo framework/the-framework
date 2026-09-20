@@ -29,15 +29,17 @@ import { ScrollArea } from './ui/scroll-area.js'
 export function DashboardPage({
   onSelectProject,
   onSelectAgent,
-  onOpenTicket,
+  canOpenLink,
+  onOpenLink,
   onAgentStarted,
   interventions,
 }: {
   onSelectProject: (id: string) => void
   /** Open one session (project + run): the Agents and hot-ticket rows link straight to a session. */
   onSelectAgent: (projectId: string, agentId: string) => void
-  /** Open one ticket's own page (#1144): a queued entry links to its ticket, so its row does too. */
-  onOpenTicket: (projectId: string, file: string) => void
+  /** Whether the shell has a page for a link into a project's files (#1774), and open it: a queued entry links to its ticket, so its row does too. */
+  canOpenLink: (href: string) => boolean
+  onOpenLink: (projectId: string, href: string) => void
   /** Where a session the onboarding checklist starts lands (#1169): on that session. */
   onAgentStarted: (projectId: string, intent: string, agentId: string) => void
   interventions: Intervention[]
@@ -68,7 +70,8 @@ export function DashboardPage({
             <AiQueue
               queue={data?.queue ?? []}
               loading={loading}
-              onOpenTicket={onOpenTicket}
+              canOpenLink={canOpenLink}
+              onOpenLink={onOpenLink}
               onAgentStarted={onAgentStarted}
               onSelectProject={onSelectProject}
             />

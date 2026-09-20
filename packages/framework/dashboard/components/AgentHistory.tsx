@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Plus, ChevronDown, Cloud, Laptop, MonitorSmartphone, Settings, LayoutDashboard, FolderGit2, Ticket, Blocks } from 'lucide-react'
+import { Plus, ChevronDown, Cloud, Laptop, MonitorSmartphone, Settings, LayoutDashboard, FolderGit2, Blocks } from 'lucide-react'
 import type { ComponentType } from 'react'
 import type { AgentMeta, AgentStatus, RecentAgent, ProjectSummary } from '../../src/index.js'
 import { DRIVER_LABELS, driverFromImpl, cloudRunState, type CloudRunState } from '../../src/client.js'
@@ -63,8 +63,6 @@ export function AgentHistory({
   onDashboard = () => {},
   onSelectProject = () => {},
   onSettings = () => {},
-  onTickets,
-  ticketsActive = false,
   pages = [],
   activePage = null,
   onPage = () => {},
@@ -83,13 +81,7 @@ export function AgentHistory({
   onSelectProject?: (projectId: string) => void
   /** Open Settings, from the sidebar footer where the navbar gear moved. */
   onSettings?: () => void
-  /** Open the cross-project Tickets view (#1144). Absent means the row is not offered at all —
-   *  the interim for a surface (like the relay) with nothing to route it to. */
-  onTickets?: (() => void) | undefined
-  /** Whether the Tickets view is the current one (list or a ticket's own page), so the row can
-   *  carry the active fill — and so Overview does not also claim it (both share `projectId === null`). */
-  ticketsActive?: boolean
-  /** The pages the installed widgets add (#1774), one nav row each, below Tickets. */
+  /** The pages the installed widgets add (#1774), one nav row each, below Overview. */
   pages?: readonly { segment: string; label: string; icon?: ComponentType<{ className?: string; 'aria-hidden'?: boolean }> }[]
   /** The widget page that is the current view, by its segment, or null. */
   activePage?: string | null
@@ -179,9 +171,8 @@ export function AgentHistory({
 
   // New is the active view when a project is open on its launcher (its "New" / Start-a-session
   // screen: a project selected, no run picked, not following a live one). On the Overview that role
-  // belongs to the Overview item instead, so the two are never active at once — and a ticket page
-  // routes with a project but is the Tickets view, not the launcher.
-  const atProjectLauncher = projectId !== null && selectedAgentId === null && !ticketsActive
+  // belongs to the Overview item instead, so the two are never active at once.
+  const atProjectLauncher = projectId !== null && selectedAgentId === null
 
   const hasRecents = rows.length > 0 || showOptimistic
 
@@ -211,12 +202,10 @@ export function AgentHistory({
         />
         {/* Overview: the way home, its own nav item directly under New and above the session list,
             more prominent than a menu row. Only this — the current view — carries the active fill. */}
-        <OverviewButton active={projectId === null && !ticketsActive && activePage === null} count={interventionCount} onClick={onDashboard} />
-        {/* Tickets: every project's backlog, one section each (#1144), not a rail tab — below
-            Overview, since it is the same kind of cross-project destination. */}
-        {onTickets && <TicketsButton active={ticketsActive} onClick={onTickets} />}
-        {/* The installed widgets' pages (#1774): the same kind of cross-project destination, named
-            by the widget, never by the dashboard. */}
+        <OverviewButton active={projectId === null && activePage === null} count={interventionCount} onClick={onDashboard} />
+        {/* The installed widgets' pages (#1774): cross-project destinations like the Overview, named
+            by the widget, never by the dashboard — the tickets' page among them, when a package
+            brings one. */}
         {pages.map(page => (
           <NavRow key={page.segment} icon={page.icon ?? Blocks} label={page.label} active={activePage === page.segment} onClick={() => onPage(page.segment)} />
         ))}
@@ -303,7 +292,7 @@ export function AgentHistory({
   )
 }
 
-// One rail destination — Overview, Tickets, a widget's page. Same box as New (px-2 py-1.5 gap-2) so every row's
+// One rail destination — Overview, a widget's page. Same box as New (px-2 py-1.5 gap-2) so every row's
 // icon and label line up exactly, and only the current view carries the active fill.
 function NavRow({
   icon: Icon,
@@ -358,12 +347,6 @@ function OverviewButton({ active, count, onClick }: { active: boolean; count: nu
       )}
     </NavRow>
   )
-}
-
-// Tickets: a project's backlog as its own nav item (#1144), same row as Overview. Only rendered
-// once a project is selected — there is nothing to open otherwise.
-function TicketsButton({ active, onClick }: { active: boolean; onClick: () => void }) {
-  return <NavRow icon={Ticket} label="Tickets" active={active} onClick={onClick} />
 }
 
 // Projects: the project selector as an expandable nav item (Rom), the same row style as Overview,

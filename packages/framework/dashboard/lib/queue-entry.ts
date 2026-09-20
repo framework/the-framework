@@ -11,19 +11,16 @@ export interface QueueEntryLabel {
   /** The human part: the link's text, else the line itself. */
   text: string
   /**
-   * The ticket the entry links to, when it is a link into `tickets/`. The bare filename — the
-   * key `WorkspaceTicket.file` uses — so the consumer can open the ticket's own page with it.
+   * The path inside the project's repository the entry links to (`tickets/2026-01-01_x.md`), when
+   * it is a link into the workspace: what a widget's page may open (#1774, `lib/data-link.ts`).
    */
-  ticket?: string
+  path?: string
   /** The link's absolute http(s) target, when the entry points out of the workspace instead. */
   url?: string
 }
 
 /** `[title](target)` at the start of a line, with the title allowed to contain anything but `]`. */
 const LEADING_LINK = /^\s*\[([^\]]+)\]\(([^)\s]+)\)\s*/
-
-/** Where a queued ticket's link points (#1164) — the same prefix a ticket's link carries (`lib/ticket-link.ts`). */
-const TICKET_PREFIX = 'tickets/'
 
 /**
  * What one queue entry should read as, and where it points.
@@ -33,17 +30,16 @@ const TICKET_PREFIX = 'tickets/'
  * after the link is the agent's own note, which is detail — it belongs in the tooltip, not in a
  * one-line list that would truncate the title away to show it.
  *
- * The target is classified the way the Overview's `queuedTicketFile` (overview.ts) classifies it:
- * only one under `tickets/` names a ticket. An absolute http(s) target is kept as `url`; any other
- * target (a bare repo path like `README.md`) has no page of its own in the dashboard, so the entry
- * keeps the link's title but points nowhere rather than at a dead destination.
+ * An absolute http(s) target is kept as `url`; any other target is a path inside the repository,
+ * kept as `path`: whether the dashboard can open it is the mounted widget pages' to say
+ * (`lib/data-link.ts`), and an entry pointing where no page is keeps the link's title and points
+ * nowhere rather than at a dead destination.
  */
 export function queueEntryLabel(entry: string): QueueEntryLabel {
   const link = LEADING_LINK.exec(entry)
   if (!link) return { text: entry.trim() }
   const text = link[1]!.trim()
   const target = link[2]!
-  if (target.startsWith(TICKET_PREFIX)) return { text, ticket: target.slice(TICKET_PREFIX.length) }
   if (/^https?:\/\//.test(target)) return { text, url: target }
-  return { text }
+  return { text, path: target }
 }

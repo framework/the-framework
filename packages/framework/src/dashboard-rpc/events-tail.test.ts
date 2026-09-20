@@ -282,9 +282,10 @@ test('tailAgentEvents on a diary that is nowhere yet: the replay marker at once,
     await sleep(200)
     assert.equal(sync, 1, 'nothing to replay is an empty replay, reported at once')
     assert.deepEqual(seen, [])
+    await sleep(1300) // one poll: asked again, still nowhere
     await writeFile(live, line('one'))
     home = true
-    await sleep(1600) // one poll: the diary is asked for again, and found
+    await sleep(1600) // the next poll: asked again, and found
     assert.deepEqual(seen, ['one'])
     await appendFile(live, line('two'))
     await sleep(1600)

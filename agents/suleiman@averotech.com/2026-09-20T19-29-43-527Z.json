@@ -1,8 +1,8 @@
 {
   "id": "2026-09-20T19-29-43-527Z",
   "startedAt": "2026-09-20T19:29:45.974Z",
-  "endedAt": "2026-09-20T19:29:59.465Z",
-  "status": "failed",
+  "endedAt": "2026-09-20T20:10:52.344Z",
+  "status": "done",
   "intent": "/work-queue",
   "driver": "claude-code",
   "model": "opus",
@@ -16,7 +16,6 @@
     "pid": 67343,
     "host": "Suleimans-MacBook-Pro.local",
     "kind": "prompt",
-    "workspace": "/Users/suleiman/Projects/gemstack/.branches/agent-2026-09-20T19-29-43-527Z",
-    "sessionId": "52746b1c-e727-4595-9382-8ab02cef20ee"
+    "workspace": "/Users/suleiman/Projects/gemstack/.branches/agent-2026-09-20T19-29-43-527Z"
   }
 }

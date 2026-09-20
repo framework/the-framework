@@ -2,6 +2,7 @@ import { contextProjects, resolveProjectPath } from './context.js'
 import { findProjectWidget, readProjectWidgets, runWidgetCommand as runCommand, type WidgetCommandResult } from '../project-widgets.js'
 import { widgetUrl } from '../dashboard/widget-serve.js'
 import { providedDataChanged } from '../store/provided.js'
+import { DATA_BRANCH, pullFileBranch } from '@gemstack/agent-data'
 
 export type { WidgetCommandResult } from '../project-widgets.js'
 
@@ -41,14 +42,20 @@ export async function onWidgets(): Promise<DashboardWidget[]> {
  * program. Once the command has run, the framework forgets what it had read of that project's
  * provided data (its queue, its runs): the command may have written it, and the next read sees
  * that at once instead of a cached copy.
+ *
+ * `acts` says the command is a widget's action on the project (a link action), not a page's read:
+ * the framework then also converges the project's data branch with origin, as its clock does
+ * every minute, before forgetting — a package's command writes as a remote writer, straight to
+ * origin, and this machine's copy would otherwise show the write only at the next sync.
  */
-export async function runWidgetCommand(projectId: string, pkg: string, args: string[], command?: string): Promise<WidgetCommandResult> {
+export async function runWidgetCommand(projectId: string, pkg: string, args: string[], command?: string, acts = false): Promise<WidgetCommandResult> {
   const root = await resolveProjectPath(projectId)
   if (!root) return { ok: false, error: 'unknown project' }
   if (!Array.isArray(args)) return { ok: false, error: 'arguments must be a list' }
   const widget = await findProjectWidget(root, pkg)
   if (!widget) return { ok: false, error: `${pkg} brings no widget to this project` }
   const result = await runCommand(root, widget, args, command)
+  if (acts) await pullFileBranch(root, DATA_BRANCH, { log: () => {} }).catch(() => {})
   providedDataChanged(root)
   return result
 }

@@ -1,6 +1,8 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { makeWorld } from './harness.js'
+import { runWidgetCommand } from '../dashboard-rpc/widgets.js'
+import { DATA_BRANCH, pullFileBranch } from '@gemstack/agent-data'
 import {
   onTickets,
   onTicket,
@@ -17,6 +19,8 @@ import {
 // skills itself.
 
 const TICKET_FILE = '2026-08-01_login-page.md'
+/** The fixture's queue package: its widget's "Add to queue" runs this package's command. */
+const QUEUE_PACKAGE = '@gemstack/skill-queue'
 const TICKET = [
   'priority: 8',
   '',
@@ -60,17 +64,20 @@ test('browse the ticket backlog: list, detail, and the cross-project pages (#697
   }
 })
 
-test('a queued ticket is read through the project\'s queue provider, and the boards show it queued (#1164/#1774)', async () => {
+test('the queue is read through the project\'s queue provider, the boards show a queued ticket, and the queue widget\'s action is seen at once (#1164/#1774)', async () => {
   const world = await makeWorld()
   const rpc = world.rpc
   try {
-    // The queue as the queue package's own "Add to queue" writes it: a link back to the ticket in
-    // the priority section the ticket's own priority earns, on the `agent-data` branch.
+    // The queue as an agent left it: a link back to the ticket in the priority section the
+    // ticket's own priority earns, on the `agent-data` branch, on origin and in this machine's
+    // copy, as the daemon's data sync keeps them.
     const project = await world.addProject({
       'README.md': '# fixture\n',
       [`tickets/${TICKET_FILE}`]: TICKET,
       'TODO_AGENTS.md': `## Priority 8\n\n- [Login page](tickets/${TICKET_FILE})\n`,
     })
+    const synced = await pullFileBranch(project.cwd, DATA_BRANCH)
+    assert.equal(synced.ok, true, `the fixture's data branch did not converge: ${synced.ok ? '' : synced.error}`)
 
     // The framework reads it by running the provider the fixture's package declares (`queue --local`).
     const queue = await rpc(onQueue)()
@@ -80,6 +87,15 @@ test('a queued ticket is read through the project\'s queue provider, and the boa
     // The queued ticket shows on the hot-tickets rail, in the AI Queue lane.
     const hotQueued = await rpc(onHotTickets)()
     assert.ok(hotQueued.some(h => h.projectId === project.id && h.ticket.file === TICKET_FILE && h.bucket === 'ai-queue'))
+
+    // The queue package's "Add to queue" action, as the dashboard runs it: the package's own
+    // command, marked as an act. The command writes as a remote writer, straight to origin; the
+    // framework then converges this machine's copy and re-reads, so the boards show the entry at
+    // once, in its own lower section, not at the daemon's next sync.
+    const added = await rpc(runWidgetCommand)(project.id, QUEUE_PACKAGE, ['add', '[Dark mode](tickets/2026-08-02_dark-mode.md)', '--priority', '3'], undefined, true)
+    assert.equal(added.ok, true, `the add failed: ${added.ok ? '' : added.error}`)
+    const after = await rpc(onQueue)()
+    assert.deepEqual(after.find(q => q.projectId === project.id)?.entries, [`[Login page](tickets/${TICKET_FILE})`, '[Dark mode](tickets/2026-08-02_dark-mode.md)'])
   } finally {
     await world.close()
   }

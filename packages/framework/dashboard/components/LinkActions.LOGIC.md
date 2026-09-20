@@ -38,7 +38,7 @@ The page gives the projects its links belong to, and what a click acts on: links
 
 #### Business logic
 
-A click resolves the links: the function form is called then, never earlier. The action is then run once per project group, in the order given, with the links of that group, through a host bound to the action's own package, so the action can run only that package's commands; opening an agent through the host lands where the page says, or nowhere. A group whose project does not have the action's package, or with no links, is skipped. The first group the action refuses ends the batch with its reason. While a click runs, every button here is disabled.
+A click resolves the links: the function form is called then, never earlier. The action is then run once per project group, in the order given, with the links of that group, through a host bound to the action's own package, so the action can run only that package's commands, and marked as acting, so the dashboard reads back at once what the action wrote (the daemon converges the project's data with origin after each of its commands, `src/dashboard-rpc/widgets.ts`); opening an agent through the host lands where the page says, or nowhere. A group whose project does not have the action's package, or with no links, is skipped. The first group the action refuses ends the batch with its reason. While a click runs, every button here is disabled.
 
 ### Done, failed, rested
 

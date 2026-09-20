@@ -111,11 +111,15 @@ export interface WidgetHost {
 /** What the dashboard knows about the widget it is serving: its package, and how to navigate. */
 export type WidgetHostBase = Pick<WidgetHost, 'package' | 'openAgent'>
 
-/** The host for one widget: the dashboard's navigation, and its commands bound to the widget's own package. */
-export function widgetHost(base: WidgetHostBase): WidgetHost {
+/**
+ * The host for one widget: the dashboard's navigation, and its commands bound to the widget's own
+ * package. `acts` marks every command as an action on the project rather than a page's read: the
+ * dashboard builds a link action's host with it, so what the action wrote is read back at once.
+ */
+export function widgetHost(base: WidgetHostBase, opts: { acts?: boolean } = {}): WidgetHost {
   return {
     ...base,
-    runCommand: (projectId, args, command) => runWidgetCommand(projectId, base.package, args, command),
+    runCommand: (projectId, args, command) => runWidgetCommand(projectId, base.package, args, command, opts.acts ?? false),
   }
 }
 

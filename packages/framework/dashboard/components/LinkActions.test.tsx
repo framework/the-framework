@@ -66,7 +66,8 @@ describe('LinkActions', () => {
     // The host runs only the widget's own package's commands.
     runWidgetCommand.mockResolvedValue({ ok: true, output: null })
     await run.mock.calls[0]![0].runCommand('p1', ['add', 'x'])
-    expect(runWidgetCommand).toHaveBeenCalledWith('p1', '@x/queue', ['add', 'x'], undefined)
+    // The last argument marks the command as an act, so the daemon converges the project's data and re-reads.
+    expect(runWidgetCommand).toHaveBeenCalledWith('p1', '@x/queue', ['add', 'x'], undefined, true)
     // Done: the button says so and rests.
     const rested = await screen.findByRole('button', { name: 'Queued' })
     expect((rested as HTMLButtonElement).disabled).toBe(true)

@@ -69,7 +69,7 @@ A page receives `projects`, the registered projects whose dependencies include i
 - `runCommand(projectId, args, command?)`, which asks the daemon to run one of that package's commands in that project and answers the command's JSON output or the reason there is none (the rules are the daemon's, in `src/project-widgets.ts`); a page can only ever run its own package's commands;
 - `openAgent(projectId, agentId)`, which navigates the dashboard to that agent's page.
 
-Called anywhere else, it fails with "useWidgetHost is only available inside a widget page". `widgetHost(base)` builds the same services from a package name and the navigation, for the dashboard to hand a link action [4] outside any page.
+Called anywhere else, it fails with "useWidgetHost is only available inside a widget page". `widgetHost(base, { acts })` builds the same services from a package name and the navigation, for the dashboard to hand a link action [4] outside any page; with `acts`, every command it runs is marked as an action on the project, so the dashboard reads back what the action wrote at once (`src/dashboard-rpc/widgets.ts`).
 
 ### What a widget may draw with
 

@@ -68,7 +68,8 @@ export function LinkActions({
     let result: LinkActionResult = { ok: true }
     try {
       const groups = typeof targets === 'function' ? await targets() : targets
-      const host = widgetHost({ package: action.package, openAgent: onOpenAgent ?? (() => {}) })
+      // An action acts: its commands are marked so, and the dashboard reads back what they wrote at once.
+      const host = widgetHost({ package: action.package, openAgent: onOpenAgent ?? (() => {}) }, { acts: true })
       // One project at a time, in the order given, only those that have the action's package;
       // the first failure ends the batch with its reason.
       for (const { projectId, links } of groups) {

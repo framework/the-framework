@@ -1,76 +1,32 @@
-import { basename } from 'node:path'
 import type { ProjectSummary } from './projects.js'
-import { readDocs, type WorkspaceDoc } from './docs.js'
+import { projectQueue, type QueueFor } from '../store/queue.js'
 
-// The cross-project Queue (#438, part of #314). The per-project docs rail already surfaces
-// a project's TODO (see docs.ts / onDocs), but the first sidebar needs the aggregate: every
-// registered project's open TODO items in one place. This parses the GitHub-style task-list
-// items out of each project's surfaced TODO docs and rolls them up per project.
+// The cross-project agent queue (#438, part of #314; #1774): every registered project's open
+// entries in one place, for the Overview's AI Queue card, the hot tickets' queue lane and the
+// tickets page's dedupe. Each project's queue is read through the command one of its packages
+// declares (`src/store/queue.ts`); the framework knows no queue file and no queue package.
 
-/** One TODO checklist entry: its text and whether it is checked off. */
-export interface QueueItem {
-  text: string
-  done: boolean
-}
-
-/** One project's rolled-up TODO queue. */
+/** One project's queue, as the dashboard reads it. */
 export interface ProjectQueue {
   projectId: string
   projectName: string
-  /** Count of unchecked items (what is still queued). */
-  open: number
-  /** Count of all parsed items (open + done). */
-  total: number
-  items: QueueItem[]
-}
-
-// A markdown list item (`-`, `*`, or `1.`), any leading indent. Deliberately the same rule the
-// agents read the queue by — the `queue` skill's own parser — because
-// the queue's readers must agree on what an entry is, or the card says "Nothing queued" while an
-// agent works the same file (#1296).
-const LIST_ITEM = /^\s*(?:[-*]|\d+\.)\s+(.*\S)\s*$/
-// A GitHub-style task checkbox at the start of an item's text: `[ ]` open, `[x]` done.
-const CHECKBOX = /^\[([ xX])\]\s*(.*)$/
-
-/**
- * Parse the queue entries out of a TODO doc; headings, prose and blank lines are ignored.
- *
- * Every list item is an entry, open unless its checkbox is checked — the sweep's semantics
- * (#1296). Triage agents write the ticket-link (#1164) style (`- [Title](tickets/x.md) — ...`) with no
- * checkbox, and the old checkbox-only regex read that whole queue as empty.
- */
-export function parseTodoItems(content: string): QueueItem[] {
-  const items: QueueItem[] = []
-  for (const line of content.split('\n')) {
-    const item = LIST_ITEM.exec(line)
-    if (!item) continue
-    const task = CHECKBOX.exec(item[1]!)
-    if (task) {
-      if (task[2]!.trim()) items.push({ text: task[2]!.trim(), done: task[1] !== ' ' })
-    } else {
-      items.push({ text: item[1]!, done: false })
-    }
-  }
-  return items
+  /** The open entries, in order of work: each the task a future agent is started with. */
+  entries: string[]
 }
 
 /**
- * Roll up the open TODO queue across the given projects, most-open first. Reads each
- * project's surfaced TODO docs (the `TODO*` half of {@link readDocs}) and parses their
- * checklist items. `read` is injectable so this is unit-testable off disk. Projects with
- * no TODO doc or no checklist items are omitted; a read failure just skips that project.
+ * The queue of every project that has one, most entries first: a project one of whose packages
+ * provides the queue is listed even with nothing queued (the card shows the projects it can speak
+ * for), and a project with no provider is left out (it has no queue, so nothing is said about it).
+ * `queueFor` is injectable so this is unit-testable off disk and processes.
  */
-export async function collectQueue(
-  projects: ProjectSummary[],
-  read: (cwd: string) => Promise<WorkspaceDoc[]> = readDocs,
-): Promise<ProjectQueue[]> {
+export async function collectQueue(projects: ProjectSummary[], queueFor: QueueFor = projectQueue): Promise<ProjectQueue[]> {
   const queues: ProjectQueue[] = []
   for (const project of projects) {
-    const docs = await read(project.path).catch(() => [])
-    const items = docs.filter(d => basename(d.name).startsWith('TODO')).flatMap(d => parseTodoItems(d.content))
-    if (items.length === 0) continue
-    const open = items.filter(i => !i.done).length
-    queues.push({ projectId: project.id, projectName: project.name, open, total: items.length, items })
+    const source = await queueFor(project.path).catch(() => undefined)
+    if (!source) continue
+    const entries = await source.list().catch((): string[] => [])
+    queues.push({ projectId: project.id, projectName: project.name, entries })
   }
-  return queues.sort((a, b) => b.open - a.open)
+  return queues.sort((a, b) => b.entries.length - a.entries.length)
 }

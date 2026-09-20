@@ -27,9 +27,14 @@ import type { FrameworkEvent } from '../events.js'
 import type { StartAgentOptions } from '../dashboard/types.js'
 import type { QuotaView } from '../dashboard/quota.js'
 
-/** The records package every fixture project depends on, linked from this workspace's own install. */
+/**
+ * The two provider packages every fixture project depends on, linked from this workspace's own
+ * install: the records package (the runs provider) and the queue package (the queue provider).
+ */
 const LOGS_PACKAGE = '@gemstack/skill-logs'
-const logsPackageDir = resolve(dirname(fileURLToPath(import.meta.resolve(LOGS_PACKAGE))), '..')
+const QUEUE_PACKAGE = '@gemstack/skill-queue'
+const packageDir = (name: string): string => resolve(dirname(fileURLToPath(import.meta.resolve(name))), '..')
+const PROVIDER_PACKAGES: Record<string, string> = { [LOGS_PACKAGE]: packageDir(LOGS_PACKAGE), [QUEUE_PACKAGE]: packageDir(QUEUE_PACKAGE) }
 
 // Re-home the process-global config home FIRST: the registry, preferences, and daemon state all
 // resolve through $XDG_CONFIG_HOME at call time, and run-tests.mjs gives the whole suite ONE
@@ -207,13 +212,14 @@ export async function makeWorld(): Promise<StoryWorld> {
         await mkdir(dirname(join(cwd, file)), { recursive: true })
         await writeFile(join(cwd, file), text)
       }
-      // The project records its runs the way a real one does: the logs package is one of its
-      // dependencies, and declares itself the runs provider the dashboard reads finished runs from.
-      await writeFile(join(cwd, 'package.json'), JSON.stringify({ name: 'story-fixture', private: true, devDependencies: { [LOGS_PACKAGE]: '*' } }, null, 2) + '\n')
+      // The project records its runs and keeps its queue the way a real one does: the logs and
+      // queue packages are among its dependencies, each declaring itself the provider the
+      // dashboard reads that data through.
+      await writeFile(join(cwd, 'package.json'), JSON.stringify({ name: 'story-fixture', private: true, devDependencies: Object.fromEntries(Object.keys(PROVIDER_PACKAGES).map(name => [name, '*'])) }, null, 2) + '\n')
       await git(cwd, 'add', '-A')
       await git(cwd, 'commit', '-q', '-m', 'seed')
       await mkdir(join(cwd, 'node_modules', '@gemstack'), { recursive: true })
-      await symlink(logsPackageDir, join(cwd, 'node_modules', LOGS_PACKAGE))
+      for (const [name, dir] of Object.entries(PROVIDER_PACKAGES)) await symlink(dir, join(cwd, 'node_modules', name))
       await appendFile(join(cwd, '.git', 'info', 'exclude'), 'node_modules\n')
       if (onBranch.length) {
         const result = await withFileBranch(cwd, DATA_BRANCH, 'seed', async dir => {

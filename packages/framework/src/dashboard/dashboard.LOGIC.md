@@ -7,7 +7,7 @@ Builds the data behind the Overview [1], the dashboard's cross-project page: how
 ## Glossary
 
 [1] the Overview: the dashboard's cross-project page at `/`.
-[2] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down. An item on it is a queue entry.
+[2] the agent queue: every task agents will work next, in the order they will be taken, kept by a project package and read through the command that package declares (`queue.ts`). An item on it is a queue entry. A project with no such package has no queue and is not among the queues.
 [3] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [4] the record: the `logs` skill's copy of a finished agent's card and diary on the `agent-data` branch, which is the one place a finished agent lives.
 [5] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.

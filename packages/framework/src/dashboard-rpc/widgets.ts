@@ -1,6 +1,7 @@
 import { contextProjects, resolveProjectPath } from './context.js'
 import { findProjectWidget, readProjectWidgets, runWidgetCommand as runCommand, type WidgetCommandResult } from '../project-widgets.js'
 import { widgetUrl } from '../dashboard/widget-serve.js'
+import { providedDataChanged } from '../store/provided.js'
 
 export type { WidgetCommandResult } from '../project-widgets.js'
 
@@ -37,7 +38,9 @@ export async function onWidgets(): Promise<DashboardWidget[]> {
  * Run one of a widget package's commands in one project and answer its JSON output: how a widget
  * reads (and changes) its own data. Refused for an unknown project and for a package that is not a
  * widget of that project, so a page can run only its own package's commands, never an arbitrary
- * program.
+ * program. Once the command has run, the framework forgets what it had read of that project's
+ * provided data (its queue, its runs): the command may have written it, and the next read sees
+ * that at once instead of a cached copy.
  */
 export async function runWidgetCommand(projectId: string, pkg: string, args: string[], command?: string): Promise<WidgetCommandResult> {
   const root = await resolveProjectPath(projectId)
@@ -45,5 +48,7 @@ export async function runWidgetCommand(projectId: string, pkg: string, args: str
   if (!Array.isArray(args)) return { ok: false, error: 'arguments must be a list' }
   const widget = await findProjectWidget(root, pkg)
   if (!widget) return { ok: false, error: `${pkg} brings no widget to this project` }
-  return runCommand(root, widget, args, command)
+  const result = await runCommand(root, widget, args, command)
+  providedDataChanged(root)
+  return result
 }

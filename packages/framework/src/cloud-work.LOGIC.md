@@ -79,7 +79,7 @@ The matched branch's whole pull request history is listed through `gh`. The pull
 
 #### Business logic
 
-When the listing succeeded and found no pull request, the agent [5] ended done, its handoff [12] was armed for a pull request, and the branch's head is beyond the anchor itself (so the session committed something), a draft pull request is opened for the remote branch with the same title and body rules as the "Open PR" button, draft so that a pull request The Framework opens by itself never puts a review request in anyone's inbox (`dashboard/agent-handoff.ts`). A failure to open it is reported as "could not open the armed draft PR for <branch>: <error>" and the branch is still recorded. An agent not armed for a pull request gets its branch recorded and nothing else.
+When the listing succeeded and found no pull request, the agent [5] ended done, its handoff [12] was armed for a pull request, and the branch's head is beyond the anchor itself (so the session committed something), a draft pull request is opened for the remote branch through the project's branches provider, with the same title and body rules as the "Open PR" button, draft so that a pull request The Framework opens by itself never puts a review request in anyone's inbox (`dashboard/agent-handoff.ts`). A failure to open it is reported as "could not open the armed draft PR for <branch>: <error>" and the branch is still recorded. An agent not armed for a pull request gets its branch recorded and nothing else.
 
 ### Recording onto the run
 

@@ -387,13 +387,9 @@ export async function onAgentHandoff(projectId: string, agentId: string): Promis
     const cwd = await resolveProjectPath(projectId)
     if (!cwd || !isSafeAgentId(agentId)) return null
     const agent = await findAgent(cwd, agentId).catch(() => undefined)
-    if (!agent) return null
-    // Uncommitted work is the one thing the branch cannot answer (#1173), and it lives in the tree
-    // the agent edited. Only when that is a checkout of the session's own: per the note above,
-    // `resolveAgentPath` falls back to the project root, whose dirt belongs to the user.
-    const checkout = await resolveAgentPath(projectId, agentId)
-    const deps = { since: agent.startedAt, ...(checkout && checkout !== cwd ? { checkout } : {}) }
-    return (await readAgentHandoff(cwd, agentBranchFor(agent), deps).catch(() => undefined)) ?? null
+    const branch = agent && agentBranchFor(agent)
+    if (!agent || branch === undefined) return null
+    return (await readAgentHandoff(cwd, branch, { since: agent.startedAt }).catch(() => undefined)) ?? null
   }, null)
 }
 

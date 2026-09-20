@@ -11,9 +11,9 @@ export type AgentHandoffState = {
   loaded: boolean
   busy: boolean
   error: string | null
-  /** Which button is in flight, so it can say "Pushing…" rather than silently greying (#948). */
-  pending: 'push' | 'pr' | 'merge' | null
-  act: (which: 'push' | 'pr' | 'merge', fn: () => Promise<unknown>, fallback: string) => void
+  /** Which button is in flight, so it can say "Opening PR…" rather than silently greying (#948). */
+  pending: 'pr' | 'merge' | null
+  act: (which: 'pr' | 'merge', fn: () => Promise<unknown>, fallback: string) => void
 }
 
 // The handoff read lifted out of its panel: the same answer now feeds two places — the summary and
@@ -24,7 +24,7 @@ export function useAgentHandoff(projectId: string, agentId: string | null | unde
   // what to offer, and `reload` makes the bar's own actions land immediately. Not read while the
   // run is live (#1026): a branch still being written to has nothing to hand off yet.
   // Same as the bar above it (#1028): fifteen seconds at rest, but a PR lookup still in flight
-  // holds the Push / Open PR offer back, so that one is worth asking again for straight away.
+  // holds the Open PR offer back, so that one is worth asking again for straight away.
   const [everyMs, setEveryMs] = useState(15_000)
   const { value: handoff, reload, loaded } = usePolled<AgentHandoff | null>(
     enabled && agentId ? () => onAgentHandoff(projectId, agentId) : null,
@@ -37,9 +37,9 @@ export function useAgentHandoff(projectId: string, agentId: string | null | unde
   )
   useEffect(() => setEveryMs(handoff?.prPending ? 1_000 : 15_000), [handoff?.prPending])
   const { busy, error, run } = useAction()
-  const [pending, setPending] = useState<'push' | 'pr' | 'merge' | null>(null)
+  const [pending, setPending] = useState<'pr' | 'merge' | null>(null)
 
-  const act = (which: 'push' | 'pr' | 'merge', fn: () => Promise<unknown>, fallback: string): void => {
+  const act = (which: 'pr' | 'merge', fn: () => Promise<unknown>, fallback: string): void => {
     setPending(which)
     void run(fn, fallback).then(outcome => {
       setPending(null)

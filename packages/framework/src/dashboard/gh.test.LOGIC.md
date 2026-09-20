@@ -1,5 +1,4 @@
 What the tests cover:
 
-- **Merging** - the first attempt arms GitHub auto-merge as a squash merge; both spellings of the "auto-merge is not allowed here" refusal ("Auto merge is not allowed for this repository", "is in clean status") fall back to a direct squash merge; any other refusal ("is not mergeable") is reported as failed and never retried as a direct merge; a draft refusal marks the pull request ready and retries arming; a readied draft still falls through to the direct merge where auto-merge is not allowed; a direct merge that also fails reports that second refusal.
 - **The linked pull request read** - the read asks `gh` for every field it keeps (number, URL, state, title, creation time, head commit); the creation time and head commit come back as answered; a field `gh` did not answer with is absent rather than present but empty.
 - **A checkout's open pull requests** - a `gh` that could not answer fails the read instead of answering an empty list; when `gh` answers, the open pull requests are listed.

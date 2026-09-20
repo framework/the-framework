@@ -12,7 +12,6 @@ Builds the data behind the dashboard's cross-project Overview [1] and its shared
 [2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps. Started from the dashboard by the user, or by the daemon.
 [3] the agent queue: every task agents will work next, in the order they will be taken, kept by a project package and read through the command that package declares (`queue.ts`, `../store/queue.ts`). An item on it is a queue entry.
 [4] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
-[5] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
 [7] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
 [8] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
 [9] the record: the `logs` skill's copy of a finished agent's card and diary on the `agent-data` branch, which is the one place a finished agent lives.
@@ -23,7 +22,7 @@ Builds the data behind the dashboard's cross-project Overview [1] and its shared
 
 ## Business logic — TL;DR
 
-- **Agents working now** - every running agent of every project, one per checkout, most recently updated first, each carrying what was asked, its session name, and the name of the machine that started it when that is not this one.
+- **Agents working now** - every running agent of every project, one per checkout, most recently updated first, each carrying what was asked and the name of the machine that started it when that is not this one.
 - **Web agents whose cloud side is still at work** - a web agent whose local half is over is still listed while its cloud session is working or waiting on a question, once across projects, marked with where it is.
 - **Open queue entries, summed** - one number: the open entries of every project's agent queue added up.
 - **Recent projects** - the projects with any activity, newest first, at most 5.
@@ -40,7 +39,7 @@ See `## Context`.
 
 #### Business logic
 
-For each project, every live agent [2] whose status is running is listed, one per checkout [4], read from the live record each agent keeps current in its own checkout. A row carries the project, the agent's id, the checkout it edits (so its git and file status is read from the working copy it changes), its status, what the user asked for, the time of its last event, and the session name [5] when the branch its checkout is on now carries one. When the agent's record names the machine whose daemon started it and that machine is not this one, the row carries that machine's name; an agent started here, or whose record names no machine, carries none. The rows are ordered by the time of the last event, newest first. A project whose live agents cannot be read contributes no rows.
+For each project, every live agent [2] whose status is running is listed, one per checkout [4], read from the live record each agent keeps current in its own checkout. A row carries the project, the agent's id, the checkout it edits (so its git and file status is read from the working copy it changes), its status, what the user asked for, and the time of its last event. When the agent's record names the machine whose daemon started it and that machine is not this one, the row carries that machine's name; an agent started here, or whose record names no machine, carries none. The rows are ordered by the time of the last event, newest first. A project whose live agents cannot be read contributes no rows.
 
 ### Web agents whose cloud side is still at work
 

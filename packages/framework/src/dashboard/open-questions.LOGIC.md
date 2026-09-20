@@ -17,7 +17,6 @@ Lists every open question [1] across all projects in one place, longest waiting 
 [7] resume hook: the one shell line under `resume` in a project's `.the-framework/hooks.yml`, which the daemon runs to continue an ended agent with the user's answer (`run-inbox.ts`).
 [8] diary: what an agent said and did, one line per event: `<id>.jsonl`, in the agent's checkout while it has one, on the `agent-data` branch once recorded; read as events through `store/agent-store.ts`.
 [9] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
-[10] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
 [11] recorded agents: the agents on the `agent-data` branch, which a project's full agent list includes beside the ones that have a checkout.
 [12] handoff: what happens to an agent's work when the agent ends.
 
@@ -38,7 +37,7 @@ See `## Context`.
 
 #### Business logic
 
-For each project, every agent [2] that has a checkout [9] and whose status is `waiting` is looked at; an agent that is working, or that ended for good, contributes nothing. The agent's events are read from its diary [8], and the question [3] still open by the shared rule (`../open-choices.ts`: open through a waiting end, closed once the agent goes on) is taken, the last one when there are several, kept whole: its options, whether several may be picked, the recommended option and the detail lines. When the diary shows no open question, because the agent went on in the meantime or the diary cannot be read, the agent contributes no card. The card carries the project, the agent's id, its session name [10] when it has one, what it was asked to do, and the time its card was last updated.
+For each project, every agent [2] that has a checkout [9] and whose status is `waiting` is looked at; an agent that is working, or that ended for good, contributes nothing. The agent's events are read from its diary [8], and the question [3] still open by the shared rule (`../open-choices.ts`: open through a waiting end, closed once the agent goes on) is taken, the last one when there are several, kept whole: its options, whether several may be picked, the recommended option and the detail lines. When the diary shows no open question, because the agent went on in the meantime or the diary cannot be read, the agent contributes no card. The card carries the project, the agent's id, what it was asked to do, and the time its card was last updated.
 
 ### A cloud session's question, from the bridge
 

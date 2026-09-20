@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { ghMergePr, ghPrList, ghPrView } from './gh.js'
+import { ghPrList, ghPrView } from './gh.js'
 import type { GhRunner } from './gh.js'
 
 /** A `gh` that answers with `stdout`, or rejects, and records what it was asked. */
@@ -14,93 +14,6 @@ function fakeGh(stdout: string | Error): { gh: GhRunner; calls: string[][] } {
   return { gh, calls }
 }
 
-test('ghMergePr arms GitHub auto-merge, so the PR lands when its checks pass (#1216)', async () => {
-  const { gh, calls } = fakeGh('')
-  assert.deepEqual(await ghMergePr('/repo', 9, gh), { outcome: 'auto-armed' })
-  assert.deepEqual(calls, [['pr', 'merge', '9', '--squash', '--auto']])
-})
-
-test('a repo that does not allow auto-merge gets the direct merge instead (#1216)', async () => {
-  // gh surfaces GitHub's GraphQL refusal verbatim; both known spellings carry the
-  // enablePullRequestAutoMerge marker.
-  for (const refusal of [
-    'GraphQL: Pull request Auto merge is not allowed for this repository (enablePullRequestAutoMerge)',
-    'GraphQL: Pull request is in clean status (enablePullRequestAutoMerge)',
-  ]) {
-    const calls: string[][] = []
-    const gh: GhRunner = async args => {
-      calls.push(args)
-      if (args.includes('--auto')) throw new Error(refusal)
-      return ''
-    }
-    assert.deepEqual(await ghMergePr('/repo', 9, gh), { outcome: 'merged' })
-    assert.deepEqual(calls, [
-      ['pr', 'merge', '9', '--squash', '--auto'],
-      ['pr', 'merge', '9', '--squash'],
-    ])
-  }
-})
-
-test('any other refusal is reported, not retried as a direct merge (#1216)', async () => {
-  // A merge conflict, a permissions problem, a network failure: retrying those without --auto
-  // would either fail again or, worse, land a PR GitHub just said not to.
-  const { gh, calls } = fakeGh(new Error('GraphQL: Pull request is not mergeable'))
-  assert.deepEqual(await ghMergePr('/repo', 9, gh), {
-    outcome: 'failed',
-    error: 'GraphQL: Pull request is not mergeable',
-  })
-  assert.deepEqual(calls, [['pr', 'merge', '9', '--squash', '--auto']])
-})
-
-test('a draft PR is marked ready and the auto-merge retried (#1216)', async () => {
-  // The already-open path can find a draft a previous agent's handoff left behind. GitHub refuses
-  // to merge or auto-merge drafts, so the draft refusal means ready-then-retry, not failure.
-  const calls: string[][] = []
-  let drafted = true
-  const gh: GhRunner = async args => {
-    calls.push(args)
-    if (args[1] === 'ready') {
-      drafted = false
-      return ''
-    }
-    if (drafted) throw new Error('GraphQL: Pull request is in draft state and cannot be merged')
-    return ''
-  }
-  assert.deepEqual(await ghMergePr('/repo', 9, gh), { outcome: 'auto-armed' })
-  assert.deepEqual(calls, [
-    ['pr', 'merge', '9', '--squash', '--auto'],
-    ['pr', 'ready', '9'],
-    ['pr', 'merge', '9', '--squash', '--auto'],
-  ])
-})
-
-test('a readied draft still falls through to the direct merge where auto-merge is not allowed (#1216)', async () => {
-  let drafted = true
-  const calls: string[][] = []
-  const gh: GhRunner = async args => {
-    calls.push(args)
-    if (args[1] === 'ready') {
-      drafted = false
-      return ''
-    }
-    if (drafted) throw new Error('GraphQL: Pull request is in draft state and cannot be merged')
-    if (args.includes('--auto')) throw new Error('Pull request Auto merge is not allowed for this repository')
-    return ''
-  }
-  assert.deepEqual(await ghMergePr('/repo', 9, gh), { outcome: 'merged' })
-  assert.deepEqual(calls.at(-1), ['pr', 'merge', '9', '--squash'])
-})
-
-test('a direct merge that also fails reports the second refusal (#1216)', async () => {
-  const gh: GhRunner = async args => {
-    if (args.includes('--auto')) throw new Error('Pull request Auto merge is not allowed for this repository')
-    throw new Error('GraphQL: Base branch was modified')
-  }
-  assert.deepEqual(await ghMergePr('/repo', 9, gh), {
-    outcome: 'failed',
-    error: 'GraphQL: Base branch was modified',
-  })
-})
 
 // #1334, found by dogfooding: `PR_VIEW_FIELDS` asked for `number,url,state,title` only, and the
 // copy-out below it dropped anything else anyway. So every caller of this path got a `LinkedPr`

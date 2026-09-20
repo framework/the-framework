@@ -1,21 +1,9 @@
-import { sessionNameOf } from '@gemstack/skill-branches/branch-names'
 import type { FrameworkEvent } from './events.js'
 
 // Derived agent state for the dashboard's overview cards (#431): the errors a run hit and the
 // live session link — each a pure projection of the same FrameworkEvent stream the log renders,
 // so the live dashboard and a past-agent replay show the identical summary. Kept here (not in the
 // dashboard) so it is unit-tested against the real event shapes.
-
-/**
- * The `sessionName` a derived view carries (#1725): the name the agent's branch carries, as a
- * field that is present only when there is one — so a view of an unnamed agent has no name,
- * rather than a name that is `undefined`. The one spelling behind every view built from an
- * agent's record.
- */
-export function sessionNameField(branch: string | undefined, agentId: string): { sessionName?: string } {
-  const sessionName = sessionNameOf(branch, agentId)
-  return sessionName ? { sessionName } : {}
-}
 
 /** One error of a run: one the agent reported through an `error` block (#1500), or one its tool wrote in the diary. */
 export interface AgentError {

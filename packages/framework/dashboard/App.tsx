@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { sessionNameOf } from '@gemstack/skill-branches/branch-names'
 import type { Intervention, Activity, ProjectionRead, ProjectSummary, RecentAgent } from '../src/index.js'
 import { onProjectFiles, onInterventions, onActivity, onRecentAgents, onAgents } from './rpc/reads.js'
 import { sendStart } from './rpc/control.js'
@@ -235,10 +234,7 @@ export function App() {
         selectProject(inProject)
       },
       agents: async inProject =>
-        (await onAgents(inProject)).map(agent => {
-          const name = sessionNameOf(agent.branch, agent.id)
-          return { id: agent.id, status: agent.status, startedAt: agent.startedAt, ...(name ? { name } : {}), ...(agent.intent ? { ask: agent.intent } : {}) }
-        }),
+        (await onAgents(inProject)).map(agent => ({ id: agent.id, status: agent.status, startedAt: agent.startedAt, ...(agent.branch ? { name: agent.branch } : {}), ...(agent.intent ? { ask: agent.intent } : {}) })),
   }
 
   // The live agent feed is owned here so both the main view and the right rail's views tab read

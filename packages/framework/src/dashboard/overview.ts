@@ -1,5 +1,4 @@
 import { readAllAgents, readLiveMetas, type LiveAgent, type AgentMeta, type AgentStatus } from '../store/index.js'
-import { sessionNameField } from '../agent-view.js'
 import type { ProjectSummary } from './projects.js'
 import { collectQueue, type ProjectQueue } from './queue.js'
 import { projectTickets, type Ticket } from '../store/tickets.js'
@@ -27,8 +26,6 @@ export interface ActiveAgent {
   scope?: string
   /** ISO timestamp of the agent's last event. */
   updatedAt?: string
-  /** The session name the agent chose (#326), off the branch its checkout is on, when it set one. */
-  sessionName?: string
   /**
    * A web run at work on its cloud side (#1668): in its session, or parked on a question the
    * bridge reported. Its local half is over, so it is not a live agent — it is listed because the
@@ -252,7 +249,6 @@ export async function buildOverview(projects: ProjectSummary[], deps: OverviewDe
     status: meta.status,
     ...(meta.intent ? { intent: meta.intent } : {}),
     ...(meta.updatedAt ? { updatedAt: meta.updatedAt } : {}),
-    ...sessionNameField(meta.branch, meta.id),
     // Another machine's daemon started it (#1648): the shared data branch shows its runs here too.
     ...(meta.host !== undefined && meta.host !== thisHost ? { host: meta.host } : {}),
 

@@ -2,13 +2,12 @@ The one line of git facts about the checkout [1] in play — its branch, whether
 
 ## Context
 
-**User story**: on a project's page the user sees which branch the project is on, whether there are uncommitted changes and whether the branch has a pull request. On an agent's [2] page the same line names the agent by its session name [3] with its project as a breadcrumb, then the agent's branch, whether the agent has uncommitted work, what the agent is up to, how much disk its checkout [1] takes, what its branch holds, and the pull request it opened; clicking the line opens the branch detail below it.
+**User story**: on a project's page the user sees which branch the project is on, whether there are uncommitted changes and whether the branch has a pull request. On an agent's [2] page the same line names the agent by its label with its project as a breadcrumb, then the agent's branch, whether the agent has uncommitted work, what the agent is up to, how much disk its checkout [1] takes, what its branch holds, and the pull request it opened; clicking the line opens the branch detail below it.
 
 ## Glossary
 
 [1] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch. The user's own working copy is "the project's checkout".
 [2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
-[3] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed after it and the dashboard labels the agent by it.
 
 ## Business logic — TL;DR
 
@@ -46,11 +45,11 @@ The facts are re-read every 10 seconds; while the daemon reports its pull reques
 
 #### Context
 
-**Problem**: the agent [2] renames its branch near the end of its work, while its session name [3] does not change under the user; and beside a session name the `the-framework/` prefix every agent branch shares is fourteen characters of noise.
+**Problem**: the agent [2] renames its branch near the end of its work, while its label does not change under the user; and beside a label the `the-framework/` prefix every agent branch shares is fourteen characters of noise.
 
 #### Business logic
 
-When the caller gives the agent's session name, it leads in bold and is the last element to truncate, so the identity never disappears. A project name given with it is prefixed as a muted "<project> /" breadcrumb that gives up width first. The branch then reads as muted context beside the name: a leading `the-framework/` is stripped from the shown text, the text is capped at 14 rem before truncating, and on a narrow bar the branch is hidden altogether; its tooltip shows the full branch and, for an agent's checkout [1], the checkout's path on a second line. Without a session name (the project home) the branch is the identity, in bold, capped at 16 rem, its tooltip reading "branch <branch>". A checkout on no branch reads "no branch".
+When the caller gives the agent's label, it leads in bold and is the last element to truncate, so the identity never disappears. A project name given with it is prefixed as a muted "<project> /" breadcrumb that gives up width first. The branch then reads as muted context beside the name: a leading `the-framework/` is stripped from the shown text, the text is capped at 14 rem before truncating, and on a narrow bar the branch is hidden altogether; its tooltip shows the full branch and, for an agent's checkout [1], the checkout's path on a second line. Without a label (the project home) the branch is the identity, in bold, capped at 16 rem, its tooltip reading "branch <branch>". A checkout on no branch reads "no branch".
 
 ### Clean or dirty, neutrally
 
@@ -70,7 +69,7 @@ A dot and a word: "clean" with a neutral gray dot, or "dirty" with an amber dot.
 
 #### Business logic
 
-The agent's state, as worded by the caller, sits right after the dot. The checkout's [1] size on disk, rendered as a short byte count such as "5 MB", shows only for an agent's checkout and only once the daemon has measured it, which it does not while something is still writing to it; its tooltip reads "This agent's worktree on disk", and an unmeasured size shows nothing, not a placeholder. The summary of what the branch holds, as worded by the caller, comes last. As the bar narrows, the facts furthest from the branch drop out first — the summary, then the size, then the branch beside a name — so the line never wraps or collides; only the session name, or the branch when there is no name, truncates with an ellipsis. On a pane too narrow even for that, the line is cut off rather than painted over the controls beside it.
+The agent's state, as worded by the caller, sits right after the dot. The checkout's [1] size on disk, rendered as a short byte count such as "5 MB", shows only for an agent's checkout and only once the daemon has measured it, which it does not while something is still writing to it; its tooltip reads "This agent's worktree on disk", and an unmeasured size shows nothing, not a placeholder. The summary of what the branch holds, as worded by the caller, comes last. As the bar narrows, the facts furthest from the branch drop out first — the summary, then the size, then the branch beside a name — so the line never wraps or collides; only the label, or the branch when there is no label, truncates with an ellipsis. On a pane too narrow even for that, the line is cut off rather than painted over the controls beside it.
 
 ### The pull request link
 

@@ -150,5 +150,5 @@ export function OpenQuestions({
 
 /** The card's label for its session: its chosen name, else the intent's first line, else the id. */
 function agentLabel(q: OpenQuestion): string {
-  return q.sessionName ?? q.intent?.split('\n')[0]?.slice(0, 80) ?? q.agentId
+  return q.intent?.split('\n')[0]?.slice(0, 80) ?? q.agentId
 }

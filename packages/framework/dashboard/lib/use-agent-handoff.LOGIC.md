@@ -18,7 +18,7 @@ Reads what an agent's [1] branch holds once its work has stopped — the commits
 - **Only read once the agent's work has stopped** - a branch still being written to has nothing to hand off.
 - **Polled, because the branch changes behind the dashboard's back** - every 15 seconds at rest, every second while the pull request lookup has not answered.
 - **The last answer stays on screen** - a failed read, and the change of polling cadence, never blank the summary.
-- **One step at a time, and it says which one** - the step in flight is named, so the button reads as pushing, opening or merging rather than silently greying out.
+- **One step at a time, and it says which one** - the step in flight is named, so the button reads as opening or merging rather than silently greying out.
 - **A step that succeeds re-reads the branch at once** - the offer becomes the next step without waiting for the next poll.
 - **A step that fails reports why** - the reason from the daemon, or the wording the button supplies.
 - **"Not read yet" is distinguishable from "nothing there"** - an empty branch state is never flashed before the first answer lands.
@@ -63,7 +63,7 @@ A read that fails leaves the last answer in place; the next read usually succeed
 
 #### Business logic
 
-Three steps can be carried out from here: pushing the branch, opening the pull request, and merging it. While one is in flight, that specific step is named, so the button reads "Opening PR…" or "Merging…", and every step's button is unavailable until it finishes. Only one step is ever in flight.
+Two steps can be carried out from here: opening the pull request (which pushes the branch on the way), and merging it. While one is in flight, that specific step is named, so the button reads "Opening PR…" or "Merging…", and every step's button is unavailable until it finishes. Only one step is ever in flight.
 
 ### A step that succeeds re-reads the branch at once
 

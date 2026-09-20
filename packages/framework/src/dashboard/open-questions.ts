@@ -1,6 +1,5 @@
 import { loadAgentEvents, readAllAgents, readLiveMetas, type AgentMeta, type LiveAgent } from '../store/index.js'
 import { pendingChoices } from '../open-choices.js'
-import { sessionNameField } from '../agent-view.js'
 import type { ChoiceRequest, FrameworkEvent } from '../events.js'
 import { bridgeChoiceRequest, type BridgeQuestion } from './bridge-question.js'
 import { bridgeQuestions } from './bridge-store.js'
@@ -18,9 +17,7 @@ export interface OpenQuestion {
   projectId: string
   projectName: string
   agentId: string
-  /** The session's name (#326) when it chose one — the card's label; else fall back to {@link intent}. */
-  sessionName?: string
-  /** What the agent was asked to do, for a card whose session never named itself. */
+  /** What the agent was asked to do: the card's label. */
   intent?: string
   /** When the agent last spoke, ISO: what the longest-waiting-first order sorts on. */
   updatedAt?: string
@@ -83,7 +80,6 @@ export async function buildOpenQuestions(
     projectId: project.id,
     projectName: project.name,
     agentId: meta.id,
-    ...sessionNameField(meta.branch, meta.id),
     ...(meta.intent ? { intent: meta.intent } : {}),
     choice,
     ...rest,

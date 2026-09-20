@@ -15,7 +15,7 @@ import { agentLabel } from './lib/agent-label.js'
 import { RightRail } from './components/RightRail.js'
 import { NotFound } from './components/NotFound.js'
 import { WidgetPageView } from './components/WidgetPageView.js'
-import { useWidgetPages } from './lib/use-widgets.js'
+import { useWidgets, WidgetsContext } from './lib/use-widgets.js'
 import { useLiveEvents } from './lib/use-live-events.js'
 import { useAgents } from './lib/use-agents.js'
 import { usePolled } from './lib/use-async.js'
@@ -64,7 +64,8 @@ export function App() {
   const { view, projectId, agentId: agentId, ticketSlug, plan } = route
   // A widget's page (#1774): the route names it by its segment, with no project selected.
   const pageSegment = route.page ?? null
-  const { pages: widgetPages, loaded: widgetsLoaded } = useWidgetPages()
+  const widgets = useWidgets()
+  const { pages: widgetPages, loaded: widgetsLoaded } = widgets
   const widgetPage = pageSegment ? widgetPages.find(page => page.segment === pageSegment) : undefined
 
   // A just-started run: bump the tick so the Sessions rail shows an optimistic "starting…" row
@@ -366,7 +367,9 @@ export function App() {
   return (
     // The whole shell lives inside the SidebarProvider so the sidebar's context (state + Cmd/Ctrl+B,
     // the `--sidebar-width` var) is available on every route, home and session alike. Its wrapper is
-    // the column that used to be a plain div.
+    // the column that used to be a plain div. The installed widgets (#1774) are provided around it
+    // all, so the link actions they offer reach any page that shows a link.
+    <WidgetsContext.Provider value={widgets}>
     <SidebarProvider className="h-screen flex-col overflow-hidden">
       {/* The top navbar is gone (#772 follow-up): its brand, global nav and utility controls moved
           into the sidebar (AgentHistory), so the workspace and right rail get the full height. */}
@@ -429,5 +432,6 @@ export function App() {
         )}
       </div>
     </SidebarProvider>
+    </WidgetsContext.Provider>
   )
 }

@@ -9,17 +9,18 @@ After the four module pull requests — #1812 (logs), #1813 (queue), #1815 (tick
 
 Suleiman's picks so far: the Overview cards belong to the package that provides them; the onboarding steps stay the framework's; Discord as a module is a later thought.
 
-## Scope: the work stops after two pull requests
+## Scope: four pull requests, read as a reduction of the framework
 
-The plan's five pull requests are cut to two.
+The plan's five pull requests become four.
 
-- Pull request 1, the root build: #1822.
-- Pull request 2, the name the agent gave its work, answered by the branches package and drawn by the framework: #1823. The framework strips no prefix; no `publish --base`.
-- Pull request 3, the Overview-card slot, is built and held on a branch, not opened.
-- Pull request 4, the two cards moving into the packages, and the launcher's gear options: not built.
+- Pull request 1, the root build: #1822, merged.
+- Pull request 2, the name the agent gave its work, answered by the branches package and drawn by the framework: #1823, merged. The framework strips no prefix; no `publish --base`.
+- Pull request 3, the Overview-card slot: #1825, open. A package brings its own card; the framework offers the place.
+- Pull request 4, next: the AI Queue card and the hot tickets card move into the queue and tickets packages, and the framework's copies, their lane rules and the `onHotTickets` daemon read are deleted. A project with no queue package sees no queue card.
+- The launcher's gear options are not restored.
 - Pull request 5, the housekeeping, is folded into whatever comes next.
 
-Why: the dashboard is secondary for now, and losing a feature in the refactor is acceptable. The direction is a handful of polished skills, then a drastically simpler dashboard. Restoring cards and options runs against that.
+Why: the dashboard is secondary for now, and losing a feature in the refactor is acceptable. The direction is a handful of polished skills and a drastically simpler dashboard. Pull requests 3 and 4 make the framework smaller, which is the part of the plan that fits.
 
 Still true from the plan: the clean rule stays the package's; a plan ask may be queued twice; "Plan truncated" does not come back; AGENTS.md's `FEATURES-SPEC.md` rule still needs to go.
 

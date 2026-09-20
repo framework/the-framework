@@ -14,6 +14,12 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - It ships no prompt text. What a project can be asked to do is what the project's own
   skills say. Picked over the built-in presets: a prompt that lives here cannot be read,
   changed or run by the agent working the repository.
+- The tickets are a package's: The Framework reads them through the command the package
+  declares (`framework.tickets`, `list --local`), and only for what it composes across
+  skills, the hot-tickets card, the onboarding step, a queued link's title. Showing,
+  planning, claiming and releasing a ticket is the package's own widget, through its
+  command. Picked over the dashboard's own ticket pages fed by the provider, which would
+  have kept a reserved route and a hand-written sidebar row.
 
 ## Starting a run
 - A Start runs the project's own `start` line, in the project's hooks file, and the line

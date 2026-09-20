@@ -136,9 +136,11 @@ test('readAllAgents and findAgent: the checkout\'s card wins over the record of 
   // A resumed run has a record from its first leg and is going again in its checkout.
   const fs = memFs({ [liveAt('r1', 'json')]: card('r1', 'running') })
   const branches = branchesOf(checkoutOf('r1'))
-  const runs = testRuns({ [CWD]: [{ card: { id: 'r1', status: 'waiting' } }, { card: { id: 'r0', status: 'done' } }] })
+  const runs = testRuns({ [CWD]: [{ card: { id: 'r1', status: 'waiting', pr: { number: 7, url: 'https://x/pull/7' } } }, { card: { id: 'r0', status: 'done' } }] })
   assert.deepEqual((await readAllAgents(CWD, fs, runs, branches)).map(agent => [agent.id, agent.status]), [['r1', 'running'], ['r0', 'done']])
   assert.equal((await findAgent(CWD, 'r1', fs, runs, branches))?.status, 'running')
+  // The record's pull request rides onto the checkout's card: the dashboard's Open PR writes it there, never on the card.
+  assert.deepEqual((await findAgent(CWD, 'r1', fs, runs, branches))?.pr, { number: 7, url: 'https://x/pull/7' })
   assert.equal((await findAgent(CWD, 'r0', fs, runs, branches))?.status, 'done')
   assert.equal(await findAgent(CWD, 'nope', fs, runs, branches), undefined)
   // No runs provider: only the runs with a checkout.

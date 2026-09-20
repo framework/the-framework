@@ -310,7 +310,15 @@ export async function readAllAgents(cwd: string, fs: StoreFs = nodeStoreFs(), ru
   liveSeen.set(cwd, ids)
   const fresh = before !== undefined && [...before].some(id => !ids.has(id))
   const archived = await listAgents(cwd, runs, { fresh }).catch(() => [] as AgentMeta[])
-  return [...live, ...archived.filter(agent => !live.some(l => l.id === agent.id))]
+  // A run that is both (a stopped run keeps its checkout, and is recorded) reads as its checkout's
+  // card, plus the one late fact the record alone learns: the pull request the dashboard's own
+  // Open PR wrote onto the record, since the framework never writes a checkout's card.
+  const recorded = new Map(archived.map(agent => [agent.id, agent]))
+  const withRecordedPr = (agent: LiveAgent): AgentMeta => {
+    const pr = recorded.get(agent.id)?.pr
+    return agent.pr === undefined && pr ? { ...agent, pr } : agent
+  }
+  return [...live.map(withRecordedPr), ...archived.filter(agent => !live.some(l => l.id === agent.id))]
 }
 
 /** One run's meta by id, the checkout's card winning over the record: {@link readAllAgents}'s rule for a single row. */

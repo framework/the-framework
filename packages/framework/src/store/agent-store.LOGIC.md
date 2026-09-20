@@ -69,7 +69,7 @@ Every checkout the project's branches provider [7] lists is read as above, each 
 
 #### Business logic
 
-A project's agents are the ones that have a checkout followed by the finished ones; an agent present in both is listed once, as its checkout's card says. Either side that cannot be read contributes nothing. When an agent that had a checkout at the project's previous read has none now, the finished agents are read fresh rather than reused (`runs.ts` shares reads for five seconds). Finding one agent by its id applies the same rule to a single row.
+A project's agents are the ones that have a checkout followed by the finished ones; an agent present in both is listed once, as its checkout's card says, plus the record's pull request when the card has none (the dashboard's Open PR writes it on the record, never on a card). Either side that cannot be read contributes nothing. When an agent that had a checkout at the project's previous read has none now, the finished agents are read fresh rather than reused (`runs.ts` shares reads for five seconds). Finding one agent by its id applies the same rule to a single row.
 
 ### One agent's events for replay
 

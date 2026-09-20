@@ -1,6 +1,6 @@
 import { parseArgs } from 'node:util'
 import { join } from 'node:path'
-import { checkoutRoot, gitReason, nodeBranchFileFs, nodeGitRunner, openBranchReader, writeFileBranchDetached, type BranchReader, type GitRunner, DATA_BRANCH } from '@gemstack/agent-data'
+import { checkoutRoot, gitReason, listBranchDir, nodeBranchFileFs, nodeGitRunner, openBranchReader, readBranchFile, writeFileBranchDetached, type BranchReader, type GitRunner, DATA_BRANCH } from '@gemstack/agent-data'
 import { isTicketFile, isTicketPath, META_FILE, TICKETS_DIR, ticketLockName, ticketPlanName, ticketStem } from './names.js'
 import { readTicket, readTickets, readTicketsMeta, type TicketsFs } from './tickets.js'
 import { applyClaims, applyRelease, claimMessage, lockHolder, releaseMessage } from './locks.js'
@@ -20,17 +20,22 @@ import { holderOf } from './holder.js'
  * pushed — its own earlier writes included. Writes are a remote writer's: one commit each, on a
  * throwaway checkout of origin's tip, pushed straight to the branch; a rejected push is re-applied
  * on the new tip and pushed again. The persistent checkout a daemon keeps is never touched.
+ *
+ * Two flags are the dashboard's, never an agent's: `--local` on the reads (this machine's copy of
+ * the branch, no fetch — the dashboard polls, and the writer on that machine keeps the checkout
+ * synced), and `--force` on `release` (lift whoever's claim: a person's answer to a dead agent).
+ * The framework finds this command through the package's `framework.tickets` declaration.
  */
 
 export const USAGE = `usage: tickets <command>
 
-  list                               every open ticket, as one JSON array
-  show <file>                        one ticket: its text, its plan, who holds it
-  meta                               when the tickets last caught up with the issue tracker
+  list [--local]                     every open ticket, as one JSON array
+  show <file> [--local]              one ticket: its text, its plan, who holds it
+  meta [--local]                     when the tickets last caught up with the issue tracker
   put <file>                         write one file under tickets/ from stdin (a ticket, a plan, meta.json)
   close <file>                       remove a ticket with its plan and lock (not while someone else holds it)
   claim <file>                       claim a ticket before planning or working it
-  release <file>                     lift your own claim
+  release <file> [--force]           lift your own claim; --force lifts anyone's (a person's act)
 
 JSON on stdout. Exit code 1 for a refusal or a git failure (the reason on stderr), 2 for a usage error.`
 
@@ -91,24 +96,22 @@ type Command = (args: string[], io: CliIo, git: GitRunner) => Promise<unknown>
 
 const COMMANDS: Record<string, Command> = {
   async list(args, io, git) {
-    parse(args, {}, 0)
-    const reader = await open(io.cwd, git)
-    return readTickets(TICKETS_DIR, ticketsFsOver(reader))
+    const { values } = parse(args, LOCAL, 0)
+    return readTickets(TICKETS_DIR, await ticketsFs(io.cwd, values.local, git))
   },
 
   async meta(args, io, git) {
-    parse(args, {}, 0)
-    const reader = await open(io.cwd, git)
-    return readTicketsMeta(TICKETS_DIR, ticketsFsOver(reader))
+    const { values } = parse(args, LOCAL, 0)
+    return readTicketsMeta(TICKETS_DIR, await ticketsFs(io.cwd, values.local, git))
   },
 
   async show(args, io, git) {
-    const { positionals } = parse(args, {}, 1)
+    const { positionals, values } = parse(args, LOCAL, 1)
     const file = ticketArg(positionals[0]!)
-    const reader = await open(io.cwd, git)
-    const ticket = await readTicket(TICKETS_DIR, file, ticketsFsOver(reader))
+    const fs = await ticketsFs(io.cwd, values.local, git)
+    const ticket = await readTicket(TICKETS_DIR, file, fs)
     if (!ticket) throw noTicket(file)
-    const plan = await reader.read(`${TICKETS_DIR}/${ticketPlanName(file)}`)
+    const plan = await fs.read(`${TICKETS_DIR}/${ticketPlanName(file)}`)
     return { ok: true, ticket, ...(plan === undefined ? {} : { plan }), ...(ticket.lockedBy === undefined ? {} : { holder: ticket.lockedBy }) }
   },
 
@@ -186,9 +189,11 @@ const COMMANDS: Record<string, Command> = {
   },
 
   async release(args, io, git) {
-    const { positionals } = parse(args, {}, 1)
+    const { positionals, values } = parse(args, { force: { type: 'boolean' } }, 1)
     const file = ticketArg(positionals[0]!)
-    const holder = await identity(io.cwd, git)
+    // `--force` lifts whoever's claim, so it needs no identity of its own: a person's act, from
+    // the dashboard, on a claim nobody answers to any more.
+    const holder = values.force ? undefined : await identity(io.cwd, git)
     let outcome = 'released' as 'released' | 'no-lock' | 'not-holder'
     let other: string | undefined
     await write(io.cwd, releaseMessage(file), async dir => {
@@ -198,9 +203,12 @@ const COMMANDS: Record<string, Command> = {
     }, git)
     if (outcome === 'no-lock') throw new Refused({ ok: false, reason: 'no-lock', file }, `${TICKETS_DIR}/${file} is not claimed`)
     if (outcome === 'not-holder') throw new Refused({ ok: false, reason: 'not-holder', file, holder: other }, `${TICKETS_DIR}/${file} is claimed by ${other ?? 'someone else'}, not by you`)
-    return { ok: true, file: `${TICKETS_DIR}/${file}`, holder }
+    return { ok: true, file: `${TICKETS_DIR}/${file}`, ...(holder === undefined ? {} : { holder }) }
   },
 }
+
+/** The one flag every read takes. */
+const LOCAL = { local: { type: 'boolean' } } as const
 
 /** The branch opened for reading, from wherever the command runs; outside a repo, a refusal. */
 async function open(cwd: string, git: GitRunner): Promise<BranchReader> {
@@ -208,9 +216,18 @@ async function open(cwd: string, git: GitRunner): Promise<BranchReader> {
   return openBranchReader(cwd, DATA_BRANCH, { git })
 }
 
-/** The ticket reader over a branch read: paths are branch-relative (`tickets/<file>`). */
-function ticketsFsOver(reader: BranchReader): TicketsFs {
-  return { list: dir => reader.list(dir), read: path => reader.read(path) }
+/**
+ * The ticket reader a read goes through, paths branch-relative (`tickets/<file>`): origin's copy,
+ * fetched once, or with `--local` this machine's copy — the persistent checkout at
+ * `.branches/agent-data`, else the local branch — with no fetch, for the dashboard's polling.
+ */
+async function ticketsFs(cwd: string, local: boolean | undefined, git: GitRunner): Promise<TicketsFs> {
+  if (!local) {
+    const reader = await open(cwd, git)
+    return { list: dir => reader.list(dir), read: path => reader.read(path) }
+  }
+  await inRepo(() => checkoutRoot(cwd, git))
+  return { list: dir => listBranchDir(cwd, DATA_BRANCH, dir, {}, { git }), read: path => readBranchFile(cwd, DATA_BRANCH, path, {}, { git }) }
 }
 
 /** One detached write, refusing where nothing can carry it. */

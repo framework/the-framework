@@ -1,6 +1,7 @@
 import type { ProjectSummary } from './projects.js'
 import { collectQueue, type ProjectQueue } from './queue.js'
 import { hasTickets } from './tickets.js'
+import { projectTickets } from '../store/tickets.js'
 import { buildOverview, type ActiveAgent, type OverviewDeps } from './overview.js'
 
 // The Overview dashboard page (#471): the cross-project rollup that used to live cramped in
@@ -18,6 +19,8 @@ export interface ProjectStat {
   projectId: string
   /** Whether the repo has any ticket in `tickets/` (#958) — presence only, not a count. */
   hasTickets: boolean
+  /** Whether one of the project's packages provides tickets at all (#1774): without one, there is nothing to populate. */
+  providesTickets: boolean
 }
 
 /** The dashboard page payload (#471). */
@@ -38,6 +41,8 @@ export interface DashboardData {
 export interface DashboardDeps extends OverviewDeps {
   /** Whether a project has tickets (#958). Defaults to {@link hasTickets} (false on any error). */
   tickets?: (cwd: string) => Promise<boolean>
+  /** Whether a project's packages provide tickets (#1774). Defaults to the provider lookup (false on any error). */
+  providesTickets?: (cwd: string) => Promise<boolean>
 }
 
 /**
@@ -47,6 +52,7 @@ export interface DashboardDeps extends OverviewDeps {
  */
 export async function buildDashboard(projects: ProjectSummary[], deps: DashboardDeps = {}): Promise<DashboardData> {
   const hasTicketsFor = deps.tickets ?? (cwd => hasTickets(cwd).catch(() => false))
+  const providesTicketsFor = deps.providesTickets ?? (cwd => projectTickets(cwd).then(source => source !== undefined, () => false))
 
   // Compute the queue once and hand it to buildOverview so the backlog is read a single time.
   const queue = await (deps.queue ?? (p => collectQueue(p)))(projects)
@@ -57,7 +63,7 @@ export async function buildDashboard(projects: ProjectSummary[], deps: Dashboard
   const ordered = [...projects].sort((a, b) => (b.lastActivityAt ?? '').localeCompare(a.lastActivityAt ?? ''))
   const projectStats: ProjectStat[] = []
   for (const project of ordered) {
-    projectStats.push({ projectId: project.id, hasTickets: await hasTicketsFor(project.path) })
+    projectStats.push({ projectId: project.id, hasTickets: await hasTicketsFor(project.path), providesTickets: await providesTicketsFor(project.path) })
   }
 
   return {

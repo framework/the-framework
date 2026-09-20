@@ -23,6 +23,9 @@
   "bin": {
     "tickets": "bin/tickets"
   },
+  "framework": {
+    "tickets": "tickets"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

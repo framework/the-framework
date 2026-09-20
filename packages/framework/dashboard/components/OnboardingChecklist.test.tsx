@@ -52,7 +52,7 @@ const EMPTY: DashboardData = {
 const WITH_PROJECT: DashboardData = {
   ...EMPTY,
   totals: { projects: 1, activeAgents: 0, openTodos: 0, totalAgents: 0 },
-  projects: [{ projectId: 'p1', hasTickets: false }],
+  projects: [{ projectId: 'p1', hasTickets: false, providesTickets: true }],
 } as unknown as DashboardData
 
 /** Click the import step and wait for the start to have been attempted. */

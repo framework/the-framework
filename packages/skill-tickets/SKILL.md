@@ -7,7 +7,7 @@ description: Where the project's tickets live, how to read and change them, how 
 
 The tickets (`tickets/<DATE>_<SLUG>.md`, with their `.plan.md` and `.lock.md` siblings) live on the branch `agent-data`, never on a code branch. A `tickets` link at the repository root, if present, shows a possibly stale copy; never write there. The command reads fresh.
 
-Read and change them with the `tickets` command, a dependency of this repository (`@gemstack/skill-tickets`), run as `npx tickets`. When that fails for a missing `node_modules`, install with the lockfile's package manager (`npm install` for `package-lock.json`) and run it again. Every change it makes is one commit pushed straight to the `agent-data` branch. A refusal exits 1 with a line on stderr; a wrong command line exits 2 with the usage.
+Read and change them with the `tickets` command, a dependency of this repository (`@gemstack/skill-tickets`), run as `npx tickets`. When that fails for a missing `node_modules`, install with the lockfile's package manager (`npm install` for `package-lock.json`) and run it again. Every change it makes is one commit pushed straight to the `agent-data` branch. The command's `--local` and `--force` flags are for the dashboard that shows the tickets; never use them. A refusal exits 1 with a line on stderr; a wrong command line exits 2 with the usage.
 
 ## Read
 

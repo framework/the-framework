@@ -49,10 +49,14 @@ test('buildDashboard reports per-project ticket presence, which onboarding reads
     liveAgents: async () => [],
     queue: async () => [],
     tickets: async cwd => cwd === '/a',
+    providesTickets: async cwd => cwd !== '/b',
   })
 
   assert.equal(data.projects.find(p => p.projectId === 'a')!.hasTickets, true)
   assert.equal(data.projects.find(p => p.projectId === 'b')!.hasTickets, false)
+  // Whether a project can have tickets at all (#1774): a step to populate them is offered only where a package provides them.
+  assert.equal(data.projects.find(p => p.projectId === 'a')!.providesTickets, true)
+  assert.equal(data.projects.find(p => p.projectId === 'b')!.providesTickets, false)
 })
 
 test('the payload carries only what a reader asks for', async () => {
@@ -64,5 +68,5 @@ test('the payload carries only what a reader asks for', async () => {
 
   assert.deepEqual(Object.keys(data).sort(), ['active', 'projects', 'queue', 'totals'])
   assert.deepEqual(Object.keys(data.totals).sort(), ['openTodos', 'projects'])
-  assert.deepEqual(Object.keys(data.projects[0]!).sort(), ['hasTickets', 'projectId'])
+  assert.deepEqual(Object.keys(data.projects[0]!).sort(), ['hasTickets', 'projectId', 'providesTickets'])
 })

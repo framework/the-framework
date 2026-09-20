@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
+import { sessionNameOf } from '@gemstack/skill-branches/branch-names'
 import type { Intervention, Activity, ProjectionRead, ProjectSummary, RecentAgent } from '../src/index.js'
-import { onProjectFiles, onInterventions, onActivity, onRecentAgents } from './rpc/reads.js'
+import { onProjectFiles, onInterventions, onActivity, onRecentAgents, onAgents } from './rpc/reads.js'
+import { sendStart } from './rpc/control.js'
 import { onProjects } from './rpc/projects.js'
 import { AgentHistory } from './components/AgentHistory.js'
 import { SidebarProvider } from './components/ui/sidebar.js'
@@ -16,6 +18,9 @@ import { RightRail } from './components/RightRail.js'
 import { NotFound } from './components/NotFound.js'
 import { WidgetPageView } from './components/WidgetPageView.js'
 import { useWidgets, WidgetsContext } from './lib/use-widgets.js'
+import { HostServicesContext, type HostServices } from './lib/host-services.js'
+import { startPicks } from './lib/use-start-agent.js'
+import { stashPendingDraft } from './lib/draft-handoff.js'
 import { useLiveEvents } from './lib/use-live-events.js'
 import { useAgents } from './lib/use-agents.js'
 import { usePolled } from './lib/use-async.js'
@@ -225,6 +230,29 @@ export function App() {
     go({ view: 'tickets', projectId: id, agentId: null, ticketSlug: slug, plan: true })
   }
 
+  // The shell's services for widgets (#1774): what a widget page or a link action may ask of the
+  // dashboard, none of it naming a skill. Bound to each widget's package where its host is built.
+  const hostServices: HostServices = {
+      openAgent: selectAgentInProject,
+      openPage: (segment, path) => go({ projectId: null, agentId: null, page: segment, ...(path && path.length ? { pagePath: path } : {}) }),
+      startRun: async (inProject, prompt) => {
+        const result = await sendStart(inProject, prompt, startPicks(preferences))
+        if (result.ok) agentStarted(inProject, prompt, result.agentId)
+        return result
+      },
+      // The launcher rehydrates a stashed draft once as it mounts (#1066): the same carry every
+      // "Configure first, then run" uses.
+      configureRun: (inProject, prompt) => {
+        stashPendingDraft(prompt)
+        selectProject(inProject)
+      },
+      agents: async inProject =>
+        (await onAgents(inProject)).map(agent => {
+          const name = sessionNameOf(agent.branch, agent.id)
+          return { id: agent.id, status: agent.status, startedAt: agent.startedAt, ...(name ? { name } : {}), ...(agent.intent ? { ask: agent.intent } : {}) }
+        }),
+  }
+
   // The live agent feed is owned here so both the main view and the right rail's views tab read
   // one shared event stream.
   // The agent whose feed and controls are in play is simply the one in the URL; in the no-id
@@ -258,7 +286,7 @@ export function App() {
       return <SettingsPage onAgentStarted={agentStarted} onSelectProject={selectProject} onDone={showDashboard} />
     if (pageSegment) {
       if (widgetPage)
-        return <WidgetPageView page={widgetPage} projects={projects} path={route.pagePath ?? []} onOpenAgent={selectAgentInProject} />
+        return <WidgetPageView page={widgetPage} projects={projects} path={route.pagePath ?? []} />
       // Not loaded yet is not "no such page": the widgets are imported after the first read.
       if (!widgetsLoaded) return null
       return (
@@ -370,6 +398,7 @@ export function App() {
     // the column that used to be a plain div. The installed widgets (#1774) are provided around it
     // all, so the link actions they offer reach any page that shows a link.
     <WidgetsContext.Provider value={widgets}>
+    <HostServicesContext.Provider value={hostServices}>
     <SidebarProvider className="h-screen flex-col overflow-hidden">
       {/* The top navbar is gone (#772 follow-up): its brand, global nav and utility controls moved
           into the sidebar (AgentHistory), so the workspace and right rail get the full height. */}
@@ -432,6 +461,7 @@ export function App() {
         )}
       </div>
     </SidebarProvider>
+    </HostServicesContext.Provider>
     </WidgetsContext.Provider>
   )
 }

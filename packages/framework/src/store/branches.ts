@@ -36,6 +36,8 @@ export interface Checkout {
   path: string
   /** The branch it is on; absent for a checkout on none, or one git no longer knows. */
   branch?: string
+  /** The name the agent gave its work, as the provider answers it; absent while the run has not named it. Drawn where a branch would be drawn as a name. */
+  name?: string
   /** Its size on disk, when sizes were asked for. */
   sizeBytes?: number
 }
@@ -58,6 +60,8 @@ export interface BranchFile {
 /** What a branch holds and where it stands, as a provider answers `show`: git facts, no pull request. */
 export interface BranchState {
   branch: string
+  /** The name the agent gave its work, as the provider answers it; absent while the run has not named it. */
+  name?: string
   /** The branch exists on this machine. Gone: every list below is empty, and only the remote can say more. */
   exists: boolean
   /** What it is measured against, the project's default branch, when one was found. */
@@ -129,6 +133,7 @@ export function parseCheckouts(output: unknown): Checkout[] {
       id,
       path: row['path'],
       ...(typeof row['branch'] === 'string' && row['branch'] !== '' ? { branch: row['branch'] } : {}),
+      ...(typeof row['name'] === 'string' && row['name'] !== '' ? { name: row['name'] } : {}),
       ...(typeof row['sizeBytes'] === 'number' ? { sizeBytes: row['sizeBytes'] } : {}),
     })
   }
@@ -145,6 +150,7 @@ export function parseBranchStates(output: unknown): BranchState[] {
     if (typeof row['branch'] !== 'string' || row['branch'] === '' || typeof row['exists'] !== 'boolean' || typeof row['pushed'] !== 'boolean' || typeof row['merged'] !== 'boolean') continue
     states.push({
       branch: row['branch'],
+      ...(typeof row['name'] === 'string' && row['name'] !== '' ? { name: row['name'] } : {}),
       exists: row['exists'],
       ...(typeof row['base'] === 'string' && row['base'] !== '' ? { base: row['base'] } : {}),
       commits: commitsOf(row['commits']),

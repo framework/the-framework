@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { nodeGitRunner } from '@gemstack/agent-data'
 import { createCheckout } from './checkout.js'
+import { nameBranch } from './worktree.js'
 import { parseCommits, parseNumstat, parsePorcelain, readBranchStates } from './branch-state.js'
 import { runCli } from './cli.js'
 
@@ -49,6 +50,7 @@ test('show: the commits and files beyond the base, whether the remote has the ti
     const [state] = await readBranchStates(repo, ['agent-a1'], git)
     assert.ok(state)
     assert.equal(state.branch, 'agent-a1')
+    assert.equal(state.name, undefined, 'still on its birth branch: no name yet')
     assert.equal(state.exists, true)
     assert.equal(state.base, 'origin/main')
     assert.deepEqual(state.commits.map(c => c.subject), ['notes', 'welcome'], 'newest first')
@@ -125,7 +127,8 @@ test('show: a repository with no remote has no remote and nothing pushed; withou
     await git(['switch', '-q', '-c', 'agent-x'], repo)
     await commit(repo, 'b.txt', 'b\n', 'b')
     const [state] = await readBranchStates(repo, ['agent-x'], git)
-    assert.deepEqual(state, { branch: 'agent-x', exists: true, commits: [], files: [], hasRemote: false, pushed: false, merged: false })
+    // No checkout is on `agent-x`, so nothing tells a birth branch apart: it is named by its suffix.
+    assert.deepEqual(state, { branch: 'agent-x', name: 'x', exists: true, commits: [], files: [], hasRemote: false, pushed: false, merged: false })
   } finally {
     await rm(repo, { recursive: true, force: true, maxRetries: 10 })
   }
@@ -142,4 +145,22 @@ test('the parsers: a subject with spaces, a binary numstat entry, a renamed and 
     { path: 'img.png', insertions: 0, deletions: 0, binary: true },
   ])
   assert.deepEqual(parsePorcelain(' M a.ts\n?? new.txt\nR  old.txt -> new name.txt\n M "sp ace.txt"\n'), ['a.ts', 'new.txt', 'new name.txt', 'sp ace.txt'])
+})
+
+test('show: the name the agent gave its work is the branch minus the prefix; none for a birth branch or a branch the package did not mint', async () => {
+  const repo = await repoWithOrigin()
+  try {
+    const { path } = await createCheckout(repo, { agentId: 'a1' })
+    await nameBranch(path, 'fix-login', git)
+    await createCheckout(repo, { agentId: 'a2' })
+    const [named, birth, main, gone] = await readBranchStates(repo, ['agent-fix-login', 'agent-a2', 'main', 'agent-gone'], git)
+    assert.equal(named?.name, 'fix-login')
+    assert.equal(birth?.name, undefined, 'the branch a checkout was created on names nothing')
+    assert.equal(main?.name, undefined, 'not this package\'s branch')
+    // A branch no checkout is on cannot be told from a birth branch, so it is named by its suffix.
+    assert.equal(gone?.exists, false)
+    assert.equal(gone?.name, 'gone')
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
 })

@@ -120,6 +120,9 @@ test('parseCheckouts keeps the rows with an id and a path; parseBranchStates the
     { id: 'run-1', path: ROW.path, branch: ROW.branch },
     { id: 'run-2', path: '/p', sizeBytes: 3 },
   ])
+  // The name the provider answers is kept as printed, and only as a non-empty string: the framework never derives one.
+  assert.deepEqual(parseCheckouts([{ ...ROW, name: 'fix-login' }, { ...ROW, name: '' }]), [{ id: 'run-1', path: ROW.path, branch: ROW.branch, name: 'fix-login' }, { id: 'run-1', path: ROW.path, branch: ROW.branch }])
+  assert.deepEqual(parseBranchStates([{ ...STATE, name: 'fix-login' }, { ...STATE, name: 7 }]), [{ ...STATE, name: 'fix-login' }, STATE])
   assert.deepEqual(parseBranchStates([STATE, { branch: 'b', exists: false, pushed: false, merged: false, commits: 'x', files: [{ path: '' }, { path: 'f' }] }, { branch: 'c' }]), [
     STATE,
     { branch: 'b', exists: false, commits: [], files: [{ path: 'f', insertions: 0, deletions: 0, binary: false }], hasRemote: false, pushed: false, merged: false },

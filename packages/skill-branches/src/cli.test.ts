@@ -196,10 +196,11 @@ test('list: every checkout with the branch it is on now, sized on request', asyn
     await run(repo, 'create', 'a1')
     await run(repo, 'create', 'a2')
     await run(worktreePath(repo, 'a2'), 'name', 'renamed')
-    const rows = (await run(repo, 'list')).out as { agentId: string; path: string; branch?: string; sizeBytes?: number }[]
+    const rows = (await run(repo, 'list')).out as { agentId: string; path: string; branch?: string; name?: string; sizeBytes?: number }[]
+    // The name is the branch minus the prefix, and only once the agent named its work: a1 is still on its birth branch.
     assert.deepEqual(rows, [
       { agentId: 'a1', path: worktreePath(repo, 'a1'), branch: 'agent-a1' },
-      { agentId: 'a2', path: worktreePath(repo, 'a2'), branch: 'agent-renamed' },
+      { agentId: 'a2', path: worktreePath(repo, 'a2'), branch: 'agent-renamed', name: 'renamed' },
     ])
     const sized = (await run(repo, 'list', '--sizes')).out as { sizeBytes?: number }[]
     assert.equal(sized.length, 2)
@@ -387,7 +388,7 @@ test('name: a name spelled like a checkout directory is a name like any other; i
     assert.deepEqual((await run(path, 'name', 'agent-zz')).out, { ok: true, branch: 'agent-agent-zz' })
     assert.equal((await git(['rev-parse', '--abbrev-ref', 'HEAD'], path)).trim(), 'agent-agent-zz')
     assert.equal(await readlink(join(repo, '.branches', 'agent-agent-zz')), 'agent-a1')
-    assert.deepEqual((await run(repo, 'list')).out, [{ agentId: 'a1', path, branch: 'agent-agent-zz' }], 'the link beside the checkout is not a checkout')
+    assert.deepEqual((await run(repo, 'list')).out, [{ agentId: 'a1', path, branch: 'agent-agent-zz', name: 'agent-zz' }], 'the link beside the checkout is not a checkout')
   } finally {
     await rm(repo, { recursive: true, force: true })
   }

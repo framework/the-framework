@@ -20,7 +20,7 @@ How The Framework reads a project's checkouts [1] and acts on its branches: thro
 
 - **Which command provides** - the first of the project's dependencies, in its package.json's order, that declares a branches provider [2] naming one of its own commands; no dependency declares one, the project has no checkouts.
 - **The command line it answers** - the checkouts (with sizes on request), the state of one or several branches, a publish of a branch, a merge of a pull request, and the removal of a checkout (with its uncommitted work discarded on request); reads touch this machine only.
-- **The shapes** - a checkout is kept only with a safe id and a path; a branch's state only with its name and its three verdicts; every other field only with the right type; anything that fails to answer is read as "nothing", never an error.
+- **The shapes** - a checkout is kept only with a safe id and a path; a branch's state only with its branch and its three verdicts; the name the agent gave its work, when the provider answers one, is kept as printed; every other field only with the right type; anything that fails to answer is read as "nothing", never an error.
 - **Reads are shared for five seconds** - the same list or the same branches asked again within five seconds reuse the answer; a write drops every read; a caller looking for a checkout that just appeared asks fresh, but a list read less than a second ago still answers.
 
 ## Business logic
@@ -44,7 +44,7 @@ The project's own package.json is read; its `dependencies` then `devDependencies
 #### Business logic
 
 The provider's command runs with Node, in the project's root, never through a shell, for at most 30 seconds and 16 MB of output. Each call prints one JSON document and exits 0; a refusal exits 1 with its reason on its last line of error output, which is the answer a write gives back; a failure of a read is read as "nothing":
-- `<command> list`, or `<command> list --sizes` when sizes are wanted: every checkout [1] as an array, each with the agent's id, its path, the branch it is on when it is on one, and its size in bytes when asked.
+- `<command> list`, or `<command> list --sizes` when sizes are wanted: every checkout [1] as an array, each with the agent's id, its path, the branch it is on when it is on one, the name the agent gave its work when the provider answers one, and its size in bytes when asked.
 - `<command> show <branch> [<branch>...]`: the state [3] of each branch named, as an array in the order asked; a branch the provider did not answer for is simply missing. Nothing is run when no branch is named.
 - `<command> publish --branch <branch> --title <title> [--body <body>] [--draft]`: push the branch and open its pull request, as a draft when asked; a branch that already has an open pull request is answered with that one. The answer is the pull request's number and link, and whether it was open already; an answer with no pull request is a failure ("<command> opened no pull request").
 - `<command> merge <number>`: land the pull request: armed on GitHub to merge when its checks pass, merged at once, or this machine watching its checks; any other answer is a failure, in the provider's words when it gave any.
@@ -59,7 +59,7 @@ See `## Context`.
 
 #### Business logic
 
-A checkout [1] is only a checkout with a string id made of letters, digits, `-` and `_` (the provider may print it as `agentId` or `id`) and a non-empty string path; a branch and a size are kept only as a non-empty string and a number. A branch's state [3] is only a state with a non-empty string branch and boolean `exists`, `pushed` and `merged`; its commits are kept only with a non-empty sha (a missing subject reads as empty), its files only with a non-empty path (missing counts read as zero, a missing binary flag as not binary), its base only as a non-empty string, its remote flag as true only when printed true, and its pending paths only when printed as a list, the strings among them. Anything else is dropped from a list.
+A checkout [1] is only a checkout with a string id made of letters, digits, `-` and `_` (the provider may print it as `agentId` or `id`) and a non-empty string path; a branch, a name and a size are kept only as a non-empty string, a non-empty string and a number. A branch's state [3] is only a state with a non-empty string branch and boolean `exists`, `pushed` and `merged`; its commits are kept only with a non-empty sha (a missing subject reads as empty), its files only with a non-empty path (missing counts read as zero, a missing binary flag as not binary), its base and its name only as non-empty strings, its remote flag as true only when printed true, and its pending paths only when printed as a list, the strings among them. Anything else is dropped from a list.
 
 ### Reads are shared for five seconds
 

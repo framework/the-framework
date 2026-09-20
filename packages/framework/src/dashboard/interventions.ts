@@ -219,7 +219,8 @@ async function unpushedFor(
       projectId: project.id,
       projectName: project.name,
       kind: 'unpushed',
-      title: agent.intent?.trim() || branch,
+      // What was asked, else the name the provider gave the branch, else the branch: never a prefix cut off here.
+      title: agent.intent?.trim() || state.name || branch,
       url: deps.dashboardUrl ?? '',
       agentId: agent.id,
       branch,

@@ -44,6 +44,8 @@ export interface HandoffFile {
 export interface AgentHandoff {
   /** The branch the work is on. */
   branch: string
+  /** The name the agent gave its work, as the branches provider answers it; absent while the run has not named it. */
+  name?: string
   /** The branch still exists in the repo (a deleted or never-created one does not). */
   exists: boolean
   /** What the branch is measured against (the repo's default branch), when one was found. */
@@ -216,6 +218,7 @@ export async function readAgentHandoff(
   const files = state.files.map(file => ({ path: file.path, insertions: file.insertions, deletions: file.deletions, binary: file.binary }))
   return {
     branch,
+    ...(state.name ? { name: state.name } : {}),
     exists: state.exists,
     ...(state.base ? { base: state.base } : {}),
     commits,
@@ -316,7 +319,7 @@ export async function openAgentPullRequest(
   if (handoff && !handoff.exists) return { ok: false, error: `branch ${branch} no longer exists` }
   // Refuse rather than open an empty PR: a session that changed nothing has nothing to hand off.
   if (handoff?.empty) return { ok: false, error: 'this session produced no commits to open a PR for' }
-  return publishBranch(cwd, branch, { title: agentPrTitle(agent), body: agentPrBody(agent), ...(options.draft ? { draft: true } : {}) }, branches)
+  return publishBranch(cwd, branch, { title: agentPrTitle(agent, handoff?.name), body: agentPrBody(agent), ...(options.draft ? { draft: true } : {}) }, branches)
 }
 
 /**
@@ -354,8 +357,10 @@ export type HandoffAgent = Pick<AgentMeta, 'id' | 'branch' | 'intent'> &
  * squash merge made that permanent: `main` ended up carrying instructions truncated mid-sentence
  * as commit subjects, which describe neither what changed nor even a whole thought (#1618).
  */
-function agentPrTitle(agent: Pick<HandoffAgent, 'id' | 'branch' | 'prTitle' | 'fixes'>): string {
-  const title = agent.prTitle ?? agent.branch ?? `Session ${agent.id}`
+function agentPrTitle(agent: Pick<HandoffAgent, 'id' | 'branch' | 'prTitle' | 'fixes'>, name?: string): string {
+  // The name the branches provider answers for the branch comes before the branch itself: the
+  // framework draws the name it is given and never cuts the package's prefix off a branch.
+  const title = agent.prTitle ?? name ?? agent.branch ?? `Session ${agent.id}`
   return agent.fixes ? `${title} (fix ${agent.fixes})` : title
 }
 

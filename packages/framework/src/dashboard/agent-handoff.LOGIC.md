@@ -33,7 +33,7 @@ Decides what becomes of an agent's [1] work once the agent has ended, its handof
 - **The "Open PR" button** - the agent's existing pull request first, even for a gone branch, unless the agent moved past it; a gone branch and an empty branch are refused with a reason; otherwise the branch is published ready for review.
 - **A pull request for a branch only the remote has** - a cloud session's own branch is published as a draft, through the same provider.
 - **The "Merge" button on a finished agent** - refused when the agent has no pull request or it is no longer open; otherwise the branches provider lands the pull request.
-- **The pull request's title** - the agent's own title, else its branch, else "Session <agent id>"; never the prompt.
+- **The pull request's title** - the agent's own title, else the name the branches provider answers for its branch, else the branch, else "Session <agent id>"; never the prompt, and never a branch with its prefix cut off by the framework.
 - **The pull request's body** - what the agent said about the work, else what was asked for, then which agent did it.
 - **What a handoff reports** - a button answers with success (and the pull request's URL and number) or one error line, and the number rides along so it gets recorded on the agent.
 

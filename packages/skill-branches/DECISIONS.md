@@ -109,6 +109,10 @@ push.
   it is pushed and merged, what its checkout left uncommitted; its pull request is the
   caller's question. Picked over the package asking GitHub, which would have put a gh call
   inside every poll.
+- `list` and `show` answer a branch's `name`, the name the agent gave its work: the branch
+  minus the package's prefix, and nothing while a checkout is still on the branch it was
+  created on. The naming rule stays the package's. Picked over the dashboard cutting the prefix
+  off, which was the dashboard knowing how the package names a branch.
 - `list` and `show` never touch the network: they read the local refs and the checkouts on
   disk, so a caller may poll them.
 - The command has a second caller, the dashboard, for `list`, `show`, `publish --branch`,

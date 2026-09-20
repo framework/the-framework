@@ -1,27 +1,17 @@
 import { cliRunner, type CliRunner } from '../cli-exec.js'
 import { cachedRead, invalidate, type Cached } from './cache.js'
-import { errorMessage } from '../error-message.js'
 
 /**
- * The `gh` CLI, in one place: the two JSON reads the dashboard makes and the runner its write
- * actions use.
+ * The `gh` CLI, in one place: the JSON reads the dashboard makes of pull requests. Reads only:
+ * pushing, opening and merging are the project's branches provider's (`../store/branches.ts`).
  *
  * There were four separate `gh` adapters across three modules. Three were reads that each
  * hand-rolled `execFile` + `JSON.parse` + a swallowed failure and each spelled the 8s timeout
- * again, and two of those differed only in whether a branch positional was passed; the fourth was
- * a generic runner for the write actions, which rejects with stderr and waits longer.
+ * again, and two of those differed only in whether a branch positional was passed.
  */
 
 /** Runs `gh`, resolving stdout and rejecting with the CLI's own stderr on failure. */
 export type GhRunner = CliRunner
-
-/**
- * A {@link GhRunner} for the write actions (push, open a PR). Longer timeout than a read: these
- * talk to the network and to git, and the user is waiting on a button they pressed.
- */
-export function nodeGhRunner(): GhRunner {
-  return cliRunner({ bin: 'gh', timeoutMs: 60_000, preferStderr: true })
-}
 
 /**
  * Reads are capped short and never surface an error: every caller is a panel that renders
@@ -153,66 +143,6 @@ function linkedPrs(prs: LinkedPr[]): LinkedPr[] {
     ...(pr.createdAt ? { createdAt: pr.createdAt } : {}),
     ...(pr.headRefOid ? { headRefOid: pr.headRefOid } : {}),
   }))
-}
-
-/**
- * The refusals that mean "auto-merge is not available here, merge directly instead" (#1216).
- *
- * gh surfaces GitHub's GraphQL errors verbatim: `Pull request Auto merge is not allowed for this
- * repository` where the repo setting is off, and `Pull request is in clean status` where nothing
- * blocks the PR — auto-merge is *only* for PRs that cannot land yet, so a green PR gets the same
- * refusal and the direct merge is exactly what was meant. Matched loosely (both carry the
- * `enablePullRequestAutoMerge` marker) so a rephrase on GitHub's side degrades to a reported
- * failure, never a wrong merge.
- */
-const DIRECT_MERGE_FALLBACK = /auto[- ]?merge is not allowed|clean status|enablePullRequestAutoMerge|protected branch/i
-
-/**
- * How a merge went (#1216). `auto-armed` is the preferred outcome: GitHub's
- * own auto-merge takes the PR, so it lands when its checks pass rather than before them. `merged`
- * is the fallback where the repo does not allow auto-merge and the PR was merged directly.
- */
-export type MergeOutcome = { outcome: 'auto-armed' | 'merged' } | { outcome: 'failed'; error: string }
-
-/**
- * Merge a PR (#1216): GitHub auto-merge first, so the PR lands when its checks pass rather than
- * before them; merged directly where the repo does not allow auto-merge. Squash in both forms — a
- * session's branch is working history, not a story worth preserving.
- *
- * Never throws: the caller reports the outcome, and a merge that could not happen is an answer.
- */
-export async function ghMergePr(cwd: string, number: number, gh: GhRunner = nodeGhRunner()): Promise<MergeOutcome> {
-  try {
-    await gh(['pr', 'merge', String(number), '--squash', '--auto'], cwd)
-    return { outcome: 'auto-armed' }
-  } catch (err) {
-    const refusal = errorMessage(err)
-    // A draft cannot be merged or auto-merged: mark it ready and try once more, because asking
-    // for the merge is the statement that its review already happened.
-    if (/draft/i.test(refusal)) {
-      try {
-        await gh(['pr', 'ready', String(number)], cwd)
-        await gh(['pr', 'merge', String(number), '--squash', '--auto'], cwd)
-        return { outcome: 'auto-armed' }
-      } catch (retry) {
-        const readyRefusal = errorMessage(retry)
-        if (!DIRECT_MERGE_FALLBACK.test(readyRefusal)) return { outcome: 'failed', error: readyRefusal }
-        return directMerge(cwd, number, gh)
-      }
-    }
-    if (!DIRECT_MERGE_FALLBACK.test(refusal)) return { outcome: 'failed', error: refusal }
-    return directMerge(cwd, number, gh)
-  }
-}
-
-/** The direct merge {@link ghMergePr} falls back to where GitHub will not arm auto-merge. */
-async function directMerge(cwd: string, number: number, gh: GhRunner): Promise<MergeOutcome> {
-  try {
-    await gh(['pr', 'merge', String(number), '--squash'], cwd)
-    return { outcome: 'merged' }
-  } catch (direct) {
-    return { outcome: 'failed', error: errorMessage(direct) }
-  }
 }
 
 /** The cached form of {@link ghPrsForBranch}, shared through the same read-through cache (#1028). */

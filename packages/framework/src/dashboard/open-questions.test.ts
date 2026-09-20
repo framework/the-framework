@@ -46,7 +46,6 @@ test('a waiting run yields its question whole, options and recommendation, read 
       projectId: 'p1',
       projectName: 'one',
       agentId: 'run-1',
-      sessionName: 'triage',
       intent: 'triage the queue',
       updatedAt: '2026-08-01T11:00:00.000Z',
       choice,

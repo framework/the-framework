@@ -57,10 +57,10 @@ describe('Agents (#1139)', () => {
 
   test('a working session with no intent still gets a label', () => {
     // ActiveAgent carries no branch or start time to fall back on, so an unlabelled row would be a
-    // blank line you cannot tell apart from its neighbours.
+    // blank line you cannot tell apart from its neighbours: the scope, else the project, names it.
     render(
       <Agents
-        working={[active('r1', { intent: '   ', sessionName: 'oauth-work' })]}
+        working={[active('r1', { intent: '   ', scope: 'oauth-work' })]}
         loading={false}
         onSelectAgent={vi.fn()}
       />,

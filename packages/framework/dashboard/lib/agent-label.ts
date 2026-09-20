@@ -1,4 +1,3 @@
-import { sessionNameOf } from '@gemstack/skill-branches/branch-names'
 import type { AgentMeta } from '../../src/index.js'
 import { formatDateTimeShort } from './format-date.js'
 
@@ -9,9 +8,9 @@ import { formatDateTimeShort } from './format-date.js'
 // and push the one fact that did identify them, the timestamp, into small muted text beside it.
 // So the loudest thing on most rows said nothing, and the rows were told apart by the quietest.
 //
-// The fallbacks in order: the session name its branch carries (#326/#1725), then the branch
-// itself when it carries none, then when nothing describes the agent, the time it started. A date is
-// a poor name but a real one, and it belongs on the line that identifies the row.
+// The fallbacks in order: the branch the agent named its work with (#326/#1725), then when nothing
+// describes the agent, the time it started. A date is a poor name but a real one, and it belongs
+// on the line that identifies the row.
 export function agentLabel(agent: Pick<AgentMeta, 'id' | 'intent' | 'branch' | 'startedAt'>): string {
-  return agent.intent?.trim() || sessionNameOf(agent.branch, agent.id) || agent.branch?.trim() || formatDateTimeShort(agent.startedAt)
+  return agent.intent?.trim() || agent.branch?.trim() || formatDateTimeShort(agent.startedAt)
 }

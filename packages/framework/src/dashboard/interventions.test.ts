@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { buildInterventions, interventionKey } from './interventions.js'
 import type { OpenPr } from './gh.js'
-import type { AgentHandoff } from './agent-handoff.js'
+import type { BranchState, BranchesFor } from '../store/branches.js'
 import type { ProjectSummary } from './projects.js'
 import type { LiveAgent, AgentMeta } from '../store/index.js'
 import type { FrameworkEvent } from '../events.js'
@@ -165,34 +165,49 @@ const doneMeta = (over: Partial<AgentMeta> = {}): AgentMeta => ({
   ...over,
 })
 
-/** A branch with work on it that never left the machine. */
-const waiting = (over: Partial<AgentHandoff> = {}): AgentHandoff => ({
+/** A branch with work on it that never left the machine, as the branches provider answers it. */
+const waiting = (over: Partial<BranchState> = {}): BranchState => ({
   branch: 'the-framework/add-cart',
   exists: true,
   base: 'main',
-  commits: [{ sha: 'abc1234', short: 'abc1234', subject: 'add the cart' }],
-  files: [],
-  insertions: 0,
-  deletions: 0,
-  empty: false,
+  commits: [{ sha: 'abc1234', subject: 'add the cart' }],
+  files: [{ path: 'cart.ts', insertions: 3, deletions: 0, binary: false }],
   hasRemote: true,
   pushed: false,
   merged: false,
   ...over,
 })
 
+/** A branches provider answering `show` from `state`, one answer per branch asked, recording what it was asked. */
+const showing = (state: (branch: string) => BranchState | undefined, asked: string[][] = []): BranchesFor => {
+  const unused = () => Promise.reject(new Error('not asked here'))
+  return async () => ({
+    list: unused,
+    show: async branches => {
+      asked.push([...branches])
+      return branches.flatMap(branch => {
+        const answer = state(branch)
+        return answer ? [answer] : []
+      })
+    },
+    publish: unused,
+    merge: unused,
+    remove: unused,
+  })
+}
+
 /** Only the unpushed source: no PRs, no paused runs. */
-const onlyUnpushed = (agents: AgentMeta[], handoff: (cwd: string, branch: string) => Promise<AgentHandoff | undefined>) => ({
+const onlyUnpushed = (agents: AgentMeta[], branches: BranchesFor) => ({
   prs: async () => [],
   liveAgents: noAgents,
   agents: async () => agents,
-  handoff,
+  branches,
 })
 
 test('a finished run with unpushed commits lands on the queue (#860)', async () => {
   const { items } = await buildInterventions(
     [project('a', '/a')],
-    onlyUnpushed([doneMeta()], async () => waiting()),
+    onlyUnpushed([doneMeta()], showing(branch => waiting({ branch }))),
   )
 
   assert.equal(items.length, 1)
@@ -205,17 +220,19 @@ test('a finished run with unpushed commits lands on the queue (#860)', async () 
 
 test('nothing is waiting when the work already went somewhere (#860)', async () => {
   // Each of these is a reason it is NOT waiting on a human.
-  const cases: [string, Partial<AgentHandoff>][] = [
+  const cases: [string, Partial<BranchState>][] = [
     ['already pushed', { pushed: true }],
     ['already merged', { merged: true }],
-    ['the session wrote nothing', { empty: true, commits: [] }],
+    ['the session wrote nothing', { commits: [] }],
+    ['the session\'s commits net to no change', { files: [] }],
     ['the branch is gone', { exists: false }],
     ['there is nowhere to push', { hasRemote: false }],
+    ['the provider did not answer for the branch', undefined as unknown as Partial<BranchState>],
   ]
   for (const [why, over] of cases) {
     const { items } = await buildInterventions(
       [project('a', '/a')],
-      onlyUnpushed([doneMeta()], async () => waiting(over)),
+      onlyUnpushed([doneMeta()], showing(branch => (over ? waiting({ branch, ...over }) : undefined))),
     )
     assert.deepEqual(items, [], `should not be surfaced: ${why}`)
   }
@@ -225,35 +242,45 @@ test('a still-running run is not unpushed work (#860)', async () => {
   // It is still writing; the overview already shows it.
   const { items } = await buildInterventions(
     [project('a', '/a')],
-    onlyUnpushed([doneMeta({ status: 'running' })], async () => waiting()),
+    onlyUnpushed([doneMeta({ status: 'running' })], showing(branch => waiting({ branch }))),
   )
   assert.deepEqual(items, [])
 })
 
-test('an unreadable branch is skipped rather than throwing (#860)', async () => {
-  const { items } = await buildInterventions(
-    [project('a', '/a')],
-    onlyUnpushed([doneMeta()], async () => {
+test('an unreadable branch state is skipped rather than throwing, and the project does not count as read whole (#860)', async () => {
+  const failing: BranchesFor = async () => ({
+    list: async () => [],
+    show: async () => {
       throw new Error('not a repo')
-    }),
-  )
+    },
+    publish: async () => ({ ok: false, error: 'no' }),
+    merge: async () => ({ ok: false, error: 'no' }),
+    remove: async () => ({ ok: false, error: 'no' }),
+  })
+  const { items, whole } = await buildInterventions([project('a', '/a')], onlyUnpushed([doneMeta()], failing))
   assert.deepEqual(items, [])
+  assert.deepEqual(whole, [])
+})
+
+test('a project with no branches provider has nothing unpushed (#1774)', async () => {
+  const { items, whole } = await buildInterventions([project('a', '/a')], onlyUnpushed([doneMeta()], async () => undefined))
+  assert.deepEqual(items, [])
+  assert.deepEqual(whole, ['a'])
 })
 
 test('only the most recent finished runs are inspected (#860)', async () => {
-  // Each inspection costs several git reads on a poll, and work sitting unpushed for dozens of
-  // runs is not news.
+  // Each read of the provider is a process on a poll, and work sitting unpushed for dozens of
+  // runs is not news: the newest few, in ONE read.
   const agents = Array.from({ length: 12 }, (_, i) =>
     doneMeta({ id: `r${i}`, startedAt: `2026-07-${String(i + 1).padStart(2, '0')}T00:00:00Z`, branch: `b${i}` }),
   )
-  const inspected: string[] = []
+  const asked: string[][] = []
   const { items } = await buildInterventions(
     [project('a', '/a')],
-    { ...onlyUnpushed(agents, async (_cwd, branch) => (inspected.push(branch), waiting({ branch }))), handoffLimit: 3 },
+    { ...onlyUnpushed(agents, showing(branch => waiting({ branch }), asked)), handoffLimit: 3 },
   )
 
-  assert.equal(inspected.length, 3)
-  assert.deepEqual(inspected, ['b11', 'b10', 'b9'], 'the newest three, by start time')
+  assert.deepEqual(asked, [['b11', 'b10', 'b9']], 'the newest three, by start time, asked at once')
   assert.equal(items.length, 3)
 })
 

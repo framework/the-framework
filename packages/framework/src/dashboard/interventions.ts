@@ -3,7 +3,8 @@ import { pendingChoices } from '../open-choices.js'
 import type { FrameworkEvent } from '../events.js'
 import type { ProjectSummary, ProjectionRead } from './projects.js'
 import { isAgentBranch } from '@gemstack/skill-branches'
-import { readAgentHandoff, agentBranchFor, type AgentHandoff } from './agent-handoff.js'
+import { agentBranchFor } from './agent-handoff.js'
+import { projectBranches, type BranchesFor, type BranchState } from '../store/branches.js'
 import { ghPrList, type PrLister } from './gh.js'
 import { interventionKey } from './keys.js'
 import { postDiscordWebhook } from './discord-webhook.js'
@@ -57,8 +58,8 @@ export interface InterventionsDeps {
   events?: (cwd: string, agentId: string) => Promise<FrameworkEvent[] | undefined>
   /** The finished-agent reader (default {@link listAgents}); drives the `unpushed` source (#860). */
   agents?: (cwd: string) => Promise<AgentMeta[]>
-  /** Reads a branch's state (default {@link readAgentHandoff}); drives the `unpushed` source (#860). */
-  handoff?: (cwd: string, branch: string) => Promise<AgentHandoff | undefined>
+  /** The project's checkouts and branches (default the project's provider, {@link projectBranches}): where a branch's state is read; drives the `unpushed` source (#860). */
+  branches?: BranchesFor
   /**
    * How many of a project's most recent finished agents to inspect for unpushed work. Each one costs
    * a handful of git reads, and this runs on a poll, so old history is not re-walked every minute:
@@ -165,8 +166,11 @@ export async function buildInterventions(
 /**
  * The finished agents of a project whose branch still holds unpushed, unmerged commits (#860).
  *
- * Only the most recent {@link InterventionsDeps.handoffLimit} finished agents are inspected: each
- * costs several git reads and this runs on a poll.
+ * Only the most recent {@link InterventionsDeps.handoffLimit} finished agents are inspected, and
+ * their branches in one read of the project's branches provider: each read is a process, and
+ * this runs on a poll. The provider answers git facts only, so the `gh` PR lookup the handoff
+ * summary makes per branch is never paid here: an open PR means the branch was pushed, so
+ * `pushed` already excludes it, and the `pr` kind above is what surfaces it.
  */
 async function unpushedFor(
   project: ProjectSummary,
@@ -174,29 +178,35 @@ async function unpushedFor(
   unread: () => void,
 ): Promise<Intervention[]> {
   const agents = deps.agents ?? listAgents
-  const handoff =
-    deps.handoff ??
-    // The default skips the `gh` PR lookup `readAgentHandoff` would otherwise do per branch: an open
-    // PR means the branch was pushed, so `pushed` already excludes it, and the `pr` kind above is
-    // what surfaces it. Paying an 8s-timeout network call per agent on every poll to learn that
-    // would be the most expensive part of this whole queue.
-    ((cwd: string, branch: string) => readAgentHandoff(cwd, branch, { pr: async () => undefined }))
+  const branches = deps.branches ?? projectBranches
 
   const finished = (await agents(project.path))
     .filter(agent => agent.status !== 'running')
     .sort((a, b) => (b.startedAt ?? '').localeCompare(a.startedAt ?? ''))
     .slice(0, deps.handoffLimit ?? HANDOFF_LIMIT)
+    .flatMap(agent => {
+      const branch = agentBranchFor(agent)
+      return branch === undefined ? [] : [{ agent, branch }]
+    })
+  if (finished.length === 0) return []
+
+  // No provider: the project has no checkouts and no branch state to read; nothing is waiting.
+  const source = await branches(project.path).catch(() => undefined)
+  if (!source) return []
+  const states = new Map<string, BranchState>()
+  try {
+    for (const state of await source.show(finished.map(({ branch }) => branch))) states.set(state.branch, state)
+  } catch {
+    unread()
+    return []
+  }
 
   const items: Intervention[] = []
-  for (const agent of finished) {
-    const branch = agentBranchFor(agent)
-    const state = await handoff(project.path, branch).catch(() => {
-      unread()
-      return undefined
-    })
+  for (const { agent, branch } of finished) {
+    const state = states.get(branch)
     // Every condition is a reason this is *not* waiting on anyone: the branch is gone, the session
     // wrote nothing, it already landed, it is already on the remote, or there is nowhere to push.
-    if (!state || !state.exists || state.empty || state.merged || state.pushed || !state.hasRemote) continue
+    if (!state || !state.exists || state.commits.length === 0 || state.files.length === 0 || state.merged || state.pushed || !state.hasRemote) continue
     items.push({
       projectId: project.id,
       projectName: project.name,

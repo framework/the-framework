@@ -1,0 +1,1 @@
+The widget's definition, the module's default export: one page whose URL is `/queue`, whose sidebar row reads "Queue" with a list icon, rendered by the Queue page (`QueuePage.tsx`); one link action, "Add to queue" (`add-to-queue.ts`); and the stylesheet `dashboard.css`, which the dashboard loads from beside the module.

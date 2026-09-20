@@ -4,7 +4,7 @@ import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { nodeGitRunner, withFileBranch, DATA_BRANCH } from '@gemstack/agent-data'
-import { appendQueueEntry, insertQueueEntry, parseQueueEntries, queueAdd, readQueue, removeQueueEntry } from './queue.js'
+import { appendQueueEntry, insertQueueEntry, parseQueueEntries, parseQueueSections, queueAdd, readQueue, removeQueueEntry } from './queue.js'
 import { QUEUE_FILE } from './names.js'
 
 test('parseQueueEntries reads open list items and skips checked, blank and prose lines', () => {
@@ -15,6 +15,20 @@ test('parseQueueEntries reads open list items and skips checked, blank and prose
 test('the priority sections need no parser support: headings are skipped, so a sorted file drains in priority order', () => {
   const md = ['## Priority 10 (critical — act immediately)', '- restore checkout', '', '## Priority 9', '- flaky auth test', '', '## Priority 5', '- tidy the config loader', '', '## Priority 0 (only if capacity)', '- rename the legacy flag'].join('\n')
   assert.deepEqual(parseQueueEntries(md), ['restore checkout', 'flaky auth test', 'tidy the config loader', 'rename the legacy flag'])
+})
+
+test('parseQueueSections gives each open entry the priority of its section, none before any section or under another heading', () => {
+  const md = ['# Backlog', '', '- before any section', '', '## Priority 10 (critical — act immediately)', '- restore checkout', '- [x] already restored', '', '## priority 5', '', '- [ ] tidy the config loader', 'prose in the section', '', '## Notes', '- not ranked', '', '## Priority 0', '- rename the legacy flag'].join('\n')
+  assert.deepEqual(parseQueueSections(md), [
+    { entry: 'before any section' },
+    { entry: 'restore checkout', priority: 10 },
+    { entry: 'tidy the config loader', priority: 5 },
+    { entry: 'not ranked' },
+    { entry: 'rename the legacy flag', priority: 0 },
+  ])
+  // The same entries, in the same order, as the plain read.
+  assert.deepEqual(parseQueueSections(md).map(p => p.entry), parseQueueEntries(md))
+  assert.deepEqual(parseQueueSections(''), [])
 })
 
 test('removeQueueEntry deletes the named open entry and nothing else', () => {

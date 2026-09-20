@@ -17,7 +17,7 @@ The instructions every agent [1] reads before touching the agent queue [2]: wher
 
 ## Business logic — TL;DR
 
-- **Where the queue is and how to reach it** - `TODO_AGENTS.md` lives on the `agent-data` branch, never on a code branch, and not in the agent's checkout; the agent installs the repository's dependencies if needed and runs `npx queue`, whose every change is one commit pushed straight to the branch.
+- **Where the queue is and how to reach it** - `TODO_AGENTS.md` lives on the `agent-data` branch, never on a code branch, and not in the agent's checkout; the agent installs the repository's dependencies if needed and runs `npx queue`, whose every change is one commit pushed straight to the branch; the `--local` and `--full` flags are the dashboard's, never the agent's.
 - **Reading** - the bare `npx queue` gives the open entries, in order of work, as one JSON array.
 - **Changing** - `npx queue add <text> [--priority N]` puts an entry in the section of its priority (0 to 10), or at the end of the file without one; `npx queue done <entry>` removes an entry passed exactly as printed, because done means deleted.
 - **The format and the order of work** - `## Priority 10` down to `## Priority 0` sections of list items, links or self-contained descriptions; all work agents will do next, sorted by priority, 10 reserved for the critical, first within a section first.
@@ -32,7 +32,7 @@ See `## Context`.
 
 #### Business logic
 
-The agent is told that the agent queue [2], `TODO_AGENTS.md`, lives on the branch `agent-data` [5], never on a code branch, so its own checkout [3] does not contain it, and that the file lists every task agents will work on next, in the order they will be taken. It reads and changes the queue with the `queue` command, a dependency of the repository (`@gemstack/skill-queue`): with no `node_modules` it first installs with the lockfile's package manager (`npm install` for `package-lock.json`), then runs `npx queue`. It is told that every change the command makes is one commit pushed straight to the `agent-data` branch, that a refusal exits 1 with a line on stderr, and that a wrong command line exits 2 with the usage.
+The agent is told that the agent queue [2], `TODO_AGENTS.md`, lives on the branch `agent-data` [5], never on a code branch, so its own checkout [3] does not contain it, and that the file lists every task agents will work on next, in the order they will be taken. It reads and changes the queue with the `queue` command, a dependency of the repository (`@gemstack/skill-queue`): with no `node_modules` it first installs with the lockfile's package manager (`npm install` for `package-lock.json`), then runs `npx queue`. It is told that every change the command makes is one commit pushed straight to the `agent-data` branch, that the command's `--local` and `--full` flags are for the dashboard that shows the queue and never for it, that a refusal exits 1 with a line on stderr, and that a wrong command line exits 2 with the usage.
 
 ### Reading
 

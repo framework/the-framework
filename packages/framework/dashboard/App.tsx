@@ -222,9 +222,12 @@ export function App() {
   const hostServices: HostServices = {
       openAgent: selectAgentInProject,
       openPage: (segment, path) => go({ projectId: null, agentId: null, page: segment, ...(path && path.length ? { pagePath: path } : {}) }),
-      startRun: async (inProject, prompt) => {
+      startRun: async (inProject, prompt, opts) => {
         const result = await sendStart(inProject, prompt, startPicks(preferences))
-        if (result.ok) agentStarted(inProject, prompt, result.agentId)
+        if (!result.ok) return result
+        // A widget starting several runs in a row asks not to land (#1818): the rail still learns of the run.
+        if (opts?.land ?? true) agentStarted(inProject, prompt, result.agentId)
+        else reload()
         return result
       },
       // The launcher rehydrates a stashed draft once as it mounts (#1066): the same carry every
@@ -291,6 +294,7 @@ export function App() {
           onOpenLink={openDataLink}
           onAgentStarted={agentStarted}
           interventions={interventions}
+          projects={projects}
         />
       )
     if (unknownProject)

@@ -20,6 +20,7 @@ const onAllTickets = { mockResolvedValue: (value: Group[]) => (groups = value) }
 const addToQueue = vi.fn()
 const widgets = (projects: string[] = ['p1', 'p2']): MountedWidgets => ({
   pages: [],
+  cards: [],
   linkActions: [{ label: 'Add to queue', doneLabel: 'Queued', run: addToQueue, package: '@x/queue', projects }],
   loaded: true,
 })

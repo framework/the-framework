@@ -26,6 +26,10 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   composes a pull request's title and body from the run, and keeps the rule that says
   which pull request is a run's, and its own reads of pull requests. Picked over the
   framework's own git and gh handoff, which was a second way to publish.
+- An Overview card belongs to the package whose data it shows: a widget declares its cards
+  and The Framework draws them, in the order the cards name, only where a project has the
+  package. Picked over the framework's own cards fed by the providers, which showed an empty
+  queue to a project with no queue package. The onboarding steps stay the framework's.
 - A run is named by its intent, else the name the branches package answers for its branch,
   else the branch as the agent named it; the framework derives no session name from a branch.
   Picked over stripping the package's prefix here, which was the framework knowing how the

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { createElement } from 'react'
-import type { WidgetDefinition, WidgetPageProps } from './widget/index.js'
+import type { WidgetCardProps, WidgetDefinition, WidgetPageProps } from './widget/index.js'
 
 // The whole transport, stubbed at its one seam: every RPC stub is `rpc(name)`, so a map by name
 // answers every read the shell makes, and the live feed never emits.
@@ -79,5 +79,76 @@ describe('widget pages in the shell (#1774)', () => {
     render(<App />)
     fireEvent.click(await screen.findByText('read'))
     await waitFor(() => expect(calls).toContainEqual({ name: 'runWidgetCommand', args: [PROJECT.id, '@acme/logs', ['--limit', '5'], undefined, false] }))
+  })
+})
+
+describe('widget cards on the Overview (#1818)', () => {
+  /** The Overview's own reads, answered empty: the shell's stub answers null otherwise, and a null list is not an empty one. */
+  function answerOverview(widgets: unknown[]): void {
+    answerShell(widgets)
+    answers.set('onHotTickets', () => [])
+    answers.set('onSchedulers', () => [])
+    answers.set('onQuota', () => null)
+    answers.set('onDashboard', () => null)
+    // Landing on a started run renders its page, whose changes card reads a list.
+    answers.set('onAgentChanges', () => [])
+    answers.set('onDocs', () => [])
+    answers.set('onProjectFiles', () => [])
+  }
+
+  test("a package's card is drawn on the Overview, given the projects that have the package, inside its host", async () => {
+    const { useWidgetHost } = await import('./widget/index.js')
+    function QueueCard({ projects }: WidgetCardProps) {
+      const host = useWidgetHost()
+      return createElement('p', null, `${host.package} card for ${projects.map(p => p.name).join(', ')}`)
+    }
+    answerOverview([{ package: '@acme/queue', url: widgetModule('__queueCard', { cards: [{ id: 'queue', Card: QueueCard }] }), projects: [PROJECT.id] }])
+    window.history.replaceState(null, '', '/')
+    render(<App />)
+    expect(await screen.findByText('@acme/queue card for app')).toBeTruthy()
+  })
+
+  test('cards come out by order, then by package name; a card that throws shows only its own error', async () => {
+    const card = (text: string) => ({ Card: () => createElement('p', null, text) })
+    function Boom(): never {
+      throw new Error('kaboom')
+    }
+    answerOverview([
+      { package: '@acme/tickets', url: widgetModule('__ticketsCard', { cards: [{ id: 'hot', order: 20, ...card('tickets card') }] }), projects: [PROJECT.id] },
+      { package: '@acme/queue', url: widgetModule('__queueCard2', { cards: [{ id: 'queue', order: 10, ...card('queue card') }, { id: 'boom', order: 10, Card: Boom }] }), projects: [PROJECT.id] },
+      { package: '@acme/audit', url: widgetModule('__auditCard', { cards: [{ id: 'audit', ...card('audit card') }] }), projects: [PROJECT.id] },
+    ])
+    window.history.replaceState(null, '', '/')
+    render(<App />)
+    const queue = await screen.findByText('queue card')
+    const tickets = await screen.findByText('tickets card')
+    const audit = await screen.findByText('audit card')
+    const before = (a: Element, b: Element) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(before(queue, tickets)).toBe(true)
+    expect(before(tickets, audit)).toBe(true)
+    expect((await screen.findByRole('alert')).textContent).toBe('The boom card failed: kaboom')
+  })
+
+  test('a card may start a run without landing on it; by default the dashboard lands on the run', async () => {
+    const { useWidgetHost } = await import('./widget/index.js')
+    function Starter({ projects }: WidgetCardProps) {
+      const host = useWidgetHost()
+      return createElement(
+        'div',
+        null,
+        createElement('button', { onClick: () => void host.startRun(projects[0]!.id, 'work the queue', { land: false }) }, 'start and stay'),
+        createElement('button', { onClick: () => void host.startRun(projects[0]!.id, 'work the queue') }, 'start and go'),
+      )
+    }
+    answerOverview([{ package: '@acme/queue', url: widgetModule('__starterCard', { cards: [{ id: 'starter', Card: Starter }] }), projects: [PROJECT.id] }])
+    answers.set('sendStart', () => ({ ok: true, agentId: 'r9' }))
+    window.history.replaceState(null, '', '/')
+    render(<App />)
+    fireEvent.click(await screen.findByRole('button', { name: 'start and stay' }))
+    await waitFor(() => expect(calls.filter(call => call.name === 'sendStart')).toHaveLength(1))
+    expect(calls.find(call => call.name === 'sendStart')?.args.slice(0, 2)).toEqual([PROJECT.id, 'work the queue'])
+    expect(window.location.pathname).toBe('/')
+    fireEvent.click(await screen.findByRole('button', { name: 'start and go' }))
+    await waitFor(() => expect(window.location.pathname).toBe(`/${PROJECT.id}/r9`))
   })
 })

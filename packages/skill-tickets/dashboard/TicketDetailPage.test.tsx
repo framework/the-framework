@@ -21,6 +21,7 @@ const sendReleaseTicketLock = { mockResolvedValue: (value: { ok: true } | { ok: 
 const addToQueue = vi.fn()
 const widgets = (projects: string[] = ['p1']): MountedWidgets => ({
   pages: [],
+  cards: [],
   linkActions: [{ label: 'Add to queue', doneLabel: 'Queued', run: addToQueue, package: '@x/queue', projects }],
   loaded: true,
 })

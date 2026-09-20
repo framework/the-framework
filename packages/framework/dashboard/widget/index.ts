@@ -90,10 +90,32 @@ export interface LinkAction {
   run(host: WidgetHost, projectId: string, links: WidgetLink[]): Promise<LinkActionResult>
 }
 
+/** What a widget card is rendered with: the projects that have its package. A card has no URL and no sub-path. */
+export interface WidgetCardProps {
+  /** The registered projects whose dependencies include the widget's package, in the registry's order. */
+  projects: WidgetProject[]
+}
+
+/**
+ * A card a widget adds to the Overview (#1818): the package's own summary of its data across the
+ * projects that have it, drawn beside the dashboard's own cards. A project none of whose packages
+ * declares a card sees none.
+ */
+export interface WidgetCard {
+  /** Which card this is, for the shell's key and its error line; never shown as a title. */
+  id: string
+  /** Its place among every installed package's cards, lower first; 50 when unsaid, ties by package name. */
+  order?: number
+  /** The card itself. */
+  Card: ComponentType<WidgetCardProps>
+}
+
 /** What a widget module default-exports. */
 export interface WidgetDefinition {
   /** The pages the widget adds, each with a sidebar row. */
   pages?: WidgetPage[]
+  /** The cards the widget adds to the Overview. */
+  cards?: WidgetCard[]
   /** The actions the widget offers on the links dashboard pages show, wherever the link's project has the widget's package. */
   linkActions?: LinkAction[]
   /** A stylesheet to load with the widget, relative to the widget module's own URL. */
@@ -145,9 +167,10 @@ export interface WidgetHost {
   openPage(segment: string, path?: string[]): void
   /**
    * Start a run in one project with this prompt, with the person's own picks (which tool, which
-   * model, where it runs), and land on it. Answers the run's id, or why there is none.
+   * model, where it runs), and land on it, unless `land` is false: then the dashboard stays where
+   * it is, for a widget that starts several runs in a row. Answers the run's id, or why there is none.
    */
-  startRun(projectId: string, prompt: string): Promise<StartRunResult>
+  startRun(projectId: string, prompt: string, opts?: { land?: boolean }): Promise<StartRunResult>
   /** Open the project's launcher with this prompt drafted in, to set it up before sending: "Configure first, then run". */
   configureRun(projectId: string, prompt: string): void
   /** The project's runs the dashboard knows: the ones running, and the recorded ones when the project records them. */

@@ -1,0 +1,1 @@
+Covers the bundle's caching rule: a fingerprinted file under `assets/` is cached as immutable, while `index.html`, a host module under `host/` and the app shell served for a client route are all `no-cache`.

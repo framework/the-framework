@@ -1,7 +1,7 @@
 {
   "id": "2026-09-20T19-20-24-435Z",
   "startedAt": "2026-09-20T19:20:26.951Z",
-  "endedAt": "2026-09-20T19:21:14.162Z",
+  "endedAt": "2026-09-20T19:22:14.141Z",
   "status": "failed",
   "intent": "/work-queue",
   "driver": "claude-code",

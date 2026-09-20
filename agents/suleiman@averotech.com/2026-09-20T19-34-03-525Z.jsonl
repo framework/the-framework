@@ -1,0 +1,3 @@
+{"kind":"start","prompt":"/work-queue"}
+{"kind":"session","sessionId":"af8dfd55-2cf7-4926-9f2f-f28c6992ef83"}
+{"kind":"ended","status":"failed","detail":"its process died before the run ended"}

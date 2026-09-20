@@ -144,7 +144,9 @@ async function runOnce(repo: string, opts: RunOptions): Promise<RunOutcome> {
       }
     }
 
-    return session(repo, {
+    // Awaited here, not returned: the lock is let go in `finally`, and a bare `return` of the
+    // promise would run that before the session ends, leaving the run to the sweep.
+    return await session(repo, {
       id,
       checkout,
       card: { id, startedAt, status: 'running', intent: opts.prompt, driver: opts.driver.id, ...modelOf(opts.model), branch: checkout.branch, caller: { scheduler: mark, pid, host, kind: 'prompt', workspace: checkout.path } },

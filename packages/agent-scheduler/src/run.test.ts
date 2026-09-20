@@ -6,8 +6,9 @@ import { appendInbox, FakeDriver, type Driver, type DriverSession, type DriverSt
 import { MERGE_HELD_NOTE, mergeHeld, publishCheckout, worktreePath } from '@gemstack/skill-branches'
 import { findRun, readDiary } from '@gemstack/skill-logs'
 import { inboxPath, readLiveCard } from './live-card.js'
-import { acquireRunLock, releaseRunLock } from './run-lock.js'
+import { acquireRunLock, lockHolder, releaseRunLock } from './run-lock.js'
 import { resumeRun, runCommand, STOPPED_DETAIL } from './run.js'
+import { sweep } from './sweep.js'
 import { git, removeRepo, testRepo } from './test-repo.js'
 
 // One run end to end on a real repository, with the agent faked: the marker, the checkout, the
@@ -520,6 +521,40 @@ test('a run with a follow-up continued after its checkout went is held again in 
     assert.deepEqual(prompts, [`/post-merge-cleanup ${first.id}`])
     assert.deepEqual(continued.then?.merge, { outcome: 'auto-armed' })
     assert.equal(calls.filter(c => c[1] === 'merge').length, 1, 'armed once, after the follow-up')
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test("a run holds its lock while the agent works: a sweep of this machine leaves it alone, and the lock goes once the run has answered", async () => {
+  const repo = await testRepo()
+  try {
+    const id = '2026-09-16T14-01-00-000Z'
+    const isAlive = (pid: number) => pid === 4242
+    const seen: { holder?: number | undefined; swept?: Awaited<ReturnType<typeof sweep>>; card?: string | undefined; checkout?: boolean } = {}
+    const working: Driver = {
+      id: 'fake',
+      start: async opts => {
+        const fake = await new FakeDriver({ turns: [{ text: 'Done.' }] }).start(opts)
+        return wrap(fake, async () => {
+          // Mid-turn, the live card says running: the lock names the run's process, and a sweep on
+          // this machine, the scheduler's tick, finds the run held and touches nothing.
+          await fake.log?.settled()
+          seen.holder = await lockHolder(repo, id, isAlive)
+          seen.swept = await sweep(repo, { host: 'this-box', isAlive, now: () => NOW })
+          seen.card = (await readLiveCard(opts.cwd, id))?.status
+          seen.checkout = await stat(opts.cwd).then(s => s.isDirectory(), () => false)
+        })
+      },
+    }
+    const outcome = await runCommand(repo, { prompt: '/work-queue', model: 'opus', driver: working, host: 'this-box', pid: 4242, isAlive, now: () => NOW, gh: async () => '[]' })
+    assert.equal(seen.holder, 4242, 'the lock is held through the session')
+    assert.deepEqual(seen.swept, { recorded: [], reclaimed: [], kept: [] })
+    assert.equal(seen.card, 'running')
+    assert.equal(seen.checkout, true, 'the checkout survives the sweep')
+    assert.equal(outcome.status, 'done')
+    assert.deepEqual(outcome.checkout, { reclaimed: true })
+    assert.equal(await lockHolder(repo, id, isAlive), undefined, 'let go once the run has answered')
   } finally {
     await removeRepo(repo)
   }

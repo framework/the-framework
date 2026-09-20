@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { nodeGitRunner } from '@gemstack/agent-data'
 import { createCheckout } from './checkout.js'
-import { publishCheckout, releaseMerge, type GhRunner } from './publish.js'
+import { mergePr, publishBranch, publishCheckout, releaseMerge, type GhRunner } from './publish.js'
 import { holdMerge, MERGE_HELD_NOTE } from './merge-hold.js'
 import { runCli } from './cli.js'
 
@@ -250,6 +250,107 @@ test('the command line: `publish --title … [--body …] [--merge] [--draft]` a
     const usage = await runCli(['publish'], io)
     assert.equal(usage, 2, 'the title is required')
     assert.match(errLines.join('\n'), /--title/)
+  } finally {
+    await rm(join(repo, '..'), { recursive: true, force: true, maxRetries: 10 })
+  }
+})
+
+test('publish --branch: the checkout on the branch is published as the agent would, its clean rule included', async () => {
+  const repo = await repoWithOrigin()
+  try {
+    const { path } = await createCheckout(repo, { agentId: 'b1' })
+    await commitWork(path)
+    await writeFile(join(path, 'draft.txt'), 'uncommitted\n')
+    const { gh, calls } = fakeGh()
+    assert.deepEqual(await publishBranch(repo, 'agent-b1', { title: 'T', gh }), { ok: false, reason: 'dirty', branch: 'agent-b1' })
+    assert.deepEqual(calls, [], 'nothing asked of gh, nothing pushed')
+    await rm(join(path, 'draft.txt'))
+    const outcome = await publishBranch(repo, 'agent-b1', { title: 'T', body: 'B', draft: true, gh })
+    assert.deepEqual(outcome, { ok: true, branch: 'agent-b1', pr: { number: 42, url: 'https://github.com/o/r/pull/42' }, existing: false })
+    assert.equal((await git(['rev-parse', 'refs/remotes/origin/agent-b1'], repo)).trim(), (await git(['rev-parse', 'HEAD'], path)).trim(), 'pushed')
+    assert.deepEqual(calls[1], ['pr', 'create', '--head', 'agent-b1', '--title', 'T', '--body', 'B', '--draft'])
+    assert.deepEqual(await publishBranch(repo, 'agent-b1', { title: 'again', gh }), { ok: true, branch: 'agent-b1', pr: { number: 42, url: 'https://github.com/o/r/pull/42' }, existing: true }, 'the open request is reused')
+  } finally {
+    await rm(join(repo, '..'), { recursive: true, force: true, maxRetries: 10 })
+  }
+})
+
+test('publish --branch without a checkout: a local branch is pushed; one only origin has is left as it is; one nowhere is no-branch', async () => {
+  const repo = await repoWithOrigin()
+  try {
+    // A local branch with no checkout: the agent's checkout was reclaimed before its request was opened.
+    await git(['branch', 'agent-b2', 'main'], repo)
+    await git(['switch', '-q', 'agent-b2'], repo)
+    await commitWork(repo)
+    await git(['switch', '-q', 'main'], repo)
+    const { gh, calls } = fakeGh()
+    const outcome = await publishBranch(repo, 'agent-b2', { title: 'T', gh })
+    assert.equal(outcome.ok, true)
+    assert.equal((await git(['rev-parse', 'refs/remotes/origin/agent-b2'], repo)).trim(), (await git(['rev-parse', 'agent-b2'], repo)).trim(), 'the local branch reached origin')
+    assert.deepEqual(calls.map(c => c.slice(0, 2)), [['pr', 'list'], ['pr', 'create']])
+
+    // A branch only origin has: pushed from elsewhere, nothing here to push.
+    await git(['branch', 'claude/remote-only', 'main'], repo)
+    await git(['push', '-q', 'origin', 'claude/remote-only'], repo)
+    await git(['branch', '-D', 'claude/remote-only'], repo)
+    const remoteTip = (await git(['rev-parse', 'refs/remotes/origin/claude/remote-only'], repo)).trim()
+    const second = fakeGh()
+    const remote = await publishBranch(repo, 'claude/remote-only', { title: 'R', draft: true, gh: second.gh })
+    assert.equal(remote.ok, true)
+    assert.equal((await git(['rev-parse', 'refs/remotes/origin/claude/remote-only'], repo)).trim(), remoteTip, 'untouched')
+    assert.equal(await git(['rev-parse', '--verify', '--quiet', 'refs/heads/claude/remote-only'], repo).then(() => true, () => false), false, 'no local branch was made')
+    assert.deepEqual(second.calls[1]!.slice(0, 4), ['pr', 'create', '--head', 'claude/remote-only'])
+
+    assert.deepEqual(await publishBranch(repo, 'nowhere', { title: 'N', gh: fakeGh().gh }), { ok: false, reason: 'no-branch', branch: 'nowhere' })
+  } finally {
+    await rm(join(repo, '..'), { recursive: true, force: true, maxRetries: 10 })
+  }
+})
+
+test('merge: a draft is marked ready, then the merge is armed as --merge arms it; a request not open is said; a view that fails is a failure', async () => {
+  const repo = await repoWithOrigin()
+  try {
+    const calls: string[][] = []
+    const ghFor = (view: unknown): GhRunner => async args => {
+      calls.push(args)
+      if (args[0] === 'pr' && args[1] === 'view') {
+        if (view instanceof Error) throw view
+        return JSON.stringify(view)
+      }
+      if (args[0] === 'pr' && (args[1] === 'ready' || args[1] === 'merge')) return ''
+      throw new Error(`unexpected gh ${args.join(' ')}`)
+    }
+    assert.deepEqual(await mergePr(repo, 7, { gh: ghFor({ state: 'OPEN', isDraft: true }) }), { outcome: 'auto-armed' })
+    assert.deepEqual(calls, [
+      ['pr', 'view', '7', '--json', 'state,isDraft'],
+      ['pr', 'ready', '7'],
+      ['pr', 'merge', '7', '--squash', '--auto'],
+    ])
+    calls.length = 0
+    assert.deepEqual(await mergePr(repo, 8, { gh: ghFor({ state: 'OPEN', isDraft: false }) }), { outcome: 'auto-armed' })
+    assert.deepEqual(calls.map(c => c[1]), ['view', 'merge'], 'a request that is ready is not marked ready again')
+    assert.deepEqual(await mergePr(repo, 9, { gh: ghFor({ state: 'MERGED', isDraft: false }) }), { outcome: 'not-open', state: 'MERGED' })
+    assert.deepEqual(await mergePr(repo, 10, { gh: ghFor(new Error('no such request')) }), { outcome: 'failed', error: 'no such request' })
+  } finally {
+    await rm(join(repo, '..'), { recursive: true, force: true, maxRetries: 10 })
+  }
+})
+
+test('the command line: `merge <number>` wants a number, and `publish --branch` wants a branch; a bare publish still acts on the checkout it runs in', async () => {
+  const repo = await repoWithOrigin()
+  try {
+    const errLines: string[] = []
+    const io = { cwd: repo, stdout: () => {}, stderr: (l: string) => errLines.push(l) }
+    assert.equal(await runCli(['merge', 'seven'], io), 2)
+    assert.match(errLines.join('\n'), /not a pull request number/)
+    assert.equal(await runCli(['publish', '--branch', ' ', '--title', 'T'], io), 2)
+    assert.match(errLines.join('\n'), /--branch names a branch/)
+    // The refusal for a branch that is nowhere, through the command line, before gh is ever needed.
+    const out: string[] = []
+    const err: string[] = []
+    assert.equal(await runCli(['publish', '--branch', 'nowhere', '--title', 'T'], { cwd: repo, stdout: l => out.push(l), stderr: l => err.push(l) }), 1)
+    assert.deepEqual(JSON.parse(out.join('')), { ok: false, reason: 'no-branch', branch: 'nowhere' })
+    assert.equal(err.join('\n'), 'no branch nowhere, here or on origin')
   } finally {
     await rm(join(repo, '..'), { recursive: true, force: true, maxRetries: 10 })
   }

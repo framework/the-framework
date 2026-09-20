@@ -134,6 +134,22 @@ export async function reclaimWorktree(repo: string, path: string, opts: ReclaimO
   return deleted.length ? { ok: true, branchesDeleted: deleted } : { ok: true }
 }
 
+/**
+ * Discard one checkout (#1774): it goes whatever it holds, uncommitted work included, nothing
+ * pushed. A person's call, for a run they are throwing away, where the rule above would keep
+ * the checkout. The branch and its commits stay: deleting a branch that may carry an open pull
+ * request is git's business, never this tool's on the way out of a checkout. Only the
+ * not-a-worktree guard applies: a directory git does not know as a worktree is left alone.
+ */
+export async function discardWorktree(repo: string, path: string, opts: Pick<ReclaimOptions, 'git' | 'beforeRemove'> = {}): Promise<{ ok: true } | { ok: false; reason: 'not-a-worktree' }> {
+  const git = opts.git ?? nodeGitRunner()
+  if (!(await isWorktreeRoot(path, git))) return { ok: false, reason: 'not-a-worktree' }
+  await opts.beforeRemove?.()
+  await git(['worktree', 'remove', '--force', path], repo)
+  await pruneWorktrees(repo, git)
+  return { ok: true }
+}
+
 /** Whether the branch tip is an ancestor of `anchor`. False on any doubt. */
 async function coveredBy(path: string, branch: string, anchor: string, git: GitRunner): Promise<boolean> {
   return git(['merge-base', '--is-ancestor', branch, anchor], path).then(

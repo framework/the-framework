@@ -1,8 +1,8 @@
-Gives an agent [1] in a shell, and the user, the `branches` command over this package: `create`, `attach`, `name`, `status`, `publish`, `merge-on-green`, `release`, `list`, `remove` and `prune`, the same operations the scheduler and the dashboard's server call as a library, so one implementation serves every surface. Every run prints one JSON document on stdout, at most one line for a person on stderr, and exits with a code that says how it went: 0 for a result, 1 for a refusal or a git failure, 2 for a command line that could not be read.
+Gives an agent [1] in a shell, the user, and the dashboard's server the `branches` command over this package: `create`, `attach`, `name`, `status`, `show`, `publish`, `merge`, `merge-on-green`, `release`, `list`, `remove` and `prune`, the same operations the scheduler calls as a library, so one implementation serves every surface. The dashboard's server names no package: it runs whichever command the project's `package.json` dependencies declare as the framework's `branches` provider (this package declares its own `branches` command), and reads or acts through `list`, `show`, `publish --branch`, `merge` and `remove`. Every run prints one JSON document on stdout, at most one line for a person on stderr, and exits with a code that says how it went: 0 for a result, 1 for a refusal or a git failure, 2 for a command line that could not be read.
 
 ## Context
 
-**User story**: an agent [1] runs `npx branches status` to learn its branch and whether its checkout [2] is clean, `npx branches name <name>` to name its work, and `npx branches publish` to push it and open its pull request, as its `branches` skill [3] instructs. The user runs `create`, `attach`, `list`, `remove` and `prune` from the project's checkout or from inside any agent's checkout. A program parsing stdout learns the outcome and its reason; a person reading stderr learns why in one line.
+**User story**: an agent [1] runs `npx branches status` to learn its branch and whether its checkout [2] is clean, `npx branches name <name>` to name its work, and `npx branches publish` to push it and open its pull request, as its `branches` skill [3] instructs. The user runs `create`, `attach`, `list`, `remove` and `prune` from the project's checkout or from inside any agent's checkout. The dashboard's server runs `list` and `show` to show a run's checkout and what its branch holds, `publish --branch` and `merge` when the user presses "Open PR" or "Merge PR" on a finished run, and `remove`, with `--discard` for a run the user throws away. A program parsing stdout learns the outcome and its reason; a person reading stderr learns why in one line.
 
 ## Glossary
 
@@ -21,17 +21,19 @@ Gives an agent [1] in a shell, and the user, the `branches` command over this pa
 
 - **One JSON document, one line, an exit code** - the result or the refusal on stdout, the reason for a person on stderr, exit 0 for a result and 1 for a refusal or a git failure.
 - **A command line that cannot be read** - an unknown command, an unknown flag or the wrong argument count prints the usage on stderr, nothing on stdout, and exits 2.
-- **Where a command acts** - `create`, `attach`, `merge-on-green`, `release`, `list`, `remove` and `prune` act on the project found from the `.branches/` layout, even from inside a checkout; `name`, `status` and `publish` act on the checkout the command runs in.
+- **Where a command acts** - `create`, `attach`, `show`, `merge`, `merge-on-green`, `release`, `list`, `remove`, `prune` and `publish --branch` act on the project found from the `.branches/` layout, even from inside a checkout; `name`, `status` and a bare `publish` act on the checkout the command runs in.
 - **Outside a repository** - a command that needs one is refused as `not-a-repo`; only git's own "not a git repository" reads as that.
 - **An agent id is checked before anything runs** - `create`, `attach` and `remove` refuse an id outside the charset, or `data`, as `invalid-id`, before the repository is even looked for.
 - **`create`: a checkout for a new agent** - `.branches/agent-<id>` on the fresh branch `agent-<id>`, from `--base` or the project's head, fully set up.
 - **`attach`: a checkout for a continued agent** - `.branches/agent-<id>` on the branch named, taken as given, fully set up.
 - **`name`: the agent names its work** - the branch becomes `agent-<name>`, suffixed when taken, the name got is printed, and the branch links follow at once; four refusals.
 - **`status`: where the agent is and whether it may finish** - the checkout's path, its branch, whether it is clean and whether it is on the remote; refused for a directory git does not know as a worktree.
-- **`publish`: the agent hands off its own work** - `--title` is required; the branch is pushed, the pull request opened with the title and `--body`, `--merge` arms the merge on green (GitHub's auto-merge, a direct merge of a request already green, or the merge watcher where the repository has no auto-merge; `held` from a checkout under a hold, armed later by `release`), `--draft` opens a draft; a dirty tree, a push that did not land and a request gh refused are refusals with a line each (`publish.ts`).
+- **`show`: what each branch holds and where it stands** - a bare JSON array, one state per branch named in the order named, gone branches included (`branch-state.ts`); at least one branch, else a usage error.
+- **`publish`: the agent hands off its own work** - `--title` is required; the branch is pushed, the pull request opened with the title and `--body`, `--merge` arms the merge on green (GitHub's auto-merge, a direct merge of a request already green, or the merge watcher where the repository has no auto-merge; `held` from a checkout under a hold, armed later by `release`), `--draft` opens a draft; a dirty tree, a push that did not land and a request gh refused are refusals with a line each (`publish.ts`). With `--branch <b>`, a person publishes branch `<b>` from anywhere in the project, through the checkout on it when one is, else the branch itself; a branch neither here nor on `origin` is `no-branch`.
+- **`merge`: land a request for a person** - for one pull request number: a draft is marked ready, then the merge is armed as `--merge` arms it; `not-open` with the state for a request no longer open, `merge-failed` with gh's line otherwise (`publish.ts`).
 - **`release`: arm a held merge** - for one pull request number, arms the merge a publish under a hold recorded as wanted, exactly as `--merge` would have; a request with no held merge and an arming that failed are refusals.
 - **`list`: every checkout under `.branches/`** - a bare JSON array, one row per checkout directory, with its branch when git knows it and its size on request.
-- **`remove`: reclaim one checkout** - under the reclaim rule, pushing unless `--no-push`, with a line for each refusal and `no-checkout` for a missing one; the branch links follow at once.
+- **`remove`: reclaim one checkout** - under the reclaim rule, pushing unless `--no-push`, with a line for each refusal and `no-checkout` for a missing one; with `--discard`, the checkout goes whatever it holds, nothing pushed, the branch kept; the branch links follow at once.
 - **`prune`: reclaim every checkout** - `remove` for each checkout directory, reporting the removed and the skipped, never refusing as a whole.
 
 ## Business logic
@@ -64,7 +66,7 @@ An unknown command, an unknown flag or the wrong number of arguments never reach
 
 #### Business logic
 
-The working directory decides. `create`, `attach`, `merge-on-green`, `release`, `list`, `remove` and `prune` act on the project: the checkout [2] whose `.branches/` directory the working directory is under, or, when it is under none, the checkout containing the working directory (the rule is in `worktree.ts`). `name`, `status` and `publish` act on the checkout containing the working directory, found from anywhere inside it. `status` alone also takes the path of a checkout root as an argument, resolved against the working directory.
+The working directory decides. `create`, `attach`, `show`, `merge`, `merge-on-green`, `release`, `list`, `remove`, `prune`, and `publish` given `--branch`, act on the project: the checkout [2] whose `.branches/` directory the working directory is under, or, when it is under none, the checkout containing the working directory (the rule is in `worktree.ts`). `name`, `status` and a bare `publish` act on the checkout containing the working directory, found from anywhere inside it. `status` alone also takes the path of a checkout root as an argument, resolved against the working directory.
 
 ### Outside a repository
 
@@ -126,6 +128,36 @@ See `## Context`.
 
 `status [path]` reports on the checkout [2] the command runs in, or on the checkout root given: `{"ok": true, "path": …, "branch": …, "clean": …, "onRemote": …}`. `path` is the checkout's root. `branch` is the branch checked out, absent when the head is detached. `clean` is true when nothing is uncommitted and nothing is untracked; ignored files do not count (`worktree.ts`). `onRemote` is true when the branch's tip is the tip of `origin/<branch>` or an ancestor of it, read from the local remote-tracking refs (`worktree.ts`), and false when there is no branch. A path that is not a worktree root [7] is refused as `not-a-worktree` ("<path> is not a git worktree"), the path in the refusal: a directory left under `.branches/` that git does not know is never reported as being on the user's branch. Given a path, the command answers about that directory even outside a repository: `not-a-worktree`, not `not-a-repo`. A status git cannot read is `git-failed`, never a clean checkout.
 
+### `show`: what each branch holds and where it stands
+
+#### Context
+
+**User story**: the dashboard shows a finished run's page: its commits and changed files, whether the work is pushed or landed, what was left uncommitted, and offers the next step from that; and lists in "needs you" the finished runs whose branch was never pushed. The dashboard's server asks this command, for one run's branch or for several runs' branches at once.
+
+#### Business logic
+
+`show <branch>...` takes one or more branch names; none is a usage error, exit 2. It acts on the project found from the working directory and answers with a bare JSON array, one state per branch named, in the order named, read as `branch-state.ts` reads it: `branch`, `exists`, `base` when found, `commits`, `files`, `hasRemote`, `pushed`, `merged`, and `pendingFiles` when a checkout under `.branches/` is on the branch. A branch that does not exist is an element like any other, with `exists` false and empty lists, never a refusal. No pull request is looked up: the caller asks GitHub itself.
+
+### `publish --branch`: a person publishes a finished agent's work
+
+#### Context
+
+**User story**: a run ended without opening its pull request (it failed, was stopped, or was told someone else publishes); the user presses "Open PR" on its page, and the request opens for the branch the run worked on, whether or not its checkout is still on disk.
+
+#### Business logic
+
+`publish --branch <b> --title <t> [--body <b>] [--merge] [--draft]` acts on the project found from the working directory and publishes branch `<b>` as `publish.ts` publishes a branch by name: through the checkout under `.branches/` that is on it when one is, with that checkout's clean rule, else the branch itself, pushed when this machine has it and left as it is when only `origin` has it. A blank `--branch` is a usage error. The refusals are a bare `publish`'s, the branch named in each line; a branch neither here nor on `origin` is `no-branch` ("no branch <b>, here or on origin").
+
+### `merge`: land a request for a person
+
+#### Context
+
+**User story**: a finished run's request is open and the user, having looked, presses "Merge PR": the request lands once its checks pass, a draft included.
+
+#### Business logic
+
+`merge <number>` takes one pull request number; anything that is not a positive whole number is a usage error, exit 2. It acts on the project found from the working directory and lands the request as `publish.ts` lands one for a person: a draft is marked ready, then the merge is armed exactly as `publish --merge` arms it. The result is `{"ok": true, "number": …, "merge": {"outcome": …}}` with `auto-armed`, `merged` or `watching`. Two refusals, exit 1: `not-open` with the request's `state` ("pull request <number> is merged, not open") when the request is no longer open, and `merge-failed` with gh's line as `detail` ("pull request <number> could not be landed: <line>") when the request could not be read, marked ready or armed.
+
 ### `merge-on-green`: wait for a request's checks, then merge
 
 #### Context
@@ -165,6 +197,8 @@ See `## Context`.
 #### Business logic
 
 `remove <id> [--no-push]` reclaims [9] the checkout [2] at `.branches/agent-<id>` under the rule that only what is on the remote may go, naming `agent-<id>` as the birth branch [10], with a push to `origin` allowed unless `--no-push` is given; the command line vouches for no pushed commit and passes no hook. A missing `.branches/agent-<id>` directory is its own refusal, `no-checkout` ("no checkout for agent <id>"). The reclaim rule's refusals come through with one line each: `not-a-worktree` ("agent <id>'s directory is not a git worktree; left alone"), `no-branch` ("agent <id>'s checkout is on no branch; kept"), `dirty` ("<branch> has uncommitted work; the checkout was kept") and `not-on-remote` ("<branch> is not on the remote (<what git said, or "not pushed">); the checkout was kept"). On success the result carries the branches that went with the checkout as `branchesDeleted`, when any did, and the branch links [6] are reconciled at once, since a link named after a branch that just went is stale from this moment.
+
+`remove <id> --discard` is the person's way out where the rule keeps the checkout: the checkout goes whatever it holds, uncommitted work included, nothing is pushed and no branch is deleted (`reclaim.ts`); `--no-push` beside it changes nothing. The same `no-checkout` and `not-a-worktree` refusals apply, and the branch links are reconciled the same way.
 
 ### `prune`: reclaim every checkout
 

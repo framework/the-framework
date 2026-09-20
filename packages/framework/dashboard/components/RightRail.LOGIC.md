@@ -18,7 +18,7 @@ The dashboard's right rail: a narrow column beside the main pane holding up to t
 ## Business logic — TL;DR
 
 - **Three panels, each earned by its content** - "Files", "Views" and "Docs" appear only when there is something in them, and a rail with no panel left disappears.
-- **No project, no rail** - with no project selected the rail is not drawn, and it is absent beside the full-width tickets page.
+- **No project, no rail** - with no project selected the rail is not drawn, and it is absent beside a full-width widget page.
 - **Which panel opens by itself** - the first view [1] an agent [2] pushes brings the rail to it; otherwise the rail rests on the files, or on the documents when there are none; once the user picks a tab by hand, nothing moves it again.
 - **A panel that loses its content hands over** - when the open panel stops existing the rail falls back to the first one that still does, rather than showing an empty column.
 - **The documents are read on a poll, and yield to the launcher** - the project's `PLAN`/`TODO` documents are re-read every few seconds, and are withheld entirely while the project home [8] shows them in its main column.
@@ -50,7 +50,7 @@ A gate [7] is answered inline in the agent's transcript, where it was asked, so 
 
 #### Business logic
 
-With no project selected the rail is not drawn. It is likewise absent beside the pages that take the full width for themselves, the tickets page among them. When every tab has been ruled out by having no content, the rail is not drawn either.
+With no project selected the rail is not drawn. It is likewise absent beside the pages that take the full width for themselves, a widget's page among them. When every tab has been ruled out by having no content, the rail is not drawn either.
 
 ### Which panel opens by itself
 

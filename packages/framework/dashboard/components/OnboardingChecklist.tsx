@@ -146,27 +146,33 @@ export function OnboardingChecklist({
           },
         ]
       : []),
-    {
-      key: 'tickets',
-      label: 'Populate tickets/',
-      description:
-        'tickets/ holds the bigger things to work on, in the repo. The agent researches and plans them, and they are the input the queue is filled from.',
-      done: hasTickets,
-      optional: true,
-      action: (
-        <div className="flex flex-col items-end gap-1">
-          <UpdateTicketsButton
-            variant="default"
-            busy={starting}
-            disabled={!targetProjectId}
-            onStart={() => void populateTickets()}
-            onConfigure={() => targetProjectId && onSelectProject(targetProjectId)}
-          />
-          {!targetProjectId && <span className="text-xs text-muted-foreground">Add a project first</span>}
-          {startError && <span className="text-xs text-destructive">{startError}</span>}
-        </div>
-      ),
-    },
+    // Only when some project can have tickets at all (#1774): a project gets them from a package it
+    // depends on, and a step asking to populate tickets no project provides would ask for nothing.
+    ...(data?.projects.some(p => p.providesTickets)
+      ? [
+          {
+            key: 'tickets',
+            label: 'Populate tickets/',
+            description:
+              'tickets/ holds the bigger things to work on, in the repo. The agent researches and plans them, and they are the input the queue is filled from.',
+            done: hasTickets,
+            optional: true,
+            action: (
+              <div className="flex flex-col items-end gap-1">
+                <UpdateTicketsButton
+                  variant="default"
+                  busy={starting}
+                  disabled={!targetProjectId}
+                  onStart={() => void populateTickets()}
+                  onConfigure={() => targetProjectId && onSelectProject(targetProjectId)}
+                />
+                {!targetProjectId && <span className="text-xs text-muted-foreground">Add a project first</span>}
+                {startError && <span className="text-xs text-destructive">{startError}</span>}
+              </div>
+            ),
+          },
+        ]
+      : []),
     {
       key: 'browser-notification',
       label: 'Add browser notifications',

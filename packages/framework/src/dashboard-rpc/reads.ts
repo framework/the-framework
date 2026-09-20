@@ -1,13 +1,11 @@
 import type { BridgeBrowserStatus } from '../bridge-browser.js'
 import { findAgent, readLiveMetas, readAllAgents, loadAgentEvents, startedAtFromAgentId, isPidAlive, type AgentMeta, type AgentStatus } from '../store/index.js'
 import { worktreeSize, isSafeAgentId } from '@gemstack/skill-branches'
-import { planAgentFor } from '../tickets.js'
 import { listProjectWorktrees } from '../worktrees.js'
 import { readDocs, type WorkspaceDoc } from '../dashboard/docs.js'
-import { readTickets, readTicket, readTicketsMeta, type WorkspaceTicket, type WorkspaceTicketDetail, type TicketsMeta } from '../dashboard/tickets.js'
 import { collectQueue, type ProjectQueue } from '../dashboard/queue.js'
 import { collectSchedulers, type ProjectScheduler } from '../dashboard/scheduler-state.js'
-import { buildOverview, buildRecentAgents, buildHotTickets, collectAllTickets, type Overview, type RecentAgent, type HotTicket, type ProjectTickets } from '../dashboard/overview.js'
+import { buildOverview, buildRecentAgents, buildHotTickets, type Overview, type RecentAgent, type HotTicket } from '../dashboard/overview.js'
 import { buildInterventions, type Intervention } from '../dashboard/interventions.js'
 import type { ProjectionRead } from '../dashboard/projects.js'
 import { buildOpenQuestions, type OpenQuestion } from '../dashboard/open-questions.js'
@@ -213,48 +211,6 @@ export async function onAgent(projectId: string, agentId: string): Promise<Frame
 /** The surfaced PLAN/TODO docs at the workspace root, in sidebar order (or `[]`). */
 export async function onDocs(projectId: string): Promise<WorkspaceDoc[]> {
   return withProject(projectId, readDocs, [])
-}
-
-/** The project's tickets, off the `agent-data` branch (#697/#1748). `[]` when it has none yet. */
-export async function onTickets(projectId: string): Promise<WorkspaceTicket[]> {
-  return withProject(projectId, readTickets, [])
-}
-
-/** One ticket's full text, for its own detail page (#1144). Null when it does not exist. */
-export async function onTicket(projectId: string, file: string): Promise<WorkspaceTicketDetail | null> {
-  return withProject(projectId, cwd => readTicket(cwd, file), null)
-}
-
-/** The agent that wrote a ticket's plan (#1511), as the plan page shows it: enough to open its session. */
-export interface PlanAgent {
-  agentId: string
-  status: AgentStatus
-}
-
-/**
- * The agent that wrote a ticket's plan (#1511), or `null` when none of the project's agents was
- * asked for it (see {@link planAgentFor}). The plan page offers to open that agent's session, where
- * the composer continues the same conversation.
- */
-export async function onPlanAgent(projectId: string, file: string): Promise<PlanAgent | null> {
-  return withProject(
-    projectId,
-    async cwd => {
-      const agent = planAgentFor(await readAllAgents(cwd), file)
-      return agent ? { agentId: agent.id, status: agent.status } : null
-    },
-    null,
-  )
-}
-
-/** When `tickets/` last caught up with GitHub (#1208), or `{}` when nothing has recorded it. */
-export async function onTicketsMeta(projectId: string): Promise<TicketsMeta> {
-  return withProject(projectId, readTicketsMeta, {})
-}
-
-/** Every registered project's tickets, one list per project (#1144): the cross-project Tickets page. */
-export async function onAllTickets(): Promise<ProjectTickets[]> {
-  return withProjects(collectAllTickets)
 }
 
 /** The aggregated open TODO queue across every registered project (#438), most-open first. */

@@ -55,14 +55,17 @@ export function fanOutLabel(count: number): string {
 export function AiQueue({
   queue,
   loading,
-  onOpenTicket,
+  canOpenLink,
+  onOpenLink,
   onAgentStarted,
   onSelectProject,
 }: {
   queue: ProjectQueue[]
   loading: boolean
-  /** Open a queued ticket's own page (#1144), by project and the `WorkspaceTicket.file` slug. */
-  onOpenTicket: (projectId: string, file: string) => void
+  /** Whether the shell has a page for a link into the project's files (#1774): a mounted widget page named by the path's first segment. */
+  canOpenLink: (href: string) => boolean
+  /** Open that page for the link, by project and the path inside its repository. */
+  onOpenLink: (projectId: string, href: string) => void
   /**
    * Told which run the play button just started (#1191). The project-carrying form, because the
    * Overview has no project selected — each entry knows its own — so the shell cannot supply it.
@@ -204,12 +207,12 @@ export function AiQueue({
                       return (
                         <li key={i} className="flex items-center gap-2 text-sm text-muted-foreground">
                           <span aria-hidden className="text-muted-foreground/50">•</span>
-                          {label.ticket !== undefined ? (
+                          {label.path !== undefined && canOpenLink(label.path) ? (
                             // In-app, so a button rather than an anchor, like every other row that
                             // navigates the shell; external targets get a real link in a new tab.
                             <button
                               type="button"
-                              onClick={() => onOpenTicket(q.projectId, label.ticket!)}
+                              onClick={() => onOpenLink(q.projectId, label.path!)}
                               className="min-w-0 flex-1 truncate text-left hover:text-foreground hover:underline"
                               title={entry}
                             >

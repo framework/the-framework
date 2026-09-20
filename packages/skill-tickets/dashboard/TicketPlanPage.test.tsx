@@ -1,0 +1,59 @@
+import { afterEach, describe, expect, test } from 'vitest'
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
+import type { WidgetAgent } from 'framework/widget'
+import { planTicketPrompt } from '../src/widget.js'
+import { fakeHost, renderWithHost, type FakeHost } from './test-host.js'
+import { TicketPlanPage } from './TicketPlanPage.js'
+
+afterEach(cleanup)
+
+const SLUG = '2026-07-20_do-the-thing.md'
+const TICKET = { file: SLUG, title: 'Do the thing', summary: '', date: '2026-01-01T00:00:00.000Z', planned: true, content: '# Do the thing\n' }
+const PLAN = '# The plan\n\nDo it in two steps.'
+
+/** The page over a `show` answer carrying `plan` (or not), and the project's runs. */
+const render = (plan: string | undefined, agents: WidgetAgent[] = []): FakeHost => {
+  const host = fakeHost({ p1: { [`show ${SLUG} --local`]: { ok: true, ticket: TICKET, ...(plan === undefined ? {} : { plan }) } } }, { p1: agents })
+  renderWithHost(<TicketPlanPage projectId="p1" slug={SLUG} />, host)
+  return host
+}
+
+describe('TicketPlanPage (#685)', () => {
+  test('reads the plan with the ticket, by its slug, and renders its markdown', async () => {
+    const host = render(PLAN)
+    await waitFor(() => expect(host.runCommand).toHaveBeenCalledWith('p1', ['show', SLUG, '--local']))
+    expect(await screen.findByText('The plan')).toBeTruthy()
+    expect(screen.getByText('Do it in two steps.')).toBeTruthy()
+    // The way back names the plan's file beside it.
+    expect(screen.getByText('tickets/2026-07-20_do-the-thing.plan.md')).toBeTruthy()
+  })
+
+  test('a ticket with no plan says so rather than showing a blank page', async () => {
+    render(undefined)
+    expect(await screen.findByText(/no plan yet/i)).toBeTruthy()
+  })
+
+  test('a plan with a known author offers to resume that agent, and opens its session (#1511)', async () => {
+    const host = render(PLAN, [{ id: 'run-7', ask: planTicketPrompt(SLUG), status: 'done', startedAt: '2026-07-21T00:00:00.000Z' }])
+    fireEvent.click(await screen.findByRole('button', { name: 'Resume agent' }))
+    expect(host.openAgent).toHaveBeenCalledWith('p1', 'run-7')
+  })
+
+  test('an author still running is opened, not resumed (#1511)', async () => {
+    render(PLAN, [{ id: 'run-8', ask: planTicketPrompt(SLUG), status: 'running', startedAt: '2026-07-21T00:00:00.000Z' }])
+    expect(await screen.findByRole('button', { name: 'Open agent' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Resume agent' })).toBeNull()
+  })
+
+  test('a plan nobody on record wrote shows no resume control (#1511)', async () => {
+    render(PLAN, [{ id: 'run-9', ask: 'Work on tickets/other.md', status: 'done', startedAt: '2026-07-21T00:00:00.000Z' }])
+    expect(await screen.findByText('The plan')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /agent/ })).toBeNull()
+  })
+
+  test('Back returns to the list, the widget\'s own page', async () => {
+    const host = render(PLAN)
+    fireEvent.click(await screen.findByRole('button', { name: /tickets/i }))
+    expect(host.openPage).toHaveBeenCalledWith('tickets')
+  })
+})

@@ -1,7 +1,8 @@
-import { Component, useMemo, type ReactNode } from 'react'
+import { Component, type ReactNode } from 'react'
 import type { ProjectSummary } from '../../src/index.js'
 import { WidgetHostContext, type WidgetProject } from '../widget/index.js'
 import type { MountedPage } from '../lib/use-widgets.js'
+import { useHostServices } from '../lib/host-services.js'
 
 /** A widget page that throws shows this instead of taking the whole dashboard down. */
 class WidgetBoundary extends Component<{ label: string; children: ReactNode }, { error: string | null }> {
@@ -21,21 +22,11 @@ class WidgetBoundary extends Component<{ label: string; children: ReactNode }, {
 
 /**
  * One widget page in the main pane (#1774): the page, given the projects that have its package,
- * inside the host context its `useWidgetHost` reads (its package, the dashboard's navigation), and
+ * inside the host context its `useWidgetHost` reads (its package, the shell's services), and
  * inside a boundary, so a broken widget breaks only its own page.
  */
-export function WidgetPageView({
-  page,
-  projects,
-  path,
-  onOpenAgent,
-}: {
-  page: MountedPage
-  projects: ProjectSummary[]
-  path: string[]
-  onOpenAgent: (projectId: string, agentId: string) => void
-}) {
-  const host = useMemo(() => ({ package: page.package, openAgent: onOpenAgent }), [page.package, onOpenAgent])
+export function WidgetPageView({ page, projects, path }: { page: MountedPage; projects: ProjectSummary[]; path: string[] }) {
+  const host = useHostServices(page.package)
   const having: WidgetProject[] = page.projects.flatMap(id => {
     const project = projects.find(p => p.id === id)
     return project ? [{ id: project.id, name: project.name }] : []

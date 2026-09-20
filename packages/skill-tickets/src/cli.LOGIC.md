@@ -1,4 +1,4 @@
-The `tickets` command: the six operations an agent [1], or a person in a shell, runs from any checkout [2] of the repository over the tickets on the `agent-data` branch [3]: `list`, `show`, `put`, `close`, `claim`, `release`. Reads come off origin's copy of the branch, fetched first; each write is one commit made on a throwaway checkout of origin's tip and pushed straight to the branch; every command answers with one JSON document on stdout, one line for a person on stderr, and an exit code that says how it went.
+The `tickets` command: the six operations an agent [1], or a person in a shell, runs from any checkout [2] of the repository over the tickets on the `agent-data` branch [3]: `list`, `show`, `put`, `close`, `claim`, `release`. Reads come off origin's copy of the branch, fetched first, or, for the dashboard, off this machine's copy with `--local`; each write is one commit made on a throwaway checkout of origin's tip and pushed straight to the branch; every command answers with one JSON document on stdout, one line for a person on stderr, and an exit code that says how it went.
 
 ## Context
 
@@ -19,13 +19,13 @@ The `tickets` command: the six operations an agent [1], or a person in a shell, 
 
 - **The contract: JSON out, a line for a person, an exit code** - every command prints one JSON document on stdout; a refusal adds one line on stderr and exits 1; a command line that cannot be read prints the usage on stderr, nothing on stdout, and exits 2; anything else that fails exits 1 as `git-failed`.
 - **Naming a ticket** - every command takes a ticket's bare filename or its `tickets/<file>` path; a plan's or claim's name, or any name that leaves `tickets/`, is refused as `invalid-path`, except that `put` also takes a `.plan.md` and `meta.json`.
-- **Reads come off origin** - `list` and `show` fetch origin once and read its copy of the branch; with no origin the local branch is read; outside a repository every command refuses `not-a-repo`.
+- **Reads come off origin, or off this machine with `--local`** - `list`, `show` and `meta` fetch origin once and read its copy of the branch; with `--local`, the dashboard's flag, they read this machine's copy with no fetch; with no origin the local branch is read; outside a repository every command refuses `not-a-repo`.
 - **`list`, `show` and `meta`** - `list` answers every open ticket's row as one JSON array; `meta` answers when the tickets last caught up with the issue tracker, `{"lastImportedAt": …}`, or `{}` when nothing usable was recorded; `show` answers one ticket's row and whole text, its plan's text when it has one, and its holder when the claim names one; a missing ticket is `no-ticket`.
 - **Writes are one pushed commit each, on a throwaway checkout** - `put`, `close`, `claim` and `release` each make one commit on a throwaway checkout of origin's tip and push it straight to the branch; nothing lands in the caller's checkout; with no remote the write is refused as `no-remote`.
 - **Who the command acts as** - `close`, `claim` and `release` act as `AGENT_ID` when it is set, else as the current branch; a checkout on no branch refuses `no-identity`.
 - **`put`** - writes one whole file under `tickets/` from stdin, a ticket, a plan or `meta.json`, creating it if new and overwriting it whoever holds the ticket; never a claim.
 - **`claim`** - claims the ticket to implement: a plan is not in the way, only someone else's claim is; a ticket the caller already holds is claimed again without a write; someone else's claim is refused as `claimed`, naming the holder when the claim line parses.
-- **`release`** - lifts only the caller's own claim; an unclaimed ticket is `no-lock`, someone else's claim is `not-holder`.
+- **`release`** - lifts only the caller's own claim; an unclaimed ticket is `no-lock`, someone else's claim is `not-holder`; with `--force`, the dashboard's flag, it lifts whoever's claim and needs no identity.
 - **`close`** - removes the ticket with its plan and claim and nothing else; refused as `not-holder` while someone else holds it; the queue entry linking the ticket stays.
 
 ## Business logic
@@ -50,15 +50,15 @@ The command is `tickets <command>`; its usage names the six commands. Every comm
 
 Every command names a ticket by its bare filename (`2042-01-01_some-ticket.md`) or by its `tickets/<file>` path; the path form is accepted only when it passes the path gate of `names.ts`, and the name that remains must pass the bare filename gate. A name that fails, a plan's or claim's name, a relative segment (`../x.md`), a nested path, an absolute path, a non-markdown name, is refused before anything is read or written, as `invalid-path`, "<name> is not a ticket filename", the refusal naming the file as given. `put` is the one exception: after dropping a leading `tickets/`, it takes a ticket's filename, a ticket's `.plan.md` (a name that is a ticket's filename once `.plan.md` is read as `.md`), or `meta.json`, and refuses everything else, a claim file included, as `invalid-path`: "<name> is not a file under tickets/ this command writes: a ticket, its .plan.md, or meta.json".
 
-### Reads come off origin
+### Reads come off origin, or off this machine with `--local`
 
 #### Context
 
-**Problem**: only origin has every writer's pushes, this command's own earlier writes included, because a write never leaves a copy of the branch in the caller's checkout [2].
+**Problem**: only origin has every writer's pushes, this command's own earlier writes included, because a write never leaves a copy of the branch in the caller's checkout [2]. The dashboard, though, polls the tickets every few seconds, and a fetch per poll is too much: the machine it runs on keeps a persistent checkout of the branch synced with origin, so that copy is what it reads.
 
 #### Business logic
 
-`list` and `show` fetch origin once and read everything from origin's copy of the `agent-data` branch [3], by the `agent-data` package's reader, so a command sees what every writer pushed. With no origin, the local branch is read; writes are refused there, so nobody else can have moved it. Outside a repository, every command, reads and writes alike, refuses `not-a-repo` before touching anything.
+`list`, `show` and `meta` fetch origin once and read everything from origin's copy of the `agent-data` branch [3], by the `agent-data` package's reader, so a command sees what every writer pushed. With `--local` they read this machine's copy instead, with no fetch: the persistent checkout at `.branches/agent-data` when there is one, else the local branch; a push from elsewhere shows there only at the next sync. `--local` is the dashboard's flag, which finds this command through the package's `framework.tickets` declaration; an agent never uses it. With no origin, the local branch is read; writes are refused there, so nobody else can have moved it. Outside a repository, every command, reads and writes alike, refuses `not-a-repo` before touching anything.
 
 ### `list`, `show` and `meta`
 
@@ -116,11 +116,11 @@ See `## Context`.
 
 #### Context
 
-**User story**: when the plan or the work is done, and before it stops unless it closed the ticket, an agent [1] lifts its own claim [4]; nothing lifts a claim on a timeout.
+**User story**: when the plan or the work is done, and before it stops unless it closed the ticket, an agent [1] lifts its own claim [4]; nothing lifts a claim on a timeout, so a person lifts a dead agent's claim from the dashboard.
 
 #### Business logic
 
-`release <file>` removes the ticket's claim [4] only while it names this very holder [5], by the release rule of `locks.ts`, and answers `{"ok":true,"file":"tickets/<file>","holder":…}`. A ticket with no claim refuses `no-lock`, "tickets/<file> is not claimed". A ticket held by anyone else, or whose claim line does not parse, refuses `not-holder`, the holder named in the refusal when the line parses, and tells the person "tickets/<file> is claimed by <holder>, not by you".
+`release <file>` removes the ticket's claim [4] only while it names this very holder [5], by the release rule of `locks.ts`, and answers `{"ok":true,"file":"tickets/<file>","holder":…}`. `release <file> --force` removes the claim whoever holds it and needs no identity, so a detached checkout can do it too; it answers `{"ok":true,"file":"tickets/<file>"}`. It is the dashboard's flag: a person's answer to a dead agent's claim, since nothing lifts a claim on a timeout; an agent never uses it. A ticket with no claim refuses `no-lock`, "tickets/<file> is not claimed". A ticket held by anyone else, or whose claim line does not parse, refuses `not-holder`, the holder named in the refusal when the line parses, and tells the person "tickets/<file> is claimed by <holder>, not by you".
 
 ### `close`
 

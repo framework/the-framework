@@ -235,3 +235,47 @@ test('a repository with no remote reads its local branch and refuses to write; o
     await rm(solo, RETRIED_RM)
   }
 })
+
+test('--local reads this machine\'s copy of the branch with no fetch, so a push from elsewhere shows only on the next sync', async () => {
+  const { seed, agents, cleanup } = await rig(1)
+  const [a] = agents
+  try {
+    // The seed clone holds the branch locally; a pushes a third ticket as a remote writer.
+    assert.equal((await run(a!, ['put', '2026-08-31_c.md'], '# C\n')).code, 0)
+    const local = await run(seed, ['list', '--local'])
+    assert.equal(local.code, 0)
+    assert.deepEqual(local.json.map((t: { file: string }) => t.file), ['2026-08-30_a.md', '2026-08-29_b.md'])
+    // `show` and `meta` take the flag the same way.
+    const show = await run(seed, ['show', '2026-08-29_b.md', '--local'])
+    assert.equal(show.code, 0)
+    assert.match(show.json.plan, /^Effort: 1/)
+    assert.deepEqual((await run(seed, ['show', '2026-08-31_c.md', '--local'])).json, { ok: false, reason: 'no-ticket', file: '2026-08-31_c.md' })
+    assert.deepEqual((await run(seed, ['meta', '--local'])).json, {})
+    // The plain read fetches, and sees it.
+    assert.deepEqual((await run(seed, ['list'])).json.map((t: { file: string }) => t.file), ['2026-08-31_c.md', '2026-08-30_a.md', '2026-08-29_b.md'])
+  } finally {
+    await cleanup()
+  }
+})
+
+test('release --force lifts anyone\'s claim, needs no identity, and still refuses a ticket nobody holds', async () => {
+  const { bare, agents, cleanup } = await rig(2)
+  const [a, b] = agents
+  try {
+    assert.equal((await run(a!, ['claim', '2026-08-30_a.md'])).code, 0)
+    // b is not the holder: refused without the flag, done with it.
+    assert.equal((await run(b!, ['release', '2026-08-30_a.md'])).json.reason, 'not-holder')
+    const forced = await run(b!, ['release', '2026-08-30_a.md', '--force'])
+    assert.equal(forced.code, 0)
+    assert.deepEqual(forced.json, { ok: true, file: 'tickets/2026-08-30_a.md' })
+    await assert.rejects(git(['show', `${DATA_BRANCH}:tickets/2026-08-30_a.lock.md`], bare))
+    assert.deepEqual((await run(b!, ['release', '2026-08-30_a.md', '--force'])).json, { ok: false, reason: 'no-lock', file: '2026-08-30_a.md' })
+    // A detached HEAD has no identity to release as, but can still force.
+    await git(['checkout', '--detach'], b!)
+    assert.equal((await run(b!, ['claim', '2026-08-30_a.md'])).json.reason, 'no-identity')
+    assert.equal((await run(a!, ['claim', '2026-08-30_a.md'])).code, 0)
+    assert.equal((await run(b!, ['release', '2026-08-30_a.md', '--force'])).code, 0)
+  } finally {
+    await cleanup()
+  }
+})

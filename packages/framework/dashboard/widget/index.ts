@@ -9,10 +9,11 @@
 // This file IS that module: the dashboard's build emits it as its own entry (`/host/widget.js`),
 // sharing every module with the dashboard itself. Nothing here names a skill.
 import { createContext, useContext, type ComponentType } from 'react'
+import type { AgentStatus } from '../../src/index.js'
 import { runWidgetCommand } from '../rpc/widgets.js'
 import type { WidgetCommandResult } from '../rpc/widgets.js'
 
-export type { WidgetCommandResult }
+export type { WidgetCommandResult, AgentStatus }
 
 /** A registered project that has the widget's package, as a page gets it. */
 export interface WidgetProject {
@@ -20,7 +21,16 @@ export interface WidgetProject {
   name: string
 }
 
-/** What a widget page is rendered with. */
+/**
+ * What a widget page is rendered with. A page reads its sub-path and navigates within itself
+ * through {@link WidgetHost.openPage}; the dashboard's own pages reach it the same way, by the
+ * link convention below.
+ *
+ * A link into a project's files (`WidgetLink.href` such as `tickets/2026-01-01_x.md`) opens the
+ * mounted page named by its first segment, at `/<segment>/<projectId>/<rest…>`: the path a page
+ * gets for it is `[projectId, ...rest]`. So a page that shows one project's file under its own
+ * segment is where every such link in the dashboard lands, and the dashboard names no page.
+ */
 export interface WidgetPageProps {
   /** The registered projects whose dependencies include the widget's package, in the registry's order. */
   projects: WidgetProject[]
@@ -95,7 +105,26 @@ export function defineWidget(definition: WidgetDefinition): WidgetDefinition {
   return definition
 }
 
-/** What the dashboard gives the widget it is rendering. */
+/** A run of a project as the dashboard knows it (#1774): enough for a page to name one and link to it. */
+export interface WidgetAgent {
+  /** The run's id, the one {@link WidgetHost.openAgent} takes. */
+  id: string
+  /** The session name the run's branch carries, when it has one. */
+  name?: string
+  /** What the run was asked, as typed or as queued; absent when its record carries none. */
+  ask?: string
+  status: AgentStatus
+  /** ISO 8601. */
+  startedAt: string
+}
+
+/** What starting a run answered: the run's id, or in words why there is none. */
+export type StartRunResult = { ok: true; agentId: string } | { ok: false; error: string }
+
+/**
+ * What the dashboard gives the widget it is rendering. Every service is generic — a project, a
+ * run, a page, a command — and none names a skill: what a widget composes out of them is its own.
+ */
 export interface WidgetHost {
   /** The package the widget came from: the one whose commands {@link runCommand} runs. */
   package: string
@@ -104,15 +133,32 @@ export interface WidgetHost {
    * same command an agent runs (`npx <command> …`). `command` names one when the package has several.
    */
   runCommand(projectId: string, args: string[], command?: string): Promise<WidgetCommandResult>
+  /**
+   * The same, for a command that changes the project's data (a claim released, an entry added):
+   * the dashboard then syncs the project's data with origin and forgets what it had read, so the
+   * change shows at once instead of at the next sync. A link action's host runs every command so.
+   */
+  act(projectId: string, args: string[], command?: string): Promise<WidgetCommandResult>
   /** Open one agent's page in the dashboard: its live feed while it runs, its record after. */
   openAgent(projectId: string, agentId: string): void
+  /** Open a page a widget adds (this one's or another's), at a sub-path: `openPage('tickets', [projectId, file])`. */
+  openPage(segment: string, path?: string[]): void
+  /**
+   * Start a run in one project with this prompt, with the person's own picks (which tool, which
+   * model, where it runs), and land on it. Answers the run's id, or why there is none.
+   */
+  startRun(projectId: string, prompt: string): Promise<StartRunResult>
+  /** Open the project's launcher with this prompt drafted in, to set it up before sending: "Configure first, then run". */
+  configureRun(projectId: string, prompt: string): void
+  /** The project's runs the dashboard knows: the ones running, and the recorded ones when the project records them. */
+  agents(projectId: string): Promise<WidgetAgent[]>
 }
 
-/** What the dashboard knows about the widget it is serving: its package, and how to navigate. */
-export type WidgetHostBase = Pick<WidgetHost, 'package' | 'openAgent'>
+/** What the dashboard knows about the widget it is serving: every service but the commands, which it binds to the package. */
+export type WidgetHostBase = Omit<WidgetHost, 'runCommand' | 'act'>
 
 /**
- * The host for one widget: the dashboard's navigation, and its commands bound to the widget's own
+ * The host for one widget: the dashboard's services, and its commands bound to the widget's own
  * package. `acts` marks every command as an action on the project rather than a page's read: the
  * dashboard builds a link action's host with it, so what the action wrote is read back at once.
  */
@@ -120,17 +166,22 @@ export function widgetHost(base: WidgetHostBase, opts: { acts?: boolean } = {}):
   return {
     ...base,
     runCommand: (projectId, args, command) => runWidgetCommand(projectId, base.package, args, command, opts.acts ?? false),
+    act: (projectId, args, command) => runWidgetCommand(projectId, base.package, args, command, true),
   }
 }
 
-/** Set by the dashboard around every widget page it renders: the widget's package and the navigation. */
-export const WidgetHostContext = createContext<WidgetHostBase | null>(null)
+/**
+ * Set by the dashboard around every widget page it renders: the widget's package and the
+ * dashboard's services. A test of a widget page provides a whole host here, commands included,
+ * and {@link useWidgetHost} hands it over as it is.
+ */
+export const WidgetHostContext = createContext<WidgetHostBase | WidgetHost | null>(null)
 
 /** The dashboard's services for the widget being rendered. Only valid inside a widget page. */
 export function useWidgetHost(): WidgetHost {
   const host = useContext(WidgetHostContext)
   if (!host) throw new Error('useWidgetHost is only available inside a widget page')
-  return widgetHost(host)
+  return 'runCommand' in host ? host : widgetHost(host)
 }
 
 // The dashboard's own building blocks, so a widget looks like the rest of the page.
@@ -138,6 +189,18 @@ export { Button, buttonVariants, type ButtonProps } from '../components/ui/butto
 export { Badge } from '../components/ui/badge.js'
 export { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card.js'
 export { Skeleton } from '../components/ui/skeleton.js'
+export { Checkbox } from '../components/ui/checkbox.js'
+export { Input } from '../components/ui/input.js'
+export { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js'
+export { RangeSlider } from '../components/ui/slider.js'
+export { Separator } from '../components/ui/separator.js'
+export { ScrollArea } from '../components/ui/scroll-area.js'
+export { Tooltip, TooltipTrigger, TooltipContent } from '../components/ui/tooltip.js'
+export { DropdownMenu, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../components/ui/dropdown-menu.js'
+export { Markdown } from '../components/Markdown.js'
+export { StartAgentButton } from '../components/StartAgentButton.js'
+export { LinkActions, type ProjectLinks, type LinkTargets } from '../components/LinkActions.js'
 export { cn } from '../lib/utils.js'
-export { formatRelative, formatDateTime, formatDuration } from '../lib/format-date.js'
-export { usePolled } from '../lib/use-async.js'
+export { formatRelative, formatDateTime, formatDuration, formatAge } from '../lib/format-date.js'
+export { usePolled, useLoaded } from '../lib/use-async.js'
+export { useAction } from '../lib/use-action.js'

@@ -1,0 +1,1 @@
+The widget's definition, what the package's `./dashboard` export default-exports: one page at `/tickets`, labelled Tickets with a ticket icon, rendered by `TicketsWidgetPage.tsx`, and the stylesheet beside the module. The widget offers no actions on links of its own; the tickets are what other widgets' actions are offered on.

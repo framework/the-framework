@@ -48,8 +48,11 @@ export async function serveClientBundle(req: IncomingMessage, res: ServerRespons
     return
   }
   const type = contentTypeFor(target)
-  // Fingerprinted assets are immutable; index.html must always revalidate.
-  const cacheControl = target.endsWith('index.html') ? 'no-cache' : 'public, max-age=31536000, immutable'
+  // Only the fingerprinted files under `assets/` are immutable. Everything at a stable path
+  // (index.html, the host modules a widget imports as `/host/*.js`) must always revalidate: a
+  // browser that kept `/host/widget.js` from the last version would hand every widget a host
+  // missing whatever the new version added, until its cache expired a year later.
+  const cacheControl = target.startsWith(join(root, 'assets') + sep) ? 'public, max-age=31536000, immutable' : 'no-cache'
   res.writeHead(200, { 'content-type': type, 'cache-control': cacheControl })
   res.end(body)
 }

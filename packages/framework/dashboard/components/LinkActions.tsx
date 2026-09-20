@@ -1,7 +1,8 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useContext, useEffect, useState, type ReactNode } from 'react'
 import { Check } from 'lucide-react'
 import { widgetHost, type LinkActionResult, type WidgetLink } from '../widget/index.js'
 import { useMountedWidgets, type MountedLinkAction } from '../lib/use-widgets.js'
+import { HostServicesContext, INERT_HOST_SERVICES } from '../lib/host-services.js'
 import { Button, type ButtonProps } from './ui/button.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 
@@ -29,7 +30,6 @@ export function LinkActions({
   disabled = false,
   size = 'sm',
   variant = 'outline',
-  onOpenAgent,
 }: {
   /** The projects the links belong to: an action shows when its package is in at least one of them. */
   projects: readonly string[]
@@ -44,10 +44,9 @@ export function LinkActions({
   disabled?: boolean
   size?: ButtonProps['size']
   variant?: ButtonProps['variant']
-  /** Where an action's `openAgent` lands; nowhere when the page offers no navigation. */
-  onOpenAgent?: (projectId: string, agentId: string) => void
 }) {
   const { linkActions } = useMountedWidgets()
+  const services = useContext(HostServicesContext)
   const actions = linkActions.filter(action => projects.some(id => action.projects.includes(id)))
   const [running, setRunning] = useState<string | null>(null)
   const [done, setDone] = useState<Set<string>>(new Set())
@@ -69,7 +68,7 @@ export function LinkActions({
     try {
       const groups = typeof targets === 'function' ? await targets() : targets
       // An action acts: its commands are marked so, and the dashboard reads back what they wrote at once.
-      const host = widgetHost({ package: action.package, openAgent: onOpenAgent ?? (() => {}) }, { acts: true })
+      const host = widgetHost({ ...(services ?? INERT_HOST_SERVICES), package: action.package }, { acts: true })
       // One project at a time, in the order given, only those that have the action's package;
       // the first failure ends the batch with its reason.
       for (const { projectId, links } of groups) {

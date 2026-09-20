@@ -15,10 +15,6 @@ export {
 } from './agent-view.js'
 // Which questions a run still waits on: one rule for the run page and the daemon's own reads.
 export { pendingChoices } from './open-choices.js'
-// The plan ask for one ticket (#685) — pure string work from an import-free module — shared with
-// the server's queue write, so the plan column's start, the queued entry, and the dedupe that
-// recognizes a queued copy all carry the exact same sentence (#1187).
-export { planTicketPrompt } from './tickets.js'
 // The identity + diff both notifier paths run, and the preference defaults both sides read (#627).
 // Pure, so the dashboard shares them rather than keeping copies that drift silently.
 export { interventionKey, activityKey } from './dashboard/keys.js'

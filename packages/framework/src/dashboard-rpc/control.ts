@@ -5,7 +5,6 @@ import { openInApp, type OpenTarget, type OpenResult } from '../dashboard/open-i
 import { contextBridgeBrowser, contextPreferences, contextStartAgent, resolveProjectPath, resolveAgentPath } from './context.js'
 import type { BridgeBrowserAction } from '../bridge-browser.js'
 import { relayOr } from './relay-agent.js'
-import { isTicketFile, releaseTicket } from '@gemstack/skill-tickets'
 import { hostname } from 'node:os'
 import { findAgent, isPidAlive, loadAgentEvents, projectRuns, readLiveMeta, type AgentMeta } from '../store/index.js'
 import { isSafeAgentId, worktreePath } from '@gemstack/skill-branches'
@@ -231,20 +230,6 @@ export async function sendMerge(projectId: string, agentId: string): Promise<Han
     if (target.agent.status === 'running') return { ok: false, error: 'that session is still going' }
     return mergeAgentPr(target.cwd, target.agent)
   }, { ok: false, error: 'could not reach the device' })
-}
-
-/**
- * Release a ticket's `.lock.md` claim by hand (#1420): the dashboard's answer to a dead agent,
- * since no timer frees locks anymore. One committed, pushed change on the `agent-data` branch — a
- * release only this machine can see would leave the ticket claimed everywhere the claim matters.
- */
-export async function sendReleaseTicketLock(projectId: string, ticket: string): Promise<{ ok: boolean; error?: string }> {
-  if (!isTicketFile(ticket)) return { ok: false, error: 'not a ticket filename' }
-  const cwd = await resolveProjectPath(projectId)
-  if (!cwd) return { ok: false, error: 'no such project' }
-  const outcome = await releaseTicket(cwd, ticket)
-  if (outcome === 'released') return { ok: true }
-  return { ok: false, error: outcome === 'no-lock' ? 'this ticket holds no lock' : 'the release could not be committed' }
 }
 
 /**

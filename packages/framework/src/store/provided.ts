@@ -1,5 +1,6 @@
 import { projectQueue } from './queue.js'
 import { projectRuns } from './runs.js'
+import { projectTickets } from './tickets.js'
 
 /**
  * A package's command just ran in the project at `root` (a widget's, through the dashboard), and
@@ -10,4 +11,5 @@ import { projectRuns } from './runs.js'
 export function providedDataChanged(root: string): void {
   projectQueue.changed(root)
   projectRuns.changed(root)
+  projectTickets.changed(root)
 }

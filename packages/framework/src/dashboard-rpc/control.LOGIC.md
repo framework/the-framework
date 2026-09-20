@@ -1,8 +1,8 @@
-Carries out every action the user takes on an agent [1] or a project from the dashboard: stopping an agent, answering its question [2], sending it a message [3], starting an agent, opening or merging its pull request, removing a retained checkout [5], deleting an agent, opening a checkout [6] in an editor, releasing a ticket's claim [8], answering the question a cloud session [9] is parked on, and showing or restarting the bridge browser [10]. For each action: what is validated, what is refused and why, and what the browser gets back. An action about an agent relayed [11] to a device [12] is carried out on the device that runs it.
+Carries out every action the user takes on an agent [1] or a project from the dashboard: stopping an agent, answering its question [2], sending it a message [3], starting an agent, opening or merging its pull request, removing a retained checkout [5], deleting an agent, opening a checkout [6] in an editor, answering the question a cloud session [9] is parked on, and showing or restarting the bridge browser [10]. For each action: what is validated, what is refused and why, and what the browser gets back. An action about an agent relayed [11] to a device [12] is carried out on the device that runs it.
 
 ## Context
 
-**User story**: on the agent view the user presses Stop, picks an option on a question's card, types a message in the composer, and, once the agent has ended, opens a pull request for it, merges it, removes the checkout it kept, or deletes the agent altogether. On the project home the user starts an agent from the launcher, or frees a ticket a dead agent still holds. (Putting a ticket on the agent queue is not a call here: it is the queue package's own widget acting through its command, `widgets.ts`.) In Settings the user shows or restarts the bridge browser. Each of these is one call from the browser to the daemon, and this is what the call does before it answers.
+**User story**: on the agent view the user presses Stop, picks an option on a question's card, types a message in the composer, and, once the agent has ended, opens a pull request for it, merges it, removes the checkout it kept, or deletes the agent altogether. On the project home the user starts an agent from the launcher. (Putting a ticket on the agent queue, or freeing a ticket a dead agent still holds a claim on, is not a call here: it is the queue package's, or the tickets package's, own widget acting through its command, `widgets.ts`.) In Settings the user shows or restarts the bridge browser. Each of these is one call from the browser to the daemon, and this is what the call does before it answers.
 
 **Business logic story**: the daemon runs no agent, so every action here reaches an agent through what the agent's tool reads. Events flow from the agent's process through its diary [13] to the browser; the other way, Start is the project's start hook [4], what the user says to an agent is a line in the agent's inbox [14] while it works and the project's resume hook [4] once it has ended, and Stop is a signal to the process the agent's card [13] names. The Framework names no tool in any of them.
 
@@ -14,7 +14,6 @@ Carries out every action the user takes on an agent [1] or a project from the da
 [4] start hook / resume hook: the one shell line under `start`, and the one under `resume`, in a project's `.the-framework/hooks.yml`. The daemon runs the `start` line when the user presses Start and the `resume` line to continue an ended agent; each answers the agent's id as JSON on stdout.
 [5] retained checkout: the checkout of an agent that has ended and is still on disk, kept so the user can inspect what the agent left; nothing removes it on a timer.
 [6] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
-[8] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
 [9] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
 [10] the Claude web bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge browser is the Chrome for Testing the daemon runs for it; the Driver tab is the extension's one pinned tab that reads claude.ai's session list, visits sessions and types answers.
 [11] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
@@ -25,9 +24,7 @@ Carries out every action the user takes on an agent [1] or a project from the da
 [17] pick: the answer to a question: the option or options the user chose.
 [23] the Overview: the dashboard's cross-project page at `/`.
 [26] runs provider: the command, among the commands of a project's dependencies, that a package declares as answering for the project's finished agents, and that removes a finished agent or sets its pull request (`../store/runs.ts`).
-[27] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [29] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
-[31] holder: who a claim names: the agent's id when the process that started the agent set it as `AGENT_ID`, else the branch the `tickets` command ran on.
 
 ## Business logic — TL;DR
 
@@ -41,7 +38,6 @@ Carries out every action the user takes on an agent [1] or a project from the da
 - **Opening a checkout in the file manager or an editor** - a local command against the agent's own checkout, or the project's; the editor is the one the preferences name, else the environment's, else VS Code.
 - **Opening a pull request** - the agent's existing pull request is returned when it has one; a gone branch or an agent that committed nothing is refused; otherwise the branch is pushed if needed and a pull request opened ready for review and recorded on the finished agent through the runs provider [26].
 - **Merging** - an ended agent's open pull request is merged, by GitHub's auto-merge where it can be armed and directly where not, and "already merged" is an answer, not an action; an agent still going has no Merge.
-- **Releasing a ticket's claim** - only a bare ticket filename is accepted; the lock is removed as one committed, pushed change, and "no lock" is an honest answer.
 - **Controlling the bridge browser** - show, hide or restart; anything else is refused.
 - **Actions about a relayed agent go to the device** - stop, a message, an answer, open pull request and merge are forwarded to the device that runs the agent; start, remove, delete and everything local-only never are.
 
@@ -150,18 +146,6 @@ The agent must be known in a known project, by a path-safe id, else the answer i
 #### Business logic
 
 Same target rule ("unknown session"). An agent that is still running has no Merge: it publishes its own work, and the call answers "that session is still going". For an agent that has ended, its pull request is merged by the merge rule in `dashboard/gh.ts` (GitHub's auto-merge first, directly where GitHub cannot arm it; `dashboard/agent-handoff.ts`), a draft being marked ready on the way: refused when the agent has no pull request ("this session has no pull request to merge") or when it is no longer open ("this session's PR is already merged", or closed), since "already merged" is an answer, not an action; and the answer carries the pull request's number and URL.
-
-### Releasing a ticket's claim
-
-#### Context
-
-**User story**: an agent died holding a ticket's claim [8], and no timer frees claims; the user frees it by hand from the ticket.
-
-**Problem**: the filename comes from the browser. A path segment could address another directory, and a sibling name could delete a plan instead of a lock, so the name is checked before any project is even resolved. And a release only this machine could see would leave the ticket claimed everywhere the claim matters, so it must land on the `agent-data` branch [27].
-
-#### Business logic
-
-Only a bare ticket filename is accepted: a `.md` name with no path separators, not starting with a dot, and not a ticket's own `.plan.md` or `.lock.md` sibling; anything else is "not a ticket filename". An unknown project is "no such project". The lock file is removed as one committed, pushed change on the `agent-data` branch, whoever the holder [31] was. A ticket that holds no claim answers "this ticket holds no lock", and a release that could not be committed answers "the release could not be committed" and changes nothing.
 
 ### Controlling the bridge browser
 

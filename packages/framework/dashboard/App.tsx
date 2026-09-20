@@ -1,25 +1,28 @@
 import { useEffect, useState } from 'react'
+import { sessionNameOf } from '@gemstack/skill-branches/branch-names'
 import type { Intervention, Activity, ProjectionRead, ProjectSummary, RecentAgent } from '../src/index.js'
-import { onProjectFiles, onInterventions, onActivity, onRecentAgents } from './rpc/reads.js'
+import { onProjectFiles, onInterventions, onActivity, onRecentAgents, onAgents } from './rpc/reads.js'
+import { sendStart } from './rpc/control.js'
 import { onProjects } from './rpc/projects.js'
 import { AgentHistory } from './components/AgentHistory.js'
 import { SidebarProvider } from './components/ui/sidebar.js'
 import { ProjectHome } from './components/ProjectHome.js'
 import { DashboardPage } from './components/DashboardPage.js'
 import { SettingsPage } from './components/SettingsPage.js'
-import { TicketsPage } from './components/TicketsPage.js'
-import { TicketDetailPage } from './components/TicketDetailPage.js'
-import { TicketPlanPage } from './components/TicketPlanPage.js'
 import { AgentView } from './components/AgentView.js'
 import { agentLabel } from './lib/agent-label.js'
 import { RightRail } from './components/RightRail.js'
 import { NotFound } from './components/NotFound.js'
 import { WidgetPageView } from './components/WidgetPageView.js'
 import { useWidgets, WidgetsContext } from './lib/use-widgets.js'
+import { HostServicesContext, type HostServices } from './lib/host-services.js'
+import { startPicks } from './lib/use-start-agent.js'
+import { stashPendingDraft } from './lib/draft-handoff.js'
 import { useLiveEvents } from './lib/use-live-events.js'
 import { useAgents } from './lib/use-agents.js'
 import { usePolled } from './lib/use-async.js'
 import { useRoute } from './lib/use-route.js'
+import { dataLinkRoute } from './lib/data-link.js'
 import { useActivityNotifications, useInterventionNotifications } from './lib/use-notifications.js'
 import { usePreferences, notificationsEnabled, newActivityEnabled, humanInterventionEnabled } from './lib/preferences.js'
 import { agentViews, currentAgentEvents } from './lib/live-state.js'
@@ -61,7 +64,7 @@ const EMPTY_RECENT: RecentAgent[] = []
 // what the remembered-project state (#475) was for.
 export function App() {
   const { route, go } = useRoute()
-  const { view, projectId, agentId: agentId, ticketSlug, plan } = route
+  const { view, projectId, agentId } = route
   // A widget's page (#1774): the route names it by its segment, with no project selected.
   const pageSegment = route.page ?? null
   const widgets = useWidgets()
@@ -201,28 +204,41 @@ export function App() {
     go({ view: 'settings', projectId: null, agentId: null })
   }
 
-  // Tickets (#1144): every registered project's backlog, one section each — required reading for a
-  // demo, so it gets the full width rather than the 22rem right rail. A cross-project destination
-  // like the Overview, not scoped to whichever project happened to be selected.
-  const showTickets = () => {
-    go({ view: 'tickets', projectId: null, agentId: null })
-  }
-
   // A widget's page (#1774): its own segment, cross-project like the Overview.
   const showPage = (segment: string) => {
     go({ projectId: null, agentId: null, page: segment })
   }
 
-  // One ticket's own page (#1144), by the same slug as its filename — what a one-liner row opens
-  // into, since Queue and the rest of its detail no longer fit on the list row.
-  const openTicket = (id: string, slug: string) => {
-    go({ view: 'tickets', projectId: id, agentId: null, ticketSlug: slug })
+  // A link into a project's files (#1774) — a queued entry's `tickets/<file>` — opens the mounted
+  // widget page named by its first segment, at `/<segment>/<projectId>/<rest>`; the dashboard has
+  // no page of its own for any such path and names no widget. Nothing opens when no page claims it.
+  const canOpenLink = (href: string) => dataLinkRoute('', href, widgetPages) !== undefined
+  const openDataLink = (id: string, href: string) => {
+    const target = dataLinkRoute(id, href, widgetPages)
+    if (target) go(target)
   }
 
-  // One ticket's plan view (#685), the plan column's link: the ticket's `.plan.md` rendered on its
-  // own page, addressed by the same slug as the ticket it belongs to.
-  const openTicketPlan = (id: string, slug: string) => {
-    go({ view: 'tickets', projectId: id, agentId: null, ticketSlug: slug, plan: true })
+  // The shell's services for widgets (#1774): what a widget page or a link action may ask of the
+  // dashboard, none of it naming a skill. Bound to each widget's package where its host is built.
+  const hostServices: HostServices = {
+      openAgent: selectAgentInProject,
+      openPage: (segment, path) => go({ projectId: null, agentId: null, page: segment, ...(path && path.length ? { pagePath: path } : {}) }),
+      startRun: async (inProject, prompt) => {
+        const result = await sendStart(inProject, prompt, startPicks(preferences))
+        if (result.ok) agentStarted(inProject, prompt, result.agentId)
+        return result
+      },
+      // The launcher rehydrates a stashed draft once as it mounts (#1066): the same carry every
+      // "Configure first, then run" uses.
+      configureRun: (inProject, prompt) => {
+        stashPendingDraft(prompt)
+        selectProject(inProject)
+      },
+      agents: async inProject =>
+        (await onAgents(inProject)).map(agent => {
+          const name = sessionNameOf(agent.branch, agent.id)
+          return { id: agent.id, status: agent.status, startedAt: agent.startedAt, ...(name ? { name } : {}), ...(agent.intent ? { ask: agent.intent } : {}) }
+        }),
   }
 
   // The live agent feed is owned here so both the main view and the right rail's views tab read
@@ -258,7 +274,7 @@ export function App() {
       return <SettingsPage onAgentStarted={agentStarted} onSelectProject={selectProject} onDone={showDashboard} />
     if (pageSegment) {
       if (widgetPage)
-        return <WidgetPageView page={widgetPage} projects={projects} path={route.pagePath ?? []} onOpenAgent={selectAgentInProject} />
+        return <WidgetPageView page={widgetPage} projects={projects} path={route.pagePath ?? []} />
       // Not loaded yet is not "no such page": the widgets are imported after the first read.
       if (!widgetsLoaded) return null
       return (
@@ -270,30 +286,13 @@ export function App() {
         />
       )
     }
-    // A ticket's plan view is the same shape plus the `plan` flag (#685): its `.plan.md` on its own
-    // page, checked before the detail page since the flag only rides alongside a slug.
-    if (view === 'tickets' && projectId && ticketSlug && plan)
-      return <TicketPlanPage projectId={projectId} slug={ticketSlug} onBack={showTickets} onOpenAgent={selectAgent} />
-    // A ticket's own page needs both a project and a slug; anything short of that (including the
-    // bare cross-project route) is the list — every registered project, one section each.
-    if (view === 'tickets' && projectId && ticketSlug)
-      return <TicketDetailPage projectId={projectId} slug={ticketSlug} onBack={showTickets} onOpenAgent={selectAgent} />
-    if (view === 'tickets')
-      return (
-        <TicketsPage
-          onOpenTicket={openTicket}
-          onOpenTicketPlan={openTicketPlan}
-          onAgentStarted={agentStarted}
-          onSelectProject={selectProject}
-          onOpenAgent={selectAgentInProject}
-        />
-      )
     if (!projectId)
       return (
         <DashboardPage
           onSelectProject={selectProject}
           onSelectAgent={selectAgentInProject}
-          onOpenTicket={openTicket}
+          canOpenLink={canOpenLink}
+          onOpenLink={openDataLink}
           onAgentStarted={agentStarted}
           interventions={interventions}
         />
@@ -370,6 +369,7 @@ export function App() {
     // the column that used to be a plain div. The installed widgets (#1774) are provided around it
     // all, so the link actions they offer reach any page that shows a link.
     <WidgetsContext.Provider value={widgets}>
+    <HostServicesContext.Provider value={hostServices}>
     <SidebarProvider className="h-screen flex-col overflow-hidden">
       {/* The top navbar is gone (#772 follow-up): its brand, global nav and utility controls moved
           into the sidebar (AgentHistory), so the workspace and right rail get the full height. */}
@@ -406,17 +406,15 @@ export function App() {
           onDashboard={showDashboard}
           onSelectProject={selectProject}
           onSettings={showSettings}
-          onTickets={showTickets}
-          ticketsActive={view === 'tickets'}
           pages={widgetPages}
           activePage={pageSegment}
           onPage={showPage}
           interventionCount={interventions.length}
         />
         <main className="flex min-w-0 flex-1 flex-col">{renderMain()}</main>
-        {/* The tickets page takes the full width itself (#1144): no rail beside it, the way
-            Settings takes the whole main pane with none either. A widget's page does the same. */}
-        {view !== 'tickets' && !pageSegment && (
+        {/* A widget's page takes the full width itself (#1774): no rail beside it, the way Settings
+            takes the whole main pane with none either. */}
+        {!pageSegment && (
           <RightRail
             projectId={projectId}
             agentId={agentId}
@@ -432,6 +430,7 @@ export function App() {
         )}
       </div>
     </SidebarProvider>
+    </HostServicesContext.Provider>
     </WidgetsContext.Provider>
   )
 }

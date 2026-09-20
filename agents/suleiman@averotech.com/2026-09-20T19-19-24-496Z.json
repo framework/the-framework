@@ -1,14 +1,22 @@
 {
   "id": "2026-09-20T19-19-24-496Z",
-  "startedAt": "2026-09-20T19:19:24.496Z",
-  "status": "running",
+  "startedAt": "2026-09-20T19:19:26.960Z",
+  "endedAt": "2026-09-20T19:20:14.175Z",
+  "status": "failed",
   "intent": "/work-queue",
   "driver": "claude-code",
   "model": "opus",
+  "branch": "agent-2026-09-20T19-19-24-496Z",
   "caller": {
     "scheduler": {
       "command": "work-queue",
-      "host": "Suleimans-MacBook-Pro.local"
-    }
+      "host": "Suleimans-MacBook-Pro.local",
+      "pid": 13336
+    },
+    "pid": 13336,
+    "host": "Suleimans-MacBook-Pro.local",
+    "kind": "prompt",
+    "workspace": "/Users/suleiman/Projects/gemstack/.branches/agent-2026-09-20T19-19-24-496Z",
+    "sessionId": "827b5714-ec2f-4cd3-b3d7-c2ce38d38e8c"
   }
 }

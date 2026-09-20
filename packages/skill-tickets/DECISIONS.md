@@ -7,9 +7,14 @@ in SPEC.md; a choice made while implementing is the implementer's judgment, not 
 decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 
 ## The tickets
-- Two callers: the command an agent runs, and a long-lived program that keeps the branch
-  checked out, starts agents through this package's functions, and imports issues with its
-  own code, stamping `meta.json`. The executable is `tickets`. The package ships
+- Three callers: the command an agent runs; a long-lived program that keeps the branch
+  checked out, starts agents through this package's functions, and imports issues with
+  its own code, stamping `meta.json`; and a dashboard, which reads the tickets through
+  the command (`--local`: this machine's copy, no fetch, because it polls and the writer
+  there keeps the checkout synced) and lifts a dead agent's claim through `release
+  --force` as its widget's own pages, found by the package's `framework.tickets`
+  declaration. A dashboard importing the package was the alternative and was not taken:
+  the dashboard names no skill. The executable is `tickets`. The package ships
   `SKILL.md`, the agent's instructions.
 - A ticket is a markdown file in `tickets/`. Its plan and its claim sit beside it:
   `<name>.plan.md` and `<name>.lock.md`, `<name>` the filename without `.md`.
@@ -39,10 +44,11 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 ## Flow: a claim
 - A claim is a committed file holding one line, `CLAIMED: <who>`, so agents on other
   machines see it.
-- One claim per ticket; it never expires: it lifts when the ticket is released or closed,
-  otherwise only by hand on the branch. The command lifts only its own lock, and closes
-  only when the ticket has no lock or its own, `not-holder` otherwise. Releasing an
-  unclaimed ticket is a refusal.
+- One claim per ticket; it never expires: it lifts when the ticket is released or
+  closed, otherwise only by a person: `release --force`, from the dashboard or a shell,
+  lifts anyone's claim and needs no identity. Without the flag the command lifts only
+  its own lock, and closes only when the ticket has no lock or its own, `not-holder`
+  otherwise. Releasing an unclaimed ticket is a refusal.
 - A lock is written only by a claim; someone else's `claim` is refused while it exists.
   `put` ignores it, so an import can refresh a ticket someone holds.
 - A claim the program committed but could not push still counts: the commit already guards

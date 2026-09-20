@@ -1,4 +1,4 @@
-"Update from GitHub": the one button that starts an agent [1] bringing a project's `tickets/` up to date with its GitHub issues, rendered identically wherever it is offered — a project's tickets list, that list's empty state, and the onboarding checklist. The label, the instruction sent, and what the tooltip promises all come from the one place, so pressing the same words on a different surface always sends the same ask.
+"Update from GitHub": the one button that starts an agent [1] bringing a project's `tickets/` up to date with its GitHub issues, rendered identically wherever it is offered — here, the onboarding checklist; the tickets package's own page carries its own copy of the same button, with the same words. The label, the instruction sent, and what the tooltip promises all come from the one place, so pressing the same words on a different surface always sends the same ask.
 
 ## Context
 

@@ -2,7 +2,7 @@ The Overview's [1] "AI Queue" card: every project's open queue entries [2], grou
 
 ## Context
 
-**User story**: the user opens the Overview, reads under "AI Queue" what the agents will pick up next in each project, clicks a ticket's title to read it, presses play on one entry to have it worked now, or sets "3" and presses the fan-out button to start three agents on a project's top three entries.
+**User story**: the user opens the Overview, reads under "AI Queue" what the agents will pick up next in each project, clicks a queued ticket's title to open its page, presses play on one entry to have it worked now, or sets "3" and presses the fan-out button to start three agents on a project's top three entries.
 
 **Business logic story**: this card starts an agent on one named entry on the user's click, through the project's start hook, like the launcher does.
 
@@ -19,7 +19,7 @@ The Overview's [1] "AI Queue" card: every project's open queue entries [2], grou
 ## Business logic — TL;DR
 
 - **What the card shows** - "AI Queue", "Tasks AI will work on next", then every project with at least one entry: its name, its count, and all of its entries; "Loading…" or "Nothing queued." otherwise.
-- **An entry's title opens what it names** - a queued ticket's title opens that ticket's page, a web link opens in a new tab, anything else is plain text; the raw queue line is the tooltip.
+- **An entry's title opens what it names** - a title linking into the project's files is a button when the shell has a page for that path (a queued ticket's, when the tickets package's widget is installed) and plain text otherwise; a web link opens in a new tab; anything else is plain text; the raw queue line is the tooltip.
 - **The play button starts one agent on one entry** - an agent told to work that entry only and take it off the queue when published, with the coding agent and model the user picked; the dashboard then goes to that agent.
 - **The fan-out button and its count** - a number box (3 by default, never below 1) and a button that promises exactly what a click starts, capped at the open entries: one agent per top entry, started one after another, stopping at the first refusal, with no navigation.
 - **"Configure first, then run"** - each button's chevron hands its prompt to the project's launcher as a draft instead of starting; for the fan-out, the top entry's prompt alone.
@@ -45,7 +45,7 @@ The card is titled "AI Queue" with the subtitle "Tasks AI will work on next". Wh
 
 #### Business logic
 
-Each row prints the entry's title rather than its source: the text of a link at the start of the line, else the line itself, with the whole raw line in the row's tooltip. A title that links into the project's tickets is a button that opens that ticket's own page in the dashboard; one that links to a web address is a link opened in a new tab; any other title is plain text and opens nothing. How a line splits into title and target is in `lib/queue-entry.ts`.
+Each row prints the entry's title rather than its source: the text of a link at the start of the line, else the line itself, with the whole raw line in the row's tooltip. A title that links into the project's files (`tickets/<file>`) is a button when the shell says it has a page for that path, and clicking it hands the project and the path to the shell, which opens the widget page named by the path's first segment (`lib/data-link.ts`); with no such page the title is plain text. One that links to a web address is a link opened in a new tab; any other title is plain text and opens nothing. How a line splits into title and target is in `lib/queue-entry.ts`.
 
 ### The play button starts one agent on one entry
 

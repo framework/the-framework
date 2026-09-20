@@ -1,4 +1,4 @@
-Starting an agent [1] from the dashboard, the same way on every surface that does it: the launcher [2], the tickets' buttons, the agent queue's button, the onboarding checklist. It sends the start, tracks that one is in flight, and turns a refusal into words the surface shows.
+Starting an agent [1] from the dashboard, the same way on every surface that does it: the launcher [2], the agent queue's button, the onboarding checklist (a widget's page starts one through the shell's services, `host-services.ts`, with the same picks). It sends the start, tracks that one is in flight, and turns a refusal into words the surface shows.
 
 ## Context
 

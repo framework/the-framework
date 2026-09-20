@@ -2,7 +2,7 @@ Decides how one queue entry [1] reads on screen and what it opens. Entries are l
 
 ## Context
 
-**User story**: on the Overview [4] and on a project's queue, the user reads the agent queue [2] as a list of named pieces of work, and clicking one that came from a ticket opens that ticket's own page.
+**User story**: on the Overview [4] and on a project's queue, the user reads the agent queue [2] as a list of named pieces of work, and clicking one that came from a ticket opens that ticket's own page, when an installed widget brings one.
 
 ## Glossary
 
@@ -14,5 +14,5 @@ Decides how one queue entry [1] reads on screen and what it opens. Entries are l
 ## Business logic — TL;DR
 
 - **The title is a link at the very start** - an entry that begins with a markdown link reads as that link's text, and everything after the link is the agent's [3] own note, which is detail rather than the name of the work and is left out of the one-line title. A link anywhere else in the line is part of a sentence, not the name of the work, so such an entry reads as the whole line with surrounding whitespace removed — as does an entry with no link at all.
-- **A link into the tickets names a ticket** - a target under `tickets/` identifies the ticket by its filename, which is what lets the entry open that ticket's page. This is the same target the dashboard writes when the user queues a ticket.
-- **Anything else points out, or nowhere** - a target that is a full web address is kept as a link out of the dashboard. Any other target, such as a bare path in the repository, has no page in the dashboard, so the entry keeps its title and points nowhere rather than offering a destination that leads to nothing.
+- **A link into the project's files carries its path** - a target that is a path inside the repository (`tickets/<file>`, the target the dashboard writes when the user queues a ticket) is kept whole as the entry's path; which page opens it, if any, is decided where the entry is shown (`lib/data-link.ts`), never here.
+- **A web address points out** - a target that is a full web address is kept as a link out of the dashboard.

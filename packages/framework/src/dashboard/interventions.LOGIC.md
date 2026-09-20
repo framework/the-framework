@@ -20,7 +20,7 @@ Builds the cross-project "needs you" list, the interventions [1] feed: every reg
 
 ## Business logic — TL;DR
 
-- **Open pull requests to review** - every open pull request of every project is an item, except a draft opened by hand; a draft on an agent's branch stays, because a draft is how an agent's work may ask for a first look.
+- **Open pull requests to review** - every open pull request of every project is an item, except a draft opened by hand; a draft on a branch one of the project's agents is on stays, because a draft is how an agent's work may ask for a first look.
 - **Agents parked on a gate** - an agent that ended `waiting` on a gate is an item carrying the question's title, read off the agent's own diary, one item per parked agent.
 - **Finished agents with unpushed work** - among a project's 5 most recent finished agents, one whose branch still exists, holds real commits, is neither merged nor on the remote, and has a remote to push to, is an item naming what was asked, the branch and the commit count.
 - **Newest first, one item per identity** - items sort by when the pull request was opened or the agent last updated, and a pull request seen through two projects registered on the same repository appears once.
@@ -37,7 +37,7 @@ See `## Context`.
 
 #### Business logic
 
-For each registered project, the open pull requests of its repository (read through `gh.ts`, at most 50) each become one item with the pull request's number, title, URL and opening time; the URL is where to act, on GitHub. A draft pull request is left out, because a draft is not asking for review, with one exception: a draft whose head branch is an agent's [2] branch (a branch named `agent-…`, other than the `agent-data` branch [7] itself) is kept. An agent publishes its pull request as a draft when a person should look at it first, and cloud work adoption opens its pull requests as drafts so they do not ping reviewers; if the feed dropped them too, nothing would tell anyone the work exists. A draft with no head branch recorded counts as opened by hand, so an answer that lacks the branch never turns every draft in the repository into a "needs you". A project whose pull requests cannot be read (no remote, `gh` missing or logged out, GitHub unreachable) contributes no pull request items.
+For each registered project, the open pull requests of its repository (read through `gh.ts`, at most 50) each become one item with the pull request's number, title, URL and opening time; the URL is where to act, on GitHub. A draft pull request is left out, because a draft is not asking for review, with one exception: a draft whose head branch is an agent's [2] branch, the branch a finished agent's record names or a working agent's checkout is on, is kept. An agent publishes its pull request as a draft when a person should look at it first, and cloud work adoption opens its pull requests as drafts so they do not ping reviewers; if the feed dropped them too, nothing would tell anyone the work exists. A draft with no head branch recorded counts as opened by hand, so an answer that lacks the branch never turns every draft in the repository into a "needs you". A project whose pull requests cannot be read (no remote, `gh` missing or logged out, GitHub unreachable) contributes no pull request items.
 
 ### Agents parked on a gate
 

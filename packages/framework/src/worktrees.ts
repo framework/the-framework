@@ -1,10 +1,9 @@
 import { errorMessage } from './error-message.js'
-import { listAgents, projectRuns, readLiveMetas, type AgentStatus, type RunsFor } from './store/index.js'
-import { agentBranchName, listWorktreeDirs, isSafeAgentId, reclaimWorktree, removeWorktree, pruneWorktrees, worktreePath, worktreeSize, type ReclaimOutcome } from '@gemstack/skill-branches'
+import { isRunId, listAgents, projectBranches, projectRuns, readLiveMetas, type AgentStatus, type BranchesFor, type RunsFor } from './store/index.js'
 
 /** A retained worktree and the agent that left it behind (#752). */
 export interface WorktreeRow {
-  /** The agent id, which is also the worktree's directory name. */
+  /** The agent id. */
   agentId: string
   /** The branch the agent's work landed on, when its meta recorded one (#799). */
   branch?: string
@@ -29,111 +28,76 @@ export type RemoveResult =
     }
   | { ok: false; error: string }
 
-/** Surface-specific work {@link removeProjectWorktree} does once removal is decided on. */
-export interface RemoveWorktreeOptions {
-  /**
-   * Run after the safety checks pass and the work is committed, just before the checkout goes.
-   * The dashboard stops the preview serving that tree here (#797); the CLI has none to stop.
-   */
-  beforeRemove?: (agentId: string) => Promise<void>
-}
-
 /**
  * The worktrees a project still has on disk (#752), newest first — the same view the dashboard's
  * retained-worktrees list is built from, through the same store reads, so the CLI is a second
- * surface rather than a second behaviour.
+ * surface rather than a second behaviour. The checkouts are what the project's branches provider
+ * lists (#1774); a project with no provider has none.
  *
  * A live agent's checkout is included and flagged rather than hidden: "what is this directory and
  * why can I not remove it" is exactly the question the list has to answer.
  */
-export async function listProjectWorktrees(cwd: string, opts: { sizes?: boolean } = {}): Promise<WorktreeRow[]> {
-  const [names, live, archived] = await Promise.all([
-    listWorktreeDirs(cwd).catch(() => []),
-    readLiveMetas(cwd).catch(() => []),
+export async function listProjectWorktrees(cwd: string, opts: { sizes?: boolean } = {}, branches: BranchesFor = projectBranches): Promise<WorktreeRow[]> {
+  const source = await branches(cwd).catch(() => undefined)
+  if (!source) return []
+  const [checkouts, live, archived] = await Promise.all([
+    // Sizing a tree an agent is writing to gives a number that is wrong by the time it prints;
+    // a caller that only wants the rows (the dashboard's retained list) skips the du entirely.
+    source.list(opts.sizes === false ? {} : { sizes: true }).catch(() => []),
+    readLiveMetas(cwd, undefined, branches).catch(() => []),
     listAgents(cwd).catch(() => []),
   ])
   const rows: WorktreeRow[] = []
-  for (const agentId of names) {
-    const meta = live.find(agent => agent.id === agentId) ?? archived.find(agent => agent.id === agentId)
+  for (const checkout of checkouts) {
+    const meta = live.find(agent => agent.id === checkout.id) ?? archived.find(agent => agent.id === checkout.id)
     const isLive = meta?.status === 'running'
     rows.push({
-      agentId,
+      agentId: checkout.id,
       live: isLive,
       ...(meta?.branch ? { branch: meta.branch } : {}),
       ...(meta?.status ? { status: meta.status } : {}),
-      // Sizing a tree an agent is writing to gives a number that is wrong by the time it prints;
-      // a caller that only wants the rows (the dashboard's retained list) skips the du entirely.
-      ...(isLive || opts.sizes === false ? {} : await sizeOf(cwd, agentId)),
+      ...(!isLive && checkout.sizeBytes !== undefined ? { sizeBytes: checkout.sizeBytes } : {}),
     })
   }
   return rows.sort((a, b) => (a.agentId < b.agentId ? 1 : a.agentId > b.agentId ? -1 : 0))
 }
 
-async function sizeOf(cwd: string, agentId: string): Promise<{ sizeBytes?: number }> {
-  const bytes = await worktreeSize(worktreePath(cwd, agentId)).catch(() => undefined)
-  return bytes === undefined ? {} : { sizeBytes: bytes }
-}
-
 /**
  * Remove one retained worktree (#752/#737/E5): the one implementation behind every surface that
  * removes one: the dashboard's Remove button (#982). The run's own tool reclaims a finished run's
- * checkout by the same git rule; this is for the checkouts that rule kept.
+ * checkout by the same rule; this is for the checkouts that rule kept.
  *
- * **One rule: only what is on the remote may go**: the git side of it is the package's
- * `reclaimWorktree`, which pushes the branch first when the remote lacks it.
+ * **One rule: only what is on the remote may go**: the rule is the branches provider's, whose
+ * `remove` pushes the branch first when the remote lacks it and refuses what it cannot push
+ * (#1774); its refusal is answered in its own words.
  *
  * Refuses while the agent is still going — an agent's checkout is where its agent is working, and Stop
  * is how you end an agent, not pulling the floor out from under it.
  */
-export async function removeProjectWorktree(
-  cwd: string,
-  agentId: string,
-  opts: RemoveWorktreeOptions = {},
-): Promise<RemoveResult> {
-  if (!isSafeAgentId(agentId)) return { ok: false, error: `invalid session id: ${agentId}` }
-  const names = await listWorktreeDirs(cwd).catch((): string[] => [])
-  if (!names.includes(agentId)) return { ok: false, error: `no worktree for session ${agentId}` }
-  const live = await readLiveMetas(cwd).catch(() => [])
+export async function removeProjectWorktree(cwd: string, agentId: string, branches: BranchesFor = projectBranches): Promise<RemoveResult> {
+  if (!isRunId(agentId)) return { ok: false, error: `invalid session id: ${agentId}` }
+  const live = await readLiveMetas(cwd, undefined, branches).catch(() => [])
   if (live.some(agent => agent.id === agentId && agent.status === 'running')) {
     return { ok: false, error: 'that session is still going; stop it before removing its worktree' }
   }
-  const path = worktreePath(cwd, agentId)
+  const source = await branches(cwd).catch(() => undefined)
+  if (!source) return { ok: false, error: 'no package of this project provides its checkouts' }
   try {
-    const outcome = await reclaimWorktree(cwd, path, {
-      birthBranch: agentBranchName(agentId),
-      mayPush: true,
-      ...(opts.beforeRemove ? { beforeRemove: () => opts.beforeRemove!(agentId) } : {}),
-    })
-    return outcome.ok ? outcome : { ok: false, error: refusal(agentId, outcome) }
+    return await source.remove(agentId)
   } catch (err) {
     return { ok: false, error: errorMessage(err) }
-  }
-}
-
-/** Why a checkout stayed, said the way every surface reports it. */
-function refusal(agentId: string, outcome: ReclaimOutcome & { ok: false }): string {
-  switch (outcome.reason) {
-    case 'not-a-worktree':
-      return `session ${agentId}'s directory is not a git worktree; left alone`
-    case 'no-branch':
-      return `session ${agentId} is on no branch; its worktree was kept`
-    case 'dirty':
-      // Nothing is committed on the way to a removal (#1638).
-      return `session ${agentId} has uncommitted work; its worktree was kept`
-    case 'not-on-remote':
-      return `${outcome.branch} is not on the remote (${outcome.detail ?? 'not pushed'}); its worktree was kept`
   }
 }
 
 /** The outcome of {@link deleteProjectAgent}. */
 export type DeleteAgentResult = { ok: true } | { ok: false; error: string }
 
-/** Surface-specific work {@link deleteProjectAgent} does. */
+/** Where {@link deleteProjectAgent} reads: the project's providers by default. */
 export interface DeleteAgentOptions {
-  /** Run before the worktree comes off disk (stop a preview serving it, as removal does). */
-  beforeRemove?: (agentId: string) => Promise<void>
   /** Where the project's finished runs are read and removed; the project's runs provider by default. */
   runs?: RunsFor
+  /** Where the project's checkouts are read and removed; the project's branches provider by default. */
+  branches?: BranchesFor
 }
 
 /**
@@ -155,22 +119,23 @@ export interface DeleteAgentOptions {
  *
  * Refuses while the agent is still going — Stop is how an agent ends. Any uncommitted work in the
  * worktree is discarded with it, which is the intent here (the session is being thrown away),
- * unlike remove-worktree, which refuses a checkout holding uncommitted work.
+ * unlike remove-worktree, which refuses a checkout holding uncommitted work: the branches
+ * provider's `remove --discard` (#1774).
  */
 export async function deleteProjectAgent(cwd: string, agentId: string, opts: DeleteAgentOptions = {}): Promise<DeleteAgentResult> {
-  if (!isSafeAgentId(agentId)) return { ok: false, error: `invalid session id: ${agentId}` }
-  const live = await readLiveMetas(cwd).catch(() => [])
+  if (!isRunId(agentId)) return { ok: false, error: `invalid session id: ${agentId}` }
+  const branches = opts.branches ?? projectBranches
+  const live = await readLiveMetas(cwd, undefined, branches).catch(() => [])
   if (live.some(agent => agent.id === agentId && agent.status === 'running')) {
     return { ok: false, error: 'that session is still going; stop it before deleting it' }
   }
   try {
-    // The worktree first, if one is on disk: force-removed (its uncommitted work goes with the
-    // session), where remove-worktree would have refused it.
-    const names = await listWorktreeDirs(cwd).catch((): string[] => [])
-    if (names.includes(agentId)) {
-      await opts.beforeRemove?.(agentId)
-      await removeWorktree(cwd, worktreePath(cwd, agentId))
-      await pruneWorktrees(cwd)
+    // The checkout first, if the provider lists one: removed with its uncommitted work (it goes
+    // with the session), where remove-worktree would have refused it.
+    const source = await branches(cwd).catch(() => undefined)
+    if (source && (await source.list().catch(() => [])).some(checkout => checkout.id === agentId)) {
+      const removed = await source.remove(agentId, { discard: true })
+      if (!removed.ok) return removed
     }
     // Then the record that put the row in the list: the finished run, removed through the
     // project's runs provider (#1582/#1769). Tolerant of an absent record, and of a project with

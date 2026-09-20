@@ -1,9 +1,8 @@
 import { join } from 'node:path'
 import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
-import { AGENT_BRANCH_PREFIX } from '@gemstack/skill-branches'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import { ghPrsForBranch, type LinkedPr } from './dashboard/gh.js'
-import { startedAtFromAgentId } from './store/index.js'
+import { listAgents, type AgentMeta } from './store/index.js'
 import { nodeFs } from './node-fs.js'
 import { errorMessage } from './error-message.js'
 import { startProjectPass, type ProjectPass, type ProjectsSource } from './project-pass.js'
@@ -22,10 +21,11 @@ import { startProjectPass, type ProjectPass, type ProjectsSource } from './proje
 // with `claude --teleport`). So the daemon sweeps instead, and every deletion has to clear four
 // gates:
 //
-// - **Old enough** (~a day) that no provisioning can still be reading it. A run branch carries its
-//   start time in its name; a `cloud-*` ref carries nothing, so the sweep remembers when it first
-//   saw one and only ages it from there — which also keeps a ref pushed by *another* machine safe,
-//   since each machine only deletes what it has itself watched for a day.
+// - **Old enough** (~a day) that no provisioning can still be reading it. A run branch is aged
+//   from its run's start, off the run's record (the records are shared across machines, so every
+//   machine's runs are known here); a `cloud-*` ref carries nothing, so the sweep remembers when
+//   it first saw one and only ages it from there — which also keeps a ref pushed by *another*
+//   machine safe, since each machine only deletes what it has itself watched for a day.
 // - **Holds no work**: its tip is already reachable from origin's default branch. That is what
 //   separates a web run's empty scratch branch from a local run's branch holding unmerged commits —
 //   the one thing this sweep must never delete.
@@ -45,9 +45,6 @@ export const SCRATCH_REF_SAFE_AGE_MS = 24 * 60 * 60 * 1000
  * not match the driver's naming is never even a candidate.
  */
 export const CLOUD_SCRATCH_REF = /^cloud-\d+-[0-9a-f]{8}$/
-
-/** What run branches are named under; the rest is the agent id, which carries the start time. */
-const RUN_BRANCH_PREFIXES = [AGENT_BRANCH_PREFIX]
 
 /**
  * Where the sweep remembers when it first saw each `cloud-*` ref, under `.the-framework/`
@@ -139,6 +136,8 @@ export interface ScratchSweepDeps {
   ageMs?: number
   /** Agent ids the daemon is still responsible for, whose run branches this must not touch. */
   busy?: ReadonlySet<string>
+  /** The project's runs, whose recorded branches are the run branches on origin (default {@link listAgents}). */
+  agents?: (cwd: string) => Promise<AgentMeta[]>
 }
 
 /** One branch on origin: its short name and the commit it points at. */
@@ -243,6 +242,10 @@ export async function sweepCloudScratchRefs(cwd: string, deps: ScratchSweepDeps 
   const { defaultBranch, heads } = parseLsRemote(listing)
 
   const state = await readState(cwd, fs)
+  // A run branch is one a run's record names (#1774): the record says when the run started, and
+  // whose it is. A branch no record names is nobody's to delete.
+  const runs = new Map<string, AgentMeta>()
+  for (const run of await (deps.agents ?? listAgents)(cwd).catch((): AgentMeta[] => [])) if (run.branch && !runs.has(run.branch)) runs.set(run.branch, run)
   // Rebuilt from what origin actually has, so entries for refs deleted (by us or anyone) fall away.
   const firstSeen: Record<string, string> = {}
   const candidates: RemoteHead[] = []
@@ -265,22 +268,21 @@ export async function sweepCloudScratchRefs(cwd: string, deps: ScratchSweepDeps 
       candidates.push(head)
       continue
     }
-    const runPrefix = RUN_BRANCH_PREFIXES.find(prefix => head.ref.startsWith(prefix))
-    if (runPrefix !== undefined) {
-      const id = head.ref.slice(runPrefix.length)
-      const startedAt = startedAtFromAgentId(id)
-      if (startedAt === undefined) continue // a name whose age is unknowable is not ours to delete
-      if (deps.busy?.has(id)) {
+    const run = runs.get(head.ref)
+    if (run) {
+      const startedMs = Date.parse(run.startedAt)
+      if (!Number.isFinite(startedMs)) continue // a run whose age is unknowable is not ours to delete
+      if (deps.busy?.has(run.id)) {
         result.kept.push({ ref: head.ref, reason: 'busy' })
         continue
       }
-      if (now - Date.parse(startedAt) < ageMs) {
+      if (now - startedMs < ageMs) {
         result.kept.push({ ref: head.ref, reason: 'young' })
         continue
       }
       candidates.push(head)
     }
-    // Every other branch — the default, `claude/*`, a named `agent-<session-name>` — is not a
+    // Every other branch — the default, `claude/*`, a branch no run's record names — is not a
     // scratch ref and is never even considered.
   }
 

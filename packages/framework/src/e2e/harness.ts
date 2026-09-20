@@ -28,15 +28,22 @@ import type { StartAgentOptions } from '../dashboard/types.js'
 import type { QuotaView } from '../dashboard/quota.js'
 
 /**
- * The three provider packages every fixture project depends on, linked from this workspace's own
- * install: the records package (the runs provider), the queue package (the queue provider) and
- * the tickets package (the tickets provider).
+ * The four provider packages every fixture project depends on, linked from this workspace's own
+ * install: the records package (the runs provider), the queue package (the queue provider), the
+ * tickets package (the tickets provider) and the branches package (the branches provider, which
+ * lists the checkouts the stand-in tool makes with that same package's library).
  */
 const LOGS_PACKAGE = '@gemstack/skill-logs'
 const QUEUE_PACKAGE = '@gemstack/skill-queue'
 const TICKETS_PACKAGE = '@gemstack/skill-tickets'
+const BRANCHES_PACKAGE = '@gemstack/skill-branches'
 const packageDir = (name: string): string => resolve(dirname(fileURLToPath(import.meta.resolve(name))), '..')
-const PROVIDER_PACKAGES: Record<string, string> = { [LOGS_PACKAGE]: packageDir(LOGS_PACKAGE), [QUEUE_PACKAGE]: packageDir(QUEUE_PACKAGE), [TICKETS_PACKAGE]: packageDir(TICKETS_PACKAGE) }
+const PROVIDER_PACKAGES: Record<string, string> = {
+  [LOGS_PACKAGE]: packageDir(LOGS_PACKAGE),
+  [QUEUE_PACKAGE]: packageDir(QUEUE_PACKAGE),
+  [TICKETS_PACKAGE]: packageDir(TICKETS_PACKAGE),
+  [BRANCHES_PACKAGE]: packageDir(BRANCHES_PACKAGE),
+}
 
 // Re-home the process-global config home FIRST: the registry, preferences, and daemon state all
 // resolve through $XDG_CONFIG_HOME at call time, and run-tests.mjs gives the whole suite ONE

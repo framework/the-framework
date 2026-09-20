@@ -1,6 +1,6 @@
 import { resolve } from 'node:path'
 import { stat } from 'node:fs/promises'
-import { fromDiaryLine, resolveAgentDiary, type AgentMeta, type AnyDiaryLine } from './store/index.js'
+import { fromDiaryLine, projectBranches, resolveAgentDiary, type AgentMeta, type AnyDiaryLine } from './store/index.js'
 import type { FrameworkEvent } from './events.js'
 import type { StartAgentOptions, StartAgentResult, AddProjectResult } from './dashboard/index.js'
 import type { EventsSource, RemoteAgents } from './dashboard/rpc-serve.js'
@@ -107,6 +107,9 @@ export function createProjectRuntime({ cwd, env }: ProjectRuntimeOptions): Proje
       ...(options.model !== undefined ? { model: options.model } : {}),
       ...(options.then !== undefined ? { then: options.then } : {}),
     })
+    // The line made a checkout (or is about to): the project's checkouts are read again on the
+    // next look rather than a few seconds from now, so the new run's page finds its own.
+    if (started.ok) projectBranches.changed(projectCwd)
     return started.ok ? { ok: true, agentId: started.id } : { ok: false, error: started.error }
   }
 

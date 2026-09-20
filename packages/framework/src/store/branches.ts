@@ -82,12 +82,17 @@ export type PublishOutcome = { ok: true; pr: { number: number; url: string }; ex
 /** What landing a pull request did: armed on GitHub, merged at once, or this machine watching its checks. */
 export type MergeOutcome = { ok: true; outcome: 'auto-armed' | 'merged' | 'watching' } | { ok: false; error: string }
 
-/** What a change to the checkouts did: done, or the provider's reason it was not. */
-export type BranchesWrite = { ok: true } | { ok: false; error: string }
+/** What reclaiming a checkout did: done, with the branches that went with it when any did, or the provider's reason it stayed. */
+export type RemoveOutcome = { ok: true; branchesDeleted?: string[] } | { ok: false; error: string }
 
 /** A project's checkouts and branches: what a provider answers, read and moved by the framework. */
 export interface BranchesSource {
-  /** Every checkout; `[]` when none can be read. `fresh` skips a list read a moment ago: the caller knows a checkout just appeared. */
+  /**
+   * Every checkout; `[]` when none can be read. `fresh` asks past a list read within the window:
+   * the caller is looking for a checkout that may have just appeared. A list read less than
+   * {@link FRESH_MS} ago still answers, so a caller asking every second for a run that has no
+   * checkout is not a process every second.
+   */
   list(opts?: { sizes?: boolean; fresh?: boolean }): Promise<Checkout[]>
   /** Each branch's state, in the order asked; a branch the provider did not answer for is missing. `[]` when nothing can be read. */
   show(branches: readonly string[]): Promise<BranchState[]>
@@ -96,7 +101,7 @@ export interface BranchesSource {
   /** Land a pull request. */
   merge(number: number): Promise<MergeOutcome>
   /** Reclaim a run's checkout, or why it stayed. `discard` drops its uncommitted work instead of refusing over it. */
-  remove(id: string, opts?: { discard?: boolean }): Promise<BranchesWrite>
+  remove(id: string, opts?: { discard?: boolean }): Promise<RemoveOutcome>
 }
 
 /** The checkouts of the project at `root`, or `undefined` when none of its packages provides them. */
@@ -107,6 +112,9 @@ export type BranchesReader = BranchesFor & { changed(root: string): void }
 
 /** How long a read is reused: the dashboard polls several reads of every project's checkouts every few seconds, and each is a process. */
 const CACHE_MS = 5_000
+
+/** How recent a list read still answers a `fresh` ask: younger than this, the checkout the caller looks for was not there a moment ago either. */
+const FRESH_MS = 1_000
 
 /** The rows read back from a provider's `list`: the objects with an id and a path, everything else as printed; anything else is no checkout. */
 export function parseCheckouts(output: unknown): Checkout[] {
@@ -194,7 +202,7 @@ function commandBranches(root: string, command: ProvidedCommand, now: () => numb
       // Concurrent reads share one process; a read that failed is not kept.
       const key = opts.sizes ? 'sizes' : 'plain'
       const known = listed.get(key)
-      if (known && !opts.fresh && now() - known.at < CACHE_MS) return known.rows
+      if (known && now() - known.at < (opts.fresh ? FRESH_MS : CACHE_MS)) return known.rows
       const read: { at: number; rows: Promise<Checkout[]> } = { at: now(), rows: Promise.resolve([]) }
       read.rows = runPackageCommand(root, command, ['list', ...(opts.sizes ? ['--sizes'] : [])]).then(result => {
         if (!result.ok || !Array.isArray(result.output)) {
@@ -245,7 +253,10 @@ function commandBranches(root: string, command: ProvidedCommand, now: () => numb
       if (!isRunId(id)) return { ok: false, error: `not a run id: ${id}` }
       const result = await runPackageCommand(root, command, ['remove', id, ...(opts.discard ? ['--discard'] : [])])
       drop()
-      return result.ok ? { ok: true } : { ok: false, error: result.error }
+      if (!result.ok) return { ok: false, error: result.error }
+      const gone = result.output && typeof result.output === 'object' ? (result.output as Record<string, unknown>)['branchesDeleted'] : undefined
+      const branchesDeleted = Array.isArray(gone) ? gone.filter((branch): branch is string => typeof branch === 'string') : []
+      return branchesDeleted.length ? { ok: true, branchesDeleted } : { ok: true }
     },
   }
 }

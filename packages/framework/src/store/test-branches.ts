@@ -18,13 +18,9 @@ export function testBranches(byProject: Record<string, Checkout[]> = {}, states:
     async show(branches) {
       return branches.flatMap(branch => states.filter(state => state.branch === branch))
     },
-    async publish(branch, opts) {
-      writes.push(`publish ${branch} ${JSON.stringify(opts)}`)
-      return { ok: true, pr: { number: 1, url: 'https://x/pull/1' }, existing: false }
-    },
-    async merge(number) {
-      writes.push(`merge ${number}`)
-      return { ok: true, outcome: 'auto-armed' }
+    async push(branch) {
+      writes.push(`push ${branch}`)
+      return { ok: true, pushed: true }
     },
     async remove(id, opts = {}) {
       writes.push(`remove ${id}${opts.discard ? ' --discard' : ''}`)

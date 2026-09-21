@@ -19,7 +19,7 @@ The tool's process side: the tick [1] wired to the real project, the run's [2] d
 
 - **A tick of the real project** - the state and the schedule read, the tick decided with this host, the `agent-data` pull, the sweep with a real pid probe, the command's folder, the check with a one-minute budget, the branch's markers and each command's last start, whether Claude Code can start here, Claude Code's quota, ids from the clock, the driver `claude-code`; the record written to the state as `lastTick` and told line by line on the log (`[agent-scheduler] tick <time>: <note>`, `[agent-scheduler]   <command>: <outcome>`).
 - **The detached run** - the run's lock [6] taken by the spawning process, then `agent-scheduler run <prompt> --id <id> --command <command>`, with `--model <model>`, `--driver <name>` and `--then <prompt>` when the run has them, detached from the tick, stdin and stdout dropped, stderr to `.agent-scheduler/runs/<id>.stderr`, the run's id in its environment as `AGENT_ID`, and the lock handed to the spawned process; a spawn that fails lets the lock go.
-- **Can a run start here** - the coding agent's readiness from `agent-driver` (its CLI installed and logged in: a problem when not), plus two warnings of this tool's own: `gh` not found, or `gh` not logged in; what the `check` command answers, and what a person's run and the tick refuse on.
+- **Can a run start here** - the coding agent's readiness from `agent-driver` (its CLI installed and logged in: a problem when not); nothing else is probed; what the `check` command answers, and what a person's run and the tick refuse on.
 - **A detached start on demand** - `run --detach <prompt>`: the run's lock taken, the marker written and the run's process spawned the way the tick does it, the id answered at once, the lock let go when the marker or the spawn throws; the command is the prompt's first word, so the run counts against that command's cap; the coding agent is Claude Code unless `--driver codex`, and the marker names it; a follow-up given with `--then` is on the marker's mark from the start and passed to the run's process.
 - **A detached continuation on demand** - `run --detach --resume <id>`: the run's process spawned to continue it, its id answered at once; the line a dashboard's resume hook runs. A run the project has no record of is refused there and then.
 - **A run in this process** - the id given by the tick or minted now, marked already when the id was given, on Claude Code or, with `--driver codex`, on Codex; a follow-up it names runs on the same coding agent, made for the follow-up's own id; a resumed run, and the follow-up its record names, on the coding agent its record names.
@@ -46,13 +46,13 @@ The state and the schedule are read from the repository. The tick decides with: 
 
 #### Context
 
-**User story**: the user picks Claude Code or Codex in a dashboard's launcher, and a missing or logged-out CLI is said under the prompt box before the Start (the project's check hook runs `agent-scheduler check`); a missing or logged-out `gh` is said too, as a warning.
+**User story**: the user picks Claude Code or Codex in a dashboard's launcher, and a missing or logged-out CLI is said under the prompt box before the Start (the project's check hook runs `agent-scheduler check`).
 
 **Problem**: a run on a coding agent whose CLI is missing or logged out takes a checkout and a marker, then dies before its first turn; the check costs about a second, the dead run a branch.
 
 #### Business logic
 
-The answer is `agent-driver`'s readiness for the coding agent named (problems: its CLI not found, or not logged in; a warning: running as root), with this tool's `gh` warnings added. `gh` is asked `--version`; when that fails the warning is "`gh` not found — the run's agent cannot open its pull request, and its record will name none. Install the GitHub CLI (https://cli.github.com) and run `gh auth login`." When `gh` is there it is asked `auth status`, and a non-zero exit is the warning "`gh` is not logged in — the run's agent cannot open its pull request, and its record will name none. Run `gh auth login`." A `gh` answer is a warning, never a problem: the agent opens its own pull request with `gh` and the run reads the number back, but the work itself needs no `gh`. The tick asks it for Claude Code, the coding agent every scheduled run is on.
+The answer is `agent-driver`'s readiness for the coding agent named (problems: its CLI not found, or not logged in; a warning: running as root), and nothing more: the project's forge is not probed, since a project with no forge package runs fine, and one whose forge cannot answer says so in the run's own log. The tick asks it for Claude Code, the coding agent every scheduled run is on.
 
 ### The detached run
 

@@ -18,8 +18,7 @@ appendFileSync(join(__dirname, 'calls.log'), args.join(' ') + '\\n')
 const answer = name => process.stdout.write(readFileSync(join(__dirname, name), 'utf8'))
 if (args[0] === 'list') answer('list.json')
 else if (args[0] === 'show') answer('show.json')
-else if (args[0] === 'publish') answer('publish.json')
-else if (args[0] === 'merge') answer('merge.json')
+else if (args[0] === 'push') process.stdout.write(args[2] === 'remote-only' ? '{"ok":true,"branch":"remote-only","pushed":false}' : args[2] === 'dirty' ? (process.stderr.write('agent-dirty has uncommitted work; commit or delete it, then push\\n'), process.exit(1)) : '{"ok":true,"branch":"agent-run-1","pushed":true}')
 else if (args[0] === 'remove') { if (args[1] === 'kept') { process.stderr.write('agent-kept has uncommitted work; the checkout was kept\\n'); process.exit(1) } process.stdout.write(args[1] === 'run-1' && !args.includes('--discard') ? '{"ok":true,"branchesDeleted":["agent-run-1"]}' : '{"ok":true}') }
 `
 
@@ -37,8 +36,6 @@ async function project(deps: Record<string, Record<string, unknown>>): Promise<s
     await writeFile(join(dir, 'provider.cjs'), PROVIDER)
     await writeFile(join(dir, 'list.json'), JSON.stringify([ROW]))
     await writeFile(join(dir, 'show.json'), JSON.stringify([STATE]))
-    await writeFile(join(dir, 'publish.json'), JSON.stringify({ ok: true, branch: 'agent-run-1', pr: { number: 7, url: 'https://x/pull/7' }, existing: false }))
-    await writeFile(join(dir, 'merge.json'), JSON.stringify({ ok: true, number: 7, merge: { outcome: 'auto-armed' } }))
   }
   return root
 }
@@ -59,8 +56,9 @@ test('a project with no branches provider has no checkouts; one with a provider 
     assert.deepEqual(await branches.list({ sizes: true }), [{ id: 'run-1', path: ROW.path, branch: ROW.branch }])
     assert.deepEqual(await branches.show(['agent-run-1', 'agent-run-2']), [STATE])
     assert.deepEqual(await branches.show([]), [], 'nothing asked is nothing run')
-    assert.deepEqual(await branches.publish('agent-run-1', { title: 'T', body: 'B', draft: true }), { ok: true, pr: { number: 7, url: 'https://x/pull/7' }, existing: false })
-    assert.deepEqual(await branches.merge(7), { ok: true, outcome: 'auto-armed' })
+    assert.deepEqual(await branches.push('agent-run-1'), { ok: true, pushed: true })
+    assert.deepEqual(await branches.push('remote-only'), { ok: true, pushed: false }, 'a branch only the remote has: nothing to push, and nothing missing')
+    assert.deepEqual(await branches.push('dirty'), { ok: false, error: 'agent-dirty has uncommitted work; commit or delete it, then push' }, "a refusal is the provider's own line")
     assert.deepEqual(await branches.remove('run-1'), { ok: true, branchesDeleted: ['agent-run-1'] }, 'the branches that went with the checkout ride along')
     assert.deepEqual(await branches.remove('run-1', { discard: true }), { ok: true })
     assert.deepEqual(await branches.remove('kept'), { ok: false, error: 'agent-kept has uncommitted work; the checkout was kept' }, "a refusal is the provider's own line")
@@ -69,8 +67,9 @@ test('a project with no branches provider has no checkouts; one with a provider 
       'list',
       'list --sizes',
       'show agent-run-1 agent-run-2',
-      'publish --branch agent-run-1 --title T --body B --draft',
-      'merge 7',
+      'push --branch agent-run-1',
+      'push --branch remote-only',
+      'push --branch dirty',
       'remove run-1',
       'remove run-1 --discard',
       'remove kept',

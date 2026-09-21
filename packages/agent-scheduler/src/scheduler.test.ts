@@ -90,10 +90,10 @@ test('a resumed run continues on the tool its record names, and a Codex run with
         return new FakeDriver({ turns: [{ text: turn }], sessionId: 's-codex' }).start(opts)
       },
     })
-    const first = await runCommand(repo, { prompt: 'Read the docs', driver: codex('Read.'), host: 'this-box', pid: 4242, now: () => NOW, gh: async () => '[]' })
+    const first = await runCommand(repo, { prompt: 'Read the docs', driver: codex('Read.'), host: 'this-box', pid: 4242, now: () => NOW, forge: { requestOfBranch: async () => undefined, mergeRequest: async () => ({ outcome: 'failed', error: 'none' }) } })
     assert.equal(first.status, 'done')
     const asked: string[] = []
-    const second = await resumeProject(repo, { id: first.id, text: 'And the tests?' }, { driverFor: name => { asked.push(name); return codex('Read too.') }, gh: async () => '[]' })
+    const second = await resumeProject(repo, { id: first.id, text: 'And the tests?' }, { driverFor: name => { asked.push(name); return codex('Read too.') } })
     assert.equal(second.status, 'done')
     assert.deepEqual(asked, ['codex'])
     assert.deepEqual(startedWith, [{}, {}], 'no model named at the start nor at the resume: Codex runs on its own default')
@@ -108,22 +108,17 @@ test('a spawned run is told its tool, and its model only when it has one', () =>
   assert.deepEqual(runArgs({ id: 'r1', command: 'work-queue', prompt: '/work-queue', then: '/post-merge-cleanup' }), ['run', '/work-queue', '--id', 'r1', '--command', 'work-queue', '--then', '/post-merge-cleanup'])
 })
 
-test('ready to run: the coding agent\'s problems stop a run, a missing or logged-out gh only warns', async () => {
+test('ready to run: the coding agent\'s problems stop a run; nothing else is probed, the forge least of all', async () => {
   const notRoot = () => false
-  const answers = (gh: { version: boolean; auth: boolean }, loggedIn = true) => async (bin: string, args: readonly string[]) =>
-    bin === 'gh' ? { ok: args[0] === '--version' ? gh.version : gh.auth, output: '' } : { ok: true, output: args[0] === '--version' ? '2.1.0' : JSON.stringify({ loggedIn }) }
+  const probed: string[] = []
+  const answers = (loggedIn: boolean) => async (bin: string, args: readonly string[]) => {
+    probed.push(bin)
+    return { ok: true, output: args[0] === '--version' ? '2.1.0' : JSON.stringify({ loggedIn }) }
+  }
+  assert.deepEqual(await readyToRun('claude-code', { probe: answers(true), isRoot: notRoot }), { problems: [], warnings: [] })
+  assert.deepEqual(await readyToRun('codex', { probe: answers(true), isRoot: notRoot }), { problems: [], warnings: [] })
+  assert.ok(probed.every(bin => bin === 'claude' || bin === 'codex'), `only the coding agent's CLI is asked, not ${probed.join(', ')}`)
 
-  assert.deepEqual(await readyToRun('claude-code', { probe: answers({ version: true, auth: true }), isRoot: notRoot }), { problems: [], warnings: [] })
-
-  const noGh = await readyToRun('claude-code', { probe: answers({ version: false, auth: false }), isRoot: notRoot })
-  assert.deepEqual(noGh.problems, [])
-  assert.equal(noGh.warnings.length, 1, 'a missing gh is not asked about its login too')
-  assert.match(noGh.warnings[0]!, /`gh` not found/)
-
-  const ghOut = await readyToRun('codex', { probe: answers({ version: true, auth: false }), isRoot: notRoot })
-  assert.deepEqual(ghOut.problems, [])
-  assert.match(ghOut.warnings[0]!, /`gh` is not logged in.*gh auth login/)
-
-  const out = await readyToRun('claude-code', { probe: answers({ version: true, auth: true }, false), isRoot: notRoot })
+  const out = await readyToRun('claude-code', { probe: answers(false), isRoot: notRoot })
   assert.match(out.problems[0]!, /claude auth login/)
 })

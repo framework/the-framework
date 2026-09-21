@@ -1,0 +1,1 @@
+What the tests cover: the project page from the scp, ssh and https remote forms, with a credential, a `.git` suffix or a trailing newline; nothing for another host, a bare host, an owner alone or an empty remote; the URL read off `origin`, and none when git has no origin.

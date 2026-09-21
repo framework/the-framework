@@ -3,7 +3,7 @@ import { closeSync, mkdirSync, openSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { BRANCHES_DIR } from '@gemstack/agent-data'
-import type { GhRunner } from './publish.js'
+import type { GhRunner } from './gh.js'
 
 /**
  * Merge on green where the repository does not allow GitHub auto-merge: a small process of this
@@ -98,7 +98,7 @@ export async function watchAndMerge(repo: string, number: number, opts: WatchOpt
   for (;;) {
     const pr = await readPr(repo, number, opts.gh)
     const elapsed = now() - started
-    log(`[branches] #${number}: ${pr.state}, checks ${pr.checks}`)
+    log(`[github] #${number}: ${pr.state}, checks ${pr.checks}`)
     if (pr.state !== 'OPEN') return { outcome: 'closed', state: pr.state }
     if (pr.checks === 'failing') return { outcome: 'checks-failed', failed: pr.failed }
     if (pr.checks === 'passing' || (pr.checks === 'none' && elapsed >= (opts.graceMs ?? NO_CHECKS_GRACE_MS))) {
@@ -115,18 +115,18 @@ export async function watchAndMerge(repo: string, number: number, opts: WatchOpt
 }
 
 /** This package's executable, beside `dist/`. */
-const BIN = fileURLToPath(new URL('../bin/branches', import.meta.url))
+const BIN = fileURLToPath(new URL('../bin/github', import.meta.url))
 
 /**
  * Start the watcher for one pull request as its own process, detached, so it outlives the agent
- * that published: `branches merge-on-green <number>` at the project root, its log under
+ * that published: `github watch <number>` at the project root, its log under
  * `.branches/merge-on-green/<number>.log`. Resolves once the process exists.
  */
 export async function spawnMergeWatch(repo: string, number: number): Promise<void> {
   const dir = join(repo, BRANCHES_DIR, WATCH_LOG_DIR)
   mkdirSync(dir, { recursive: true })
   const fd = openSync(join(dir, `${number}.log`), 'a')
-  const child = spawn(process.execPath, [BIN, 'merge-on-green', String(number)], { cwd: repo, detached: true, stdio: ['ignore', fd, fd] })
+  const child = spawn(process.execPath, [BIN, 'watch', String(number)], { cwd: repo, detached: true, stdio: ['ignore', fd, fd] })
   closeSync(fd)
   child.unref()
   await new Promise<void>((resolve, reject) => {

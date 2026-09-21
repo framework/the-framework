@@ -6,4 +6,4 @@ What the tests cover, with the spawn and the CLIs' answers faked:
 - **The spawned run's command line** - the model, the driver and the follow-up (`--then`) are named only when the run has them.
 - **The coding agent** - a run's Codex has full access and the run's id as `AGENT_ID` in its environment; a run's Claude Code is Claude Code.
 - **A resume** - an ended run recorded on Codex is resumed on Codex, asked for by the record's name, and with no model named at the start nor at the resume.
-- **Can a run start here** - a ready coding agent and `gh` give no problem and no warning; a missing `gh` is one warning and its login is not asked; a logged-out `gh` is a warning naming `gh auth login`, on Codex too; a logged-out Claude Code is a problem naming `claude auth login`.
+- **Can a run start here** - a ready coding agent gives no problem and no warning, on Codex too, and only the coding agent's CLI is probed; a logged-out Claude Code is a problem naming `claude auth login`.

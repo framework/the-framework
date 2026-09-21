@@ -8,7 +8,6 @@ import { findRun } from '@gemstack/skill-logs'
 import { DATA_BRANCH, nodeGitRunner, pullFileBranch, type GitRunner } from '@gemstack/agent-data'
 import { CHECK_TIMEOUT_MS, SCHEDULER_LOG, TICK_MS } from './names.js'
 import { inFlight, lastStart, markerCard, withdrawMarker, writeMarker } from './records.js'
-import type { GhRunner } from './pr.js'
 import { resumeRun, runCommand, runIdFrom, type RunOutcome } from './run.js'
 import { readSchedule } from './schedule.js'
 import { readState, runStderrPath, stateDir, updateState, withoutPid, type State, type TickRecord } from './state.js'
@@ -72,21 +71,13 @@ export async function tickProject(repo: string, opts: { git?: GitRunner; log?: (
 /**
  * Whether a run on `driver` can start on this machine, asked before it spends a checkout: the
  * coding agent's CLI is installed and logged in (a problem when not: the session would die
- * before its first turn), and `gh` is there and logged in (a warning when not: the agent opens
- * its own pull request with it, and the run reads the number back, but the work itself needs
- * no `gh`). What a dashboard's check hook runs, and what a person's run and the tick refuse on.
+ * before its first turn). What a dashboard's check hook runs, and what a person's run and the
+ * tick refuse on. The forge is not probed: a project with no forge package runs fine, and one
+ * whose forge cannot answer says so in the run's own log.
  */
 export async function readyToRun(driver: DriverName, deps: { probe?: CliProbe; isRoot?: () => boolean } = {}): Promise<DriverReadiness> {
   const probe = deps.probe ?? probeCli
-  const ready = await checkDriverReady(driver, { probe, ...(deps.isRoot ? { isRoot: deps.isRoot } : {}) })
-  const noPr = 'the run\'s agent cannot open its pull request, and its record will name none.'
-  if (!(await probe('gh', ['--version'])).ok) {
-    ready.warnings.push(`\`gh\` not found — ${noPr} Install the GitHub CLI (https://cli.github.com) and run \`gh auth login\`.`)
-  } else if (!(await probe('gh', ['auth', 'status'])).ok) {
-    // `gh auth status` exits non-zero when no host is logged in; the exit code is the answer.
-    ready.warnings.push(`\`gh\` is not logged in — ${noPr} Run \`gh auth login\`.`)
-  }
-  return ready
+  return checkDriverReady(driver, { probe, ...(deps.isRoot ? { isRoot: deps.isRoot } : {}) })
 }
 
 /** The command line of a spawned run: the model, the coding agent and the follow-up named only when the run has them, so the run's own defaults apply otherwise. */
@@ -234,7 +225,7 @@ export async function runProject(repo: string, opts: { prompt: string; id?: stri
 export async function resumeProject(
   repo: string,
   opts: { id: string; text?: string; answer?: string; model?: string; log?: (line: string) => void },
-  deps: { driverFor?: typeof driverFor; gh?: GhRunner } = {},
+  deps: { driverFor?: typeof driverFor } = {},
 ): Promise<RunOutcome> {
   const card = await findRun(repo, opts.id)
   const recorded = card?.driver ?? 'claude-code'
@@ -246,7 +237,6 @@ export async function resumeProject(
     ...(opts.model !== undefined ? { model: opts.model } : {}),
     driver: (deps.driverFor ?? driverFor)(recorded, opts.id),
     nextDriver: next => (deps.driverFor ?? driverFor)(recorded, next),
-    ...(deps.gh ? { gh: deps.gh } : {}),
     ...(opts.log ? { log: opts.log } : {}),
   })
 }

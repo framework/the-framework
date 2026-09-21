@@ -1,12 +1,12 @@
-Decides what becomes of an agent's [1] work once the agent has ended, its handoff [2]: reads what the agent left on its branch (commits, changed files, whether the branch is pushed or merged, what it left uncommitted in its checkout [3]) through the project's branches provider [14], works out which pull request is the agent's, and backs the "Open PR" and "Merge" buttons on a finished agent's page. It runs no git and no `gh` write itself: pushing a branch, opening its pull request and landing it are the branches provider's, asked through the command the provider's package declares. It publishes nothing on its own: an agent publishes its own work, and the automatic handoff the daemon's former run process ran when an agent ended is gone with that process. Nothing here commits on the agent's behalf, and every read is forgiving: a project with no branches provider, no remote or no `gh` yields a handoff with less in it, never an error.
+Decides what becomes of an agent's [1] work once the agent has ended, its handoff [2]: reads what the agent left on its branch (commits, changed files, whether the branch is pushed or merged, what it left uncommitted in its checkout [3]) through the project's branches provider [14], works out which pull request is the agent's, and backs the "Push", "Open PR" and "Merge" buttons on a finished agent's page. It runs no git and no forge tool itself: pushing a branch is the branches provider's, opening a pull request and landing it are the forge provider's [19], each asked through the command its package declares; opening a pull request is the two composed, the push then the open. It publishes nothing on its own: an agent publishes its own work, and the automatic handoff the daemon's former run process ran when an agent ended is gone with that process. Nothing here commits on the agent's behalf, and every read is forgiving: a project with no branches provider, no forge, or no remote yields a handoff with less in it, never an error; without a forge, the last step is the push.
 
 ## Context
 
 **User story**:
 - The user starts an agent [1] and walks away. The agent publishes its own work: it pushes its branch and opens its pull request itself. Nothing here does it for the agent.
-- On a finished agent's page the user sees what the agent produced — its commits, the files it changed, the files it left uncommitted — and opens the pull request ("Open PR") or merges it ("Merge") with one press. The user is never handed an empty pull request or a second pull request for the same branch.
+- On a finished agent's page the user sees what the agent produced — its commits, the files it changed, the files it left uncommitted — and opens the pull request ("Open PR") or merges it ("Merge") with one press; on a project with no forge package, pushes the branch ("Push"). The user is never handed an empty pull request or a second pull request for the same branch.
 
-**Business logic story**: the dashboard's buttons run the manual actions on a finished agent (`../dashboard-rpc/control.ts`); cloud work adoption opens the pull request for a branch that exists only on the remote (`../cloud-work.ts`); the intervention [8] feed reads branch states through the same provider to list unpushed work (`interventions.ts`). Every pull request read goes through GitHub's `gh` command by the rules in `gh.ts`; every push, pull request creation and merge goes through the branches provider [14] by the contract in `../store/branches.ts`.
+**Business logic story**: the dashboard's buttons run the manual actions on a finished agent (`../dashboard-rpc/control.ts`); cloud work adoption opens the pull request for a branch that exists only on the remote (`../cloud-work.ts`); the intervention [8] feed reads branch states through the same provider to list unpushed work (`interventions.ts`). Every pull request read still goes through GitHub's `gh` command by the rules in `gh.ts`; every push goes through the branches provider [14] by the contract in `../store/branches.ts`, and every pull request opened or landed through the forge provider [19] by the contract in `../store/forge.ts`.
 
 ## Glossary
 
@@ -18,21 +18,23 @@ Decides what becomes of an agent's [1] work once the agent has ended, its handof
 [9] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
 [10] hands-off: said of an agent whose work leaves this machine, so its first prompt is the whole agent: an agent whose location is `web`.
 [12] run: only the `logs` skill's record of one agent on the `agent-data` branch: a card (what was asked, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said).
-[14] branches provider: the package of the project that declares it provides the checkouts and branches; The Framework reads a branch's state and moves branches through the command that package declares (`../store/branches.ts`).
+[14] branches provider: the package of the project that declares it provides the checkouts and branches; The Framework reads a branch's state and pushes branches through the command that package declares (`../store/branches.ts`). Git only.
+[19] forge provider: the package of the project that declares it provides the forge (`"framework": { "forge": "<command>" }`); The Framework opens and lands pull requests through the command that package declares (`../store/forge.ts`). A project with none has no forge: no pull request is opened or landed for it.
 [18] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
 
 ## Business logic — TL;DR
 
 - **The branch an agent's work is on** - the branch recorded on the agent, because the agent renames its branch itself; an agent that recorded none has no branch to hand off.
-- **What a finished agent left behind** - the branch's git facts as the branches provider answers them, so the read is the same whether or not the checkout still exists: the base, the branch's own commits, the change since the branch point, whether the branch is pushed and merged, the uncommitted work in the checkout on that branch, and a gone branch as a fact rather than an error; plus the agent's pull request from the dashboard's own lookup.
+- **What a finished agent left behind** - the branch's git facts as the branches provider answers them, so the read is the same whether or not the checkout still exists: the base, the branch's own commits, the change since the branch point, whether the branch is pushed and merged, the uncommitted work in the checkout on that branch, and a gone branch as a fact rather than an error; plus whether the project has a forge provider at all, and the agent's pull request from the dashboard's own lookup.
 - **Nothing to hand off** - a branch with no commit the base lacks, or whose commits change no file, is empty, and every step that would publish it refuses.
 - **Uncommitted work is named, never committed** - what the agent left uncommitted in the checkout on its branch is listed by path, as the provider names it, and nothing commits it on the agent's behalf.
 - **Which pull request is the agent's** - out of the branch's whole pull request history: an open one always, a closed one only when created after the agent started; the first for identity, the latest for handoff decisions.
 - **The pull request the agent recorded** - the number the agent wrote down is the fact; its state is read live, and when nothing live is known the record stands on its own.
-- **Publishing a branch** - the branches provider pushes the branch and opens its pull request, or answers the open one it already has; the answer's URL and number come back, and the cached "no pull request" is forgotten.
+- **Publishing a branch** - the branches provider pushes the branch, then the forge provider opens its pull request, or answers the open one it already has; a project missing either provider, or a push the branches provider refuses, ends the action before the forge is asked; the answer's URL and number come back, and the cached "no pull request" is forgotten.
 - **The "Open PR" button** - the agent's existing pull request first, even for a gone branch, unless the agent moved past it; a gone branch and an empty branch are refused with a reason; otherwise the branch is published ready for review.
-- **A pull request for a branch only the remote has** - a cloud session's own branch is published as a draft, through the same provider.
-- **The "Merge" button on a finished agent** - refused when the agent has no pull request or it is no longer open; otherwise the branches provider lands the pull request.
+- **The "Push" button** - the branches provider pushes the agent's recorded branch, nothing more: the last step where the project has no forge; refused for an agent with no branch or a project with no branches provider.
+- **A pull request for a branch only the remote has** - a cloud session's own branch is published as a draft, through the same two providers.
+- **The "Merge" button on a finished agent** - refused when the agent has no pull request or it is no longer open, or the project has no forge; otherwise the forge provider lands the pull request.
 - **The pull request's title** - the agent's own title, else the name the branches provider answers for its branch, else the branch, else "Session <agent id>"; never the prompt, and never a branch with its prefix cut off by the framework.
 - **The pull request's body** - what the agent said about the work, else what was asked for, then which agent did it.
 - **What a handoff reports** - a button answers with success (and the pull request's URL and number) or one error line, and the number rides along so it gets recorded on the agent.
@@ -62,6 +64,7 @@ The branch is the one recorded on the agent's [1] record while it ran. An agent 
 - The branch's git facts are asked of the project's branches provider [14], for that one branch. A project with no branches provider, or a provider that does not answer for the branch, yields no handoff [2] at all: nothing about it is answerable.
 - The provider answers whether the branch exists on this machine, the base it is measured against when one was found, its own commits beyond the base (newest first, each with its full id and its subject), the files it changed since the branch point (each with lines inserted, lines deleted and whether it is binary), whether the repository has a remote, whether the remote holds the branch at the very same commit, whether the base already contains it, and the uncommitted paths in the checkout [3] that is on the branch, when one is. Each commit gets a seven-character id for display, and the line totals sum the files.
 - A branch that no longer exists locally still yields a handoff, marked as gone, with no commits and no files. Its pull request is still looked up: a hands-off [10] agent pushes its branch and opens its pull request from the cloud, and a merged branch gets deleted, so the pull request is the one thing left worth showing.
+- The handoff says whether the project has a forge provider [19] at all (`forge`), by asking for it: the page offers a pull request only where one can be opened, and the push alone otherwise.
 - The pull request is looked up through the dashboard's read cache and allowed to arrive late: while the lookup is still warming the handoff says "not known yet" rather than "no pull request", so the git answers never wait on `gh` and the caller can ask again.
 
 ### Nothing to hand off
@@ -108,11 +111,11 @@ An agent [1] with no recorded pull request has none. For an agent with one, the 
 
 #### Context
 
-**Problem**: GitHub refuses to open a pull request for a branch the remote has never seen, so the push must be part of the action rather than something the user has to remember first. How a branch is pushed, against which base its pull request opens, and what a checkout must look like before it may be published are the branches provider's [14] rules, not the dashboard's.
+**Problem**: a forge refuses to open a pull request for a branch the remote has never seen, so the push must be part of the action rather than something the user has to remember first. How a branch is pushed and what a checkout must look like before it may be pushed are the branches provider's [14] rules; against which base the pull request opens is the forge provider's [19]; neither is the dashboard's.
 
 #### Business logic
 
-The branches provider [14] is asked to publish the branch with the given title and body, and as a draft when asked; a project with no branches provider refuses with "this project has no branches provider to publish with". The provider pushes the branch when the remote lacks it and opens the pull request, or answers the open pull request the branch already has; a refusal of its own (a checkout on the branch holding uncommitted work, a push that failed, a pull request GitHub refused) ends the action with the provider's own line as the error. The pull request's URL and number come back from the provider. The branch's cached "no pull request" answers — the single view and the history — are forgotten, so the page stops offering to open one.
+Two providers, in order. A project with no branches provider refuses with "this project has no branches provider to push with"; one with no forge provider refuses with "this project has no forge package to open a pull request with"; both are checked before anything moves. The branches provider [14] is asked to push the branch: the checkout on it under the provider's clean rule, else the branch itself, and a branch only the remote has counts as pushed already. A refusal of its own (a checkout on the branch holding uncommitted work, a push that failed, a branch nowhere) ends the action with the provider's own line as the error, and the forge is never asked. Then the forge provider [19] is asked to open the branch's pull request with the given title and body, and as a draft when asked; it answers the open pull request the branch already has when there is one; a refusal of its own (the forge's own line) is the error. The pull request's URL and number come back from the forge. The branch's cached "no pull request" answers — the single view and the history — are forgotten, so the page stops offering to open one.
 
 ### The "Open PR" button
 
@@ -124,6 +127,16 @@ The branches provider [14] is asked to publish the branch with the given title a
 
 An agent [1] that recorded no branch is refused with "this session recorded no branch to open a PR from". Otherwise the branch's state is read with the agent's start time, picking the latest pull request that saw the branch. The agent's pull request is the answer first, even when the branch is gone locally — a hands-off [10] agent's branch only ever existed on the remote, and its pull request is what the button exists to give — unless the agent demonstrably moved past it. An agent has moved past its pull request when the pull request is merged or closed and its head commit is known and differs from the branch tip; never for an open pull request (pushed commits still land on it), never when the lookup carried no head commit (a duplicate pull request is not risked on a guess), and never for a gone branch (no tip to compare, so the pull request stays the best answer). Then a branch that no longer exists is refused with "branch <branch> no longer exists", and an empty branch with "this session produced no commits to open a PR for". Otherwise the branch is published by the rule above, ready for review unless the caller asks for a draft, with the title and body rules below. A pull request a human asked for by name is asking for review. The dashboard records the number and URL it gets back on the agent's run [12] card (`../dashboard-rpc/control.ts`).
 
+### The "Push" button
+
+#### Context
+
+**User story**: on a project with no forge package, a finished agent's [1] page offers "Push": the branch reaches the remote, and that is where the handoff [2] ends, since nothing can open a pull request for it.
+
+#### Business logic
+
+An agent [1] that recorded no branch is refused with "this session recorded no branch to push"; a project with no branches provider [14] with "this project has no branches provider to push with". Otherwise the branches provider is asked to push the recorded branch, by the same rule as above, and its refusal is the error. Nothing is opened, no cache is touched. ("Push" on an agent still running is refused with "that session is still going" in `../dashboard-rpc/control.ts`.)
+
 ### A pull request for a branch only the remote has
 
 #### Context
@@ -132,7 +145,7 @@ An agent [1] that recorded no branch is refused with "this session recorded no b
 
 #### Business logic
 
-The branch is published by the rule above, always as a draft — a pull request The Framework opens by itself must not request anyone's review, and the intervention [8] feed keeps listing it — with the title and body rules below. The branches provider [14] finds nothing to push for a branch only the remote has and opens the pull request against its own default base.
+The branch is published by the rule above, always as a draft — a pull request The Framework opens by itself must not request anyone's review, and the intervention [8] feed keeps listing it — with the title and body rules below. The branches provider [14] finds nothing to push for a branch only the remote has and answers it as it is; the forge provider [19] opens the pull request against its own default base.
 
 ### The "Merge" button on a finished agent
 
@@ -142,7 +155,7 @@ The branch is published by the rule above, always as a draft — a pull request 
 
 #### Business logic
 
-The agent's [1] recorded pull request is resolved by the rule above. No pull request: refused with "this session has no pull request to merge". A pull request that is not open: refused with "this session's PR is already merged" (or "closed"), because that is an answer, not an action. A project with no branches provider [14]: refused with "this project has no branches provider to merge with". Otherwise the branches provider is asked to land the pull request by its number — armed on GitHub to merge on green, merged at once where it is already green, or watched by the provider where the repository allows no auto-merge, a draft marked ready on the way — and a refusal is returned as the provider's own error. On success the branch's cached pull request answers are forgotten, so the page stops offering a merge for a pull request that landed, and the pull request's URL and number are returned.
+The agent's [1] recorded pull request is resolved by the rule above. No pull request: refused with "this session has no pull request to merge". A pull request that is not open: refused with "this session's PR is already merged" (or "closed"), because that is an answer, not an action. A project with no forge provider [19]: refused with "this project has no forge package to merge with". Otherwise the forge provider is asked to land the pull request by its number — armed to merge on green, merged at once where it is already green, or watched by the provider where the repository allows no auto-merge, a draft marked ready on the way — and a refusal is returned as the provider's own error. On success the branch's cached pull request answers are forgotten, so the page stops offering a merge for a pull request that landed, and the pull request's URL and number are returned.
 
 ### The pull request's title
 

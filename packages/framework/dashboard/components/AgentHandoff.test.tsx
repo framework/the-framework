@@ -4,8 +4,9 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 const onAgentHandoff = vi.fn(async () => null as unknown)
 const sendOpenPullRequest = vi.fn(async () => ({ ok: true }) as unknown)
 const sendMerge = vi.fn(async () => ({ ok: true }) as unknown)
+const sendPush = vi.fn(async () => ({ ok: true }) as unknown)
 vi.mock('../rpc/reads.js', () => ({ onAgentHandoff }))
-vi.mock('../rpc/control.js', () => ({ sendOpenPullRequest, sendMerge }))
+vi.mock('../rpc/control.js', () => ({ sendOpenPullRequest, sendMerge, sendPush }))
 
 const { HandoffActions, HandoffSummary, AgentHandoffDetails, handoffExpandable } = await import('./AgentHandoff.js')
 const { useAgentHandoff } = await import('../lib/use-agent-handoff.js')
@@ -23,6 +24,7 @@ const worked = {
   hasRemote: true,
   pushed: false,
   merged: false,
+  forge: true,
 }
 
 // The same composition AgentView uses: the verdict and the next step in the action bar, the
@@ -45,6 +47,8 @@ beforeEach(() => {
   sendOpenPullRequest.mockResolvedValue({ ok: true })
   sendMerge.mockClear()
   sendMerge.mockResolvedValue({ ok: true })
+  sendPush.mockClear()
+  sendPush.mockResolvedValue({ ok: true })
 })
 afterEach(cleanup)
 
@@ -186,6 +190,20 @@ describe('run handoff (#799)', () => {
     await waitFor(() => expect(screen.getByText('1 commit')).toBeTruthy())
     expect(screen.queryByText('Merge PR')).toBeNull()
     expect(screen.queryByText('Open PR')).toBeNull()
+  })
+
+  test('with no forge package the last step is Push, and a pushed branch is where the handoff ends (#1820)', async () => {
+    onAgentHandoff.mockResolvedValue({ ...worked, forge: false })
+    render(<Harness />)
+    await waitFor(() => expect(screen.getByText('Push')).toBeTruthy())
+    expect(screen.queryByText('Open PR')).toBeNull()
+    fireEvent.click(screen.getByText('Push'))
+    await waitFor(() => expect(sendPush).toHaveBeenCalledWith('p1', 'run-1'))
+    cleanup()
+    onAgentHandoff.mockResolvedValue({ ...worked, forge: false, pushed: true })
+    render(<Harness />)
+    await waitFor(() => expect(screen.getByText(/Pushed — no forge package/)).toBeTruthy())
+    expect(screen.queryByText('Push')).toBeNull()
   })
 
   test('a repo with no remote says why instead of offering a dead button', async () => {

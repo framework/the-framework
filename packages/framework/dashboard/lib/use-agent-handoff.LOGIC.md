@@ -2,14 +2,14 @@ Reads what an agent's [1] branch holds once its work has stopped — the commits
 
 ## Context
 
-**User story**: an agent ends, or ends waiting [3] on a question, and its page offers the one step that moves the work forward: "Open PR" when the branch has commits and a remote, "Merge PR" once a pull request exists. While that step runs the button says what it is doing ("Opening PR…", "Merging…"), and when it fails the reason is shown instead of the button silently doing nothing. The summary above the button says what the branch holds, and expanding it lists the commits and files.
+**User story**: an agent ends, or ends waiting [3] on a question, and its page offers the one step that moves the work forward: "Open PR" when the branch has commits and a remote, "Merge PR" once a pull request exists, "Push" where the project has no forge package. While that step runs the button says what it is doing ("Opening PR…", "Merging…", "Pushing…"), and when it fails the reason is shown instead of the button silently doing nothing. The summary above the button says what the branch holds, and expanding it lists the commits and files.
 
 **Problem**: the same facts are needed in two places at once — the summary line and the actions in the action bar, and the commits and files the bar expands. Read separately they disagree with each other and cost twice the traffic.
 
 ## Glossary
 
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
-[2] handoff: what becomes of an agent's work once the agent has ended: its branch pushed, a pull request opened for it, the pull request merged. The agent does it itself; on a finished agent's page the "Open PR" and "Merge" buttons do it by hand.
+[2] handoff: what becomes of an agent's work once the agent has ended: its branch pushed, a pull request opened for it, the pull request merged. The agent does it itself; on a finished agent's page the "Push", "Open PR" and "Merge" buttons do it by hand.
 [3] waiting: how an agent that ended on a question reads: not working, its checkout kept, resumed by the answer or by the user's next message.
 [4] project: a repository the user registered in the dashboard, identified by an id derived from its path.
 
@@ -63,7 +63,7 @@ A read that fails leaves the last answer in place; the next read usually succeed
 
 #### Business logic
 
-Two steps can be carried out from here: opening the pull request (which pushes the branch on the way), and merging it. While one is in flight, that specific step is named, so the button reads "Opening PR…" or "Merging…", and every step's button is unavailable until it finishes. Only one step is ever in flight.
+Three steps can be carried out from here: opening the pull request (which pushes the branch on the way), merging it, and, where the project has no forge, pushing the branch alone. While one is in flight, that specific step is named, so the button reads "Opening PR…", "Merging…" or "Pushing…", and every step's button is unavailable until it finishes. Only one step is ever in flight.
 
 ### A step that succeeds re-reads the branch at once
 

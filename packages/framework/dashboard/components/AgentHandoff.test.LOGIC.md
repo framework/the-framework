@@ -10,5 +10,6 @@ What the tests cover, for what an agent left behind as shown in the agent's acti
 - **A failed action says why** - when opening the pull request fails, its reason (such as "gh: not logged in") is shown instead of nothing happening.
 - **An open pull request becomes the merge** - with an open, unmerged pull request, neither "Open PR" nor "Push branch" is offered, and "Merge PR" merges it.
 - **A landed pull request offers nothing** - a merged or closed pull request offers neither "Merge PR" nor "Open PR".
+- **No forge package** - a project with no forge package offers "Push" and no "Open PR"; pressing it pushes the branch; once the branch is pushed the bar says "Pushed — no forge package to open a pull request with." and offers nothing.
 - **No remote** - a repository without a remote says "No remote to push to" and offers no push.
 - **Nothing before the first read** - until the branch read answers, nothing at all is rendered, so no wrong empty state flashes.

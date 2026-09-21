@@ -20,12 +20,18 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   planning, claiming and releasing a ticket is the package's own widget, through its
   command. Picked over the dashboard's own ticket pages fed by the provider, which would
   have kept a reserved route and a hand-written sidebar row.
-- The checkouts are a package's: The Framework finds a run's checkout, and pushes, opens,
-  lands and reclaims its branch, through the command the package declares
-  (`framework.branches`: `list`, `show`, `publish --branch`, `merge`, `remove`); it
-  composes a pull request's title and body from the run, and keeps the rule that says
-  which pull request is a run's, and its own reads of pull requests. Picked over the
-  framework's own git and gh handoff, which was a second way to publish.
+- The checkouts are a package's: The Framework finds a run's checkout, and pushes and
+  reclaims its branch, through the command the package declares (`framework.branches`:
+  `list`, `show`, `push --branch`, `remove`); it composes a pull request's title and body
+  from the run, and keeps the rule that says which pull request is a run's. Picked over the
+  framework's own git handoff, which was a second way to publish.
+- The forge is a package's: every pull request The Framework opens, lands or reads goes
+  through the command the package declares (`framework.forge`: `requests`, `open`,
+  `merge`, `home`), and Open PR is the two commands composed, the push then the open.
+  The Framework names no forge and runs no forge tool; a project with no forge package
+  has no pull requests, and a finished run's last step is Push. Picked over the branches
+  package opening the request, which put the forge inside the git skill, and over a forge
+  adapter inside it, which made another forge a change to that package.
 - Which package provides a kind of data when several installed packages declare it: the
   project's own package.json says, under the same `framework` key with the package's name
   as the value; several and no line means nothing provides it, and the project's banner

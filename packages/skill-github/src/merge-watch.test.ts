@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { readPr, watchAndMerge } from './merge-watch.js'
-import type { GhRunner } from './publish.js'
+import type { GhRunner } from './gh.js'
 
 // The watcher with gh scripted: what each read of the request says, and what the watcher does
 // about it. A clock that moves one interval per sleep, so hours pass in no time.

@@ -19,9 +19,8 @@ import {
 import { createCheckout, attachCheckout } from './checkout.js'
 import { reconcileBranchLinks } from './branch-links.js'
 import { discardWorktree, reclaimWorktree, type ReclaimOutcome, type ReclaimRefusal } from './reclaim.js'
-import { mergePr, nodeGhRunner, publishBranch, publishCheckout, releaseMerge, type PublishOutcome } from './publish.js'
+import { pushBranchByName, pushCheckout, type PushOutcome } from './push.js'
 import { readBranchStates } from './branch-state.js'
-import { watchAndMerge } from './merge-watch.js'
 
 /**
  * The command line over the package (#1725): the same functions a caller's code calls, for an agent
@@ -34,10 +33,13 @@ import { watchAndMerge } from './merge-watch.js'
  * on stderr so a person does.
  *
  * Where the project is comes from the working directory: for every command that acts on the
- * project (`create`, `attach`, `show`, `merge`, `list`, `remove`, `prune`, and `publish --branch`)
- * it is the checkout whose `.branches/` the working directory is under, else the checkout
- * itself — so the same command works from inside an agent's checkout; the commands that act on
- * one checkout (`name`, `status`, a bare `publish`) act on the one the working directory is in.
+ * project (`create`, `attach`, `show`, `list`, `remove`, `prune`, and `push --branch`) it is
+ * the checkout whose `.branches/` the working directory is under, else the checkout itself — so
+ * the same command works from inside an agent's checkout; the commands that act on one checkout
+ * (`name`, `status`, a bare `push`) act on the one the working directory is in.
+ *
+ * Git only (#1820): what the project's forge does with a pushed branch, the pull request and its
+ * merge, is the forge package's own command; this one never names it.
  */
 
 export const USAGE = `usage: branches <command>
@@ -47,11 +49,7 @@ export const USAGE = `usage: branches <command>
   name <name>                  rename this checkout's branch to agent-<name>; prints the name it got
   status [path]                the checkout's branch, whether it is clean, whether it is on the remote
   show <branch>...             what each branch holds and where it stands: its commits and files beyond the base, whether it is pushed, merged, and what its checkout left uncommitted
-  publish [--branch <b>] --title <t> [--body <b>] [--merge] [--draft]
-                               push this checkout's branch, or branch <b>, and open its pull request; --merge lands it on green
-  merge <number>               land pull request <number>: a draft is marked ready, then the merge is armed as --merge arms it
-  merge-on-green <number>      wait for pull request <number>'s checks and merge it once they pass; what --merge starts where the repository has no auto-merge
-  release <number>             arm the merge a publish held for pull request <number>, as --merge would have
+  push [--branch <b>]          push this checkout's branch, or branch <b>, to origin; a dirty checkout is refused
   list [--sizes]               every agent checkout under .branches/
   remove <id> [--no-push]      reclaim agent <id>'s checkout, once the remote has everything it holds
          [--discard]           ... or drop it whatever it holds, nothing pushed; the branch stays
@@ -151,57 +149,18 @@ const COMMANDS: Record<string, Command> = {
     return readBranchStates(repo, positionals, git)
   },
 
-  async publish(args, cwd, git) {
-    const { values } = parse(args, { branch: { type: 'string' }, title: { type: 'string' }, body: { type: 'string' }, merge: { type: 'boolean' }, draft: { type: 'boolean' } }, 0)
-    if (!values.title?.trim()) throw new Usage('--title is required: one line naming what the change does')
-    const opts = {
-      title: values.title.trim(),
-      ...(values.body !== undefined ? { body: values.body } : {}),
-      ...(values.merge ? { merge: true } : {}),
-      ...(values.draft ? { draft: true } : {}),
-      git,
-    }
+  async push(args, cwd, git) {
+    const { values } = parse(args, { branch: { type: 'string' } }, 0)
     if (values.branch !== undefined) {
       if (!values.branch.trim()) throw new Usage('--branch names a branch')
-      const outcome = await publishBranch(await project(cwd, git), values.branch, opts)
-      if (!outcome.ok) throw new Refused(outcome, publishRefusalLine(values.branch, outcome))
+      const outcome = await pushBranchByName(await project(cwd, git), values.branch, git)
+      if (!outcome.ok) throw new Refused(outcome, pushRefusalLine(values.branch, outcome))
       return outcome
     }
     const checkout = await inRepo(() => checkoutRoot(cwd, git))
-    const outcome = await publishCheckout(checkout, opts)
-    if (!outcome.ok) throw new Refused(outcome, publishRefusalLine(checkout, outcome))
+    const outcome = await pushCheckout(checkout, git)
+    if (!outcome.ok) throw new Refused(outcome, pushRefusalLine(checkout, outcome))
     return outcome
-  },
-
-  async merge(args, cwd, git) {
-    const { positionals } = parse(args, {}, 1)
-    const number = Number(positionals[0])
-    if (!Number.isInteger(number) || number <= 0) throw new Usage(`${positionals[0]} is not a pull request number`)
-    const repo = await project(cwd, git)
-    const outcome = await mergePr(repo, number)
-    if (outcome.outcome === 'not-open') throw new Refused({ ok: false, reason: 'not-open', number, state: outcome.state }, `pull request ${number} is ${outcome.state.toLowerCase()}, not open`)
-    if (outcome.outcome === 'failed') throw new Refused({ ok: false, reason: 'merge-failed', number, detail: outcome.error }, `pull request ${number} could not be landed: ${outcome.error}`)
-    return { ok: true, number, merge: outcome }
-  },
-
-  async 'merge-on-green'(args, cwd, git) {
-    const { positionals } = parse(args, {}, 1)
-    const number = Number(positionals[0])
-    if (!Number.isInteger(number) || number <= 0) throw new Usage(`${positionals[0]} is not a pull request number`)
-    const repo = await project(cwd, git)
-    const outcome = await watchAndMerge(repo, number, { gh: nodeGhRunner(), log: line => console.error(line) })
-    return { ok: outcome.outcome === 'merged', number, ...outcome }
-  },
-
-  async release(args, cwd, git) {
-    const { positionals } = parse(args, {}, 1)
-    const number = Number(positionals[0])
-    if (!Number.isInteger(number) || number <= 0) throw new Usage(`${positionals[0]} is not a pull request number`)
-    const repo = await project(cwd, git)
-    const outcome = await releaseMerge(repo, number)
-    if (outcome.outcome === 'not-held') throw new Refused({ ok: false, reason: 'not-held', number }, `pull request ${number} has no held merge here`)
-    if (outcome.outcome === 'failed') throw new Refused({ ok: false, reason: 'release-failed', number, detail: outcome.error }, `the merge of pull request ${number} could not be armed: ${outcome.error}`)
-    return { ok: true, number, ...outcome }
   },
 
   async list(args, cwd, git) {
@@ -287,19 +246,17 @@ function refusalLine(agentId: string, outcome: (ReclaimOutcome & { ok: false }) 
 const branchOf = (outcome: object): string => String((outcome as { branch?: string }).branch)
 const detailOf = (outcome: object): string | undefined => (outcome as { detail?: string }).detail
 
-/** Why a checkout was not published, as one line for a person. */
-function publishRefusalLine(subject: string, outcome: PublishOutcome & { ok: false }): string {
+/** Why a branch was not pushed, as one line for a person. */
+function pushRefusalLine(subject: string, outcome: PushOutcome & { ok: false }): string {
   switch (outcome.reason) {
     case 'not-a-worktree':
       return `${subject} is not a git worktree`
     case 'no-branch':
       return outcome.branch !== undefined ? `no branch ${outcome.branch}, here or on origin` : `${subject} is on no branch`
     case 'dirty':
-      return `${outcome.branch} has uncommitted work; commit or delete it, then publish`
+      return `${outcome.branch} has uncommitted work; commit or delete it, then push`
     case 'push-failed':
       return `${outcome.branch} could not be pushed: ${outcome.detail ?? 'the push did not land'}`
-    case 'pr-failed':
-      return `the pull request for ${outcome.branch} could not be opened: ${outcome.detail ?? 'gh failed'}`
   }
 }
 

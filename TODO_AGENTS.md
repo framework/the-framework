@@ -8,6 +8,7 @@
 
 
 ## Priority 4
+- [Write the plan for: The Files tab shows a run's changes for as long as they exist, and says so once they are gone](tickets/2026-09-21_files-tab-after-checkout.md)
 
 
 ## Priority 3

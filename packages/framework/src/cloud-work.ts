@@ -1,5 +1,5 @@
 import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
-import { ghPrsForBranchOrThrow, pickAgentPr, type LinkedPr } from './dashboard/gh.js'
+import { pickAgentPr, prsForBranchOrThrow, type LinkedPr } from './dashboard/pull-requests.js'
 import { openRemoteBranchPullRequest, type HandoffResult } from './dashboard/agent-handoff.js'
 import { listAgents, projectRuns, startedAtFromAgentId, type AgentMeta, type RunPatch } from './store/index.js'
 import { errorMessage } from './error-message.js'
@@ -46,10 +46,10 @@ export interface CloudWorkResult {
   failed: { agentId: string; error: string }[]
 }
 
-/** Injectable seams so the pass is unit-testable off disk, off the network and off GitHub. */
+/** Injectable seams so the pass is unit-testable off disk, off the network and off the forge. */
 export interface CloudWorkDeps {
   git?: GitRunner
-  /** The branch's full PR history; a listing that fails must throw (default {@link ghPrsForBranchOrThrow}). */
+  /** The branch's full PR history; a listing that fails must throw (default {@link prsForBranchOrThrow}). */
   prs?: (cwd: string, branch: string) => Promise<LinkedPr[]>
   /** The project's run records, none older than `since` in epoch ms (default {@link listAgents}). */
   agents?: (cwd: string, since: number) => Promise<AgentMeta[]>
@@ -154,7 +154,7 @@ async function patchProvidedRun(cwd: string, agentId: string, patch: RunPatch): 
  */
 export async function adoptCloudWork(cwd: string, deps: CloudWorkDeps = {}): Promise<CloudWorkResult> {
   const git = deps.git ?? nodeGitRunner()
-  const prs = deps.prs ?? ghPrsForBranchOrThrow
+  const prs = deps.prs ?? prsForBranchOrThrow
   const agents = deps.agents ?? ((project: string, since: number) => listAgents(project, projectRuns, { since }))
   const patchArchive = deps.patch ?? patchProvidedRun
   const openPr = deps.openPr ?? openRemoteBranchPullRequest

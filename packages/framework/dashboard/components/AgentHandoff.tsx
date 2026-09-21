@@ -94,7 +94,7 @@ export function HandoffActions({
   // From here every branch says something. A session that has finished and shows no control at all
   // is #1173: the reason there is nothing to press is exactly what the reader came for.
   if (!handoff.exists) return <Reason>Branch gone — nothing to open a PR from.</Reason>
-  // A branch with no diff never gets the button (#1173): there is nothing GitHub would accept a PR
+  // A branch with no diff never gets the button (#1173): there is nothing the forge would accept a PR
   // for, and offering one that fails with "No commits between main and <branch>" is the dead end
   // this bar exists to prevent. When the tree holds uncommitted work, that work is named — the
   // reader's next step is to have the session commit it (the composer is right below).

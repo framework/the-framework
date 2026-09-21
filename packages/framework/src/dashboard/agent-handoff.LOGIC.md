@@ -6,7 +6,7 @@ Decides what becomes of an agent's [1] work once the agent has ended, its handof
 - The user starts an agent [1] and walks away. The agent publishes its own work: it pushes its branch and opens its pull request itself. Nothing here does it for the agent.
 - On a finished agent's page the user sees what the agent produced — its commits, the files it changed, the files it left uncommitted — and opens the pull request ("Open PR") or merges it ("Merge") with one press; on a project with no forge package, pushes the branch ("Push"). The user is never handed an empty pull request or a second pull request for the same branch.
 
-**Business logic story**: the dashboard's buttons run the manual actions on a finished agent (`../dashboard-rpc/control.ts`); cloud work adoption opens the pull request for a branch that exists only on the remote (`../cloud-work.ts`); the intervention [8] feed reads branch states through the same provider to list unpushed work (`interventions.ts`). Every pull request read still goes through GitHub's `gh` command by the rules in `gh.ts`; every push goes through the branches provider [14] by the contract in `../store/branches.ts`, and every pull request opened or landed through the forge provider [19] by the contract in `../store/forge.ts`.
+**Business logic story**: the dashboard's buttons run the manual actions on a finished agent (`../dashboard-rpc/control.ts`); cloud work adoption opens the pull request for a branch that exists only on the remote (`../cloud-work.ts`); the intervention [8] feed reads branch states through the same provider to list unpushed work (`interventions.ts`). Every pull request read goes through the forge provider [19] by the rules in `pull-requests.ts`; every push goes through the branches provider [14] by the contract in `../store/branches.ts`, and every pull request opened or landed through the forge provider [19] by the contract in `../store/forge.ts`.
 
 ## Glossary
 
@@ -65,7 +65,7 @@ The branch is the one recorded on the agent's [1] record while it ran. An agent 
 - The provider answers whether the branch exists on this machine, the base it is measured against when one was found, its own commits beyond the base (newest first, each with its full id and its subject), the files it changed since the branch point (each with lines inserted, lines deleted and whether it is binary), whether the repository has a remote, whether the remote holds the branch at the very same commit, whether the base already contains it, and the uncommitted paths in the checkout [3] that is on the branch, when one is. Each commit gets a seven-character id for display, and the line totals sum the files.
 - A branch that no longer exists locally still yields a handoff, marked as gone, with no commits and no files. Its pull request is still looked up: a hands-off [10] agent pushes its branch and opens its pull request from the cloud, and a merged branch gets deleted, so the pull request is the one thing left worth showing.
 - The handoff says whether the project has a forge provider [19] at all (`forge`), by asking for it: the page offers a pull request only where one can be opened, and the push alone otherwise.
-- The pull request is looked up through the dashboard's read cache and allowed to arrive late: while the lookup is still warming the handoff says "not known yet" rather than "no pull request", so the git answers never wait on `gh` and the caller can ask again.
+- The pull request is looked up through the dashboard's read cache and allowed to arrive late: while the lookup is still warming the handoff says "not known yet" rather than "no pull request", so the git answers never wait on the forge and the caller can ask again.
 
 ### Nothing to hand off
 
@@ -91,11 +91,11 @@ When a checkout [3] is on the branch, the branches provider [14] names every fil
 
 #### Context
 
-**Problem**: a branch name gets reused. An agent [1] on a branch name an earlier agent used inherits every pull request its predecessors opened on that name, and GitHub's newest pull request for a branch name, in any state, may be a predecessor's merged one showing as a fresh agent's own.
+**Problem**: a branch name gets reused. An agent [1] on a branch name an earlier agent used inherits every pull request its predecessors opened on that name, and the forge's newest pull request for a branch name, in any state, may be a predecessor's merged one showing as a fresh agent's own.
 
 #### Business logic
 
-The branch's whole pull request history is read — through the dashboard's read cache, or through a lookup the caller supplies — and one entry is picked by the rule in `gh.ts`: an open pull request always counts, because GitHub allows one open pull request per branch and that is where pushed commits land; a merged or closed one counts only when it was created after the agent [1] started; without a start time, only an open one is trusted. When several qualify, "first" answers identity (which pull request did this agent open, so a later agent's is never the answer) and "latest" answers a handoff [2] decision (which pull request last saw the branch, so whether the agent kept working past it reads off that pull request's head commit). The agent's start time is the one recorded on it, else the moment its agent id [9] encodes.
+The branch's whole pull request history is read — through the dashboard's read cache, or through a lookup the caller supplies — and one entry is picked by the rule in `pull-requests.ts`: an open pull request always counts, because a forge allows one open pull request per branch and that is where pushed commits land; a merged or closed one counts only when it was created after the agent [1] started; without a start time, only an open one is trusted. When several qualify, "first" answers identity (which pull request did this agent open, so a later agent's is never the answer) and "latest" answers a handoff [2] decision (which pull request last saw the branch, so whether the agent kept working past it reads off that pull request's head commit). The agent's start time is the one recorded on it, else the moment its agent id [9] encodes.
 
 ### The pull request the agent recorded
 
@@ -105,7 +105,7 @@ The branch's whole pull request history is read — through the dashboard's read
 
 #### Business logic
 
-An agent [1] with no recorded pull request has none. For an agent with one, the pull request's current state is read live through the dashboard's read cache, because it changes without the agent doing anything: a pull request merges, a human closes it. When the live read returns the recorded number, its state, title and URL are the answer. A different number on the branch is some other pull request and never this agent's answer. When the live read has nothing to say — the lookup still warming, `gh` missing, or a branch on a repository this machine cannot see — the recorded number and URL stand on their own, with state "OPEN" while the lookup is still pending (the caller may ask again) and "UNKNOWN" otherwise, and no title.
+An agent [1] with no recorded pull request has none. For an agent with one, the pull request's current state is read live through the dashboard's read cache, because it changes without the agent doing anything: a pull request merges, a human closes it. When the live read returns the recorded number, its state, title and URL are the answer. A different number on the branch is some other pull request and never this agent's answer. When the live read has nothing to say — the lookup still warming, no forge provider, or a branch on a repository this machine cannot see — the recorded number and URL stand on their own, with state "OPEN" while the lookup is still pending (the caller may ask again) and "UNKNOWN" otherwise, and no title.
 
 ### Publishing a branch
 

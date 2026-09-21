@@ -3,12 +3,12 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 
 // The ⋮ menu subsumes the old WorkspaceActions / Stop / Remove / Delete row, so it pulls the same
 // RPC + editor reads; stub them the way WorkspaceActions.test did.
-const onGithubUrl = vi.fn(async () => 'https://github.com/o/r')
+const onForgeHome = vi.fn(async () => ({ url: 'https://github.com/o/r', name: 'GitHub' }))
 const sendOpenInApp = vi.fn(async () => ({ ok: true as const }))
 const sendStop = vi.fn(async () => {})
 const sendRemoveWorktree = vi.fn(async () => ({ ok: true as const }))
 const sendDeleteAgent = vi.fn(async () => ({ ok: true as const }))
-vi.mock('../rpc/reads.js', () => ({ onGithubUrl }))
+vi.mock('../rpc/reads.js', () => ({ onForgeHome }))
 vi.mock('../rpc/control.js', () => ({
   sendOpenInApp,
   sendStop,

@@ -1,14 +1,14 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
-const onGithubUrl = vi.fn(async () => 'https://github.com/o/r')
+const onForgeHome = vi.fn(async () => ({ url: 'https://github.com/o/r', name: 'GitHub' }))
 const onAgentWorktree = vi.fn(async () => null as unknown)
 const sendOpenInApp = vi.fn(async () => ({ ok: true as const }))
 const sendPreview = vi.fn(async () => ({ ok: true as const, url: 'http://localhost:5173', command: 'dev' }))
 const onServeTargets = vi.fn(async () => [{ id: '.', label: 'app', dir: '', script: 'dev' }])
 const onPreviewStatus = vi.fn(async () => ({ running: false }))
 const sendStopPreview = vi.fn(async () => {})
-vi.mock('../rpc/reads.js', () => ({ onGithubUrl, onAgentWorktree }))
+vi.mock('../rpc/reads.js', () => ({ onForgeHome, onAgentWorktree }))
 vi.mock('../rpc/control.js', () => ({
   sendOpenInApp,
   sendPreview,
@@ -37,7 +37,7 @@ const buttons = () => screen.getAllByRole('button')
 
 beforeEach(() => {
   sendOpenInApp.mockClear()
-  onGithubUrl.mockClear()
+  onForgeHome.mockClear()
   updatePreferences.mockClear()
   prefs = {}
   detectedEditors = []

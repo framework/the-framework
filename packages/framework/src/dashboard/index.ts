@@ -17,7 +17,7 @@ export { readSchedulerState, collectSchedulers, SCHEDULER_STATE_FILE, type Sched
 export { buildOverview, buildRecentAgents, type Overview, type ActiveAgent as ActiveAgent, type RecentProject, type RecentAgent as RecentAgent, type OverviewDeps } from './overview.js'
 export { buildDashboard, type DashboardData, type ProjectStat, type DashboardDeps } from './dashboard.js'
 export { readGitStatus, type GitStatus } from './git-status.js'
-export { ghPrView, ghPrList, ghJson, type LinkedPr, type OpenPr, type PrLookup, type BranchPrLookup, type PrLister, type GhRunner } from './gh.js'
+export { prView, prsForBranch, openPrs, pickAgentPr, type LinkedPr, type OpenPr, type PrLookup, type BranchPrLookup, type PrLister } from './pull-requests.js'
 export { readFileDiff, readFileChanges, safeRepoPath, type FileDiff, type FileChange } from './file-diff.js'
 export { readFileContent, type FileContent } from './file-read.js'
 export {

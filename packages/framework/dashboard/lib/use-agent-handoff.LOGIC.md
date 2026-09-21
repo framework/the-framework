@@ -79,7 +79,7 @@ A step that succeeds triggers an immediate re-read of the branch, so what is off
 
 #### Context
 
-**User story**: opening a pull request can fail for reasons the user can act on — no remote, GitHub refusing it, no `gh` available — and the page says which.
+**User story**: opening a pull request can fail for reasons the user can act on — no remote, no forge package, the forge refusing it — and the page says which.
 
 #### Business logic
 

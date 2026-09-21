@@ -1,4 +1,4 @@
-import { cachedPrView, cachedPrsForBranch, forgetBranchPrs, forgetPr, pickAgentPr, type LinkedPr, type BranchPrLookup } from './gh.js'
+import { cachedPrView, cachedPrsForBranch, forgetBranchPrs, forgetPr, pickAgentPr, type LinkedPr, type BranchPrLookup } from './pull-requests.js'
 import type { Cached } from './cache.js'
 import type { AgentMeta } from '../store/index.js'
 import { projectBranches, type BranchesFor } from '../store/branches.js'
@@ -84,7 +84,7 @@ export interface AgentHandoff {
    * is not on the branch yet, so it is
    * not in {@link commits} and it does not make {@link empty} false. Paths rather than a count,
    * because a no-diff branch must *name* what is waiting instead of offering an Open PR that
-   * GitHub can only refuse. Absent when no checkout is on the branch any more — "no checkout"
+   * the forge can only refuse. Absent when no checkout is on the branch any more — "no checkout"
    * and "a checkout, tree clean" are different answers.
    */
   pendingFiles?: string[]
@@ -358,7 +358,7 @@ export async function openAgentPullRequest(
 export type HandoffAgent = Pick<AgentMeta, 'id' | 'branch' | 'intent'> &
   Partial<Pick<AgentMeta, 'startedAt'>> & {
     /**
-     * The GitHub issue the agent's ticket tracks (`#42`), when it implements one (#1334). Carried
+     * The tracker's issue the agent's ticket tracks (`#42`), when it implements one (#1334). Carried
      * into the PR title as `(fix #42)` so the squash-merge commit — which inherits the title —
      * closes the issue; without it an auto-merged quick-win leaves its ticket open.
      */

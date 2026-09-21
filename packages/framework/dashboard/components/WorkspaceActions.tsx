@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
-import { Github, FolderOpen, Code } from 'lucide-react'
-import { onGithubUrl } from '../rpc/reads.js'
+import { ExternalLink, FolderOpen, Code } from 'lucide-react'
+import type { ForgeHome } from '../../src/index.js'
+import { onForgeHome } from '../rpc/reads.js'
 import { sendOpenInApp } from '../rpc/control.js'
 import { useLoaded } from '../lib/use-async.js'
 import { useAction } from '../lib/use-action.js'
@@ -30,9 +31,9 @@ export function WorkspaceActions({
 }) {
   // The repo link is the project's either way: a session is a branch of that same repo, and its
   // branch may not be pushed anywhere yet. Its PR, when there is one, shows in the git status.
-  // keepPrevious: hold the GitHub icon while a new project's URL loads, so it does not pop out and
+  // keepPrevious: hold the forge icon while a new project's page loads, so it does not pop out and
   // back and shove the icon row (within a project it is already stable, keyed on projectId).
-  const githubUrl = useLoaded<string | null>(() => onGithubUrl(projectId), null, [projectId], true)
+  const home = useLoaded<ForgeHome | null>(() => onForgeHome(projectId), null, [projectId], true)
   const { busy, error, reset, run } = useAction()
 
   // `error` belongs to open(), not to the read, so clearing it on a switch is its own effect:
@@ -44,21 +45,21 @@ export function WorkspaceActions({
 
   return (
     <>
-      {githubUrl && (
+      {home && (
         <Tooltip>
           <TooltipTrigger
             render={
               <a
-                href={githubUrl}
+                href={home.url}
                 target="_blank"
                 rel="noreferrer"
                 className={buttonVariants({ variant: 'outline', size: 'icon-sm' })}
               />
             }
           >
-            <Github className="h-3.5 w-3.5" />
+            <ExternalLink className="h-3.5 w-3.5" />
           </TooltipTrigger>
-          <TooltipContent>Open on GitHub</TooltipContent>
+          <TooltipContent>Open on {home.name}</TooltipContent>
         </Tooltip>
       )}
       <Tooltip>

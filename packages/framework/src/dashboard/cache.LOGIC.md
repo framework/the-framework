@@ -1,8 +1,8 @@
-A read-through cache for the dashboard's slow reads: the pull request facts that come from the `gh` CLI (`gh.ts`). A fact that is already known is answered at once and refreshed behind the caller once it is older than its trust window; a fact that is not known yet is fetched once for everyone asking and waited for only briefly, after which the caller is told the answer is still pending; a fetch that fails never erases the last good answer. The cache lives in the daemon's memory, so a daemon restart starts cold.
+A read-through cache for the dashboard's slow reads: the pull request facts that come from the project's forge provider (`pull-requests.ts`). A fact that is already known is answered at once and refreshed behind the caller once it is older than its trust window; a fact that is not known yet is fetched once for everyone asking and waited for only briefly, after which the caller is told the answer is still pending; a fetch that fails never erases the last good answer. The cache lives in the daemon's memory, so a daemon restart starts cold.
 
 ## Context
 
-**User story**: the user opens an agent [1] in the dashboard and sees the agent's branch and its pull request in the git status bar and in the handoff [2] summary of its agent view [3], and the same row on project home [4]; the page re-reads those rows every few seconds. Reading a pull request through `gh` takes around 600 ms where the git facts beside it take around ten, so without this cache every panel would wait on GitHub on every poll and the same answer would be bought several times over.
+**User story**: the user opens an agent [1] in the dashboard and sees the agent's branch and its pull request in the git status bar and in the handoff [2] summary of its agent view [3], and the same row on project home [4]; the page re-reads those rows every few seconds. Reading a pull request is a run of the forge provider's command, hundreds of milliseconds where the git facts beside it take around ten, so without this cache every panel would wait on the forge on every poll and the same answer would be bought several times over.
 
 **Problem**: a caller deciding whether to offer "Open PR" must never mistake "not known yet" for "there is no pull request", or it opens a second one. The cache therefore answers with two facts: the value, and whether a read is still running with no value known yet.
 
@@ -16,7 +16,7 @@ A read-through cache for the dashboard's slow reads: the pull request facts that
 ## Business logic — TL;DR
 
 - **A known answer is served at once and refreshed behind the caller** - once a value has been read it is returned immediately, and when it is older than its trust window (60 seconds unless the caller sets another) a refresh runs in the background, so the cost of staying current is never paid by the caller that happens to ask.
-- **Concurrent asks share one fetch** - while a value is being fetched, every caller asking for the same key joins that fetch instead of starting another, so two panels and a poll do not become three `gh` processes.
+- **Concurrent asks share one fetch** - while a value is being fetched, every caller asking for the same key joins that fetch instead of starting another, so two panels and a poll do not become three forge processes.
 - **A cold ask waits briefly, then reports pending** - the first ask for an unknown value waits 150 ms (unless the caller sets another budget) for the fetch, and past that the caller is told the value is pending while the fetch finishes for the next ask.
 - **A failed fetch keeps the last good value** - a fetch that fails changes nothing that was known and is retried on the next ask, and a cold fetch that fails leaves the caller with a pending answer rather than a false "none".
 - **Forgetting a key** - after an action that changes the answer (opening or merging a pull request), the caller drops the key so the next ask fetches afresh.
@@ -31,13 +31,13 @@ See `## Context`.
 
 #### Business logic
 
-Every fact is cached under a key the caller chooses. When the key has a value, the ask is answered with that value straight away and is never marked pending. If the value was read 60 seconds ago or longer (the caller may set a different window, as `gh.ts` does for the repository's auto-merge setting) and no refresh is already running, a refresh starts in the background; the caller still gets the old value now, and the next ask gets the new one once it has landed. The window is measured from when the value was last read successfully, so after a background refresh that fails the value is still stale and the following ask starts another refresh.
+Every fact is cached under a key the caller chooses. When the key has a value, the ask is answered with that value straight away and is never marked pending. If the value was read 60 seconds ago or longer (the caller may set a different window) and no refresh is already running, a refresh starts in the background; the caller still gets the old value now, and the next ask gets the new one once it has landed. The window is measured from when the value was last read successfully, so after a background refresh that fails the value is still stale and the following ask starts another refresh.
 
 ### Concurrent asks share one fetch
 
 #### Context
 
-**Problem**: the git status bar and the handoff [2] summary both ask for the same pull request, and a poll may ask again while the first fetch is still running; each fetch is a `gh` process.
+**Problem**: the git status bar and the handoff [2] summary both ask for the same pull request, and a poll may ask again while the first fetch is still running; each fetch is a process.
 
 #### Business logic
 
@@ -57,7 +57,7 @@ When nothing is known for the key, the ask starts the fetch (or joins the runnin
 
 #### Context
 
-**Problem**: a `gh` hiccup (a network blip, a rate limit) must not make a panel drop the pull request it was showing a second ago.
+**Problem**: a forge hiccup (a network blip, a rate limit) must not make a panel drop the pull request it was showing a second ago.
 
 #### Business logic
 

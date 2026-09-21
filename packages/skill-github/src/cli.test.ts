@@ -1,0 +1,139 @@
+import { strict as assert } from 'node:assert'
+import { test } from 'node:test'
+import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
+import type { GhRunner } from './gh.js'
+import { runCli, USAGE } from './cli.js'
+
+// The command line the framework, the scheduler and an agent run: JSON on stdout, a line for a
+// person on stderr, an exit code that says refusal or usage error. gh is scripted throughout.
+
+interface Ran {
+  code: number
+  out: unknown
+  err: string
+}
+
+async function run(cwd: string, argv: string[], deps: { gh?: GhRunner; git?: GitRunner; watch?: (repo: string, number: number) => Promise<void> } = {}): Promise<Ran> {
+  const outLines: string[] = []
+  const errLines: string[] = []
+  const code = await runCli(argv, { cwd, stdout: line => outLines.push(line), stderr: line => errLines.push(line) }, deps)
+  return { code, out: outLines.length ? JSON.parse(outLines.join('\n')) : undefined, err: errLines.join('\n') }
+}
+
+const row = (over: Record<string, unknown> = {}) => ({ number: 7, url: 'https://github.com/o/r/pull/7', state: 'OPEN', title: 'T', isDraft: false, headRefName: 'agent-x', headRefOid: 'abc', createdAt: '2026-09-20T10:00:00Z', ...over })
+
+test('no command, an unknown command, a bad flag: the usage, exit 2', async () => {
+  assert.equal((await run('/r', [])).code, 2)
+  assert.match((await run('/r', ['frobnicate'])).err, /usage: github/)
+  const bad = await run('/r', ['requests', '--nope'])
+  assert.equal(bad.code, 2)
+  assert.ok(bad.err.endsWith(USAGE))
+  assert.equal((await run('/r', ['merge', 'seven'])).code, 2)
+  assert.equal((await run('/r', ['open'])).code, 2, '--title is required')
+  assert.equal((await run('/r', ['requests', '--state', 'draft'])).code, 2)
+})
+
+test('requests: the flags become one gh listing, the rows come back as requests, and a gh that cannot answer is a forge-failed refusal', async () => {
+  const asked: string[][] = []
+  const gh: GhRunner = async args => {
+    asked.push(args)
+    return JSON.stringify([row({ number: 8, state: 'MERGED', mergedAt: '2026-09-22T00:00:00Z', createdAt: '2026-09-21T00:00:00Z' }), row()])
+  }
+  const all = await run('/r', ['requests'], { gh })
+  assert.equal(all.code, 0)
+  assert.deepEqual((all.out as { number: number; state: string }[]).map(r => [r.number, r.state]), [[8, 'merged'], [7, 'open']])
+  assert.deepEqual(asked[0]!.slice(0, 4), ['pr', 'list', '--state', 'all'])
+
+  const some = await run('/r', ['requests', '--branch', 'agent-x', '--state', 'merged', '--since', '2026-09-22T00:00:00Z'], { gh })
+  assert.deepEqual(asked[1]!.slice(0, 6), ['pr', 'list', '--state', 'merged', '--head', 'agent-x'])
+  assert.deepEqual((some.out as { number: number }[]).map(r => r.number), [8])
+
+  const failed = await run('/r', ['requests'], { gh: async () => Promise.reject(new Error('gh: not logged in')) })
+  assert.equal(failed.code, 1)
+  assert.deepEqual(failed.out, { ok: false, reason: 'forge-failed', detail: 'gh: not logged in' })
+  assert.match(failed.err, /could not be read: gh: not logged in/)
+})
+
+test('open: on the current branch or --branch, with the words given; --merge arms; the open one is answered as it is; the refusals', async () => {
+  const dir = await realpath(await mkdtemp(join(tmpdir(), 'github-cli-')))
+  const git = nodeGitRunner()
+  try {
+    await git(['init', '-q', '-b', 'agent-fix'], dir)
+    await git(['config', 'user.email', 't@t'], dir)
+    await git(['config', 'user.name', 't'], dir)
+    await writeFile(join(dir, 'a'), 'a')
+    await git(['add', '-A'], dir)
+    await git(['commit', '-q', '-m', 'init'], dir)
+
+    const calls: string[][] = []
+    let opened = false
+    const gh: GhRunner = async args => {
+      calls.push(args)
+      if (args[1] === 'list') return JSON.stringify(opened ? [row({ number: 42, url: 'https://github.com/o/r/pull/42' })] : [])
+      if (args[1] === 'create') {
+        opened = true
+        return 'https://github.com/o/r/pull/42\n'
+      }
+      if (args[1] === 'merge') throw new Error('auto-merge is not allowed for this repository')
+      throw new Error(`unexpected ${args.join(' ')}`)
+    }
+    const watched: number[] = []
+    const first = await run(dir, ['open', '--title', 'Fix it', '--body', 'Fixed.', '--merge'], { gh, watch: async (_r, n) => void watched.push(n) })
+    assert.equal(first.code, 0)
+    assert.deepEqual(first.out, { ok: true, branch: 'agent-fix', request: { number: 42, url: 'https://github.com/o/r/pull/42' }, existing: false, merge: { outcome: 'watching' } })
+    assert.deepEqual(calls[1], ['pr', 'create', '--head', 'agent-fix', '--title', 'Fix it', '--body', 'Fixed.'])
+    assert.deepEqual(watched, [42])
+
+    const again = await run(dir, ['open', '--title', 'x', '--draft'], { gh })
+    assert.deepEqual(again.out, { ok: true, branch: 'agent-fix', request: { number: 42, url: 'https://github.com/o/r/pull/42' }, existing: true })
+
+    const other = await run(dir, ['open', '--branch', 'agent-other', '--title', 'Other'], { gh: async args => (args[1] === 'list' ? '[]' : Promise.reject(new Error('no commits between main and agent-other'))) })
+    assert.equal(other.code, 1)
+    assert.deepEqual(other.out, { ok: false, reason: 'open-failed', branch: 'agent-other', detail: 'no commits between main and agent-other' })
+    assert.match(other.err, /agent-other could not be opened/)
+
+    await git(['checkout', '-q', '--detach'], dir)
+    const detached = await run(dir, ['open', '--title', 'x'], { gh })
+    assert.equal(detached.code, 1)
+    assert.deepEqual(detached.out, { ok: false, reason: 'no-branch' })
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('merge: a number, a draft marked ready first, then armed; not-open and merge-failed are refusals with their detail', async () => {
+  const calls: string[][] = []
+  const gh = (view: unknown, merge: () => Promise<string> = async () => ''): GhRunner => async args => {
+    calls.push(args)
+    if (args[1] === 'view') return JSON.stringify(view)
+    if (args[1] === 'merge') return merge()
+    return ''
+  }
+  const landed = await run('/r', ['merge', '5'], { gh: gh({ state: 'OPEN', isDraft: true }) })
+  assert.equal(landed.code, 0)
+  assert.deepEqual(landed.out, { ok: true, number: 5, outcome: 'auto-armed' })
+  assert.deepEqual(calls.map(c => c[1]), ['view', 'ready', 'merge'])
+
+  const closed = await run('/r', ['merge', '5'], { gh: gh({ state: 'MERGED' }) })
+  assert.equal(closed.code, 1)
+  assert.deepEqual(closed.out, { ok: false, reason: 'not-open', number: 5, state: 'MERGED' })
+  assert.equal(closed.err, 'pull request 5 is merged, not open')
+
+  const stuck = await run('/r', ['merge', '5'], { gh: gh({ state: 'OPEN' }, async () => Promise.reject(new Error('Pull request is not mergeable'))) })
+  assert.deepEqual(stuck.out, { ok: false, reason: 'merge-failed', number: 5, detail: 'Pull request is not mergeable' })
+  assert.match(stuck.err, /could not be landed: Pull request is not mergeable/)
+})
+
+test('home: the project page from origin, with the forge named; no origin, or not GitHub, is no-remote', async () => {
+  const home = await run('/r', ['home'], { git: async () => 'git@github.com:o/r.git\n' })
+  assert.equal(home.code, 0)
+  assert.deepEqual(home.out, { ok: true, url: 'https://github.com/o/r', name: 'GitHub' })
+  const gitlab = await run('/r', ['home'], { git: async () => 'git@gitlab.com:o/r.git\n' })
+  assert.equal(gitlab.code, 1)
+  assert.deepEqual(gitlab.out, { ok: false, reason: 'no-remote' })
+  const none = await run('/r', ['home'], { git: async () => Promise.reject(new Error('fatal: No such remote')) })
+  assert.deepEqual(none.out, { ok: false, reason: 'no-remote' })
+})

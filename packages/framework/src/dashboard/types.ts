@@ -1,4 +1,4 @@
-import type { LinkedPr } from './gh.js'
+import type { LinkedPr } from './pull-requests.js'
 
 // The dashboard's request/result vocabulary (#345/#396/#475): the shapes the Start / Add /
 // Preview RPCs speak. They live here, on neither the HTTP server nor the RPC mount, so both —

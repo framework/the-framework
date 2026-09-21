@@ -7,7 +7,7 @@ import type { Ticket, TicketDetail, TicketsMeta } from './tickets.js'
 
 export type { Ticket, TicketDetail, TicketsMeta }
 
-/** The prompt behind "Update from GitHub": the project's `update-tickets` command. One wording for every surface that offers it. */
+/** The prompt behind "Update tickets": the project's `update-tickets` command, which brings the tickets in line with the issue tracker. One wording for every surface that offers it. */
 export const UPDATE_TICKETS_PROMPT = '/update-tickets'
 
 /**

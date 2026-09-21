@@ -23,7 +23,7 @@ export const USAGE = `usage: agent-scheduler <command>
                                 continue an ended run: the same record, its session resumed; the text as the next prompt, or the answer to the question it ended on
   run --detach --resume <id> …  the same continuing in its own process, answered at once: what a dashboard's resume hook runs
   check [--driver <claude-code|codex>]
-                                whether a run can start here: the coding agent's CLI installed and logged in, gh too; what a dashboard's check hook runs
+                                whether a run can start here: the coding agent's CLI installed and logged in; what a dashboard's check hook runs
   init                          this tool's lines in the dashboard's .the-framework/hooks.yml, so its Start works; a line already there is kept
   start [--keep-alive]          the scheduler on, ticking every minute in its own process
   stop [--unless-keep-alive]    the scheduler off; runs in flight go to the end; with the flag a keep-alive scheduler is left running

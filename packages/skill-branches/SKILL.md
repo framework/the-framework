@@ -1,15 +1,15 @@
 ---
 name: branches
-description: Where your work goes (a branch named agent-<name>), how to name it, and what must be true before you finish.
+description: Where your work goes (a branch named agent-<name>), how to name it, what must be true before you finish, and how to push it.
 ---
 
 # Branch management
 
-Your work goes on a branch named `agent-<name>`, unless whoever started you continued you on another. When you finish, you publish it yourself: push, pull request, and merge on green when the work may land on its own. Unless whoever started you said they publish for you: then you never do.
+Your work goes on a branch named `agent-<name>`, unless whoever started you continued you on another. When you finish, you push it yourself; what happens to a pushed branch next, if anything, is another skill's. Unless whoever started you said they publish for you: then you never push.
 
 ## The command
 
-`branches` is a dependency of this repository (`@gemstack/skill-branches`). If `node_modules` is missing, install with the lockfile's package manager (`npm install` for `package-lock.json`). Then run `npx branches` inside your checkout. `status`, `name` and `publish` are yours; the rest are the caller's.
+`branches` is a dependency of this repository (`@gemstack/skill-branches`). If `node_modules` is missing, install with the lockfile's package manager (`npm install` for `package-lock.json`). Then run `npx branches` inside your checkout. `status`, `name` and `push` are yours; the rest are the caller's.
 
 ## Where you are
 
@@ -49,12 +49,12 @@ npx branches status
 
 It must report `"clean": true`. `clean` is false while anything is uncommitted or untracked: commit or delete what you added; if what remains is not yours, say so and finish.
 
-## Publish
+## Push
 
 Once clean, unless whoever started you said they publish for you:
 
 ```
-npx branches publish --title "<one line naming what the change does>" --body "<what changed, and why>"
+npx branches push
 ```
 
-It pushes your branch, opens the pull request, and prints it in `pr`. Add `--merge` when the work may land on its own: the request then merges once its checks pass, also where the repository does not allow auto-merge (`merge` in the answer says `auto-armed`, `merged` or `watching`; or `held` when whoever started you has more work coming on your branch: the merge is armed for you once that is done). Add `--draft` for a request a person should look at first. A branch that already has an open request gets no second one. `clean` false is refused as `dirty`: commit or delete first.
+It pushes your branch to origin and prints it in `branch`. `clean` false is refused as `dirty`: commit or delete first.

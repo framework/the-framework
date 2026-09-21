@@ -1,14 +1,15 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readAgentHandoff, resolveAgentPr, mergeAgentPr, agentBranchFor, openAgentPullRequest, openRemoteBranchPullRequest, type HandoffAgent } from './agent-handoff.js'
-import { pickAgentPr, type LinkedPr } from './gh.js'
+import { readAgentHandoff, resolveAgentPr, mergeAgentPr, agentBranchFor, openAgentPullRequest, openRemoteBranchPullRequest, pushAgentBranch, type HandoffAgent } from './agent-handoff.js'
+import { pickAgentPr, type LinkedPr } from './pull-requests.js'
 import type { BranchState, BranchesFor, BranchesSource } from '../store/branches.js'
+import type { ForgeFor, ForgeSource } from '../store/forge.js'
 import type { AgentMeta } from '../store/index.js'
 
-// The handoff over the branches provider (#1774): the branch's facts come from the provider's
-// `show`, every push, pull request and merge goes through its `publish` and `merge`, and what is
-// tested here is what the framework decides on top: which PR is the run's, when an existing PR is
-// the answer, what the PR says, and what each button refuses.
+// The handoff over the two providers (#1774, #1820): the branch's facts come from the branches
+// provider's `show` and its push from `push`; every pull request goes through the forge provider's
+// `open` and `merge`; and what is tested here is what the framework decides on top: which PR is
+// the run's, when an existing PR is the answer, what the PR says, and what each button refuses.
 
 /** A branch with work on it, as the provider answers `show`. */
 const state = (over: Partial<BranchState> = {}): BranchState => ({
@@ -29,11 +30,11 @@ const state = (over: Partial<BranchState> = {}): BranchState => ({
   ...over,
 })
 
-/** A fake provider: `show` answers from `states` (a branch missing there is not answered), the writes record what they were asked and answer as told. */
+/** The two fake providers over one call log: the branches provider's `show` answers from `states` (a branch missing there is not answered) and its `push` as told; the forge's `open` and `merge` answer as told. */
 function fakeBranches(
   states: Record<string, BranchState | undefined>,
-  answers: { publish?: Awaited<ReturnType<BranchesSource['publish']>>; merge?: Awaited<ReturnType<BranchesSource['merge']>> } = {},
-): { branches: BranchesFor; calls: unknown[][] } {
+  answers: { push?: Awaited<ReturnType<BranchesSource['push']>>; open?: Awaited<ReturnType<ForgeSource['open']>>; merge?: Awaited<ReturnType<ForgeSource['merge']>> } = {},
+): { branches: BranchesFor; forge: ForgeFor; calls: unknown[][] } {
   const calls: unknown[][] = []
   const branches: BranchesFor = async () => ({
     list: async () => [],
@@ -44,21 +45,30 @@ function fakeBranches(
         return answer ? [answer] : []
       })
     },
-    publish: async (branch, opts) => {
-      calls.push(['publish', branch, opts])
-      return answers.publish ?? { ok: true, pr: { number: 9, url: 'https://github.com/o/r/pull/9' }, existing: false }
+    push: async branch => {
+      calls.push(['push', branch])
+      return answers.push ?? { ok: true, pushed: true }
+    },
+    remove: async () => ({ ok: true }),
+  })
+  const forge: ForgeFor = async () => ({
+    requests: async () => ({ ok: true, requests: [] }),
+    open: async (branch, opts) => {
+      calls.push(['open', branch, opts])
+      return answers.open ?? { ok: true, request: { number: 9, url: 'https://github.com/o/r/pull/9' }, existing: false }
     },
     merge: async number => {
       calls.push(['merge', number])
       return answers.merge ?? { ok: true, outcome: 'auto-armed' }
     },
-    remove: async () => ({ ok: true }),
+    home: async () => undefined,
   })
-  return { branches, calls }
+  return { branches, forge, calls }
 }
 
 const noPr = async (): Promise<LinkedPr | undefined> => undefined
 const noBranches: BranchesFor = async () => undefined
+const noForge: ForgeFor = async () => undefined
 
 test('the branch an agent\'s work is on is the one its record carries, and nothing else (#799/#1725)', () => {
   assert.equal(agentBranchFor({ id: 'r1', branch: 'feat/mine' }), 'feat/mine')
@@ -158,37 +168,55 @@ test('the PR is looked up for the session branch (#799), and a gone branch still
 const agent = (over: Partial<AgentMeta> = {}): AgentMeta => ({ id: 'r1', status: 'done', startedAt: '2026-07-26T00:00:00Z', updatedAt: '2026-07-26T01:00:00Z', branch: 'the-framework/work', intent: 'fix it', ...over })
 const { branch: _branch, ...unbranched } = agent()
 
-test('the Open PR button publishes the branch through the provider, with the title and body the run gives it', async () => {
-  const { branches, calls } = fakeBranches({ 'the-framework/work': state() })
-  const result = await openAgentPullRequest('/repo', agent(), { branches })
+test('the Open PR button pushes the branch through the branches provider, then opens its pull request through the forge, with the title and body the run gives it', async () => {
+  const { branches, forge, calls } = fakeBranches({ 'the-framework/work': state() })
+  const result = await openAgentPullRequest('/repo', agent(), { branches, forge })
   assert.deepEqual(result, { ok: true, url: 'https://github.com/o/r/pull/9', number: 9 })
-  assert.deepEqual(calls.at(-1), ['publish', 'the-framework/work', { title: 'the-framework/work', body: 'fix it\n\nOpened from The Framework session `r1`.' }])
+  assert.deepEqual(calls.slice(-2), [
+    ['push', 'the-framework/work'],
+    ['open', 'the-framework/work', { title: 'the-framework/work', body: 'fix it\n\nOpened from The Framework session `r1`.' }],
+  ])
   // A caller not asking for review opens a draft.
-  await openAgentPullRequest('/repo', agent(), { branches, draft: true })
+  await openAgentPullRequest('/repo', agent(), { branches, forge, draft: true })
   assert.deepEqual((calls.at(-1) as unknown[])[2], { title: 'the-framework/work', body: 'fix it\n\nOpened from The Framework session `r1`.', draft: true })
 })
 
-test('the Open PR button refuses a session with no branch, a gone branch, an empty branch, and a project with no provider', async () => {
-  const { branches } = fakeBranches({ gone: state({ branch: 'gone', exists: false, commits: [], files: [] }), empty: state({ branch: 'empty', commits: [], files: [] }) })
-  assert.deepEqual(await openAgentPullRequest('/repo', unbranched, { branches }), { ok: false, error: 'this session recorded no branch to open a PR from' })
-  assert.deepEqual(await openAgentPullRequest('/repo', agent({ branch: 'gone' }), { branches }), { ok: false, error: 'branch gone no longer exists' })
-  assert.deepEqual(await openAgentPullRequest('/repo', agent({ branch: 'empty' }), { branches }), { ok: false, error: 'this session produced no commits to open a PR for' })
-  assert.deepEqual(await openAgentPullRequest('/repo', agent(), { branches: noBranches }), { ok: false, error: 'this project has no branches provider to publish with' })
+test('the Open PR button refuses a session with no branch, a gone branch, an empty branch, a project with no branches provider, and one with no forge', async () => {
+  const { branches, forge } = fakeBranches({ gone: state({ branch: 'gone', exists: false, commits: [], files: [] }), empty: state({ branch: 'empty', commits: [], files: [] }), 'the-framework/work': state() })
+  assert.deepEqual(await openAgentPullRequest('/repo', unbranched, { branches, forge }), { ok: false, error: 'this session recorded no branch to open a PR from' })
+  assert.deepEqual(await openAgentPullRequest('/repo', agent({ branch: 'gone' }), { branches, forge }), { ok: false, error: 'branch gone no longer exists' })
+  assert.deepEqual(await openAgentPullRequest('/repo', agent({ branch: 'empty' }), { branches, forge }), { ok: false, error: 'this session produced no commits to open a PR for' })
+  assert.deepEqual(await openAgentPullRequest('/repo', agent(), { branches: noBranches, forge }), { ok: false, error: 'this project has no branches provider to push with' })
+  assert.deepEqual(await openAgentPullRequest('/repo', agent(), { branches, forge: noForge }), { ok: false, error: 'this project has no forge package to open a pull request with' })
 })
 
-test("a provider's refusal is the button's answer, never a throw (a dirty checkout, a failed push)", async () => {
-  const { branches } = fakeBranches({ 'the-framework/work': state() }, { publish: { ok: false, error: 'the-framework/work has uncommitted work; commit or delete it, then publish' } })
-  assert.deepEqual(await openAgentPullRequest('/repo', agent(), { branches }), { ok: false, error: 'the-framework/work has uncommitted work; commit or delete it, then publish' })
-  assert.deepEqual(await openRemoteBranchPullRequest('/repo', agent(), 'claude/x', { branches }), { ok: false, error: 'the-framework/work has uncommitted work; commit or delete it, then publish' })
+test("a provider's refusal is the button's answer, never a throw: a dirty checkout stops before the forge is asked, a refused open is the forge's line", async () => {
+  const dirty = fakeBranches({ 'the-framework/work': state() }, { push: { ok: false, error: 'the-framework/work has uncommitted work; commit or delete it, then push' } })
+  assert.deepEqual(await openAgentPullRequest('/repo', agent(), { branches: dirty.branches, forge: dirty.forge }), { ok: false, error: 'the-framework/work has uncommitted work; commit or delete it, then push' })
+  assert.deepEqual(await openRemoteBranchPullRequest('/repo', agent(), 'claude/x', { branches: dirty.branches, forge: dirty.forge }), { ok: false, error: 'the-framework/work has uncommitted work; commit or delete it, then push' })
+  assert.deepEqual(dirty.calls.filter(call => call[0] === 'open'), [], 'nothing asked of the forge')
+  const refused = fakeBranches({ 'the-framework/work': state() }, { open: { ok: false, error: 'gh: not logged in' } })
+  assert.deepEqual(await openAgentPullRequest('/repo', agent(), { branches: refused.branches, forge: refused.forge }), { ok: false, error: 'gh: not logged in' })
 })
 
-test('a remote-only branch gets its draft PR through the provider, and the body says what the agent said or what was asked (#1601/#1567)', async () => {
-  const { branches, calls } = fakeBranches({})
-  const result = await openRemoteBranchPullRequest('/repo', { id: 'r1', branch: 'agent-x', intent: 'fix it', description: 'What changed: the cart keeps its items.' }, 'claude/x', { branches })
+test('a remote-only branch gets its draft PR through the two providers, and the body says what the agent said or what was asked (#1601/#1567)', async () => {
+  const { branches, forge, calls } = fakeBranches({})
+  const result = await openRemoteBranchPullRequest('/repo', { id: 'r1', branch: 'agent-x', intent: 'fix it', description: 'What changed: the cart keeps its items.' }, 'claude/x', { branches, forge })
   assert.deepEqual(result, { ok: true, url: 'https://github.com/o/r/pull/9', number: 9 })
-  assert.deepEqual(calls, [['publish', 'claude/x', { title: 'agent-x', body: 'What changed: the cart keeps its items.\n\nOpened from The Framework session `r1`.', draft: true }]])
-  await openRemoteBranchPullRequest('/repo', { id: 'r1', branch: 'agent-x', intent: 'fix it' }, 'claude/x', { branches })
+  assert.deepEqual(calls, [['push', 'claude/x'], ['open', 'claude/x', { title: 'agent-x', body: 'What changed: the cart keeps its items.\n\nOpened from The Framework session `r1`.', draft: true }]])
+  await openRemoteBranchPullRequest('/repo', { id: 'r1', branch: 'agent-x', intent: 'fix it' }, 'claude/x', { branches, forge })
   assert.equal((calls.at(-1)![2] as { body: string }).body, 'fix it\n\nOpened from The Framework session `r1`.')
+})
+
+test('the Push button pushes a finished session\'s branch through the branches provider: the last step where the project has no forge (#1820)', async () => {
+  const { branches, forge, calls } = fakeBranches({ 'the-framework/work': state() })
+  assert.deepEqual(await pushAgentBranch('/repo', agent(), { branches }), { ok: true })
+  assert.deepEqual(calls, [['push', 'the-framework/work']])
+  assert.deepEqual(await pushAgentBranch('/repo', unbranched, { branches }), { ok: false, error: 'this session recorded no branch to push' })
+  assert.deepEqual(await pushAgentBranch('/repo', agent(), { branches: noBranches }), { ok: false, error: 'this project has no branches provider to push with' })
+  const handoff = await readAgentHandoff('/repo', 'the-framework/work', { branches, forge: noForge, pr: noPr })
+  assert.equal(handoff?.forge, false, 'the handoff says the project has no forge, so the bar offers Push')
+  assert.equal((await readAgentHandoff('/repo', 'the-framework/work', { branches, forge, pr: noPr }))?.forge, true)
 })
 
 test('pickAgentPr trusts an open PR, and otherwise only one created after the run started (#1251)', () => {
@@ -204,18 +232,18 @@ test('pickAgentPr trusts an open PR, and otherwise only one created after the ru
 })
 
 test('an existing PR is the Open PR answer, unless the session kept committing after it closed (#1255/#1512)', async () => {
-  const { branches, calls } = fakeBranches({ 'the-framework/work': state({ commits: [{ sha: 'tip0000000', subject: 'more' }] }), gone: state({ branch: 'gone', exists: false, commits: [], files: [] }) })
+  const { branches, forge, calls } = fakeBranches({ 'the-framework/work': state({ commits: [{ sha: 'tip0000000', subject: 'more' }] }), gone: state({ branch: 'gone', exists: false, commits: [], files: [] }) })
   const open = { number: 5, url: 'u5', state: 'OPEN', title: 'open' }
   assert.deepEqual(await openAgentPullRequest('/repo', agent(), { branches, pr: async () => open }), { ok: true, url: 'u5', number: 5 }, 'an open PR is the answer')
   // A hands-off web agent's branch only ever existed on the remote: its PR is still the answer.
   assert.deepEqual(await openAgentPullRequest('/repo', agent({ branch: 'gone' }), { branches, pr: async () => open }), { ok: true, url: 'u5', number: 5 })
   const landedHere = { number: 6, url: 'u6', state: 'MERGED', title: 'landed', createdAt: '2026-07-27T00:00:00Z', headRefOid: 'tip0000000' }
   assert.deepEqual(await openAgentPullRequest('/repo', agent(), { branches, pr: async () => landedHere }), { ok: true, url: 'u6', number: 6 }, 'a landed PR whose head is the tip: everything already landed')
-  assert.deepEqual(calls.filter(call => call[0] === 'publish'), [], 'nothing was published for those')
+  assert.deepEqual(calls.filter(call => call[0] === 'open'), [], 'nothing was opened for those')
   const landedBefore = { ...landedHere, headRefOid: 'older00000' }
-  const opened = await openAgentPullRequest('/repo', agent(), { branches, pr: async () => landedBefore })
+  const opened = await openAgentPullRequest('/repo', agent(), { branches, forge, pr: async () => landedBefore })
   assert.deepEqual(opened, { ok: true, url: 'https://github.com/o/r/pull/9', number: 9 }, 'the session kept committing after its PR closed: the new work gets its own')
-  assert.equal(calls.filter(call => call[0] === 'publish').length, 1)
+  assert.equal(calls.filter(call => call[0] === 'open').length, 1)
 })
 
 test('resolveAgentPr reads the PR the run recorded, and asks gh only for its state (E6)', async () => {
@@ -250,9 +278,9 @@ test('a different PR on the branch is not this run’s answer (E6)', async () =>
 })
 
 async function titleOf(handoffAgent: HandoffAgent): Promise<string | undefined> {
-  const { branches, calls } = fakeBranches({})
-  await openRemoteBranchPullRequest('/repo', handoffAgent, 'claude/x', { branches })
-  return (calls[0]?.[2] as { title: string } | undefined)?.title
+  const { branches, forge, calls } = fakeBranches({})
+  await openRemoteBranchPullRequest('/repo', handoffAgent, 'claude/x', { branches, forge })
+  return (calls.find(call => call[0] === 'open')?.[2] as { title: string } | undefined)?.title
 }
 
 test("a run implementing a ticket carries its issue as `(fix #42)` in the PR title (#1334)", async () => {
@@ -282,45 +310,45 @@ test('a session with no branch gets its id as the title, not the prompt it was g
   assert.equal(await titleOf({ id: 'r1', intent, fixes: '#1' }), 'Session r1 (fix #1)')
 })
 
-test("the Merge action lands the session's open PR through the provider (#1391)", async () => {
-  const { branches, calls } = fakeBranches({})
+test("the Merge action lands the session's open PR through the forge (#1391)", async () => {
+  const { forge, calls } = fakeBranches({})
   const result = await mergeAgentPr(
     '/repo',
     { id: 'r1', branch: 'the-framework/x', pr: { number: 7, url: 'https://github.com/o/r/pull/7' } },
-    { branches, prs: async () => ({ value: { number: 7, url: 'https://github.com/o/r/pull/7', state: 'OPEN', title: 'x' }, pending: false }) },
+    { forge, prs: async () => ({ value: { number: 7, url: 'https://github.com/o/r/pull/7', state: 'OPEN', title: 'x' }, pending: false }) },
   )
   assert.deepEqual(calls, [['merge', 7]])
   assert.deepEqual(result, { ok: true, url: 'https://github.com/o/r/pull/7', number: 7 })
 })
 
-test('the Merge action refuses a session with no PR, one already landed, and a project with no provider (#1391)', async () => {
-  const { branches } = fakeBranches({})
-  const none = await mergeAgentPr('/repo', { id: 'r1' }, { branches, prs: async () => ({ value: undefined, pending: false }) })
+test('the Merge action refuses a session with no PR, one already landed, and a project with no forge (#1391)', async () => {
+  const { forge } = fakeBranches({})
+  const none = await mergeAgentPr('/repo', { id: 'r1' }, { forge, prs: async () => ({ value: undefined, pending: false }) })
   assert.deepEqual(none, { ok: false, error: 'this session has no pull request to merge' })
   // A closed/merged PR is an answer, not an action: nothing to press twice.
   const open = { value: { number: 7, url: 'u', state: 'OPEN', title: 'x' }, pending: false }
-  const landed = await mergeAgentPr('/repo', { id: 'r1', branch: 'the-framework/x', pr: { number: 7, url: 'u' } }, { branches, prs: async () => ({ ...open, value: { ...open.value, state: 'MERGED' } }) })
+  const landed = await mergeAgentPr('/repo', { id: 'r1', branch: 'the-framework/x', pr: { number: 7, url: 'u' } }, { forge, prs: async () => ({ ...open, value: { ...open.value, state: 'MERGED' } }) })
   assert.deepEqual(landed, { ok: false, error: "this session's PR is already merged" })
-  const unprovided = await mergeAgentPr('/repo', { id: 'r1', branch: 'the-framework/x', pr: { number: 7, url: 'u' } }, { branches: noBranches, prs: async () => open })
-  assert.deepEqual(unprovided, { ok: false, error: 'this project has no branches provider to merge with' })
+  const unprovided = await mergeAgentPr('/repo', { id: 'r1', branch: 'the-framework/x', pr: { number: 7, url: 'u' } }, { forge: noForge, prs: async () => open })
+  assert.deepEqual(unprovided, { ok: false, error: 'this project has no forge package to merge with' })
 })
 
-test('a Merge the provider refuses comes back as the error, not a success (#1391)', async () => {
-  const { branches } = fakeBranches({}, { merge: { ok: false, error: 'Pull request is not mergeable: the base branch requires review' } })
+test('a Merge the forge refuses comes back as the error, not a success (#1391)', async () => {
+  const { forge } = fakeBranches({}, { merge: { ok: false, error: 'Pull request is not mergeable: the base branch requires review' } })
   const result = await mergeAgentPr(
     '/repo',
     { id: 'r1', branch: 'the-framework/x', pr: { number: 7, url: 'u' } },
-    { branches, prs: async () => ({ value: { number: 7, url: 'u', state: 'OPEN', title: 'x' }, pending: false }) },
+    { forge, prs: async () => ({ value: { number: 7, url: 'u', state: 'OPEN', title: 'x' }, pending: false }) },
   )
   assert.deepEqual(result, { ok: false, error: 'Pull request is not mergeable: the base branch requires review' })
 })
 
 test("the Open PR button titles the request by the name the provider answers for the branch, before the branch itself; the agent's own title still wins", async () => {
-  const { branches, calls } = fakeBranches({ 'agent-fix-login': state({ branch: 'agent-fix-login', name: 'fix-login' }), 'agent-r1': state({ branch: 'agent-r1' }) })
-  await openAgentPullRequest('/repo', agent({ branch: 'agent-fix-login' }), { branches })
+  const { branches, forge, calls } = fakeBranches({ 'agent-fix-login': state({ branch: 'agent-fix-login', name: 'fix-login' }), 'agent-r1': state({ branch: 'agent-r1' }) })
+  await openAgentPullRequest('/repo', agent({ branch: 'agent-fix-login' }), { branches, forge })
   assert.equal((calls.at(-1)![2] as { title: string }).title, 'fix-login')
-  await openAgentPullRequest('/repo', agent({ branch: 'agent-r1' }), { branches })
+  await openAgentPullRequest('/repo', agent({ branch: 'agent-r1' }), { branches, forge })
   assert.equal((calls.at(-1)![2] as { title: string }).title, 'agent-r1', 'no name answered: the branch as it is')
-  await openRemoteBranchPullRequest('/repo', { id: 'r1', branch: 'agent-fix-login', prTitle: 'Fix the login redirect' }, 'agent-fix-login', { branches })
+  await openRemoteBranchPullRequest('/repo', { id: 'r1', branch: 'agent-fix-login', prTitle: 'Fix the login redirect' }, 'agent-fix-login', { branches, forge })
   assert.equal((calls.at(-1)![2] as { title: string }).title, 'Fix the login redirect')
 })

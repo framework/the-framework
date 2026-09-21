@@ -7,7 +7,7 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { adoptCloudWork, startCloudWorkAdoption, CLOUD_ADOPTION_WINDOW_MS, type CloudWorkDeps, type CloudWorkResult } from './cloud-work.js'
 import type { AgentMeta } from './store/index.js'
-import type { LinkedPr } from './dashboard/gh.js'
+import type { LinkedPr } from './dashboard/pull-requests.js'
 
 const sh = promisify(execFile)
 

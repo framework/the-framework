@@ -70,7 +70,7 @@ See `## Context`.
 
 #### Business logic
 
-`list` takes no argument and answers every open ticket's row, newest first, as one JSON array, the rows being those of `tickets.ts`: file, title, summary, date, planned, and, when set, priority, topics, github, effort, uncertainty, locked and lockedBy; a plan or claim [4] beside a ticket folds into that ticket's row and is never a row of its own. `show <file>` answers `{"ok":true,"ticket":…}`, the ticket being its row plus `content`, the whole markdown; `plan`, the plan's whole text, is present only when the ticket has a plan; `holder`, the name the claim's line gives, is present only when the ticket is claimed and the line parses (a claim whose line does not parse still shows the ticket as locked, without a holder). A file that names no existing ticket refuses `no-ticket`, "no ticket tickets/<file>".
+`list` takes no argument and answers every open ticket's row, newest first, as one JSON array, the rows being those of `tickets.ts`: file, title, summary, date, planned, and, when set, priority, topics, issue, pr, effort, uncertainty, locked and lockedBy; a plan or claim [4] beside a ticket folds into that ticket's row and is never a row of its own. `show <file>` answers `{"ok":true,"ticket":…}`, the ticket being its row plus `content`, the whole markdown; `plan`, the plan's whole text, is present only when the ticket has a plan; `holder`, the name the claim's line gives, is present only when the ticket is claimed and the line parses (a claim whose line does not parse still shows the ticket as locked, without a holder). A file that names no existing ticket refuses `no-ticket`, "no ticket tickets/<file>".
 
 ### Writes are one pushed commit each, on a throwaway checkout
 

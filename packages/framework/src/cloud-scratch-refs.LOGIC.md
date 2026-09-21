@@ -79,7 +79,7 @@ See `## Context`.
 
 #### Business logic
 
-The candidate's pull request history is listed; any open pull request keeps the ref as "open-pr", so a deletion never closes one. A listing that cannot be read counts as no pull requests, which leans toward deletion; that is acceptable only because the work gate has already proven the ref holds nothing.
+The candidate's pull request history is listed through the project's forge provider (`dashboard/pull-requests.ts`); any open pull request keeps the ref as "open-pr", so a deletion never closes one. A listing that cannot be read, or a project with no forge provider, counts as no pull requests, which leans toward deletion; that is acceptable only because the work gate has already proven the ref holds nothing.
 
 ### Deleting and remembering
 

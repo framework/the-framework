@@ -1,4 +1,4 @@
-import { readProvidedCommand, runPackageCommand, type ProvidedCommand } from '../project-widgets.js'
+import { readProvidedCommand, runPackageCommand, type ProvidedCommand } from '@gemstack/agent-data'
 
 /**
  * The tickets, as the framework reads them (#1774). The framework keeps no ticket and imports no
@@ -29,8 +29,8 @@ export interface Ticket {
   /** `0`–`10` as written, `10` acting at once; absent when unset, and not checked here. */
   priority?: string
   topics?: string[]
-  /** The issue it tracks, and the pull request that closes it: a label and where it points. */
-  github?: { label: string; url: string }
+  /** The issue it tracks in the project's tracker, and the pull request that closes it: a label and where it points. */
+  issue?: { label: string; url: string }
   pr?: { label: string; url: string }
   /** ISO 8601: the file's date. */
   date: string

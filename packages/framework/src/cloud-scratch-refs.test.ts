@@ -10,7 +10,7 @@ import {
   type ScratchSweepResult,
 } from './cloud-scratch-refs.js'
 import type { GitRunner } from '@gemstack/agent-data'
-import type { LinkedPr } from './dashboard/gh.js'
+import type { LinkedPr } from './dashboard/pull-requests.js'
 import type { AgentMeta } from './store/index.js'
 
 const DAY = 24 * 60 * 60 * 1000

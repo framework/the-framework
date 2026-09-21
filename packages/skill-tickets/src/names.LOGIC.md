@@ -1,8 +1,8 @@
-Fixes where tickets live on the `agent-data` branch [1] and how a ticket's plan and claim [2] are named after it, and holds the small rules every filename or queue entry [3] arriving from outside is judged by: which names may address a ticket at all, which queue entry names a ticket, which priority section a ticket earns on the agent queue [4], and which GitHub issue a ticket tracks. Nothing here touches git or disk, so the dashboard's browser code applies the same rules.
+Fixes where tickets live on the `agent-data` branch [1] and how a ticket's plan and claim [2] are named after it, and holds the small rules every filename or queue entry [3] arriving from outside is judged by: which names may address a ticket at all, which queue entry names a ticket, which priority section a ticket earns on the agent queue [4], and which issue a ticket tracks. Nothing here touches git or disk, so the dashboard's browser code applies the same rules.
 
 ## Context
 
-**User story**: an agent pastes a queue entry's link target (`tickets/2042-01-01_some-ticket.md`) straight into `npx tickets show`, `claim` or `close` and names the same ticket the entry does; the user queues a ticket from the dashboard and it lands in the priority section its own `Priority:` names; the dashboard reads the queue entry back as the ticket it names, and the agent working the entry claims that very ticket; a pull request opened for a ticket closes the GitHub issue the ticket tracks.
+**User story**: an agent pastes a queue entry's link target (`tickets/2042-01-01_some-ticket.md`) straight into `npx tickets show`, `claim` or `close` and names the same ticket the entry does; the user queues a ticket from the dashboard and it lands in the priority section its own `Priority:` names; the dashboard reads the queue entry back as the ticket it names, and the agent working the entry claims that very ticket; a pull request opened for a ticket closes the issue the ticket tracks in the tracker.
 
 **Problem**: a filename that comes from outside (a command's argument, a browser) could reach another directory (`../x.md`, an absolute path), a hidden file, or a ticket's own plan or claim; every reader and writer must refuse the same names, in both spellings a name has (bare, or under `tickets/`).
 
@@ -21,7 +21,7 @@ Fixes where tickets live on the `agent-data` branch [1] and how a ticket's plan 
 - **The path gate** - the path form of a ticket's name is exactly `tickets/` followed by a name the bare filename gate accepts.
 - **Which queue entry names a ticket** - a queue entry names a ticket only through a markdown link whose target passes the path gate; any other entry is plain text.
 - **The priority a ticket earns on the queue** - a `Priority:` that is a whole number from 0 to 10 places the ticket in that section; anything else, or none, places it at 5.
-- **Which issue a ticket tracks** - the `GitHub:` header line yields `#<number>`, the number taken from the link's URL first and from a bare `#<number>` in the line otherwise.
+- **Which issue a ticket tracks** - the `Issue:` header line yields `#<number>`, the number taken from the link's URL first and from a bare `#<number>` in the line otherwise.
 
 ## Business logic
 
@@ -79,8 +79,8 @@ The `Priority:` value, with surrounding whitespace removed, earns the ticket the
 
 #### Context
 
-**User story**: an agent working a ticket imported from GitHub opens a pull request whose body closes that issue, so the issue number has to be readable off the ticket.
+**User story**: an agent working a ticket imported from the issue tracker opens a pull request whose body closes that issue, so the issue number has to be readable off the ticket.
 
 #### Business logic
 
-The first line of the ticket whose text, trimmed and lowercased, starts with `github:` is the issue line. When that line holds a parenthesized URL whose path ends in `/issues/<number>` or `/pull/<number>`, the number comes from the URL: the URL is the identity, the link's label is display text, and a label that disagrees with the URL loses (`[gh-7](…/issues/99)` yields `#99`). Without such a URL, the first `#<number>` in the line counts, so a hand-written `GitHub: #13` yields `#13`. A ticket with no issue line, or an issue line with neither (`GitHub: none yet`), tracks no issue.
+The first line of the ticket whose text, trimmed and lowercased, starts with `issue:` is the issue line. When that line holds a parenthesized URL whose path ends in `/issues/<number>` or `/pull/<number>`, the number comes from the URL: the URL is the identity, the link's label is display text, and a label that disagrees with the URL loses (`[gh-7](…/issues/99)` yields `#99`). Without such a URL, the first `#<number>` in the line counts, so a hand-written `Issue: #13` yields `#13`. A ticket with no issue line, or an issue line with neither (`Issue: none yet`), tracks no issue.

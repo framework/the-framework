@@ -57,7 +57,7 @@ const WITH_PROJECT: DashboardData = {
 
 /** Click the import step and wait for the start to have been attempted. */
 const clickImport = async () => {
-  fireEvent.click(await screen.findByRole('button', { name: 'Update from GitHub' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Update tickets' }))
   await waitFor(() => expect(startAgent.start).toHaveBeenCalled())
 }
 
@@ -103,7 +103,7 @@ describe('OnboardingChecklist (#1139)', () => {
   })
 })
 
-describe('the GitHub import lands on the session it starts (#1169)', () => {
+describe('the tickets import lands on the session it starts (#1169)', () => {
   test('the started run id is handed up, with the project it runs in', async () => {
     onDashboard.mockResolvedValue(WITH_PROJECT)
     onOnboarding.mockResolvedValue(null)
@@ -147,7 +147,7 @@ describe('the GitHub import lands on the session it starts (#1169)', () => {
     onOnboarding.mockResolvedValue(null)
     const onSelectProject = vi.fn()
     render(<OnboardingChecklist onAgentStarted={vi.fn()} onSelectProject={onSelectProject} />)
-    await configureFirst('Other ways to update from GitHub')
+    await configureFirst('Other ways to update the tickets')
     // The launcher, not an agent — the model and where it runs are nowhere on this checklist.
     await waitFor(() => expect(onSelectProject).toHaveBeenCalledWith('p1'))
     expect(startAgent.start).not.toHaveBeenCalled()
@@ -159,6 +159,6 @@ describe('the GitHub import lands on the session it starts (#1169)', () => {
     onOnboarding.mockResolvedValue(null)
     render(<OnboardingChecklist onAgentStarted={vi.fn()} onSelectProject={vi.fn()} />)
     await waitFor(() => expect(screen.getByText('Add a project')).toBeTruthy())
-    expect(screen.queryByRole('button', { name: 'Update from GitHub' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Update tickets' })).toBeNull()
   })
 })

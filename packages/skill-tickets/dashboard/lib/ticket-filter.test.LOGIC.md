@@ -6,7 +6,7 @@ What the tests cover:
 - **Buckets and range stay mutually exclusive** - setting a range clears the selected buckets, toggling a bucket clears the range, and the "no value" option survives both.
 - **Planning stage** - unplanned and planned split on whether a plan exists; claimed follows the claim and composes with planned rather than excluding it; selecting several stages widens the list.
 - **Topics** - topics match without regard to case, so `UX` and `ux` are one topic; "No topics" selects the tickets carrying none.
-- **Project and "Not linked"** - selected projects narrow by membership; "Not linked" keeps only the tickets with no GitHub link.
+- **Project and "Not linked"** - selected projects narrow by membership; "Not linked" keeps only the tickets with no issue link.
 - **Sorting** - the list orders by the chosen key in the chosen direction; a ticket naming no value for that key sorts last in both directions; ties fall back to newest first; a freshly picked key starts at its natural direction (newest first for date, highest first for priority, A to Z for title, easiest first for effort).
 - **The slider mirroring the buckets** - one bucket, or several adjacent ones, form a single span; a selection that skips a bucket in the middle, or an empty selection, forms none.
 - **The per-option counts** - each option is counted with every other facet applied but its own facet ignored, so picking one topic still leaves the other topics pickable with real counts, while the priority counts respect the topic selection; the stage counts and the "Not linked" count follow the same rule; the "no value" counts are real counts, so the option can be offered only when it would show something.

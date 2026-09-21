@@ -83,7 +83,7 @@ export interface TicketFilters {
   stage: StageId[]
   /** Selected project ids; empty means every project. */
   projects: string[]
-  /** Only tickets with no GitHub link — the locally written ones. */
+  /** Only tickets with no issue link — the locally written ones. */
   unlinked: boolean
 }
 
@@ -191,7 +191,7 @@ function matchesFilters(row: TicketRow, f: TicketFilters): boolean {
   }
   if (f.stage.length > 0 && !f.stage.some(stage => matchesStage(t, stage))) return false
   if (f.projects.length > 0 && !f.projects.includes(row.projectId)) return false
-  if (f.unlinked && t.github !== undefined) return false
+  if (f.unlinked && t.issue !== undefined) return false
   return true
 }
 
@@ -332,7 +332,7 @@ export function projectFacetCounts(rows: TicketRow[], f: TicketFilters): Record<
 }
 
 export function unlinkedCount(rows: TicketRow[], f: TicketFilters): number {
-  return rowsForFacet(rows, f, { unlinked: false }).filter(r => r.ticket.github === undefined).length
+  return rowsForFacet(rows, f, { unlinked: false }).filter(r => r.ticket.issue === undefined).length
 }
 
 // ---- The URL codec (#784's doctrine: the URL is the selection — filters are selection too). ----
@@ -384,7 +384,7 @@ export function parseTicketsView(search: string): TicketsView {
     .split(',')
     .filter((s): s is StageId => STAGES.some(stage => stage.id === s))
   view.filters.projects = (params.get('project') ?? '').split(',').filter(Boolean)
-  view.filters.unlinked = params.get('github') === 'unlinked'
+  view.filters.unlinked = params.get('issue') === 'none'
   const sortKey = params.get('sort')
   if (sortKey && SORT_KEYS.includes(sortKey as SortKey)) view.sort.key = sortKey as SortKey
   const dir = params.get('dir')
@@ -410,7 +410,7 @@ export function formatTicketsView(view: TicketsView): string {
   if (topics.length) params.set('topics', topics.join(','))
   if (f.stage.length) params.set('stage', f.stage.join(','))
   if (f.projects.length) params.set('project', f.projects.join(','))
-  if (f.unlinked) params.set('github', 'unlinked')
+  if (f.unlinked) params.set('issue', 'none')
   if (view.sort.key !== 'date') params.set('sort', view.sort.key)
   if (view.sort.dir !== DEFAULT_DIR[view.sort.key]) params.set('dir', view.sort.dir)
   if (view.group === 'none') params.set('group', 'none')

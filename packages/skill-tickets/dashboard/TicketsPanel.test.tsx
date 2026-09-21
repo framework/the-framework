@@ -168,19 +168,19 @@ describe('TicketsPanel (#697/#1144)', () => {
     expect(titles.findIndex(t => t?.includes('Older'))).toBeLessThan(titles.findIndex(t => t?.includes('Newer')))
   })
 
-  test('links the row\'s GitHub issue out, without hijacking the row\'s own click (#1144/#1265)', async () => {
+  test('links the row\'s issue out, without hijacking the row\'s own click (#1144/#1265)', async () => {
     const onOpen = vi.fn()
     render(
       <TicketsPanel
         projectId="p1"
-        tickets={[ticket({ github: { label: '#42', url: 'https://github.com/org/repo/issues/42' } })]}
+        tickets={[ticket({ issue: { label: '#42', url: 'https://forge.example/org/repo/issues/42' } })]}
         loaded
         onOpen={onOpen}
        
       />,
     )
     const link = await screen.findByRole('link', { name: /#42/ })
-    expect(link.getAttribute('href')).toBe('https://github.com/org/repo/issues/42')
+    expect(link.getAttribute('href')).toBe('https://forge.example/org/repo/issues/42')
     // A sibling of the row's button, not a child: clicking the link must not open the detail page.
     fireEvent.click(link)
     expect(onOpen).not.toHaveBeenCalled()
@@ -188,7 +188,7 @@ describe('TicketsPanel (#697/#1144)', () => {
     expect(onOpen).toHaveBeenCalledWith('2026-07-20_do-the-thing.md')
   })
 
-  test('shows the effort the plan recorded, and keeps the row meta in priority/date/GitHub order (#1144/#1265)', async () => {
+  test('shows the effort the plan recorded, and keeps the row meta in priority/date/issue order (#1144/#1265)', async () => {
     const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60_000).toISOString()
     render(
       <TicketsPanel
@@ -200,7 +200,7 @@ describe('TicketsPanel (#697/#1144)', () => {
             uncertainty: 4,
             priority: '7',
             date: twoDaysAgo,
-            github: { label: '#42', url: 'https://github.com/org/repo/issues/42' },
+            issue: { label: '#42', url: 'https://forge.example/org/repo/issues/42' },
           }),
         ]}
         loaded
@@ -225,9 +225,9 @@ describe('TicketsPanel (#697/#1144)', () => {
     expect(onOpen).toHaveBeenCalledWith('2026-07-20_do-the-thing.md')
   })
 
-  test('an empty tickets/ offers the GitHub update instead of a dead end (#1501)', async () => {
+  test('an empty tickets/ offers the update instead of a dead end (#1501)', async () => {
     render(<TicketsPanel projectId="p1" tickets={[]} loaded onOpen={() => {}} />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Update from GitHub' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Update tickets' }))
     // The project's own command, under the one label every surface offers it by.
     await waitFor(() => expect(started()).toEqual([['p1', '/update-tickets']]))
   })
@@ -235,27 +235,27 @@ describe('TicketsPanel (#697/#1144)', () => {
   test('a refused update says why (#1169)', async () => {
     render(<TicketsPanel projectId="p1" tickets={[]} loaded onOpen={() => {}} />)
     host.startRun.mockResolvedValue({ ok: false, error: 'a session is already active' })
-    fireEvent.click(await screen.findByRole('button', { name: 'Update from GitHub' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Update tickets' }))
     expect(await screen.findByText(/already active/i)).toBeTruthy()
   })
 
   test('a filled tickets/ offers the same update beside the stamp (#1208)', async () => {
     render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onOpen={() => {}} />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Update from GitHub' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Update tickets' }))
     await waitFor(() => expect(started()).toEqual([['p1', '/update-tickets']]))
   })
 
   test('the empty state offers exactly one update button, without the stamp row (#1501)', async () => {
     render(<TicketsPanel projectId="p1" tickets={[]} loaded onOpen={() => {}} />)
     // One button, one command: the stamp row and its sibling button belong to the filled panel.
-    expect((await screen.findAllByRole('button', { name: 'Update from GitHub' })).length).toBe(1)
+    expect((await screen.findAllByRole('button', { name: 'Update tickets' })).length).toBe(1)
     expect(screen.queryByText(/No record of an import yet/i)).toBeNull()
   })
 
   test('the stamp says when tickets/ last caught up, read with `meta --local`, and admits when it does not know (#1208)', async () => {
     onTicketsMeta.mockResolvedValue({ lastImportedAt: new Date(Date.now() - 3 * 60 * 60_000).toISOString() })
     render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onOpen={() => {}} />)
-    expect(await screen.findByText('Updated from GitHub 3h ago')).toBeTruthy()
+    expect(await screen.findByText('Updated from the tracker 3h ago')).toBeTruthy()
     expect(host.runCommand).toHaveBeenCalledWith('p1', ['meta', '--local'])
     cleanup()
     // A repo imported before the stamp existed has none, and saying so beats inventing a date.
@@ -267,7 +267,7 @@ describe('TicketsPanel (#697/#1144)', () => {
   test('a refused update on the filled panel says why too (#1208)', async () => {
     render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onOpen={() => {}} />)
     host.startRun.mockResolvedValue({ ok: false, error: 'a session is already active' })
-    fireEvent.click(await screen.findByRole('button', { name: 'Update from GitHub' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Update tickets' }))
     expect(await screen.findByText(/already active/i)).toBeTruthy()
   })
 
@@ -299,12 +299,12 @@ describe('TicketsPanel (#697/#1144)', () => {
   test("the update's Configure first carries the update command, from either state (#1501)", async () => {
     // The filled panel's stamp row.
     render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onOpen={() => {}} />)
-    await configureFirst('Other ways to update from GitHub')
+    await configureFirst('Other ways to update the tickets')
     await waitFor(() => expect(host.configureRun).toHaveBeenCalledWith('p1', '/update-tickets'))
     cleanup()
     // And the empty panel's own button, which offers the same command under the same label.
     render(<TicketsPanel projectId="p1" tickets={[]} loaded onOpen={() => {}} />)
-    await configureFirst('Other ways to update from GitHub')
+    await configureFirst('Other ways to update the tickets')
     await waitFor(() => expect(host.configureRun).toHaveBeenCalledWith('p1', '/update-tickets'))
     expect(host.startRun).not.toHaveBeenCalled()
   })
@@ -312,7 +312,7 @@ describe('TicketsPanel (#697/#1144)', () => {
   test('an empty list with hiddenByFilter says so, rather than offering an update for work already done (#1144/#1230)', async () => {
     render(<TicketsPanel projectId="p1" tickets={[]} loaded hiddenByFilter={3} onOpen={() => {}} />)
     expect(await screen.findByText(/3 tickets hidden by the current filter/i)).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Update from GitHub' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Update tickets' })).toBeNull()
   })
 
   test('no project renders nothing at all', () => {

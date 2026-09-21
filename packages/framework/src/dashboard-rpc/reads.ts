@@ -1,6 +1,7 @@
 import type { BridgeBrowserStatus } from '../bridge-browser.js'
 import { findAgent, readLiveMetas, readAllAgents, loadAgentEvents, startedAtFromAgentId, isPidAlive, type AgentMeta, type AgentStatus, isRunId, projectBranches } from '../store/index.js'
 import { listProjectWorktrees } from '../worktrees.js'
+import { projectForge, type ForgeHome } from '../store/forge.js'
 import { readDocs, type WorkspaceDoc } from '../dashboard/docs.js'
 import { collectQueue, type ProjectQueue } from '../dashboard/queue.js'
 import { collectSchedulers, type ProjectScheduler } from '../dashboard/scheduler-state.js'
@@ -10,7 +11,6 @@ import type { ProjectionRead } from '../dashboard/projects.js'
 import { buildOpenQuestions, type OpenQuestion } from '../dashboard/open-questions.js'
 import { buildActivity, type Activity } from '../dashboard/activity.js'
 import { buildDashboard, type DashboardData } from '../dashboard/dashboard.js'
-import { githubUrlFor } from '../dashboard/github.js'
 import { readGitStatus, type GitStatus } from '../dashboard/git-status.js'
 import { readAgentHandoff, resolveAgentPr, agentBranchFor, type AgentHandoff } from '../dashboard/agent-handoff.js'
 import type { AgentWorktree } from '../dashboard/types.js'
@@ -241,8 +241,8 @@ export async function onRecentAgents(): Promise<RecentAgent[]> {
  *
  * The panels render `items` and ignore the rest. The browser's notifier is the caller that cannot:
  * it keeps a baseline of what was already waiting when the page opened, and a queue that came back
- * empty because GitHub was unreachable is not a baseline — taking it for one announces the whole
- * backlog the moment GitHub answers.
+ * empty because the forge was unreachable is not a baseline — taking it for one announces the whole
+ * backlog the moment the forge answers.
  */
 export async function onInterventions(): Promise<ProjectionRead<Intervention>> {
   return withProjects(buildInterventions)
@@ -346,11 +346,12 @@ export async function onFileContent(projectId: string, path: string, agentId?: s
   )
 }
 
-/** The project's GitHub URL from its `origin` remote (#489), or null (no remote / not GitHub / relay). */
-export async function onGithubUrl(projectId: string): Promise<string | null> {
+/** The project's page on its forge and the forge's name (#489, #1820), or null: no forge package, no remote there, or the relay. */
+export async function onForgeHome(projectId: string): Promise<ForgeHome | null> {
   const cwd = await resolveProjectPath(projectId)
   if (!cwd) return null
-  return (await githubUrlFor(cwd)) ?? null
+  const forge = await projectForge(cwd).catch(() => undefined)
+  return (await forge?.home()) ?? null
 }
 
 /**

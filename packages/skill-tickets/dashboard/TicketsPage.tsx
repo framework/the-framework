@@ -36,7 +36,7 @@ function initialView(): TicketsView {
 // faceted filters (priority/topics/stage/effort/uncertainty/project/unlinked), sort with
 // direction, and Group by project (each section its own poll-independent TicketsPanel) vs a flat
 // cross-project list — the one view that can answer "what is the single highest-priority ticket
-// anywhere". Rows are selectable (GitHub's list idiom): while any shown row is ticked, the
+// anywhere". Rows are selectable (the list idiom of issue trackers): while any shown row is ticked, the
 // heading's queue buttons narrow from the whole shown set to just the selected tickets.
 export function TicketsPage({ projects }: { projects: WidgetProject[] }) {
   const host = useWidgetHost()
@@ -135,7 +135,7 @@ export function TicketsPage({ projects }: { projects: WidgetProject[] }) {
   const shownGroups = view.filters.projects.length > 0 ? groups.filter(g => view.filters.projects.includes(g.projectId)) : groups
   const flatRows = sortRows(visible, view.sort)
 
-  // The row selection (GitHub's list idiom): tick some rows and the queue buttons narrow to just
+  // The row selection (the list idiom of issue trackers): tick some rows and the queue buttons narrow to just
   // them. Keyed project + file, since the page spans projects and two projects can share a
   // filename. Only shown selected rows count — a selected ticket the filters hide is neither
   // acted on nor counted, and comes back with its row — so what the buttons act on is always
@@ -307,7 +307,7 @@ export function TicketsPage({ projects }: { projects: WidgetProject[] }) {
               )}
               {flatRows.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
-                  {rows.length === 0 ? 'No tickets in any project yet — group by project to import from GitHub.' : 'No tickets match.'}
+                  {rows.length === 0 ? 'No tickets in any project yet — group by project to import a project\'s issues.' : 'No tickets match.'}
                 </p>
               ) : (
                 <div className="overflow-hidden rounded-lg border border-border">

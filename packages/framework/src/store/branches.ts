@@ -1,4 +1,4 @@
-import { readProvidedCommand, runPackageCommand, type ProvidedCommand } from '../project-widgets.js'
+import { readProvidedCommand, runPackageCommand, type ProvidedCommand } from '@gemstack/agent-data'
 import { isRunId } from './runs.js'
 
 /**
@@ -14,16 +14,15 @@ import { isRunId } from './runs.js'
  * exits 1 with its reason on stderr):
  *   `<command> list [--sizes]`                          every checkout, as an array of {@link Checkout}
  *   `<command> show <branch>...`                        what each branch holds and where it stands, as an array of {@link BranchState}, in the order asked
- *   `<command> publish --branch <b> --title <t> [--body <b>] [--draft]`
- *                                                       push the branch and open its pull request; an open one is answered as it is
- *   `<command> merge <number>`                          land the pull request: armed to merge on green, or merged at once
+ *   `<command> push --branch <b>`                       push the branch to the remote; a branch only the remote has is answered as it is
  *   `<command> remove <id> [--discard]`                 reclaim a run's checkout once the remote has everything; `--discard` drops uncommitted work
  * `list` and `show` read this machine, no network: the framework polls. `show` answers the branch's
- * git facts only; its pull request is the framework's own read, as every pull request is.
+ * git facts only; its pull request is the forge provider's (`forge.ts`), as every pull request is.
  *
- * That is the whole contract. The framework reads checkouts to find the runs that have one, and a
- * branch's state for what it composes: the run page's handoff, the Human Queue's unpushed rows.
- * What a checkout is, where it lives, how a branch is pushed, opened and landed is the package's.
+ * That is the whole contract: git, and nothing beyond it (#1820). The framework reads checkouts to
+ * find the runs that have one, and a branch's state for what it composes: the run page's handoff,
+ * the Human Queue's unpushed rows. Opening a pull request is the push here, then the forge
+ * provider's `open`. What a checkout is, where it lives, how a branch is pushed is the package's.
  *
  * The shapes, owned here: {@link Checkout}, {@link BranchState}.
  */
@@ -80,11 +79,8 @@ export interface BranchState {
   pendingFiles?: string[]
 }
 
-/** What publishing a branch left: its pull request, and whether it was open already. */
-export type PublishOutcome = { ok: true; pr: { number: number; url: string }; existing: boolean } | { ok: false; error: string }
-
-/** What landing a pull request did: armed on GitHub, merged at once, or this machine watching its checks. */
-export type MergeOutcome = { ok: true; outcome: 'auto-armed' | 'merged' | 'watching' } | { ok: false; error: string }
+/** What pushing a branch did: `pushed` is false when only the remote had it, so there was nothing here to push. */
+export type PushOutcome = { ok: true; pushed: boolean } | { ok: false; error: string }
 
 /** What reclaiming a checkout did: done, with the branches that went with it when any did, or the provider's reason it stayed. */
 export type RemoveOutcome = { ok: true; branchesDeleted?: string[] } | { ok: false; error: string }
@@ -100,10 +96,8 @@ export interface BranchesSource {
   list(opts?: { sizes?: boolean; fresh?: boolean }): Promise<Checkout[]>
   /** Each branch's state, in the order asked; a branch the provider did not answer for is missing. `[]` when nothing can be read. */
   show(branches: readonly string[]): Promise<BranchState[]>
-  /** Push a branch and open its pull request, or answer the open one. */
-  publish(branch: string, opts: { title: string; body?: string; draft?: boolean }): Promise<PublishOutcome>
-  /** Land a pull request. */
-  merge(number: number): Promise<MergeOutcome>
+  /** Push a branch to the remote: the checkout on it under its clean rule, else the branch itself. */
+  push(branch: string): Promise<PushOutcome>
   /** Reclaim a run's checkout, or why it stayed. `discard` drops its uncommitted work instead of refusing over it. */
   remove(id: string, opts?: { discard?: boolean }): Promise<RemoveOutcome>
 }
@@ -188,12 +182,6 @@ function filesOf(value: unknown): BranchFile[] {
   })
 }
 
-/** A pull request read back from a `publish` answer, or undefined. */
-function prOf(output: unknown): { number: number; url: string } | undefined {
-  const pr = output && typeof output === 'object' ? ((output as Record<string, unknown>)['pr'] as Record<string, unknown> | undefined) : undefined
-  return pr && typeof pr === 'object' && typeof pr['number'] === 'number' && typeof pr['url'] === 'string' ? { number: pr['number'], url: pr['url'] } : undefined
-}
-
 /** The branches source over one provider command: each read one run of the command, cached per {@link CACHE_MS}; each write drops the reads. */
 function commandBranches(root: string, command: ProvidedCommand, now: () => number): BranchesSource & { drop(): void } {
   const listed = new Map<string, { at: number; rows: Promise<Checkout[]> }>()
@@ -237,23 +225,12 @@ function commandBranches(root: string, command: ProvidedCommand, now: () => numb
       shown.set(key, read)
       return read.states
     },
-    async publish(branch, opts) {
-      const args = ['publish', '--branch', branch, '--title', opts.title, ...(opts.body !== undefined ? ['--body', opts.body] : []), ...(opts.draft ? ['--draft'] : [])]
-      const result = await runPackageCommand(root, command, args)
+    async push(branch) {
+      const result = await runPackageCommand(root, command, ['push', '--branch', branch])
       drop()
       if (!result.ok) return { ok: false, error: result.error }
-      const pr = prOf(result.output)
-      if (!pr) return { ok: false, error: `${command.name} opened no pull request` }
-      return { ok: true, pr, existing: (result.output as Record<string, unknown>)['existing'] === true }
-    },
-    async merge(number) {
-      const result = await runPackageCommand(root, command, ['merge', String(number)])
-      drop()
-      if (!result.ok) return { ok: false, error: result.error }
-      const merge = result.output && typeof result.output === 'object' ? ((result.output as Record<string, unknown>)['merge'] as Record<string, unknown> | undefined) : undefined
-      const outcome = merge && typeof merge === 'object' ? merge['outcome'] : undefined
-      if (outcome === 'auto-armed' || outcome === 'merged' || outcome === 'watching') return { ok: true, outcome }
-      return { ok: false, error: typeof merge?.['error'] === 'string' ? merge['error'] : `${command.name} did not merge` }
+      const pushed = result.output && typeof result.output === 'object' ? (result.output as Record<string, unknown>)['pushed'] : undefined
+      return { ok: true, pushed: pushed !== false }
     },
     async remove(id, opts = {}) {
       if (!isRunId(id)) return { ok: false, error: `not a run id: ${id}` }

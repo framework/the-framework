@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
-import { ghPrsForBranch, type LinkedPr } from './dashboard/gh.js'
+import { prsForBranch, type LinkedPr } from './dashboard/pull-requests.js'
 import { listAgents, type AgentMeta } from './store/index.js'
 import { nodeFs } from './node-fs.js'
 import { errorMessage } from './error-message.js'
@@ -124,10 +124,10 @@ export interface ScratchSweepResult {
   failed: { ref: string; error: string }[]
 }
 
-/** Injectable seams so the sweep is unit-testable off disk, off the network and off GitHub. */
+/** Injectable seams so the sweep is unit-testable off disk, off the network and off the forge. */
 export interface ScratchSweepDeps {
   git?: GitRunner
-  /** The branch's full PR history (default {@link ghPrsForBranch}). */
+  /** The branch's full PR history (default {@link prsForBranch}). */
   prs?: (cwd: string, branch: string) => Promise<LinkedPr[]>
   fs?: ScratchFs
   /** The current time in ms (injected so tests can age refs deterministically). */
@@ -227,7 +227,7 @@ async function emptyTipOnLandedParent(
  */
 export async function sweepCloudScratchRefs(cwd: string, deps: ScratchSweepDeps = {}): Promise<ScratchSweepResult> {
   const git = deps.git ?? nodeGitRunner()
-  const prs = deps.prs ?? ghPrsForBranch
+  const prs = deps.prs ?? prsForBranch
   const fs = deps.fs ?? nodeScratchFs()
   const now = deps.now ? deps.now() : Date.now()
   const ageMs = deps.ageMs ?? SCRATCH_REF_SAFE_AGE_MS
@@ -295,7 +295,7 @@ export async function sweepCloudScratchRefs(cwd: string, deps: ScratchSweepDeps 
       result.kept.push({ ref, reason: 'holds-work' })
       continue
     }
-    // ghPrsForBranch resolves [] when gh is missing/unauthed, so a hiccup here fails toward
+    // prsForBranch resolves [] when the forge cannot answer, so a hiccup here fails toward
     // deletion — acceptable only because the work gate already proved the ref holds nothing.
     const history = await prs(cwd, ref).catch((): LinkedPr[] => [])
     if (history.some(pr => pr.state === 'OPEN')) {

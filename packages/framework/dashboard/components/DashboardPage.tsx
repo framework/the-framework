@@ -177,7 +177,7 @@ function HumanQueue({
                       <span className="truncate text-sm font-medium">{item.title}</span>
                       <span className="ml-auto shrink-0 text-xs text-muted-foreground">{item.projectName}</span>
                     </TooltipTrigger>
-                    <TooltipContent>{`Open PR #${item.number} on GitHub`}</TooltipContent>
+                    <TooltipContent>{`Open PR #${item.number}`}</TooltipContent>
                   </Tooltip>
 
                 )}

@@ -1,4 +1,4 @@
-One ticket's own page: its whole markdown rather than the one line the list shows, everything known about it (age, priority, the GitHub issue it tracks, its topics, whether it is planned, who holds it, its effort and uncertainty ratings, its file name), the ticket as a link [7] with whatever the installed widgets [8] offer on one (an "Add to queue" button when the project has a queue package), and, when an agent [2] holds it, a button that lifts that claim [3].
+One ticket's own page: its whole markdown rather than the one line the list shows, everything known about it (age, priority, the issue it tracks, its topics, whether it is planned, who holds it, its effort and uncertainty ratings, its file name), the ticket as a link [7] with whatever the installed widgets [8] offer on one (an "Add to queue" button when the project has a queue package), and, when an agent [2] holds it, a button that lifts that claim [3].
 
 ## Context
 
@@ -47,7 +47,7 @@ The ticket is re-read every 10 seconds, so a ticket an agent [2] edits, claims [
 
 #### Business logic
 
-Under the summary, in this order: the ticket's age ("2d ago", with the exact date and time on hover), "Priority: N" colored red from 8 up and amber from 5 to 7, a link to the GitHub issue the ticket tracks showing that issue's label and opening in a new tab, one badge per topic, "planned" when the ticket has a plan, the claim badge described below, "Effort: N" and "Uncertainty: N" when the ticket's plan recorded them, and last the ticket's file name.
+Under the summary, in this order: the ticket's age ("2d ago", with the exact date and time on hover), "Priority: N" colored red from 8 up and amber from 5 to 7, a link to the issue the ticket tracks, an external-link icon and that issue's label, opening in a new tab, one badge per topic, "planned" when the ticket has a plan, the claim badge described below, "Effort: N" and "Uncertainty: N" when the ticket's plan recorded them, and last the ticket's file name.
 
 Each of these appears only when the ticket has it, so a bare ticket shows only its age and its file name.
 

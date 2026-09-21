@@ -8,7 +8,7 @@ What an agent [2] left behind, as the user meets it in the agent's action bar: a
 
 ## Glossary
 
-[1] next step: what a person can do with an ended agent's work from the dashboard: open a pull request for its branch, or merge the pull request it has.
+[1] next step: what a person can do with an ended agent's work from the dashboard: open a pull request for its branch, or merge the pull request it has; on a project with no forge package, push the branch.
 [2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps. An agent publishes its own work — pushes its branch, opens its pull request — when its command says to.
 [3] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [4] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds.
@@ -16,7 +16,7 @@ What an agent [2] left behind, as the user meets it in the agent's action bar: a
 ## Business logic — TL;DR
 
 - **The one-line verdict** - what the branch holds, in a phrase: "branch gone", "merged", "no changes", or the commit and file counts with the lines added and removed, plus "pushed" when the branch is on the remote and has no pull request.
-- **The next step, or why there is none** - once the agent has stopped: "Open PR", or "Merge PR" for an open pull request, or one sentence saying why nothing can be pressed; never a button GitHub would refuse, and nothing at all while the pull request lookup is still out.
+- **The next step, or why there is none** - once the agent has stopped: "Open PR", or "Merge PR" for an open pull request, or "Push" where the project has no forge package, or one sentence saying why nothing can be pressed; never a button the forge would refuse, and nothing at all while the pull request lookup is still out.
 - **The lists behind the disclosure** - the commits (up to 6), the changed files (up to 10) and the uncommitted files (up to 10), the rest counted as "and N more"; shown only when there is something to list.
 
 ## Business logic
@@ -51,9 +51,10 @@ Shown once the agent has ended (the caller's decision, in `AgentView.tsx`); an a
 - The branch is gone: "Branch gone — nothing to open a PR from."
 - The branch carries no commit beyond the base: "Nothing committed — no PR to open." when the checkout [3] holds no uncommitted files; otherwise "Nothing committed — <files> left uncommitted.", where <files> names the first two paths, joined by a comma, followed by "and <N> more" for the rest; hovering the sentence shows every path, one per line. No button: GitHub would refuse a pull request with no commits, and the named work is what the user's next message to the agent should have it commit.
 - The repository has no remote: "No remote to push to."
+- The project has no forge package: nothing can open a pull request for it, so the last step is the push. A branch not yet on the remote gets one button, "Push", reading "Pushing…" while it is in flight; a branch already pushed gets "Pushed — no forge package to open a pull request with." and no button.
 - Otherwise one button, "Open PR", reading "Opening PR…" while it is in flight. Opening a pull request pushes the branch on the way, so no separate push button competes with it.
 
-A reason is capped in width and truncated with an ellipsis, so a long file name never widens the row. Both buttons are disabled while an action is in flight. A failed action reports "Could not merge the pull request." or "Could not open the pull request." unless the daemon answered with a more specific error, and the reason reaches the bar's summary line beside the verdict rather than nothing happening. After an action succeeds, the branch is read again so the bar shows the new state.
+A reason is capped in width and truncated with an ellipsis, so a long file name never widens the row. Both buttons are disabled while an action is in flight. A failed action reports "Could not merge the pull request.", "Could not open the pull request." or "Could not push the branch." unless the daemon answered with a more specific error, and the reason reaches the bar's summary line beside the verdict rather than nothing happening. After an action succeeds, the branch is read again so the bar shows the new state.
 
 ### The lists behind the disclosure
 

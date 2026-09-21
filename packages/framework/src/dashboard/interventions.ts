@@ -4,7 +4,7 @@ import type { FrameworkEvent } from '../events.js'
 import type { ProjectSummary, ProjectionRead } from './projects.js'
 import { agentBranchFor } from './agent-handoff.js'
 import { projectBranches, type BranchesFor, type BranchState } from '../store/branches.js'
-import { ghPrList, type PrLister } from './gh.js'
+import { openPrs, type PrLister } from './pull-requests.js'
 import { interventionKey } from './keys.js'
 import { postDiscordWebhook } from './discord-webhook.js'
 
@@ -32,7 +32,7 @@ export interface Intervention {
    */
   kind: 'pr' | 'awaiting' | 'unpushed'
   title: string
-  /** Where to act: the PR on GitHub (`pr`), or the dashboard (the other two, when the URL is known). */
+  /** Where to act: the PR on the forge (`pr`), or the dashboard (the other two, when the URL is known). */
   url: string
   /** The PR number (`pr` only). */
   number?: number
@@ -92,7 +92,7 @@ export async function buildInterventions(
   projects: ProjectSummary[],
   deps: InterventionsDeps = {},
 ): Promise<ProjectionRead<Intervention>> {
-  const prs = deps.prs ?? ghPrList
+  const prs = deps.prs ?? openPrs
   const liveAgents = deps.liveAgents ?? readLiveMetas
   const events = deps.events ?? loadAgentEvents
   const items: Intervention[] = []
@@ -153,7 +153,7 @@ export async function buildInterventions(
       })
     }
     // A finished agent whose work never left the machine is a "needs you" too (#860). Until now the
-    // queue only knew about a PR that is *already on GitHub* and an agent parked on a gate, so an agent
+    // queue only knew about a PR that is *already on the forge* and an agent parked on a gate, so an agent
     // that committed real code and stopped produced neither, and nothing told anyone: the overview
     // drops it (it filters on `running`) and the handoff panel is behind clicking into that agent.
     //
@@ -176,7 +176,7 @@ export async function buildInterventions(
  *
  * Only the most recent {@link InterventionsDeps.handoffLimit} finished agents are inspected, and
  * their branches in one read of the project's branches provider: each read is a process, and
- * this runs on a poll. The provider answers git facts only, so the `gh` PR lookup the handoff
+ * this runs on a poll. The provider answers git facts only, so the forge PR lookup the handoff
  * summary makes per branch is never paid here: an open PR means the branch was pushed, so
  * `pushed` already excludes it, and the `pr` kind above is what surfaces it.
  */

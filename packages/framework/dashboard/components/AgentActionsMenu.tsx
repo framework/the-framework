@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import type { FrameworkEvent } from '../../src/index.js'
+import type { ForgeHome, FrameworkEvent } from '../../src/index.js'
 import { sessionInfo } from '../../src/client.js'
-import { MoreVertical, Github, FolderOpen, Code, Check, ExternalLink, Square, FolderX, Trash2, Copy } from 'lucide-react'
-import { onGithubUrl } from '../rpc/reads.js'
+import { MoreVertical, FolderOpen, Code, Check, ExternalLink, Square, FolderX, Trash2, Copy } from 'lucide-react'
+import { onForgeHome } from '../rpc/reads.js'
 import {
   sendOpenInApp,
   sendStop,
@@ -31,7 +31,7 @@ import {
 
 // One ⋮ overflow menu for everything you can DO to a session (#toolbar-menu), instead of a row of
 // five-plus icon buttons that came and went with the agent's state. It folds in what used to be
-// WorkspaceActions (GitHub / folder / editor / Serve), the Stop button, Remove worktree, Open
+// WorkspaceActions (forge / folder / editor / Serve), the Stop button, Remove worktree, Open
 // session, and Delete. The handoff's Push / Open PR stay visible in the bar — they move the work
 // forward, not just open it somewhere. Serve keeps its state (Serve → Open/Stop, or a picker
 // submenu in a multi-app repo); the editor keeps its preferred-editor submenu; Delete opens its
@@ -82,8 +82,8 @@ export function AgentActionsMenu({
       copiedTimer.current = setTimeout(() => setCopied(false), 1500)
     })
   }
-  // keepPrevious: hold the last repo URL while a new project's loads, so the item does not flicker.
-  const githubUrl = useLoaded<string | null>(() => onGithubUrl(projectId), null, [projectId], true)
+  // keepPrevious: hold the last forge page while a new project's loads, so the item does not flicker.
+  const home = useLoaded<ForgeHome | null>(() => onForgeHome(projectId), null, [projectId], true)
 
   const { busy, error, run } = useAction()
 
@@ -126,9 +126,9 @@ export function AgentActionsMenu({
           <TooltipContent>Session actions</TooltipContent>
         </Tooltip>
         <DropdownMenuContent align="end" className="min-w-[14rem]">
-          {githubUrl && (
-            <DropdownMenuItem render={<a href={githubUrl} target="_blank" rel="noreferrer" />}>
-              <Github className="h-3.5 w-3.5 shrink-0" /> Open on GitHub
+          {home && (
+            <DropdownMenuItem render={<a href={home.url} target="_blank" rel="noreferrer" />}>
+              <ExternalLink className="h-3.5 w-3.5 shrink-0" /> Open on {home.name}
             </DropdownMenuItem>
           )}
           {/* Named for what it actually opens (#1195): once a session's worktree is gone this

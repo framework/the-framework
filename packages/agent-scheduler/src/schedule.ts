@@ -9,7 +9,7 @@ import { DEFAULT_CAP, SCHEDULE_FILE } from './names.js'
  *
  *     - work-queue: when `npx queue`, cap 1
  *     - triage-quick: every 6h
- *     - update-tickets: every 1h, when `gh issue list …`
+ *     - update-tickets: every 1h, when `npx tickets meta | jq …`
  *     - post-merge-cleanup: every 1d, off
  *
  * `when` is a shell command, run at the repository root. The command is due while the check

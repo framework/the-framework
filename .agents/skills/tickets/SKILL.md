@@ -13,8 +13,8 @@ Read and change them with the `tickets` command, a dependency of this repository
 
 ```
 npx tickets list                 every open ticket, as one JSON array: file, title, summary, priority, topics,
-                                 github, pr, date, planned, effort, uncertainty, locked, lockedBy
-                                 (priority, topics, github, pr, effort, uncertainty, locked, lockedBy
+                                 issue, pr, date, planned, effort, uncertainty, locked, lockedBy
+                                 (priority, topics, issue, pr, effort, uncertainty, locked, lockedBy
                                  absent when unset; pr set means the ticket is in review)
 npx tickets show <file>          one ticket: its text, its plan, who holds it
 npx tickets meta                 when the tickets last caught up with the issue tracker:
@@ -65,8 +65,8 @@ DATE: yyyy-mm-dd. SLUG: a succinct kebab-case slug of the ticket title.
 ```md
 Priority: 0-10 [optional, 10: critical — act immediately, 0: only if capacity]
 Topics: [list-of-topics] [optional]
-GitHub: [#42](https://github.com/org/repo/issues/42) [optional]
-PR: [#1790](https://github.com/org/repo/pull/1790) [optional: the pull request that closes this ticket, once one is open]
+Issue: [#42](https://forge.example/org/repo/issues/42) [optional: the issue this ticket tracks in the project's issue tracker]
+PR: [#1790](https://forge.example/org/repo/pull/1790) [optional: the pull request that closes this ticket, once one is open]
 
 # Ticket title
 

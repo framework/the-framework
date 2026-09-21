@@ -1,4 +1,4 @@
-import { Github, ClipboardPlus, ClipboardList, Hammer, Play } from 'lucide-react'
+import { ExternalLink, ClipboardPlus, ClipboardList, Hammer, Play } from 'lucide-react'
 import { Badge, Button, Checkbox, StartAgentButton, Tooltip, TooltipTrigger, TooltipContent, cn, formatRelative, formatAge, formatDateTime, useAction, useLoaded, useWidgetHost } from 'framework/widget'
 import { UPDATE_TICKETS_PROMPT, planTicketPrompt, readMeta, workOnTicketPrompt, type TicketsMeta } from '../src/widget.js'
 import type { WorkspaceTicket } from './lib/types.js'
@@ -10,12 +10,12 @@ const NO_META: TicketsMeta = {}
 
 /**
  * One ticket as a one-liner row (#697/#1144): the start column, title, project (flat mode only),
- * topics, claim, effort/uncertainty, priority, age, the plan column, and the GitHub link.
+ * topics, claim, effort/uncertainty, priority, age, the plan column, and the issue link.
  * Extracted from the panel so the flat cross-project list (#1144's Group: none) renders the same
  * row with per-row project context.
  *
  * The metadata cluster is a *sibling* of the row's open button, not a child — same rule as the
- * plan cell and the GitHub link (an interactive control nested in a button is invalid HTML), and
+ * plan cell and the issue link (an interactive control nested in a button is invalid HTML), and
  * since the topic badges and the claim marker filter on click (#1144), they are controls now.
  */
 export function TicketRow({
@@ -66,7 +66,7 @@ export function TicketRow({
   const holder = ticket.lockedByAgent?.name ?? ticket.lockedBy
   return (
     <li className="flex items-stretch transition-colors hover:bg-accent/60">
-      {/* The selection checkbox, the row's left edge — GitHub's list idiom: pick some rows and the
+      {/* The selection checkbox, the row's left edge — the list idiom of issue trackers: pick some rows and the
           page's bulk actions narrow to them. Never disabled: selecting is page state, not an
           action, so it costs nothing and can be changed any time. A sibling of the open button
           like every control on the row. */}
@@ -182,7 +182,7 @@ export function TicketRow({
       </span>
       {/* The plan column (#685): a `.plan.md` is either there to read or waiting to be written.
           Planned → a link to the rendered plan; not planned → a button that starts a session to
-          write one. A sibling of the row's button, not a child, for the same reason the GitHub
+          write one. A sibling of the row's button, not a child, for the same reason the issue
           link is: an interactive control nested in a button is invalid HTML, and the two go
           different places. */}
       <div className="flex w-16 shrink-0 items-center justify-center">
@@ -230,15 +230,15 @@ export function TicketRow({
           />
         )}
       </div>
-      {ticket.github ? (
+      {ticket.issue ? (
         <a
-          href={ticket.github.url}
+          href={ticket.issue.url}
           target="_blank"
           rel="noreferrer"
           className="flex w-20 shrink-0 items-center justify-end gap-1 px-3 text-xs text-muted-foreground hover:text-foreground hover:underline"
         >
-          <Github className="h-4 w-4" aria-hidden />
-          {ticket.github.label}
+          <ExternalLink className="h-4 w-4" aria-hidden />
+          {ticket.issue.label}
         </a>
       ) : (
         // Same width as the link so the row's right edge — and with it the priority and date
@@ -253,8 +253,8 @@ export function TicketRow({
 // what the agent already did to it, and how recently, all on the row — so the backlog is scannable
 // without opening one. A row opens its detail page (#1144), which is where Queue and the summary
 // live, and carries two direct starts: the start column (an agent implementing the ticket) and the
-// plan column (an agent writing its plan, #685). An empty `tickets/` offers to import the repo's
-// GitHub issues instead of just saying "nothing here"; a filled one offers to update it (#1208)
+// plan column (an agent writing its plan, #685). An empty `tickets/` offers to import the project's
+// issues instead of just saying "nothing here"; a filled one offers to update it (#1208)
 // instead of a re-import re-walking the whole backlog.
 export function TicketsPanel({
   projectId,
@@ -299,7 +299,7 @@ export function TicketsPanel({
 }) {
   const { busy, error, run } = useAction()
   const host = useWidgetHost()
-  // When `tickets/` last caught up with GitHub, from `tickets meta --local`. Read here rather than
+  // When `tickets/` last caught up with the issue tracker, from `tickets meta --local`. Read here rather than
   // passed down: the cross-project page reads one ticket list per project, and this is the one
   // extra read a section adds.
   const meta = useLoaded<TicketsMeta>(projectId ? async () => readMeta(await host.runCommand(projectId, ['meta', '--local'])) : null, NO_META, [projectId])
@@ -318,7 +318,7 @@ export function TicketsPanel({
     await run(() => host.startRun(projectId, prompt), failure)
   }
 
-  const updateFromGithub = () => startSession(UPDATE_TICKETS_PROMPT, 'The update could not be started.')
+  const updateTickets = () => startSession(UPDATE_TICKETS_PROMPT, 'The update could not be started.')
   // A plan is written per-ticket for a human to read: the reader reviews the result through the
   // plan column's link.
   const startPlan = (file: string) => startSession(planTicketPrompt(file), 'The planning agent could not be started.')
@@ -350,7 +350,7 @@ export function TicketsPanel({
           plans from.
         </p>
         {error && <p className="text-xs text-danger">{error}</p>}
-        <UpdateTicketsButton busy={busy} onStart={() => void updateFromGithub()} onConfigure={configure(UPDATE_TICKETS_PROMPT)} />
+        <UpdateTicketsButton busy={busy} onStart={() => void updateTickets()} onConfigure={configure(UPDATE_TICKETS_PROMPT)} />
       </div>
     )
   }
@@ -365,12 +365,12 @@ export function TicketsPanel({
             a whole panel-width away from the line it acts on. */}
         <span className="min-w-0 truncate text-xs text-muted-foreground">
           {meta.lastImportedAt
-            ? `Updated from GitHub ${formatRelative(meta.lastImportedAt)}`
+            ? `Updated from the tracker ${formatRelative(meta.lastImportedAt)}`
             : 'No record of an import yet'}
         </span>
         <UpdateTicketsButton
           busy={busy}
-          onStart={() => void updateFromGithub()}
+          onStart={() => void updateTickets()}
           onConfigure={configure(UPDATE_TICKETS_PROMPT)}
           lastImportedAt={meta.lastImportedAt}
           className="h-6 gap-1 px-2 text-xs"

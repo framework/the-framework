@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { buildInterventions, interventionKey } from './interventions.js'
-import type { OpenPr } from './gh.js'
+import type { OpenPr } from './pull-requests.js'
 import type { BranchState, BranchesFor } from '../store/branches.js'
 import type { ProjectSummary } from './projects.js'
 import type { LiveAgent, AgentMeta } from '../store/index.js'
@@ -190,8 +190,7 @@ const showing = (state: (branch: string) => BranchState | undefined, asked: stri
         return answer ? [answer] : []
       })
     },
-    publish: unused,
-    merge: unused,
+    push: unused,
     remove: unused,
   })
 }
@@ -253,8 +252,7 @@ test('an unreadable branch state is skipped rather than throwing, and the projec
     show: async () => {
       throw new Error('not a repo')
     },
-    publish: async () => ({ ok: false, error: 'no' }),
-    merge: async () => ({ ok: false, error: 'no' }),
+    push: async () => ({ ok: false, error: 'no' }),
     remove: async () => ({ ok: false, error: 'no' }),
   })
   const { items, whole } = await buildInterventions([project('a', '/a')], onlyUnpushed([doneMeta()], failing))

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import type { AgentHandoff } from '../../src/index.js'
-import { GitMerge, GitPullRequest } from 'lucide-react'
-import { sendMerge, sendOpenPullRequest } from '../rpc/control.js'
+import { GitMerge, GitPullRequest, Upload } from 'lucide-react'
+import { sendMerge, sendOpenPullRequest, sendPush } from '../rpc/control.js'
 import type { AgentHandoffState } from '../lib/use-agent-handoff.js'
 import { cn } from '../lib/utils.js'
 import { DiffStat } from './DiffView.js'
@@ -94,7 +94,7 @@ export function HandoffActions({
   // From here every branch says something. A session that has finished and shows no control at all
   // is #1173: the reason there is nothing to press is exactly what the reader came for.
   if (!handoff.exists) return <Reason>Branch gone — nothing to open a PR from.</Reason>
-  // A branch with no diff never gets the button (#1173): there is nothing GitHub would accept a PR
+  // A branch with no diff never gets the button (#1173): there is nothing the forge would accept a PR
   // for, and offering one that fails with "No commits between main and <branch>" is the dead end
   // this bar exists to prevent. When the tree holds uncommitted work, that work is named — the
   // reader's next step is to have the session commit it (the composer is right below).
@@ -104,6 +104,17 @@ export function HandoffActions({
     return <Reason title={pending.join('\n')}>Nothing committed — {namePending(pending)} left uncommitted.</Reason>
   }
   if (!handoff.hasRemote) return <Reason>No remote to push to.</Reason>
+  // No forge package (#1820): nothing opens a pull request for this project, so the last step is
+  // the push, and a pushed branch is where the handoff ends.
+  if (!handoff.forge) {
+    if (handoff.pushed) return <Reason>Pushed — no forge package to open a pull request with.</Reason>
+    return (
+      <Button size="xs" disabled={busy} onClick={() => act('push', () => sendPush(projectId, agentId), 'Could not push the branch.')}>
+        <Upload className="h-3.5 w-3.5" />
+        {pending === 'push' ? 'Pushing…' : 'Push'}
+      </Button>
+    )
+  }
   // One button, not two (#1173). "Push branch" and "Open PR" sat side by side as equals, and
   // nobody could say what pushing without a PR was for — a control nobody can
   // explain is a control nobody should have to read. Opening a PR pushes the branch on the way,

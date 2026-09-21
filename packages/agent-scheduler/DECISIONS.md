@@ -87,9 +87,14 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   prompt once, and the agent's own loop to the end. No system prompt, no gates, no
   steering: the command's skill file is the whole instruction. Picked over carrying The
   Framework's run child over: its flow is the dashboard's, not a scheduled run's.
-- The agent publishes its own work through the branches skill; the run reads the pull
-  request back off the branch for the record. Picked over the run opening the request from
-  the branch's commits, and over the agent leaving a title and body in a file.
+- The agent publishes its own work through the skills in its checkout; the run reads the
+  pull request back off the branch for the record, through the command the project's forge
+  package declares, never through a forge's own client. Picked over the run opening the
+  request from the branch's commits, and over the agent leaving a title and body in a file.
+- A run with a follow-up tells its agent, in a line after the prompt, to open the pull request
+  without arming its merge, and the tool merges it through the forge once the follow-up ends
+  done. Picked over a hold on the checkout that the agent's publish honoured, which put the
+  forge inside the branches package.
 - The live record is agent-driver's log, written in the run record's shape, and the run
   copies the two files onto the branch unchanged. Picked over the tool's own live log in
   the dashboard's shape, converted at the end: one shape, one file, no temporary label.

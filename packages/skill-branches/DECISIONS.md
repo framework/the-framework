@@ -90,33 +90,32 @@ push.
   goes, to stop whatever serves the tree; the command line passes no hook.
 
 ## The skill
-- The agent publishes its own work when it finishes: `npx branches publish` pushes its
-  branch, opens the pull request with the title and body the agent wrote, and arms the
-  merge on green when the command that started it says the work may land on its own.
-  Picked over whoever started the agent publishing for it, which needed a run process
-  that knew the agent's words: the agent knows them. Whoever started the agent may still
-  say they publish for it; then the agent never does.
-- `publish` refuses a checkout that is not clean, opens no second request for a branch
-  that has one open, and never opens a draft when the merge is armed.
-- A person publishes a finished agent's branch through the same `publish`, by name
+- The package knows git and nothing beyond it: it pushes a branch and never opens or
+  lands a pull request, and it names no forge and no forge package. The pull request is
+  the forge package's own command, composed after the push by whoever runs both: the
+  agent through its skills, the dashboard through the two declared commands. Picked over
+  the package opening the request itself, which put the forge's tool inside the git skill
+  and made another forge a change to this package.
+- The agent pushes its own work when it finishes: `npx branches push` pushes its branch
+  once its checkout is clean. Picked over whoever started the agent pushing for it.
+  Whoever started the agent may still say they publish for it; then the agent never
+  pushes.
+- A person pushes a finished agent's branch through the same `push`, by name
   (`--branch`): the checkout on it under the agent's clean rule, else the branch itself,
   pushed when this machine has it and left as it is when only origin has it. Picked over
-  a second publish path in the dashboard, which duplicated the push and the request.
-- `merge <number>` lands a request for a person: a draft is marked ready, then the merge
-  is armed exactly as `--merge` arms it; a request no longer open is refused. Picked over
-  the dashboard merging with gh itself.
+  a second push path in the dashboard.
 - `show` answers a branch's git facts only, its commits and files beyond the base, whether
   it is pushed and merged, what its checkout left uncommitted; its pull request is the
-  caller's question. Picked over the package asking GitHub, which would have put a gh call
-  inside every poll.
+  caller's question. Picked over the package asking the forge, which would have put a
+  network call inside every poll.
 - `list` and `show` answer a branch's `name`, the name the agent gave its work: the branch
   minus the package's prefix, and nothing while a checkout is still on the branch it was
   created on. The naming rule stays the package's. Picked over the dashboard cutting the prefix
   off, which was the dashboard knowing how the package names a branch.
 - `list` and `show` never touch the network: they read the local refs and the checkouts on
   disk, so a caller may poll them.
-- The command has a second caller, the dashboard, for `list`, `show`, `publish --branch`,
-  `merge` and `remove`, declared as the project's branches provider
+- The command has a second caller, the dashboard, for `list`, `show`, `push --branch` and
+  `remove`, declared as the project's branches provider
   (`"framework": { "branches": "branches" }`).
 - Before its first change the agent names its session, saying what the work is, unless its
   branch already differs from its folder name, as a continued agent's does: it is already
@@ -132,10 +131,10 @@ push.
   on stderr, nothing on stdout, exit 2. An id the charset rejects is a refusal,
   `invalid-id`, not a usage error. A command that throws is reported like a refusal,
   reason `git-failed`, the error's own line as `detail` on stdout and on stderr.
-- `create`, `attach`, `list`, `remove` and `prune` act on the project, found from the
-  `.branches/` layout even from inside a checkout; `name` and `status` act on the checkout
-  the command runs in, found from anywhere inside it; `status` also takes the path of a
-  checkout root.
+- `create`, `attach`, `show`, `list`, `remove`, `prune` and `push --branch` act on the
+  project, found from the `.branches/` layout even from inside a checkout; `name`,
+  `status` and a bare `push` act on the checkout the command runs in, found from anywhere
+  inside it; `status` also takes the path of a checkout root.
 - `list` answers with a bare JSON array; every other result and every refusal is an object
   whose `ok` tells the two apart.
 - Outside a repository, a command that needs one refuses with `not-a-repo`: only git's own

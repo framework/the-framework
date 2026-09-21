@@ -86,11 +86,11 @@ describe('TicketsPage (#1144)', () => {
     expect(host.openPage).toHaveBeenCalledWith('tickets', ['p1', 't.md'])
   })
 
-  test('a project with no tickets still offers its own GitHub update, not a dead end', async () => {
+  test('a project with no tickets still offers its own update, not a dead end', async () => {
     onAllTickets.mockResolvedValue([{ projectId: 'p1', projectName: 'Alpha', tickets: [] }])
     render()
     expect(await screen.findByText('Alpha')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Update from GitHub' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Update tickets' })).toBeTruthy()
   })
 
   test('no project with the package says so rather than an empty page', async () => {
@@ -102,7 +102,7 @@ describe('TicketsPage (#1144)', () => {
   test('an import/update started in one project\'s section starts in that project (#948)', async () => {
     onAllTickets.mockResolvedValue([{ projectId: 'p1', projectName: 'Alpha', tickets: [] }])
     render()
-    fireEvent.click(await screen.findByRole('button', { name: 'Update from GitHub' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Update tickets' }))
     await waitFor(() => expect(started()).toEqual([['p1', '/update-tickets']]))
   })
 
@@ -250,7 +250,7 @@ describe('TicketsPage filters (#1144)', () => {
     render()
     expect(await screen.findByText(/2 tickets hidden by the current filters/i)).toBeTruthy()
     // Not the update offer — these tickets exist, they are filtered (#1230's rule, kept).
-    expect(screen.queryByRole('button', { name: 'Update from GitHub' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Update tickets' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: /clear filters/i }))
     expect(await screen.findByText('Improve the lock')).toBeTruthy()
     expect(window.location.search).toBe('')
@@ -275,7 +275,7 @@ describe('TicketsPage grouping (#1144)', () => {
     const titles = (await screen.findAllByRole('button')).map(b => b.textContent)
     expect(titles.findIndex(t => t?.includes('Beta ticket'))).toBeLessThan(titles.findIndex(t => t?.includes('Alpha ticket')))
     // No per-project Update bars in the flat list.
-    expect(screen.queryByRole('button', { name: 'Update from GitHub' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Update tickets' })).toBeNull()
   })
 
   test('opening a flat row still hands back its own project and file', async () => {
@@ -441,7 +441,7 @@ describe('TicketsPage queue plans for the shown set', () => {
   })
 })
 
-// Row selection (GitHub's list idiom): every row carries a checkbox, and while any is ticked the
+// Row selection (the list idiom of issue trackers): every row carries a checkbox, and while any is ticked the
 // heading's queue buttons speak for — and act on — just the selected tickets.
 describe('TicketsPage selection scopes the queue buttons', () => {
   const threeTickets = () =>

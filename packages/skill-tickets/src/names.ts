@@ -88,12 +88,12 @@ export function queuePriorityForTicket(priority?: string): number {
 
 /**
  * The issue a ticket tracks, as a `#42` reference, or `undefined` when it tracks none. Read off
- * the ticket's `GitHub: [#42](…/issues/42)` header line: the number comes from the URL when there
+ * the ticket's `Issue: [#42](…/issues/42)` header line: the number comes from the URL when there
  * is one — the label is display text, the URL is the identity — with the label's own `#42` as the
  * fallback for a hand-written line.
  */
 export function ticketIssueRef(md: string): string | undefined {
-  const line = md.split('\n').find(l => l.trim().toLowerCase().startsWith('github:'))
+  const line = md.split('\n').find(l => l.trim().toLowerCase().startsWith('issue:'))
   if (!line) return undefined
   const url = /\((?:[^)]*\/)?(?:issues|pull)\/(\d+)\)/.exec(line)
   const match = url ?? /#(\d+)/.exec(line)

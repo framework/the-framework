@@ -47,7 +47,7 @@ Fixes the vocabulary of the event stream [1]: every kind of event an agent's [2]
 - **Facts that must survive a reload** - what the handoff is armed to do, the branch, the pull request once opened, and the cloud anchor each travel as events because only an event reaches a tab opened later.
 - **The on-before-mergeable outcome** - the follow-up queued its prompts, queued them without finishing cleanly, or declined for one of five reasons; it is silent when the option was off.
 - **The handoff outcome** - the handoff is done (pushed, a pull request, how the merge went), skipped for one of nine reasons that are not faults, or failed at the push or at the pull request.
-- **How a merge went, and why it is withheld** - GitHub's own auto-merge is preferred, a direct merge is the fallback, the CI watch takes a pull request whose checks are pending, a failed merge never fails the handoff, and a merge is withheld when the agent never said it was ready or its own to-do list is still open.
+- **How a merge went, and why it is withheld** - the forge's own auto-merge is preferred, a direct merge is the fallback, the CI watch takes a pull request whose checks are pending, a failed merge never fails the handoff, and a merge is withheld when the agent never said it was ready or its own to-do list is still open.
 - **Settled, spend and the end** - the agent says when it is parked on the user, reports its cumulative usage after every turn that reports it, and ends as done, stopped, failed, or waiting on an answer to the question it asked.
 
 ## Business logic
@@ -121,7 +121,7 @@ A pick is normalized to a list of option ids wherever a list is needed: a subset
 #### Business logic
 
 - Ready for merge [18]: the agent [2] signaled that it believes the work is complete and ready for human review. Non-blocking: it flips the agent's badge from building to ready, and the on-before-mergeable follow-up hangs off it.
-- The pull request text: the title and description the agent asked for through its `open-pr` signal. This is how an agent opens a pull request through The Framework instead of running `gh pr create` itself, so the recording of the pull request number still applies. The title is the agent's name for the work and the description is what changed; either may be absent when the agent wrote only the other. Non-blocking; the handoff [5] uses the latest one.
+- The pull request text: the title and description the agent asked for through its `open-pr` signal. This is how an agent opens a pull request through The Framework instead of opening it itself, so the recording of the pull request number still applies. The title is the agent's name for the work and the description is what changed; either may be absent when the agent wrote only the other. Non-blocking; the handoff [5] uses the latest one.
 
 Both are read off a turn's [14] final message as turn signals [12]; the parsing rules are `turn-gate.ts`'s.
 
@@ -180,9 +180,9 @@ The handoff itself is `cli.ts`'s.
 
 When the agent [2] was armed for the `merge` rung of the handoff [5], the merge half of the handoff ends in one of:
 
-- auto-armed, the preferred outcome: GitHub's own auto-merge takes the pull request, so it lands when its checks pass rather than before them;
+- auto-armed, the preferred outcome: the forge's own auto-merge takes the pull request, so it lands when its checks pass rather than before them;
 - merged: the fallback where the repository does not allow auto-merge, and the pull request was merged directly;
-- watched: GitHub cannot arm the merge and the pull request's checks have not passed yet, so the CI watch [26] takes the pull request and merges it once its checks go green, because merging directly there would land before CI;
+- watched: the forge cannot arm the merge and the pull request's checks have not passed yet, so the CI watch [26] takes the pull request and merges it once its checks go green, because merging directly there would land before CI;
 - failed, with the error: never a failed handoff, since the pull request exists either way and a human can still merge it by hand;
 - withheld: the merge never ran, because it was armed but not authorized, and the pull request opened as a draft for a human instead. The two reasons: the agent never signaled ready for merge [18], so the work was never declared done; or the agent's own to-do list, `TODO_<SESSION_NAME>.agent.md`, still has open entries. The agent queue [27] never withholds a merge: it is decoupled from any one agent.
 

@@ -3,11 +3,11 @@ import { mkdir, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { continuationPrompt, logDiaryFile, parseQuestion, promptOf, takeInbox, type Driver, type DriverSession, type LogEndStatus } from 'agent-driver'
 import { excludeFromGit, nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
-import { agentBranchName, attachCheckout, createCheckout, holdMerge, reclaimWorktree, releaseMerge, worktreeBranch, worktreePath, type ReleaseOutcome } from '@gemstack/skill-branches'
+import { agentBranchName, attachCheckout, createCheckout, reclaimWorktree, worktreeBranch, worktreePath } from '@gemstack/skill-branches'
 import { findRun, readDiary, type AnyDiaryLine, type LogsDeps, type RunCard, type RunStatus } from '@gemstack/skill-logs'
 import { inboxPath, liveDir, LIVE_DIR, readLiveCard, readLiveDiary } from './live-card.js'
 import { markerCard, recordRun, schedulerMark, writeMarker, type SchedulerMark } from './records.js'
-import { prOfBranch, type GhRunner } from './pr.js'
+import { projectForge, type Forge, type MergeOutcome } from './forge.js'
 import { acquireRunLock, isPidAlive, releaseRunLock } from './run-lock.js'
 
 /**
@@ -34,14 +34,25 @@ import { acquireRunLock, isPidAlive, releaseRunLock } from './run-lock.js'
  *
  * A run may name a follow-up (`run --then <prompt>`): once it ends done with a pull request, a
  * fresh agent, a run of its own with its own record, works on the same branch from the prompt,
- * the first run's id after it. Until then the first run's merge is held: its checkout is under the
- * branches package's hold, so the agent's own `publish --merge` opens the request and arms
- * nothing; the follow-up ending done releases it. A follow-up that fails or is stopped leaves the
- * merge held and the request open, for a person.
+ * the first run's id after it. The first agent is told, in a line after its prompt, to open the
+ * pull request without arming its merge; the follow-up ending done is when this process merges
+ * it, through the project's forge (`forge.ts`). A follow-up that fails or is stopped leaves the
+ * request open, for a person.
+ *
+ * The pull request a run's branch has is read back the same way, through the forge the project
+ * declares; a project with no forge package records none.
  */
 
 /** The detail a stopped run's record carries. */
 export const STOPPED_DETAIL = 'stopped by a signal to its process'
+
+/** The line after a prompt when a follow-up is coming: the agent opens the request, this process merges it later. */
+export const HOLD_MERGE_LINE = 'Open the pull request but do not arm its merge: it is merged for you once a follow-up is done.'
+
+/** The prompt an agent gets: the run's own, and the line above when the run names a follow-up. */
+export function agentPrompt(prompt: string, then: string | undefined): string {
+  return then !== undefined ? `${prompt}\n\n${HOLD_MERGE_LINE}` : prompt
+}
 
 /** Filesystem-safe, time-ordered id from an ISO start: the shape the dashboard sorts runs by. */
 export function runIdFrom(startedAt: string): string {
@@ -77,7 +88,8 @@ export interface RunOptions {
   isAlive?: (pid: number) => boolean
   now?: () => Date
   git?: GitRunner
-  gh?: GhRunner
+  /** The project's forge; the one the project declares when absent. */
+  forge?: Forge
   logs?: LogsDeps
   log?: (line: string) => void
 }
@@ -91,8 +103,8 @@ export interface RunOutcome {
   /** Whether the checkout went once the remote had its branch, or stayed and why. */
   checkout: { reclaimed: true } | { reclaimed: false; reason: string }
   detail?: string
-  /** The follow-up run, when one ran, and how the release of the held merge went when it ended done. */
-  then?: RunOutcome & { merge?: ReleaseOutcome }
+  /** The follow-up run, when one ran, and how the merge of this run's pull request went when it ended done. */
+  then?: RunOutcome & { merge?: MergeOutcome }
 }
 
 export async function runCommand(repo: string, opts: RunOptions): Promise<RunOutcome> {
@@ -131,31 +143,18 @@ async function runOnce(repo: string, opts: RunOptions): Promise<RunOutcome> {
       await recordRun(repo, { ...markerCard({ id, startedAt, prompt: opts.prompt, driver: opts.driver.id, ...modelOf(opts.model), mark }), status: 'failed', endedAt: clock() }, [{ kind: 'ended', status: 'failed', detail }], logs)
       return { id, status: 'failed', checkout: { reclaimed: false, reason: 'no checkout' }, detail }
     }
-    // A merge that cannot be held would land before the follow-up: no agent starts, and the
-    // checkout, still empty, goes.
-    if (opts.then !== undefined) {
-      try {
-        await holdMerge(checkout.path, git)
-      } catch (err) {
-        const detail = `could not hold the merge: ${errorMessage(err)}`
-        await recordRun(repo, { ...markerCard({ id, startedAt, prompt: opts.prompt, driver: opts.driver.id, ...modelOf(opts.model), mark }), status: 'failed', endedAt: clock(), branch: checkout.branch }, [{ kind: 'ended', status: 'failed', detail }], logs)
-        const reclaimed = await reclaimWorktree(repo, checkout.path, { mayPush: true, birthBranch: agentBranchName(id), git })
-        return outcomeOf(id, 'failed', checkout.branch, undefined, undefined, reclaimed.ok ? { reclaimed: true } : { reclaimed: false, reason: reclaimReason(reclaimed) }, detail)
-      }
-    }
-
     // Awaited here, not returned: the lock is let go in `finally`, and a bare `return` of the
     // promise would run that before the session ends, leaving the run to the sweep.
     return await session(repo, {
       id,
       checkout,
       card: { id, startedAt, status: 'running', intent: opts.prompt, driver: opts.driver.id, ...modelOf(opts.model), branch: checkout.branch, caller: { scheduler: mark, pid, host, kind: 'prompt', workspace: checkout.path } },
-      prompt: opts.prompt,
+      prompt: agentPrompt(opts.prompt, opts.then),
       driver: opts.driver,
       ...modelOf(opts.model),
       continued: false,
       git,
-      ...(opts.gh ? { gh: opts.gh } : {}),
+      forge: opts.forge ?? projectForge,
       logs,
       log,
       clock,
@@ -182,7 +181,8 @@ export interface ResumeOptions {
   isAlive?: (pid: number) => boolean
   now?: () => Date
   git?: GitRunner
-  gh?: GhRunner
+  /** The project's forge; the one the project declares when absent. */
+  forge?: Forge
   logs?: LogsDeps
   log?: (line: string) => void
 }
@@ -192,7 +192,8 @@ export interface ResumeOptions {
  * the run kept, or a new one attached to its branch; the session resumes by the id the record
  * carries; the diary goes on from where it stopped. The prompt is the user's text, or the
  * continuation of the question the run ended on with the given answer. A follow-up the record
- * names is still owed: the merge stays held, and the follow-up runs once this ends done.
+ * names is still owed: the agent is told again not to arm the merge, and the follow-up runs once
+ * this ends done.
  */
 export async function resumeRun(repo: string, opts: ResumeOptions): Promise<RunOutcome> {
   const resumed = await resumeOnce(repo, opts)
@@ -239,7 +240,6 @@ async function resumeOnce(repo: string, opts: ResumeOptions): Promise<{ outcome:
     const path = worktreePath(repo, opts.id)
     const kept = await stat(path).then(s => s.isDirectory(), () => false)
     const checkout = kept ? { path, branch } : await attachCheckout(repo, { agentId: opts.id, branch }, git)
-    if (previous.then !== undefined) await holdMerge(checkout.path, git)
 
     // The record is written running again over the ended one, so every reader sees the run in flight.
     const mark: SchedulerMark = { command: previous.command, host, pid, ...(previous.then !== undefined ? { then: previous.then } : {}) }
@@ -254,13 +254,13 @@ async function resumeOnce(repo: string, opts: ResumeOptions): Promise<{ outcome:
       checkout,
       card: { ...runningCard },
       priorDiary: diary,
-      prompt,
+      prompt: agentPrompt(prompt, previous.then),
       driver: opts.driver,
       ...modelOf(model),
       continued: true,
       ...(sessionId !== undefined ? { resumeSessionId: sessionId } : {}),
       git,
-      ...(opts.gh ? { gh: opts.gh } : {}),
+      forge: opts.forge ?? projectForge,
       logs,
       log,
       clock,
@@ -274,9 +274,8 @@ async function resumeOnce(repo: string, opts: ResumeOptions): Promise<{ outcome:
 /**
  * The follow-up a run named, once the run ended done with a pull request: a fresh agent on the
  * run's branch, a run of its own, given the prompt and the first run's id. When it ends done the
- * held merge of the first run's request is released; otherwise it stays held, the request open.
- * A run that did not end done, or opened no request, has nothing to follow up: its merge, if its
- * agent asked for one, stays held.
+ * first run's request is merged through the project's forge; otherwise the request stays open. A
+ * run that did not end done, or opened no request, has nothing to follow up.
  */
 async function followUp(repo: string, first: RunOutcome, then: string, opts: FollowUpContext): Promise<RunOutcome> {
   if (first.status !== 'done' || !first.pr || !first.branch) return first
@@ -286,14 +285,14 @@ async function followUp(repo: string, first: RunOutcome, then: string, opts: Fol
     id,
     branch: first.branch,
     driver: opts.nextDriver ? opts.nextDriver(id) : opts.driver,
-    ...pick(opts, ['model', 'host', 'pid', 'isAlive', 'now', 'git', 'gh', 'logs', 'log']),
+    ...pick(opts, ['model', 'host', 'pid', 'isAlive', 'now', 'git', 'forge', 'logs', 'log']),
   })
   if (next.status !== 'done') return { ...first, then: next }
-  return { ...first, then: { ...next, merge: await releaseMerge(repo, first.pr.number, opts.gh ? { gh: opts.gh } : {}) } }
+  return { ...first, then: { ...next, merge: await (opts.forge ?? projectForge).mergeRequest(repo, first.pr.number) } }
 }
 
 /** What a follow-up run shares with the run before it: where it runs and how, never what it is for. */
-type FollowUpContext = Pick<RunOptions, 'driver' | 'nextDriver' | 'model' | 'host' | 'pid' | 'isAlive' | 'now' | 'git' | 'gh' | 'logs' | 'log'>
+type FollowUpContext = Pick<RunOptions, 'driver' | 'nextDriver' | 'model' | 'host' | 'pid' | 'isAlive' | 'now' | 'git' | 'forge' | 'logs' | 'log'>
 
 function pick<T extends object, K extends keyof T>(from: T, keys: readonly K[]): Partial<Pick<T, K>> {
   const picked: Partial<Pick<T, K>> = {}
@@ -313,7 +312,7 @@ interface SessionRun {
   continued: boolean
   resumeSessionId?: string
   git: GitRunner
-  gh?: GhRunner
+  forge: Forge
   logs: LogsDeps
   log: (line: string) => void
   clock: () => string
@@ -396,9 +395,9 @@ async function sessionToEnd(repo: string, run: SessionRun, dir: string, inbox: s
       }
 
       // Where the work ended up: the agent renames its branch itself, and the pull request it
-      // opened, if any, is read back off the branch.
+      // opened, if any, is read back off the branch through the project's forge.
       branch = (await worktreeBranch(run.checkout.path, run.git).catch(() => undefined)) ?? run.checkout.branch
-      pr = await prOfBranch(repo, branch, run.gh)
+      pr = await run.forge.requestOfBranch(repo, branch).catch(() => undefined)
       const live = driverSession.log
       if (!live) break
       await live.patch({ branch, ...(pr ? { pr } : {}) })

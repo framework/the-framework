@@ -120,9 +120,9 @@ describe('topics facet', () => {
 })
 
 describe('project + unlinked facets', () => {
-  test('projects narrow by membership; unlinked keeps only tickets with no GitHub link', () => {
+  test('projects narrow by membership; unlinked keeps only tickets with no issue link', () => {
     const rows = [
-      row('a.md', { github: { label: '#1', url: 'https://x/1' } }, 'p1'),
+      row('a.md', { issue: { label: '#1', url: 'https://x/1' } }, 'p1'),
       row('b.md', {}, 'p2'),
     ]
     expect(filterRows(rows, filtersWith({ projects: ['p2'] })).map(r => r.ticket.file)).toEqual(['b.md'])

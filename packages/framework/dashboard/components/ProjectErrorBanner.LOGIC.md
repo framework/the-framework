@@ -1,4 +1,4 @@
-The red banner at the top of a project's page naming what the daemon currently finds wrong with the project, one alert per kind of error: a headline for the kind, the failing command's own words, and since when. Today the one kind is "Not syncing with the remote": the project's `agent-data` branch [1] cannot reach the remote, so agents [2] would work from stale tickets and fill an agent queue [3] nobody else sees.
+The red banner at the top of a project's page naming what the daemon currently finds wrong with the project, one alert per kind of error: a headline for the kind, the failing command's own words, and since when. Two kinds: "Not syncing with the remote", the project's `agent-data` branch [1] cannot reach the remote, so agents [2] would work from stale tickets and fill an agent queue [3] nobody else sees; and "Unsettled: which package provides the data", two of the project's packages declare the same kind of data and the project's `package.json` names none, or names one that does not declare it.
 
 ## Glossary
 
@@ -9,5 +9,5 @@ The red banner at the top of a project's page naming what the daemon currently f
 ## Business logic — TL;DR
 
 - **No error, no banner** - a project the daemon has no complaint about shows nothing at all.
-- **One alert per error** - each error reads as an alert with a warning icon, its headline ("Not syncing with the remote" for a data-sync error), " · since <age>" (as "3h ago", "2d ago", "1w ago"), and under it the message the failing command printed, as the user would see running it by hand (for example "the data branch could not be pushed: Permission denied (publickey)").
+- **One alert per error** - each error reads as an alert with a warning icon, its headline ("Not syncing with the remote" for a data-sync error, "Unsettled: which package provides the data" for a provider error), " · since <age>" (as "3h ago", "2d ago", "1w ago"), and under it the message the failing command printed, as the user would see running it by hand (for example "the data branch could not be pushed: Permission denied (publickey)").
 - **Nothing to dismiss** - the banner has no state and no close button: it renders exactly what the daemon records, the daemon keeps the original "since" when it re-reports the same error, and the banner goes away only when the daemon clears the error because the condition is gone.

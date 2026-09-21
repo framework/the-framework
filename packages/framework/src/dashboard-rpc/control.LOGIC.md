@@ -1,8 +1,8 @@
-Carries out every action the user takes on an agent [1] or a project from the dashboard: stopping an agent, answering its question [2], sending it a message [3], starting an agent, opening or merging its pull request, removing a retained checkout [5], deleting an agent, opening a checkout [6] in an editor, answering the question a cloud session [9] is parked on, and showing or restarting the bridge browser [10]. For each action: what is validated, what is refused and why, and what the browser gets back. An action about an agent relayed [11] to a device [12] is carried out on the device that runs it.
+Carries out every action the user takes on an agent [1] or a project from the dashboard: stopping an agent, answering its question [2], sending it a message [3], starting an agent, pushing its branch, opening or merging its pull request, removing a retained checkout [5], deleting an agent, opening a checkout [6] in an editor, answering the question a cloud session [9] is parked on, and showing or restarting the bridge browser [10]. For each action: what is validated, what is refused and why, and what the browser gets back. An action about an agent relayed [11] to a device [12] is carried out on the device that runs it.
 
 ## Context
 
-**User story**: on the agent view the user presses Stop, picks an option on a question's card, types a message in the composer, and, once the agent has ended, opens a pull request for it, merges it, removes the checkout it kept, or deletes the agent altogether. On the project home the user starts an agent from the launcher. (Putting a ticket on the agent queue, or freeing a ticket a dead agent still holds a claim on, is not a call here: it is the queue package's, or the tickets package's, own widget acting through its command, `widgets.ts`.) In Settings the user shows or restarts the bridge browser. Each of these is one call from the browser to the daemon, and this is what the call does before it answers.
+**User story**: on the agent view the user presses Stop, picks an option on a question's card, types a message in the composer, and, once the agent has ended, pushes its branch, opens a pull request for it, merges it, removes the checkout it kept, or deletes the agent altogether. On the project home the user starts an agent from the launcher. (Putting a ticket on the agent queue, or freeing a ticket a dead agent still holds a claim on, is not a call here: it is the queue package's, or the tickets package's, own widget acting through its command, `widgets.ts`.) In Settings the user shows or restarts the bridge browser. Each of these is one call from the browser to the daemon, and this is what the call does before it answers.
 
 **Business logic story**: the daemon runs no agent, so every action here reaches an agent through what the agent's tool reads. Events flow from the agent's process through its diary [13] to the browser; the other way, Start is the project's start hook [4], what the user says to an agent is a line in the agent's inbox [14] while it works and the project's resume hook [4] once it has ended, and Stop is a signal to the process the agent's card [13] names. The Framework names no tool in any of them.
 
@@ -24,7 +24,8 @@ Carries out every action the user takes on an agent [1] or a project from the da
 [17] pick: the answer to a question: the option or options the user chose.
 [23] the Overview: the dashboard's cross-project page at `/`.
 [26] runs provider: the command, among the commands of a project's dependencies, that a package declares as answering for the project's finished agents, and that removes a finished agent or sets its pull request (`../store/runs.ts`).
-[30] branches provider: the package of the project that declares it provides the checkouts and branches; The Framework reads a branch's state and moves branches through the command that package declares (`../store/branches.ts`).
+[30] branches provider: the package of the project that declares it provides the checkouts and branches; The Framework reads a branch's state and pushes branches through the command that package declares (`../store/branches.ts`).
+[31] forge provider: the package of the project that declares it provides the forge; The Framework opens and lands pull requests through the command that package declares (`../store/forge.ts`).
 
 ## Business logic — TL;DR
 
@@ -36,8 +37,9 @@ Carries out every action the user takes on an agent [1] or a project from the da
 - **Removing a retained checkout** - refused while the agent is still going, for an unsafe id, for a project with no branches provider, and, in the provider's words, for a checkout that is not there and whenever the work is not yet on the remote; a clean checkout is pushed first and then removed.
 - **Deleting an agent** - refused while the agent is still going; the checkout goes with whatever it holds, the finished agent's record goes through the runs provider [26], and its branch stays.
 - **Opening a checkout in the file manager or an editor** - a local command against the agent's own checkout, or the project's; the editor is the one the preferences name, else the environment's, else VS Code.
-- **Opening a pull request** - the agent's existing pull request is returned when it has one; a gone branch or an agent that committed nothing is refused; otherwise the branch is published through the branches provider [30], ready for review, and the pull request is recorded on the finished agent through the runs provider [26].
-- **Merging** - an ended agent's open pull request is landed through the branches provider [30], and "already merged" is an answer, not an action; an agent still going has no Merge.
+- **Opening a pull request** - the agent's existing pull request is returned when it has one; a gone branch or an agent that committed nothing is refused; otherwise the branch is pushed through the branches provider [30] and its pull request opened through the forge provider [31], ready for review, and the pull request is recorded on the finished agent through the runs provider [26].
+- **Pushing** - an ended agent's branch is pushed through the branches provider [30], the last step where the project has no forge; an agent still going has no Push.
+- **Merging** - an ended agent's open pull request is landed through the forge provider [31], and "already merged" is an answer, not an action; an agent still going has no Merge.
 - **Controlling the bridge browser** - show, hide or restart; anything else is refused.
 - **Actions about a relayed agent go to the device** - stop, a message, an answer, open pull request and merge are forwarded to the device that runs the agent; start, remove, delete and everything local-only never are.
 
@@ -135,7 +137,17 @@ Localhost-only by nature: the daemon spawns a local command against a registered
 
 #### Business logic
 
-The agent must be known in a known project, by a path-safe id, else the answer is "unknown session". The decision of whether and how to open is `dashboard/agent-handoff.ts`'s: the agent's existing pull request is returned as the answer when it has one, unless the agent demonstrably kept committing after that pull request merged or closed; a branch that no longer exists is refused ("branch … no longer exists"); an agent that changed nothing is refused rather than given an empty pull request ("this session produced no commits to open a PR for"); otherwise the branch is published through the branches provider [30] (pushed when the remote lacks it, its pull request opened) ready for review, not as a draft, because a pull request a human asked for by name is asking for review. Its title is the agent's own when it recorded one, else its branch, else "Session <agent id>"; its body is what was asked and which agent did it. The call runs under the agent's lock, so the provider's push cannot race a removal of the same checkout. When a pull request was opened, its number and URL are recorded on the finished agent through the runs provider [26], when the project has one: the agent's process is gone by then, so no event can carry the fact, and every surface reads it from the same place rather than re-deriving it from branch names.
+The agent must be known in a known project, by a path-safe id, else the answer is "unknown session". The decision of whether and how to open is `dashboard/agent-handoff.ts`'s: the agent's existing pull request is returned as the answer when it has one, unless the agent demonstrably kept committing after that pull request merged or closed; a branch that no longer exists is refused ("branch … no longer exists"); an agent that changed nothing is refused rather than given an empty pull request ("this session produced no commits to open a PR for"); otherwise the branch is pushed through the branches provider [30] and its pull request opened through the forge provider [31], ready for review, not as a draft, because a pull request a human asked for by name is asking for review; a project with no forge is refused ("this project has no forge package to open a pull request with"). Its title is the agent's own when it recorded one, else its branch, else "Session <agent id>"; its body is what was asked and which agent did it. The call runs under the agent's lock, so the provider's push cannot race a removal of the same checkout. When a pull request was opened, its number and URL are recorded on the finished agent through the runs provider [26], when the project has one: the agent's process is gone by then, so no event can carry the fact, and every surface reads it from the same place rather than re-deriving it from branch names.
+
+### Pushing
+
+#### Context
+
+**User story**: on a project with no forge package, an agent has ended and the user pushes its branch with one button: the work is on the remote, and that is the handoff's end there.
+
+#### Business logic
+
+Same target rule ("unknown session"). An agent that is still running has no Push: it pushes its own work, and the call answers "that session is still going". For an agent that has ended, its recorded branch is pushed through the branches provider [30] (`dashboard/agent-handoff.ts`), under the agent's lock so the push cannot race a removal of the same checkout: refused when the agent recorded no branch ("this session recorded no branch to push") or the project has no branches provider; the provider's own refusal is the answer.
 
 ### Merging
 
@@ -145,7 +157,7 @@ The agent must be known in a known project, by a path-safe id, else the answer i
 
 #### Business logic
 
-Same target rule ("unknown session"). An agent that is still running has no Merge: it publishes its own work, and the call answers "that session is still going". For an agent that has ended, its pull request is landed through the branches provider [30] (`dashboard/agent-handoff.ts`): refused when the agent has no pull request ("this session has no pull request to merge") or when it is no longer open ("this session's PR is already merged", or closed), since "already merged" is an answer, not an action; and the answer carries the pull request's number and URL.
+Same target rule ("unknown session"). An agent that is still running has no Merge: it publishes its own work, and the call answers "that session is still going". For an agent that has ended, its pull request is landed through the forge provider [31] (`dashboard/agent-handoff.ts`): refused when the agent has no pull request ("this session has no pull request to merge") or when it is no longer open ("this session's PR is already merged", or closed), since "already merged" is an answer, not an action, and a project with no forge is refused ("this project has no forge package to merge with"); and the answer carries the pull request's number and URL.
 
 ### Controlling the bridge browser
 

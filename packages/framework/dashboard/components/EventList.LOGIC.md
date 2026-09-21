@@ -1,4 +1,4 @@
-Renders an agent's [1] transcript: every event [2] the agent emitted, one row each, in the order it happened — for a running agent, whose rows arrive live, and for a finished agent replayed from the archive [3] alike. Most rows read as the one-line text the terminal prints; the user's prompts and the agent's replies, the system prompt, gates [4] and the browser preview get their own row treatment, so the transcript reads like a conversation whose interactions can be acted on where they happened.
+Renders an agent's [1] transcript: every event [2] the agent emitted, one row each, in the order it happened — for a running agent, whose rows arrive live, and for a finished agent replayed from the archive [3] alike. Most rows read as the one-line text the terminal prints; the user's prompts and the agent's replies, gates [4] and the browser preview get their own row treatment, so the transcript reads like a conversation whose interactions can be acted on where they happened.
 
 ## Context
 
@@ -25,7 +25,6 @@ Renders an agent's [1] transcript: every event [2] the agent emitted, one row ea
 
 - **One row per event, as the terminal's line** - every event [2] is one row: a kind badge, the terminal's one-line text for that event, and on live rows the arrival time.
 - **The conversation reads as messages** - the user's prompt and the agent's reply render as Markdown, clamped to one line beyond 100 characters and expanding in place on click.
-- **The system prompt stays folded** - the system prompt row reads "system prompt sent (N chars)" with the full text behind a click.
 - **The first prompt opens the transcript** - the first prompt is hoisted above the rows emitted before it, so the transcript starts with what the user asked.
 - **A gate is answered where it happened** - when the transcript knows its project, an open gate [4] renders as the interactive gate panel inline, an answered one as a collapsed card that replaces its "✓ chose" line, and a gate whose agent ended unanswered stays text.
 - **Badges once per group, colored as a scanning aid** - the kind badge shows on the first of consecutive rows of one group, "YOU" for the user's prompt; only failures, the user's turn, gates, milestones and pushed surfaces get a color.
@@ -55,21 +54,11 @@ Each event [2] is one row with three columns: a fixed-width badge column, the ro
 
 Two events carry conversation text: the prompt that opens a turn [7] (the user's prompt, or a live chat [9] message) and the agent's reply. Both render as compact Markdown (the rendering rules in `Markdown.tsx`) instead of the terminal's truncated line. A message whose text, with runs of whitespace collapsed to one space, is at most 100 characters renders whole. A longer message is clamped to its first line with a chevron ("›") in front of it; clicking either the chevron or the clamped text expands the same rendered Markdown in place, so the opening is never shown twice, and the chevron turns to point down and folds it back on click. The chevron's accessible name is "Expand message" while folded and "Collapse message" while expanded.
 
-### The system prompt stays folded
-
-#### Context
-
-**Problem**: the system prompt the coding agent [5] was started with is thousands of characters the user did not write; printed inline it would bury the transcript's first screen.
-
-#### Business logic
-
-The event carrying the system prompt renders as a disclosure whose summary reads "system prompt sent (<N> chars)", with N the character count formatted in the reader's locale. Opening it shows the full text in a box of bounded height that scrolls.
-
 ### The first prompt opens the transcript
 
 #### Context
 
-**Problem**: the agent emits its session line and the system prompt before the first prompt, so the one line the user wrote would open three rows down, under the summary of a prompt they did not write.
+**Problem**: the agent emits its session line before the first prompt, so the one line the user wrote would open under a row they did not write.
 
 #### Business logic
 
@@ -101,7 +90,7 @@ Without a project, every gate row keeps its text.
 
 #### Business logic
 
-Consecutive rows of the same group share one badge, shown on the group's first row. The group is the event's kind, except that the user's prompt forms its own group apart from the rest of the coding agent's events, so each of the user's turns opens a new group. The badge word is "you" for the prompt, and otherwise the kind's plain-language label (the label rules in `lib/event-labels.ts`: "agent" for the coding agent's own events, "waiting" for the agent settling [8], "cost" for a usage report, "resume" for a session id update, and every other kind's name with hyphens turned to spaces, such as "system prompt" or "ready for merge"); the badge is shown uppercased. The badge column is wide enough for "system prompt" on one line, and the body column aligns whether or not the row shows a badge.
+Consecutive rows of the same group share one badge, shown on the group's first row. The group is the event's kind, except that the user's prompt forms its own group apart from the rest of the coding agent's events, so each of the user's turns opens a new group. The badge word is "you" for the prompt, and otherwise the kind's plain-language label (the label rules in `lib/event-labels.ts`: "agent" for the coding agent's own events, "waiting" for the agent settling [8], "cost" for a usage report, "resume" for a session id update, and every other kind's name with hyphens turned to spaces, such as "ready for merge"); the badge is shown uppercased. The badge column is wide enough for "ready for merge" on one line, and the body column aligns whether or not the row shows a badge.
 
 The badge's color is a navigation aid: a failing row's badge is red and the user's prompt's badge is blue (those two win over everything below); a gate [4] and its resolution are amber, the rows the reader most wants to find; a clean end and the ready-for-merge [6] signal are green, as milestones; a pushed surface (a view [11], a browser preview, a browser page, an app preview) takes the dashboard's primary accent, as the agent showing the user something; every other badge is muted. A stopped or failed end is not a milestone and stays out of green, and the handoff [12] report stays muted because its body may report mixed outcomes.
 

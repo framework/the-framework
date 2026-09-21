@@ -5,7 +5,6 @@ What the tests cover, across the pick normalization in `events.ts` and the termi
 - **The pick as a terminal line** - "✓ chose p0, p2 (user)": a subset lists its ids, an empty subset says "(none)", a single id is shown as is, and who picked follows in parentheses.
 - **The armed line says what will happen** - a push, a pull request and a merge together read "when this ends: push the branch, open a PR, and merge it"; a pull request without a merge, or with the merge flag absent, reads "when this ends: push the branch and open a draft PR"; a merge flag without a pull request is never promised, the line reading only "when this ends: push the branch".
 - **The session id line** - "session abc123", with " — <link>" appended once a session link is known.
-- **The system prompt line** - only the length is shown: "system prompt sent (5 chars)".
 - **The forwarded prompt line** - the coding agent's turn start shows the prompt text itself ("› prompt: Build this app end to end"), not just "prompt sent"; a long prompt is cut to well under 160 characters and ends in an ellipsis.
 - **The end line** - "✓ finished", "■ stopped", or "✗ failed: <detail>", so a stop never reads as a failure.
 - **The usage line** - "spend: $0.0400", the one turn's price with four decimals.

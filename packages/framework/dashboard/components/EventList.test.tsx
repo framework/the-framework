@@ -143,15 +143,14 @@ describe('EventList badge tones', () => {
   })
 })
 
-// The prompt opens the log (#1170): it is emitted after `session` and `system-prompt`, so the one
-// line the reader wrote used to sit under a char-count summary of a prompt they did not write.
+// The prompt opens the log (#1170): it is emitted after `session`, so the one line the reader
+// wrote used to sit under a row they did not write.
 describe('EventList prompt placement', () => {
   const rowText = () => Array.from(document.querySelectorAll('[data-message-id]')).map(n => n.textContent ?? '')
 
-  test('the first prompt is hoisted above the session and system-prompt rows (#1170)', () => {
+  test('the first prompt is hoisted above the session row (#1170)', () => {
     const events: FrameworkEvent[] = [
       { kind: 'session', driver: 'claude-code', workspace: '/repo', fake: false },
-      { kind: 'system-prompt', text: 'you are a careful engineer' },
       { kind: 'driver', event: { type: 'start', prompt: 'add a search box' } },
       { kind: 'driver', event: { type: 'text', text: 'done' } },
     ]
@@ -161,7 +160,7 @@ describe('EventList prompt placement', () => {
 
   test('a later turn stays where it happened, in the conversation (#1170)', () => {
     const events: FrameworkEvent[] = [
-      { kind: 'system-prompt', text: 'you are a careful engineer' },
+      { kind: 'session', driver: 'claude-code', workspace: '/repo', fake: false },
       { kind: 'driver', event: { type: 'start', prompt: 'first question' } },
       { kind: 'driver', event: { type: 'text', text: 'first answer' } },
       { kind: 'driver', event: { type: 'start', prompt: 'second question' } },
@@ -175,11 +174,11 @@ describe('EventList prompt placement', () => {
 
   test('a log with no prompt at all is left alone (#1170)', () => {
     const events: FrameworkEvent[] = [
-      { kind: 'system-prompt', text: 'you are a careful engineer' },
+      { kind: 'session', driver: 'claude-code', workspace: '/repo', fake: false },
       { kind: 'driver', event: { type: 'text', text: 'resumed reply' } },
     ]
     render(<EventList events={events} stick={false} />)
-    expect(rowText()[0]).toContain('system prompt sent')
+    expect(rowText()[0]).toContain('/repo')
   })
 })
 

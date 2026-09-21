@@ -15,8 +15,6 @@ export function formatFrameworkEvent(event: FrameworkEvent): string {
       }`
     case 'session-update':
       return `  session ${event.sessionId}${event.sessionLink ? ` — ${event.sessionLink}` : ''}`
-    case 'system-prompt':
-      return `  system prompt sent (${event.text.length} chars)`
     case 'browser-stream':
       return `◆ browser preview: http://127.0.0.1:${event.port}/stream`
     case 'browser':

@@ -17,11 +17,11 @@ import { isRunId } from './runs.js'
  *   `<command> push --branch <b>`                       push the branch to the remote; a branch only the remote has is answered as it is
  *   `<command> remove <id> [--discard]`                 reclaim a run's checkout once the remote has everything; `--discard` drops uncommitted work
  * `list` and `show` read this machine, no network: the framework polls. `show` answers the branch's
- * git facts only; its pull request is the forge provider's (`forge.ts`), as every pull request is.
+ * git facts only; its pull request is the git host provider's (`git-host.ts`), as every pull request is.
  *
  * That is the whole contract: git, and nothing beyond it (#1820). The framework reads checkouts to
  * find the runs that have one, and a branch's state for what it composes: the run page's handoff,
- * the Human Queue's unpushed rows. Opening a pull request is the push here, then the forge
+ * the Human Queue's unpushed rows. Opening a pull request is the push here, then the git host
  * provider's `open`. What a checkout is, where it lives, how a branch is pushed is the package's.
  *
  * The shapes, owned here: {@link Checkout}, {@link BranchState}.

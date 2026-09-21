@@ -3,7 +3,7 @@ import { cachedPrView, cachedPrsForBranch, pickAgentPr, type LinkedPr, type PrLo
 
 // The project panel's git status (#491, part of #488): the active branch, whether the tree is
 // dirty, and the linked PR. Branch + dirty are a local git read; the PR is a best-effort read
-// through the project's forge that simply degrades to nothing when the project has no forge or
+// through the project's git host that simply degrades to nothing when the project has no git host or
 // there is no PR. Safe anywhere — the relay has no local checkout, so it resolves to nothing there.
 
 /** A project's git status for the panel. */
@@ -47,7 +47,7 @@ export async function readGitStatus(cwd: string, deps: GitStatusDeps = {}): Prom
   }
   const dirty = (await git(['status', '--porcelain'], cwd).catch(() => '')).trim().length > 0
   // The branch and the dirty flag are what this row is for, and they are ten milliseconds of git.
-  // The PR is a forge read an order of magnitude slower, so it is read through the cache and is
+  // The PR is a git host read an order of magnitude slower, so it is read through the cache and is
   // allowed to arrive late (#1028) rather than holding the whole row back on every poll.
   const pr = await linkedPr(cwd, branch, deps)
   return { branch, dirty, ...(pr.value ? { pr: pr.value } : {}), ...(pr.pending ? { prPending: true } : {}) }

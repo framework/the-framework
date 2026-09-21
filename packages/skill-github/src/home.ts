@@ -5,8 +5,8 @@ import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
  * project bar can link straight to it. The framework asks this command and never spells the host.
  */
 
-/** The forge's name, as the framework labels the link. */
-export const FORGE_NAME = 'GitHub'
+/** The git host's name, as the framework labels the link. */
+export const GIT_HOST_NAME = 'GitHub'
 
 /**
  * Normalize a git remote URL to an `https://github.com/<owner>/<repo>` URL, or undefined when

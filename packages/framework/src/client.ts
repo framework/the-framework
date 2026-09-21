@@ -20,7 +20,7 @@ export { pendingChoices } from './open-choices.js'
 export { interventionKey, activityKey } from './dashboard/keys.js'
 // The baseline half of the same engine (#1625): what counts as "already there" when a feed is first
 // seen. The dashboard used to decide that by counting observations, which made a page loaded with no
-// forge reach take an empty backlog for a real one. Pure, and its only import is a type.
+// git host reach take an empty backlog for a real one. Pure, and its only import is a type.
 export { SeenTracker } from './dashboard/keyed-watcher.js'
 export type { ProjectionRead } from './dashboard/projects.js'
 export { NOTIFICATION_DEFAULTS, MAX_SPEND_OFFSET, DEFAULT_SPEND_OFFSET, notifies, notifyMethodEnabled, notifyCategoryEnabled, type NotifyMethod, type NotifyCategory } from './preference-defaults.js'

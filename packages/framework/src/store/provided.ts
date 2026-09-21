@@ -1,6 +1,6 @@
 import { lookupProvidedCommand } from '@gemstack/agent-data'
 import { projectBranches } from './branches.js'
-import { projectForge } from './forge.js'
+import { projectGitHost } from './git-host.js'
 import { projectQueue } from './queue.js'
 import { projectRuns } from './runs.js'
 import { projectTickets } from './tickets.js'
@@ -13,14 +13,14 @@ import { projectTickets } from './tickets.js'
  */
 export function providedDataChanged(root: string): void {
   projectBranches.changed(root)
-  projectForge.changed(root)
+  projectGitHost.changed(root)
   projectQueue.changed(root)
   projectRuns.changed(root)
   projectTickets.changed(root)
 }
 
-/** The kinds of the framework's data a project's package may provide, one reader each (`forge` is `forge.ts`). */
-export const PROVIDED_KINDS = ['tickets', 'queue', 'runs', 'branches', 'forge'] as const
+/** The kinds of the framework's data a project's package may provide, one reader each (`git-host` is `git-host.ts`). */
+export const PROVIDED_KINDS = ['tickets', 'queue', 'runs', 'branches', 'git-host'] as const
 
 /**
  * Why a kind of the project's data has no provider although packages declare it (#1820): two or

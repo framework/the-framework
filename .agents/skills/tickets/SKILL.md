@@ -65,8 +65,8 @@ DATE: yyyy-mm-dd. SLUG: a succinct kebab-case slug of the ticket title.
 ```md
 Priority: 0-10 [optional, 10: critical — act immediately, 0: only if capacity]
 Topics: [list-of-topics] [optional]
-Issue: [#42](https://forge.example/org/repo/issues/42) [optional: the issue this ticket tracks in the project's issue tracker]
-PR: [#1790](https://forge.example/org/repo/pull/1790) [optional: the pull request that closes this ticket, once one is open]
+Issue: [#42](https://example.com/org/repo/issues/42) [optional: the issue this ticket tracks in the project's issue tracker]
+PR: [#1790](https://example.com/org/repo/pull/1790) [optional: the pull request that closes this ticket, once one is open]
 
 # Ticket title
 

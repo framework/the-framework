@@ -38,8 +38,8 @@ import { readBranchStates } from './branch-state.js'
  * the same command works from inside an agent's checkout; the commands that act on one checkout
  * (`name`, `status`, a bare `push`) act on the one the working directory is in.
  *
- * Git only (#1820): what the project's forge does with a pushed branch, the pull request and its
- * merge, is the forge package's own command; this one never names it.
+ * Git only (#1820): what the project's git host does with a pushed branch, the pull request and its
+ * merge, is the git host package's own command; this one never names it.
  */
 
 export const USAGE = `usage: branches <command>

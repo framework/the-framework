@@ -10,7 +10,7 @@ import { repoHasRemote, worktreeBranch, worktreeDirEntries } from './worktree.js
  * exists: the commits the branch has beyond the project's default branch, the files they
  * changed, whether the remote has the tip, whether the default branch already contains it, and
  * the uncommitted paths of the checkout that is on the branch, when one is. The pull request is
- * the caller's own question, asked of the forge, never here.
+ * the caller's own question, asked of the git host, never here.
  *
  * Forgiving throughout: a branch that is gone answers `exists: false` with empty lists, a
  * project without a remote answers `hasRemote: false`, and a git read that fails reads as empty.

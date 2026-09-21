@@ -1,4 +1,4 @@
-Implements the `github` skill [1]: everything the product and an agent [2] ask of GitHub, the project's forge [3], behind one command. `gh`, GitHub's command line, runs only here (`gh.ts`). The command (`cli.ts`) answers five things: the project's pull requests as one read (`requests.ts`), opening a branch's pull request with the merge armed on request (`open.ts`), landing a pull request (`merge.ts`), waiting for a pull request's checks and merging it where the repository allows no auto-merge (`merge-watch.ts`), and the project's page on GitHub (`home.ts`). The `*.BUG-ANALYSIS.md` notes beside the sources, when present, are review bookkeeping and carry no business logic.
+Implements the `github` skill [1]: everything the product and an agent [2] ask of GitHub, the project's git host [3], behind one command. `gh`, GitHub's command line, runs only here (`gh.ts`). The command (`cli.ts`) answers five things: the project's pull requests as one read (`requests.ts`), opening a branch's pull request with the merge armed on request (`open.ts`), landing a pull request (`merge.ts`), waiting for a pull request's checks and merging it where the repository allows no auto-merge (`merge-watch.ts`), and the project's page on GitHub (`home.ts`). The `*.BUG-ANALYSIS.md` notes beside the sources, when present, are review bookkeeping and carry no business logic.
 
 ## Context
 
@@ -8,7 +8,7 @@ Implements the `github` skill [1]: everything the product and an agent [2] ask o
 
 [1] skill: one of the capabilities an agent is taught — `branches`, `tickets`, `queue`, `logs`, `github` — each a package with the instructions the agent reads (its `SKILL.md`), a command on the agent's PATH, and, for some, a command the product runs.
 [2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
-[3] forge: the service hosting the project's remote repository, its pull requests and its issues: GitHub here.
+[3] git host: the service hosting the project's remote repository, its pull requests and its issues: GitHub here.
 [4] merge watcher: a process of this package's own, started for one pull request, that waits for its checks and merges it once they pass (`merge-watch.ts`).
 
 ## Business logic — TL;DR

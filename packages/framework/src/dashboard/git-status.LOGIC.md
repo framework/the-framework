@@ -1,4 +1,4 @@
-Reads the git status bar of a project or of an agent's [1] checkout [2]: the current branch, whether the working tree has uncommitted changes, and the pull request linked to the branch. The branch and the dirty flag are a local git read that costs about ten milliseconds; the pull request is a read through the project's forge provider [7] an order of magnitude slower, so it comes through the read-through cache (`pull-requests.ts`, `cache.ts`) and is allowed to arrive late, marked as pending, rather than hold the whole row back on every poll. A directory that is not a git repository yields no status at all, which is also what an agent run on a device [3] through the relay [4] looks like from this machine, since it has no local checkout.
+Reads the git status bar of a project or of an agent's [1] checkout [2]: the current branch, whether the working tree has uncommitted changes, and the pull request linked to the branch. The branch and the dirty flag are a local git read that costs about ten milliseconds; the pull request is a read through the project's git host provider [7] an order of magnitude slower, so it comes through the read-through cache (`pull-requests.ts`, `cache.ts`) and is allowed to arrive late, marked as pending, rather than hold the whole row back on every poll. A directory that is not a git repository yields no status at all, which is also what an agent run on a device [3] through the relay [4] looks like from this machine, since it has no local checkout.
 
 ## Glossary
 
@@ -8,7 +8,7 @@ Reads the git status bar of a project or of an agent's [1] checkout [2]: the cur
 [4] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
 [5] project home: a project's own page with the launcher (the Start form) and its composer (the prompt editor, also used for live chat).
 [6] agent view: one agent's page.
-[7] forge provider: the package of the project that declares it provides the forge (`"framework": { "forge": "<command>" }`); The Framework reads and moves pull requests through the command that package declares (`../store/forge.ts`, `pull-requests.ts`). A project with none has no pull requests.
+[7] git host provider: the package of the project that declares it provides the git host (`"framework": { "git-host": "<command>" }`); The Framework reads and moves pull requests through the command that package declares (`../store/git-host.ts`, `pull-requests.ts`). A project with none has no pull requests.
 
 ## Business logic — TL;DR
 
@@ -32,11 +32,11 @@ The branch is the one the checkout is currently on. When git cannot answer that 
 
 #### Context
 
-**Problem**: a pull request lookup is a run of the forge provider's [7] command and takes hundreds of milliseconds where the git facts beside it take ten, and the row is re-read every few seconds.
+**Problem**: a pull request lookup is a run of the git host provider's [7] command and takes hundreds of milliseconds where the git facts beside it take ten, and the row is re-read every few seconds.
 
 #### Business logic
 
-For a project's own checkout [2], the pull request is the one linked to the current branch, read through the cache in `pull-requests.ts` as the newest pull request of that branch in any state: a known answer is served at once, and while the first lookup for a branch is still running the row carries no pull request but is marked pending, which means "not known yet" and not "there is none". When the project has no forge provider [7], or the forge cannot answer, the row simply has no pull request and is not pending.
+For a project's own checkout [2], the pull request is the one linked to the current branch, read through the cache in `pull-requests.ts` as the newest pull request of that branch in any state: a known answer is served at once, and while the first lookup for a branch is still running the row carries no pull request but is marked pending, which means "not known yet" and not "there is none". When the project has no git host provider [7], or the git host cannot answer, the row simply has no pull request and is not pending.
 
 ### An agent's own pull request
 

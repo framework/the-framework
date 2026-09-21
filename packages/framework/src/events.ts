@@ -101,10 +101,10 @@ export type MergeWithheldReason =
  * How the merge half of a handoff went (#1216), when the agent was armed for it. Lives here beside
  * {@link AutoHandoffSkip} for the same leaf-module reason.
  *
- * `auto-armed` is the preferred outcome: the forge's own auto-merge takes the PR, so it lands when
+ * `auto-armed` is the preferred outcome: the git host's own auto-merge takes the PR, so it lands when
  * its checks pass rather than before them. `merged` is the fallback where the repo does not allow
  * auto-merge and the PR was merged directly. `watched` (#1418) is the auto path's answer where
- * the forge cannot arm the merge and the PR's checks have not passed yet: merging directly there is
+ * the git host cannot arm the merge and the PR's checks have not passed yet: merging directly there is
  * exactly the lands-before-CI hazard (#1406), so the daemon's CI watch takes the PR instead and
  * merges it once its checks go green. `failed` never fails the handoff — the PR exists either
  * way, a human can still merge it by hand. `withheld` means the merge never ran at all (#1363):

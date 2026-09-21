@@ -1,4 +1,4 @@
-Pushes a branch to `origin`: the last git step of an agent's [1] work, and the step before whatever the project's forge package does with the branch. This package knows git and nothing beyond it: what becomes of a pushed branch on the forge, a pull request or anything else, is another package's command, composed after the push by whoever runs both. Two doors onto one rule: the agent pushes the checkout [2] it is in; a person, or the dashboard's server on the person's behalf, pushes a finished agent's branch by name, whether or not its checkout is still on disk.
+Pushes a branch to `origin`: the last git step of an agent's [1] work, and the step before whatever the project's git host package does with the branch. This package knows git and nothing beyond it: what becomes of a pushed branch on the git host, a pull request or anything else, is another package's command, composed after the push by whoever runs both. Two doors onto one rule: the agent pushes the checkout [2] it is in; a person, or the dashboard's server on the person's behalf, pushes a finished agent's branch by name, whether or not its checkout is still on disk.
 
 ## Context
 

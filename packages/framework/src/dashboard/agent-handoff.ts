@@ -2,7 +2,7 @@ import { cachedPrView, cachedPrsForBranch, forgetBranchPrs, forgetPr, pickAgentP
 import type { Cached } from './cache.js'
 import type { AgentMeta } from '../store/index.js'
 import { projectBranches, type BranchesFor } from '../store/branches.js'
-import { projectForge, type ForgeFor } from '../store/forge.js'
+import { projectGitHost, type GitHostFor } from '../store/git-host.js'
 // What a finished session produced, and what is left to do with it (#799).
 //
 // Everything up to "the agent is done" was covered; the handoff back to the human was not. A
@@ -16,15 +16,15 @@ import { projectForge, type ForgeFor } from '../store/forge.js'
 // not its checkout still exists.
 //
 // The branch's git facts and its push are the project's branches provider's (#1774), and every
-// pull request, opened or landed, is the project's forge provider's (#1820): the framework asks the
+// pull request, opened or landed, is the project's git host provider's (#1820): the framework asks the
 // packages the project picked, through the commands they declare (`store/branches.ts`,
-// `store/forge.ts`), and never runs git or a forge tool itself. Opening a pull request is the two
+// `store/git-host.ts`), and never runs git or a git host tool itself. Opening a pull request is the two
 // composed: the push, then the open. What stays here is what is about the *run*: which of the
 // branch's pull requests is this run's, when an existing pull request is the answer and when a new
 // one is, and what the pull request says.
 //
-// Forgiving throughout: a project with no branches provider, no forge, or no remote yields a
-// handoff with less in it, never an error. Without a forge the run's last step is the push.
+// Forgiving throughout: a project with no branches provider, no git host, or no remote yields a
+// handoff with less in it, never an error. Without a git host the run's last step is the push.
 
 /** One commit a session put on its branch. */
 export interface HandoffCommit {
@@ -70,8 +70,8 @@ export interface AgentHandoff {
   pushed: boolean
   /** The branch is already merged into the base. */
   merged: boolean
-  /** The project has a forge package (#1820): a pull request is a next step at all. Without one, the last step is the push. */
-  forge: boolean
+  /** The project has a git host package (#1820): a pull request is a next step at all. Without one, the last step is the push. */
+  gitHost: boolean
   /** The PR opened for this branch, when there is one. */
   pr?: LinkedPr
   /** The PR is not known yet, rather than absent (#1028): the lookup is still running. */
@@ -84,7 +84,7 @@ export interface AgentHandoff {
    * is not on the branch yet, so it is
    * not in {@link commits} and it does not make {@link empty} false. Paths rather than a count,
    * because a no-diff branch must *name* what is waiting instead of offering an Open PR that
-   * the forge can only refuse. Absent when no checkout is on the branch any more — "no checkout"
+   * the git host can only refuse. Absent when no checkout is on the branch any more — "no checkout"
    * and "a checkout, tree clean" are different answers.
    */
   pendingFiles?: string[]
@@ -95,8 +95,8 @@ export interface AgentHandoffDeps {
   pr?: BranchPrLookup
   /** The project's checkouts and branches (default the project's provider, {@link projectBranches}). */
   branches?: BranchesFor
-  /** The project's forge (default the project's provider, {@link projectForge}). */
-  forge?: ForgeFor
+  /** The project's git host (default the project's provider, {@link projectGitHost}). */
+  gitHost?: GitHostFor
   /**
    * When the agent started (ISO), so the PR lookup can tell the agent's own PR from an earlier agent's
    * on the same branch name (#1251). Without it, only an open PR is trusted.
@@ -175,7 +175,7 @@ export async function resolveAgentPr(
 
 /**
  * Merge a finished session's open PR (#1391): the Merge action, pressed by a human saying "it's
- * good, land it". The landing itself is the forge provider's (`merge <number>`): armed to merge on
+ * good, land it". The landing itself is the git host provider's (`merge <number>`): armed to merge on
  * green, merged at once where it is already green, or watched by the provider where the
  * repository allows no auto-merge; a draft is marked ready on the way. Refuses when the agent has
  * no PR or it is no longer open — "already merged" is an answer, not an action.
@@ -183,14 +183,14 @@ export async function resolveAgentPr(
 export async function mergeAgentPr(
   cwd: string,
   agent: PrAgent,
-  deps: { forge?: ForgeFor; prs?: CachedBranchPrLookup } = {},
+  deps: { gitHost?: GitHostFor; prs?: CachedBranchPrLookup } = {},
 ): Promise<HandoffResult> {
   const pr = (await resolveAgentPr(cwd, agent, deps.prs)).value
   if (!pr) return { ok: false, error: 'this session has no pull request to merge' }
   if (pr.state !== 'OPEN') return { ok: false, error: `this session's PR is already ${pr.state.toLowerCase()}` }
-  const forge = await (deps.forge ?? projectForge)(cwd).catch(() => undefined)
-  if (!forge) return { ok: false, error: 'this project has no forge package to merge with' }
-  const merged = await forge.merge(pr.number)
+  const gitHost = await (deps.gitHost ?? projectGitHost)(cwd).catch(() => undefined)
+  if (!gitHost) return { ok: false, error: 'this project has no git host package to merge with' }
+  const merged = await gitHost.merge(pr.number)
   if (!merged.ok) return { ok: false, error: merged.error }
   // The PR's cached state just changed, so the branch's cached read must go or the bar keeps
   // offering a merge for a PR that landed (#1028).
@@ -218,9 +218,9 @@ export async function readAgentHandoff(
   if (!branches) return undefined
   const [state] = await branches.show([branch])
   if (!state) return undefined
-  const forge = await (deps.forge ?? projectForge)(cwd).catch(() => undefined)
+  const gitHost = await (deps.gitHost ?? projectGitHost)(cwd).catch(() => undefined)
   // Read through the cache and allowed to arrive late (#1028): the branch's facts are local
-  // git, and none of them should wait on the forge.
+  // git, and none of them should wait on the git host.
   const pr = await lookupAgentPr(cwd, branch, deps)
   const commits = state.commits.map(commit => ({ sha: commit.sha, short: commit.sha.slice(0, 7), subject: commit.subject }))
   const files = state.files.map(file => ({ path: file.path, insertions: file.insertions, deletions: file.deletions, binary: file.binary }))
@@ -240,7 +240,7 @@ export async function readAgentHandoff(
     hasRemote: state.hasRemote,
     pushed: state.pushed,
     merged: state.merged,
-    forge: forge !== undefined,
+    gitHost: gitHost !== undefined,
     ...(pr.value ? { pr: pr.value } : {}),
     ...(pr.pending ? { prPending: true } : {}),
     ...(state.pendingFiles ? { pendingFiles: state.pendingFiles } : {}),
@@ -256,19 +256,19 @@ export type HandoffResult = { ok: true; url?: string; number?: number } | { ok: 
 
 /**
  * Open a PR for a branch: the two providers composed (#1820). The branches provider pushes the
- * branch (`push --branch`), then the forge provider opens its request (`open --branch`); the
- * request's base is the forge's. A branch that already has an open request is answered as it is.
+ * branch (`push --branch`), then the git host provider opens its request (`open --branch`); the
+ * request's base is the git host's. A branch that already has an open request is answered as it is.
  * The branch has a PR now, so the cached "no PR" must go or the bar would keep offering to open
  * one for the next minute (#1028) — both caches: the single-PR view and the history.
  */
-async function publishBranch(cwd: string, branch: string, draft: { title: string; body: string; draft?: boolean }, branches: BranchesFor, forge: ForgeFor): Promise<HandoffResult> {
+async function publishBranch(cwd: string, branch: string, draft: { title: string; body: string; draft?: boolean }, branches: BranchesFor, gitHost: GitHostFor): Promise<HandoffResult> {
   const source = await branches(cwd).catch(() => undefined)
   if (!source) return { ok: false, error: 'this project has no branches provider to push with' }
-  const forgeSource = await forge(cwd).catch(() => undefined)
-  if (!forgeSource) return { ok: false, error: 'this project has no forge package to open a pull request with' }
+  const gitHostSource = await gitHost(cwd).catch(() => undefined)
+  if (!gitHostSource) return { ok: false, error: 'this project has no git host package to open a pull request with' }
   const pushed = await source.push(branch)
   if (!pushed.ok) return { ok: false, error: pushed.error }
-  const opened = await forgeSource.open(branch, { title: draft.title, body: draft.body, ...(draft.draft ? { draft: true } : {}) })
+  const opened = await gitHostSource.open(branch, { title: draft.title, body: draft.body, ...(draft.draft ? { draft: true } : {}) })
   if (!opened.ok) return { ok: false, error: opened.error }
   forgetPr(cwd, branch)
   forgetBranchPrs(cwd, branch)
@@ -276,7 +276,7 @@ async function publishBranch(cwd: string, branch: string, draft: { title: string
 }
 
 /**
- * Push a finished session's branch (#1820): the last step where the project has no forge, or the
+ * Push a finished session's branch (#1820): the last step where the project has no git host, or the
  * step a person wants on its own. The branches provider pushes it under its clean rule; a branch
  * only the remote has is already there. Refuses a session that recorded no branch.
  */
@@ -300,9 +300,9 @@ export async function openRemoteBranchPullRequest(
   cwd: string,
   agent: HandoffAgent,
   branch: string,
-  deps: { branches?: BranchesFor; forge?: ForgeFor } = {},
+  deps: { branches?: BranchesFor; gitHost?: GitHostFor } = {},
 ): Promise<HandoffResult> {
-  return publishBranch(cwd, branch, { title: agentPrTitle(agent), body: agentPrBody(agent), draft: true }, deps.branches ?? projectBranches, deps.forge ?? projectForge)
+  return publishBranch(cwd, branch, { title: agentPrTitle(agent), body: agentPrBody(agent), draft: true }, deps.branches ?? projectBranches, deps.gitHost ?? projectGitHost)
 }
 
 /**
@@ -329,16 +329,16 @@ function movedPastPr(state: Pick<AgentHandoff, 'pr' | 'commits'>): boolean {
 export async function openAgentPullRequest(
   cwd: string,
   agent: AgentMeta,
-  options: { draft?: boolean; branches?: BranchesFor; forge?: ForgeFor; pr?: BranchPrLookup } = {},
+  options: { draft?: boolean; branches?: BranchesFor; gitHost?: GitHostFor; pr?: BranchPrLookup } = {},
 ): Promise<HandoffResult> {
   const branch = agentBranchFor(agent)
   if (branch === undefined) return { ok: false, error: 'this session recorded no branch to open a PR from' }
   const branches = options.branches ?? projectBranches
-  const forge = options.forge ?? projectForge
+  const gitHost = options.gitHost ?? projectGitHost
   // `latest` order (#1512), because the `movedPastPr` decision below compares the branch tip
   // against a PR's head: against the *first* PR, work a second one already landed reads as
   // unlanded and this opens a third for it.
-  const handoff = await readAgentHandoff(cwd, branch, { since: agent.startedAt, order: 'latest', branches, forge, ...(options.pr ? { pr: options.pr } : {}) }).catch(() => undefined)
+  const handoff = await readAgentHandoff(cwd, branch, { since: agent.startedAt, order: 'latest', branches, gitHost, ...(options.pr ? { pr: options.pr } : {}) }).catch(() => undefined)
   // The agent's PR first, even when its branch is gone locally: a hands-off web agent's branch only
   // ever existed on the remote, and its PR is the answer the button exists to give (#1255).
   // Unless the session demonstrably kept committing after that PR merged or closed (#1512) —
@@ -347,7 +347,7 @@ export async function openAgentPullRequest(
   if (handoff && !handoff.exists) return { ok: false, error: `branch ${branch} no longer exists` }
   // Refuse rather than open an empty PR: a session that changed nothing has nothing to hand off.
   if (handoff?.empty) return { ok: false, error: 'this session produced no commits to open a PR for' }
-  return publishBranch(cwd, branch, { title: agentPrTitle(agent, handoff?.name), body: agentPrBody(agent), ...(options.draft ? { draft: true } : {}) }, branches, forge)
+  return publishBranch(cwd, branch, { title: agentPrTitle(agent, handoff?.name), body: agentPrBody(agent), ...(options.draft ? { draft: true } : {}) }, branches, gitHost)
 }
 
 /**

@@ -10,7 +10,7 @@ import { parseCommits, parseNumstat, parsePorcelain, readBranchStates } from './
 import { runCli } from './cli.js'
 
 // What a branch holds and where it stands (#1774): the caller's read of a finished agent's
-// work. Real git, a bare origin; no forge, since the pull request is the caller's own question.
+// work. Real git, a bare origin; no git host, since the pull request is the caller's own question.
 
 const git = nodeGitRunner()
 

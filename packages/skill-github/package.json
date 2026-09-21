@@ -1,7 +1,7 @@
 {
   "name": "@gemstack/skill-github",
   "version": "0.0.1",
-  "description": "GitHub as a skill for coding agents: the project's pull requests and issues through gh, and the one command the framework and the scheduler run for the forge: requests, open, merge, home.",
+  "description": "GitHub as a skill for coding agents: the project's pull requests and issues through gh, and the one command the framework and the scheduler run for the git host: requests, open, merge, home.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -24,7 +24,7 @@
     "github": "bin/github"
   },
   "framework": {
-    "forge": "github"
+    "git-host": "github"
   },
   "exports": {
     ".": {

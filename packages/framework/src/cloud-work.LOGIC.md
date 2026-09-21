@@ -69,7 +69,7 @@ For each waiting agent [5], the `claude/*` heads that contain the anchor commit 
 
 #### Business logic
 
-The matched branch's whole pull request history is listed through the project's forge provider (`dashboard/pull-requests.ts`); a project with no forge provider has none. The pull request that belongs to the agent [5] is picked as `dashboard/pull-requests.ts` picks it: an open pull request always; otherwise the latest one created after the agent's start, so a predecessor's pull request on a reused branch name is never this agent's. "None" and "could not list" are kept apart: a listing that fails is reported as "could not list the PRs of <branch> (<error>), so no draft PR was opened this pass", nothing is opened, and the agent is asked again next pass, because a second draft on a branch that already has one is the cost of guessing.
+The matched branch's whole pull request history is listed through the project's git host provider (`dashboard/pull-requests.ts`); a project with no git host provider has none. The pull request that belongs to the agent [5] is picked as `dashboard/pull-requests.ts` picks it: an open pull request always; otherwise the latest one created after the agent's start, so a predecessor's pull request on a reused branch name is never this agent's. "None" and "could not list" are kept apart: a listing that fails is reported as "could not list the PRs of <branch> (<error>), so no draft PR was opened this pass", nothing is opened, and the agent is asked again next pass, because a second draft on a branch that already has one is the cost of guessing.
 
 ### Opening the armed draft pull request
 
@@ -79,7 +79,7 @@ The matched branch's whole pull request history is listed through the project's 
 
 #### Business logic
 
-When the listing succeeded and found no pull request, the agent [5] ended done, its handoff [12] was armed for a pull request, and the branch's head is beyond the anchor itself (so the session committed something), a draft pull request is opened for the remote branch through the project's branches provider and forge provider, with the same title and body rules as the "Open PR" button, draft so that a pull request The Framework opens by itself never puts a review request in anyone's inbox (`dashboard/agent-handoff.ts`). A failure to open it is reported as "could not open the armed draft PR for <branch>: <error>" and the branch is still recorded. An agent not armed for a pull request gets its branch recorded and nothing else.
+When the listing succeeded and found no pull request, the agent [5] ended done, its handoff [12] was armed for a pull request, and the branch's head is beyond the anchor itself (so the session committed something), a draft pull request is opened for the remote branch through the project's branches provider and git host provider, with the same title and body rules as the "Open PR" button, draft so that a pull request The Framework opens by itself never puts a review request in anyone's inbox (`dashboard/agent-handoff.ts`). A failure to open it is reported as "could not open the armed draft PR for <branch>: <error>" and the branch is still recorded. An agent not armed for a pull request gets its branch recorded and nothing else.
 
 ### Recording onto the run
 

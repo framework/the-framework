@@ -119,11 +119,11 @@ function describe(md: string): { title?: string; summary: string; priority?: str
     .split(',')
     .map(t => t.trim())
     .filter(Boolean)
-  // `Issue: [#42](https://forge.example/org/repo/issues/42)` — a bare markdown link to the tracker's issue.
+  // `Issue: [#42](https://example.com/org/repo/issues/42)` — a bare markdown link to the tracker's issue.
   const issueLine = preamble.find(line => line.toLowerCase().startsWith('issue:'))?.slice('issue:'.length).trim()
   const issueMatch = issueLine ? /\[([^\]]+)\]\(([^)]+)\)/.exec(issueLine) : null
   const issue = issueMatch ? { label: issueMatch[1]!, url: issueMatch[2]! } : undefined
-  // `PR: [#1790](https://forge.example/org/repo/pull/1790)` — the same link shape: the ticket is in review.
+  // `PR: [#1790](https://example.com/org/repo/pull/1790)` — the same link shape: the ticket is in review.
   const prLine = preamble.find(line => line.toLowerCase().startsWith('pr:'))?.slice('pr:'.length).trim()
   const prMatch = prLine ? /\[([^\]]+)\]\(([^)]+)\)/.exec(prLine) : null
   const pr = prMatch ? { label: prMatch[1]!, url: prMatch[2]! } : undefined

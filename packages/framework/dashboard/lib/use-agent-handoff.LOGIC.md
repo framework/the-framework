@@ -2,7 +2,7 @@ Reads what an agent's [1] branch holds once its work has stopped — the commits
 
 ## Context
 
-**User story**: an agent ends, or ends waiting [3] on a question, and its page offers the one step that moves the work forward: "Open PR" when the branch has commits and a remote, "Merge PR" once a pull request exists, "Push" where the project has no forge package. While that step runs the button says what it is doing ("Opening PR…", "Merging…", "Pushing…"), and when it fails the reason is shown instead of the button silently doing nothing. The summary above the button says what the branch holds, and expanding it lists the commits and files.
+**User story**: an agent ends, or ends waiting [3] on a question, and its page offers the one step that moves the work forward: "Open PR" when the branch has commits and a remote, "Merge PR" once a pull request exists, "Push" where the project has no git host package. While that step runs the button says what it is doing ("Opening PR…", "Merging…", "Pushing…"), and when it fails the reason is shown instead of the button silently doing nothing. The summary above the button says what the branch holds, and expanding it lists the commits and files.
 
 **Problem**: the same facts are needed in two places at once — the summary line and the actions in the action bar, and the commits and files the bar expands. Read separately they disagree with each other and cost twice the traffic.
 
@@ -63,7 +63,7 @@ A read that fails leaves the last answer in place; the next read usually succeed
 
 #### Business logic
 
-Three steps can be carried out from here: opening the pull request (which pushes the branch on the way), merging it, and, where the project has no forge, pushing the branch alone. While one is in flight, that specific step is named, so the button reads "Opening PR…", "Merging…" or "Pushing…", and every step's button is unavailable until it finishes. Only one step is ever in flight.
+Three steps can be carried out from here: opening the pull request (which pushes the branch on the way), merging it, and, where the project has no git host, pushing the branch alone. While one is in flight, that specific step is named, so the button reads "Opening PR…", "Merging…" or "Pushing…", and every step's button is unavailable until it finishes. Only one step is ever in flight.
 
 ### A step that succeeds re-reads the branch at once
 
@@ -79,7 +79,7 @@ A step that succeeds triggers an immediate re-read of the branch, so what is off
 
 #### Context
 
-**User story**: opening a pull request can fail for reasons the user can act on — no remote, no forge package, the forge refusing it — and the page says which.
+**User story**: opening a pull request can fail for reasons the user can act on — no remote, no git host package, the git host refusing it — and the page says which.
 
 #### Business logic
 

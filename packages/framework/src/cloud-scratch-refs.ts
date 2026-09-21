@@ -124,7 +124,7 @@ export interface ScratchSweepResult {
   failed: { ref: string; error: string }[]
 }
 
-/** Injectable seams so the sweep is unit-testable off disk, off the network and off the forge. */
+/** Injectable seams so the sweep is unit-testable off disk, off the network and off the git host. */
 export interface ScratchSweepDeps {
   git?: GitRunner
   /** The branch's full PR history (default {@link prsForBranch}). */
@@ -295,7 +295,7 @@ export async function sweepCloudScratchRefs(cwd: string, deps: ScratchSweepDeps 
       result.kept.push({ ref, reason: 'holds-work' })
       continue
     }
-    // prsForBranch resolves [] when the forge cannot answer, so a hiccup here fails toward
+    // prsForBranch resolves [] when the git host cannot answer, so a hiccup here fails toward
     // deletion — acceptable only because the work gate already proved the ref holds nothing.
     const history = await prs(cwd, ref).catch((): LinkedPr[] => [])
     if (history.some(pr => pr.state === 'OPEN')) {

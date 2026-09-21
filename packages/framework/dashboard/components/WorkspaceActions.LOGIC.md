@@ -1,4 +1,4 @@
-The row of buttons for reaching a checkout [1] outside the browser: open the project's repository on its forge, open the checkout in the operating system's file manager, and open it in the user's editor — plus the choice of which editor that is. The same row serves a project's own page and an agent's [2] page: on a project's page the buttons act on the project's checkout, and on an agent's page every one of them acts on that agent's own checkout instead.
+The row of buttons for reaching a checkout [1] outside the browser: open the project's repository on its git host, open the checkout in the operating system's file manager, and open it in the user's editor — plus the choice of which editor that is. The same row serves a project's own page and an agent's [2] page: on a project's page the buttons act on the project's checkout, and on an agent's page every one of them acts on that agent's own checkout instead.
 
 ## Context
 
@@ -14,14 +14,14 @@ The row of buttons for reaching a checkout [1] outside the browser: open the pro
 
 ## Business logic — TL;DR
 
-- **The repository on the forge** - one link to the project's repository page, labelled with the forge's name, shown only when the project's forge names a page.
+- **The repository on the git host** - one link to the project's repository page, labelled with the git host's name, shown only when the project's git host names a page.
 - **The folder and the editor** - two buttons opening this checkout on the user's machine, naming whose checkout they mean.
 - **Which editor** - the editor menu also carries the choice of editor, stored in the preferences.
 - **When opening fails** - the reason is shown beside the buttons, and never carries over to another checkout.
 
 ## Business logic
 
-### The repository on the forge
+### The repository on the git host
 
 #### Context
 
@@ -29,7 +29,7 @@ The row of buttons for reaching a checkout [1] outside the browser: open the pro
 
 #### Business logic
 
-An external-link icon links to the project's repository page, opening in a new tab, with the tooltip "Open on <forge name>" ("Open on GitHub" for a GitHub project). It is shown only when the daemon answers a page for the project, which its forge provider names; a project with no forge package, or none whose remote the forge knows, simply has no such button. The last known page stays while another project's loads, so the icon does not pop out and back. The link is the project's repository on both pages, since an agent works a branch of that same repository. A pull request an agent opened is shown by the agent's own git status, not here.
+An external-link icon links to the project's repository page, opening in a new tab, with the tooltip "Open on <git host name>" ("Open on GitHub" for a GitHub project). It is shown only when the daemon answers a page for the project, which its git host provider names; a project with no git host package, or none whose remote the git host knows, simply has no such button. The last known page stays while another project's loads, so the icon does not pop out and back. The link is the project's repository on both pages, since an agent works a branch of that same repository. A pull request an agent opened is shown by the agent's own git status, not here.
 
 ### The folder and the editor
 

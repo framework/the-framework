@@ -25,13 +25,13 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   `list`, `show`, `push --branch`, `remove`); it composes a pull request's title and body
   from the run, and keeps the rule that says which pull request is a run's. Picked over the
   framework's own git handoff, which was a second way to publish.
-- The forge is a package's: every pull request The Framework opens, lands or reads goes
-  through the command the package declares (`framework.forge`: `requests`, `open`,
+- The git host is a package's: every pull request The Framework opens, lands or reads goes
+  through the command the package declares (`framework.git-host`: `requests`, `open`,
   `merge`, `home`), and Open PR is the two commands composed, the push then the open.
-  The Framework names no forge and runs no forge tool; a project with no forge package
+  The Framework names no git host and runs no git host tool; a project with no git host package
   has no pull requests, and a finished run's last step is Push. Picked over the branches
-  package opening the request, which put the forge inside the git skill, and over a forge
-  adapter inside it, which made another forge a change to that package.
+  package opening the request, which put the git host inside the git skill, and over a git host
+  adapter inside it, which made another git host a change to that package.
 - Which package provides a kind of data when several installed packages declare it: the
   project's own package.json says, under the same `framework` key with the package's name
   as the value; several and no line means nothing provides it, and the project's banner

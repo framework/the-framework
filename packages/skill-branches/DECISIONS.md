@@ -91,11 +91,11 @@ push.
 
 ## The skill
 - The package knows git and nothing beyond it: it pushes a branch and never opens or
-  lands a pull request, and it names no forge and no forge package. The pull request is
-  the forge package's own command, composed after the push by whoever runs both: the
+  lands a pull request, and it names no git host and no git host package. The pull request is
+  the git host package's own command, composed after the push by whoever runs both: the
   agent through its skills, the dashboard through the two declared commands. Picked over
-  the package opening the request itself, which put the forge's tool inside the git skill
-  and made another forge a change to this package.
+  the package opening the request itself, which put the git host's tool inside the git skill
+  and made another git host a change to this package.
 - The agent pushes its own work when it finishes: `npx branches push` pushes its branch
   once its checkout is clean. Picked over whoever started the agent pushing for it.
   Whoever started the agent may still say they publish for it; then the agent never
@@ -106,7 +106,7 @@ push.
   a second push path in the dashboard.
 - `show` answers a branch's git facts only, its commits and files beyond the base, whether
   it is pushed and merged, what its checkout left uncommitted; its pull request is the
-  caller's question. Picked over the package asking the forge, which would have put a
+  caller's question. Picked over the package asking the git host, which would have put a
   network call inside every poll.
 - `list` and `show` answer a branch's `name`, the name the agent gave its work: the branch
   minus the package's prefix, and nothing while a checkout is still on the branch it was

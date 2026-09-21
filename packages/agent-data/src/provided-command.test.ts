@@ -44,23 +44,23 @@ test('one package declaring a kind provides it; a declaration naming no command 
 })
 
 test('two packages declaring a kind: the one the project names provides; none named is none, with the reason; a name that does not provide it is none, said', async () => {
-  const two = { github: { bin: { github: 'cmd.cjs' }, framework: { forge: 'github' } }, gitlab: { bin: { gitlab: 'cmd.cjs' }, framework: { forge: 'gitlab' } } }
+  const two = { github: { bin: { github: 'cmd.cjs' }, framework: { 'git-host': 'github' } }, gitlab: { bin: { gitlab: 'cmd.cjs' }, framework: { 'git-host': 'gitlab' } } }
   const unnamed = await project(two)
-  const named = await project(two, { forge: 'gitlab' })
-  const wrong = await project(two, { forge: 'plain' })
-  const wrongAlone = await project({ github: two.github }, { forge: 'plain' })
+  const named = await project(two, { 'git-host': 'gitlab' })
+  const wrong = await project(two, { 'git-host': 'plain' })
+  const wrongAlone = await project({ github: two.github }, { 'git-host': 'plain' })
   try {
-    const none = await lookupProvidedCommand(unnamed, 'forge')
+    const none = await lookupProvidedCommand(unnamed, 'git-host')
     assert.equal(none.command, undefined, 'never the first in dependency order')
-    assert.equal(none.problem, '2 packages provide forge: github, gitlab; name one under "framework" in package.json')
-    assert.equal(await readProvidedCommand(unnamed, 'forge'), undefined)
+    assert.equal(none.problem, '2 packages provide git-host: github, gitlab; name one under "framework" in package.json')
+    assert.equal(await readProvidedCommand(unnamed, 'git-host'), undefined)
 
-    const picked = await lookupProvidedCommand(named, 'forge')
+    const picked = await lookupProvidedCommand(named, 'git-host')
     assert.equal(picked.command?.package, 'gitlab')
     assert.equal(picked.problem, undefined)
 
-    assert.deepEqual(await lookupProvidedCommand(wrong, 'forge'), { problem: 'package.json names plain for forge, which does not provide it; the providers are github, gitlab' })
-    assert.deepEqual(await lookupProvidedCommand(wrongAlone, 'forge'), { problem: 'package.json names plain for forge, which does not provide it; the providers are github' }, 'a wrong name is wrong even with one provider')
+    assert.deepEqual(await lookupProvidedCommand(wrong, 'git-host'), { problem: 'package.json names plain for git-host, which does not provide it; the providers are github, gitlab' })
+    assert.deepEqual(await lookupProvidedCommand(wrongAlone, 'git-host'), { problem: 'package.json names plain for git-host, which does not provide it; the providers are github' }, 'a wrong name is wrong even with one provider')
   } finally {
     for (const root of [unnamed, named, wrong, wrongAlone]) await rm(root, { recursive: true, force: true })
   }

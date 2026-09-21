@@ -3,9 +3,9 @@ import { test } from 'node:test'
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { parseRequests, providedForge } from './forge.js'
+import { parseRequests, providedGitHost } from './git-host.js'
 
-// The forge contract (#1820): a project's package declares `"framework": { "forge": "<command>" }`
+// The git host contract (#1820): a project's package declares `"framework": { "git-host": "<command>" }`
 // and the framework reads the project's pull requests, opens one, lands one and finds the
 // project's page by running that command. Real processes: a tiny provider script that logs each
 // call it answers, in a throwaway project.
@@ -27,7 +27,7 @@ const REQUEST = { number: 7, url: 'https://x/pull/7', state: 'open', title: 'T',
 
 /** A project whose package.json lists `deps`, each installed under node_modules with its own package.json. */
 async function project(deps: Record<string, Record<string, unknown>>): Promise<string> {
-  const root = await realpath(await mkdtemp(join(tmpdir(), 'framework-forge-')))
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'framework-git host-')))
   await writeFile(join(root, 'package.json'), JSON.stringify({ devDependencies: Object.fromEntries(Object.keys(deps).map(name => [name, '*'])) }))
   for (const [name, manifest] of Object.entries(deps)) {
     const dir = join(root, 'node_modules', name)
@@ -43,26 +43,26 @@ async function project(deps: Record<string, Record<string, unknown>>): Promise<s
   return root
 }
 
-const FORGE = { github: { bin: { github: 'provider.cjs' }, framework: { forge: 'github' } } }
+const GIT_HOST = { github: { bin: { github: 'provider.cjs' }, framework: { 'git-host': 'github' } } }
 
 const calls = async (root: string, pkg: string): Promise<string[]> =>
   (await readFile(join(root, 'node_modules', pkg, 'calls.log'), 'utf8').catch(() => '')).split('\n').filter(Boolean)
 
-test('a project with no forge package has no forge; one with a provider is read and moved through its command line', async () => {
+test('a project with no git host package has no git host; one with a provider is read and moved through its command line', async () => {
   const none = await project({ plain: { bin: { plain: 'provider.cjs' } } })
-  const root = await project(FORGE)
+  const root = await project(GIT_HOST)
   try {
-    assert.equal(await providedForge()(none), undefined)
-    const forge = (await providedForge()(root))!
-    assert.ok(forge)
-    assert.deepEqual(await forge.requests(), { ok: true, requests: [REQUEST, { ...REQUEST, number: 6, state: 'merged', mergedAt: '2026-09-02T00:00:00Z' }] }, 'a row without the facts a request needs is no request')
-    assert.deepEqual(await forge.requests({ branch: 'agent-run-1', state: 'open', since: '2026-09-01T00:00:00Z' }), { ok: true, requests: [REQUEST, { ...REQUEST, number: 6, state: 'merged', mergedAt: '2026-09-02T00:00:00Z' }] })
-    assert.deepEqual(await forge.requests({ branch: 'unreachable' }), { ok: false, error: 'gh: could not resolve to a Repository' }, '"could not tell" is not "none"')
-    assert.deepEqual(await forge.open('agent-run-1', { title: 'T', body: 'B' }), { ok: true, request: { number: 9, url: 'https://x/pull/9' }, existing: false })
-    assert.deepEqual(await forge.open('agent-run-1', { title: 'T', draft: true }), { ok: true, request: { number: 7, url: 'https://x/pull/7' }, existing: true })
-    assert.deepEqual(await forge.merge(7), { ok: true, outcome: 'auto-armed' })
-    assert.deepEqual(await forge.merge(8), { ok: false, error: 'pull request 8 is merged, not open' }, "a refusal is the provider's own line")
-    assert.deepEqual(await forge.home(), { url: 'https://github.com/o/r', name: 'GitHub' })
+    assert.equal(await providedGitHost()(none), undefined)
+    const gitHost = (await providedGitHost()(root))!
+    assert.ok(gitHost)
+    assert.deepEqual(await gitHost.requests(), { ok: true, requests: [REQUEST, { ...REQUEST, number: 6, state: 'merged', mergedAt: '2026-09-02T00:00:00Z' }] }, 'a row without the facts a request needs is no request')
+    assert.deepEqual(await gitHost.requests({ branch: 'agent-run-1', state: 'open', since: '2026-09-01T00:00:00Z' }), { ok: true, requests: [REQUEST, { ...REQUEST, number: 6, state: 'merged', mergedAt: '2026-09-02T00:00:00Z' }] })
+    assert.deepEqual(await gitHost.requests({ branch: 'unreachable' }), { ok: false, error: 'gh: could not resolve to a Repository' }, '"could not tell" is not "none"')
+    assert.deepEqual(await gitHost.open('agent-run-1', { title: 'T', body: 'B' }), { ok: true, request: { number: 9, url: 'https://x/pull/9' }, existing: false })
+    assert.deepEqual(await gitHost.open('agent-run-1', { title: 'T', draft: true }), { ok: true, request: { number: 7, url: 'https://x/pull/7' }, existing: true })
+    assert.deepEqual(await gitHost.merge(7), { ok: true, outcome: 'auto-armed' })
+    assert.deepEqual(await gitHost.merge(8), { ok: false, error: 'pull request 8 is merged, not open' }, "a refusal is the provider's own line")
+    assert.deepEqual(await gitHost.home(), { url: 'https://github.com/o/r', name: 'GitHub' })
     assert.deepEqual(await calls(root, 'github'), [
       'requests',
       'requests --branch agent-run-1 --state open --since 2026-09-01T00:00:00Z',
@@ -80,17 +80,17 @@ test('a project with no forge package has no forge; one with a provider is read 
 })
 
 test('the provider is looked up again after the window, or when changed() says so; parseRequests keeps the rows with a number, a url and a known state', async () => {
-  const root = await project(FORGE)
+  const root = await project(GIT_HOST)
   try {
     let clock = 1_000_000
-    const reader = providedForge(() => clock)
+    const reader = providedGitHost(() => clock)
     const first = await reader(root)
     assert.equal(await reader(root), first, 'the same source within the window')
     clock += 6_000
     assert.equal(await reader(root), first, 'the same command still provides: the same source')
     await writeFile(join(root, 'package.json'), JSON.stringify({ devDependencies: {} }))
     reader.changed(root)
-    assert.equal(await reader(root), undefined, 'the package dropped: no forge')
+    assert.equal(await reader(root), undefined, 'the package dropped: no git host')
   } finally {
     await rm(root, { recursive: true, force: true })
   }

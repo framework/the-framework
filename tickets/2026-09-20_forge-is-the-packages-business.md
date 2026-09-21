@@ -5,7 +5,11 @@ Issue: [#1820](https://github.com/framework/the-framework/issues/1820)
 
 ## TLDR
 
-Can The Framework work with no git provider at all, and with GitLab, Bitbucket or a custom provider instead of GitHub? Yes to both, and the way there is decided: **GitHub is a skill**. A `skill-github` package owns `gh` and declares one command, `framework.forge`; no other skill mentions GitHub or gh. GitLab means replacing `skill-github` with `skill-gitlab`, which is not a priority — the priority is the clean modularization.
+Can The Framework work with no git provider at all, and with GitLab, Bitbucket or a custom provider instead of GitHub? Yes to both, and the way there is decided: **GitHub is a skill**. A `skill-github` package owns `gh` and declares one command, `"framework": { "git-host": "<command>" }`; no other skill mentions GitHub or gh. GitLab means replacing `skill-github` with `skill-gitlab`, which is not a priority — the priority is the clean modularization.
+
+## Status
+
+The build below has landed (#1827, #1829): GitHub is a skill (`@gemstack/skill-github`, the only place `gh` runs); the branches package is git only and gains `push`; the framework and the scheduler reach the git host through the one command a package declares under the kind `git-host`; when two installed packages declare the same kind, the project's own package.json names the one it takes, and two with no such line is a red banner, never the first taken silently; the tickets' `GitHub:` key is `Issue:`; the word "forge" is gone, the name is "git host". The issue is still open.
 
 ## Why it matters
 

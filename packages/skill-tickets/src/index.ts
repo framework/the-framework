@@ -19,7 +19,7 @@ export {
   nodeTicketsFs,
   type Ticket,
   type TicketDetail,
-  type TicketGithubLink,
+  type TicketLink,
   type TicketsFs,
   type TicketsMeta,
 } from './tickets.js'

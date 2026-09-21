@@ -1,10 +1,10 @@
-Lists one project's tickets as one-liner rows — priority, topics, who holds the ticket, its effort and uncertainty ratings, its age, whether it has a plan, and the GitHub issue it tracks — so the backlog is readable without opening anything. Each row opens its ticket, and carries two direct starts: an agent [1] that implements the ticket, and an agent that writes its plan. Above the rows sits when the tickets last caught up with GitHub and the button that catches them up again.
+Lists one project's tickets as one-liner rows — priority, topics, who holds the ticket, its effort and uncertainty ratings, its age, whether it has a plan, and the issue it tracks — so the backlog is readable without opening anything. Each row opens its ticket, and carries two direct starts: an agent [1] that implements the ticket, and an agent that writes its plan. Above the rows sits when the tickets last caught up with the issue tracker and the button that catches them up again.
 
 ## Context
 
 **User story**: the user reads a project's backlog on the project's home and on the dashboard's Tickets page, scanning for what is urgent, what nobody planned yet and what an agent [1] is already working, then either opens a ticket to read it or starts an agent on it from the row itself.
 
-**Business logic story**: the tickets are markdown files under `tickets/` on the project's `agent-data` branch [2]; this panel shows the rows the Tickets page read with the `tickets` command, and reads one thing itself: when the tickets last caught up with GitHub, with `tickets meta --local`, run in the project by the dashboard. The same row is used twice: inside a project's section, where the section heading names the project, and in the Tickets page's flat cross-project list, where each row names its own project instead.
+**Business logic story**: the tickets are markdown files under `tickets/` on the project's `agent-data` branch [2]; this panel shows the rows the Tickets page read with the `tickets` command, and reads one thing itself: when the tickets last caught up with the issue tracker, with `tickets meta --local`, run in the project by the dashboard. The same row is used twice: inside a project's section, where the section heading names the project, and in the Tickets page's flat cross-project list, where each row names its own project instead.
 
 ## Glossary
 
@@ -17,12 +17,12 @@ Lists one project's tickets as one-liner rows — priority, topics, who holds th
 
 ## Business logic — TL;DR
 
-- **One ticket per row** - title, project (in the flat list), topics, claim, effort, uncertainty, priority, age, plan and GitHub issue, in fixed columns so the list scans down.
+- **One ticket per row** - title, project (in the flat list), topics, claim, effort, uncertainty, priority, age, plan and issue, in fixed columns so the list scans down.
 - **Who holds a ticket** - a hammer and the holder's name mark a claimed ticket, and lead to the agent holding it.
 - **The plan column** - a plan that exists is a link to read it; a ticket with none offers to start an agent that writes it.
 - **Starting work from a row** - one click starts an agent implementing that one ticket and nothing else.
 - **Configure first, then run** - every start on the panel also offers a trip to this project's launcher with the same prompt waiting there.
-- **Catching the tickets up with GitHub** - a line saying when the tickets last caught up, and a button that starts an agent to catch them up again.
+- **Catching the tickets up with the issue tracker** - a line saying when the tickets last caught up, and a button that starts an agent to catch them up again.
 - **Nothing to show** - a project with no ticket offers the import; a project filtered down to nothing says how many are hidden and clears the filters from there.
 - **One start at a time** - while a start is in flight every start on the panel is out, and a refusal is shown above the rows.
 
@@ -47,7 +47,7 @@ A row reads, left to right:
 - "Priority: N", or nothing when the ticket names no priority. The value is red from 8 up, amber from 5 to 7, and muted below that or when there is none, so the critical tickets stand out down the column.
 - The ticket's age, as "22s ago", "30m ago", "5d ago", "2w ago" or "1y ago", with the exact date and time on hover.
 - The plan column, described below.
-- The GitHub issue the ticket tracks, as a link opening in a new tab, showing the issue's label. A ticket that tracks no issue keeps the column's width empty, so the columns to its left stay aligned row to row.
+- The issue the ticket tracks, as a link opening in a new tab, an external-link icon and the issue's label. A ticket that tracks no issue keeps the column's width empty, so the columns to its left stay aligned row to row.
 
 The topics, claim, effort and uncertainty are hidden on a narrow screen; every other column stays.
 
@@ -103,19 +103,19 @@ When a start succeeds, the surrounding page is told what was asked and which age
 
 #### Business logic
 
-Every start on the panel — the work start, the plan start and the GitHub update — carries a chevron beside it offering "Configure first, then run": "Opens the launcher with this ticket's prompt, so you can set the model and where it runs." for the work start, and "Opens the launcher with the plan prompt, so you can set the model and where it runs." for the plan start. Choosing it asks the dashboard to open this project's launcher [9] with the same prompt drafted in, starting nothing. The chevrons of every row name their own ticket ("Other ways to work on <title>", "Other ways to plan <title>").
+Every start on the panel — the work start, the plan start and the tickets update — carries a chevron beside it offering "Configure first, then run": "Opens the launcher with this ticket's prompt, so you can set the model and where it runs." for the work start, and "Opens the launcher with the plan prompt, so you can set the model and where it runs." for the plan start. Choosing it asks the dashboard to open this project's launcher [9] with the same prompt drafted in, starting nothing. The chevrons of every row name their own ticket ("Other ways to work on <title>", "Other ways to plan <title>").
 
 A chevron is never disabled by a start in flight, because it starts nothing: being unable to go and look at the settings while something else runs would defeat the offer.
 
-### Catching the tickets up with GitHub
+### Catching the tickets up with the issue tracker
 
 #### Context
 
-**User story**: a project's issues live on GitHub and its tickets live on the `agent-data` branch [2]; the user wants the second to reflect the first without walking the issues by hand.
+**User story**: a project's issues live in its issue tracker and its tickets live on the `agent-data` branch [2]; the user wants the second to reflect the first without walking the issues by hand.
 
 #### Business logic
 
-Above the rows, one line states when the tickets last caught up with GitHub — "Updated from GitHub 3h ago", or "No record of an import yet" when nothing was ever imported — with the update button immediately beside it, rather than a panel's width away from the line it acts on. What that button offers and how it words itself is described in `UpdateTicketsButton.tsx`.
+Above the rows, one line states when the tickets last caught up with the issue tracker — "Updated from the tracker 3h ago", or "No record of an import yet" when nothing was ever imported — with the update button immediately beside it, rather than a panel's width away from the line it acts on. What that button offers and how it words itself is described in `UpdateTicketsButton.tsx`.
 
 The update is the project's `update-tickets` command, started like any other agent. A refusal reads "The update could not be started.".
 

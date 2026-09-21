@@ -1,8 +1,8 @@
-The toolbar above the dashboard's Tickets list at `/tickets`: a search box, one button per facet the backlog can be narrowed by (priority, topics, planning stage, effort, uncertainty, project, and tickets with no GitHub link), a way to clear every filter, and a menu that sets the sort order and whether the list is grouped by project. Every control hands the page a whole new viewing state, which the page writes into its address; what each filter actually hides, and how the address spells it, is decided by the rules in `lib/ticket-filter.ts`.
+The toolbar above the dashboard's Tickets list at `/tickets`: a search box, one button per facet the backlog can be narrowed by (priority, topics, planning stage, effort, uncertainty, project, and tickets with no issue link), a way to clear every filter, and a menu that sets the sort order and whether the list is grouped by project. Every control hands the page a whole new viewing state, which the page writes into its address; what each filter actually hides, and how the address spells it, is decided by the rules in `lib/ticket-filter.ts`.
 
 ## Context
 
-**User story**: the backlog is one long cross-project list, and the user narrows it to the question at hand — "the critical ones nobody planned yet", "everything tagged `dx`", "the tickets an agent [1] already holds", "the ones I wrote myself rather than imported from GitHub" — then reads the narrowed list, shares it as a link, or hands it to the agents in bulk from the page's heading.
+**User story**: the backlog is one long cross-project list, and the user narrows it to the question at hand — "the critical ones nobody planned yet", "everything tagged `dx`", "the tickets an agent [1] already holds", "the ones I wrote myself rather than imported from the issue tracker" — then reads the narrowed list, shares it as a link, or hands it to the agents in bulk from the page's heading.
 
 **Problem**: a facet whose options carry no counts forces the user to try each one to find out whether it shows anything. Every option here states how many tickets it would show, so the user picks once instead of probing.
 
@@ -17,7 +17,7 @@ The toolbar above the dashboard's Tickets list at `/tickets`: a search box, one 
 - **What every option counts** - an option's count is how many tickets it would show under the other filters, ignoring its own facet's current selection.
 - **The numeric facets** - priority, effort and uncertainty each offer three named spans, a fine-grained range, and "names no value", the spans and the range being two ways to say one thing.
 - **Topics, stage and project** - three plain option lists, each shown only when it has something to say.
-- **Tickets nobody linked to GitHub** - one toggle for the tickets written here rather than imported.
+- **Tickets linked to no issue** - one toggle for the tickets written here rather than imported.
 - **Clearing the filters** - one button, shown only while something is filtered, resetting the filters and leaving the sort and the grouping alone.
 - **Sort and grouping** - one menu: the sort key, the direction spelled out in the key's own words, and whether the list is grouped by project.
 
@@ -85,15 +85,15 @@ Three facets that are plain lists of options with counts:
 
 Picking several options within one facet widens the list; the facets narrow each other.
 
-### Tickets nobody linked to GitHub
+### Tickets linked to no issue
 
 #### Context
 
-**User story**: some tickets are imported from GitHub issues and carry a link back to the issue; the rest were written here. The user reviewing what the agents themselves produced wants only the latter.
+**User story**: some tickets are imported from the issue tracker and carry a link back to the issue; the rest were written here. The user reviewing what the agents themselves produced wants only the latter.
 
 #### Business logic
 
-A "Not linked" toggle, carrying the count of tickets with no GitHub link, narrows the list to exactly those. It appears only when at least one such ticket is in the pool, or the toggle is already on, and it shows whether it is pressed.
+A "Not linked" toggle, carrying the count of tickets with no issue link, narrows the list to exactly those. It appears only when at least one such ticket is in the pool, or the toggle is already on, and it shows whether it is pressed.
 
 ### Clearing the filters
 

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Github, LockOpen } from 'lucide-react'
+import { ExternalLink, LockOpen } from 'lucide-react'
 import { Badge, Button, LinkActions, Markdown, cn, formatAge, formatDateTime, useAction, usePolled, useWidgetHost } from 'framework/widget'
 import { holderAgent, readShown, ticketLink } from '../src/widget.js'
 import type { WorkspaceTicketDetail } from './lib/types.js'
@@ -92,7 +92,7 @@ export function TicketDetailPage({
             </div>
           </div>
           {ticket.summary && <p className="mt-2 text-sm text-muted-foreground">{ticket.summary}</p>}
-          {/* All meta below the description (#1144/#1265): date, priority, then the GitHub
+          {/* All meta below the description (#1144/#1265): date, priority, then the issue
               link lead in that order, followed by the rest of what is known about the ticket. */}
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
             <span className="text-[10px] text-muted-foreground/70" title={formatDateTime(ticket.date)}>
@@ -103,15 +103,15 @@ export function TicketDetailPage({
                 Priority: {ticket.priority}
               </Badge>
             )}
-            {ticket.github && (
+            {ticket.issue && (
               <a
-                href={ticket.github.url}
+                href={ticket.issue.url}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground hover:underline"
               >
-                <Github className="h-4 w-4" aria-hidden />
-                {ticket.github.label}
+                <ExternalLink className="h-4 w-4" aria-hidden />
+                {ticket.issue.label}
               </a>
             )}
             {ticket.topics?.map(topic => (

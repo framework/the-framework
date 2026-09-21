@@ -1,8 +1,8 @@
-Reads tickets off the `tickets/` directory of the `agent-data` branch [1] into rows: what the head of each ticket's markdown says about itself (title, summary, priority, topics, GitHub link, pull request link, date) plus what the plan and the claim [2] beside it add (planned, locked, holder [3], effort, uncertainty). The same reader serves the `tickets` command's `list` and `show` and the daemon, which serves the dashboard's ticket rows, whether the directory is a checkout on disk or a tree read straight off the branch without a checkout; it also reads `tickets/meta.json`, the stamp of the last issue import.
+Reads tickets off the `tickets/` directory of the `agent-data` branch [1] into rows: what the head of each ticket's markdown says about itself (title, summary, priority, topics, issue link, pull request link, date) plus what the plan and the claim [2] beside it add (planned, locked, holder [3], effort, uncertainty). The same reader serves the `tickets` command's `list` and `show` and the daemon, which serves the dashboard's ticket rows, whether the directory is a checkout on disk or a tree read straight off the branch without a checkout; it also reads `tickets/meta.json`, the stamp of the last issue import.
 
 ## Context
 
-**User story**: the user opens a project's tickets in the dashboard and reads each ticket as one row: its title, a one-line summary, its priority, its topics, the GitHub issue it tracks, its date, whether it has a plan, who holds it, and the plan's effort and uncertainty ratings. An agent [4] runs `npx tickets list` and `npx tickets show <file>` and gets the same fields. Tickets are written by hand, by agents and by an issue import, and some predate the ticket format, so every field is read tolerantly: a ticket missing a field still lists, with whatever it has.
+**User story**: the user opens a project's tickets in the dashboard and reads each ticket as one row: its title, a one-line summary, its priority, its topics, the issue it tracks, its date, whether it has a plan, who holds it, and the plan's effort and uncertainty ratings. An agent [4] runs `npx tickets list` and `npx tickets show <file>` and gets the same fields. Tickets are written by hand, by agents and by an issue import, and some predate the ticket format, so every field is read tolerantly: a ticket missing a field still lists, with whatever it has.
 
 **Business logic story**: the ticket format itself is fixed by the skill's `SKILL.md`; which names count as tickets and which as siblings [5] is decided by the gates in `names.ts`; the claim's one line is parsed by the rule in `locks.ts`.
 
@@ -13,12 +13,12 @@ Reads tickets off the `tickets/` directory of the `agent-data` branch [1] into r
 [3] holder: who a claim names: the agent's id when the program that started the agent set it in `AGENT_ID` (the scheduler does), else the branch the `tickets` command ran on.
 [4] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [5] sibling: a ticket's plan file (`<name>.plan.md`) or claim file (`<name>.lock.md`), written about the ticket and never a ticket of its own.
-[6] key block: the `key: value` lines above a ticket's or a plan's `# ` heading, where `Priority:`, `Topics:`, `GitHub:`, `PR:`, `Effort:` and `Uncertainty:` are read from.
+[6] key block: the `key: value` lines above a ticket's or a plan's `# ` heading, where `Priority:`, `Topics:`, `Issue:`, `PR:`, `Effort:` and `Uncertainty:` are read from.
 
 ## Business logic — TL;DR
 
-- **What a ticket's row holds** - one row per ticket, the same fields for `list` and `show`: file, title, summary, date and whether planned always; priority, topics, GitHub link, pull request link, locked, holder, effort and uncertainty only when they have a value.
-- **The key block above the title** - `Priority:`, `Topics:`, `GitHub:` and `PR:` are read only from the key block [6], the lines above the `# ` heading, keys matched in any case; any other line there is noise.
+- **What a ticket's row holds** - one row per ticket, the same fields for `list` and `show`: file, title, summary, date and whether planned always; priority, topics, issue link, pull request link, locked, holder, effort and uncertainty only when they have a value.
+- **The key block above the title** - `Priority:`, `Topics:`, `Issue:` and `PR:` are read only from the key block [6], the lines above the `# ` heading, keys matched in any case; any other line there is noise.
 - **The title, else the filename made readable** - the first `# ` heading is the title; without one, the filename without `.md`, percent escapes decoded and underscores turned into spaces.
 - **The summary is the first prose line** - the first line after `## TLDR` that is not blank, not a heading and not a `Source:` line; without a `## TLDR`, the first such line after the title; empty when there is none.
 - **A ticket's date, and newest first** - the `yyyy-mm-dd` the filename starts with, at midnight UTC; else the file's modification time; else the Unix epoch; a listing is ordered newest first.
@@ -38,17 +38,17 @@ See `## Context`.
 
 #### Business logic
 
-A row names the ticket by its filename inside `tickets/`, which is also its identity, and always carries the title, the summary (an empty string when the ticket has none), the date, and whether a plan sits beside it. The other fields appear only when they have a value and are absent otherwise, never null or empty: the priority as written, lowercased but otherwise verbatim (the format says a whole number from 0 to 10, but the row does not check it; the number the agent queue uses is derived by the rule in `names.ts`); the topics as bare tags; the GitHub link as its label and its URL; locked, present and true only when a claim [2] exists; the holder [3] the claim names; the plan's effort; the plan's uncertainty. `show` adds the ticket's whole markdown. `list` parses only a ticket's head, its first 4,000 characters, because nothing below the head is shown in a list.
+A row names the ticket by its filename inside `tickets/`, which is also its identity, and always carries the title, the summary (an empty string when the ticket has none), the date, and whether a plan sits beside it. The other fields appear only when they have a value and are absent otherwise, never null or empty: the priority as written, lowercased but otherwise verbatim (the format says a whole number from 0 to 10, but the row does not check it; the number the agent queue uses is derived by the rule in `names.ts`); the topics as bare tags; the issue link as its label and its URL; locked, present and true only when a claim [2] exists; the holder [3] the claim names; the plan's effort; the plan's uncertainty. `show` adds the ticket's whole markdown. `list` parses only a ticket's head, its first 4,000 characters, because nothing below the head is shown in a list.
 
 ### The key block above the title
 
 #### Context
 
-**Problem**: `Priority:`, `Topics:`, `GitHub:` and `PR:` are plain text lines a ticket's body could also contain, so reading keys out of the body would turn a sentence that mentions "priority:" into a field. Restricting keys to the lines above the title keeps the format unambiguous while staying tolerant of tickets written before it.
+**Problem**: `Priority:`, `Topics:`, `Issue:` and `PR:` are plain text lines a ticket's body could also contain, so reading keys out of the body would turn a sentence that mentions "priority:" into a field. Restricting keys to the lines above the title keeps the format unambiguous while staying tolerant of tickets written before it.
 
 #### Business logic
 
-The lines above the first `# ` heading are the ticket's key block [6]; a ticket with no heading has no key block, so none of the keys are read. In the key block, a line whose lowercased text starts with `priority:`, `topics:`, `github:` or `pr:` gives that key its value: the text after the colon with surrounding whitespace removed, the first such line winning. A `Priority:` value is lowercased and kept as written (`High` becomes `high`, `7` stays `7`); an empty value counts as absent. A `Topics:` value drops one leading `[` and one trailing `]`, then splits on commas into trimmed tags with empty tags dropped, so `[dx, ui, docs]` and `dx, ui, docs` both give three topics; a value with no tag left counts as absent. A `GitHub:` value gives a link only when it holds a markdown link, `[label](url)`: the first such link's label and URL are kept as written, the label never re-derived from the URL; a `GitHub:` line without a link gives no link. A `PR:` value is read by the same rule: the pull request that closes the ticket once merged, present while the ticket is in review. Any other line in the key block, such as a leftover `Status:` line, is noise and never a field.
+The lines above the first `# ` heading are the ticket's key block [6]; a ticket with no heading has no key block, so none of the keys are read. In the key block, a line whose lowercased text starts with `priority:`, `topics:`, `issue:` or `pr:` gives that key its value: the text after the colon with surrounding whitespace removed, the first such line winning. A `Priority:` value is lowercased and kept as written (`High` becomes `high`, `7` stays `7`); an empty value counts as absent. A `Topics:` value drops one leading `[` and one trailing `]`, then splits on commas into trimmed tags with empty tags dropped, so `[dx, ui, docs]` and `dx, ui, docs` both give three topics; a value with no tag left counts as absent. An `Issue:` value gives a link only when it holds a markdown link, `[label](url)`: the first such link's label and URL are kept as written, the label never re-derived from the URL; an `Issue:` line without a link gives no link. A `PR:` value is read by the same rule: the pull request that closes the ticket once merged, present while the ticket is in review. Any other line in the key block, such as a leftover `Status:` line, is noise and never a field.
 
 ### The title, else the filename made readable
 
@@ -124,7 +124,7 @@ A single ticket is read by its bare filename, only when the name passes the bare
 
 #### Context
 
-**Business logic story**: an import of the project's issues as tickets stamps `tickets/meta.json` with the moment it began, so the next import can ask only for what changed since. No program in the repository writes the stamp any more, and no `tickets` command reads it; the product reads it to show when the tickets were last updated from GitHub.
+**Business logic story**: an import of the project's issues as tickets stamps `tickets/meta.json` with the moment it began, so the next import can ask only for what changed since. No program in the repository writes the stamp any more, and no `tickets` command reads it; the product reads it to show when the tickets were last updated from the issue tracker.
 
 #### Business logic
 

@@ -16,7 +16,7 @@ import {
   DropdownMenuSeparator,
 } from './ui/dropdown-menu.js'
 
-// What you can do to a checkout: open it on GitHub (#489), in the file manager or an editor
+// What you can do to a checkout: open it on the project's forge (#489), in the file manager or an editor
 // (#490), and serve it (#475). One component for both pages (#809) — the project home passes no
 // session and acts on the project's tree, a session passes its id and every action addresses its
 // own worktree instead. Opening a session in your editor is the whole point of a worktree, and

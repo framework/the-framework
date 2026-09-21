@@ -78,13 +78,13 @@ Two parts of a row filter on click, additively, so clicking a second one widens 
 
 #### Context
 
-**User story**: grouped by project, the user reads each project's backlog as its own table, with that project's import from GitHub at hand. The flat list is the one view that answers "what is the single highest-priority ticket anywhere", since it orders every project's tickets as one pool.
+**User story**: grouped by project, the user reads each project's backlog as its own table, with that project's tickets update at hand. The flat list is the one view that answers "what is the single highest-priority ticket anywhere", since it orders every project's tickets as one pool.
 
 #### Business logic
 
 By default the page groups by project: one section per project, headed by the project's name, containing a project panel (`TicketsPanel.tsx`) with that project's shown tickets in the view's sort order. Each section is told how many of its own tickets the filters hide and, while any filter is active, given a way to clear the filters; how it shows both is the panel's business. A section is rendered for every project, even one with no tickets. A project deselected in the filter bar's project facet disappears entirely rather than staying as an empty section, since hiding it was the user's choice.
 
-In flat mode (the address carries `group=none`), every shown ticket of every project is one list sorted as a single pool, and each row carries its project's name. No per-project import bar appears in flat mode; importing from GitHub belongs to the project sections. Above the flat list, when a filter is active and hides at least one ticket: "N ticket hidden by the current filters." (or "N tickets …") with a "Clear filters" button. A flat list with nothing to show reads "No tickets in any project yet — group by project to import from GitHub." when no project has any ticket at all, and "No tickets match." otherwise.
+In flat mode (the address carries `group=none`), every shown ticket of every project is one list sorted as a single pool, and each row carries its project's name. No per-project import bar appears in flat mode; updating the tickets belongs to the project sections. Above the flat list, when a filter is active and hides at least one ticket: "N ticket hidden by the current filters." (or "N tickets …") with a "Clear filters" button. A flat list with nothing to show reads "No tickets in any project yet — group by project to import a project's issues." when no project has any ticket at all, and "No tickets match." otherwise.
 
 Whichever mode, rows are ordered by the view's sort: by date, priority, title or effort, in the chosen direction, with tickets missing the sorted value last in both directions and ties broken newest first (rules in `lib/ticket-filter.ts`).
 

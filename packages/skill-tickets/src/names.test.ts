@@ -64,12 +64,12 @@ test('a name is refused bare exactly when it is refused under tickets/', () => {
   }
 })
 
-test('ticketIssueRef reads the issue off the GitHub header line, URL first', () => {
-  assert.equal(ticketIssueRef('Priority: 5\nGitHub: [#42](https://github.com/org/repo/issues/42)\n\n# T\n'), '#42')
+test('ticketIssueRef reads the issue off the Issue header line, URL first', () => {
+  assert.equal(ticketIssueRef('Priority: 5\nIssue: [#42](https://forge.example/org/repo/issues/42)\n\n# T\n'), '#42')
   // The URL is the identity: a label that disagrees with it loses.
-  assert.equal(ticketIssueRef('GitHub: [gh-7](https://github.com/o/r/issues/99)\n'), '#99')
+  assert.equal(ticketIssueRef('Issue: [gh-7](https://forge.example/o/r/issues/99)\n'), '#99')
   // A hand-written line with no URL still counts by its label.
-  assert.equal(ticketIssueRef('GitHub: #13\n'), '#13')
-  assert.equal(ticketIssueRef('# A ticket with no GitHub line\n'), undefined)
-  assert.equal(ticketIssueRef('GitHub: none yet\n'), undefined)
+  assert.equal(ticketIssueRef('Issue: #13\n'), '#13')
+  assert.equal(ticketIssueRef('# A ticket with no Issue line\n'), undefined)
+  assert.equal(ticketIssueRef('Issue: none yet\n'), undefined)
 })

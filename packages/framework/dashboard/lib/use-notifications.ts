@@ -13,8 +13,8 @@ import { SeenTracker, activityKey, interventionKey, type ProjectionRead } from '
 // you only hear about what happens while you are watching, never what was already there.
 //
 // The baseline used to be a count: the first two observations, whatever they held (#1625). A page
-// opened while the daemon could not reach GitHub spent both of them on empty lists, and the first
-// fetch that did reach GitHub announced every already-open pull request as new.
+// opened while the daemon could not reach the forge spent both of them on empty lists, and the first
+// fetch that did reach the forge announced every already-open pull request as new.
 
 /** The per-feed half: identity (shared with the daemon's notifier) plus wording and click target. */
 interface NotificationSpec<T> {
@@ -80,7 +80,7 @@ const INTERVENTIONS: NotificationSpec<Intervention> = {
     }
     return `#${item.number} ${item.title}`
   },
-  // A PR opens on GitHub; a paused agent and unpushed work both live in this dashboard, so those
+  // A PR opens on the forge; a paused agent and unpushed work both live in this dashboard, so those
   // just bring the tab forward (project selection is client state, not a URL).
   clickUrl: first => (first.kind === 'awaiting' || first.kind === 'unpushed' ? undefined : first.url),
 }

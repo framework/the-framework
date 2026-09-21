@@ -29,8 +29,8 @@ export interface Ticket {
   /** `0`–`10` as written, `10` acting at once; absent when unset, and not checked here. */
   priority?: string
   topics?: string[]
-  /** The issue it tracks, and the pull request that closes it: a label and where it points. */
-  github?: { label: string; url: string }
+  /** The issue it tracks in the project's tracker, and the pull request that closes it: a label and where it points. */
+  issue?: { label: string; url: string }
   pr?: { label: string; url: string }
   /** ISO 8601: the file's date. */
   date: string

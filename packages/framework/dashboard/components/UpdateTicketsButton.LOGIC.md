@@ -1,8 +1,8 @@
-"Update from GitHub": the one button that starts an agent [1] bringing a project's `tickets/` up to date with its GitHub issues, rendered identically wherever it is offered — here, the onboarding checklist; the tickets package's own page carries its own copy of the same button, with the same words. The label, the instruction sent, and what the tooltip promises all come from the one place, so pressing the same words on a different surface always sends the same ask.
+"Update tickets": the one button that starts an agent [1] bringing a project's `tickets/` up to date with the issues of its issue tracker, rendered identically wherever it is offered — here, the onboarding checklist; the tickets package's own page carries its own copy of the same button, with the same words. The label, the instruction sent, and what the tooltip promises all come from the one place, so pressing the same words on a different surface always sends the same ask.
 
 ## Context
 
-**User story**: the user keeps a project's issues on GitHub and wants them as tickets on the `agent-data` branch [2], where the agents read them. One press does it, whether the project has never imported anything or imported an hour ago.
+**User story**: the user keeps a project's issues in an issue tracker and wants them as tickets on the `agent-data` branch [2], where the agents read them. One press does it, whether the project has never imported anything or imported an hour ago.
 
 **Problem**: the same offer written out per surface drifts: one wording change and the other surfaces keep saying the old thing while sending a different instruction under the same label.
 
@@ -30,7 +30,7 @@ See `## Context`.
 
 #### Business logic
 
-The button reads "Update from GitHub" with a refresh icon and sends `/update-tickets`, the project's `update-tickets` command [3]. That command covers both cases: a project with no tickets at all is treated as a first import, which is why an empty `tickets/` needs no separate offer of its own.
+The button reads "Update tickets" with a refresh icon and sends `/update-tickets`, the project's `update-tickets` command [3]. That command covers both cases: a project with no tickets at all is treated as a first import, which is why an empty `tickets/` needs no separate offer of its own.
 
 ### The promise depends on what is on record
 
@@ -40,7 +40,7 @@ The button reads "Update from GitHub" with a refresh icon and sends `/update-tic
 
 #### Business logic
 
-When the caller knows when the tickets last caught up with GitHub, the tooltip reads "Bring tickets/ up to date with the issues and comments changed since the last import." With no import on record it reads "Bring tickets/ up to date with GitHub. With no import on record, everything open comes across."
+When the caller knows when the tickets last caught up with the tracker, the tooltip reads "Bring tickets/ up to date with the issues and comments changed since the last import." With no import on record it reads "Bring tickets/ up to date with the issue tracker. With no import on record, everything open comes across."
 
 ### Configure first, then run
 
@@ -50,7 +50,7 @@ When the caller knows when the tickets last caught up with GitHub, the tooltip r
 
 #### Business logic
 
-Beside the button sits a chevron, labeled "Other ways to update from GitHub", offering "Configure first, then run": "Opens the launcher with the update prompt, so you can set the model and where it runs." Choosing it leaves the same instruction waiting in the launcher and starts nothing. The chevron stays live while a start is in flight, since it spends nothing.
+Beside the button sits a chevron, labeled "Other ways to update the tickets", offering "Configure first, then run": "Opens the launcher with the update prompt, so you can set the model and where it runs." Choosing it leaves the same instruction waiting in the launcher and starts nothing. The chevron stays live while a start is in flight, since it spends nothing.
 
 ### Busy while it starts
 

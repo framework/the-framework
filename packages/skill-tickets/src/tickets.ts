@@ -20,10 +20,10 @@ export interface Ticket {
   priority?: string
   /** The optional `Topics:` key (`Topics: [dx, ui]`), as bare tags. */
   topics?: string[]
-  /** The optional `GitHub:` key, split into the link text and the URL it points at. */
-  github?: TicketGithubLink
+  /** The optional `Issue:` key, the tracker's issue this ticket tracks, split into the link text and the URL it points at. */
+  issue?: TicketLink
   /** The optional `PR:` key: the pull request that closes this ticket once merged, written by the agent that opened it. Same link shape. */
-  pr?: TicketGithubLink
+  pr?: TicketLink
   /**
    * ISO 8601. The `<DATE>_<SLUG>.md` filename's date when it has one — the format every ticket is
    * written in — else the file's modification time, for the rare ticket that predates the format;
@@ -45,8 +45,8 @@ export interface Ticket {
   uncertainty?: number
 }
 
-/** A ticket's `GitHub:` link, split into what a reader clicks and where it goes. */
-export interface TicketGithubLink {
+/** A ticket's `Issue:` or `PR:` link, split into what a reader clicks and where it goes. */
+export interface TicketLink {
   /** As written, e.g. `#42` — not re-derived, in case the source ever names a PR differently. */
   label: string
   /** The issue/PR URL the label links to. */
@@ -97,10 +97,10 @@ function titleFromFile(file: string): string {
 
 /**
  * Read the head of a ticket: the `key: value` block above the title (`Priority:`, `Topics:`,
- * `GitHub:`, `PR:` — all optional), the `# ` heading, and the `## TLDR`. Deliberately tolerant: a ticket
+ * `Issue:`, `PR:` — all optional), the `# ` heading, and the `## TLDR`. Deliberately tolerant: a ticket
  * predating the format still lists, with whatever it has.
  */
-function describe(md: string): { title?: string; summary: string; priority?: string; topics?: string[]; github?: TicketGithubLink; pr?: TicketGithubLink } {
+function describe(md: string): { title?: string; summary: string; priority?: string; topics?: string[]; issue?: TicketLink; pr?: TicketLink } {
   const lines = md.split('\n')
   const headingAt = lines.findIndex(line => line.startsWith('# '))
   const heading = headingAt === -1 ? undefined : lines[headingAt]!.slice(2).trim()
@@ -119,11 +119,11 @@ function describe(md: string): { title?: string; summary: string; priority?: str
     .split(',')
     .map(t => t.trim())
     .filter(Boolean)
-  // `GitHub: [#42](https://github.com/org/repo/issues/42)` — a bare markdown link.
-  const githubLine = preamble.find(line => line.toLowerCase().startsWith('github:'))?.slice('github:'.length).trim()
-  const githubMatch = githubLine ? /\[([^\]]+)\]\(([^)]+)\)/.exec(githubLine) : null
-  const github = githubMatch ? { label: githubMatch[1]!, url: githubMatch[2]! } : undefined
-  // `PR: [#1790](https://github.com/org/repo/pull/1790)` — the same link shape: the ticket is in review.
+  // `Issue: [#42](https://forge.example/org/repo/issues/42)` — a bare markdown link to the tracker's issue.
+  const issueLine = preamble.find(line => line.toLowerCase().startsWith('issue:'))?.slice('issue:'.length).trim()
+  const issueMatch = issueLine ? /\[([^\]]+)\]\(([^)]+)\)/.exec(issueLine) : null
+  const issue = issueMatch ? { label: issueMatch[1]!, url: issueMatch[2]! } : undefined
+  // `PR: [#1790](https://forge.example/org/repo/pull/1790)` — the same link shape: the ticket is in review.
   const prLine = preamble.find(line => line.toLowerCase().startsWith('pr:'))?.slice('pr:'.length).trim()
   const prMatch = prLine ? /\[([^\]]+)\]\(([^)]+)\)/.exec(prLine) : null
   const pr = prMatch ? { label: prMatch[1]!, url: prMatch[2]! } : undefined
@@ -135,7 +135,7 @@ function describe(md: string): { title?: string; summary: string; priority?: str
     ...(heading ? { title: heading } : {}),
     ...(priority ? { priority } : {}),
     ...(topics && topics.length > 0 ? { topics } : {}),
-    ...(github ? { github } : {}),
+    ...(issue ? { issue } : {}),
     ...(pr ? { pr } : {}),
     summary,
   }
@@ -187,7 +187,7 @@ function planMeta(md: string | undefined): { effort?: number; uncertainty?: numb
  * so an unreadable or malformed lock still locks.
  */
 async function ticketRow(dir: string, file: string, head: string, siblings: Set<string>, fs: TicketsFs): Promise<Ticket> {
-  const { title, summary, priority, topics, github, pr } = describe(head)
+  const { title, summary, priority, topics, issue, pr } = describe(head)
   const planName = ticketPlanName(file)
   const lockName = ticketLockName(file)
   const [date, plan, lock] = await Promise.all([
@@ -202,7 +202,7 @@ async function ticketRow(dir: string, file: string, head: string, siblings: Set<
     summary,
     ...(priority ? { priority } : {}),
     ...(topics ? { topics } : {}),
-    ...(github ? { github } : {}),
+    ...(issue ? { issue } : {}),
     ...(pr ? { pr } : {}),
     date,
     planned: siblings.has(planName),

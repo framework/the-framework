@@ -1,6 +1,6 @@
 Priority: 3
 Topics: [UX, only-if-quick-win]
-GitHub: [#1513](https://github.com/gemstack-land/the-framework/issues/1513)
+Issue: [#1513](https://github.com/gemstack-land/the-framework/issues/1513)
 
 # Project dropdown
 

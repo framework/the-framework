@@ -1,4 +1,4 @@
-GitHub: [#1774](https://github.com/framework/the-framework/issues/1774)
+Issue: [#1774](https://github.com/framework/the-framework/issues/1774)
 
 # Dashboard architecture: the plan and six questions
 

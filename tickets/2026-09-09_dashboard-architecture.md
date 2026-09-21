@@ -1,5 +1,5 @@
 Priority: 9
-GitHub: [#1768](https://github.com/framework/the-framework/issues/1768)
+Issue: [#1768](https://github.com/framework/the-framework/issues/1768)
 
 # Dashboard architecture
 

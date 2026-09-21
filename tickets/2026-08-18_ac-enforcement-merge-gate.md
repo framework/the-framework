@@ -1,5 +1,5 @@
 Priority: 5
-GitHub: [#1591](https://github.com/gemstack-land/the-framework/issues/1591)
+Issue: [#1591](https://github.com/gemstack-land/the-framework/issues/1591)
 
 # AC enforcement: a merge gate checking the diff against AGENTS.md and the ticket's acceptance criteria
 

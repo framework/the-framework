@@ -1,5 +1,5 @@
 Topics: [the-framework, modularity]
-GitHub: [#1818](https://github.com/framework/the-framework/issues/1818)
+Issue: [#1818](https://github.com/framework/the-framework/issues/1818)
 
 # Modular structure: what the four module PRs left behind
 

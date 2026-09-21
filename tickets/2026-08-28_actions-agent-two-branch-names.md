@@ -1,4 +1,4 @@
-GitHub: [#1746](https://github.com/framework/the-framework/issues/1746)
+Issue: [#1746](https://github.com/framework/the-framework/issues/1746)
 
 # An Actions agent is told two branch names
 

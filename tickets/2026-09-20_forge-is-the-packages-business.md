@@ -1,5 +1,5 @@
 Topics: [the-framework, modularity]
-GitHub: [#1820](https://github.com/framework/the-framework/issues/1820)
+Issue: [#1820](https://github.com/framework/the-framework/issues/1820)
 
 # Working with no forge, and with GitLab, Bitbucket or a custom one: the forge is the packages' business
 

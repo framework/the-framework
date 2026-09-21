@@ -1,5 +1,5 @@
 Priority: 2
-GitHub: [#1758](https://github.com/framework/the-framework/issues/1758)
+Issue: [#1758](https://github.com/framework/the-framework/issues/1758)
 
 # New skill: browser access (with limited permissions)
 

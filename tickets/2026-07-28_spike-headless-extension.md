@@ -1,6 +1,6 @@
 Priority: 8
 Topics: [UX]
-GitHub: [#1332](https://github.com/framework/the-framework/issues/1332)
+Issue: [#1332](https://github.com/framework/the-framework/issues/1332)
 
 # Spike: Is it possible to make the extension headless?
 

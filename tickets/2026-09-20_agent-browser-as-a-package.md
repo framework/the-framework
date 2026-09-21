@@ -1,5 +1,5 @@
 Topics: [the-framework, modularity]
-GitHub: [#1819](https://github.com/framework/the-framework/issues/1819)
+Issue: [#1819](https://github.com/framework/the-framework/issues/1819)
 
 # The agent's browser as a package: the first package that extends a run
 

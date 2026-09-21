@@ -1,4 +1,4 @@
-GitHub: [#1757](https://github.com/framework/the-framework/issues/1757)
+Issue: [#1757](https://github.com/framework/the-framework/issues/1757)
 
 # Follow-ups from the DECISIONS.md and SKILL.md cold reads
 

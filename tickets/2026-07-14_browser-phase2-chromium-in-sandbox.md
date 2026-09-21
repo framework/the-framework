@@ -1,5 +1,5 @@
 Topics: [the-framework]
-GitHub: [#469](https://github.com/gemstack-land/the-framework/issues/469)
+Issue: [#469](https://github.com/gemstack-land/the-framework/issues/469)
 
 # Browser Phase 2: bundle Chromium into the sandbox runner image
 

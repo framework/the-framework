@@ -1,5 +1,5 @@
 Topics: [system-prompt]
-GitHub: [#1416](https://github.com/gemstack-land/the-framework/issues/1416)
+Issue: [#1416](https://github.com/gemstack-land/the-framework/issues/1416)
 
 # New gate: let agent gauge uncertainty
 

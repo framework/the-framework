@@ -20,7 +20,7 @@ The cloud scratch sweep [1]: the sweep [2] that, once per tick [3] of the daemon
 
 ## Business logic — TL;DR
 
-- **Which refs are candidates** - only refs named `cloud-<number>-<8 hex digits>` and the branches a run's record names; every other branch on origin is never considered.
+- **Which refs are candidates** - only refs named `cloud-<number>-<8 hex digits>` and the branches a run's record names, never the default branch nor the `agent-data` branch, whatever a record says; every other branch on origin is never considered.
 - **Old enough** - a candidate is left alone for 24 hours: a `cloud-*` ref from the moment this machine first saw it, remembered in `.the-framework/cloud-refs.json`; a run's branch from the start its record says.
 - **Not a live agent's** - a run's branch whose run the caller names as busy is kept; the daemon names none, since it runs no agent.
 - **Holds no work** - a ref goes only when its tip is already reachable from origin's default branch, or is an empty commit on a parent that is; anything unprovable keeps the ref.
@@ -39,7 +39,7 @@ The cloud scratch sweep [1]: the sweep [2] that, once per tick [3] of the daemon
 
 #### Business logic
 
-Origin's branches and its default branch are read in one listing (the default branch is what origin's HEAD points at, else `main` or `master` when present). A ref is a candidate only in one of two ways: named exactly `cloud-<digits>-<eight hex digits>`, anchored tightly so a user's own `cloud-…` branch is never a candidate; or the branch a run's record names (the project's finished agents, as its runs provider answers them; a record whose start cannot be read makes its branch no candidate). A branch no record names, the default branch, `claude/*` branches and everything else are not even listed as kept. A branch a run named itself is a run's branch like any other once its record names it, and goes only when every gate below says it holds nothing.
+Origin's branches and its default branch are read in one listing (the default branch is what origin's HEAD points at, else `main` or `master` when present). A ref is a candidate only in one of two ways: named exactly `cloud-<digits>-<eight hex digits>`, anchored tightly so a user's own `cloud-…` branch is never a candidate; or the branch a run's record names (the project's finished agents, as its runs provider answers them; a record whose start cannot be read makes its branch no candidate). The default branch and the `agent-data` branch are never candidates, even when a run's record names one of them (a run that never left `main` records `main`); they, a branch no record names, `claude/*` branches and everything else are not even listed as kept. A branch a run named itself is a run's branch like any other once its record names it, and goes only when every gate below says it holds nothing.
 
 ### Old enough
 

@@ -272,6 +272,17 @@ test('a branch a run named itself is a run branch too, when the run\'s record na
   assert.deepEqual(await sweepCloudScratchRefs('/repo', { agents: unread, git: fakeGit({ heads: { main: MAIN_SHA, [NAMED_RUN]: SHA } }).git, fs: memFs().fs, prs: noPrs, now: () => NOW }), { deleted: [], kept: [], failed: [] })
 })
 
+test('the default branch and the data branch are never candidates, even when a run\'s record names them (#1827)', async () => {
+  // A failed 2026-08-18 run recorded `branch: main`; under the run-branch rule the sweep then asked
+  // origin to delete main every hour (GitHub refused only because it is the default branch).
+  const heads = { main: MAIN_SHA, 'agent-data': SHA, [OLD_RUN]: SHA }
+  const { git, deleted } = fakeGit({ heads })
+  const naming = async (): Promise<AgentMeta[]> => [run(OLD_RUN_ID, '2026-08-16T10:00:00.000Z', 'main'), run(YOUNG_RUN_ID, '2026-08-16T10:00:00.000Z', 'agent-data')]
+  const result = await sweepCloudScratchRefs('/repo', { agents: naming, git, fs: memFs().fs, prs: noPrs, now: () => NOW })
+  assert.deepEqual(deleted, [])
+  assert.deepEqual(result, { deleted: [], kept: [], failed: [] })
+})
+
 test('every other branch is never even a candidate: a name no run\'s record names is nobody\'s to delete', async () => {
   const heads = {
     main: MAIN_SHA,

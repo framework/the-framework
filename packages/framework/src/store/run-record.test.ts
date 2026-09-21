@@ -30,14 +30,12 @@ test('a card unfolds into the meta: the skill\'s fields on top, whatever sits un
 })
 
 test('a diary reads as events: the skill\'s four kinds mapped, every other line as it is (#1769)', () => {
-  const usage = { inputTokens: 1, outputTokens: 2, cacheReadTokens: 0, cacheCreationTokens: 0 }
   assert.deepEqual(
     eventsOf([
       { kind: 'session', driver: 'claude-code', workspace: '/w', fake: false, model: 'opus' },
       { kind: 'said', text: 'Reading.' },
-      { kind: 'result', text: 'Done.', sessionId: 's1', usage },
-      { kind: 'cost', usd: 0.5, ...usage, turns: 1 },
-      { kind: 'cost', ...usage, turns: 1 },
+      { kind: 'result', text: 'Done.', sessionId: 's1' },
+      { kind: 'cost', usd: 0.5 },
       { kind: 'ended', status: 'done' },
       { kind: 'ended', status: 'stopped', detail: 'its process died' },
       { kind: 'ended', status: 'failed', detail: 'API 500' },
@@ -45,9 +43,8 @@ test('a diary reads as events: the skill\'s four kinds mapped, every other line 
     [
       { kind: 'session', driver: 'claude-code', workspace: '/w', fake: false, model: 'opus' },
       { kind: 'driver', event: { type: 'text', text: 'Reading.' } },
-      { kind: 'driver', event: { type: 'result', text: 'Done.', sessionId: 's1', usage } },
-      { kind: 'usage', costUsd: 0.5, ...usage, turns: 1 },
-      { kind: 'usage', ...usage, turns: 1 },
+      { kind: 'driver', event: { type: 'result', text: 'Done.', sessionId: 's1' } },
+      { kind: 'usage', costUsd: 0.5 },
       { kind: 'end', ok: true },
       { kind: 'end', ok: false, stopped: true, detail: 'its process died' },
       { kind: 'end', ok: false, detail: 'API 500' },

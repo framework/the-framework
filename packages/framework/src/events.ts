@@ -292,22 +292,13 @@ export type FrameworkEvent =
    */
   | { kind: 'settled' }
   /**
-   * Cumulative token + cost usage for the agent so far (#322). Emitted after each
-   * agent turn that reports usage, for the dashboard's live spend readout. Nothing
-   * gates on it: an agent already running is never cut short over spending, and the
-   * account's quota decides what may *start* instead.
-   *
-   * `costUsd` is absent when the agent reports tokens but no price (#540).
+   * The price of one turn in USD (#322): the run's record keeps a cost line per turn the
+   * coding agent priced, and no token counts, so a turn without a price has no usage event
+   * (#540). The dashboard adds them up into its spend readout. Nothing gates on it: an
+   * agent already running is never cut short over spending, and the account's quota
+   * decides what may *start* instead.
    */
-  | {
-      kind: 'usage'
-      costUsd?: number
-      inputTokens: number
-      outputTokens: number
-      cacheReadTokens: number
-      cacheCreationTokens: number
-      turns: number
-    }
+  | { kind: 'usage'; costUsd: number }
   /**
    * The agent paused on an interactive choice (#304) and is awaiting a pick. The
    * dashboard renders the options with the recommended default pre-selected and

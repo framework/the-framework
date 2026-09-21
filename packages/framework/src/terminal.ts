@@ -71,16 +71,8 @@ export function formatFrameworkEvent(event: FrameworkEvent): string {
           return `  ! could not ${event.step === 'pr' ? 'open the PR' : 'push the branch'}: ${event.error}`
       }
     }
-    case 'usage': {
-      const turns = `over ${event.turns} turn${event.turns === 1 ? '' : 's'}`
-      // No price to show: report the tokens the agent *did* report, rather than a
-      // `$0.0000` that would read as free (#540).
-      if (event.costUsd === undefined) {
-        const tokens = event.inputTokens + event.cacheReadTokens + event.outputTokens
-        return `  tokens: ${tokens.toLocaleString('en-US')} (${event.outputTokens.toLocaleString('en-US')} out) ${turns} — no price reported`
-      }
-      return `  spend: $${event.costUsd.toFixed(4)} ${turns}`
-    }
+    case 'usage':
+      return `  spend: $${event.costUsd.toFixed(4)}`
     case 'choice': {
       const mark = (o: ChoiceOption) =>
         event.multi ? (o.default ? '[x]' : '[ ]') : o.id === event.recommended ? '●' : '○'

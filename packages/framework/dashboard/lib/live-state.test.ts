@@ -75,7 +75,7 @@ describe('pendingChoices', () => {
     const next: FrameworkEvent = { kind: 'driver', event: { type: 'text', text: 'On it.' } }
     expect(pendingChoices([choice('q', 'Which?'), waiting, next])).toEqual([])
     // What is not the agent's own (its cost, a log line) closes nothing.
-    expect(pendingChoices([choice('q', 'Which?'), { kind: 'usage', costUsd: 0.1 } as FrameworkEvent, waiting]).map(c => c.id)).toEqual(['q'])
+    expect(pendingChoices([choice('q', 'Which?'), { kind: 'usage', costUsd: 0.1 }, waiting]).map(c => c.id)).toEqual(['q'])
   })
 
   test('an end that does not say waiting still closes it, also after a waiting one', () => {

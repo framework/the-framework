@@ -157,15 +157,6 @@ export type FrameworkEvent =
    * (each Claude Code prompt is a fresh session), keeping the link current.
    */
   | { kind: 'session-update'; sessionId: string; sessionLink?: string }
-  /**
-   * The full system prompt sent to the wrapped agent for this agent (#343): the
-   * #326 block plus any personas / skills / memory framing, exactly as passed to
-   * the driver's system channel. Emitted once at session start so the dashboard
-   * can show the normally-hidden prompt (the per-turn user prompts arrive as
-   * `driver` `start` events, which already carry their text). Transparency, never
-   * gated on.
-   */
-  | { kind: 'system-prompt'; text: string }
   /** What this session was asked for, emitted once as it opens (#211). */
   | { kind: 'intent'; text: string }
   /** The wrapped agent's own progress, forwarded verbatim (never gated on). */

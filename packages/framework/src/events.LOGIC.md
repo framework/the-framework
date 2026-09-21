@@ -39,7 +39,7 @@ Fixes the vocabulary of the event stream [1]: every kind of event an agent's [2]
 
 ## Business logic — TL;DR
 
-- **The opening events** - the session opening, the session id once known, the full system channel and the intent say what the agent is, what it was told and what it was asked; a continuation opens with its own session opening, so readers keep the latest.
+- **The opening events** - the session opening, the session id once known and the intent say what the agent is and what it was asked; a continuation opens with its own session opening, so readers keep the latest.
 - **The coding agent's progress, forwarded** - every progress event the coding agent reports is forwarded verbatim onto the stream and never decided on.
 - **What the agent shows the user** - a view updates in place by title, a reported error stays in the log as history, a log line narrates, and the agent's browser travels as a page URL and a stream port only, never as frames.
 - **A gate and its pick** - a gate is a question, at least one option and, for a single-select gate, a recommended option; a checklist pre-checks options instead; the pick is one option id or the chosen subset, and says whether the user or nobody picked.
@@ -60,11 +60,10 @@ See `## Context`.
 
 #### Business logic
 
-Four events open an agent's [2] stream:
+Three events open an agent's [2] stream:
 
 - The session opening, emitted once before the first turn [14]: which driver [13] runs the agent, the checkout [9] it works in, whether the driver is the fake driver, the model the agent was started on when the user chose one, and the session link when it is already known. A continuation (an agent resumed from a stopped one) emits its own session opening and may run a different model, so a reader keeps the latest model rather than the first. A model left to the coding agent's [7] own default is absent.
 - The session id, emitted once the coding agent reports it, since it is not known at the start: the live driver session [15] id and, when the driver has a link template, the session link resolved from it. It is emitted again whenever the id changes, which keeps the link current.
-- The system channel's full text, emitted once at the start: exactly what the coding agent was framed with, so the dashboard can show the normally hidden prompt. The per-turn prompts are not repeated here; they arrive inside the forwarded progress events, which carry their text. Shown for transparency, never decided on.
 - The intent: what the agent was asked for, emitted once as it opens; every surface titles the agent by it.
 
 ### The coding agent's progress, forwarded

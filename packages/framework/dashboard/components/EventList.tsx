@@ -24,7 +24,6 @@ import {
 //   - The message text: the user's prompt (`driver` `start`) and the agent's reply (`driver` `text`)
 //     render their raw text inline, truncated to one line when long and expanding in place on click
 //     (#476/#520). The prompt carries its own YOU badge so the log reads like a conversation.
-//   - The system prompt keeps a char-count summary with the full text behind a click.
 //   - Choice gates, when the log knows its project (#1455 item 6): an open gate renders the same
 //     interactive ChoicePanel the rail used to hold, so the question is answered from the flow;
 //     a resolved one collapses to the AnsweredChoice ✓ card and hides its "✓ chose" line.
@@ -34,12 +33,6 @@ import {
 // never live, so they show none. Scrolling rides shadcn's Base UI message-scroller (#712): live
 // follows the edge (`autoScroll`) but yields the moment the reader scrolls up, replay renders static
 // from the top, and the "Jump to latest" chip is the scroller's own inert-when-not-scrollable button.
-
-/** The system prompt: a char-count summary with the full text behind a click. */
-function disclosableText(e: FrameworkEvent): { text: string; label: string } | null {
-  if (e.kind === 'system-prompt') return { text: e.text, label: 'system prompt sent' }
-  return null
-}
 
 // The conversation text — the user's prompt (YOU) and the agent's reply (AGENT). Both are rendered
 // as Markdown: the agent writes in Markdown, and a prompt may too.
@@ -135,8 +128,8 @@ function rowWash(e: FrameworkEvent): string {
 /**
  * Hoist the agent's first prompt to the top of the log (#1170).
  *
- * It is emitted after the `session` and `system-prompt` events, so the one line the reader wrote
- * themselves opened three rows down, under a char-count summary of a prompt they did not write.
+ * It is emitted after the `session` event, so the one line the reader wrote themselves opened
+ * under a row they did not write.
  * Only the *first* prompt moves: a later turn is part of the conversation and belongs where it
  * happened. The rows it jumps keep their order, so the log reads as "what I asked, then
  * everything that followed".
@@ -264,7 +257,6 @@ export function EventList({
         <MessageScrollerViewport aria-label="Agent output">
           <MessageScrollerContent className="gap-1 p-4 font-mono text-xs">
             {shown.map((e, i, rows) => {
-              const disclosable = disclosableText(e)
               const message = messageText(e)
               const choiceRow = choiceRows?.rows.get(e)
               const prev = i > 0 ? rows[i - 1] : undefined
@@ -274,20 +266,13 @@ export function EventList({
                 // Every row carries the same -mx/px pair so a washed row's band and a plain row's
                 // text share the exact same columns; only the background differs.
                 <MessageScrollerItem key={i} messageId={String(i)} scrollAnchor={isTurnBoundary(e)} className={`-mx-1.5 flex items-start gap-2 rounded-sm px-1.5 ${rowWash(e)}`}>
-                  {/* Fixed-width badge column so the text lines up whether or not this row repeats the badge. Wide enough for the longest common label ("system prompt") to sit on one line. */}
+                  {/* Fixed-width badge column so the text lines up whether or not this row repeats the badge. Wide enough for the longest common label ("ready for merge") to sit on one line. */}
                   <span className="w-28 shrink-0">
                     {chunkHead && (
                       <Badge className={`mt-0.5 text-[10px] uppercase ${badgeTone(e) || 'text-muted-foreground'}`}>{rowLabel(e)}</Badge>
                     )}
                   </span>
-                  {disclosable ? (
-                    <details className="min-w-0 flex-1">
-                      <summary className="cursor-pointer text-foreground marker:text-muted-foreground">
-                        {disclosable.label} ({disclosable.text.length.toLocaleString()} chars)
-                      </summary>
-                      <pre className="mt-1 max-h-96 overflow-auto whitespace-pre-wrap break-words rounded bg-muted p-2 text-foreground">{disclosable.text}</pre>
-                    </details>
-                  ) : message !== null ? (
+                  {message !== null ? (
                     // A prompt (YOU) or a reply (AGENT): compact Markdown, collapsed to its first line when long.
                     <Message text={message} />
                   ) : choiceRow && projectId ? (

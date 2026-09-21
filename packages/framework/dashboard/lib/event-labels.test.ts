@@ -10,7 +10,7 @@ describe('eventKindLabel', () => {
   })
 
   it('de-hyphenates the kinds that are already clear', () => {
-    expect(eventKindLabel('system-prompt')).toBe('system prompt')
+    expect(eventKindLabel('browser-stream')).toBe('browser stream')
     expect(eventKindLabel('ready-for-merge')).toBe('ready for merge')
   })
 

@@ -84,10 +84,6 @@ test('formatFrameworkEvent renders a session-update line', () => {
   )
 })
 
-test('formatFrameworkEvent renders a system-prompt line by length (#343)', () => {
-  assert.equal(formatFrameworkEvent({ kind: 'system-prompt', text: 'abcde' }), '  system prompt sent (5 chars)')
-})
-
 test('formatFrameworkEvent shows a preview of the driver prompt, not just "prompt sent" (#476)', () => {
   assert.equal(
     formatFrameworkEvent({ kind: 'driver', event: { type: 'start', prompt: 'Build this app end to end' } }),

@@ -23,3 +23,4 @@ the-framework # Spins up the dashboard
 # Or one-shot (no install):
 npx framework # Spins up the dashboard
 ```
+<!-- forge check 2026-09-21 -->

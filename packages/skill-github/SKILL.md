@@ -1,6 +1,6 @@
 ---
 name: github
-description: The project's forge is GitHub: how to open your pull request once your branch is pushed, how to land it, and how to read and close the project's issues.
+description: The project's git host is GitHub: how to open your pull request once your branch is pushed, how to land it, and how to read and close the project's issues.
 ---
 
 # GitHub

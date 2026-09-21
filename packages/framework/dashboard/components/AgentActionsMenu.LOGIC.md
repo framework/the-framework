@@ -1,4 +1,4 @@
-One "⋮" menu at the end of an agent's [1] action bar, holding everything the user can do to the agent other than its next step [2]: open the project on its forge, open the agent's folder, open it in an editor, open its driver session [3], copy the command that resumes that driver session in a terminal, stop [4] the agent, remove its kept checkout [5], and delete it after a confirmation. Each item is offered only when it can honestly do what it says.
+One "⋮" menu at the end of an agent's [1] action bar, holding everything the user can do to the agent other than its next step [2]: open the project on its git host, open the agent's folder, open it in an editor, open its driver session [3], copy the command that resumes that driver session in a terminal, stop [4] the agent, remove its kept checkout [5], and delete it after a confirmation. Each item is offered only when it can honestly do what it says.
 
 ## Context
 
@@ -17,7 +17,7 @@ One "⋮" menu at the end of an agent's [1] action bar, holding everything the u
 
 ## Business logic — TL;DR
 
-- **Opening the agent somewhere** - "Open on <forge name>" when the project's forge names a page; a folder item named for what it will open; an "Open in editor" submenu with the preferred-editor picker; "Open session (<id>)" when the driver session has a real link.
+- **Opening the agent somewhere** - "Open on <git host name>" when the project's git host names a page; a folder item named for what it will open; an "Open in editor" submenu with the preferred-editor picker; "Open session (<id>)" when the driver session has a real link.
 - **Copying the resume command** - when the driver session id is known, one item copies the terminal command that reopens the conversation, or just the id when the directory it ran in is unknown, and confirms with "Copied".
 - **Stop, while the agent works** - "Stop agent", which reads "Stopping…" until the agent's end arrives. There is no merge here: an agent that is working publishes its own work.
 - **Remove and delete, once the agent has ended** - "Remove worktree" only while the agent's checkout is kept; "Delete session" only for a finished agent, behind a confirmation that says the history is gone for good while the branch and pull request stay in git.
@@ -35,7 +35,7 @@ See `## Context`.
 
 The menu opens from an icon button whose hover reads "Session actions". Its first items, in order:
 
-- "Open on <forge name>" ("Open on GitHub" for a GitHub project), opening the project's repository page in a new tab. Offered only when the project's forge provider names a page; the last known page stays while another project's loads, so the item does not flicker.
+- "Open on <git host name>" ("Open on GitHub" for a GitHub project), opening the project's repository page in a new tab. Offered only when the project's git host provider names a page; the last known page stays while another project's loads, so the item does not flicker.
 - The folder item, which asks the daemon to open the agent's [1] folder in the OS file manager. It is named for what it will open: "Open session's folder" when the agent still has a checkout [5] of its own, which is the case while it runs and, once finished, while its checkout was kept; "Open project folder" when the agent's checkout is gone, since the open then resolves to the project root, with the hover "This session no longer has its own checkout"; and "Open folder" when the menu serves no particular agent.
 - "Open in editor", a submenu: "Open this session's checkout" (or "Open in your editor" without an agent) asks the daemon to open it in the user's editor, and below a separator the "Preferred editor" picker (`PreferredEditorItems.tsx`) stores the editor choice in the preferences [6] without closing the menu.
 - "Open session (<session id>)", opening the driver session [3] in a new tab. Offered only when the driver session's link genuinely opens this session, which is when the link contains the session id (the rule in `lib/session-link.ts`); a generic product page is not worth an action.

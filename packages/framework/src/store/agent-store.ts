@@ -91,7 +91,7 @@ export interface AgentMeta {
    * How the handoff's merge half went (#1418), folded from the `handoff` event's `merge` field.
    *
    * What the daemon's CI watch scans for: `watched` is a PR waiting for green that *this* side
-   * must merge (the repo could not arm the forge's auto-merge), `auto-armed` one the forge will land by
+   * must merge (the repo could not arm the git host's auto-merge), `auto-armed` one the git host will land by
    * itself but whose checks going red is still ours to notice. On the meta because the watch
    * reads metas, not event logs, and must survive both the agent's process and the daemon's.
    * Absent on runs from before this field, and on every agent whose handoff had no merge to report.

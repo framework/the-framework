@@ -3,5 +3,5 @@ export { listRequests, parseRequests, requestsArgs, sinceFilter, openRequestOf, 
 export { openRequest, currentBranch, requestNumber, type OpenOptions, type OpenOutcome } from './open.js'
 export { armMerge, mergeRequest, type MergeArming, type MergeOutcome, type MergeOptions, type WatchStarter } from './merge.js'
 export { readPr, watchAndMerge, spawnMergeWatch, NO_CHECKS_GRACE_MS, WATCH_EVERY_MS, WATCH_FOR_MS, WATCH_LOG_DIR, type ChecksState, type WatchOptions, type WatchOutcome } from './merge-watch.js'
-export { homeUrlFromRemote, homeUrlFor, FORGE_NAME } from './home.js'
+export { homeUrlFromRemote, homeUrlFor, GIT_HOST_NAME } from './home.js'
 export { runCli, USAGE, type CliIo, type CliDeps, type CliRefusal } from './cli.js'

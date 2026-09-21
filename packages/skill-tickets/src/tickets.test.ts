@@ -34,16 +34,16 @@ test('readTickets reads the format: keys above the title, then the TLDR', async 
 })
 
 test('readTickets reads the Issue: link, split into its label and URL, and leaves it off when absent', async () => {
-  const [linked] = await readTickets(await dir({ '2026-07-20_thing.md': 'Issue: [#42](https://forge.example/org/repo/issues/42)\n\n# Thing\n' }))
-  assert.deepEqual(linked?.issue, { label: '#42', url: 'https://forge.example/org/repo/issues/42' })
+  const [linked] = await readTickets(await dir({ '2026-07-20_thing.md': 'Issue: [#42](https://example.com/org/repo/issues/42)\n\n# Thing\n' }))
+  assert.deepEqual(linked?.issue, { label: '#42', url: 'https://example.com/org/repo/issues/42' })
   const [bare] = await readTickets(await dir({ '2026-07-20_thing.md': '# Thing\n' }))
   assert.equal(bare?.issue, undefined)
 })
 
 test('readTickets reads the PR: link the same way, the ticket in review, and leaves it off when absent', async () => {
-  const [inReview] = await readTickets(await dir({ '2026-07-20_thing.md': 'Issue: [#42](https://forge.example/org/repo/issues/42)\nPR: [#1790](https://forge.example/org/repo/pull/1790)\n\n# Thing\n' }))
-  assert.deepEqual(inReview?.pr, { label: '#1790', url: 'https://forge.example/org/repo/pull/1790' })
-  assert.deepEqual(inReview?.issue, { label: '#42', url: 'https://forge.example/org/repo/issues/42' })
+  const [inReview] = await readTickets(await dir({ '2026-07-20_thing.md': 'Issue: [#42](https://example.com/org/repo/issues/42)\nPR: [#1790](https://example.com/org/repo/pull/1790)\n\n# Thing\n' }))
+  assert.deepEqual(inReview?.pr, { label: '#1790', url: 'https://example.com/org/repo/pull/1790' })
+  assert.deepEqual(inReview?.issue, { label: '#42', url: 'https://example.com/org/repo/issues/42' })
   const [bare] = await readTickets(await dir({ '2026-07-20_thing.md': 'PR: not a link\n\n# Thing\n' }))
   assert.equal(bare?.pr, undefined)
 })

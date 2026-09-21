@@ -1,7 +1,7 @@
 import type { BridgeBrowserStatus } from '../bridge-browser.js'
 import { findAgent, readLiveMetas, readAllAgents, loadAgentEvents, startedAtFromAgentId, isPidAlive, type AgentMeta, type AgentStatus, isRunId, projectBranches } from '../store/index.js'
 import { listProjectWorktrees } from '../worktrees.js'
-import { projectForge, type ForgeHome } from '../store/forge.js'
+import { projectGitHost, type GitHostHome } from '../store/git-host.js'
 import { readDocs, type WorkspaceDoc } from '../dashboard/docs.js'
 import { collectQueue, type ProjectQueue } from '../dashboard/queue.js'
 import { collectSchedulers, type ProjectScheduler } from '../dashboard/scheduler-state.js'
@@ -241,8 +241,8 @@ export async function onRecentAgents(): Promise<RecentAgent[]> {
  *
  * The panels render `items` and ignore the rest. The browser's notifier is the caller that cannot:
  * it keeps a baseline of what was already waiting when the page opened, and a queue that came back
- * empty because the forge was unreachable is not a baseline — taking it for one announces the whole
- * backlog the moment the forge answers.
+ * empty because the git host was unreachable is not a baseline — taking it for one announces the whole
+ * backlog the moment the git host answers.
  */
 export async function onInterventions(): Promise<ProjectionRead<Intervention>> {
   return withProjects(buildInterventions)
@@ -346,12 +346,12 @@ export async function onFileContent(projectId: string, path: string, agentId?: s
   )
 }
 
-/** The project's page on its forge and the forge's name (#489, #1820), or null: no forge package, no remote there, or the relay. */
-export async function onForgeHome(projectId: string): Promise<ForgeHome | null> {
+/** The project's page on its git host and the git host's name (#489, #1820), or null: no git host package, no remote there, or the relay. */
+export async function onGitHostHome(projectId: string): Promise<GitHostHome | null> {
   const cwd = await resolveProjectPath(projectId)
   if (!cwd) return null
-  const forge = await projectForge(cwd).catch(() => undefined)
-  return (await forge?.home()) ?? null
+  const gitHost = await projectGitHost(cwd).catch(() => undefined)
+  return (await gitHost?.home()) ?? null
 }
 
 /**

@@ -72,8 +72,8 @@ export async function tickProject(repo: string, opts: { git?: GitRunner; log?: (
  * Whether a run on `driver` can start on this machine, asked before it spends a checkout: the
  * coding agent's CLI is installed and logged in (a problem when not: the session would die
  * before its first turn). What a dashboard's check hook runs, and what a person's run and the
- * tick refuse on. The forge is not probed: a project with no forge package runs fine, and one
- * whose forge cannot answer says so in the run's own log.
+ * tick refuse on. The git host is not probed: a project with no git host package runs fine, and one
+ * whose git host cannot answer says so in the run's own log.
  */
 export async function readyToRun(driver: DriverName, deps: { probe?: CliProbe; isRoot?: () => boolean } = {}): Promise<DriverReadiness> {
   const probe = deps.probe ?? probeCli

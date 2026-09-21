@@ -46,7 +46,7 @@ export interface CloudWorkResult {
   failed: { agentId: string; error: string }[]
 }
 
-/** Injectable seams so the pass is unit-testable off disk, off the network and off the forge. */
+/** Injectable seams so the pass is unit-testable off disk, off the network and off the git host. */
 export interface CloudWorkDeps {
   git?: GitRunner
   /** The branch's full PR history; a listing that fails must throw (default {@link prsForBranchOrThrow}). */

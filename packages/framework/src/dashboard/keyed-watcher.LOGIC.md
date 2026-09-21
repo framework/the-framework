@@ -4,7 +4,7 @@ The engine behind both notification feeds, the interventions [1] feed and the ac
 
 **User story**: the user configures a Discord webhook and is told when something new needs them or when an agent [2] starts or finishes; what already existed when the daemon started is never announced, and a repository the daemon cannot reach neither floods Discord later with everything it already held nor silences the other projects.
 
-**Problem**: the reads underneath a poll forgive their own failures, so a poll made while the forge is unreachable succeeds with an empty list. Taken as a baseline, that empty list would make the next good poll announce every pre-existing item as new; taken as "seen", it would hide nothing, since it saw nothing. The engine therefore separates two facts: which items a poll saw, and which projects it read completely.
+**Problem**: the reads underneath a poll forgive their own failures, so a poll made while the git host is unreachable succeeds with an empty list. Taken as a baseline, that empty list would make the next good poll announce every pre-existing item as new; taken as "seen", it would hide nothing, since it saw nothing. The engine therefore separates two facts: which items a poll saw, and which projects it read completely.
 
 ## Glossary
 
@@ -46,11 +46,11 @@ Only a project that a poll read whole earns a baseline, and it earns it after th
 
 #### Context
 
-**Problem**: a first poll that could not reach the forge must not make the next good one announce everything pre-existing as new.
+**Problem**: a first poll that could not reach the git host must not make the next good one announce everything pre-existing as new.
 
 #### Business logic
 
-When the scan of the registered projects or the projection over them fails, the poll yields no new items and no project earns a baseline: the baseline must come from a real read. The same holds for a poll that succeeds but reads no project whole, which is what a start-up without forge reach looks like from here.
+When the scan of the registered projects or the projection over them fails, the poll yields no new items and no project earns a baseline: the baseline must come from a real read. The same holds for a poll that succeeds but reads no project whole, which is what a start-up without git host reach looks like from here.
 
 ### Driven by the daemon's clock, one poll at a time
 

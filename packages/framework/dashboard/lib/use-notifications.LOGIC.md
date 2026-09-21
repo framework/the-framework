@@ -2,7 +2,7 @@ Fires a browser notification when something new appears in one of the dashboard'
 
 ## Context
 
-**User story**: the user leaves the dashboard open in a background tab. When an agent parks on a question, when a pull request lands for review, when work is left unpushed, or when an agent starts or finishes, the operating system shows a notification; clicking it opens the pull request on the forge, or brings the dashboard tab forward. What was already waiting when the tab was opened is not announced, so opening the dashboard never produces a burst of notifications about things the user already knows.
+**User story**: the user leaves the dashboard open in a background tab. When an agent parks on a question, when a pull request lands for review, when work is left unpushed, or when an agent starts or finishes, the operating system shows a notification; clicking it opens the pull request on the git host, or brings the dashboard tab forward. What was already waiting when the tab was opened is not announced, so opening the dashboard never produces a burst of notifications about things the user already knows.
 
 **Business logic story**: the daemon delivers the same two feeds to Discord on its own schedule, whether or not a dashboard is open. Both surfaces use the same rule for what counts as the same item and the same rule for what counts as already there, so a user with both enabled hears about the same things and never twice about one thing.
 
@@ -25,7 +25,7 @@ Fires a browser notification when something new appears in one of the dashboard'
 - **Turning the notifications off does not bank a backlog** - the feeds keep being absorbed while notifications are off, so turning them back on announces nothing retroactively.
 - **What an intervention notification says** - one item names the project, several are counted, and each line reads as a pull request, a question, or unpushed work.
 - **What an activity notification says** - an agent started or finished, named by what it is building.
-- **What a click does** - a pull request opens on the forge in a new tab, everything else brings the dashboard tab forward.
+- **What a click does** - a pull request opens on the git host in a new tab, everything else brings the dashboard tab forward.
 
 ## Business logic
 
@@ -62,7 +62,7 @@ These are the same identities the daemon's Discord delivery uses.
 
 #### Context
 
-**Problem**: everything already waiting when the user opens the dashboard would otherwise be announced as new. Counting the first read or two as the baseline is not enough: a page opened while the daemon cannot reach the forge sees an empty list, and the first read that does reach the forge would then announce every already-open pull request as new.
+**Problem**: everything already waiting when the user opens the dashboard would otherwise be announced as new. Counting the first read or two as the baseline is not enough: a page opened while the daemon cannot reach the git host sees an empty list, and the first read that does reach the git host would then announce every already-open pull request as new.
 
 #### Business logic
 
@@ -117,4 +117,4 @@ One new item titles the notification "Agent started · <project name>" or "Agent
 
 #### Business logic
 
-Clicking a notification about a pull request opens that pull request on the forge in a new tab. Every other notification brings the dashboard's own tab forward instead, since the question, the unpushed work and the agent [3] all live in the dashboard. When several items were announced together, the click follows the first of them. The notification closes on click either way.
+Clicking a notification about a pull request opens that pull request on the git host in a new tab. Every other notification brings the dashboard's own tab forward instead, since the question, the unpushed work and the agent [3] all live in the dashboard. When several items were announced together, the click follows the first of them. The notification closes on click either way.

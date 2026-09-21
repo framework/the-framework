@@ -9,7 +9,7 @@ import { pushBranchByName, pushCheckout } from './push.js'
 import { runCli } from './cli.js'
 
 // Pushing is the agent's last git step (#1820): the branch reaches origin, on a clean tree only.
-// What happens to the branch on the forge is another package's. Real git and a bare origin.
+// What happens to the branch on the git host is another package's. Real git and a bare origin.
 
 const git = nodeGitRunner()
 

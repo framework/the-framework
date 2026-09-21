@@ -1,11 +1,11 @@
-import { projectForge, type ForgeFor, type ForgeRequest } from '../store/forge.js'
+import { projectGitHost, type GitHostFor, type GitHostRequest } from '../store/git-host.js'
 import { cachedRead, invalidate, type Cached } from './cache.js'
 
 /**
- * The pull requests the dashboard reads (#1820), in one place, all through the project's forge
- * provider (`../store/forge.ts`): a branch's request, a branch's whole request history, and the
+ * The pull requests the dashboard reads (#1820), in one place, all through the project's git host
+ * provider (`../store/git-host.ts`): a branch's request, a branch's whole request history, and the
  * project's open requests. Reads only: opening and landing are `agent-handoff.ts`'s, through the
- * same provider. The framework runs no forge tool; a project with no forge package has no pull
+ * same provider. The framework runs no git host tool; a project with no git host package has no pull
  * requests, and every read here answers "none" for it.
  *
  * The shapes are the framework's own ({@link LinkedPr}, {@link OpenPr}), copied out of what the
@@ -17,7 +17,7 @@ import { cachedRead, invalidate, type Cached } from './cache.js'
 export interface LinkedPr {
   number: number
   url: string
-  /** OPEN / MERGED / CLOSED, as the forge reports it; UNKNOWN for a recorded request no live read confirmed. */
+  /** OPEN / MERGED / CLOSED, as the git host reports it; UNKNOWN for a recorded request no live read confirmed. */
   state: string
   title: string
   /** ISO creation time, when the read included it: what tells one agent's PR from a predecessor's. */
@@ -59,11 +59,11 @@ export type PrLookup = (cwd: string, branch?: string) => Promise<LinkedPr | unde
  */
 export type BranchPrLookup = (cwd: string, branch: string) => Promise<LinkedPr | undefined>
 
-/** Lists a checkout's open PRs; rejects when the forge could not answer. */
+/** Lists a checkout's open PRs; rejects when the git host could not answer. */
 export type PrLister = (cwd: string) => Promise<OpenPr[]>
 
 /** A provider's request as the framework keeps it: the state upper-cased, the head as the request's commit. */
-export function linkedPrOf(request: ForgeRequest): LinkedPr {
+export function linkedPrOf(request: GitHostRequest): LinkedPr {
   return {
     number: request.number,
     url: request.url,
@@ -75,7 +75,7 @@ export function linkedPrOf(request: ForgeRequest): LinkedPr {
 }
 
 /** A provider's open request as the interventions queue keeps it. */
-export function openPrOf(request: ForgeRequest): OpenPr {
+export function openPrOf(request: GitHostRequest): OpenPr {
   return {
     number: request.number,
     title: request.title,
@@ -92,31 +92,31 @@ export function openPrOf(request: ForgeRequest): OpenPr {
  * The newest request for a head *in any state* is what a single view would answer, so a session
  * whose prompt pins its branch name (`the-framework/triage-quick`) inherits a predecessor's
  * merged PR as its own. The list form keeps the whole history so {@link pickAgentPr} can decide
- * which entry, if any, belongs to the agent asking. Resolves `[]` when the project has no forge or
- * the forge could not answer — indistinguishable from "no PRs", which is what every caller would do
+ * which entry, if any, belongs to the agent asking. Resolves `[]` when the project has no git host or
+ * the git host could not answer — indistinguishable from "no PRs", which is what every caller would do
  * with a failure anyway.
  */
-export async function prsForBranch(cwd: string, branch: string, forge: ForgeFor = projectForge): Promise<LinkedPr[]> {
-  return prsForBranchOrThrow(cwd, branch, forge).catch((): LinkedPr[] => [])
+export async function prsForBranch(cwd: string, branch: string, gitHost: GitHostFor = projectGitHost): Promise<LinkedPr[]> {
+  return prsForBranchOrThrow(cwd, branch, gitHost).catch((): LinkedPr[] => [])
 }
 
 /**
- * {@link prsForBranch} for a caller about to *open* a PR (#1601): a listing the forge could not
+ * {@link prsForBranch} for a caller about to *open* a PR (#1601): a listing the git host could not
  * answer throws instead of reading as "no PRs", because "none" and "could not tell" must not look
  * alike there — the difference is a second draft PR on a branch that already has one. A project
- * with no forge has none, truthfully.
+ * with no git host has none, truthfully.
  */
-export async function prsForBranchOrThrow(cwd: string, branch: string, forge: ForgeFor = projectForge): Promise<LinkedPr[]> {
-  const source = await forge(cwd)
+export async function prsForBranchOrThrow(cwd: string, branch: string, gitHost: GitHostFor = projectGitHost): Promise<LinkedPr[]> {
+  const source = await gitHost(cwd)
   if (!source) return []
   const listed = await source.requests({ branch, state: 'all' })
   if (!listed.ok) throw new Error(listed.error)
   return listed.requests.map(linkedPrOf)
 }
 
-/** The newest PR of `branch`, in any state, or undefined when it has none or the forge cannot tell. */
-export async function prView(cwd: string, branch: string, forge: ForgeFor = projectForge): Promise<LinkedPr | undefined> {
-  return (await prsForBranch(cwd, branch, forge))[0]
+/** The newest PR of `branch`, in any state, or undefined when it has none or the git host cannot tell. */
+export async function prView(cwd: string, branch: string, gitHost: GitHostFor = projectGitHost): Promise<LinkedPr | undefined> {
+  return (await prsForBranch(cwd, branch, gitHost))[0]
 }
 
 /**
@@ -162,7 +162,7 @@ function branchPrsCacheKey(cwd: string, branch: string): string {
 /**
  * The PR that belongs to an agent, out of every PR its branch name has had (#1251/#1255).
  *
- * An OPEN PR always counts: a forge allows one open PR per head branch, so whatever is open on the
+ * An OPEN PR always counts: a git host allows one open PR per head branch, so whatever is open on the
  * run's branch is where its pushed commits land. A closed one counts only when it was created
  * after the agent started (`since`, the agent's `startedAt`) — the oldest such entry, which is the one
  * this agent's handoff opened. Anything older is a previous agent's PR wearing the same branch name,
@@ -186,16 +186,16 @@ export function pickAgentPr(prs: LinkedPr[], since?: string, order: 'first' | 'l
 }
 
 /**
- * A project's open PRs, through its forge. Unlike the other reads here it *rejects* when the forge
- * could not answer — no remote, not logged in, the forge unreachable — instead of resolving `[]`.
+ * A project's open PRs, through its git host. Unlike the other reads here it *rejects* when the git host
+ * could not answer — no remote, not logged in, the git host unreachable — instead of resolving `[]`.
  *
  * "No PRs are open" and "I could not look" are different answers, and its caller keeps a baseline
  * of what it has already announced (#1623): taking the second for the first makes the next
  * successful read announce every already-open PR as new. The caller decides what a failure costs;
- * it cannot decide what it never hears about. A project with no forge package has none open.
+ * it cannot decide what it never hears about. A project with no git host package has none open.
  */
-export async function openPrs(cwd: string, forge: ForgeFor = projectForge): Promise<OpenPr[]> {
-  const source = await forge(cwd)
+export async function openPrs(cwd: string, gitHost: GitHostFor = projectGitHost): Promise<OpenPr[]> {
+  const source = await gitHost(cwd)
   if (!source) return []
   const listed = await source.requests({ state: 'open' })
   if (!listed.ok) throw new Error(listed.error)

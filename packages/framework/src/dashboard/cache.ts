@@ -2,7 +2,7 @@
  * A read-through cache for the dashboard's slow reads (#1028).
  *
  * The dashboard polls. Every session view asks for its branch's PR, twice (the worktree bar and
- * the handoff summary), on every navigation and again every ten seconds — and a forge read costs
+ * the handoff summary), on every navigation and again every ten seconds — and a git host read costs
  * about 600ms against a local git read's ten. So the same answer was being bought over and over,
  * and the panel waited for it each time.
  *
@@ -53,7 +53,7 @@ export interface CacheOptions {
  * Read `key` through the cache, calling `load` when it is missing or stale.
  *
  * A failed load is not cached: it leaves whatever was there (a panel keeps showing the last PR it
- * knew about rather than dropping it because the forge hiccuped) and the next read tries again.
+ * knew about rather than dropping it because the git host hiccuped) and the next read tries again.
  */
 export async function cachedRead<T>(key: string, load: () => Promise<T>, options: CacheOptions = {}): Promise<Cached<T>> {
   const { ttlMs = 60_000, budgetMs = 150, now = Date.now } = options

@@ -104,7 +104,7 @@ export function App() {
 
   // The cross-project "needs you" queue (#632): open PRs to review. Polled here in the shell so
   // the sidebar badge and the Overview card share one poll. Slow cadence — PRs change rarely and
-  // each poll runs a forge read per project.
+  // each poll runs a git host read per project.
   const { value: interventionsRead } = usePolled<ProjectionRead<Intervention>>(onInterventions, EMPTY_INTERVENTIONS, 15000, [])
   // The queue itself for every panel; the read as a whole for the notifier, which also needs to know
   // which projects the poll actually reached before it calls anything "new" (#1625).

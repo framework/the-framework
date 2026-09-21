@@ -6,12 +6,12 @@ A bullet is a person's pick, and says what it was picked over. What the code doe
 in SPEC.md; a choice made while implementing is the implementer's judgment, not a
 decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 
-## The forge as a skill
+## The git host as a skill
 - GitHub is a skill: this package teaches an agent how to work with GitHub and declares the
-  one command the framework and the scheduler run for the forge
-  (`"framework": { "forge": "github" }`). `gh` runs in this package only; no other skill
-  names GitHub or `gh`. Another forge is another package answering the same command;
-  the framework and the scheduler name none. Picked over a forge adapter inside the
+  one command the framework and the scheduler run for the git host
+  (`"framework": { "git-host": "github" }`). `gh` runs in this package only; no other skill
+  names GitHub or `gh`. Another git host is another package answering the same command;
+  the framework and the scheduler name none. Picked over a git host adapter inside the
   branches package, which would have kept a request half in a skill about git.
 - Pushing is not this package's: the branches package pushes, and the agent, the framework
   and the scheduler compose push then open through the two declared commands. Picked over

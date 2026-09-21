@@ -1,6 +1,6 @@
 What the tests cover, for the "⋮" menu of an agent's action bar:
 
-- **One menu for the agent's actions** - a finished agent in a project whose forge names a page offers "Open on GitHub" (the forge's name being GitHub), "Open project folder", "Open in editor" and "Delete session" in the one menu.
+- **One menu for the agent's actions** - a finished agent in a project whose git host names a page offers "Open on GitHub" (the git host's name being GitHub), "Open project folder", "Open in editor" and "Delete session" in the one menu.
 - **Opening the folder addresses this agent** - the folder item asks the daemon to open the folder for this agent's id, whichever checkout that resolves to.
 - **The folder item names what it opens** - a finished agent whose checkout is gone reads "Open project folder" and never "Open session's folder"; one whose checkout was kept reads "Open session's folder".
 - **The resume command** - when the agent's events carry a driver session id, the id's first eight characters are visible in the menu, "Copy resume command" puts `mkdir -p '<directory>' && cd '<directory>' && claude --resume <session id>` on the clipboard, and the item then reads "Copied".

@@ -36,7 +36,7 @@ test('no command, an unknown command, a bad flag: the usage, exit 2', async () =
   assert.equal((await run('/r', ['requests', '--state', 'draft'])).code, 2)
 })
 
-test('requests: the flags become one gh listing, the rows come back as requests, and a gh that cannot answer is a forge-failed refusal', async () => {
+test('requests: the flags become one gh listing, the rows come back as requests, and a gh that cannot answer is a git-host-failed refusal', async () => {
   const asked: string[][] = []
   const gh: GhRunner = async args => {
     asked.push(args)
@@ -53,7 +53,7 @@ test('requests: the flags become one gh listing, the rows come back as requests,
 
   const failed = await run('/r', ['requests'], { gh: async () => Promise.reject(new Error('gh: not logged in')) })
   assert.equal(failed.code, 1)
-  assert.deepEqual(failed.out, { ok: false, reason: 'forge-failed', detail: 'gh: not logged in' })
+  assert.deepEqual(failed.out, { ok: false, reason: 'git-host-failed', detail: 'gh: not logged in' })
   assert.match(failed.err, /could not be read: gh: not logged in/)
 })
 
@@ -127,7 +127,7 @@ test('merge: a number, a draft marked ready first, then armed; not-open and merg
   assert.match(stuck.err, /could not be landed: Pull request is not mergeable/)
 })
 
-test('home: the project page from origin, with the forge named; no origin, or not GitHub, is no-remote', async () => {
+test('home: the project page from origin, with the git host named; no origin, or not GitHub, is no-remote', async () => {
   const home = await run('/r', ['home'], { git: async () => 'git@github.com:o/r.git\n' })
   assert.equal(home.code, 0)
   assert.deepEqual(home.out, { ok: true, url: 'https://github.com/o/r', name: 'GitHub' })

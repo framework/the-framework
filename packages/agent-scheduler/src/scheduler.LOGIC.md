@@ -52,7 +52,7 @@ The state and the schedule are read from the repository. The tick decides with: 
 
 #### Business logic
 
-The answer is `agent-driver`'s readiness for the coding agent named (problems: its CLI not found, or not logged in; a warning: running as root), and nothing more: the project's forge is not probed, since a project with no forge package runs fine, and one whose forge cannot answer says so in the run's own log. The tick asks it for Claude Code, the coding agent every scheduled run is on.
+The answer is `agent-driver`'s readiness for the coding agent named (problems: its CLI not found, or not logged in; a warning: running as root), and nothing more: the project's git host is not probed, since a project with no git host package runs fine, and one whose git host cannot answer says so in the run's own log. The tick asks it for Claude Code, the coding agent every scheduled run is on.
 
 ### The detached run
 

@@ -1,9 +1,9 @@
 import { readProvidedCommand, runPackageCommand } from '@gemstack/agent-data'
 
 /**
- * The project's forge (#1820), reached by declaration: whichever of the project's packages
- * declares `"framework": { "forge": "<command>" }` answers the pull requests, and this tool runs
- * that command the way the dashboard runs any provided command. The tool names no forge and no
+ * The project's git host (#1820), reached by declaration: whichever of the project's packages
+ * declares `"framework": { "git-host": "<command>" }` answers the pull requests, and this tool runs
+ * that command the way the dashboard runs any provided command. The tool names no git host and no
  * package: a project with none has no pull requests to read back and nothing to merge.
  *
  * Two questions this tool asks of it: which pull request a branch has, for the run's record, and
@@ -16,23 +16,23 @@ export interface BranchRequest {
   url: string
 }
 
-/** How merging a pull request went: armed on green, merged at once, watched by the forge package, or not at all. */
+/** How merging a pull request went: armed on green, merged at once, watched by the git host package, or not at all. */
 export type MergeOutcome = { outcome: 'auto-armed' | 'merged' | 'watching' } | { outcome: 'failed'; error: string }
 
-/** What a run asks of the forge; a test may hand in its own. */
-export interface Forge {
-  /** The newest pull request whose head is `branch`, open or closed; none when there is none, no forge, or the forge could not tell. */
+/** What a run asks of the git host; a test may hand in its own. */
+export interface GitHost {
+  /** The newest pull request whose head is `branch`, open or closed; none when there is none, no git host, or the git host could not tell. */
   requestOfBranch(repo: string, branch: string): Promise<BranchRequest | undefined>
   /** Land pull request `number`: armed to merge on green, or merged at once. */
   mergeRequest(repo: string, number: number): Promise<MergeOutcome>
 }
 
-const NO_FORGE = 'this project has no forge package'
+const NO_GIT_HOST = 'this project has no git host package'
 
-/** The forge the project declares, run as a command. */
-export const projectForge: Forge = {
+/** The git host the project declares, run as a command. */
+export const projectGitHost: GitHost = {
   async requestOfBranch(repo, branch) {
-    const command = await readProvidedCommand(repo, 'forge').catch(() => undefined)
+    const command = await readProvidedCommand(repo, 'git-host').catch(() => undefined)
     if (!command) return undefined
     const result = await runPackageCommand(repo, command, ['requests', '--branch', branch])
     if (!result.ok || !Array.isArray(result.output)) return undefined
@@ -41,11 +41,11 @@ export const projectForge: Forge = {
   },
 
   async mergeRequest(repo, number) {
-    const command = await readProvidedCommand(repo, 'forge').catch(() => undefined)
-    if (!command) return { outcome: 'failed', error: NO_FORGE }
+    const command = await readProvidedCommand(repo, 'git-host').catch(() => undefined)
+    if (!command) return { outcome: 'failed', error: NO_GIT_HOST }
     const result = await runPackageCommand(repo, command, ['merge', String(number)])
     if (!result.ok) return { outcome: 'failed', error: result.error }
     const outcome = (result.output as { outcome?: unknown } | null)?.outcome
-    return outcome === 'auto-armed' || outcome === 'merged' || outcome === 'watching' ? { outcome } : { outcome: 'failed', error: `the forge answered no outcome for pull request ${number}` }
+    return outcome === 'auto-armed' || outcome === 'merged' || outcome === 'watching' ? { outcome } : { outcome: 'failed', error: `the git host answered no outcome for pull request ${number}` }
   },
 }

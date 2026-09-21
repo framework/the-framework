@@ -41,7 +41,7 @@ Answers everything the dashboard reads about a project or an agent [1]: the agen
 - **Cross-project rollups** - the aggregated agent queue, the Overview, recent agents, interventions, open questions, activity, the dashboard page and every project's scheduler state, each built over every project the registry lists.
 - **The files of a checkout and their status** - every file git sees, and each file's untracked/modified/deleted status, from the agent's own checkout when an agent id is given.
 - **One file's diff, one file's content, and what the agent changed** - the diff of a changed file, the content of an unchanged one, and every changed file with its line counts, always read from the checkout's own git state.
-- **The project's page on its forge, and git status** - the project's page and the forge's name, as the forge provider answers them; the branch, dirty flag and linked pull request of the project or of one agent's checkout, filtered to that agent's lifetime.
+- **The project's page on its git host, and git status** - the project's page and the git host's name, as the git host provider answers them; the branch, dirty flag and linked pull request of the project or of one agent's checkout, filtered to that agent's lifetime.
 - **What an agent's handoff left behind** - the agent's own branch, as the project's branches provider answers it, plus the agent's pull request; an agent that recorded no branch has no handoff.
 - **The bridge's state** - the question a cloud session is parked on, where the picked answer stands, what the session has said, whether anything reached the bridge and how, the bridge token while the bridge is on, and the bridge browser's state.
 - **Reads about a relayed agent go to the device** - the reads that are about one agent's checkout are answered by the device that runs the agent, and an unreachable device answers the read's empty shape.
@@ -128,7 +128,7 @@ The surfaced documents are read at the project root in sidebar order (`dashboard
 
 #### Business logic
 
-Each rollup is built over every project the registry lists (the builders are `dashboard/overview.ts`, `dashboard/queue.ts`, `dashboard/scheduler-state.ts`, `dashboard/interventions.ts`, `dashboard/open-questions.ts`, `dashboard/activity.ts` and `dashboard/dashboard.ts`), and a registry that cannot be read means no projects. Recent agents carry the same annotations as the agent history. The interventions [17] and the activity feed report, beside their items, which projects were read whole: a project whose sources could not be read contributes no items, exactly like a project with nothing waiting, and the browser's notifier needs the difference, because a queue that came back empty only because the forge was unreachable is not a baseline to announce the whole backlog against later.
+Each rollup is built over every project the registry lists (the builders are `dashboard/overview.ts`, `dashboard/queue.ts`, `dashboard/scheduler-state.ts`, `dashboard/interventions.ts`, `dashboard/open-questions.ts`, `dashboard/activity.ts` and `dashboard/dashboard.ts`), and a registry that cannot be read means no projects. Recent agents carry the same annotations as the agent history. The interventions [17] and the activity feed report, beside their items, which projects were read whole: a project whose sources could not be read contributes no items, exactly like a project with nothing waiting, and the browser's notifier needs the difference, because a queue that came back empty only because the git host was unreachable is not a baseline to announce the whole backlog against later.
 
 ### The files of a checkout and their status
 
@@ -152,15 +152,15 @@ The files are every file git sees in the checkout, tracked and untracked, honori
 
 The diff is read from the agent's checkout when an agent id names one, else the project's. The file's status comes from the checkout's own git status, never from the caller, so a browser that claims a file is untracked cannot make the daemon read it as one; a path that is not a changed file, or is unsafe, answers nothing (the path rule is `dashboard/file-read.ts`'s: repository-relative, no parent segments, never inside `.git`). The content of an unchanged file answers nothing when the path is unsafe, resolves outside the checkout, or cannot be read. What the agent changed is every changed file in its checkout with its line counts, an empty list when nothing changed or there is no checkout.
 
-### The project's page on its forge, and git status
+### The project's page on its git host, and git status
 
 #### Context
 
-**User story**: the git status bar shows the branch, whether there are uncommitted changes, and the linked pull request; the project links to its page on the forge, labelled with the forge's name.
+**User story**: the git status bar shows the branch, whether there are uncommitted changes, and the linked pull request; the project links to its page on the git host, labelled with the git host's name.
 
 #### Business logic
 
-The project's page and the forge's name are what the project's forge provider answers for its `home` (`store/forge.ts`); nothing when the project is unknown, has no forge provider, the provider cannot name a page (no remote of its forge), or the project is on the relay. The git status is the project's, or one agent's checkout's when an agent id is given: that agent's branch and dirty state are the ones that actually belong to it. A read for an agent is filtered to the agent's lifetime, derived from its id, so an agent on a reused branch does not show a predecessor's merged pull request as its own. Not a repository, or no checkout, answers nothing.
+The project's page and the git host's name are what the project's git host provider answers for its `home` (`store/git-host.ts`); nothing when the project is unknown, has no git host provider, the provider cannot name a page (no remote of its git host), or the project is on the relay. The git status is the project's, or one agent's checkout's when an agent id is given: that agent's branch and dirty state are the ones that actually belong to it. A read for an agent is filtered to the agent's lifetime, derived from its id, so an agent on a reused branch does not show a predecessor's merged pull request as its own. Not a repository, or no checkout, answers nothing.
 
 ### What an agent's handoff left behind
 

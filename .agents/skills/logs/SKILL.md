@@ -41,7 +41,7 @@ A ticket, or a queue entry that links one, may have been worked before. A `stopp
   "driver": "claude-code",
   "model": "opus",
   "branch": "agent-2026-09-08T18-14-30-111Z",
-  "pr": { "number": 1765, "url": "https://forge.example/org/repo/pull/1765" },
+  "pr": { "number": 1765, "url": "https://example.com/org/repo/pull/1765" },
   "ticket": "tickets/2026-09-01_some-ticket.md",
   "cost": 0.62
 }

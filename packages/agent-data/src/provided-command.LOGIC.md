@@ -1,14 +1,14 @@
-Which of a project's installed packages provides one kind of The Framework's data (the tickets, the agent queue, the runs, the checkouts, the forge), and how such a package's command is run to read it. Neither The Framework nor the scheduler names a package: a package says in its own `package.json` what it provides, and when two installed packages say the same thing, the project's own `package.json` says which one it takes.
+Which of a project's installed packages provides one kind of The Framework's data (the tickets, the agent queue, the runs, the checkouts, the git host), and how such a package's command is run to read it. Neither The Framework nor the scheduler names a package: a package says in its own `package.json` what it provides, and when two installed packages say the same thing, the project's own `package.json` says which one it takes.
 
 ## Context
 
-**User story**: a project depends on the `tickets` skill's package; the dashboard shows the project's tickets without knowing the word "tickets": the package declares that its `tickets` command answers that kind of data, and the dashboard runs it. A project that installs both a GitHub package and a GitLab package, each declaring it provides the forge, sees a red banner naming both and the one line to write in its `package.json`; once the line names one, that one provides the forge and the banner is gone.
+**User story**: a project depends on the `tickets` skill's package; the dashboard shows the project's tickets without knowing the word "tickets": the package declares that its `tickets` command answers that kind of data, and the dashboard runs it. A project that installs both a GitHub package and a GitLab package, each declaring it provides the git host, sees a red banner naming both and the one line to write in its `package.json`; once the line names one, that one provides the git host and the banner is gone.
 
 **Problem**: with two packages declaring the same kind, taking the first in dependency order silently makes the project's behaviour depend on the order of a JSON file nobody reads for that.
 
 ## Glossary
 
-[1] kind: one sort of The Framework's data a package may provide: `tickets`, `queue`, `runs`, `branches`, `forge`. A kind is a word both sides agree on; The Framework knows the kinds, never the packages.
+[1] kind: one sort of The Framework's data a package may provide: `tickets`, `queue`, `runs`, `branches`, `git-host`. A kind is a word both sides agree on; The Framework knows the kinds, never the packages.
 [2] provided command: the command a package declares, in its own `package.json` under `"framework": { "<kind>": "<command>" }`, naming one of its own `bin` entries, as answering one kind [1] for the project.
 [3] the project's line: the entry in the project's own root `package.json`, `"framework": { "<kind>": "<package name>" }`, naming which installed package provides a kind [1] when several declare it.
 

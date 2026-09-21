@@ -1,8 +1,8 @@
-A read-through cache for the dashboard's slow reads: the pull request facts that come from the project's forge provider (`pull-requests.ts`). A fact that is already known is answered at once and refreshed behind the caller once it is older than its trust window; a fact that is not known yet is fetched once for everyone asking and waited for only briefly, after which the caller is told the answer is still pending; a fetch that fails never erases the last good answer. The cache lives in the daemon's memory, so a daemon restart starts cold.
+A read-through cache for the dashboard's slow reads: the pull request facts that come from the project's git host provider (`pull-requests.ts`). A fact that is already known is answered at once and refreshed behind the caller once it is older than its trust window; a fact that is not known yet is fetched once for everyone asking and waited for only briefly, after which the caller is told the answer is still pending; a fetch that fails never erases the last good answer. The cache lives in the daemon's memory, so a daemon restart starts cold.
 
 ## Context
 
-**User story**: the user opens an agent [1] in the dashboard and sees the agent's branch and its pull request in the git status bar and in the handoff [2] summary of its agent view [3], and the same row on project home [4]; the page re-reads those rows every few seconds. Reading a pull request is a run of the forge provider's command, hundreds of milliseconds where the git facts beside it take around ten, so without this cache every panel would wait on the forge on every poll and the same answer would be bought several times over.
+**User story**: the user opens an agent [1] in the dashboard and sees the agent's branch and its pull request in the git status bar and in the handoff [2] summary of its agent view [3], and the same row on project home [4]; the page re-reads those rows every few seconds. Reading a pull request is a run of the git host provider's command, hundreds of milliseconds where the git facts beside it take around ten, so without this cache every panel would wait on the git host on every poll and the same answer would be bought several times over.
 
 **Problem**: a caller deciding whether to offer "Open PR" must never mistake "not known yet" for "there is no pull request", or it opens a second one. The cache therefore answers with two facts: the value, and whether a read is still running with no value known yet.
 
@@ -16,7 +16,7 @@ A read-through cache for the dashboard's slow reads: the pull request facts that
 ## Business logic — TL;DR
 
 - **A known answer is served at once and refreshed behind the caller** - once a value has been read it is returned immediately, and when it is older than its trust window (60 seconds unless the caller sets another) a refresh runs in the background, so the cost of staying current is never paid by the caller that happens to ask.
-- **Concurrent asks share one fetch** - while a value is being fetched, every caller asking for the same key joins that fetch instead of starting another, so two panels and a poll do not become three forge processes.
+- **Concurrent asks share one fetch** - while a value is being fetched, every caller asking for the same key joins that fetch instead of starting another, so two panels and a poll do not become three git host processes.
 - **A cold ask waits briefly, then reports pending** - the first ask for an unknown value waits 150 ms (unless the caller sets another budget) for the fetch, and past that the caller is told the value is pending while the fetch finishes for the next ask.
 - **A failed fetch keeps the last good value** - a fetch that fails changes nothing that was known and is retried on the next ask, and a cold fetch that fails leaves the caller with a pending answer rather than a false "none".
 - **Forgetting a key** - after an action that changes the answer (opening or merging a pull request), the caller drops the key so the next ask fetches afresh.
@@ -57,7 +57,7 @@ When nothing is known for the key, the ask starts the fetch (or joins the runnin
 
 #### Context
 
-**Problem**: a forge hiccup (a network blip, a rate limit) must not make a panel drop the pull request it was showing a second ago.
+**Problem**: a git host hiccup (a network blip, a rate limit) must not make a panel drop the pull request it was showing a second ago.
 
 #### Business logic
 

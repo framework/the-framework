@@ -5,12 +5,12 @@ import { listRequests } from './requests.js'
 import { openRequest, type OpenOutcome } from './open.js'
 import { mergeRequest } from './merge.js'
 import { watchAndMerge } from './merge-watch.js'
-import { FORGE_NAME, homeUrlFor } from './home.js'
+import { GIT_HOST_NAME, homeUrlFor } from './home.js'
 
 /**
  * The command line over the package (#1820): the same functions for an agent in a shell, and for
- * the framework and the scheduler, which run this command as the project's forge provider,
- * declared in package.json as `"framework": { "forge": "github" }`. One implementation, every
+ * the framework and the scheduler, which run this command as the project's git host provider,
+ * declared in package.json as `"framework": { "git-host": "github" }`. One implementation, every
  * surface a caller.
  *
  * The contract, the same as the other skills' commands: JSON on stdout, one line for a person on
@@ -85,7 +85,7 @@ export async function runCli(argv: string[], io: CliIo, deps: CliDeps = {}): Pro
       return 1
     }
     const detail = err instanceof Error ? err.message : String(err)
-    io.stdout(JSON.stringify({ ok: false, reason: 'forge-failed', detail }))
+    io.stdout(JSON.stringify({ ok: false, reason: 'git-host-failed', detail }))
     io.stderr(detail)
     return 1
   }
@@ -110,7 +110,7 @@ const COMMANDS: Record<string, Command> = {
       return await listRequests(cwd, { ...(values.branch ? { branch: values.branch } : {}), state, ...(values.since ? { since: values.since } : {}) }, gh)
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err)
-      throw new Refused({ ok: false, reason: 'forge-failed', detail }, `the pull requests could not be read: ${detail}`)
+      throw new Refused({ ok: false, reason: 'git-host-failed', detail }, `the pull requests could not be read: ${detail}`)
     }
   },
 
@@ -150,7 +150,7 @@ const COMMANDS: Record<string, Command> = {
     parse(args, {}, 0)
     const url = await homeUrlFor(cwd, git)
     if (!url) throw new Refused({ ok: false, reason: 'no-remote' }, 'no origin remote on GitHub')
-    return { ok: true, url, name: FORGE_NAME }
+    return { ok: true, url, name: GIT_HOST_NAME }
   },
 }
 

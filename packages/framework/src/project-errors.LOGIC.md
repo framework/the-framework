@@ -67,7 +67,7 @@ When that sync fails, the `data-sync` error is recorded with the sync's own erro
 
 #### Context
 
-**Business logic story**: a project installs both a GitHub package and a GitLab package, each declaring it provides the forge. Nothing in The Framework picks one by dependency order; the project must say.
+**Business logic story**: a project installs both a GitHub package and a GitLab package, each declaring it provides the git host. Nothing in The Framework picks one by dependency order; the project must say.
 
 #### Business logic
 

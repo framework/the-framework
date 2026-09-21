@@ -24,7 +24,7 @@ const worked = {
   hasRemote: true,
   pushed: false,
   merged: false,
-  forge: true,
+  gitHost: true,
 }
 
 // The same composition AgentView uses: the verdict and the next step in the action bar, the
@@ -192,17 +192,17 @@ describe('run handoff (#799)', () => {
     expect(screen.queryByText('Open PR')).toBeNull()
   })
 
-  test('with no forge package the last step is Push, and a pushed branch is where the handoff ends (#1820)', async () => {
-    onAgentHandoff.mockResolvedValue({ ...worked, forge: false })
+  test('with no git host package the last step is Push, and a pushed branch is where the handoff ends (#1820)', async () => {
+    onAgentHandoff.mockResolvedValue({ ...worked, gitHost: false })
     render(<Harness />)
     await waitFor(() => expect(screen.getByText('Push')).toBeTruthy())
     expect(screen.queryByText('Open PR')).toBeNull()
     fireEvent.click(screen.getByText('Push'))
     await waitFor(() => expect(sendPush).toHaveBeenCalledWith('p1', 'run-1'))
     cleanup()
-    onAgentHandoff.mockResolvedValue({ ...worked, forge: false, pushed: true })
+    onAgentHandoff.mockResolvedValue({ ...worked, gitHost: false, pushed: true })
     render(<Harness />)
-    await waitFor(() => expect(screen.getByText(/Pushed — no forge package/)).toBeTruthy())
+    await waitFor(() => expect(screen.getByText(/Pushed — no git host package/)).toBeTruthy())
     expect(screen.queryByText('Push')).toBeNull()
   })
 

@@ -3,8 +3,8 @@ import { currentBranch, isWorktreeRoot, projectRoot, worktreeBranch, worktreeCle
 
 /**
  * Pushing a branch to origin (#1820): the last git step of an agent's work, and the step before
- * whatever the project's forge package does with the branch. This package knows git and nothing
- * beyond it: the pull request, if the project has a forge, is another package's command.
+ * whatever the project's git host package does with the branch. This package knows git and nothing
+ * beyond it: the pull request, if the project has a git host, is another package's command.
  *
  * One rule before the push: the tree is clean, since what is pushed is what is committed, and
  * nothing is committed on the agent's behalf.

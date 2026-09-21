@@ -2,7 +2,7 @@ Renders the markdown agents [1] write — the project's surfaced `PLAN`/`TODO` d
 
 ## Context
 
-**Problem**: everything rendered here was written by a coding agent, not by the user; a renderer that turned it into HTML would let a prompt-injected reply run script or forge dashboard chrome. Building elements directly, and linking only to `http`/`https` targets, keeps the content inert.
+**Problem**: everything rendered here was written by a coding agent, not by the user; a renderer that turned it into HTML would let a prompt-injected reply run script or git host dashboard chrome. Building elements directly, and linking only to `http`/`https` targets, keeps the content inert.
 
 ## Glossary
 

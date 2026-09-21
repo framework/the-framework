@@ -45,7 +45,7 @@ function useAsyncValue<T>(
     const token = { live: true }
     liveRef.current = token
     // A switch normally shows nothing rather than the last target's data. `keepPrevious` opts out:
-    // the toolbar keeps its resolved header (branch/PR/forge) visible while the next one loads, so
+    // the toolbar keeps its resolved header (branch/PR/git host) visible while the next one loads, so
     // navigating between sessions updates it in place instead of blanking and popping (the flicker).
     if (!keepPrevious) setValue(initialRef.current)
     setLoaded(false)

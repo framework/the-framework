@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { ExternalLink, FolderOpen, Code } from 'lucide-react'
-import type { ForgeHome } from '../../src/index.js'
-import { onForgeHome } from '../rpc/reads.js'
+import type { GitHostHome } from '../../src/index.js'
+import { onGitHostHome } from '../rpc/reads.js'
 import { sendOpenInApp } from '../rpc/control.js'
 import { useLoaded } from '../lib/use-async.js'
 import { useAction } from '../lib/use-action.js'
@@ -16,7 +16,7 @@ import {
   DropdownMenuSeparator,
 } from './ui/dropdown-menu.js'
 
-// What you can do to a checkout: open it on the project's forge (#489), in the file manager or an editor
+// What you can do to a checkout: open it on the project's git host (#489), in the file manager or an editor
 // (#490), and serve it (#475). One component for both pages (#809) — the project home passes no
 // session and acts on the project's tree, a session passes its id and every action addresses its
 // own worktree instead. Opening a session in your editor is the whole point of a worktree, and
@@ -31,9 +31,9 @@ export function WorkspaceActions({
 }) {
   // The repo link is the project's either way: a session is a branch of that same repo, and its
   // branch may not be pushed anywhere yet. Its PR, when there is one, shows in the git status.
-  // keepPrevious: hold the forge icon while a new project's page loads, so it does not pop out and
+  // keepPrevious: hold the git host icon while a new project's page loads, so it does not pop out and
   // back and shove the icon row (within a project it is already stable, keyed on projectId).
-  const home = useLoaded<ForgeHome | null>(() => onForgeHome(projectId), null, [projectId], true)
+  const home = useLoaded<GitHostHome | null>(() => onGitHostHome(projectId), null, [projectId], true)
   const { busy, error, reset, run } = useAction()
 
   // `error` belongs to open(), not to the read, so clearing it on a switch is its own effect:

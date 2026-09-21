@@ -71,7 +71,7 @@ describe('TicketDetailPage (#1144)', () => {
 
   test('shows the issue link, date, and priority in that order below the description (#1144/#1265)', async () => {
     onTicket.mockResolvedValue(
-      ticket({ priority: '3', issue: { label: '#42', url: 'https://forge.example/org/repo/issues/42' }, summary: 'A short description.' }),
+      ticket({ priority: '3', issue: { label: '#42', url: 'https://example.com/org/repo/issues/42' }, summary: 'A short description.' }),
     )
     render(<TicketDetailPage projectId="p1" slug="2026-07-20_do-the-thing.md" />)
     const description = await screen.findByText('A short description.')
@@ -81,7 +81,7 @@ describe('TicketDetailPage (#1144)', () => {
     expect(order[0]).toBeLessThan(order[1] as number)
     expect(order[1]).toBeLessThan(order[2] as number)
     const link = screen.getByRole('link', { name: /#42/ })
-    expect(link.getAttribute('href')).toBe('https://forge.example/org/repo/issues/42')
+    expect(link.getAttribute('href')).toBe('https://example.com/org/repo/issues/42')
   })
 
   test('shows the date in the meta below the description (#1144/#1265)', async () => {

@@ -7,7 +7,7 @@ import { agentBranchName, attachCheckout, createCheckout, reclaimWorktree, workt
 import { findRun, readDiary, type AnyDiaryLine, type LogsDeps, type RunCard, type RunStatus } from '@gemstack/skill-logs'
 import { inboxPath, liveDir, LIVE_DIR, readLiveCard, readLiveDiary } from './live-card.js'
 import { markerCard, recordRun, schedulerMark, writeMarker, type SchedulerMark } from './records.js'
-import { projectForge, type Forge, type MergeOutcome } from './forge.js'
+import { projectGitHost, type GitHost, type MergeOutcome } from './git-host.js'
 import { acquireRunLock, isPidAlive, releaseRunLock } from './run-lock.js'
 
 /**
@@ -36,11 +36,11 @@ import { acquireRunLock, isPidAlive, releaseRunLock } from './run-lock.js'
  * fresh agent, a run of its own with its own record, works on the same branch from the prompt,
  * the first run's id after it. The first agent is told, in a line after its prompt, to open the
  * pull request without arming its merge; the follow-up ending done is when this process merges
- * it, through the project's forge (`forge.ts`). A follow-up that fails or is stopped leaves the
+ * it, through the project's git host (`git-host.ts`). A follow-up that fails or is stopped leaves the
  * request open, for a person.
  *
- * The pull request a run's branch has is read back the same way, through the forge the project
- * declares; a project with no forge package records none.
+ * The pull request a run's branch has is read back the same way, through the git host the project
+ * declares; a project with no git host package records none.
  */
 
 /** The detail a stopped run's record carries. */
@@ -88,8 +88,8 @@ export interface RunOptions {
   isAlive?: (pid: number) => boolean
   now?: () => Date
   git?: GitRunner
-  /** The project's forge; the one the project declares when absent. */
-  forge?: Forge
+  /** The project's git host; the one the project declares when absent. */
+  gitHost?: GitHost
   logs?: LogsDeps
   log?: (line: string) => void
 }
@@ -154,7 +154,7 @@ async function runOnce(repo: string, opts: RunOptions): Promise<RunOutcome> {
       ...modelOf(opts.model),
       continued: false,
       git,
-      forge: opts.forge ?? projectForge,
+      gitHost: opts.gitHost ?? projectGitHost,
       logs,
       log,
       clock,
@@ -181,8 +181,8 @@ export interface ResumeOptions {
   isAlive?: (pid: number) => boolean
   now?: () => Date
   git?: GitRunner
-  /** The project's forge; the one the project declares when absent. */
-  forge?: Forge
+  /** The project's git host; the one the project declares when absent. */
+  gitHost?: GitHost
   logs?: LogsDeps
   log?: (line: string) => void
 }
@@ -260,7 +260,7 @@ async function resumeOnce(repo: string, opts: ResumeOptions): Promise<{ outcome:
       continued: true,
       ...(sessionId !== undefined ? { resumeSessionId: sessionId } : {}),
       git,
-      forge: opts.forge ?? projectForge,
+      gitHost: opts.gitHost ?? projectGitHost,
       logs,
       log,
       clock,
@@ -274,7 +274,7 @@ async function resumeOnce(repo: string, opts: ResumeOptions): Promise<{ outcome:
 /**
  * The follow-up a run named, once the run ended done with a pull request: a fresh agent on the
  * run's branch, a run of its own, given the prompt and the first run's id. When it ends done the
- * first run's request is merged through the project's forge; otherwise the request stays open. A
+ * first run's request is merged through the project's git host; otherwise the request stays open. A
  * run that did not end done, or opened no request, has nothing to follow up.
  */
 async function followUp(repo: string, first: RunOutcome, then: string, opts: FollowUpContext): Promise<RunOutcome> {
@@ -285,14 +285,14 @@ async function followUp(repo: string, first: RunOutcome, then: string, opts: Fol
     id,
     branch: first.branch,
     driver: opts.nextDriver ? opts.nextDriver(id) : opts.driver,
-    ...pick(opts, ['model', 'host', 'pid', 'isAlive', 'now', 'git', 'forge', 'logs', 'log']),
+    ...pick(opts, ['model', 'host', 'pid', 'isAlive', 'now', 'git', 'gitHost', 'logs', 'log']),
   })
   if (next.status !== 'done') return { ...first, then: next }
-  return { ...first, then: { ...next, merge: await (opts.forge ?? projectForge).mergeRequest(repo, first.pr.number) } }
+  return { ...first, then: { ...next, merge: await (opts.gitHost ?? projectGitHost).mergeRequest(repo, first.pr.number) } }
 }
 
 /** What a follow-up run shares with the run before it: where it runs and how, never what it is for. */
-type FollowUpContext = Pick<RunOptions, 'driver' | 'nextDriver' | 'model' | 'host' | 'pid' | 'isAlive' | 'now' | 'git' | 'forge' | 'logs' | 'log'>
+type FollowUpContext = Pick<RunOptions, 'driver' | 'nextDriver' | 'model' | 'host' | 'pid' | 'isAlive' | 'now' | 'git' | 'gitHost' | 'logs' | 'log'>
 
 function pick<T extends object, K extends keyof T>(from: T, keys: readonly K[]): Partial<Pick<T, K>> {
   const picked: Partial<Pick<T, K>> = {}
@@ -312,7 +312,7 @@ interface SessionRun {
   continued: boolean
   resumeSessionId?: string
   git: GitRunner
-  forge: Forge
+  gitHost: GitHost
   logs: LogsDeps
   log: (line: string) => void
   clock: () => string
@@ -395,9 +395,9 @@ async function sessionToEnd(repo: string, run: SessionRun, dir: string, inbox: s
       }
 
       // Where the work ended up: the agent renames its branch itself, and the pull request it
-      // opened, if any, is read back off the branch through the project's forge.
+      // opened, if any, is read back off the branch through the project's git host.
       branch = (await worktreeBranch(run.checkout.path, run.git).catch(() => undefined)) ?? run.checkout.branch
-      pr = await run.forge.requestOfBranch(repo, branch).catch(() => undefined)
+      pr = await run.gitHost.requestOfBranch(repo, branch).catch(() => undefined)
       const live = driverSession.log
       if (!live) break
       await live.patch({ branch, ...(pr ? { pr } : {}) })

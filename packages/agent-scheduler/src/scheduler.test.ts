@@ -90,7 +90,7 @@ test('a resumed run continues on the tool its record names, and a Codex run with
         return new FakeDriver({ turns: [{ text: turn }], sessionId: 's-codex' }).start(opts)
       },
     })
-    const first = await runCommand(repo, { prompt: 'Read the docs', driver: codex('Read.'), host: 'this-box', pid: 4242, now: () => NOW, forge: { requestOfBranch: async () => undefined, mergeRequest: async () => ({ outcome: 'failed', error: 'none' }) } })
+    const first = await runCommand(repo, { prompt: 'Read the docs', driver: codex('Read.'), host: 'this-box', pid: 4242, now: () => NOW, gitHost: { requestOfBranch: async () => undefined, mergeRequest: async () => ({ outcome: 'failed', error: 'none' }) } })
     assert.equal(first.status, 'done')
     const asked: string[] = []
     const second = await resumeProject(repo, { id: first.id, text: 'And the tests?' }, { driverFor: name => { asked.push(name); return codex('Read too.') } })
@@ -108,7 +108,7 @@ test('a spawned run is told its tool, and its model only when it has one', () =>
   assert.deepEqual(runArgs({ id: 'r1', command: 'work-queue', prompt: '/work-queue', then: '/post-merge-cleanup' }), ['run', '/work-queue', '--id', 'r1', '--command', 'work-queue', '--then', '/post-merge-cleanup'])
 })
 
-test('ready to run: the coding agent\'s problems stop a run; nothing else is probed, the forge least of all', async () => {
+test('ready to run: the coding agent\'s problems stop a run; nothing else is probed, the git host least of all', async () => {
   const notRoot = () => false
   const probed: string[] = []
   const answers = (loggedIn: boolean) => async (bin: string, args: readonly string[]) => {

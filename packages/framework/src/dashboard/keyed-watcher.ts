@@ -73,7 +73,7 @@ export interface KeyedWatcherOptions<T> {
  * Watch a projection and hand each poll's new items to `onNew`. A project's first *whole* read only
  * seeds that project's baseline. Forgiving — a failed project scan or projection just yields no new
  * items that cycle, and earns no baseline: the baseline must come from a real read, or a first poll
- * that could not reach the forge would make the next good one announce everything pre-existing as new.
+ * that could not reach the git host would make the next good one announce everything pre-existing as new.
  *
  * Owns no timer (E4): the daemon's one clock calls {@link KeyedWatcher.poll}, so the cadence is
  * declared where every other background job's is.

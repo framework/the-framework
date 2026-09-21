@@ -15,7 +15,7 @@ The Overview [1], the dashboard's landing page shown while no project is selecte
 ## Business logic — TL;DR
 
 - **The board's order** - onboarding checklist (until dismissed), the quota card, then the "Human Queue" beside the "Agents" card stacked on the cards the installed packages declare (`WidgetCards.tsx`, in their declared order) stacked on the "Scheduler" card.
-- **The Human Queue** - the interventions across every project, three kinds of row: "Awaiting" opens the agent parked on a gate, "Unpushed" opens the agent whose commits never left the machine, and a pull request row opens it on the forge; "AI doesn't need you." when empty.
+- **The Human Queue** - the interventions across every project, three kinds of row: "Awaiting" opens the agent parked on a gate, "Unpushed" opens the agent whose commits never left the machine, and a pull request row opens it on the git host; "AI doesn't need you." when empty.
 - **Dismissing the checklist** - hides it on the Overview only; the Settings page keeps it.
 
 ## Business logic
@@ -41,7 +41,7 @@ From top to bottom: the onboarding checklist while it is not dismissed (`Onboard
 The card is titled "Human Queue", with a count badge when there is at least one item, and described as "Agents awaiting your approval, review, or input". With nothing to clear it reads "AI doesn't need you.". Each row shows its title and, at the right, its project's name, and is one of three kinds:
 - "Awaiting": an agent [4] paused on a gate [5]. The tooltip reads "Open the agent to answer" and the click opens that agent's page.
 - "Unpushed": a finished agent whose branch holds commits that were never pushed. The row adds "1 commit" or "N commits" when the count is known and above zero, and says nothing about commits otherwise rather than a contradictory "0 commits". The tooltip reads "Open the session: work on <branch> was never pushed" and the click opens that agent's page.
-- A pull request: "#<number>" then its title; the row is a link that opens the pull request on the forge in a new tab, with the tooltip "Open PR #<number>".
+- A pull request: "#<number>" then its title; the row is a link that opens the pull request on the git host in a new tab, with the tooltip "Open PR #<number>".
 An "Awaiting" or "Unpushed" row that somehow names no agent opens the project instead of doing nothing.
 
 ### Dismissing the checklist

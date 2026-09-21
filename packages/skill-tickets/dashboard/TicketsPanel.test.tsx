@@ -173,14 +173,14 @@ describe('TicketsPanel (#697/#1144)', () => {
     render(
       <TicketsPanel
         projectId="p1"
-        tickets={[ticket({ issue: { label: '#42', url: 'https://forge.example/org/repo/issues/42' } })]}
+        tickets={[ticket({ issue: { label: '#42', url: 'https://example.com/org/repo/issues/42' } })]}
         loaded
         onOpen={onOpen}
        
       />,
     )
     const link = await screen.findByRole('link', { name: /#42/ })
-    expect(link.getAttribute('href')).toBe('https://forge.example/org/repo/issues/42')
+    expect(link.getAttribute('href')).toBe('https://example.com/org/repo/issues/42')
     // A sibling of the row's button, not a child: clicking the link must not open the detail page.
     fireEvent.click(link)
     expect(onOpen).not.toHaveBeenCalled()
@@ -200,7 +200,7 @@ describe('TicketsPanel (#697/#1144)', () => {
             uncertainty: 4,
             priority: '7',
             date: twoDaysAgo,
-            issue: { label: '#42', url: 'https://forge.example/org/repo/issues/42' },
+            issue: { label: '#42', url: 'https://example.com/org/repo/issues/42' },
           }),
         ]}
         loaded

@@ -19,7 +19,7 @@ Everything the daemon runs in the background beside serving the dashboard, wired
 ## Business logic — TL;DR
 
 - **Four jobs on one clock** - the data sync and the Discord watchers every minute, the cloud scratch sweep hourly, cloud work adoption every ten minutes; all take the start-up tick [5].
-- **The data sync** - every minute, every project's `agent-data` branch is converged with the remote in one pull through the shared branch library, and the project's "data-sync" error is set by the failure or cleared by the success.
+- **The data sync** - every minute, every project's `agent-data` branch is converged with the remote in one pull through the shared branch library, and the project's "data-sync" error is set by the failure or cleared by the success; on the same turn the project's providers are checked, and its "provider" error set with one line per kind of data whose provider is unsettled (two packages declare it and the project's `package.json` names none, or names one that does not), or cleared.
 - **The Discord watchers** - two watchers, interventions [7] and activity, exist only when a webhook is configured, post only when the preferences allow the category at posting time, seed their baseline on their first poll so nothing old is announced, and are rebuilt whenever a credential is saved from the dashboard.
 - **What the daemon can ask of the services** - reload Discord, and quiesce: stop the clock after the turn in flight, then every job.
 
@@ -50,7 +50,7 @@ Every job takes the start-up tick. Each job reads the preference [6] that gates 
 
 #### Business logic
 
-Every minute, for every registered project in turn, the daemon converges the project's `agent-data` branch [2] with the remote in one pull through the shared branch library (`agent-data`'s), which creates the branch's checkout when there is none. Anything a failed cycle left local is carried out. The daemon knows nothing of what is on the branch: the `tickets` link at a project's root and the queue file's seed are each skill's own setup, no longer the daemon's. A success clears the project's "data-sync" error unconditionally, so the error lives exactly as long as the condition and is gone at the next tick after the user fixes the remote; a failure logs "[framework] data sync: <error>" and sets that error for the dashboard to show.
+Every minute, for every registered project in turn, the daemon converges the project's `agent-data` branch [2] with the remote in one pull through the shared branch library (`agent-data`'s), which creates the branch's checkout when there is none. Anything a failed cycle left local is carried out. The daemon knows nothing of what is on the branch: the `tickets` link at a project's root and the queue file's seed are each skill's own setup, no longer the daemon's. A success clears the project's "data-sync" error unconditionally, so the error lives exactly as long as the condition and is gone at the next tick after the user fixes the remote; a failure logs "[framework] data sync: <error>" and sets that error for the dashboard to show. On the same turn the project's providers are checked (`store/provided.ts`): for each kind of data The Framework reads through a provider, the shared library says whether the provider is unsettled; the project's "provider" error is set with one line per unsettled kind, in the library's words, or cleared when every kind is settled.
 
 ### The Discord watchers
 

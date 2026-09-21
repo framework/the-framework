@@ -29,3 +29,16 @@ export {
   type BranchFileFs,
   type BranchReader,
 } from './file-branch.js'
+export {
+  projectPackages,
+  packageBins,
+  readManifest,
+  lookupProvidedCommand,
+  readProvidedCommand,
+  runPackageCommand,
+  type PackageManifest,
+  type ProjectPackage,
+  type ProvidedCommand,
+  type ProvidedCommandLookup,
+  type PackageCommandResult,
+} from './provided-command.js'

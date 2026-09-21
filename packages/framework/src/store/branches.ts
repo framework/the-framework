@@ -1,4 +1,4 @@
-import { readProvidedCommand, runPackageCommand, type ProvidedCommand } from '../project-widgets.js'
+import { readProvidedCommand, runPackageCommand, type ProvidedCommand } from '@gemstack/agent-data'
 import { isRunId } from './runs.js'
 
 /**

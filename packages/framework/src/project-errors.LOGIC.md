@@ -1,4 +1,4 @@
-Keeps, per project [1], the states a sweep [2] of the daemon finds that the user must fix and can only fix if told: one slot per project and kind of error, recorded by the sweep that finds it and cleared by the same sweep the moment the state is good again, so the dashboard can show a red dot on the project and a banner on its page. The only kind today is `data-sync`: the `agent-data` branch [3] cannot converge with the remote. The record lives in memory only: every sweep re-evaluates on its own cadence, so a restarted daemon re-learns each error within a tick [4] and no stale record outlives the condition that raised it.
+Keeps, per project [1], the states a sweep [2] of the daemon finds that the user must fix and can only fix if told: one slot per project and kind of error, recorded by the sweep that finds it and cleared by the same sweep the moment the state is good again, so the dashboard can show a red dot on the project and a banner on its page. Two kinds: `data-sync`, the `agent-data` branch [3] cannot converge with the remote; `provider`, which package provides a kind of the project's data is unsettled, because two installed packages declare it and the project's `package.json` names none, or names one that does not declare it. The record lives in memory only: every sweep re-evaluates on its own cadence, so a restarted daemon re-learns each error within a tick [4] and no stale record outlives the condition that raised it.
 
 ## Context
 
@@ -19,6 +19,7 @@ Keeps, per project [1], the states a sweep [2] of the daemon finds that the user
 - **Cleared the moment it is good** - the sweep that found an error clears it as soon as the condition is gone; clearing what was never recorded does nothing; a report after a clear starts its own clock.
 - **What the dashboard shows** - a project's errors, oldest first: a red dot in the project list, and on project home one banner per error.
 - **The data-sync error** - set by the per-project data sync when the `agent-data` branch cannot converge with the remote, cleared unconditionally when a sync succeeds.
+- **The provider error** - set by the per-project provider check, on the data sync's clock, with one line per unsettled kind of data in the shared library's words; cleared when every kind is settled.
 
 ## Business logic
 
@@ -61,3 +62,13 @@ A project's errors are listed oldest first. The dashboard reads them from the pr
 #### Business logic
 
 When that sync fails, the `data-sync` error is recorded with the sync's own error text, and the same text goes to the daemon's log as "[framework] data sync: <error>". When the sync succeeds, the error is cleared unconditionally, so it lives exactly as long as the condition: the next tick [4] after the user fixes the remote, it is gone. Its headline in the dashboard is "Not syncing with the remote".
+
+### The provider error
+
+#### Context
+
+**Business logic story**: a project installs both a GitHub package and a GitLab package, each declaring it provides the forge. Nothing in The Framework picks one by dependency order; the project must say.
+
+#### Business logic
+
+On the data sync's clock, for every kind of data The Framework reads through a provider, the daemon asks the shared library whether the provider is unsettled. When any kind is, the `provider` error is recorded with one line per such kind, as the library words it: "<n> packages provide <kind>: <names>; name one under \"framework\" in package.json", or "package.json names <name> for <kind>, which does not provide it; the providers are <names>". When every kind is settled the error is cleared. Its headline in the dashboard is "Unsettled: which package provides the data".

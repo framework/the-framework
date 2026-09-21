@@ -12,8 +12,13 @@
  * outlive the condition that raised it.
  */
 
-/** What went wrong, by kind: the dashboard picks its wording from this, the message carries the detail. */
-export type ProjectErrorCode = 'data-sync'
+/**
+ * What went wrong, by kind: the dashboard picks its wording from this, the message carries the
+ * detail. `data-sync`: the data branch cannot converge with the remote. `provider`: which package
+ * provides a kind of the project's data is unsettled (#1820): several declare it and the project's
+ * package.json names none, or names one that does not.
+ */
+export type ProjectErrorCode = 'data-sync' | 'provider'
 
 export interface ProjectError {
   code: ProjectErrorCode

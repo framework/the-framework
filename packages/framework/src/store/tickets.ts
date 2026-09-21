@@ -1,4 +1,4 @@
-import { readProvidedCommand, runPackageCommand, type ProvidedCommand } from '../project-widgets.js'
+import { readProvidedCommand, runPackageCommand, type ProvidedCommand } from '@gemstack/agent-data'
 
 /**
  * The tickets, as the framework reads them (#1774). The framework keeps no ticket and imports no

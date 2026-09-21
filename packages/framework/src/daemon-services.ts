@@ -12,6 +12,7 @@ import type { ProjectErrors } from './project-errors.js'
 import { startCloudScratchSweep } from './cloud-scratch-refs.js'
 import { adoptCloudWork, startCloudWorkAdoption } from './cloud-work.js'
 import type { ProjectSummary } from './dashboard/projects.js'
+import { providerProblems } from './store/provided.js'
 
 /**
  * Everything the daemon runs in the background beside serving the dashboard: the two Discord
@@ -79,6 +80,19 @@ export async function syncProjectData(path: string, errors: ProjectErrors, log: 
     log(`[framework] data sync: ${result.error}`)
     errors.set(path, 'data-sync', result.error)
   }
+}
+
+/**
+ * One project's provider check (#1820), on the data sync's clock: a kind of the project's data
+ * that packages declare but none is settled to provide (several declare it and the project's
+ * package.json names none, or names one that does not declare it) is the project's `provider`
+ * error, every such kind on its own line; every kind settled clears it. The framework never picks
+ * the first declarer silently: the project says, or nothing provides and the banner says why.
+ */
+export async function checkProviders(path: string, errors: ProjectErrors): Promise<void> {
+  const problems = await providerProblems(path)
+  if (problems.length === 0) errors.clear(path, 'provider')
+  else errors.set(path, 'provider', problems.join('\n'))
 }
 
 /** The registered projects as dashboard summaries. */
@@ -203,8 +217,10 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
         name: 'data sync',
         every: 2,
         run: async () => {
-          for (const project of await projects().catch((): ProjectSummary[] => []))
+          for (const project of await projects().catch((): ProjectSummary[] => [])) {
             await syncProjectData(project.path, deps.projectErrors, log)
+            await checkProviders(project.path, deps.projectErrors)
+          }
         },
       },
       // The watched things change slowly and a poll costs a read per project. Their first turn is

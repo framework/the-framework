@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { readProvidedCommand } from '../project-widgets.js'
+import { readProvidedCommand } from '@gemstack/agent-data'
 import { parseRunCard, providedRuns } from './runs.js'
 
 // The finished-runs contract (#1774): a project's package declares `"framework": { "runs": "<command>" }`
@@ -52,16 +52,15 @@ async function project(deps: Record<string, Record<string, unknown>>): Promise<s
 const calls = async (root: string, pkg: string): Promise<string[]> =>
   (await readFile(join(root, 'node_modules', pkg, 'calls.log'), 'utf8').catch(() => '')).split('\n').filter(Boolean)
 
-test('the runs provider is the first dependency that declares it, naming one of its own commands; none declares it, none provides', async () => {
+test('the runs provider is the dependency that declares it, naming one of its own commands; none declares it, none provides', async () => {
   const root = await project({
     plain: { bin: { plain: 'provider.cjs' } },
     'wrong-bin': { bin: { a: 'provider.cjs' }, framework: { runs: 'b' } },
-    first: { bin: { records: 'provider.cjs' }, framework: { runs: 'records' } },
-    second: { bin: { other: 'provider.cjs' }, framework: { runs: 'other' } },
+    logs: { bin: { records: 'provider.cjs' }, framework: { runs: 'records' } },
   })
   try {
     const found = await readProvidedCommand(root, 'runs')
-    assert.equal(found?.package, 'first', 'package.json order: a declaration naming no command of the package is skipped')
+    assert.equal(found?.package, 'logs', 'a declaration naming no command of the package is skipped')
     assert.equal(found?.name, 'records')
     assert.equal(await readProvidedCommand(root, 'tickets'), undefined, 'another kind: nobody declares it')
     const none = await project({ plain: { bin: { plain: 'provider.cjs' } } })

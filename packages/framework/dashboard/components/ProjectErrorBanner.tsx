@@ -12,6 +12,8 @@ export function projectErrorTitle(code: ProjectErrorCode): string {
   switch (code) {
     case 'data-sync':
       return 'Not syncing with the remote'
+    case 'provider':
+      return 'Unsettled: which package provides the data'
   }
 }
 

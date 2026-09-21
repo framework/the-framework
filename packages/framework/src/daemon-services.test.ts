@@ -1,11 +1,11 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { syncProjectData } from './daemon-services.js'
+import { checkProviders, syncProjectData } from './daemon-services.js'
 import { projectErrorStore } from './project-errors.js'
 
 const git = promisify(execFile)
@@ -41,5 +41,34 @@ test('a project whose data branch cannot reach a remote carries a data-sync erro
   } finally {
     await rm(project, { recursive: true, force: true })
     await rm(remote, { recursive: true, force: true })
+  }
+})
+
+/**
+ * The provider error (#1820): two packages declaring the same kind with no line in the project's
+ * package.json is a state the user must fix, shown as the project's `provider` error; the line
+ * clears it at the next turn.
+ */
+test('a project where two packages provide the same kind carries a provider error until its package.json names one (#1820)', async () => {
+  const project = await mkdtemp(join(tmpdir(), 'framework-providers-'))
+  try {
+    const manifest = (framework?: Record<string, string>) => JSON.stringify({ devDependencies: { a: '*', b: '*' }, ...(framework ? { framework } : {}) })
+    await writeFile(join(project, 'package.json'), manifest())
+    for (const name of ['a', 'b']) {
+      await mkdir(join(project, 'node_modules', name), { recursive: true })
+      await writeFile(join(project, 'node_modules', name, 'package.json'), JSON.stringify({ name, bin: { [name]: 'cmd.cjs' }, framework: { tickets: name } }))
+      await writeFile(join(project, 'node_modules', name, 'cmd.cjs'), '')
+    }
+    const errors = projectErrorStore()
+    await checkProviders(project, errors)
+    const [unsettled] = errors.list(project)
+    assert.equal(unsettled?.code, 'provider')
+    assert.equal(unsettled?.message, '2 packages provide tickets: a, b; name one under "framework" in package.json')
+
+    await writeFile(join(project, 'package.json'), manifest({ tickets: 'b' }))
+    await checkProviders(project, errors)
+    assert.deepEqual(errors.list(project), [])
+  } finally {
+    await rm(project, { recursive: true, force: true })
   }
 })

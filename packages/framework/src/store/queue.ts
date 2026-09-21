@@ -1,4 +1,4 @@
-import { readProvidedCommand, runPackageCommand, type ProvidedCommand } from '../project-widgets.js'
+import { readProvidedCommand, runPackageCommand, type ProvidedCommand } from '@gemstack/agent-data'
 
 /**
  * The agent queue, as the framework reads it (#1774). The framework keeps no queue and imports no

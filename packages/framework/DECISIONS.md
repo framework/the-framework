@@ -26,6 +26,11 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   composes a pull request's title and body from the run, and keeps the rule that says
   which pull request is a run's, and its own reads of pull requests. Picked over the
   framework's own git and gh handoff, which was a second way to publish.
+- Which package provides a kind of data when several installed packages declare it: the
+  project's own package.json says, under the same `framework` key with the package's name
+  as the value; several and no line means nothing provides it, and the project's banner
+  says why. Picked over the first in dependency order, taken silently, and over routing by
+  the remote's host.
 - An Overview card belongs to the package whose data it shows: a widget declares its cards
   and The Framework draws them, in the order the cards name, only where a project has the
   package. Picked over the framework's own cards fed by the providers, which showed an empty

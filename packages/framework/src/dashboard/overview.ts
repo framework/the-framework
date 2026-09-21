@@ -1,7 +1,6 @@
 import { readAllAgents, readLiveMetas, type LiveAgent, type AgentMeta, type AgentStatus } from '../store/index.js'
 import type { ProjectSummary } from './projects.js'
 import { collectQueue, type ProjectQueue } from './queue.js'
-import { projectTickets, type Ticket } from '../store/tickets.js'
 import { cloudRunState } from '../cloud-run-state.js'
 import { bridgeQuestions } from './bridge-store.js'
 import { hostname } from 'node:os'
@@ -90,124 +89,6 @@ export async function buildRecentAgents(projects: ProjectSummary[], deps: Recent
   // was listed once per checkout; the first project to list it keeps it.
   const seen = new Set<string>()
   return all.filter(row => !seen.has(row.agent.id) && seen.add(row.agent.id)).slice(0, RECENT_RUNS_LIMIT)
-}
-
-/** Which lane of the "hot tickets" overview (#1139) a ticket sits in. */
-export type HotBucket = 'in-progress' | 'ai-queue' | 'high-priority'
-
-/** One ticket surfaced on the Overview's hot-tickets card, tagged with its project and lane. */
-export interface HotTicket {
-  projectId: string
-  projectName: string
-  bucket: HotBucket
-  ticket: Ticket
-}
-
-/** Where the ticket format's 10-0 scale starts reading as high. */
-const HIGH_PRIORITY_FLOOR = 7
-
-/**
- * Whether a `priority:` value reads as "do this soon". The ticket format's own scale
- * (`ticketing_format.md`: `10-0 … 10: critical — act immediately, 0: only if capacity`), so 7 and
- * up qualify — NOT the P0/P1 convention, whose low-numbers-first reading is not this format.
- * Getting that backwards is what kept a backlog full of `Priority: 8` tickets off the card
- * entirely. Word spellings (`high`/`urgent`/…) are no longer read: the format says 0-10.
- */
-function isHighPriority(priority: string): boolean {
-  const n = Number.parseInt(priority, 10)
-  return !Number.isNaN(n) && n >= HIGH_PRIORITY_FLOOR
-}
-
-/**
- * A ticket's lane (#1139), or null when it is in none of the three the card shows:
- * - in-progress: an agent has planned it, so work is under way in the inferred sense. Which
- *   ticket an agent is implementing right now is the ticket's own claim to say (#1774); the
- *   framework no longer records it on the run.
- * - ai-queue: it sits in the AI Queue — an open queue entry links to it — so the
- *   framework will pick it up on its own.
- * - high-priority: none of the above, but flagged high priority; what a human would likely queue next.
- *
- * Precedence follows that order: work already under way outranks a queued ticket, which outranks a
- * bare priority flag. Everything else is dropped — the card is a shortlist, not the whole backlog.
- */
-export function ticketBucket(ticket: Ticket, opts: { queued?: boolean } = {}): HotBucket | null {
-  if (ticket.planned) return 'in-progress'
-  if (opts.queued) return 'ai-queue'
-  if (ticket.priority && isHighPriority(ticket.priority)) return 'high-priority'
-  return null
-}
-
-/** `[title](target)` at the very start of a queue entry — where a queued ticket's link is written. */
-const QUEUE_LEADING_LINK = /^\s*\[[^\]]+\]\(([^)\s]+)\)/
-
-/**
- * Where a link into a project's files points when it names a ticket: the dashboard's link
- * convention (`framework/widget`), a path whose first segment is the page that shows it. The
- * framework imports no tickets package; the word is the convention's, not a package's.
- */
-const TICKET_LINK_PREFIX = 'tickets/'
-
-/**
- * The ticket file an open queue entry points at, or undefined when it is not a ticket link. Mirrors
- * the dashboard's `queueEntryLabel`: only a link at the START of the entry names the work, and only
- * one under `tickets/` is a ticket. Returned as the bare filename, the key {@link Ticket.file} uses.
- */
-function queuedTicketFile(entry: string): string | undefined {
-  const link = QUEUE_LEADING_LINK.exec(entry)
-  if (!link) return undefined
-  return link[1]!.startsWith(TICKET_LINK_PREFIX) ? link[1]!.slice(TICKET_LINK_PREFIX.length) : undefined
-}
-
-/** How many hot tickets the Overview pools before the card trims per lane. */
-const HOT_TICKETS_LIMIT = 60
-
-/** Injectable readers so {@link buildHotTickets} is unit-testable off disk. */
-export interface HotTicketsDeps {
-  /** A project's tickets (default: the provider its packages declare, none when no package does — #1774). */
-  tickets?: (cwd: string) => Promise<Ticket[]>
-  /** The cross-project agent queue, for the AI-Queue lane (#1139). Defaults to {@link collectQueue}. */
-  queue?: (projects: ProjectSummary[]) => Promise<ProjectQueue[]>
-}
-
-/**
- * Every project's tickets pooled and bucketed for the Overview's "hot tickets" card (#1139): what is
- * being worked on (planned), what sits in the AI Queue (an open queue entry links to it), and
- * what is merely flagged high priority. Ordered lane-first (in-progress,
- * ai-queue, high-priority), file order within a lane; a ticket in none of the three is dropped.
- * Forgiving — a project whose tickets cannot be read simply contributes nothing.
- */
-export async function buildHotTickets(projects: ProjectSummary[], deps: HotTicketsDeps = {}): Promise<HotTicket[]> {
-  const readT = deps.tickets ?? providedTicketsOf
-  // The AI Queue: which tickets an open queue entry links to, per project (#1139).
-  const queues = await (deps.queue ?? (p => collectQueue(p)))(projects)
-  const queuedByProject = new Map<string, Set<string>>()
-  for (const q of queues) {
-    const files = new Set<string>()
-    for (const entry of q.entries) {
-      const file = queuedTicketFile(entry)
-      if (file) files.add(file)
-    }
-    queuedByProject.set(q.projectId, files)
-  }
-  const all: HotTicket[] = []
-  for (const project of projects) {
-    const queued = queuedByProject.get(project.id) ?? new Set<string>()
-    for (const ticket of await readT(project.path).catch(() => [])) {
-      const bucket = ticketBucket(ticket, { queued: queued.has(ticket.file) })
-      // A ticket in none of the three shown lanes is left off the card entirely.
-      if (!bucket) continue
-      all.push({ projectId: project.id, projectName: project.name, bucket, ticket })
-    }
-  }
-  const lane: Record<HotBucket, number> = { 'in-progress': 0, 'ai-queue': 1, 'high-priority': 2 }
-  all.sort((a, b) => lane[a.bucket] - lane[b.bucket])
-  return all.slice(0, HOT_TICKETS_LIMIT)
-}
-
-/** A project's tickets through the provider one of its packages declares (#1774); none provided, none read. */
-async function providedTicketsOf(cwd: string): Promise<Ticket[]> {
-  const source = await projectTickets(cwd)
-  return source ? source.list() : []
 }
 
 /** Injectable readers so {@link buildOverview} is unit-testable off disk. */

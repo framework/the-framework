@@ -16,7 +16,7 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   changed or run by the agent working the repository.
 - The tickets are a package's: The Framework reads them through the command the package
   declares (`framework.tickets`, `list --local`), and only for what it composes across
-  skills, the hot-tickets card, the onboarding step, a queued link's title. Showing,
+  skills, the onboarding step, a queued link's title. Showing,
   planning, claiming and releasing a ticket is the package's own widget, through its
   command. Picked over the dashboard's own ticket pages fed by the provider, which would
   have kept a reserved route and a hand-written sidebar row.
@@ -30,6 +30,11 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   and The Framework draws them, in the order the cards name, only where a project has the
   package. Picked over the framework's own cards fed by the providers, which showed an empty
   queue to a project with no queue package. The onboarding steps stay the framework's.
+- The Overview's queue card is the queue package's and its hot-tickets card the tickets
+  package's, each reading through its own command; The Framework draws neither, reads no
+  hot tickets and rules no lane. The lane for queued tickets was The Framework knowing both
+  packages and is gone: a ticket's way onto the queue is the action the queue package
+  offers on links, drawn beside the row where a project has that package.
 - A run is named by its intent, else the name the branches package answers for its branch,
   else the branch as the agent named it; the framework derives no session name from a branch.
   Picked over stripping the package's prefix here, which was the framework knowing how the

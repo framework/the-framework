@@ -18,7 +18,7 @@ import { readProvidedCommand, runPackageCommand, type ProvidedCommand } from '..
  *
  * The shape, owned here: an entry is one string, the task a future agent is started with, as the
  * queue's own command prints it. A markdown link at its start names the work and where it points;
- * how the dashboard reads that is `dashboard/lib/queue-entry.ts`'s and `dashboard/overview.ts`'s.
+ * how a dashboard reads that is the queue package's widget's.
  */
 
 /** A project's queue: what a provider answers, read by the framework. */

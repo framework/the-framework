@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { holderAgent, planAgentFor, planLink, planPath, planTicketPrompt, readListed, readMeta, readShown, routeOf, ticketLink, workOnTicketPrompt } from './widget.js'
+import { holderAgent, hotLane, isHighPriority, planAgentFor, planLink, planPath, planTicketPrompt, readListed, readMeta, readShown, routeOf, ticketLink, workOnTicketPrompt } from './widget.js'
 
 const FILE = '2026-08-30_login-page.md'
 
@@ -55,4 +55,18 @@ test('the command\'s answers are read back: a list, one ticket or its refusal, t
   assert.deepEqual(readMeta({ ok: true, output: { lastImportedAt: '2026-09-01T00:00:00Z' } }), { lastImportedAt: '2026-09-01T00:00:00Z' })
   assert.deepEqual(readMeta({ ok: true, output: {} }), {})
   assert.deepEqual(readMeta({ ok: false, error: 'x' }), {})
+})
+
+test('hotLane: a claimed ticket is in the claimed lane whatever its priority, an unclaimed one at 7 or up is high priority, the rest are off the card', () => {
+  assert.equal(hotLane({ locked: true }), 'claimed')
+  assert.equal(hotLane({ locked: true, priority: '2' }), 'claimed')
+  assert.equal(hotLane({ priority: '7' }), 'high-priority')
+  assert.equal(hotLane({ priority: '10' }), 'high-priority')
+  assert.equal(hotLane({ locked: false, priority: '6' }), null)
+  assert.equal(hotLane({}), null)
+  // The format's 0-10 scale, never a P0/P1 reading, never a word.
+  assert.equal(hotLane({ priority: '0' }), null)
+  assert.equal(hotLane({ priority: 'high' }), null)
+  assert.equal(isHighPriority(' 8 '), true)
+  assert.equal(isHighPriority(undefined), false)
 })

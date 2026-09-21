@@ -1,9 +1,8 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { buildOverview, buildRecentAgents, buildHotTickets, ticketBucket } from './overview.js'
+import { buildOverview, buildRecentAgents } from './overview.js'
 import type { ProjectSummary } from './projects.js'
 import type { ProjectQueue } from './queue.js'
-import type { Ticket } from '../store/tickets.js'
 import type { AgentMeta } from '../store/index.js'
 
 const project = (id: string, path: string, lastActivityAt?: string): ProjectSummary => ({
@@ -91,77 +90,6 @@ test('buildRecentAgents tolerates a project whose runs cannot be read', async ()
     },
   })
   assert.deepEqual(recent.map(r => r.agent.id), ['x'])
-})
-
-const ticket = (file: string, over: Partial<Ticket> = {}): Ticket => ({
-  file,
-  title: file,
-  summary: '',
-  date: '2026-01-01T00:00:00.000Z',
-  planned: false,
-  ...over,
-})
-
-test('ticketBucket: in-progress > ai-queue > high-priority, else null (#1139)', () => {
-  assert.equal(ticketBucket(ticket('a', { planned: true })), 'in-progress')
-  assert.equal(ticketBucket(ticket('c', { priority: '8' })), 'high-priority')
-  // Not in any of the three shown lanes: dropped from the card.
-  assert.equal(ticketBucket(ticket('e')), null)
-  assert.equal(ticketBucket(ticket('f', { priority: '2' })), null)
-  // A queued ticket lands in the AI Queue, and that outranks a bare priority flag.
-  assert.equal(ticketBucket(ticket('g'), { queued: true }), 'ai-queue')
-  assert.equal(ticketBucket(ticket('h', { priority: '8' }), { queued: true }), 'ai-queue')
-  // Work already under way outranks both: a planned (or queued-and-planned) ticket stays in-progress.
-  assert.equal(ticketBucket(ticket('i', { planned: true, priority: '8' })), 'in-progress')
-  assert.equal(ticketBucket(ticket('j', { planned: true }), { queued: true }), 'in-progress')
-})
-
-test('ticketBucket: the ticket format\'s 10-0 scale, high from 7 up', () => {
-  // ticketing_format.md: `Priority: 10-0 … 10: critical — act immediately, 0: only if capacity`.
-  for (const high of ['10', '9', '8', '7']) {
-    assert.equal(ticketBucket(ticket(high, { priority: high })), 'high-priority', `priority ${high}`)
-  }
-  for (const low of ['6', '5', '2', '1', '0']) {
-    assert.equal(ticketBucket(ticket(low, { priority: low })), null, `priority ${low}`)
-  }
-  // The word spellings are no longer read — the format says 0-10, and a word is not on the scale.
-  for (const word of ['high', 'urgent', 'p0', 'p1']) {
-    assert.equal(ticketBucket(ticket(word, { priority: word })), null, `priority ${word}`)
-  }
-})
-
-test('buildHotTickets pools every project, buckets each, drops the rest, and orders lane-first', async () => {
-  const tickets: Record<string, Ticket[]> = {
-    '/a': [ticket('a1.md', { planned: true }), ticket('a2.md', { priority: '8' })],
-    '/b': [ticket('b1.md'), ticket('b2.md')],
-  }
-  const hot = await buildHotTickets([project('alpha', '/a'), project('beta', '/b')], {
-    tickets: async cwd => tickets[cwd] ?? [],
-    // beta's b1 is linked from its TODO_AGENTS.md, so it lands in the AI-Queue lane; b2 is in no
-    // lane and drops off the card entirely.
-    queue: async () => [
-      { projectId: 'beta', projectName: 'beta', entries: ['[b one](tickets/b1.md) — a note'] },
-    ],
-  })
-  assert.deepEqual(
-    hot.map(h => ({ p: h.projectName, f: h.ticket.file, b: h.bucket })),
-    [
-      { p: 'alpha', f: 'a1.md', b: 'in-progress' },
-      { p: 'beta', f: 'b1.md', b: 'ai-queue' },
-      { p: 'alpha', f: 'a2.md', b: 'high-priority' },
-    ],
-  )
-})
-
-test('buildHotTickets tolerates a project whose tickets cannot be read', async () => {
-  const hot = await buildHotTickets([project('ok', '/ok'), project('bad', '/bad')], {
-    tickets: async cwd => {
-      if (cwd === '/bad') throw new Error('unreadable')
-      return [ticket('x.md', { priority: '8' })]
-    },
-    queue: async () => [],
-  })
-  assert.deepEqual(hot.map(h => h.ticket.file), ['x.md'])
 })
 
 test('buildOverview lists a web run whose cloud side is still at work, and says where it is (#1668)', async () => {

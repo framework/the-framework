@@ -58,3 +58,8 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   caller deciding, since no page knows the queue: "add" means the set ends up queued,
   and a second entry would outlive the first's check-off as open work naming something
   done.
+- The Overview's AI Queue card is this package's, reading `queue --local` like the page and
+  starting agents through the dashboard: one on an entry, landing on it, or one per top entry
+  without landing. Picked over a card in the dashboard fed by the queue provider, which drew
+  an empty queue for a project with no queue package. The card names no tickets: a queued
+  ticket reads as its title and opens nothing here.

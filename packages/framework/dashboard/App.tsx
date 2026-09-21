@@ -177,7 +177,7 @@ export function App() {
   }
 
   // Naming a session in another project. The Overview's cross-project rows — the sidebar recents,
-  // the Agents view (#1139), and the hot tickets — know which run they are about, and going through
+  // the Agents view (#1139), and the widgets' cards — know which run they are about, and going through
   // selectProject drops that on the way, landing on the launcher instead of the session the row was
   // describing.
   const selectAgentInProject = (id: string, agentId: string) => {
@@ -208,10 +208,9 @@ export function App() {
     go({ projectId: null, agentId: null, page: segment })
   }
 
-  // A link into a project's files (#1774) — a queued entry's `tickets/<file>` — opens the mounted
-  // widget page named by its first segment, at `/<segment>/<projectId>/<rest>`; the dashboard has
-  // no page of its own for any such path and names no widget. Nothing opens when no page claims it.
-  const canOpenLink = (href: string) => dataLinkRoute('', href, widgetPages) !== undefined
+  // A link into a project's files (#1774) — `tickets/<file>` — opens the mounted widget page named
+  // by its first segment, at `/<segment>/<projectId>/<rest>`; the dashboard has no page of its own
+  // for any such path and names no widget. Nothing opens when no page claims it.
   const openDataLink = (id: string, href: string) => {
     const target = dataLinkRoute(id, href, widgetPages)
     if (target) go(target)
@@ -290,8 +289,6 @@ export function App() {
         <DashboardPage
           onSelectProject={selectProject}
           onSelectAgent={selectAgentInProject}
-          canOpenLink={canOpenLink}
-          onOpenLink={openDataLink}
           onAgentStarted={agentStarted}
           interventions={interventions}
           projects={projects}

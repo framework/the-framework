@@ -2,7 +2,7 @@ Collects the agent queue [1] of every project into the dashboard's cross-project
 
 ## Context
 
-**User story**: with no project selected, the user sees on the Overview what agents will work on next in every project, and which project has the most waiting; a ticket the queue links to shows in the hot tickets' AI Queue lane; the tickets page's "add to queue" skips what is already queued. A project without a queue package appears in none of it.
+**User story**: with no project selected, the user sees on the Overview what agents will work on next in every project, and which project has the most waiting; the tickets page's "add to queue" skips what is already queued. A project without a queue package appears in none of it.
 
 ## Glossary
 

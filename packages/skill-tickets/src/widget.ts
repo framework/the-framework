@@ -1,7 +1,7 @@
 // The rules of the package's dashboard widget (`../dashboard/`), kept apart from React so they
 // are unit-tested like the rest of the package: the sentences the pages start agents with, how a
 // page finds the agent behind a claim or a plan, how the widget's URL reads, what a ticket is as
-// a link, and how the command's answers are read back.
+// a link, which lane of the Overview card a ticket sits in, and how the command's answers are read back.
 import { TICKETS_DIR, isTicketFile, queuePriorityForTicket, ticketPlanName } from './names.js'
 import type { Ticket, TicketDetail, TicketsMeta } from './tickets.js'
 
@@ -157,4 +157,32 @@ export function readMeta(result: CommandResult): TicketsMeta {
   if (!result.ok || !result.output || typeof result.output !== 'object') return {}
   const stamp = (result.output as { lastImportedAt?: unknown }).lastImportedAt
   return typeof stamp === 'string' ? { lastImportedAt: stamp } : {}
+}
+
+/** The two lanes of the Overview's hot-tickets card: what an agent holds, and what is flagged to do soon. */
+export type HotLane = 'claimed' | 'high-priority'
+
+/** Where the ticket format's 0-10 scale starts reading as high. */
+const HIGH_PRIORITY_FLOOR = 7
+
+/**
+ * Whether a `Priority:` value reads as "do this soon": the format's own scale (`10` acts
+ * immediately, `0` only if capacity), so 7 and up qualify. Not the P0/P1 convention, whose
+ * low-numbers-first reading is not this format; a word (`high`, `urgent`) is not read either.
+ */
+export function isHighPriority(priority: string | undefined): boolean {
+  const n = Number.parseInt(priority ?? '', 10)
+  return !Number.isNaN(n) && n >= HIGH_PRIORITY_FLOOR
+}
+
+/**
+ * A ticket's lane on the hot-tickets card, or null when it is in neither: claimed, an agent holds
+ * it (planning it or implementing it); high-priority, nobody holds it but its priority is high,
+ * what a person would likely start next. A claim outranks the flag: work under way is the
+ * fact. Everything else is left off the card, which is a shortlist, not the backlog.
+ */
+export function hotLane(ticket: { locked?: boolean | undefined; priority?: string | undefined }): HotLane | null {
+  if (ticket.locked) return 'claimed'
+  if (isHighPriority(ticket.priority)) return 'high-priority'
+  return null
 }

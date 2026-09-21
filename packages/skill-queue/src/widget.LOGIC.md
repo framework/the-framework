@@ -1,4 +1,4 @@
-The rules of the package's dashboard widget [1] (`../dashboard/`), kept apart from React so they are tested like the rest of the package: how a queue entry [2] reads on a dashboard, and what the "Add to queue" action runs for the links [3] a dashboard page hands it.
+The rules of the package's dashboard widget [1] (`../dashboard/`), kept apart from React so they are tested like the rest of the package: how a queue entry [2] reads on a dashboard, what the "Add to queue" action runs for the links [3] a dashboard page hands it, and how the Overview card starts agents on entries.
 
 ## Context
 
@@ -16,6 +16,8 @@ The rules of the package's dashboard widget [1] (`../dashboard/`), kept apart fr
 - **What a link is queued as** - `[text](href)` when it points somewhere, its plain text otherwise, by `queue add`, with `--priority N` when the page gave a priority.
 - **Queueing a batch** - one read of the open entries, then one `queue add` per link not yet queued, in order, stopping at the first command that could not run or answered a refusal, with its reason.
 - **Already queued** - a link that points somewhere is queued when an open entry leads with a link to the same target; plain text is queued when an open entry is exactly that text.
+- **The prompt for one entry** - an agent started on an entry is told to use the `queue` skill, work that one entry only, run `queue done` with the entry once the work is published, and start no other; the raw entry line closes the prompt.
+- **The fan-out** - the top of the queue, as many entries as the count says (at least one, never more than there are); one run per entry in order, each with its own entry's prompt; the batch stops at the first refusal with its reason; the button's label says how many it starts.
 
 ## Business logic
 
@@ -60,3 +62,25 @@ See the problem above: the widget knows nothing of what a target names, only tha
 #### Business logic
 
 A link that points somewhere is already queued when an open entry leads with a link to the same target, whatever that entry's text or the note an agent left after the link. A link that points nowhere, plain text, is already queued when an open entry is exactly that text, trimmed. A link's text alone never matches an entry's link: a plain text and a link with the same words are two different lines on the queue.
+
+### The prompt for one entry
+
+#### Context
+
+**User story**: from the Overview's AI Queue card the user starts an agent on one queued entry, and expects the entry to leave the queue once the work is done, and nothing else to be started.
+
+#### Business logic
+
+The prompt tells the agent to use the `queue` skill, to work on this one open entry only, to run `queue done "<the entry>"` once the work is done and published, and to start no other entry; the raw entry line, exactly as the queue prints it, closes the prompt. The raw line and not its label, because the agent must name exactly this entry to take it off, and the line's link is how it opens what the entry names.
+
+### The fan-out
+
+#### Context
+
+**User story**: the user spins up several agents on a project's queue at once.
+
+**Problem**: several agents told "the first open entry" would all implement the same one.
+
+#### Business logic
+
+The entries a fan-out takes are the first N open entries in order of work, N being the count beside the button, read as at least 1; when the queue has fewer, all of them. One run is started per entry, one after another, each with that entry's own prompt, so no two agents are told the same entry. The batch ends at the first start that is refused: the runs started so far stay started, the later entries are never tried, and the refusal's reason is the outcome. An empty list starts nothing. The default count is 3. The button's label reads "Spin up an agent working on the top entry" for one, "Spin up N agents working on the top N entries" otherwise.

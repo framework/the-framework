@@ -33,7 +33,7 @@ Renders an agent's [1] event stream [2] in a terminal, one human-readable line p
 - **The handoff, announced then reported** - one line saying what will happen when the agent ends, then what happened to the push and the pull request, and always a line for the merge.
 - **Why a merge was withheld** - "the session never signalled ready-for-merge", the same words the CLI prints.
 - **Why a handoff or the extra turn was skipped** - every reason as a sentence in the reader's terms.
-- **Usage** - the spend in dollars over the turns, or the tokens when no price was reported, never a zero that reads as free.
+- **Usage** - the price of one turn in dollars.
 - **The driver's own events** - the prompt, the text, the actions, the turn boundary, quota warnings only when the quota is tight, errors, notices, and the question a turn ended on.
 - **The end** - "✓ finished", "■ stopped", "? waiting for an answer", or "✗ failed" with the detail.
 
@@ -106,11 +106,11 @@ The extra turn [4] an agent [1] may get after ready for merge [9] (the rules are
 
 #### Context
 
-**Problem**: a coding agent on a subscription reports no price, and a "$0.0000" would read as free.
+**Problem**: a coding agent on a subscription reports no price, and a "$0.0000" would read as free. The agent's [1] record keeps a cost line only for a turn [4] the coding agent priced, so a turn without a price has no usage event to print.
 
 #### Business logic
 
-With a price, usage prints "spend: $<cost, four decimals> over <n> turn(s)". Without one it prints the tokens the agent [1] did report: "tokens: <input + cache-read + output tokens> (<output tokens> out) over <n> turn(s) — no price reported". The turn [4] count is singular or plural as it should be.
+Usage prints "spend: $<cost, four decimals>", the price of the one turn [4] the event is about.
 
 ### The driver's own events
 

@@ -148,7 +148,7 @@ test('readAllAgents and findAgent: the checkout\'s card wins over the record of 
 })
 
 test('loadAgentEvents replays a run\'s diary as the framework\'s events: the checkout\'s while it has one, else the finished run\'s (#1769)', async () => {
-  const diary = [{ kind: 'said', text: 'Reading.' }, { kind: 'result', text: 'Done.', sessionId: 's1' }, { kind: 'cost', usd: 0.5, turns: 1 }, { kind: 'ended', status: 'failed', detail: 'API 500' }]
+  const diary = [{ kind: 'said', text: 'Reading.' }, { kind: 'result', text: 'Done.', sessionId: 's1' }, { kind: 'cost', usd: 0.5 }, { kind: 'ended', status: 'failed', detail: 'API 500' }]
   const recorded = diary.map(line => JSON.stringify(line)).join('\n') + '\n'
   const fs = memFs()
   const branches = branchesOf(checkoutOf('r1'))
@@ -156,7 +156,7 @@ test('loadAgentEvents replays a run\'s diary as the framework\'s events: the che
   assert.deepEqual(await loadAgentEvents(CWD, 'r1', fs, runs, branches), [
     { kind: 'driver', event: { type: 'text', text: 'Reading.' } },
     { kind: 'driver', event: { type: 'result', text: 'Done.', sessionId: 's1' } },
-    { kind: 'usage', costUsd: 0.5, turns: 1 },
+    { kind: 'usage', costUsd: 0.5 },
     { kind: 'end', ok: false, detail: 'API 500' },
   ])
 

@@ -106,24 +106,8 @@ test('formatFrameworkEvent distinguishes finished / stopped / failed (#218)', ()
   assert.equal(formatFrameworkEvent({ kind: 'end', ok: false, detail: 'boom' }), '✗ failed: boom')
 })
 
-test('formatFrameworkEvent renders a usage spend line (#322)', () => {
-  const base = { kind: 'usage' as const, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 }
-  assert.equal(formatFrameworkEvent({ ...base, costUsd: 0.04, turns: 2 }), '  spend: $0.0400 over 2 turns')
-  assert.equal(formatFrameworkEvent({ ...base, costUsd: 0.02, turns: 1 }), '  spend: $0.0200 over 1 turn')
-})
-
-test('formatFrameworkEvent reports tokens when the agent reported no price (#540)', () => {
-  // Codex's shape. A `$0.0000` spend line would read as free rather than unknown.
-  const line = formatFrameworkEvent({
-    kind: 'usage',
-    inputTokens: 186,
-    outputTokens: 6,
-    cacheReadTokens: 12032,
-    cacheCreationTokens: 0,
-    turns: 1,
-  })
-  assert.equal(line, '  tokens: 12,224 (6 out) over 1 turn — no price reported')
-  assert.doesNotMatch(line!, /\$/)
+test('formatFrameworkEvent renders a usage spend line: the price of one turn (#322)', () => {
+  assert.equal(formatFrameworkEvent({ kind: 'usage', costUsd: 0.04 }), '  spend: $0.0400')
 })
 
 test('formats the rate-limit line by how much the quota actually matters (#517)', () => {

@@ -70,10 +70,8 @@ export function fromDiaryLine(line: AnyDiaryLine): FrameworkEvent {
         ...(typeof file === 'string' ? { file } : {}),
       } as FrameworkEvent
     }
-    case 'cost': {
-      const { kind: _kind, usd, ...rest } = line
-      return { kind: 'usage', ...(usd !== undefined ? { costUsd: usd } : {}), ...rest } as FrameworkEvent
-    }
+    case 'cost':
+      return { kind: 'usage', costUsd: line['usd'] as number }
     default:
       return line as unknown as FrameworkEvent
   }

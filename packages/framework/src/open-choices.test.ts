@@ -7,7 +7,7 @@ const ASK: FrameworkEvent = { kind: 'choice', id: 'await-choices', title: 'Which
 const SAID: FrameworkEvent = { kind: 'driver', event: { type: 'text', text: 'going on' } }
 
 test('a question stays open through the end of a run that ended waiting on it, whole', () => {
-  const open = pendingChoices([SAID, ASK, { kind: 'usage', costUsd: 0.1 } as FrameworkEvent, { kind: 'end', ok: false, waiting: true }])
+  const open = pendingChoices([SAID, ASK, { kind: 'usage', costUsd: 0.1 }, { kind: 'end', ok: false, waiting: true }])
   assert.deepEqual(open, [{ id: 'await-choices', title: 'Which way?', options: [{ id: 'a', label: 'Left' }, { id: 'b', label: 'Right' }], recommended: 'a' }])
 })
 

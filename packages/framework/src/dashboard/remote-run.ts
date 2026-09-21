@@ -264,7 +264,7 @@ function trimSlashes(url: string): string {
 export function foldRelayedEvent(meta: AgentMeta, event: FrameworkEvent, at: string): AgentMeta {
   const next: AgentMeta = { ...meta, updatedAt: at }
   if (event.kind === 'session-update') next.sessionId = event.sessionId
-  else if (event.kind === 'usage' && event.costUsd !== undefined) next.cost = (next.cost ?? 0) + event.costUsd
+  else if (event.kind === 'usage') next.cost = (next.cost ?? 0) + event.costUsd
   else if (event.kind === 'end') {
     next.status = event.ok ? 'done' : event.stopped ? 'stopped' : event.waiting ? 'waiting' : 'failed'
     next.endedAt = at

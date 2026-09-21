@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
+import { DATA_BRANCH, nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import { prsForBranch, type LinkedPr } from './dashboard/pull-requests.js'
 import { listAgents, type AgentMeta } from './store/index.js'
@@ -268,6 +268,9 @@ export async function sweepCloudScratchRefs(cwd: string, deps: ScratchSweepDeps 
       candidates.push(head)
       continue
     }
+    // The default branch and the data branch are nobody's scratch, whatever a run's record says: a
+    // run that recorded `main` as its branch (one that never left it) must not turn the sweep on main.
+    if (head.ref === defaultBranch || head.ref === DATA_BRANCH) continue
     const run = runs.get(head.ref)
     if (run) {
       const startedMs = Date.parse(run.startedAt)

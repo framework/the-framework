@@ -1,5 +1,6 @@
 Effort: 5
 Uncertainty: 4
+Outdated: yes
 
 # [Plan] Working with no forge, and with GitLab, Bitbucket or a custom one: the forge is the packages' business
 

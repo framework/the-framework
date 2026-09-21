@@ -7,6 +7,10 @@
   "driver": "claude-code",
   "model": "opus",
   "branch": "agent-2026-09-21T14-21-43-433Z",
+  "pr": {
+    "number": 1828,
+    "url": "https://github.com/framework/the-framework/pull/1828"
+  },
   "cost": 0.2094765,
   "caller": {
     "scheduler": {

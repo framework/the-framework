@@ -1,101 +1,74 @@
-Effort: 6
-Uncertainty: 6
-Outdated: yes
+Effort: 2
+Uncertainty: 3
 
 # [Plan] Dashboard architecture: the plan and six questions
 
-What is left of #1774 now that Q7 is built, and the order to do it in.
+What is left of #1774 on main 1d324acb (2026-09-23), and how to finish it.
 
 ## TLDR
 
-Most of Q6 and Q7 is on main (9bb62321, 2026-09-16). The work that remains:
+Nearly all of #1774 is built. The ticket's text still lists the Q8 steps as future work, and they are on main. Two open points remain:
 
-1. Fix the ticket where main disagrees with it.
-2. Move the daemon's other background jobs off its clock, or remove them. Each job needs a person's pick.
-3. Turn launcher presets into commands (#1770).
-4. Let a person stop a scheduled run.
-5. Have agent-driver write the live log.
-6. Do the dashboard half. Its plan is on the #1768 ticket (`2026-09-09_dashboard-architecture.md`), not here.
+1. **Claims left by a dead run (Q6.4).** Nothing lifts them except a person's Release.
+2. **The daemon's four remaining clock jobs.** Each needs a person's pick: keep it, move it, or remove it.
 
-Most of the uncertainty is in step 2. The design is settled; step 2 needs picks, not research.
+Recommendation: resolve both points, then close the ticket. The dashboard half has its own ticket (`2026-09-09_dashboard-architecture.md`), and so do the module leftovers (`2026-09-20_modular-structure-leftovers.md`). Neither belongs here.
 
-## Where main is (9bb62321)
+## Where main is (1d324acb)
 
-- **Done:**
-  - Step 0, `work-queue` tracked in the project (#1781).
-  - The `agent-scheduler` package (#1782). It has `tick`, `run`, `start`, `stop` and `status`, the two files, the per-run process, and the sweep.
-  - The open and close hooks, plus the Scheduler card on the Overview (#1784).
-  - Four routine commands and `every` in the schedule (#1785).
-  - `agent-schedule.md` at the root lists `work-queue`, `update-tickets`, `plan-tickets`, `triage-quick` and `triage-consensual`.
-  - `@gemstack/routines` is gone from `packages/framework/package.json`.
-- **Where the ticket is stale.** `packages/agent-scheduler/DECISIONS.md` is the source of truth. The ticket text should follow it:
-  - Q7.2's open point (how the PR title and body reach the publisher) is closed. The agent publishes through the branches skill, and the run reads the PR back off the branch.
-  - Q7.3 and Q7.6 say "marker files". Main uses the run record itself, written with `status: running` before the spawn.
-  - Q7.6 says "the daemon's clock calls each project's `tick` during the transition". Main does not do this. `start` is the only clock, and the dashboard's hooks start and stop it. The Framework names no tool.
-  - Q7.4 says "cap per command in the schedule file". Main does that, and it also has `every`.
-- **Still on the daemon's clock** (`packages/framework/src/daemon-services.ts:329-367`):
-  - worktree sweep
-  - branch links
-  - data sync
-  - CI watch (it can start fix runs)
-  - Discord watchers
-  - cloud scratch sweep
-  - cloud work adoption
-- **The framework still knows skills:**
-  - `packages/framework/package.json:49-53` depends on `agent-data` and the four skill packages.
-  - 24 non-test source files under `packages/framework/src` and `packages/framework/dashboard` import one of them.
-  - The #1768 plan covers this.
+Done since the last plan:
+
+- **Q8.1, the launcher.** It starts runs through the project's start hook, and the daemon runs no agent (#1798). It lists only the project's commands (#1800). The built-in presets are gone; only a person's own custom presets stay (`packages/framework/src/project-presets.ts`).
+- **Q8.2, the start hook.** `start` and `resume` are run hook kinds (`packages/framework/src/project-hooks.ts:36`). `agent-scheduler run --detach` answers with the run's id.
+- **Q8.3 and Q8.4, the transport.** agent-driver owns the inbox (`packages/agent-driver/src/inbox.ts`) and names the live card and diary files (`logCardFile`, `logDiaryFile`). `run` takes `--driver`, `--resume` and `--then`. The browser option was dropped on purpose; `2026-09-20_agent-browser-as-a-package.md` brings it back as a package.
+- **Stop.** A run stops on SIGINT or SIGTERM to its process, and the dashboard's Stop is that signal (`packages/agent-scheduler/DECISIONS.md:119-121`). No `stop-run` verb was needed.
+- **The CI watch.** It is gone with the daemon's agent runner (#1798). Merging on green is `publish --merge` in the branches tool (#1807). No `fix-ci` command was built.
+- **The worktree sweep and branch links.** They are gone from the daemon. The scheduler's sweep reclaims a dead run's checkout (`packages/agent-scheduler/src/sweep.ts`).
+- **The framework knows no skill.** The four skill packages are `devDependencies` of `packages/framework/package.json`. Only the end-to-end harness imports them (`src/e2e/harness.ts`, `src/e2e/fake-run-bin.ts`). The pages and cards are the packages' own (#1812-#1826).
+
+Still on the daemon's clock (`packages/framework/src/daemon-services.ts:209-235`):
+
+- data sync (with the provider check);
+- Discord watchers;
+- cloud scratch sweep;
+- cloud work adoption.
+
+None of them starts a run.
 
 ## Problems
 
-1. **What happens to each daemon job (uncertainty 7).** Each job goes one of three ways:
-   - a scheduled command (a skill plus a line in `agent-schedule.md`);
-   - a job inside `agent-scheduler`;
-   - removed.
-
-   The Q7 goal is "the daemon becomes a projection of files". That points away from keeping any of them. But some jobs serve only the dashboard's own runs:
-   - The worktree sweep and branch links serve the dashboard's checkouts.
-   - Cloud work adoption serves the dashboard's web runs, and Q7 says web runs stay with the dashboard server.
-2. **CI watch starts agents (uncertainty 6).** The only agent-starter left in the daemon is the CI fix (`autoPm`). Under Q7, starting agents belongs to the scheduler. A scheduled `fix-ci` command would need a `when` check that lists red PRs owned by agents.
-3. **Stopping a scheduled run (uncertainty 5).** The pid is in `.the-framework/agent.json`. Main has no verb that stops a run. Two options:
-   - a `stop-run <id>` on `agent-scheduler`;
-   - the dashboard's Stop button signals the pid it reads.
-
-   The second option makes the dashboard act on a file it only projects.
-4. **Stalled locks (Q6.4, open).** A run that dies leaves its claim. The sweep reclaims the checkout, but the claim is released only by a person.
+1. **Dead run, live claim (uncertainty 3).** When a run's process dies, the sweep writes the run `failed` and reclaims its checkout. A claim the agent took stays: the holder is the run's branch or `AGENT_ID`, and only `npx tickets release` by that holder, or a person's Release, lifts it. The locked ticket is skipped by `plan-tickets`, `triage` and `work-queue` until then.
+2. **The four daemon jobs (uncertainty 3).** Rom's direction of 09-21 settles most of this: the dashboard is secondary, drastically simpler, and Discord as a module is a later thought.
 
 ## Solutions
 
-1. Suggested picks for the daemon jobs, for a person to confirm:
-   - **data sync:** keep it in the dashboard for now. A projection needs fresh files. Later it can become a read on demand.
-   - **worktree sweep and branch links:** keep them in the dashboard while the dashboard runs its own agents. Remove them once presets become commands (step 3).
-   - **cloud scratch sweep and cloud work adoption:** keep them with web runs in the dashboard server, as Q7 says.
-   - **Discord watchers:** make them a scheduled command, or remove them. This is Rom's call, since it is a notification feature.
-   - **CI watch:** make it a scheduled `fix-ci` command package, with `when` = a `gh pr list` check for failing agent PRs and `cap 1`. Then remove `autoPm` and `ci-watch.ts`.
-2. For the Stop verb, `agent-scheduler stop-run <id>`: it signals the pid in the run's `agent.json`, and the run records itself as stopped. The dashboard's hook file can map a Stop button to it the same way `open` and `close` map to `start` and `stop`. That keeps the dashboard free of tool names.
-3. For stalled locks, the sweep can release the claims held by the id of a run it reclaims. The run's id is the holder, so no skill knowledge is needed beyond `npx tickets release`. That call would make the scheduler name a skill, though. The alternative is to leave it to the person's Release button.
+For problem 1:
 
-## Implementation (one PR each, in order)
+- **A. Leave it to a person.** The tickets page already has Release. Cost: a ticket can sit locked for days unnoticed.
+- **B. The sweep releases the claim.** When the sweep records a dead run, it runs `npx tickets release --force` for each claim held by the run's id. This makes `agent-scheduler` name the tickets skill, which Q3 forbids.
+- **C. A scheduled command releases stale claims.** A `release-stale-claims` line in `agent-schedule.md` checks for claims whose holder has a run recorded `failed` or no run at all, using `npx tickets list` and `npx logs`. The command's SKILL.md composes the two skills. No tool names a skill.
 
-1. **Ticket and issue sync.** Post a short comment on #1774 listing the four stale points above. The ticket importer then folds it in. No code.
-2. **`fix-ci` command.**
-   - Add a `packages/skill-fix-ci` command skill, tracked as `.claude/skills/fix-ci`.
-   - Add its schedule line.
-   - Remove the CI watch job, `ci-watch.ts`, and the `autoPm` switch.
-   - Update FEATURES-SPEC.md if the repo has it again (memory says it was removed; check first).
-3. **Presets → commands (#1770).** Follow that ticket's plan.
-4. **`stop-run`.**
-   - Add the verb to `agent-scheduler`, with its LOGIC.md and tests.
-   - Add a `stop-run` hook key in `project-hooks.ts`.
-   - Add the Stop button for scheduled runs.
-5. **Live log in agent-driver.** Move the temporary `.the-framework/agent.json` / `events.jsonl` writer out of `packages/agent-scheduler/src/live-log.ts` into agent-driver, as DECISIONS.md "The run" asks.
-6. **The rest of the daemon jobs.** Apply whatever a person picked for Discord, the sweeps and data sync.
-7. **The dashboard half.** Follow the #1768 plan (slot contract, discovery, data path, logs first).
+Pick **A** for now, and write it as a DECISIONS.md line in `packages/skill-tickets`: "a dead run's claim is lifted by a person". C is the clean fix if stale locks turn up in practice. B is rejected: it breaks Q3.
+
+For problem 2, suggested picks:
+
+- **Data sync:** keep it. The dashboard projects files and needs them fresh.
+- **Cloud scratch sweep and cloud work adoption:** keep them with web runs in the dashboard server, as Q7 says.
+- **Discord watchers:** keep them as they are. Moving them is the "later thought"; not this ticket.
+
+With these picks, problem 2 needs no code.
+
+## Implementation
+
+1. Post one comment on #1774 (🤖 marked, per the project's posting rules, on Suleiman's word only). It says:
+   - Q8 steps 1-4 are built; the CI watch went without a `fix-ci` command; Stop is a signal to the run's process.
+   - The two picks above, as proposals.
+   The next ticket import folds the comment into this ticket.
+2. On his picks: add the one DECISIONS.md line for problem 1 (needs his pick; an AI only proposes one).
+3. Close the ticket and its issue. Anything left moves to the two sibling tickets.
 
 ## Considerations
 
-- Changing any DECISIONS.md bullet needs a person's pick. An AI only proposes one.
-- Each new command package must name no other skill. It composes capabilities through its SKILL.md prompt (Q2 and Q3).
-- "A skill is absent" means its SKILL.md and its package are both gone. The scheduler already checks `.claude/skills/<command>`.
-- Cutover after each merge: pull and build main, and restart the daemon. Scheduled commands start only on machines where the user's `hooks.yml` runs `agent-scheduler start`.
+- A DECISIONS.md bullet changes only on a person's pick.
+- The daemon jobs are framework code, so "the framework names no skill" does not constrain them.
 - No compatibility code (AGENTS.md: zero users).

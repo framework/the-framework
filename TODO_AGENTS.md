@@ -5,7 +5,6 @@
 
 
 ## Priority 5
-- Create tickets/2026-09-09_dashboard-architecture-plan.plan.md
 
 
 ## Priority 4

@@ -91,6 +91,7 @@ test('a command may carry one word after its folder name, the argument the skill
   assert.equal(promptCommand('/triage quick', undefined), 'triage')
   assert.equal(promptCommand('/work-queue now', schedule), 'work-queue')
   assert.equal(promptCommand('Read the docs', schedule), 'Read')
+  assert.equal(promptCommand('  /triage quick  ', schedule), 'triage quick')
 })
 
 test('a cap of zero reads as one: zero would spell "never", which is the line being absent', () => {

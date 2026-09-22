@@ -148,7 +148,7 @@ export function commandSkill(name: string): string {
  * `work-queue`; a plain prompt's first word).
  */
 export function promptCommand(prompt: string, schedule: Schedule | undefined): string {
-  const typed = prompt.replace(/^\//, '').trim()
+  const typed = prompt.trim().replace(/^\//, '')
   if (schedule?.commands.some(c => c.name === typed)) return typed
   return typed.split(/\s+/)[0] || prompt
 }

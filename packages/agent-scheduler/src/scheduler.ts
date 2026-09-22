@@ -155,7 +155,7 @@ async function spawnDetached(repo: string, id: string, args: string[]): Promise<
  * branch, the run's process spawned detached, the id returned. What a dashboard's start hook
  * runs: it needs the id back now, not when the agent ends. The command is the schedule line the
  * prompt names, else the prompt's first word without its slash, so the run counts against that
- * command's cap like a scheduled one.
+ * command's cap and interval like a scheduled one.
  */
 export async function detachRun(
   repo: string,

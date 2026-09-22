@@ -41,7 +41,7 @@ export interface Ticket {
   lockedBy?: string
   /** The `Effort:` its `.plan.md` preamble records (`0`-`10`, 0 trivial, 10 takes months). Absent when unplanned or unrated. */
   effort?: number
-  /** The `Uncertainty:` its `.plan.md` preamble records (`0`-`10`, 0 an obvious implementation, 10 highly uncertain). */
+  /** The `Uncertainty:` its `.plan.md` preamble records (`0`-`10`, 0 an obvious implementation, 10 highly uncertain). Absent when unplanned or unrated. */
   uncertainty?: number
   /** Whether the `.plan.md` preamble says `Outdated: yes`: the ticket changed in a way that makes the plan outdated. Absent otherwise. */
   outdated?: true

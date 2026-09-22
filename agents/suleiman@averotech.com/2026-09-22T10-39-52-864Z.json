@@ -1,0 +1,14 @@
+{
+  "id": "2026-09-22T10-39-52-864Z",
+  "startedAt": "2026-09-22T10:39:52.864Z",
+  "status": "running",
+  "intent": "/triage-quick",
+  "driver": "claude-code",
+  "model": "opus",
+  "caller": {
+    "scheduler": {
+      "command": "triage-quick",
+      "host": "Suleimans-MacBook-Pro.local"
+    }
+  }
+}

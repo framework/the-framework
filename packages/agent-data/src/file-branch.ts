@@ -97,6 +97,47 @@ async function ensureBranchRef(repo: string, branch: string, git: GitRunner): Pr
   }
 }
 
+/** The branch HEAD is attached to in a checkout, or `undefined` when HEAD is detached. */
+async function attachedBranch(path: string, git: GitRunner): Promise<string | undefined> {
+  const ref = await git(['symbolic-ref', '--quiet', 'HEAD'], path).catch(() => '')
+  return ref.trim().replace(/^refs\/heads\//, '') || undefined
+}
+
+/**
+ * Whether git holds a checkout registered at `path`: a worktree of the repo whose directory is
+ * still there. A directory that is not one (never made, deleted by hand, or a stray folder no
+ * worktree owns) reads as absent, and so does a registration whose directory is gone.
+ */
+async function checkoutRegistered(repo: string, path: string, git: GitRunner): Promise<boolean> {
+  const { realpath } = await import('node:fs/promises')
+  const want = await realpath(path).catch(() => undefined)
+  if (!want) return false
+  const list = await git(['worktree', 'list', '--porcelain'], repo).catch(() => '')
+  for (const entry of list.split('\n\n')) {
+    const lines = entry.split('\n')
+    const at = lines[0]?.startsWith('worktree ') ? lines[0].slice('worktree '.length) : undefined
+    if (!at || (await realpath(at).catch(() => at)) !== want) continue
+    return !lines.some(line => line === 'prunable' || line.startsWith('prunable '))
+  }
+  return false
+}
+
+/**
+ * Put a checkout found off its branch back on it. A rebase left half done (a process killed
+ * mid-way, or the lock another process held at its last step) is abandoned first, which
+ * restores the branch when git still has that rebase's state. Detached after that — the way a
+ * rebase whose last step was refused leaves it, at origin's tip — the branch is moved to HEAD:
+ * whatever was committed on the detached HEAD (a record a later cycle wrote there) stays and
+ * goes out with the next push. On another branch (a hand's doing), the branch is checked out
+ * again and the other branch is left where it is.
+ */
+async function attachBranch(path: string, branch: string, git: GitRunner): Promise<void> {
+  await git(['rebase', '--abort'], path).catch(() => {})
+  const at = await attachedBranch(path, git)
+  if (at === branch) return
+  await git(at ? ['checkout', '--force', branch] : ['checkout', '--force', '-B', branch], path)
+}
+
 /**
  * The unserialized ensure: branch and checkout. Split from {@link ensureFileBranch} so the
  * writer and the pull can run it inside the cycle they already hold the chain for.
@@ -104,11 +145,10 @@ async function ensureBranchRef(repo: string, branch: string, git: GitRunner): Pr
 async function ensureCore(repo: string, branch: string, r: Resolved): Promise<void> {
   const path = fileBranchPath(repo, branch)
   // Already checked out on the right branch: done. The common case, taken on every tick.
-  const onBranch = await r.git(['rev-parse', '--abbrev-ref', 'HEAD'], path).then(
-    out => out.trim() === branch,
-    () => false,
-  )
-  if (onBranch) return
+  if ((await attachedBranch(path, r.git)) === branch) return
+  // The checkout is there but off its branch: back on it, never added a second time (git
+  // refuses: the path exists), which is how one detached checkout once failed every write after.
+  if (await checkoutRegistered(repo, path, r.git)) return attachBranch(path, branch, r.git)
   await ensureBranchRef(repo, branch, r.git)
   // A stale registration at this path (the dir was deleted by hand) blocks the add.
   await r.git(['worktree', 'prune'], repo).catch(() => {})
@@ -123,6 +163,14 @@ async function ensureCore(repo: string, branch: string, r: Resolved): Promise<vo
  * push that could not land earlier) onto origin's tip. A conflict resolves toward origin — the
  * writer re-applies the local intent afterwards, which is the "re-run on conflict" rule the whole
  * cycle is built on.
+ *
+ * Whatever the rebase did, the checkout ends on the branch. A rebase moves the branch onto
+ * origin's tip as its last step, with HEAD detached there until then; when that step is refused
+ * (another process on this clone held the branch's ref lock at that instant) git fails and
+ * leaves HEAD detached, and the abort meets the same lock. A plain reset would keep it detached:
+ * the next commit would land on no branch, and the push, which sends the branch, would carry
+ * nothing while reporting nothing wrong. So the fallback checks the branch out again on origin's
+ * tip, attached, which is the same "origin wins" outcome for a conflict.
  */
 async function syncCore(repo: string, branch: string, r: Resolved): Promise<void> {
   if (!(await hasRemote(repo, r.git))) return
@@ -133,7 +181,7 @@ async function syncCore(repo: string, branch: string, r: Resolved): Promise<void
     await r.git(['rebase', `origin/${branch}`], path)
   } catch {
     await r.git(['rebase', '--abort'], path).catch(() => {})
-    await r.git(['reset', '--hard', `origin/${branch}`], path)
+    await r.git(['checkout', '--force', '-B', branch, `origin/${branch}`], path)
   }
 }
 
@@ -171,14 +219,15 @@ function resolveMessage(message: CommitMessage): string {
 }
 
 /**
- * git's refusal when another process holds the checkout's index: the one failure two processes
- * on one clone (a daemon and a scheduler, each with its own in-process chain) hand each other.
- * git does not wait for the index lock, so the cycle waits instead and runs again.
+ * git's refusal when another process holds a lock of the checkout — its index, or the branch's
+ * ref: the failures two processes on one clone (a daemon and a scheduler, each with its own
+ * in-process chain) hand each other. git does not wait for a lock, so the cycle waits instead
+ * and runs again.
  */
-const INDEX_LOCK_RETRIES = 3
-const INDEX_LOCK_WAIT_MS = 500
-export function isIndexLocked(err: unknown): boolean {
-  return /index\.lock['"]?: File exists/.test(errorMessage(err))
+const LOCK_RETRIES = 3
+const LOCK_WAIT_MS = 500
+export function isGitLocked(err: unknown): boolean {
+  return /\.lock['"]?: File exists/.test(errorMessage(err))
 }
 
 /**
@@ -186,9 +235,9 @@ export function isIndexLocked(err: unknown): boolean {
  * against the checkout, commit whatever it changed, push. The single funnel a long-lived
  * process's writes go through.
  *
- * Another process holding the checkout's index (its `index.lock`) is waited out: the checkout
- * is reset, the cycle waits half a second and runs again, three times at most, before the
- * failure is reported like any other.
+ * Another process holding a lock of the checkout (its `index.lock`, or the branch's ref lock)
+ * is waited out: the checkout is reset, the cycle waits half a second and runs again, three
+ * times at most, before the failure is reported like any other.
  *
  * `op` must be re-runnable: when the push loses a race with another writer, the cycle re-syncs
  * and runs it again against the fresher state rather than force-fitting a stale commit — the op
@@ -210,8 +259,8 @@ export async function withFileBranch(
   return serialize(repo, branch, async () => {
     for (let locked = 0; ; locked++) {
       const outcome = await cycle(repo, branch, path, message, op, r)
-      if (outcome.ok || !isIndexLocked(outcome.error) || locked >= INDEX_LOCK_RETRIES) return outcome
-      await new Promise(resolve => setTimeout(resolve, INDEX_LOCK_WAIT_MS))
+      if (outcome.ok || !isGitLocked(outcome.error) || locked >= LOCK_RETRIES) return outcome
+      await new Promise(resolve => setTimeout(resolve, LOCK_WAIT_MS))
     }
   })
 }

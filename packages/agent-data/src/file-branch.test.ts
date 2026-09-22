@@ -8,7 +8,7 @@ import {
   ensureFileBranch,
   fileBranchPath,
   fileBranchRepo,
-  isIndexLocked,
+  isGitLocked,
   listBranchDir,
   pullFileBranch,
   readBranchFile,
@@ -211,13 +211,110 @@ test('a push lost to another writer re-applies the intent once, not twice', asyn
   }
 })
 
+test('a lost push whose re-sync finds the branch locked by another process still lands, and the checkout ends on the branch', async () => {
+  const { repo, bare, other, cleanup } = await initSyncedRepos()
+  try {
+    await withFileBranch(repo, BRANCH, 'seed', async dir => {
+      await writeFile(join(dir, 'queue.md'), '- first\n')
+    })
+    // Another process on this clone (the daemon's pull, a scheduler's record) holds the branch's ref
+    // lock at the instant the re-sync's rebase moves the branch onto origin's tip: git leaves HEAD
+    // detached there and fails, and the abort that follows meets the same lock.
+    const lock = join(repo, '.git', 'refs', 'heads', `${BRANCH}.lock`)
+    let armed = false
+    let locked = 0
+    const racing: GitRunner = async (args, cwd) => {
+      const hold = armed && args[0] === 'rebase'
+      if (hold) {
+        await writeFile(lock, '')
+        locked++
+      }
+      try {
+        return await git(args, cwd)
+      } finally {
+        if (hold) await rm(lock, { force: true })
+      }
+    }
+    let runs = 0
+    const result = await withFileBranch(
+      repo,
+      BRANCH,
+      'append',
+      async dir => {
+        runs++
+        // The other machine lands between this op's first run and its push; the first push is rejected.
+        if (runs === 1) {
+          await otherMachineWrites(other, 'theirs.md', 'theirs\n')
+          armed = true
+        }
+        const queue = await readFile(join(dir, 'queue.md'), 'utf8').catch(() => '')
+        await writeFile(join(dir, 'queue.md'), `${queue}- appended\n`)
+      },
+      { git: racing },
+    )
+    assert.ok(locked >= 1, 'the re-sync rebased under the lock')
+    assert.deepEqual(result, { ok: true, changed: true, pushed: true })
+    assert.equal(runs, 2)
+    assert.equal(await git(['show', `${BRANCH}:queue.md`], bare), '- first\n- appended\n')
+    assert.equal(await git(['show', `${BRANCH}:theirs.md`], bare), 'theirs\n')
+    const wt = fileBranchPath(repo, BRANCH)
+    assert.equal((await git(['symbolic-ref', 'HEAD'], wt)).trim(), `refs/heads/${BRANCH}`)
+    assert.equal((await git(['rev-parse', BRANCH], repo)).trim(), (await git(['rev-parse', BRANCH], bare)).trim())
+    // The next write finds the checkout where it was left, on the branch: it is never made a second time.
+    const next = await withFileBranch(repo, BRANCH, 'next', async dir => {
+      await writeFile(join(dir, 'next.md'), 'next\n')
+    })
+    assert.deepEqual(next, { ok: true, changed: true, pushed: true })
+  } finally {
+    await cleanup()
+  }
+})
+
+test('a checkout found off its branch is put back on it, keeping what it holds, never made a second time', async () => {
+  const { repo, bare, cleanup } = await initSyncedRepos()
+  try {
+    await withFileBranch(repo, BRANCH, 'seed', async dir => {
+      await writeFile(join(dir, 'a.md'), 'a\n')
+    })
+    const wt = fileBranchPath(repo, BRANCH)
+    // The state a cycle interrupted mid-rebase leaves: HEAD detached at the tip, a record committed on
+    // it afterwards, the branch itself behind.
+    await git(['checkout', '--detach'], wt)
+    await writeFile(join(wt, 'held.md'), 'held\n')
+    await git(['add', '-A'], wt)
+    await git(['commit', '-m', 'committed while detached'], wt)
+    const result = await withFileBranch(repo, BRANCH, 'b', async dir => {
+      await writeFile(join(dir, 'b.md'), 'b\n')
+    })
+    assert.deepEqual(result, { ok: true, changed: true, pushed: true })
+    assert.equal((await git(['symbolic-ref', 'HEAD'], wt)).trim(), `refs/heads/${BRANCH}`)
+    for (const [file, content] of [['held.md', 'held\n'], ['b.md', 'b\n']] as const) {
+      assert.equal(await git(['show', `${BRANCH}:${file}`], bare), content, file)
+    }
+    // On another branch by hand: the branch is checked out again, and neither branch takes the other's tip.
+    await git(['checkout', '-b', 'stray'], wt)
+    await writeFile(join(wt, 'stray.md'), 'stray\n')
+    await git(['add', '-A'], wt)
+    await git(['commit', '-m', 'on stray'], wt)
+    const stray = (await git(['rev-parse', 'stray'], repo)).trim()
+    assert.deepEqual(await ensureFileBranch(repo, BRANCH), { ok: true })
+    assert.equal((await git(['symbolic-ref', 'HEAD'], wt)).trim(), `refs/heads/${BRANCH}`)
+    assert.equal((await git(['rev-parse', 'stray'], repo)).trim(), stray)
+    await assert.rejects(git(['show', `${BRANCH}:stray.md`], repo))
+  } finally {
+    await cleanup()
+  }
+})
+
 test('another process holding the index is waited out: the cycle runs again and the write lands once', async () => {
   const { repo, bare, cleanup } = await initSyncedRepos()
   try {
     // git's own refusal, as the daemon and the scheduler hand it to each other on one clone.
     const refusal = new Error("Command failed: git add -A\nfatal: Unable to create '/x/.git/worktrees/store/index.lock': File exists.\n\nAnother git process seems to be running in this repository")
-    assert.equal(isIndexLocked(refusal), true)
-    assert.equal(isIndexLocked(new Error('Command failed: git push')), false)
+    assert.equal(isGitLocked(refusal), true)
+    // The branch's ref lock, held by another process's commit, reset or rebase, reads the same way.
+    assert.equal(isGitLocked(new Error("Command failed: git rebase origin/store\nerror: cannot lock ref 'refs/heads/store': Unable to create '/x/.git/refs/heads/store.lock': File exists.")), true)
+    assert.equal(isGitLocked(new Error('Command failed: git push')), false)
     let refusals = 2
     const locked: GitRunner = (args, cwd) => {
       if (args[0] === 'add' && refusals-- > 0) return Promise.reject(refusal)

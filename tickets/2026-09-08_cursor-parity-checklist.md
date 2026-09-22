@@ -1,3 +1,4 @@
+Topics: [the-framework, cursor-parity]
 Issue: [#1764](https://github.com/framework/the-framework/issues/1764)
 
 # Cursor parity checklist: what the framework covers, what is missing, what is skipped on purpose

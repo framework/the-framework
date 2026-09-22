@@ -1,3 +1,4 @@
+Topics: [dashboard, UX]
 Issue: [#1455](https://github.com/framework/the-framework/issues/1455)
 
 # Dashboard UX notes: rail width, Docs/History placement, inline choices, composer Stop/Resume

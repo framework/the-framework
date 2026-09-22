@@ -11,3 +11,4 @@ Reads the working-tree state of every changed file in a checkout [1], from one `
 - **Three states per file** - `??` is untracked, a `D` in either column is deleted, every other change is modified, keyed by repository-relative path.
 - **Renames and quoting** - a rename is recorded under its new path; a quoted path loses its surrounding quotes.
 - **Forgiving** - a failed git read or a directory that is not a repository yields no statuses at all.
+- **One vocabulary with the commits' changes** - the file states also include added, a file a commit created, which only the reader of an agent's committed changes gives (`agent-tree.ts`); this read never does, since a new file on disk is untracked.

@@ -35,7 +35,7 @@ See `## Context`.
 
 #### Business logic
 
-The calls a relaying daemon may make here are exactly the reads about one agent [3] — the project's files and their statuses, a file's diff and content, the agent's changes, the git status, the agent's checkout [4], its handoff [6] state and the agent itself (`reads.ts`) — and the steering of it: stopping [7], answering its question [5], sending a message, opening the pull request and merging it (`control.ts`). Starting an agent, deleting one, removing a retained checkout are not on the list: a Start reaches a device through its own relay endpoint, where the device runs its own project's start hook, and destroying history or checkouts is not something a relaying daemon may reach.
+The calls a relaying daemon may make here are exactly the reads about one agent [3] — the project's files, the agent's own files with what it changed, a file's diff and content, the agent's changes, the git status, the agent's checkout [4], its handoff [6] state and the agent itself (`reads.ts`) — and the steering of it: stopping [7], answering its question [5], sending a message, opening the pull request and merging it (`control.ts`). Starting an agent, deleting one, removing a retained checkout are not on the list: a Start reaches a device through its own relay endpoint, where the device runs its own project's start hook, and destroying history or checkouts is not something a relaying daemon may reach.
 
 ### Only the device's home project
 

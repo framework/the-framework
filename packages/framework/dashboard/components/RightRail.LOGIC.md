@@ -17,7 +17,7 @@ The dashboard's right rail: a narrow column beside the main pane holding up to t
 
 ## Business logic — TL;DR
 
-- **Three panels, each earned by its content** - "Files", "Views" and "Docs" appear only when there is something in them, and a rail with no panel left disappears.
+- **Three panels, each earned by its content** - "Files", "Views" and "Docs" appear only when there is something in them, and a rail with no panel left disappears; an agent's [2] "Files" is always there, since it says where the agent's changes went even when there are none left.
 - **No project, no rail** - with no project selected the rail is not drawn, and it is absent beside a full-width widget page.
 - **Which panel opens by itself** - the first view [1] an agent [2] pushes brings the rail to it; otherwise the rail rests on the files, or on the documents when there are none; once the user picks a tab by hand, nothing moves it again.
 - **A panel that loses its content hands over** - when the open panel stops existing the rail falls back to the first one that still does, rather than showing an empty column.
@@ -36,7 +36,7 @@ See `## Context`.
 
 The rail offers at most three tabs, always in this order, each with a one-line explanation on hover:
 
-- "Files" — "The project’s files, with what the session changed — hover one to preview it, click one to add it to the next run’s Context." Shown when the project has files to list. The tree is scoped to the selected agent's [2] own checkout [4] when an agent is selected, so it shows that agent's working copy rather than the user's. The rail is handed the Context [9] the shell keeps: the tree shows which files are picked, and a click toggles one (`FileTree.tsx`).
+- "Files" — "The project’s files, or a session’s with what it changed, for as long as its checkout, branch or merge commit exists — hover one to preview it, click one to add it to the next run’s Context." With no agent selected, shown when the project has files to list. With an agent [2] selected, always shown: the tree is that agent's own, from its checkout [4], its branch or its merge commit, and when none is left it says the agent's changes are gone, which is itself the answer (`FileTree.tsx`). The rail is handed the Context [9] the shell keeps: the tree shows which files are picked, and a click toggles one (`FileTree.tsx`).
 - "Views" — "Documents the agent pushed up during the session — a plan, a summary, a writeup." Shown once the selected agent has pushed at least one view [1]. The views arrive on the agent's live event stream.
 - "Docs" — "The PLAN/TODO markdown files at the root of the workspace."
 
@@ -61,7 +61,7 @@ With no project selected the rail is not drawn. It is likewise absent beside the
 #### Business logic
 
 - The moment the selected agent's first view [1] arrives, the rail switches to "Views". A second view does not: the panel the user is on stays.
-- Until the user picks a tab by hand, and while there is no view, the rail rests on "Files" when the project has files and on "Docs" otherwise.
+- Until the user picks a tab by hand, and while there is no view, the rail rests on "Files" when it is offered and on "Docs" otherwise.
 - Once the user has picked a tab, the rail stops choosing for the user. Only a first view may still move it.
 
 ### A panel that loses its content hands over

@@ -13,7 +13,7 @@ Shows what actually changed in a checkout's [1] files, for the file tree's hover
 
 ## Business logic — TL;DR
 
-- **A tracked file's diff** - the file's diff against the last commit with three lines of context, stripped of git's preamble, with added and removed lines counted; no diff means no card, a binary change says so, and a long patch is cut at 500 lines and says it was cut.
+- **A tracked file's diff** - the file's diff against the last commit, or between the two commits the caller names (an agent's committed change, `agent-tree.ts`), with three lines of context, stripped of git's preamble, with added and removed lines counted; no diff means no card, a binary change says so, and a long patch is cut at 500 lines and says it was cut.
 - **An untracked file as all-added** - a file git does not know is read from disk inside the checkout and shown with every line as an addition, counted whole even when its preview is cut.
 - **Unsafe paths are refused before any read** - a path that is not a plain repository-relative path yields nothing and never reaches git or the disk.
 - **The "Changes" list** - every changed file with its line counts from one numstat read, untracked files counted from disk, binary files flagged, sorted by path so a live agent's list does not reshuffle.
@@ -29,6 +29,8 @@ See `## Context`.
 #### Business logic
 
 A modified or deleted file is diffed against the last commit, not against the index, so a change the agent [3] has already staged still shows, which also matches the status read that marked the file in the first place; the diff carries three lines of context. In a repository with no commit yet, the working-tree diff is the honest answer rather than an error, so it is read instead; when git fails altogether, there is nothing to show. Git's preamble (the `diff --git`, index and mode lines) is dropped and the body starts at the file headers or the first hunk. Added and removed lines are counted from the body, ignoring the two file headers that precede the first hunk; past that hunk a line that happens to open the same way is content (a removed `---` separator reads `----`, a removed `-- comment` reads `--- comment`) and counts. A file with no diff yields nothing rather than an empty card. When git reports a binary change, the answer is flagged binary with an empty body and zero counts. A body longer than 500 lines is cut to 500 and flagged as truncated.
+
+When the caller names two commits, the diff is between them rather than against the last commit, with no fallback and nothing read from disk: that is how an agent's committed change to a file is shown, from where its branch forked to its last commit, or a merge commit's own change (`agent-tree.ts`). The same cutting, counting and binary rules apply.
 
 ### An untracked file as all-added
 

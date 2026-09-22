@@ -18,7 +18,7 @@ type Tab = 'files' | 'views' | 'docs'
 // History had one too, rendering a committed markdown re-narration of what the event log already
 // holds exactly (B3); the sessions themselves are the history now.
 const TABS: Record<Tab, { label: string; help: string }> = {
-  files: { label: 'Files', help: 'The project’s files, with what the session changed — hover one to preview it, click one to add it to the next run’s Context.' },
+  files: { label: 'Files', help: 'The project’s files, or a session’s with what it changed, for as long as its checkout, branch or merge commit exists — hover one to preview it, click one to add it to the next run’s Context.' },
   views: { label: 'Views', help: 'Documents the agent pushed up during the session — a plan, a summary, a writeup.' },
   docs: { label: 'Docs', help: 'The PLAN/TODO markdown files at the root of the workspace.' },
 }
@@ -37,7 +37,7 @@ export function RightRail({
   docsInMain = false,
 }: {
   projectId: string | null
-  /** The selected agent: scopes the file tree to its worktree (#815). */
+  /** The selected agent: the file tree is then its own (#815), and the Files tab always shows. */
   agentId?: string | null | undefined
   views: AgentView[]
   /** The project's files for the Files tab tree (#492); empty on the relay. */
@@ -72,7 +72,8 @@ export function RightRail({
     setTab(t)
   }
   const hasViews = views.length > 0
-  const hasFiles = files.length > 0
+  // A run's Files tab stays even with nothing to list: it says where the run's changes went.
+  const hasFiles = Boolean(agentId) || files.length > 0
 
   // Only pull the rail for something genuinely new (#695/U22): the first view. A second view or
   // a Files flip no longer yanks the tab you're reading, and an explicit pick is never overridden

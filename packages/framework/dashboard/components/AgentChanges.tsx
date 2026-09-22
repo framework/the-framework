@@ -23,12 +23,14 @@ const EMPTY: FileChange[] = []
 
 const LABEL: Record<FileChange['status'], string> = {
   untracked: 'new',
+  added: 'new',
   modified: 'modified',
   deleted: 'deleted',
 }
 
 const TONE: Record<FileChange['status'], string> = {
   untracked: 'text-success',
+  added: 'text-success',
   modified: 'text-warning',
   deleted: 'text-danger',
 }

@@ -91,7 +91,7 @@ describe('RightRail docsInMain (#1455 items 2/3)', () => {
   })
 
   test('with only Docs to offer, the launcher shows no rail at all', async () => {
-    const { container } = render(<RightRail {...baseProps} docsInMain />)
+    const { container } = render(<RightRail {...baseProps} agentId={null} docsInMain />)
     await settle()
     expect(container.querySelector('aside')).toBeNull()
   })
@@ -111,7 +111,7 @@ describe('RightRail empty panels (#1146)', () => {
 
   test('no docs, no Docs tab — and with nothing else, no rail at all', async () => {
     onDocs.mockResolvedValue([])
-    const { container } = render(<RightRail {...baseProps} />)
+    const { container } = render(<RightRail {...baseProps} agentId={null} />)
     await settle()
     expect(screen.queryByRole('tab', { name: /docs/i })).toBeNull()
     expect(container.querySelector('aside')).toBeNull()
@@ -143,6 +143,13 @@ describe('RightRail empty panels (#1146)', () => {
     await settle()
     expect(screen.queryByRole('tab', { name: /views/i })).toBeNull()
     // Not an empty panel: the rail falls back to the first tab that still has content.
-    expect(screen.getByRole('tab', { name: /docs/i }).getAttribute('aria-selected')).toBe('true')
+    expect(screen.getByRole('tab', { name: /files/i }).getAttribute('aria-selected')).toBe('true')
+  })
+
+  test("a session keeps its Files tab with nothing listed: the tree says where the run's changes went", async () => {
+    onDocs.mockResolvedValue([])
+    render(<RightRail {...baseProps} />)
+    await settle()
+    expect(screen.getByRole('tab', { name: /files/i })).toBeTruthy()
   })
 })

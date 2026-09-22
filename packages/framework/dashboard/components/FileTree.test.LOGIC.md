@@ -1,7 +1,9 @@
 What the tests cover, for the project panel's file tree:
 
-- **Whose checkout the verdicts describe** - with no agent [1] selected the file statuses are read for the project's own checkout [2]; with an agent selected they are read for that agent's checkout; switching to another agent reads that agent's checkout afresh instead of keeping the previous dots.
-- **A changed file is marked** - a file the agent modified carries the letter "M".
+- **Whose files the tree shows** - with no agent [1] selected the file statuses are read for the project's own checkout [2] and the agent's tree is not asked for; with an agent selected the tree is that agent's own, its files replacing the project's and the project's statuses not asked for; switching to another agent reads that agent's tree afresh instead of keeping the previous marks.
+- **A changed file is marked, committed and uncommitted apart** - a file modified only on disk reads "modified, not committed", a file a commit added carries "A" and reads "added, committed", and the caption says the tree is from the agent's checkout.
+- **Where a finished agent's tree comes from** - an agent read from its branch is captioned "From branch <branch>", one read from its merge commit "From the merge of #<number>".
+- **Gone says so** - an agent none of whose sources is left shows the "changes are gone" line, and not the project's files.
 - **Clicking picks** - clicking a file reports its path to be toggled in the Context [3], and a file already in the Context shows tinted.
 
 ## Glossary

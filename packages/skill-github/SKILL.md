@@ -29,7 +29,7 @@ A pull request whose body has a line `Closes #<number>` closes that issue when i
 npx github requests [--branch <b>] [--state open|merged|all] [--since <iso>]
 ```
 
-The project's pull requests, newest first: `number`, `url`, `state` (`open`, `merged`, `closed`), `title`, `draft`, `branch`, `head`, `createdAt`, `mergedAt`.
+The project's pull requests, newest first: `number`, `url`, `state` (`open`, `merged`, `closed`), `title`, `draft`, `branch`, `head`, `createdAt`, `mergedAt`, `mergeCommit` (the commit a merged request landed as).
 
 For a pull request's discussion and diff, and for the project's issues, use `gh` directly: `gh pr view <number> --comments`, `gh pr diff <number>`, `gh issue list`, `gh issue view <number> --comments`, `gh issue comment <number> --body "<text>"`. `gh` is installed and logged in where you run.
 

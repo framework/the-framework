@@ -5,19 +5,20 @@ import type { GhRunner } from './gh.js'
 
 // One read for every question about pull requests: what is asked of gh, and what comes back.
 
-const row = (over: Record<string, unknown> = {}) => ({ number: 7, url: 'https://github.com/o/r/pull/7', state: 'OPEN', title: 'T', isDraft: false, headRefName: 'agent-x', headRefOid: 'abc', createdAt: '2026-09-20T10:00:00Z', mergedAt: null, ...over })
+const row = (over: Record<string, unknown> = {}) => ({ number: 7, url: 'https://github.com/o/r/pull/7', state: 'OPEN', title: 'T', isDraft: false, headRefName: 'agent-x', headRefOid: 'abc', createdAt: '2026-09-20T10:00:00Z', mergedAt: null, mergeCommit: null, ...over })
 
 test('the query becomes one gh listing: state (all by default), head branch, the limit, the fields', () => {
-  assert.deepEqual(requestsArgs({}), ['pr', 'list', '--state', 'all', '--limit', '50', '--json', 'number,url,state,title,isDraft,headRefName,headRefOid,createdAt,mergedAt'])
+  assert.deepEqual(requestsArgs({}), ['pr', 'list', '--state', 'all', '--limit', '50', '--json', 'number,url,state,title,isDraft,headRefName,headRefOid,createdAt,mergedAt,mergeCommit'])
   assert.deepEqual(requestsArgs({ branch: 'agent-x', state: 'open' }).slice(0, 6), ['pr', 'list', '--state', 'open', '--head', 'agent-x'])
 })
 
-test("gh's rows become requests: states lowercased, the head as branch and sha, mergedAt only when set; a row without number and url is none", () => {
-  const [open, merged, closed] = parseRequests([row(), row({ number: 8, state: 'MERGED', mergedAt: '2026-09-21T00:00:00Z', isDraft: true }), row({ number: 9, state: 'CLOSED' }), { title: 'junk' }])
+test("gh's rows become requests: states lowercased, the head as branch and sha, mergedAt and mergeCommit only when set; a row without number and url is none", () => {
+  const [open, merged, closed] = parseRequests([row(), row({ number: 8, state: 'MERGED', mergedAt: '2026-09-21T00:00:00Z', mergeCommit: { oid: 'm8' }, isDraft: true }), row({ number: 9, state: 'CLOSED' }), { title: 'junk' }])
   assert.deepEqual(open, { number: 7, url: 'https://github.com/o/r/pull/7', state: 'open', title: 'T', draft: false, branch: 'agent-x', head: 'abc', createdAt: '2026-09-20T10:00:00Z' })
   assert.equal(merged?.state, 'merged')
   assert.equal(merged?.draft, true)
   assert.equal(merged?.mergedAt, '2026-09-21T00:00:00Z')
+  assert.equal(merged?.mergeCommit, 'm8')
   assert.equal(closed?.state, 'closed')
   assert.equal(parseRequests([row(), { title: 'junk' }]).length, 1)
   assert.deepEqual(parseRequests('not a list'), [])

@@ -1,4 +1,4 @@
-Answers everything the dashboard reads about a project or an agent [1]: the agent history, one agent's replay, the project's surfaced documents, the cross-project rollups the Overview [2] and the launcher show, the files of a checkout [3] with their git status, one file's diff or content, where an agent is working and what its handoff [4] left behind, and the state of the Claude web bridge [5]. Every read is forgiving: an unknown project or a failing read answers the empty shape (an empty list, an empty map, nothing) rather than an error, and a read about an agent relayed [6] to a device [7] is answered by that device.
+Answers everything the dashboard reads about a project or an agent [1]: the agent history, one agent's replay, the project's surfaced documents, the cross-project rollups the Overview [2] and the launcher show, the files of a checkout [3] with their git status, an agent's own files with what it changed, one file's diff or content, where an agent is working and what its handoff [4] left behind, and the state of the Claude web bridge [5]. Every read is forgiving: an unknown project or a failing read answers the empty shape (an empty list, an empty map, nothing) rather than an error, and a read about an agent relayed [6] to a device [7] is answered by that device.
 
 ## Context
 
@@ -39,8 +39,9 @@ Answers everything the dashboard reads about a project or an agent [1]: the agen
 - **Where an agent is working** - its checkout's path, whether that checkout is its own, its branch, whether it holds uncommitted changes, its size once nothing writes to it, and the pull request that belongs to this agent and not a predecessor's.
 - **Documents** - the surfaced documents at the project root.
 - **Cross-project rollups** - the aggregated agent queue, the Overview, recent agents, interventions, open questions, activity, the dashboard page and every project's scheduler state, each built over every project the registry lists.
-- **The files of a checkout and their status** - every file git sees, and each file's untracked/modified/deleted status, from the agent's own checkout when an agent id is given.
-- **One file's diff, one file's content, and what the agent changed** - the diff of a changed file, the content of an unchanged one, and every changed file with its line counts, always read from the checkout's own git state.
+- **The files of a checkout and their status** - every file git sees (from the agent's own checkout when an agent id is given), and each file's untracked/modified/deleted status in the project's root.
+- **An agent's own files, for as long as git has them** - the agent's tree with what it changed marked, from its checkout, else its branch, else its merge commit; gone when none is left.
+- **One file's diff, one file's content, and what the agent changed** - the diff of a changed file and the content of an unchanged one, from the same source as the agent's own files; and every changed file with its line counts, read from the checkout's own git state.
 - **The project's page on its git host, and git status** - the project's page and the git host's name, as the git host provider answers them; the branch, dirty flag and linked pull request of the project or of one agent's checkout, filtered to that agent's lifetime.
 - **What an agent's handoff left behind** - the agent's own branch, as the project's branches provider answers it, plus the agent's pull request; an agent that recorded no branch has no handoff.
 - **The bridge's state** - the question a cloud session is parked on, where the picked answer stands, what the session has said, whether anything reached the bridge and how, the bridge token while the bridge is on, and the bridge browser's state.
@@ -134,11 +135,23 @@ Each rollup is built over every project the registry lists (the builders are `da
 
 #### Context
 
-**User story**: the context picker and the file tree list the checkout's files, and the tree dots each file with its git status.
+**User story**: the context picker lists the checkout's files, and on a project's home the file tree lists them and marks each changed file with its git status.
 
 #### Business logic
 
-The files are every file git sees in the checkout, tracked and untracked, honoring the ignore rules, repository-relative and sorted; the statuses map each changed file to untracked, modified or deleted. With an agent id both read the agent's own checkout rather than the project's root. No checkout (an unknown project, a relayed agent's unreachable device) answers an empty list and an empty map.
+The files are every file git sees in the checkout, tracked and untracked, honoring the ignore rules, repository-relative and sorted. With an agent id the file list reads the agent's own checkout rather than the project's root, and the project's root once that checkout is gone. The statuses are always the project's root's: each changed file mapped to untracked, modified or deleted. An unknown project, or a relayed agent's unreachable device, answers an empty list and an empty map.
+
+### An agent's own files, for as long as git has them
+
+#### Context
+
+**User story**: on an agent's page the file tree shows the agent's files with what it changed marked, while it works and long after its checkout [3] was reclaimed; when nothing of it is left, the tree says so.
+
+**Problem**: once an agent's checkout is reclaimed, a read of "its checkout" falls back to the project's root and shows the project unmarked, which reads as "this agent touched nothing" while its change is still in git.
+
+#### Business logic
+
+The project must be known and the id an agent id [8], else the answer is that the agent's changes are gone. The source, the list and the marks are `dashboard/agent-tree.ts`'s: the agent's checkout while it exists, else its recorded branch, else the commit its pull request merged as; still being looked up while that pull request is; gone when none is left on this machine. The answer names the source (and the branch or the pull request's number), and carries the files with each changed one marked added, untracked, modified or deleted, committed or not. A relayed agent is answered by its device; an unreachable device, or a read that fails, answers gone.
 
 ### One file's diff, one file's content, and what the agent changed
 
@@ -150,7 +163,7 @@ The files are every file git sees in the checkout, tracked and untracked, honori
 
 #### Business logic
 
-The diff is read from the agent's checkout when an agent id names one, else the project's. The file's status comes from the checkout's own git status, never from the caller, so a browser that claims a file is untracked cannot make the daemon read it as one; a path that is not a changed file, or is unsafe, answers nothing (the path rule is `dashboard/file-read.ts`'s: repository-relative, no parent segments, never inside `.git`). The content of an unchanged file answers nothing when the path is unsafe, resolves outside the checkout, or cannot be read. What the agent changed is every changed file in its checkout with its line counts, an empty list when nothing changed or there is no checkout.
+For an agent id [8], the diff and the content are read from the same source as that agent's own files (see above): the checkout, the branch or the merge commit, and nothing when the agent's changes are gone. Without one, they are read from the project's root. In a checkout, a file changed on disk diffs against its last commit, and a file changed only by the agent's commits diffs from where the agent's branch forked to its last commit; on a branch or a merge commit, the diff is that commit's own change to the file, and the content is the file as that commit holds it. The file's status comes from git, never from the caller, so a browser that claims a file is untracked cannot make the daemon read it as one; a path that is not a changed file, or is unsafe, answers nothing (the path rule is `dashboard/file-read.ts`'s: repository-relative, no parent segments, never inside `.git`). The content of an unchanged file answers nothing when the path is unsafe, resolves outside the checkout, or cannot be read. What the agent changed is every changed file in its checkout with its line counts, an empty list when nothing changed or there is no checkout.
 
 ### The project's page on its git host, and git status
 

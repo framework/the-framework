@@ -19,6 +19,8 @@ export interface Request {
   head: string
   createdAt: string
   mergedAt?: string
+  /** The commit a merged request landed as on the base branch. */
+  mergeCommit?: string
 }
 
 export interface RequestsQuery {
@@ -33,7 +35,7 @@ export interface RequestsQuery {
 /** The most requests one read answers. */
 export const REQUESTS_LIMIT = 50
 
-const FIELDS = 'number,url,state,title,isDraft,headRefName,headRefOid,createdAt,mergedAt'
+const FIELDS = 'number,url,state,title,isDraft,headRefName,headRefOid,createdAt,mergedAt,mergeCommit'
 
 /** The gh command line for a query: what the test checks, and what runs. */
 export function requestsArgs(query: RequestsQuery): string[] {
@@ -50,6 +52,7 @@ interface GhRequest {
   headRefOid?: unknown
   createdAt?: unknown
   mergedAt?: unknown
+  mergeCommit?: { oid?: unknown } | null
 }
 
 /** gh's OPEN / MERGED / CLOSED, lowercased; anything else reads as closed. */
@@ -73,6 +76,7 @@ export function parseRequests(output: unknown): Request[] {
       head: typeof row.headRefOid === 'string' ? row.headRefOid : '',
       createdAt: typeof row.createdAt === 'string' ? row.createdAt : '',
       ...(typeof row.mergedAt === 'string' && row.mergedAt ? { mergedAt: row.mergedAt } : {}),
+      ...(typeof row.mergeCommit?.oid === 'string' && row.mergeCommit.oid ? { mergeCommit: row.mergeCommit.oid } : {}),
     })
   }
   return requests

@@ -9,7 +9,7 @@ import { THE_FRAMEWORK_DIR } from '../framework-dir.js'
  * none for the id. The provider's list is shared for a few seconds; a run that is not in it may
  * have started a moment ago, so a miss asks once more, fresh (`branches.ts` bounds how fresh).
  */
-async function findCheckout(projectCwd: string, agentId: string, branches: BranchesFor): Promise<Checkout | undefined> {
+export async function findCheckout(projectCwd: string, agentId: string, branches: BranchesFor): Promise<Checkout | undefined> {
   const source = await branches(projectCwd).catch(() => undefined)
   if (!source) return undefined
   const known = (await source.list().catch(() => [])).find(checkout => checkout.id === agentId)

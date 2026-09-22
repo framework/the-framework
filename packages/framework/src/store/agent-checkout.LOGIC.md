@@ -33,6 +33,7 @@ See `## Context`.
 - No agent id [2], or an id that is not path-safe, resolves to the project root.
 - The checkout [1] the branches provider [6] lists for the agent resolves, whether or not the tool that runs the agent has written the card yet. When the provider's shared list lacks the agent, the list is asked once more, fresh (`branches.ts` says how fresh), since the agent may have started since the last read.
 - Otherwise the project root: a project with no provider, an unknown agent, or a finished agent whose checkout is already gone; the project's own state is the sane thing to act on. Nothing here fails.
+- The lookup of the listed checkout alone, without the fallback to the project root, is shared with the reader of an agent's own files (`../dashboard/agent-tree.ts`), for which a gone checkout must read as gone and not as the project root.
 
 ### The diary a tail follows
 

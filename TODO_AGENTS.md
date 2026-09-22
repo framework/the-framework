@@ -14,6 +14,7 @@
 
 
 ## Priority 3
+- Rewrite the outdated plan of [Dashboard architecture: the plan and six questions](tickets/2026-09-09_dashboard-architecture-plan.md)
 
 
 ## Priority 2

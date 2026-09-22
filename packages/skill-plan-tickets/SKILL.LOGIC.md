@@ -12,9 +12,9 @@ The `plan-tickets` command skill: the prompt of the agent a runner starts for qu
 - **The listing decides** - the agent reads the open tickets as listed and opens none; what a ticket needs, and in which order, is read off its row.
 - **Needs a plan** - the listing shows no plan, or shows the plan outdated.
 - **Skipped** - a ticket its listing shows locked (held by someone), with a pull request (in review), or already on the queue: an entry with the ticket's file without `.md` anywhere in it, so a plan ask and a link to the ticket both count; a queued ticket whose name another ticket's name starts with skips that other one too, in the skill and the check alike.
-- **At most ten a run** - highest priority first, then oldest date first, then by file name A to Z, so two runs keep the same ten in the same order; the rest wait for the next run. A ticket's priority is its own when that is a bare whole number from 0 to 10, else 5, the rule the queue's `--priority` and the tickets skill share.
+- **At most ten a run** - highest priority first, then oldest date first, then by file name A to Z, so two runs keep the same ten in the same order; the rest wait for the next run. A ticket's priority is its own when that is a bare whole number from 0 to 10, else 5, the tickets skill's rule; the queue takes only 0 to 10.
 - **The plan ask** - the plain sentence `Create tickets/<name>.plan.md`, `<name>` the ticket's file without `.md`, not a link to the ticket (a leading link reads as queued for implementation), at the ticket's priority, queued one by one in that order; an entry lands at the end of its priority section, so the order of the writes is the order of work within a priority.
 - **A failed write** - a queue write that fails is tried once more after reading the queue again, a ticket the new reading shows queued left alone; a write that fails again ends the run with the failure said, the remaining tickets left for the next run.
 - **Only queue** - the queue is the only thing it changes; it writes no plan itself.
-- **Nothing to plan** - it says so and stops.
+- **Nothing to queue** - no ticket needs a plan, or every one is skipped: it says so and stops.
 - **No ticketing system, no AI queue** - it shows an error to the user and stops; in capability words, naming no skill.

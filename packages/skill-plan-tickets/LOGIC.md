@@ -8,4 +8,4 @@ The `@gemstack/skill-plan-tickets` npm package: the `plan-tickets` command skill
 
 ## Business logic — TL;DR
 
-- **The job** (`SKILL.md`) - queueing a plan for the open tickets that have none or an outdated one, at most ten a run, unattended; the routine the scheduler fires on the interval the project's schedule gives it.
+- **The job** (`SKILL.md`) - queueing a plan for the open tickets that have none or an outdated one, at most ten a run, unattended; the command the scheduler fires on the interval the project's schedule gives it.

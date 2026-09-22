@@ -1,251 +1,237 @@
 Effort: 6
-Uncertainty: 6
-Outdated: yes
+Uncertainty: 5
 
 # [Plan] The agent's browser as a package: the first package that extends a run
 
 What "a package adds something to a run" means, worked out on the browser: the plug the run tool
-offers, the address the run's card carries, and the tab the run page shows.
+offers, the address the run's card carries, and the message the run's chat shows.
 
 ## TLDR
 
 The browser itself is a move from history. The new thing is a plug, and it is three small contracts:
 
 1. **The plug.** `agent-scheduler run` reads the project's packages and, for each one declaring
-   `"framework": { "run": "<command>" }`, runs `<command> attach --run <id> --checkout <path>`
-   beside the agent, for the run's life. The command prints one JSON document when it is up — the
-   MCP server the agent should get, and the loopback address a person can watch — and stays up
-   until the run ends.
+   `"framework": { "run": "<command>" }`, runs `<command> attach --run <id> --checkout <path>
+   --diary <path>` beside the agent, for the run's life. The command prints one JSON document when
+   it is up — the MCP server the agent should get, and the loopback address the dashboard may
+   reach — and stays up until the run ends.
 2. **The address.** What the plugs answered goes on the run's card under `caller.run.<package>`,
-   written into the card's starting fields before the session opens. Every reader of a run already
-   reads the card.
-3. **The tab.** A widget gains `runPanels`: a component the dashboard mounts as a tab on the run
-   page, for a run whose card names that package. The daemon proxies same-origin from
-   `/_run/<project>/<run>/<package>/…` to the address the card names, and to nothing else.
+   written into the card's starting fields before the session opens. The daemon proxies
+   same-origin from `/_run/<project>/<run>/<package>/…` to the address the card names, and to
+   nothing else.
+3. **The message.** The package appends its own lines to the run's diary —
+   `{"kind":"browser","from":"<package>","url":…}` each time the agent's browser lands on a new
+   page — and its widget gains `messages`: a component per line kind. The dashboard renders such a
+   line in the chat, where a text message would be, through the widget of the package the line is
+   `from`. For the browser that component is the live, interactive browser with its own address
+   bar. No tab, no run-page slot.
 
 Then the package: `@gemstack/skill-browser`, with the Chrome launcher, the stream server and the
-panel brought back from `43c4de5b^`, a SKILL.md for the agent, and a package.json declaring both
+viewer brought back from `43c4de5b^`, a SKILL.md for the agent, and a package.json declaring both
 `framework.run` and `exports["./dashboard"]`.
+
+## What changed since the first plan
+
+- The ticket's screen is now a chat message, not a tab: the first plan's `runPanels` slot (its
+  P5) is gone, replaced by diary lines a package writes and its widget renders (P5 below).
+- The package reader already lives in `@gemstack/agent-data`
+  (`packages/agent-data/src/provided-command.ts`: `projectPackages` :50,
+  `lookupProvidedCommand` :108, `readProvidedCommand` :130, `runPackageCommand` :147), and the
+  scheduler already uses it (`packages/agent-scheduler/src/git-host.ts:35`). The first plan's
+  step "the reader moves" is done; only a plural variant is missing.
 
 ## What is already there
 
-Read before designing anything: what the ticket calls "deleted, not kept dark" is exact — the two
-framework files that still carry browser names hold something else.
-
-- The feature itself is only in history, at `43c4de5b^`: `packages/framework/src/browser.ts` (317
-  lines then) launching Chrome on a throwaway profile with `--remote-debugging-port` and making the
-  MCP spec pointing at it; `src/browser-stream.ts` (344 lines then) serving that Chrome as MJPEG on
-  a port the OS picks and taking clicks, keys, scrolls and navigations back over POST;
-  `dashboard/components/BrowserPanel.tsx` and `InlineBrowser.tsx` (the viewer);
-  `src/dashboard/browser-proxy.ts` (125 lines: `/browser/<project>/<agent>/stream|input`, the port
-  read off the agent's own meta); `prompts/protocols/browser.md` (the words the agent read).
-- What kept those two file names on main is not the feature: `browser.ts` is down to 41 lines and
-  `browser-stream.ts` to 60, holding `freePort`, `waitForDebugEndpoint` and `connectCdp` — the CDP
-  plumbing `src/bridge-browser.ts` uses for the daemon's sign-in Chrome, and nothing else.
-- Dead marks of the feature still on main: the `browser-stream` and `browser` event kinds
-  (`packages/framework/src/events.ts:180`), their terminal line (`src/terminal.ts:20`) and their
-  colour rule (`dashboard/components/EventList.tsx:110,117`).
-- `packages/framework/src/bridge-browser.ts` is the daemon's own Chrome for the web sign-in. It is
-  not this, it moves nowhere, and nothing here touches it — but it owns those three helpers, which
-  is why the package will carry its own copy of them (below).
-
-What the modules work already gives us, and what it does not:
-
-- `readProvidedCommand(root, kind)` (`packages/framework/src/project-widgets.ts:145`) is how a
-  project's package declares it provides something; `runPackageCommand` (:215) runs it. Both live
-  in the framework package.
-- `agent-scheduler` does not depend on the framework, and the framework does not depend on
-  `agent-scheduler`. Both depend on `@gemstack/agent-data`.
-- A run's card carries `caller`, a free record the logs package stores and never reads
-  (`packages/skill-logs/src/run.ts:36`), and the framework unfolds it into the meta the dashboard
-  shows (`packages/framework/src/store/run-record.ts:15`).
-- A widget is `pages` and `linkActions` and nothing else
-  (`packages/framework/dashboard/widget/index.ts:94`). There is no run-page slot; #1817 left it for
-  the first package that needs one.
-- The run starts at `packages/agent-scheduler/src/run.ts:103`: the checkout is made, the starting
-  card is built (:147) and the session opens with `driver.start` (:354). The driver itself was
-  built earlier, by `driverFor` (`src/scheduler.ts:260`), before any checkout exists.
-- Claude Code takes MCP servers at driver construction (`packages/agent-driver/src/claude-code.ts:41`),
-  written to a `--mcp-config` file lazily per session (:202). `DriverStartOptions`
-  (`packages/agent-driver/src/types.ts:52`) has no MCP field. The Codex driver has no MCP at all.
+- The feature itself is only in history, at `43c4de5b^`: `packages/framework/src/browser.ts`
+  (Chrome on a throwaway profile with `--remote-debugging-port`, and the MCP spec pointing at it);
+  `src/browser-stream.ts` (that Chrome as MJPEG on an OS-picked port, clicks, keys, scrolls and
+  navigations back over POST); `dashboard/components/BrowserPanel.tsx` and `InlineBrowser.tsx`
+  (the viewer); `src/dashboard/browser-proxy.ts` (the proxy, port read off the agent's meta);
+  `prompts/protocols/browser.md` (the words the agent read).
+- On main, `packages/framework/src/browser.ts` (41 lines) and `browser-stream.ts` (60 lines) hold
+  only `freePort`, `waitForDebugEndpoint` and `connectCdp`, the CDP plumbing of
+  `src/bridge-browser.ts` — the daemon's own sign-in Chrome, which this does not touch.
+- Marks of the old feature still on main: the `browser-stream` and `browser` event kinds
+  (`packages/framework/src/events.ts:171,180`), their terminal line (`src/terminal.ts:18`) and
+  their colour rule (`dashboard/components/EventList.tsx:110`). The framework must not know what a
+  browser is once this lands, so they go.
+- A diary is JSONL, and any writer may add its own kinds: `AnyDiaryLine`
+  (`packages/skill-logs/src/run.ts:57`); `fromDiaryLine` passes an unknown kind through as a
+  framework event as written (`packages/framework/src/store/run-record.ts:75`).
+- The live diary is written by agent-driver's `SessionLog`
+  (`packages/agent-driver/src/session-log.ts`): truncated when a fresh session opens (:96), then
+  only appended to (:109, :128). A second writer that only appends whole lines after the session
+  is open is safe beside it.
+- A run's card carries `caller`, stored and never read by the logs package
+  (`packages/skill-logs/src/run.ts:36`), unfolded into the meta by the framework
+  (`packages/framework/src/store/run-record.ts:15`).
+- A widget is `pages` and `linkActions` (`packages/framework/dashboard/widget/index.ts:114`).
+- The chat is `EventList` (via `AgentFeed`, mounted in `AgentView.tsx:215`); a `choice` line is
+  already rendered as an interactive inline panel there — the precedent for a message that is not
+  text.
+- The run starts in `runCommand` (`packages/agent-scheduler/src/run.ts:111`): the checkout, the
+  starting card (:152), then `session`, which opens the driver with `driver.start` (:356). The
+  driver itself was built earlier by `driverFor` (`src/scheduler.ts:251`).
+- Claude Code takes MCP servers at driver construction
+  (`packages/agent-driver/src/claude-code.ts:41`), written to a `--mcp-config` file per session
+  (:190). `DriverStartOptions` (`packages/agent-driver/src/types.ts:52`) has no MCP field. The
+  Codex driver has no MCP at all.
 
 ## Problems
 
 Rated for how much a better way might exist:
 
-- **P1 — the plug's shape and lifetime (8).** Nothing in the tool starts something that must live
-  as long as the agent and die with it.
-- **P2 — who may read a package's declaration (5).** The reader is in the framework; the run tool
-  cannot import it.
-- **P3 — handing the agent the tool (6).** The MCP spec is known only after the checkout exists,
+- **P1 — the plug's shape and lifetime (7).** Nothing in the run tool starts something that must
+  live as long as the agent and die with it.
+- **P2 — reading every package that declares `run` (1).** The reader returns one provider.
+- **P3 — handing the agent the tool (5).** The MCP spec is known only after the checkout exists,
   and the driver was built before that.
-- **P4 — where the address lives (4).** The dashboard must find a run's browser without the
+- **P4 — where the stream address lives (3).**
+- **P5 — the message in the chat (6).** A package's line rendered by that package, without the
   framework knowing what a browser is.
-- **P5 — the run-page slot (7).** What a package puts on a run page, and when the tab is there.
-- **P6 — the proxy (5).** Same-origin for the pane, without becoming a relay into anything on
+- **P6 — the proxy (4).** Same-origin for the viewer, without becoming a relay into anything on
   loopback.
-- **P7 — the words the agent reads (2).**
-- **P8 — whether every run gets a browser (6).**
-- **P9 — Chrome that outlives its run (5).**
+- **P7 — the words the agent reads (1).**
+- **P8 — whether every run gets a browser (5).**
+- **P9 — Chrome that outlives its run (4).**
 
 ## Solutions
 
 ### P1 — the plug
 
 - **A. A long-lived child of the run's process (recommended).** `<command> attach --run <id>
-  --checkout <path>`: prints one JSON document on stdout when it is up, then stays. The run tool
-  reads that line, keeps the child, and SIGTERMs it when the session ends — in the same `finally`
-  that disposes the driver session, so a stop, a failure and a normal end all close it. One
-  lifetime, no second command, nothing to reconcile.
-- B. A `start` command that detaches its own daemon and a `stop` command that kills it. Two
-  commands, two failure modes, and a stop that never runs leaves a Chrome behind with nobody
-  responsible for it.
-- C. A module the run tool imports. Rejected: every other package talks through a command, and a
-  module would make the run tool resolve and load package code.
+  --checkout <path> --diary <path>` prints one JSON document on stdout when it is up, then stays.
+  The run tool reads it, keeps the child, and SIGTERMs it in the same `finally` that disposes the
+  driver session, so a stop, a failure and a normal end all close it.
+- B. `start` detaching its own daemon, `stop` killing it. Rejected: a stop that never runs leaves a
+  Chrome with nobody responsible for it.
+- C. A module the run tool imports. Rejected: every other package talks through a command.
 
-Several packages may declare `run`, and **all** of them attach — unlike a provider (`tickets`,
-`queue`, `runs`, `branches`), where the first declaring package wins because a project has one
-queue. An extension is plural by nature; the reader needs a "every package that declares it"
-variant beside today's "the first one".
-
-Bounded like every other package command: a handshake that does not arrive within a timeout
-(say 30s) means no extension — the run goes on without it, and the diary says so. A plug that
-fails never fails the run.
+Several packages may declare `run`, and all of them attach — unlike a provider, where a project has
+one. A handshake that does not arrive within 30s (`COMMAND_TIMEOUT_MS`) means no extension: the run
+goes on, and the diary says so. A plug that fails never fails the run.
 
 ### P2 — the reader
 
-- **Move `projectPackages` / `readProvidedCommand` into `@gemstack/agent-data` (recommended)**, and
-  have the framework re-export what it uses. Both sides then read one answer to "which package
-  provides what", and `agent-data` is already the shared floor.
-- B. A second small reader inside `agent-scheduler`. Rejected: two readers of one convention drift.
-- C. The framework reads the packages and passes them to the run tool. Rejected: a run also starts
-  from a shell, with no framework in sight.
+`readProvidedCommands(root, kind)` beside `lookupProvidedCommand` in
+`packages/agent-data/src/provided-command.ts`: every installed package declaring the kind, in the
+project's dependency order, no "name one" rule.
 
 ### P3 — the tool for the agent
 
-- **`DriverStartOptions.mcpServers` (recommended)**: a per-session map, merged over the driver's
-  own in `ClaudeCodeSession.mcpConfigFile()`. `run.ts` passes what the plugs answered at
-  `driver.start`. The driver stays built where it is built.
-- B. Build the driver after the plugs answer (`driverFor` takes the specs). Rejected: the run tool
-  would have to know each driver's construction options, and a resume builds its driver elsewhere
-  again.
+- **`DriverStartOptions.mcpServers` (recommended)**: a per-session map merged over the driver's own
+  when `ClaudeCodeSession` writes its `--mcp-config`. `session` passes what the plugs answered at
+  `driver.start`.
+- B. Build the driver after the plugs answer. Rejected: the run tool would learn every driver's
+  construction options, and a resume builds its driver elsewhere.
 
-A driver with no MCP (Codex today) gets no tool: the plug still runs, the person can still watch
-the page, and the agent simply has no browser. Say it plainly in the package's SKILL.md rather than
-refusing the run.
+Codex gets no tool: the plug still runs, the pane still shows, the agent has no browser. The
+package's SKILL.md says so.
 
-### P4 — the address
+### P4 — the stream address
 
-- **`caller.run.<package>` on the run's card (recommended)**, exactly what the plug printed, put
-  into the card's starting fields at `run.ts:147` before the session opens — so it is on the live
-  card from the first write, and on the record afterwards, with no patch. `caller` is already "the
-  writer's own record, stored as given"; the framework unfolds it and the dashboard has it.
-- B. A diary line announcing the port, as the old runner did (`announceBrowserPort`). Rejected: a
-  reader would have to replay the diary to learn a fact that is true for the whole run.
+`caller.run.<package>` on the run's card, exactly what the plug printed, put into the starting
+card at `run.ts:152` before the session opens: on the live card from the first write, on the
+record afterwards. It is true for the whole run, so it belongs on the card, not repeated on every
+diary line.
 
-### P5 — the run-page slot
+### P5 — the message
 
-- **`WidgetDefinition.runPanels?: RunPanel[]` (recommended)**: `{ label, icon?, Panel }`, and the
-  panel is given `{ projectId, run, extension, url(path) }` — the run as `WidgetAgent`, the card's
-  own `caller.run[<this package>]` entry, and a function building the proxied same-origin path for
-  this run and this package. The dashboard mounts it as a tab on the run page (`AgentView.tsx`)
-  **only** when the run's card names that package: no package, no tab; a run started before the
-  package was installed, no tab. The framework never learns what a browser is — only that a
-  package attached to a run.
-- B. A panel always shown, deciding for itself whether it has anything. Rejected: an empty
-  "Browser" tab on every run of a project.
-- C. Reuse `pages` with a run-scoped sub-path. Rejected: the run page is where a person watches the
-  run; a second page is a second place.
+- **A package's diary lines, rendered by its widget (recommended).** The attach child appends
+  `{"kind":"browser","from":"@gemstack/skill-browser","url":"https://…"}` to the `--diary` path
+  when the agent's browser reaches its first real (http/https) page and again on each change of
+  page — the URL only, never a frame: someone will type a password into that pane. `from` is the
+  package's name, so two packages may use the same kind without colliding.
+  `WidgetDefinition.messages?: Record<string, Message>` names a component per line kind; the
+  dashboard renders a line that carries `from` through that package's widget, given `{ line, run,
+  live, url(path) }` — `url` builds the proxied path for this run and this package, `live` is
+  whether this is the run's last line of that kind from that package while the run is running.
+  A line whose package has no widget, or no component for its kind, stays the plain row it is
+  today.
+- B. Keep the `browser` event kind in the framework and render the viewer there. Rejected: the
+  framework would know what a browser is, and the next package extending a run would need the
+  framework changed again.
+- C. The first plan's run-page tab. Rejected by the ticket: the browser is a chat message, where
+  the agent used it.
+
+For the browser: the run has one Chrome, so only the last `browser` line is the live, interactive
+pane (address bar with back, forward, reload and the URL, stream, input); an earlier one folds to
+its address, a link down to the live one. A run that has ended shows the last line's address and
+says the run has ended.
+
+The `--diary` path is given, not built by the package: the package does not learn the live
+directory's layout. The child writes only once the agent browses, which is after the session has
+opened, so `SessionLog`'s truncation on open (`session-log.ts:96`) cannot remove its lines; the
+package still writes nothing before its first navigation, and says why in a comment.
 
 ### P6 — the proxy
 
 `/_run/<projectId>/<runId>/<package>/<rest…>`, beside `WIDGETS_PREFIX`
-(`packages/framework/src/dashboard/widget-serve.ts`): the daemon resolves the run's card, reads
-`caller.run[package]`, and proxies to that address only — loopback only, port never named by the
-client, methods and bodies passed through, the MJPEG response streamed. Anything else 404s.
-`43c4de5b^:packages/framework/src/dashboard/browser-proxy.ts` is the skeleton; what changes is that
-the two legs (`stream`, `input`) become whatever path the package's own server serves, and the port
-comes from the card rather than from a meta field named `browserPort`.
+(`packages/framework/src/dashboard/widget-serve.ts:8`): the daemon resolves the run's card, reads
+`caller.run[package]`, and proxies to that loopback address only — the client never names a port;
+methods and bodies passed through, the MJPEG response streamed; anything else 404s.
+`43c4de5b^:packages/framework/src/dashboard/browser-proxy.ts` is the skeleton. It resolves through
+the dashboard's run lookup, not the checkout, so it answers (a 404 from a dead address) after the
+checkout is gone.
 
 ### P7 — the words
 
-The package ships `SKILL.md`, like every other skill package; `43c4de5b^:packages/framework/prompts/protocols/browser.md`
-is its source text. Nothing in the framework ships prompt text any more, and this keeps it that way.
+The package's `SKILL.md`, from `43c4de5b^:packages/framework/prompts/protocols/browser.md`.
 
 ### P8 — whether every run gets a browser
 
 - **Every run of a project that installs the package (recommended).** The start hook carries
-  `PROMPT`, `DRIVER`, `MODEL`, `THEN` and nothing else (`project-hooks.ts:156`); a per-package
-  launcher row would be the option-per-feature the modules work just removed. A project that does
-  not want a Chrome per run does not install the package.
-- B. A launcher box, as `--browser` used to be. Rejected for the above; if a per-run choice is ever
-  wanted, it belongs to the package (a line in the prompt, its own config), not to the framework's
-  hook contract.
-- Cost to accept and to state: a Chrome per run in a project that installed it, whether the agent
-  browses or not. The package may read its own project config to stay out of runs it should not be
-  in; that is the package's business, not the plug's.
+  `PROMPT`, `DRIVER`, `MODEL`, `THEN` and nothing else; a per-package launcher row would be the
+  option-per-feature the modules work removed. A project that does not want a Chrome per run does
+  not install it.
+- B. A launcher box, as `--browser` used to be. Rejected for the above.
+
+Cost to state: a Chrome per run in such a project, whether the agent browses or not.
 
 ### P9 — Chrome that outlives its run
 
-The attach child dies with the run in every ordinary end, including a stop (SIGTERM reaches it from
-the same handler that aborts the session). A run whose process is killed outright leaves a Chrome:
-the throwaway-profile prefix the old `browser.ts` used (`framework-chrome-`) already marks an
-agent's Chrome, so the package's own command can sweep profiles whose run is no longer recorded
-running — and the scheduler's existing sweep is where that is triggered from, if anywhere.
+The attach child dies with the run in every ordinary end, a stop included. A run killed outright
+leaves a Chrome; the throwaway-profile prefix (`framework-chrome-`) marks it, so the package's own
+command can sweep profiles whose run is not recorded running, triggered from the scheduler's
+existing sweep if anywhere. Not in the first cut.
 
 ## Considerations
 
-- A resume (`resumeRun`) must attach again: the run gets a new address, and the card written at the
-  resume carries the new one. The panel keys on the card, so it follows.
+- A resume (`resumeRun`, `run.ts:199`) attaches again: a new address on the card written at the
+  resume (:247), and the live pane follows the card.
 - A follow-up run (`run --then`) is a run of its own and attaches on its own.
-- A run that ends keeps its card, so the tab remains, pointing at an address nothing answers. The
-  old panel already handled a dead stream (`InlineBrowser` kept a last still); simplest correct
-  behaviour is the panel saying the run has ended.
-- The proxy must be reachable for a run whose checkout is gone (the card lives on the data branch
-  by then) — it resolves through the same run lookup the rest of the dashboard uses, not through
-  the checkout.
-- Headless is not on the table: Cloudflare blocks it. The old code launches a real, off-screen
-  Chrome; keep that as it is and do not revisit it here.
-- Nothing in this gives the dashboard's page origin access to Chrome's debug port: the package's
-  own server is still the only way in, and the daemon is still the only client of it.
-- The CDP helpers (`freePort`, `waitForDebugEndpoint`, `connectCdp`, ~100 lines) are used by the
-  daemon's bridge browser as well as by the agent's. A package cannot depend on the framework, so
-  it carries its own copy and the framework keeps its own for the bridge browser. Two copies of a
-  hundred lines of Chrome plumbing is the cheaper of the two prices; the alternative is a third
-  package for them, which is a package nobody asked for.
-- The e2e story harness already links a package into a product project and waits on it (the
-  branches PR did this); the story here is: a run starts, a tab appears on its page, the stream
-  answers, the run ends, the Chrome is gone.
-- LOGIC.md beside every file touched, and DECISIONS entries in `packages/framework/DECISIONS.md`
-  and `packages/agent-scheduler/DECISIONS.md` for the plug, the address and the slot.
+- Headless is not on the table (Cloudflare); keep the old off-screen real Chrome.
+- The dashboard's origin never reaches Chrome's debug port: the package's own server is the only
+  way in, and the daemon its only client.
+- The CDP helpers (~100 lines) are the bridge browser's too; a package cannot depend on the
+  framework, so it carries its own copy.
+- LOGIC.md beside every file touched; DECISIONS entries in `packages/framework/DECISIONS.md` and
+  `packages/agent-scheduler/DECISIONS.md` for the plug, the address and the message;
+  FEATURES-SPEC.md gains the browser.
 
 ## Implementation
 
-Six commits, each buildable and tested on its own; the first four are the plug and can land before
-the package exists.
+Five commits, each buildable and tested; the first three can land before the package exists.
 
-1. **The reader moves.** `projectPackages`, `readProvidedCommand` and a new `readProvidedCommands`
-   (plural, for kinds several packages may declare) into `@gemstack/agent-data`; the framework
-   re-exports and keeps `project-widgets.ts` for the widget half. No behaviour change; existing
-   tests cover it.
-2. **agent-driver: MCP per session.** `DriverStartOptions.mcpServers`, merged over the driver's own
-   in `ClaudeCodeSession`; Codex ignores it. One test proving the written `--mcp-config` holds both.
-3. **agent-scheduler: the plug.** Read the project's `framework.run` declarations; after the
-   checkout and before the card, spawn each `<command> attach --run <id> --checkout <path>`, read
-   one JSON document with a timeout, put the answers on the card under `caller.run`, pass the MCP
-   specs to `driver.start`, and SIGTERM every child in the session's `finally`. Tests over a fake
-   attach script in `test-repo.ts`: it answers, it is on the card, it is killed on a normal end, on
-   a stop and on a failure; one that never answers is skipped and the run still runs.
-4. **framework: the proxy and the slot.** `/_run/<project>/<run>/<package>/…` beside the widget
-   files route, refusing any address the card does not name; `runPanels` in `widget/index.ts`,
-   mounted as tabs in `AgentView`, with the host giving the panel its `url(path)`; tests for the
-   route's refusals and for a panel mounted only where the card names its package.
-5. **The package.** `packages/skill-browser`, built from `43c4de5b^`: the Chrome launcher and the
-   stream server as its own modules (with their own copy of the CDP helpers), a `browser` command
-   whose `attach` launches both and prints the handshake, `SKILL.md` from the old protocol text,
-   `DECISIONS.md`, and a `./dashboard` widget whose one run panel is `BrowserPanel` +
-   `InlineBrowser`, talking to `url('/stream')` and `url('/input')`. package.json declares
-   `"framework": { "run": "browser" }` and `exports["./dashboard"]`.
-6. **The leftovers and the proof.** Drop the `browser` / `browser-stream` event kinds and their
-   terminal and colour branches; the e2e story above; DECISIONS in both packages; this repository
-   installs the package and runs a dogfood run with it.
+1. **agent-data + agent-driver.** `readProvidedCommands`; `DriverStartOptions.mcpServers` merged
+   in `ClaudeCodeSession` (Codex ignores it). Tests: the plural reader; the written
+   `--mcp-config` holds both maps.
+2. **agent-scheduler: the plug.** Read every `framework.run`; after the checkout and before the
+   card, spawn each attach with `--run`, `--checkout`, `--diary`; read one JSON document with a
+   timeout; answers on the card under `caller.run`; MCP specs to `driver.start`; SIGTERM every
+   child in the session's `finally`; the same at a resume. Tests over a fake attach script: it
+   answers, it is on the card, it is killed on a normal end, a stop and a failure; one that never
+   answers is skipped and the run still runs.
+3. **framework: the proxy and the message.** The `/_run/…` route refusing any address the card
+   does not name; `messages` in `widget/index.ts`; `EventList` rendering a `from` line through its
+   package's widget, with `live` and `url(path)`; the `browser` / `browser-stream` event kinds,
+   terminal line and colour rule dropped. Tests: the route's refusals; a line rendered by its
+   widget, a line with no widget kept as a row, only the last line live.
+4. **The package.** `packages/skill-browser` from `43c4de5b^`: launcher and stream server with
+   their own CDP helpers, a `browser` command whose `attach` starts both, prints the handshake and
+   appends the `browser` lines; `SKILL.md`, `DECISIONS.md`; a `./dashboard` widget whose
+   `messages.browser` is the viewer (`InlineBrowser` with an address bar), talking to
+   `url('/stream')` and `url('/input')`.
+5. **The proof.** An e2e story: a run starts, the agent browses, a browser message appears in the
+   chat and streams, the run ends, the Chrome is gone; this repository installs the package and a
+   dogfood run uses it.

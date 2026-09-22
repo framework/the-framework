@@ -1,0 +1,15 @@
+{
+  "id": "2026-09-22T14-35-12-765Z",
+  "startedAt": "2026-09-22T14:35:12.779Z",
+  "status": "running",
+  "intent": "In packages/agent-scheduler/src/run.LOGIC.md, the section 'The checkout' says that when a run names a follow-up its checkout is 'put under the hold [12]' and that a hold that cannot be put fails the run with 'could not hold the merge'. The code has no such hold: run.ts only adds the line HOLD_MERGE_LINE to the agent's prompt (described under 'The follow-up'), and glossary item [12] is the git host. Remove those sentences from 'The checkout' so the file says what the code does, and change nothing else. Commit, push your branch and open its pull request.",
+  "driver": "claude-code",
+  "model": "opus",
+  "caller": {
+    "scheduler": {
+      "command": "In",
+      "host": "Suleimans-MacBook-Pro.local",
+      "then": "/post-merge-cleanup"
+    }
+  }
+}

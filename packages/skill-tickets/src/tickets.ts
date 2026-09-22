@@ -41,8 +41,10 @@ export interface Ticket {
   lockedBy?: string
   /** The `Effort:` its `.plan.md` preamble records (`0`-`10`, 0 trivial, 10 takes months). Absent when unplanned or unrated. */
   effort?: number
-  /** The `Uncertainty:` its `.plan.md` preamble records (`0`-`10`, 0 an obvious implementation, 10 highly uncertain). */
+  /** The `Uncertainty:` its `.plan.md` preamble records (`0`-`10`, 0 an obvious implementation, 10 highly uncertain). Absent when unplanned or unrated. */
   uncertainty?: number
+  /** Whether the `.plan.md` preamble says `Outdated: yes`: the ticket changed in a way that makes the plan outdated. Absent otherwise. */
+  outdated?: true
 }
 
 /** A ticket's `Issue:` or `PR:` link, split into what a reader clicks and where it goes. */
@@ -170,15 +172,16 @@ function planScale(preamble: readonly string[], key: string): number | undefined
   return value >= 0 && value <= 10 ? value : undefined
 }
 
-/** What a `.plan.md`'s preamble records: `Effort:` and `Uncertainty:`, the keys above the `# [Plan]` heading. */
-function planMeta(md: string | undefined): { effort?: number; uncertainty?: number } {
+/** What a `.plan.md`'s preamble records: `Effort:`, `Uncertainty:` and `Outdated:`, the keys above the `# [Plan]` heading. */
+function planMeta(md: string | undefined): { effort?: number; uncertainty?: number; outdated?: true } {
   if (md === undefined) return {}
   const lines = md.slice(0, MAX_TICKET_BYTES).split('\n')
   const headingAt = lines.findIndex(line => line.startsWith('# '))
   const preamble = headingAt === -1 ? lines : lines.slice(0, headingAt)
   const effort = planScale(preamble, 'effort')
   const uncertainty = planScale(preamble, 'uncertainty')
-  return { ...(effort === undefined ? {} : { effort }), ...(uncertainty === undefined ? {} : { uncertainty }) }
+  const outdated = preamble.find(line => line.toLowerCase().startsWith('outdated:'))?.slice('outdated:'.length).trim().toLowerCase() === 'yes'
+  return { ...(effort === undefined ? {} : { effort }), ...(uncertainty === undefined ? {} : { uncertainty }), ...(outdated ? { outdated: true } : {}) }
 }
 
 /**

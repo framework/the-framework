@@ -23,7 +23,7 @@ One run [1]: a checkout [2] from the `branches` package, a session from `agent-d
 
 ## Business logic — TL;DR
 
-- **The id, the command and the mark** - the id is given by the tick or minted from the start time; the command is given by the tick or the prompt's first word without its slash; the mark names the command, this host and this process, and the follow-up [11] when the run names one.
+- **The id, the command and the mark** - the id is given by the tick or minted from the start time; the command is given by the tick, else read off the prompt by the schedule's rule (the schedule line the prompt names, else the prompt's first word without its slash); the mark names the command, this host and this process, and the follow-up [11] when the run names one.
 - **The run's lock** - taken for the run's id with this process's pid before the marker, waited for while another live process holds it (a tick's run finds it already handed to it), let go once the record is written and the checkout reclaimed or kept, whatever happened.
 - **The marker** - a person's run writes its own marker; the tick's run was marked before it was spawned and does not mark itself again.
 - **The checkout** - made through the `branches` package for the run's id, on the birth branch `agent-<id>`, or attached to an existing branch when one is given (a follow-up's); without one there is no run: the record is written `failed` with `could not create a checkout: …` over the marker, and the outcome says `no checkout`.
@@ -46,7 +46,7 @@ See `## Context`.
 
 #### Business logic
 
-The run starts at the clock's now. Its id is the one the tick handed over, or else the start time as an id. Its command is the one the tick handed over, or else the prompt's first word with a leading `/` removed (`/work-queue` → `work-queue`). Its mark [6] is that command, this machine's host name, this process's pid, and the follow-up's [11] prompt when the run names one.
+The run starts at the clock's now. Its id is the one the tick handed over, or else the start time as an id. Its command is the one the tick handed over, or else read off the prompt by the schedule's rule (`schedule.ts`): the schedule line the prompt names without its slash (`/triage quick` → `triage quick`), else the prompt's first word with a leading `/` removed (`/work-queue` → `work-queue`). Its mark [6] is that command, this machine's host name, this process's pid, and the follow-up's [11] prompt when the run names one.
 
 ### The run's lock
 

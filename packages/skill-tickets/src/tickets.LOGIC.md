@@ -1,4 +1,4 @@
-Reads tickets off the `tickets/` directory of the `agent-data` branch [1] into rows: what the head of each ticket's markdown says about itself (title, summary, priority, topics, issue link, pull request link, date) plus what the plan and the claim [2] beside it add (planned, locked, holder [3], effort, uncertainty). The same reader serves the `tickets` command's `list` and `show` and the daemon, which serves the dashboard's ticket rows, whether the directory is a checkout on disk or a tree read straight off the branch without a checkout; it also reads `tickets/meta.json`, the stamp of the last issue import.
+Reads tickets off the `tickets/` directory of the `agent-data` branch [1] into rows: what the head of each ticket's markdown says about itself (title, summary, priority, topics, issue link, pull request link, date) plus what the plan and the claim [2] beside it add (planned, locked, holder [3], effort, uncertainty, outdated). The same reader serves the `tickets` command's `list` and `show` and the daemon, which serves the dashboard's ticket rows, whether the directory is a checkout on disk or a tree read straight off the branch without a checkout; it also reads `tickets/meta.json`, the stamp of the last issue import.
 
 ## Context
 
@@ -17,13 +17,14 @@ Reads tickets off the `tickets/` directory of the `agent-data` branch [1] into r
 
 ## Business logic — TL;DR
 
-- **What a ticket's row holds** - one row per ticket, the same fields for `list` and `show`: file, title, summary, date and whether planned always; priority, topics, issue link, pull request link, locked, holder, effort and uncertainty only when they have a value.
+- **What a ticket's row holds** - one row per ticket, the same fields for `list` and `show`: file, title, summary, date and whether planned always; priority, topics, issue link, pull request link, locked, holder, effort, uncertainty and outdated only when they have a value.
 - **The key block above the title** - `Priority:`, `Topics:`, `Issue:` and `PR:` are read only from the key block [6], the lines above the `# ` heading, keys matched in any case; any other line there is noise.
 - **The title, else the filename made readable** - the first `# ` heading is the title; without one, the filename without `.md`, percent escapes decoded and underscores turned into spaces.
 - **The summary is the first prose line** - the first line after `## TLDR` that is not blank, not a heading and not a `Source:` line; without a `## TLDR`, the first such line after the title; empty when there is none.
 - **A ticket's date, and newest first** - the `yyyy-mm-dd` the filename starts with, at midnight UTC; else the file's modification time; else the Unix epoch; a listing is ordered newest first.
 - **A plan and a claim fold into their ticket** - `.plan.md` and `.lock.md` files are never rows of their own; they mark their ticket as planned and as locked, the claim's holder shown only when its line parses.
 - **The plan's effort and uncertainty ratings** - `Effort:` and `Uncertainty:` above the plan's heading, each a whole number from 0 to 10, else absent, never clamped.
+- **The plan's outdated mark** - `Outdated: yes` above the plan's heading sets `outdated` on the row; any other value, or the key below the heading, does not.
 - **Listing a directory** - every `.md` that is not a sibling and can be read, parsed from its head only; a missing directory lists nothing; `meta.json` and other files are ignored; "any ticket at all" is answered from the listing alone.
 - **One ticket by name** - only a name passing the bare filename gate, and only when the file exists; the answer carries the ticket's whole text.
 - **The last-import stamp** - `tickets/meta.json` records when the tickets last caught up with the issue tracker; every way the file can be unusable reads as "not known".
@@ -38,7 +39,7 @@ See `## Context`.
 
 #### Business logic
 
-A row names the ticket by its filename inside `tickets/`, which is also its identity, and always carries the title, the summary (an empty string when the ticket has none), the date, and whether a plan sits beside it. The other fields appear only when they have a value and are absent otherwise, never null or empty: the priority as written, lowercased but otherwise verbatim (the format says a whole number from 0 to 10, but the row does not check it; the number the agent queue uses is derived by the rule in `names.ts`); the topics as bare tags; the issue link as its label and its URL; locked, present and true only when a claim [2] exists; the holder [3] the claim names; the plan's effort; the plan's uncertainty. `show` adds the ticket's whole markdown. `list` parses only a ticket's head, its first 4,000 characters, because nothing below the head is shown in a list.
+A row names the ticket by its filename inside `tickets/`, which is also its identity, and always carries the title, the summary (an empty string when the ticket has none), the date, and whether a plan sits beside it. The other fields appear only when they have a value and are absent otherwise, never null or empty: the priority as written, lowercased but otherwise verbatim (the format says a whole number from 0 to 10, but the row does not check it; the number the agent queue uses is derived by the rule in `names.ts`); the topics as bare tags; the issue link as its label and its URL; the pull request link the same way; locked, present and true only when a claim [2] exists; the holder [3] the claim names; the plan's effort; the plan's uncertainty; outdated, present and true only when the plan says so. `show` adds the ticket's whole markdown. `list` parses only a ticket's head, its first 4,000 characters, because nothing below the head is shown in a list.
 
 ### The key block above the title
 
@@ -99,6 +100,16 @@ A `.plan.md` or `.lock.md` sibling [5] never becomes a row of its own; a lone pl
 #### Business logic
 
 `Effort:` and `Uncertainty:` are read from the plan's own key block [6], the lines above the plan's first `# ` heading (a plan with no heading is all key block), keys matched in any case, the first line per key winning, within the plan's first 4,000 characters. A value counts only when it is a whole number from 0 to 10. A fraction (`2.5`), an out-of-range number (`15`), a word, or a key written below the heading yields no rating, never a clamped one: a rating that is not on the scale is a typo, and inventing one would hide it. An unplanned ticket has no ratings.
+
+### The plan's outdated mark
+
+#### Context
+
+**User story**: a plan written before the ticket changed says `Outdated: yes` above its heading, as the plan format allows; the routines that pick tickets by their plan's numbers must not queue work on a plan that no longer fits, so the row says so.
+
+#### Business logic
+
+`Outdated:` is read from the same key block [6] as the ratings, the first line per key winning, matched in any case. The row carries `outdated: true` only when the value, surrounding whitespace removed, is `yes` in any case; any other value, a missing key, or the key below the heading leaves the row without the field.
 
 ### Listing a directory
 

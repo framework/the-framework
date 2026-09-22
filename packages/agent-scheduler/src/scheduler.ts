@@ -9,7 +9,7 @@ import { DATA_BRANCH, nodeGitRunner, pullFileBranch, type GitRunner } from '@gem
 import { CHECK_TIMEOUT_MS, SCHEDULER_LOG, TICK_MS } from './names.js'
 import { inFlight, lastStart, markerCard, withdrawMarker, writeMarker } from './records.js'
 import { resumeRun, runCommand, runIdFrom, type RunOutcome } from './run.js'
-import { readSchedule } from './schedule.js'
+import { promptCommand, readSchedule } from './schedule.js'
 import { readState, runStderrPath, stateDir, updateState, withoutPid, type State, type TickRecord } from './state.js'
 import { sweep } from './sweep.js'
 import { acquireRunLock, handOverRunLock, isPidAlive, releaseRunLock } from './run-lock.js'
@@ -153,8 +153,9 @@ async function spawnDetached(repo: string, id: string, args: string[]): Promise<
 /**
  * A run started the way the tick starts one, and answered at once: the marker written on the
  * branch, the run's process spawned detached, the id returned. What a dashboard's start hook
- * runs: it needs the id back now, not when the agent ends. The command is the prompt's first
- * word without its slash, so the run counts against that command's cap like a scheduled one.
+ * runs: it needs the id back now, not when the agent ends. The command is the schedule line the
+ * prompt names, else the prompt's first word without its slash, so the run counts against that
+ * command's cap and interval like a scheduled one.
  */
 export async function detachRun(
   repo: string,
@@ -163,7 +164,7 @@ export async function detachRun(
 ): Promise<{ id: string; command: string; driver: DriverName; model?: string }> {
   const now = opts.now ?? (() => new Date())
   const id = runIdFrom(now().toISOString())
-  const command = opts.prompt.replace(/^\//, '').split(/\s+/)[0] || opts.prompt
+  const command = promptCommand(opts.prompt, await readSchedule(repo))
   const driver = opts.driver ?? 'claude-code'
   const model = await modelFor(repo, driver, opts.model)
   // The lock before the marker: a scheduler's sweep that reads the marker in the moment before

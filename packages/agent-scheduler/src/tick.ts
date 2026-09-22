@@ -6,7 +6,7 @@ import type { RunCard } from '@gemstack/skill-logs'
 import { COMMANDS_DIR } from './names.js'
 import { quotaBoundaryStatus, quotaHeadroom } from './quota-boundary.js'
 import { markerCard, type SchedulerMark } from './records.js'
-import { commandPrompt, isDue, type Schedule, type ScheduledCommand } from './schedule.js'
+import { commandPrompt, commandSkill, isDue, type Schedule, type ScheduledCommand } from './schedule.js'
 import { isSwitchedOn, type ScheduleLine, type State, type TickDecision, type TickRecord } from './state.js'
 
 /**
@@ -74,7 +74,7 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
     const decide = (outcome: string, run?: string): void => {
       record.decisions.push({ command: command.name, outcome, ...(run ? { run } : {}) })
     }
-    if (!(await deps.hasCommand(command.name))) {
+    if (!(await deps.hasCommand(commandSkill(command.name)))) {
       decide('no such command in this project')
       continue
     }
@@ -179,7 +179,7 @@ async function boundary(deps: TickDeps) {
   return quotaBoundaryStatus({ windows: reading.windows, now: deps.now().getTime(), model: deps.state.model, limitOffset: deps.state.spendOffset })
 }
 
-/** Whether the project has a command: its skill folder is there, tracked file or link. */
+/** Whether the project has a command's skill: its folder is there, tracked file or link. */
 export async function projectHasCommand(repo: string, name: string): Promise<boolean> {
   if (!/^[a-z0-9][a-z0-9-]*$/.test(name)) return false
   return stat(join(repo, COMMANDS_DIR, name)).then(s => s.isDirectory(), () => false)

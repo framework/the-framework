@@ -16,7 +16,7 @@ Every command prints one JSON document; a refusal is `{"ok":false,"reason":…}`
 ```
 npx tickets list                 every open ticket, as one JSON array; a row: file, title, summary, date,
                                  planned, and when set priority, topics, issue, pr (set: the ticket is in
-                                 review), effort, uncertainty, locked, lockedBy
+                                 review), effort, uncertainty, outdated (the plan says so), locked, lockedBy
 npx tickets show <file>          one ticket: its text, its plan, who holds it
 npx tickets meta                 when the tickets last caught up with the issue tracker:
                                  {"lastImportedAt": <ISO 8601>}, or {} when no import was recorded

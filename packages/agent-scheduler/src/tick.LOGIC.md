@@ -12,7 +12,7 @@ One tick [1]: pull the `agent-data` branch [2], sweep [3], read the schedule [4]
 [2] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [3] sweep: the pass on every tick that records and reclaims the runs of this machine whose process died.
 [4] the schedule: `agent-schedule.md` at the repository root, tracked, written by a person: one list line per command.
-[5] command: a `.claude/skills/<name>` folder tracked in the project, which the coding agent's harness expands from the slash command `/<name>`.
+[5] command: a schedule line's name, a skill folder's name under `.claude/skills/` and at most one word the skill takes as its argument (`triage quick`), which the coding agent's harness expands from the slash command `/<name>`; the whole name is what the switch, the interval, the cap and the run records go by.
 [6] cap: how many runs of one command may be in flight at once, across every machine that shares the repository.
 [7] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
 [8] run: one agent this tool starts: a detached process of the tool's own, a checkout, one prompt to the coding agent, and a run record when it ends.
@@ -28,7 +28,7 @@ One tick [1]: pull the `agent-data` branch [2], sweep [3], read the schedule [4]
 - **Unreadable lines** - each is one decision under `line <N>` with `unreadable: <text>`.
 - **Per command, in order** - `no such command in this project`; `switched off on this machine` when this machine's schedule switch [12], else the line, says off, and no check runs; for a line with an interval, `not due (last start <age> ago, every <interval>)` while the command's last recorded start on any machine is younger than the interval, and no check runs; for a line with a check, `check failed: <last line of stderr>` or `not due`; `cap reached (<N> in flight: <id> on <host>, …)`; `not ready: <problems>`; `quota: <reason>`; `not started: the scheduler was stopped` when a stop came in during the readings; then the marker, the re-count, and `started <id>` or `could not start: <error>`.
 - **Two machines** - a marker whose push was rejected twice is withdrawn: `another machine got there first: <error>`; a marker that landed but ranks past the cap among the in-flight ids in time order is withdrawn: `cap reached (…)` naming the others.
-- **The project has a command** - its `.claude/skills/<name>` is a directory, tracked file or link; a name outside lowercase letters, digits and dashes never matches.
+- **The project has a command** - its skill folder, `.claude/skills/<the name's first word>`, is a directory, tracked file or link; a folder name outside lowercase letters, digits and dashes never matches.
 - **The check** - run through `sh -c` at the repository root within its budget; its exit code, stdout and stderr are what the tick reads.
 - **The interval** - read before the check, because the run records are on disk while the check spawns a shell; a command never started is past every interval; the age in the line is floored to minutes, hours or days, `less than a minute` under one.
 
@@ -81,7 +81,7 @@ Once the command passed its schedule switch (step 2 below), when the line carrie
 6. Whether the coding agent can start on this machine is read, once per tick and only now (`readyToRun` in `scheduler.ts`); an answer with problems gives `not ready: <the problems, joined by a space>`, nothing is marked and the quota is not read, and every later command of this tick sees the same answer without a second read. Warnings change nothing here.
 7. The quota is read, once per tick and only now, and measured against the spend boundary with the state's model and spend cushion; a reading that fails or is not available counts as unknown. No headroom gives `quota: <the headroom rule's reason>`, and every later command of this tick sees the same answer without a second read.
 8. The scheduler has not been told to stop while the readings above ran, or the outcome is `not started: the scheduler was stopped`: a stopped scheduler starts nothing, and the readings are where a tick spends its seconds.
-9. A run id is minted from the clock, the prompt is `/<command>`, and a marker [10] is written: a running card with the prompt, the driver's id, the state's model, and the mark naming the command and this host (no pid: the run's process does not exist yet).
+9. A run id is minted from the clock, the prompt is `/<command>` (the whole name, `/triage quick`), and a marker [10] is written: a running card with the prompt, the driver's id, the state's model, and the mark naming the command (the whole name) and this host (no pid: the run's process does not exist yet).
 10. The re-count, below.
 11. The run is spawned detached with the id, the command, the prompt and the model; the outcome is `started <id>` and the decision carries the id as its `run`; a spawn that throws gives `could not start: <the error>`, and the marker stays for the sweep to end on the next tick.
 
@@ -103,7 +103,7 @@ A marker whose write did not land (the push was rejected, re-applied on origin's
 
 #### Business logic
 
-A command exists when `.claude/skills/<name>` at the repository root is a directory, whether a tracked folder or a link to one. A name that is not lowercase letters, digits and dashes never exists, so a schedule line cannot reach outside that folder.
+A command exists when its skill folder, `.claude/skills/<the name's first word>` at the repository root, is a directory, whether a tracked folder or a link to one; `triage quick` and `triage consensual` both exist through `.claude/skills/triage`. A folder name that is not lowercase letters, digits and dashes never exists, so a schedule line cannot reach outside that folder.
 
 ### The check
 

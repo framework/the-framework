@@ -5,6 +5,7 @@ What the tests cover, on the schedule's text alone:
 - **An unreadable interval** - an unknown unit, `every 0h`, `every` twice, an unknown word beside it, and `every day` are each unreadable.
 - **Unreadable lines** - a capitalized name, a line with a cap but no check, and a check without backticks are each kept aside with their line number and text, while the readable line still counts.
 - **`off`** - `every 1d, off` and `off, every 6h, cap 2` each read as a command that does not run where nobody switched it; `off` twice, and `off` with neither `every` nor `when`, are each unreadable.
+- **A word after the folder** - `triage quick: every 6h` and `triage consensual: every 7d, when …, off` each read as a command named by both words; two words after the folder, two spaces between them, and a space before the colon are each unreadable; the prompt of `triage quick` is `/triage quick` and its folder is `triage`, while a one-word command's folder is itself; a person's prompt is filed under the schedule line it names (`/triage quick` → `triage quick`), else under its first word (`/triage`, `/work-queue now`, a plain sentence), and under its first word when there is no schedule.
 - **A cap of zero** - reads as one.
 - **Due** - a non-empty JSON array or object, `true` and non-JSON text are due; `[]`, `{}`, `null`, `false`, `""`, no output and blank output are not.
 - **The prompt** - a command's prompt is its slash command.

@@ -21,14 +21,14 @@ The rules and the processes of `agent-scheduler`: the schedule [1] a person writ
 [11] cap: how many runs of one command may be in flight at once, across every machine that shares the repository; 1 when the schedule line names none.
 [12] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
 [13] reclaim: removing a finished agent's checkout once its work is on the remote.
-[14] command: a `.claude/skills/<name>` folder tracked in the project, which the coding agent's harness expands from the slash command `/<name>`.
+[14] command: a schedule line's name, a skill folder's name under `.claude/skills/` and at most one word the skill takes as its argument (`triage quick`), which the coding agent's harness expands from the slash command `/<name>`.
 [15] the run's lock: `.agent-scheduler/runs/<id>.lock` at the repository root, holding the pid of the one process of the run at work on it; a pid that is not a live process holds nothing.
 [16] schedule switch: a person's choice, on one machine, whether a scheduled command runs there; kept in the state, not in the schedule. The schedule line is the default where nobody switched the command: on, unless the line says `off`.
 
 ## Business logic — TL;DR
 
 - **The names** (`names.ts`) - the schedule file, the state directory and file, the commands directory, and the defaults: `opus`, a spend cushion of half a day, a cap of 1, a tick every minute, a check's budget of one minute.
-- **The schedule** (`schedule.ts`, `schedule.test.ts`) - which lines name a command [14], its check, its interval (`every 6h`: at most that often, from the command's last recorded start) or both, its cap [11], and `off` for a command that runs only where a machine switched it on [16]; a line that cannot be read is named by its number; a check's output says due when it is non-empty JSON; a command's prompt is its slash command.
+- **The schedule** (`schedule.ts`, `schedule.test.ts`) - which lines name a command [14] (a folder name, and at most one word after it for the skill), its check, its interval (`every 6h`: at most that often, from the command's last recorded start) or both, its cap [11], and `off` for a command that runs only where a machine switched it on [16]; a line that cannot be read is named by its number; a check's output says due when it is non-empty JSON; a command's prompt is its slash command.
 - **The state** (`state.ts`, `state.test.ts`) - the JSON file and its defaults, hidden from git on the first write, read as the default when missing or unreadable; a schedule switch [16] kept only where it differs from its line; a scheduler ending clears only its own pid; where a spawned run's stderr lands.
 - **The spend boundary** (`quota-boundary.ts`, `quota-boundary.test.ts`) - the reset prose read as an instant, the elapsed share of the week, the windows in force, the limit the cushion moves, and the one line that says why a run may not start.
 - **Run records as markers** (`records.ts`, `records.test.ts`) - a marker is a running card with the tool's mark, counted per command across machines; withdrawn when the cap was lost; overwritten by the record at the end.

@@ -30,7 +30,7 @@ export const USAGE = `usage: agent-scheduler <command>
   status                        the state file, and whether the scheduler's process is alive
   model <id>                    the model every run starts on (this user)
   offset <points>               how far past the spend boundary a run may still start (this user)
-  switch <command> <on|off>     whether a command of agent-schedule.md runs on this machine; what a dashboard's switch hook runs
+  switch <command> <on|off>     whether a command of agent-schedule.md runs on this machine, the command as its line names it (quoted when it has a word after it); what a dashboard's switch hook runs
 
 JSON on stdout. Exit code 1 for a refusal or a failure (the reason on stderr), 2 for a usage error.`
 

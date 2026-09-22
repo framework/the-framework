@@ -9,7 +9,7 @@ The state [1]: one JSON file under `.agent-scheduler/` at the repository root, w
 [1] the state: `.agent-scheduler/state.json` at the repository root, per user, hidden from git through the repository's exclude file.
 [2] run: one agent this tool starts: a detached process of the tool's own, a checkout, one prompt to the coding agent, and a run record when it ends.
 [3] tick: one pass of the scheduler: pull the `agent-data` branch, sweep, then one decision per scheduled command, each decision one line in the state.
-[4] schedule switch: a person's choice, on one machine, whether a scheduled command runs there; kept in the state, not in the schedule (`agent-schedule.md`). The schedule line is the default where nobody switched the command: on, unless the line says `off`.
+[4] schedule switch: a person's choice, on one machine, whether a scheduled command runs there, by the command's name as its schedule line writes it (`triage quick`); kept in the state, not in the schedule (`agent-schedule.md`). The schedule line is the default where nobody switched the command: on, unless the line says `off`.
 
 ## Business logic — TL;DR
 

@@ -2,6 +2,7 @@ What the tests cover, with every reading injected (the wiring to a real project 
 
 - **A start** - a due command under its cap with quota to spare gets a running marker (the prompt `/<command>`, the state's model, the mark with the command and this host), is spawned with the same id, and the decision is `started <id>` with the run's id.
 - **An interval** - a command never started is due and its check decides; a start younger than the interval is `not due (last start 2h ago, every 6h)` (`1m` for a minute) with no check run and no marker written; a start older than the interval is due again.
+- **A word after the folder** - for `triage quick` and `triage consensual` the folder looked up is `triage` for both; the decisions, the marker's mark, the spawn and the recorded schedule carry the whole name; the prompt is `/triage quick`; a switch and a last start under the whole name hold that line alone.
 - **A schedule switch** - with nobody switching, a line listed `off` is `switched off on this machine` while the other command starts, and the tick records the schedule as the lines say it (name, check or interval, `on`); with this machine switching the first command off and the `off` line on, the first is `switched off on this machine` and the other starts, and no check runs for the command switched off.
 - **Off** - the pull and the sweep still run, no check runs, the note is `off`.
 - **A failed pull** - the note is `agent-data could not be pulled: <error>` and nothing is spawned.

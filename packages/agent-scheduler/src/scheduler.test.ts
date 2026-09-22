@@ -1,4 +1,6 @@
 import { strict as assert } from 'node:assert'
+import { writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { test } from 'node:test'
 import { findRun } from '@gemstack/skill-logs'
 import { CodexDriver, FakeDriver, type Driver } from 'agent-driver'
@@ -26,6 +28,13 @@ test('run --detach writes the marker, spawns the run with its id, and answers th
     const plain = await detachRun(repo, { prompt: 'Read the docs', model: 'opus', now: () => new Date(NOW.getTime() + 1000) }, { spawn: async () => {}, host: 'this-box' })
     assert.equal(plain.command, 'Read')
     assert.equal(plain.model, 'opus')
+    // A prompt that is a schedule line's name is filed under that line, cap and interval included.
+    await writeFile(join(repo, 'agent-schedule.md'), '- triage quick: every 6h\n')
+    const scheduled = await detachRun(repo, { prompt: '/triage quick', now: () => new Date(NOW.getTime() + 2000) }, { spawn: async () => {}, host: 'this-box' })
+    assert.equal(scheduled.command, 'triage quick')
+    assert.deepEqual((await findRun(repo, scheduled.id))?.caller?.['scheduler'], { command: 'triage quick', host: 'this-box' })
+    const bare = await detachRun(repo, { prompt: '/triage', now: () => new Date(NOW.getTime() + 3000) }, { spawn: async () => {}, host: 'this-box' })
+    assert.equal(bare.command, 'triage')
   } finally {
     await removeRepo(repo)
   }

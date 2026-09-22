@@ -9,6 +9,7 @@ import { inboxPath, liveDir, LIVE_DIR, readLiveCard, readLiveDiary } from './liv
 import { markerCard, recordRun, schedulerMark, writeMarker, type SchedulerMark } from './records.js'
 import { projectGitHost, type GitHost, type MergeOutcome } from './git-host.js'
 import { acquireRunLock, isPidAlive, releaseRunLock } from './run-lock.js'
+import { promptCommand, readSchedule } from './schedule.js'
 
 /**
  * One run (#1774): a checkout from the branches package, a session from agent-driver, the prompt
@@ -71,7 +72,7 @@ export interface RunOptions {
   id?: string
   /** Whether the run's marker is already on the branch: the tick writes it before it spawns. A person's run marks itself. */
   marked?: boolean
-  /** The command the run is for, as the schedule names it; the prompt's own name when absent. */
+  /** The command the run is for, as the schedule names it; read off the prompt and the schedule when absent. */
   command?: string
   /** The model the session starts on; the tool's own default when absent. */
   model?: string
@@ -120,7 +121,7 @@ async function runOnce(repo: string, opts: RunOptions): Promise<RunOutcome> {
   const pid = opts.pid ?? process.pid
   const startedAt = clock()
   const id = opts.id ?? runIdFrom(startedAt)
-  const command = opts.command ?? opts.prompt.replace(/^\//, '').split(/\s+/)[0] ?? opts.prompt
+  const command = opts.command ?? promptCommand(opts.prompt, await readSchedule(repo))
   const mark: SchedulerMark = { command, host, pid, ...(opts.then !== undefined ? { then: opts.then } : {}) }
   const log = opts.log ?? (() => {})
   const logs = opts.logs ?? {}

@@ -27,11 +27,11 @@ Something must launch the browser when a run starts, hand the agent the tool (th
 
 ## The screen
 
-The run-page slot deferred at #1817, finally with a package that needs it: the Browser tab on a run comes from the package's widget, streaming from the address the run's card names; the daemon's proxy reads that address from the card.
+The browser shows inside the agent chat, as a message: where a message would show text, this one shows the live, interactive browser, at the point the agent used it, with its own address bar. So the run's diary gets a line of a new kind, the browser's address at that moment, and the dashboard renders that line as the browser inline in the transcript. No tab, no run-page slot.
 
 ## Order
 
-After the Overview cards move to their packages (#1818): those are two moves with a slot already known. The browser then defines the run plug. The panel and the proxy are a move from history; the run half is the new work.
+Parked behind the ten skills; the maintainer's answer (09-20) is that the browser "can be a skill". After the Overview cards move to their packages (#1818): those are two moves with a slot already known. The browser then defines the run plug. The panel and the proxy are a move from history; the run half is the new work.
 
 ## See also
 

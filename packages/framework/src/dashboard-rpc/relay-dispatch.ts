@@ -1,4 +1,4 @@
-import { onProjectFiles, onProjectFileStatus, onFileDiff, onAgentChanges, onFileContent, onGitStatus, onAgentWorktree, onAgentHandoff, onAgent } from './reads.js'
+import { onProjectFiles, onAgentTree, onFileDiff, onAgentChanges, onFileContent, onGitStatus, onAgentWorktree, onAgentHandoff, onAgent } from './reads.js'
 import { sendStop, sendChoice, sendMessage, sendOpenPullRequest, sendMerge } from './control.js'
 
 // The device side of the remote-agent relay (#1067 slice 2). A daemon that relayed an agent here asks this
@@ -16,7 +16,7 @@ type RelayFn = (...args: unknown[]) => Promise<unknown>
 // Null-prototype, like RPC_HANDLERS (R1): the key is a request-controlled string, so a plain object
 // would answer `constructor`/`toString`/`valueOf` off Object.prototype and invoke them as handlers.
 const RELAY_FNS = Object.assign(Object.create(null) as Record<string, RelayFn>, {
-  onProjectFiles, onProjectFileStatus, onFileDiff, onAgentChanges, onFileContent,
+  onProjectFiles, onAgentTree, onFileDiff, onAgentChanges, onFileContent,
   onGitStatus, onAgentWorktree, onAgentHandoff, onAgent,
   sendStop, sendChoice, sendMessage, sendOpenPullRequest, sendMerge,
 }) as unknown as Record<string, RelayFn>

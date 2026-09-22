@@ -4,9 +4,9 @@ What the tests cover, for the dashboard's right rail:
 - **No project, no rail** - with no project selected the rail is not drawn.
 - **Tabs explain themselves** - hovering a tab shows what that panel holds, for example that "Docs" holds the `PLAN`/`TODO` files.
 - **The launcher's documents are not repeated** - while the project home [4] shows the `PLAN`/`TODO` documents in its main column, the "Docs" tab is withheld and the documents are not even read; every other tab is unaffected, and when documents were the only thing left to show, no rail is drawn at all. On an agent's page the tab is there as usual.
-- **Every panel is earned by its content** - a project with no documents has no "Docs" tab, and with nothing else to show has no rail; a surface with a pushed view [1] keeps the rail even when every read comes back empty.
+- **Every panel is earned by its content** - a project with no documents has no "Docs" tab, and with nothing else to show has no rail; a surface with a pushed view [1] keeps the rail even when every read comes back empty; an agent's [2] page keeps its "Files" tab with no project files listed.
 - **A first read still out is not an empty panel** - the tab stays while the first read is in flight, so changing project does not blink the rail out and back in.
-- **A panel that loses its content hands over** - when the tab the user picked by hand stops existing, the rail selects the first tab that still has content instead of showing an empty panel.
+- **A panel that loses its content hands over** - when the tab the user picked by hand stops existing, the rail selects the first tab that still has content (on an agent's page, "Files") instead of showing an empty panel.
 
 ## Glossary
 

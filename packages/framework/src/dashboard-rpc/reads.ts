@@ -18,6 +18,7 @@ import { crawlRepoFiles } from '../project.js'
 import { readFileStatuses, type FileGitStatus } from '../dashboard/file-status.js'
 import { readFileDiff, readFileChanges, type FileDiff, type FileChange } from '../dashboard/file-diff.js'
 import { readFileContent, type FileContent } from '../dashboard/file-read.js'
+import { readAgentFileContent, readAgentFileDiff, readAgentTree, resolveAgentFiles, type AgentFilesAt, type AgentTree } from '../dashboard/agent-tree.js'
 import { contextBridgeBrowser, contextProjects, contextRemote, resolveProjectPath, resolveAgentPath } from './context.js'
 import { relayOr } from './relay-agent.js'
 import type { FrameworkEvent } from '../events.js'
@@ -52,6 +53,17 @@ async function withProject<T>(projectId: string, read: (cwd: string) => Promise<
 async function withAgentPath<T>(projectId: string, agentId: string | undefined, read: (cwd: string) => Promise<T>, empty: T): Promise<T> {
   const cwd = await resolveAgentPath(projectId, agentId)
   return cwd ? read(cwd).catch(() => empty) : empty
+}
+
+/**
+ * Where a run's files are read from (`agent-tree.ts`), with the project root they are read in:
+ * its checkout, its branch, its merge commit, or gone. Undefined for an unknown project or an id
+ * that names no run.
+ */
+async function agentFiles(projectId: string, agentId: string): Promise<{ root: string; at: AgentFilesAt } | undefined> {
+  const root = await resolveProjectPath(projectId)
+  if (!root || !isRunId(agentId)) return undefined
+  return { root, at: await resolveAgentFiles(root, agentId) }
 }
 
 /** Run a cross-project rollup over every registered project, tolerating a failed registry read. */
@@ -267,40 +279,52 @@ export async function onDashboard(): Promise<DashboardData> {
 }
 
 /**
- * The project's files for the `#` context picker (#504) and the panel tree (#492): every
+ * The project's files for the `#` context picker (#504) and the project's file tree (#492): every
  * file git sees (tracked + untracked, honoring .gitignore), repo-relative and sorted, via
  * `git ls-files`. Localhost-only by nature — the relay has no checkout, so it resolves `[]`.
- * Pass a live `agentId` to list that agent's worktree instead of the project root (#738).
+ * Pass a live `agentId` to list that agent's worktree instead of the project root (#738); a run's
+ * own tree is {@link onAgentTree}.
  */
 export async function onProjectFiles(projectId: string, agentId?: string): Promise<string[]> {
   return relayOr(agentId, 'onProjectFiles', [projectId, agentId], () => withAgentPath(projectId, agentId, crawlRepoFiles, []), [])
 }
 
 /**
- * Per-file git status for the tree's dots (#492): repo-relative path -> untracked/modified/
- * deleted, from `git status --porcelain`. `{}` when not a repo / on the relay (no checkout).
- * Pass a live `agentId` to see that agent's own worktree rather than the project root (#738).
+ * Per-file git status for the project's file tree (#492): repo-relative path -> untracked/
+ * modified/deleted, from `git status --porcelain` in the project root. `{}` when not a repo. A
+ * run's own marks come with its tree, {@link onAgentTree}.
  */
-export async function onProjectFileStatus(projectId: string, agentId?: string): Promise<Record<string, FileGitStatus>> {
-  return relayOr<Record<string, FileGitStatus>>(
-    agentId,
-    'onProjectFileStatus',
-    [projectId, agentId],
-    () => withAgentPath<Record<string, FileGitStatus>>(projectId, agentId, readFileStatuses, {}),
-    {},
-  )
+export async function onProjectFileStatus(projectId: string): Promise<Record<string, FileGitStatus>> {
+  return withProject<Record<string, FileGitStatus>>(projectId, readFileStatuses, {})
+}
+
+/**
+ * A run's files for the agent page's Files tab (`agent-tree.ts`): the tree with the paths the run
+ * changed marked, read from its checkout while it exists, then from its branch, then from the
+ * commit its pull request merged as. `gone` when none is left on this machine, `pending` while
+ * the pull request is still being looked up.
+ */
+export async function onAgentTree(projectId: string, agentId: string): Promise<AgentTree> {
+  return relayOr<AgentTree>(agentId, 'onAgentTree', [projectId, agentId], async () => {
+    const found = await agentFiles(projectId, agentId)
+    return found ? readAgentTree(found.root, found.at).catch((): AgentTree => ({ source: 'gone' })) : { source: 'gone' }
+  }, { source: 'gone' })
 }
 
 /**
  * One changed file's diff, for the tree's hover card (#816). Null when the path is not a changed
- * file, is unsafe (see `safeRepoPath`), or there is no checkout. Reads the agent's own worktree when
- * `agentId` names one, so it shows the same change the tree dotted (#815).
+ * file, is unsafe (see `safeRepoPath`), or there is no checkout. For a run it reads the same
+ * source its tree does ({@link onAgentTree}), so it shows the same change the tree marked (#815).
  *
- * The status comes from the same `git status` the dots do, rather than from the caller: a client
+ * The status comes from the same git read the marks do, rather than from the caller: a client
  * that thinks a file is untracked must not be able to make the server read it as one.
  */
 export async function onFileDiff(projectId: string, path: string, agentId?: string): Promise<FileDiff | null> {
   return relayOr(agentId, 'onFileDiff', [projectId, path, agentId], async () => {
+    if (agentId !== undefined && isRunId(agentId)) {
+      const found = await agentFiles(projectId, agentId)
+      return found ? readAgentFileDiff(found.root, found.at, path).catch(() => null) : null
+    }
     const cwd = await resolveAgentPath(projectId, agentId)
     if (!cwd) return null
     const statuses = await readFileStatuses(cwd).catch((): Record<string, FileGitStatus> => ({}))
@@ -330,8 +354,8 @@ export async function onAgentChanges(projectId: string, agentId?: string): Promi
 
 /**
  * One unchanged file's contents, for the tree's hover card (#828). Null when the path is unsafe
- * (see `safeRepoPath`), outside the checkout, or unreadable. Reads the agent's own worktree when
- * `agentId` names one, so it shows the copy the tree is listing (#815).
+ * (see `safeRepoPath`), outside the checkout, or unreadable. For a run it reads the same source
+ * its tree does ({@link onAgentTree}), so it shows the copy the tree is listing (#815).
  *
  * The caller picks this or {@link onFileDiff} from the status the tree already holds; a changed
  * file has a diff worth seeing, an unchanged one has only itself.
@@ -341,7 +365,11 @@ export async function onFileContent(projectId: string, path: string, agentId?: s
     agentId,
     'onFileContent',
     [projectId, path, agentId],
-    () => withAgentPath<FileContent | null>(projectId, agentId, cwd => readFileContent(cwd, path), null),
+    async () => {
+      if (agentId === undefined || !isRunId(agentId)) return withAgentPath<FileContent | null>(projectId, agentId, cwd => readFileContent(cwd, path), null)
+      const found = await agentFiles(projectId, agentId)
+      return found ? readAgentFileContent(found.root, found.at, path).catch(() => null) : null
+    },
     null,
   )
 }

@@ -74,7 +74,8 @@ function asAllAdded(text: string): string {
 }
 
 /**
- * The diff for one changed file in the checkout at `cwd`.
+ * The diff for one changed file in the checkout at `cwd`, or, given a `range`, between two
+ * commits of the repository at `cwd` (a run's committed change, `agent-tree.ts`).
  *
  * Tracked files diff against `HEAD`, not the index, so a change the agent staged still shows;
  * that also matches `git status --porcelain`, which is what dotted the file in the first place.
@@ -88,10 +89,11 @@ export async function readFileDiff(
   path: string,
   status: FileGitStatus,
   git: GitRunner = nodeGitRunner(),
+  range?: { from: string; to: string },
 ): Promise<FileDiff | null> {
   if (!safeRepoPath(path)) return null
 
-  if (status === 'untracked') {
+  if (!range && status === 'untracked') {
     const raw = await readConfinedFile(cwd, path)
     if (!raw) return null
     if (raw.includes(0)) return { path, status, patch: '', added: 0, removed: 0, truncated: false, binary: true }
@@ -105,9 +107,11 @@ export async function readFileDiff(
 
   // `HEAD` is missing in a repo with no commits yet; the working-tree diff is the honest answer
   // there rather than an error.
-  const raw = await git(['diff', '--unified=3', 'HEAD', '--', path], cwd)
-    .catch(() => git(['diff', '--unified=3', '--', path], cwd))
-    .catch(() => '')
+  const raw = range
+    ? await git(['diff', '--unified=3', range.from, range.to, '--', path], cwd).catch(() => '')
+    : await git(['diff', '--unified=3', 'HEAD', '--', path], cwd)
+        .catch(() => git(['diff', '--unified=3', '--', path], cwd))
+        .catch(() => '')
   if (!raw.trim()) return null
   if (/^Binary files /m.test(raw)) return { path, status, patch: '', added: 0, removed: 0, truncated: false, binary: true }
 

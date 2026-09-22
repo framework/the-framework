@@ -3,8 +3,11 @@ import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
 // file, so the tree can dot untracked/modified/deleted entries. A single `git status --porcelain`
 // read, mapped to repo-relative path -> state. Forgiving: a non-repo / failed git yields `{}`.
 
-/** The tree's per-file git state (matches the animate-ui Files `gitStatus`). */
-export type FileGitStatus = 'untracked' | 'modified' | 'deleted'
+/**
+ * The tree's per-file git state. `added` is a file a commit created (a run's committed change,
+ * `agent-tree.ts`); the working tree's status here never says it, a new file there is `untracked`.
+ */
+export type FileGitStatus = 'untracked' | 'added' | 'modified' | 'deleted'
 
 /** Strip git's surrounding quotes from a path with special chars (basic; leaves escapes as-is). */
 function unquotePath(path: string): string {

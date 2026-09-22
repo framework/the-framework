@@ -20,6 +20,7 @@ export { readGitStatus, type GitStatus } from './git-status.js'
 export { prView, prsForBranch, openPrs, pickAgentPr, type LinkedPr, type OpenPr, type PrLookup, type BranchPrLookup, type PrLister } from './pull-requests.js'
 export { readFileDiff, readFileChanges, safeRepoPath, type FileDiff, type FileChange } from './file-diff.js'
 export { readFileContent, type FileContent } from './file-read.js'
+export { resolveAgentFiles, readAgentTree, readAgentFileDiff, readAgentFileContent, type AgentFilesAt, type AgentTree, type FileMark } from './agent-tree.js'
 export {
   readAgentHandoff,
   agentBranchFor,

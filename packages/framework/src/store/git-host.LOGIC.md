@@ -13,7 +13,7 @@ How The Framework reads a project's pull requests and acts on them: through the 
 ## Glossary
 
 [1] git host provider: the command, among the commands of a project's dependencies, that a package declares as answering for the project's git host, in its own package.json under `"framework": { "git-host": "<command>" }` (the `github` skill's package declares its `github` command); it lists the project's pull requests, opens one, lands one, and names the project's page on the git host (`store/git-host.ts`).
-[2] pull request: as the provider answers it: its number, its link, its state (`open`, `merged` or `closed`), its title, whether it is a draft, the branch it is from, the commit its head is at, when it was created and, for a merged one, when it merged.
+[2] pull request: as the provider answers it: its number, its link, its state (`open`, `merged` or `closed`), its title, whether it is a draft, the branch it is from, the commit its head is at, when it was created and, for a merged one, when it merged and the commit it landed as on the base branch.
 [3] the project's page on the git host: a link to the project where its pull requests live, and the git host's name, for the dashboard to draw a link from without naming any git host itself.
 
 ## Business logic — TL;DR
@@ -58,7 +58,7 @@ See `## Context`.
 
 #### Business logic
 
-A pull request [2] is only a pull request with a number, a string link and a state that is exactly `open`, `merged` or `closed`; its title, branch and head are kept as printed or read as empty, its draft flag as true only when printed true, its creation time as printed or empty, and its merge time only when printed. Anything else is dropped from a list, and an answer that is not a list is no pull requests. An opened pull request is read only with a number and a link. The project's page is read only with both a link and a name.
+A pull request [2] is only a pull request with a number, a string link and a state that is exactly `open`, `merged` or `closed`; its title, branch and head are kept as printed or read as empty, its draft flag as true only when printed true, its creation time as printed or empty, and its merge time and merge commit only when printed. Anything else is dropped from a list, and an answer that is not a list is no pull requests. An opened pull request is read only with a number and a link. The project's page is read only with both a link and a name.
 
 ### The provider is looked up again every five seconds
 

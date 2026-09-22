@@ -27,6 +27,8 @@ export interface LinkedPr {
    * PR already landed everything" from "the session kept working after its PR merged".
    */
   headRefOid?: string
+  /** The commit a merged PR landed as on the base branch, when the git host said. */
+  mergeCommit?: string
 }
 
 /** An open PR on the interventions queue (#632). */
@@ -71,6 +73,7 @@ export function linkedPrOf(request: GitHostRequest): LinkedPr {
     title: request.title,
     ...(request.createdAt ? { createdAt: request.createdAt } : {}),
     ...(request.head ? { headRefOid: request.head } : {}),
+    ...(request.mergeCommit ? { mergeCommit: request.mergeCommit } : {}),
   }
 }
 

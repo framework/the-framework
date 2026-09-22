@@ -38,6 +38,8 @@ export interface GitHostRequest {
   createdAt: string
   /** ISO merge time, for a merged request. */
   mergedAt?: string
+  /** The commit a merged request landed as on the base branch. */
+  mergeCommit?: string
 }
 
 /** The project's page on the git host, and what the git host is called: what a link is drawn from. */
@@ -95,6 +97,7 @@ export function parseRequests(output: unknown): GitHostRequest[] {
       head: typeof row['head'] === 'string' ? row['head'] : '',
       createdAt: typeof row['createdAt'] === 'string' ? row['createdAt'] : '',
       ...(typeof row['mergedAt'] === 'string' ? { mergedAt: row['mergedAt'] } : {}),
+      ...(typeof row['mergeCommit'] === 'string' ? { mergeCommit: row['mergeCommit'] } : {}),
     })
   }
   return requests

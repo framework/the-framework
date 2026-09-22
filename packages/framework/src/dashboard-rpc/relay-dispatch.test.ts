@@ -10,7 +10,7 @@ import { dispatchRelayRpc, RELAY_RPC_NAMES } from './relay-dispatch.js'
 
 test('RELAY_RPC_NAMES is the run-scoped read/steer/handoff surface and excludes start/delete (#1067 slice 2)', () => {
   for (const name of [
-    'onProjectFiles', 'onProjectFileStatus', 'onFileDiff', 'onAgentChanges', 'onFileContent',
+    'onProjectFiles', 'onAgentTree', 'onFileDiff', 'onAgentChanges', 'onFileContent',
     'onGitStatus', 'onAgentWorktree', 'onAgentHandoff', 'onAgent',
     'sendStop', 'sendChoice', 'sendMessage', 'sendOpenPullRequest', 'sendMerge',
   ]) {

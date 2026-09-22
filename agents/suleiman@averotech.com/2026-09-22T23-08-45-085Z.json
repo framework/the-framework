@@ -1,7 +1,8 @@
 {
   "id": "2026-09-22T23-08-45-085Z",
   "startedAt": "2026-09-22T23:08:45.085Z",
-  "status": "running",
+  "endedAt": "2026-09-22T23:10:38.288Z",
+  "status": "stopped",
   "intent": "/work-queue",
   "driver": "claude-code",
   "model": "opus",

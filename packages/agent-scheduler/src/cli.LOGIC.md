@@ -23,7 +23,7 @@ The command line, `agent-scheduler <command>`: JSON on stdout, one line for a pe
 - **`init`** - this tool's lines written into the dashboard's hooks file, a line already there kept; answered with the file and which keys gained a line; refused `no-dashboard` where the project has no `.the-framework/` directory and `unreadable` where the file is not a YAML map (`init.ts`).
 - **`start`, `stop`, `status`** - the state answered after each; `start --foreground` makes this process the scheduler's; `start --keep-alive` writes keep-alive on; `stop --unless-keep-alive` leaves a keep-alive scheduler running, says so on stderr, and answers `kept: true`.
 - **`model <id>`, `offset <points>`** - the state's model or spend cushion written for this user and the state answered; `offset` with something that is not a number is a usage error, `<value> is not a number of percentage points`.
-- **`switch <command> <on|off>`** - this machine's schedule switch [4] for one command of `agent-schedule.md` written and the state answered; refused `no-schedule` without the file and `not-scheduled` when it has no line for the command; a value neither `on` nor `off` is a usage error.
+- **`switch <command> <on|off>`** - this machine's schedule switch [4] for one command of `agent-schedule.md`, named as its line names it (quoted when it holds a word after the folder: `switch "triage quick" on`), written and the state answered; refused `no-schedule` without the file and `not-scheduled` when it has no line for the command; a value neither `on` nor `off` is a usage error.
 
 ## Business logic
 

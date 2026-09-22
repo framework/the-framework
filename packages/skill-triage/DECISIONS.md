@@ -19,9 +19,16 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   convention, a command is a skill.
 - A command is marked `disable-model-invocation`: a person or a runner fires it, the
   agent never picks it on its own.
-- A runner fires a command by its name, `/triage-quick`; the agent's harness expands the
-  skill. The command's words are the rules of the job — a quick win is a planned ticket
-  with a low effort and no uncertainty, not one whose plan records a decision not to do
-  the work, not one in review; each goes on the queue with a sensible priority, the
-  cheapest first; only queue, never do, so a human can still veto on the queue — never a
-  skill's name or command.
+- One triage command with a mode word, `/triage quick` and `/triage consensual`, and both
+  modes when the word is missing; the schedule paces and switches each mode on its own
+  line. Picked over two commands one sentence apart (the same job written twice), and
+  over one line running both modes (significant work would then be queued wherever quick
+  wins are, with no switch of its own).
+- The command's words are the rules of the job, in numbers two runs agree on: a quick
+  win is a planned ticket with effort 2 or less and uncertainty 2 or less; consensual
+  work is a planned ticket with uncertainty 3 or less that is no quick win; a ticket on
+  the queue, held, in review, or whose plan records a decision not to do the work is
+  skipped; a quick win goes on the queue one above the ticket's priority, consensual
+  work at the ticket's priority; only queue, never do, so a human can still veto on the
+  queue. Picked over "low effort and no uncertainty" and "significant, consensual",
+  which one run read as uncertainty 0 (never met) and another as uncertainty 3.

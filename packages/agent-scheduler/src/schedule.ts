@@ -5,10 +5,14 @@ import { DEFAULT_CAP, SCHEDULE_FILE } from './names.js'
 /**
  * The schedule (#1774): a markdown file a person writes and tracks at the repository root, one
  * list line per command. The tool knows no command by name; this file is the only place a
- * command is named, and `.claude/skills/<command>` in the repository is what runs.
+ * command is named. A command is written as a person types it, without the slash: a skill's
+ * folder name, then at most one word the skill takes as its argument; `.claude/skills/<folder>`
+ * in the repository is what runs, and the whole name is the command's identity (its prompt,
+ * its switch, its interval, its cap, its run records).
  *
  *     - work-queue: when `npx queue`, cap 1
- *     - triage-quick: every 6h
+ *     - triage quick: every 6h
+ *     - triage consensual: every 7d, off
  *     - update-tickets: every 1h, when `npx tickets meta | jq …`
  *     - post-merge-cleanup: every 1d, off
  *
@@ -27,7 +31,7 @@ import { DEFAULT_CAP, SCHEDULE_FILE } from './names.js'
 
 /** One command as the schedule names it. */
 export interface ScheduledCommand {
-  /** The command: the `.claude/skills/<name>` the agent's harness expands from `/<name>`. */
+  /** The command as typed without its slash: the skill's folder name, then at most one word the skill gets as its argument (`triage quick`). */
   name: string
   /** The check, a shell command line; absent when the line paces by time alone. */
   when?: string
@@ -48,7 +52,7 @@ export interface Schedule {
   unreadable: { line: number; text: string }[]
 }
 
-const COMMAND_LINE = /^-\s+([a-z0-9][a-z0-9-]*):\s*(.+)$/
+const COMMAND_LINE = /^-\s+([a-z0-9][a-z0-9-]*(?: [a-z0-9][a-z0-9-]*)?):\s*(.+)$/
 const EVERY = /^every\s+(\d+)(m|h|d)$/
 const WHEN = /^when\s+`([^`]+)`$/
 const CAP = /^cap\s+(\d+)$/
@@ -127,9 +131,14 @@ export async function readSchedule(repo: string): Promise<Schedule | undefined> 
   return md === undefined ? undefined : parseSchedule(md)
 }
 
-/** The prompt a command runs with: its slash command, which the agent's harness expands. */
+/** The prompt a command runs with: its slash command, which the agent's harness expands, the word after it handed to the skill. */
 export function commandPrompt(name: string): string {
   return `/${name}`
+}
+
+/** The skill folder a command runs: the name's first word; the rest is the skill's argument. */
+export function commandSkill(name: string): string {
+  return name.split(' ')[0]!
 }
 
 /**

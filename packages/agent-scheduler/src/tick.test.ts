@@ -104,6 +104,39 @@ test('a due command under its cap with quota to spare is marked on the branch, t
   assert.deepEqual(seen.spawned, [{ id: marker.id, command: 'work-queue', prompt: '/work-queue', model: 'opus' }])
 })
 
+test('a command with a word after its folder name: the folder is looked up, the whole name is what the switch, the interval, the marker and the decision carry, and the prompt is the name with a slash', async () => {
+  const md = '- triage quick: every 6h\n- triage consensual: every 7d\n'
+  const looked: string[] = []
+  const started: Record<string, string> = { 'triage consensual': '2026-09-15T14:00:00.000Z' }
+  const { deps: d, seen } = deps({
+    md,
+    hasCommand: async name => {
+      looked.push(name)
+      return name === 'triage'
+    },
+    lastStart: async command => started[command],
+    stateOver: { switches: { 'triage consensual': false } },
+  })
+  const record = await tick(d)
+  assert.deepEqual(looked, ['triage', 'triage'])
+  assert.deepEqual(record.decisions, [
+    { command: 'triage quick', outcome: 'started 2026-09-16T14-01-00-000Z', run: '2026-09-16T14-01-00-000Z' },
+    { command: 'triage consensual', outcome: 'switched off on this machine' },
+  ])
+  assert.equal(seen.markers[0]!.intent, '/triage quick')
+  assert.deepEqual(seen.markers[0]!.caller, { scheduler: { command: 'triage quick', host: 'this-box' } })
+  assert.deepEqual(seen.spawned, [{ id: '2026-09-16T14-01-00-000Z', command: 'triage quick', prompt: '/triage quick', model: 'opus' }])
+  assert.deepEqual(record.schedule, [
+    { command: 'triage quick', every: '6h', on: true },
+    { command: 'triage consensual', every: '7d', on: true },
+  ])
+
+  // The interval is the whole name's: the consensual start is not the quick one's.
+  const paced = deps({ md, hasCommand: async () => true, lastStart: async command => started[command] })
+  const second = await tick(paced.deps)
+  assert.deepEqual(second.decisions.map(dec => dec.outcome.replace(/ 2026.*$/, '')), ['started', 'not due (last start 1d ago, every 7d)'])
+})
+
 test('off: the pull and the sweep still run, nothing is decided', async () => {
   let swept = false
   const { deps: d, seen } = deps({ stateOver: { on: false }, sweep: async () => { swept = true } })

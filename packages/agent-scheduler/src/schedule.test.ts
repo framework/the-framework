@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { commandPrompt, isDue, parseSchedule } from './schedule.js'
+import { commandPrompt, commandSkill, isDue, parseSchedule } from './schedule.js'
 
 test('a schedule line names a command, its check and its cap; prose and headings are not read', () => {
   const schedule = parseSchedule(`# Agent schedule
@@ -66,6 +66,24 @@ test('`off` lists a command that runs only where a machine switched it on; once 
   ])
   // Twice is a typo; `off` alone still says nothing about when.
   assert.deepEqual(schedule.unreadable.map(u => u.line), [3, 4])
+})
+
+test('a command may carry one word after its folder name, the argument the skill gets: the whole name is the command, the first word is the folder', () => {
+  const schedule = parseSchedule(`- triage quick: every 6h
+- triage consensual: every 7d, when \`npx tickets list\`, off
+- triage quick wins: every 6h
+- triage  quick: every 6h
+- triage quick : every 6h
+`)
+  assert.deepEqual(schedule.commands, [
+    { name: 'triage quick', every: { ms: 6 * 3_600_000, text: '6h' }, cap: 1, on: true, line: 1 },
+    { name: 'triage consensual', when: 'npx tickets list', every: { ms: 7 * 86_400_000, text: '7d' }, cap: 1, on: false, line: 2 },
+  ])
+  // Two words after the folder, two spaces, or a space before the colon: not a command a person types.
+  assert.deepEqual(schedule.unreadable.map(u => u.line), [3, 4, 5])
+  assert.equal(commandPrompt('triage quick'), '/triage quick')
+  assert.equal(commandSkill('triage quick'), 'triage')
+  assert.equal(commandSkill('work-queue'), 'work-queue')
 })
 
 test('a cap of zero reads as one: zero would spell "never", which is the line being absent', () => {

@@ -10,6 +10,7 @@
 
 
 ## Priority 4
+- Rewrite the outdated plan of [The agent's browser as a package: the first package that extends a run](tickets/2026-09-20_agent-browser-as-a-package.md)
 
 
 ## Priority 3

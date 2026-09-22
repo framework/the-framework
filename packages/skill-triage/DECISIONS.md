@@ -26,9 +26,11 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   wins are, with no switch of its own).
 - The command's words are the rules of the job, in numbers two runs agree on: a quick
   win is a planned ticket with effort 2 or less and uncertainty 2 or less; consensual
-  work is a planned ticket with uncertainty 3 or less that is no quick win; a ticket on
-  the queue, held, in review, or whose plan records a decision not to do the work is
-  skipped; a quick win goes on the queue one above the ticket's priority, consensual
-  work at the ticket's priority; only queue, never do, so a human can still veto on the
-  queue. Picked over "low effort and no uncertainty" and "significant, consensual",
-  which one run read as uncertainty 0 (never met) and another as uncertainty 3.
+  work is a planned ticket with uncertainty 3 or less that is no quick win; a plan
+  without both numbers qualifies for nothing; a ticket on the queue, held, in review,
+  whose plan is outdated or whose plan records a decision not to do the work is
+  skipped; every pick goes on the queue at the ticket's priority; only queue, never do,
+  so a human can still veto on the queue. Picked over "low effort and no uncertainty"
+  and "significant, consensual", which one run read as uncertainty 0 (never met) and
+  another as uncertainty 3, and over bumping quick wins one above their priority, which
+  contradicted the rule every ticket is queued by.

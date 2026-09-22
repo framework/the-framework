@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { commandPrompt, commandSkill, isDue, parseSchedule } from './schedule.js'
+import { commandPrompt, commandSkill, isDue, parseSchedule, promptCommand } from './schedule.js'
 
 test('a schedule line names a command, its check and its cap; prose and headings are not read', () => {
   const schedule = parseSchedule(`# Agent schedule
@@ -84,6 +84,13 @@ test('a command may carry one word after its folder name, the argument the skill
   assert.equal(commandPrompt('triage quick'), '/triage quick')
   assert.equal(commandSkill('triage quick'), 'triage')
   assert.equal(commandSkill('work-queue'), 'work-queue')
+  // A person's prompt is filed under the line it names, else under its first word.
+  assert.equal(promptCommand('/triage quick', schedule), 'triage quick')
+  assert.equal(promptCommand('/triage consensual', schedule), 'triage consensual')
+  assert.equal(promptCommand('/triage', schedule), 'triage')
+  assert.equal(promptCommand('/triage quick', undefined), 'triage')
+  assert.equal(promptCommand('/work-queue now', schedule), 'work-queue')
+  assert.equal(promptCommand('Read the docs', schedule), 'Read')
 })
 
 test('a cap of zero reads as one: zero would spell "never", which is the line being absent', () => {

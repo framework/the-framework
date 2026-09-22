@@ -21,7 +21,7 @@ The schedule [1]: how `agent-schedule.md` is read into commands [2], each with i
 - **What is not read** - headings, blank lines, prose: anything not starting a list item is the person's.
 - **An unreadable list line** - kept aside with its line number and text; the tick names it as `line N` with `unreadable: <text>`.
 - **Due** - the check's output, parsed as JSON, is something other than empty; output that is not JSON is due when non-blank. The interval [5] is the tick's to apply, from the run records; a line with both clauses starts only when both hold.
-- **The prompt** - a command's prompt is its slash command, `/<name>`, the whole name; the folder the command runs is the name's first word.
+- **The prompt** - a command's prompt is its slash command, `/<name>`, the whole name; the folder the command runs is the name's first word; a prompt a person types is filed under the schedule line it names, else under its first word.
 
 ## Business logic
 
@@ -73,4 +73,4 @@ A command is due when its check exited 0 and its output, surrounding whitespace 
 
 #### Business logic
 
-A command's prompt is `/<name>`, the whole name as written: `triage quick` runs as `/triage quick`, and the harness hands the skill the word. The folder the command runs is the name's first word. Nothing else is added: no system prompt, no framing.
+A command's prompt is `/<name>`, the whole name as written: `triage quick` runs as `/triage quick`, and the harness hands the skill the word. The folder the command runs is the name's first word. Nothing else is added: no system prompt, no framing. The other way round, a prompt a person types (`run`, `run --detach`, a dashboard's launcher) is filed under the schedule line whose name it is without its slash (`/triage quick` → `triage quick`), so the run counts against that line's cap and interval, else under its first word without the slash (`/triage` → `triage`, `/work-queue now` → `work-queue`, `Read the docs` → `Read`); with no schedule file, always the first word.

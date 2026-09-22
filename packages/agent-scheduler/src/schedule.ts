@@ -12,7 +12,7 @@ import { DEFAULT_CAP, SCHEDULE_FILE } from './names.js'
  *
  *     - work-queue: when `npx queue`, cap 1
  *     - triage quick: every 6h
- *     - triage consensual: every 7d, off
+ *     - triage consensual: every 7d, when `npx tickets list | jq …`
  *     - update-tickets: every 1h, when `npx tickets meta | jq …`
  *     - post-merge-cleanup: every 1d, off
  *
@@ -142,8 +142,20 @@ export function commandSkill(name: string): string {
 }
 
 /**
+ * The command a prompt typed by a person is filed under, so the run counts against that command's
+ * cap and interval like a scheduled one: the schedule line whose name the prompt is, without its
+ * slash (`/triage quick` → `triage quick`), else the prompt's first word (`/work-queue now` →
+ * `work-queue`; a plain prompt's first word).
+ */
+export function promptCommand(prompt: string, schedule: Schedule | undefined): string {
+  const typed = prompt.replace(/^\//, '').trim()
+  if (schedule?.commands.some(c => c.name === typed)) return typed
+  return typed.split(/\s+/)[0] || prompt
+}
+
+/**
  * Whether a check's output says the command is due (#1774): the output parsed as JSON is
- * something other than empty — `[]`, `{}`, `null`, `false`, `""` and no output at all are not
+ * something other than empty — `[]`, `{}`, `null`, `false`, `""`, `0` and no output at all are not
  * due. Every skill command prints JSON on stdout, so a check like `npx queue` needs no piping.
  * Output that is not JSON counts by its text: anything non-blank is due.
  */

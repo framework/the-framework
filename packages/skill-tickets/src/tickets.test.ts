@@ -148,6 +148,7 @@ test('readTickets reads the plan preamble\'s Effort: and Uncertainty: keys, on t
   assert.equal(byFile.get('2026-07-20_b.md')?.effort, undefined, 'out of range is not clamped')
   assert.equal(byFile.get('2026-07-20_b.md')?.uncertainty, undefined, 'fractional is not a value')
   assert.equal(byFile.get('2026-07-20_c.md')?.effort, undefined, 'the body is not a preamble')
+  assert.equal(byFile.get('2026-07-20_a.md')?.outdated, undefined, 'no Outdated: key, no flag')
   assert.equal(byFile.get('2026-07-20_d.md')?.effort, undefined)
   const detail = await readTicket(cwd, '2026-07-20_a.md')
   assert.equal(detail?.effort, 3)
@@ -220,4 +221,20 @@ test('the reader works over a git-style seam: relative paths, no modification ti
     ],
   )
   assert.equal((await readTicket('tickets', '2026-07-20_a.md', fs))?.content, tree['tickets/2026-07-20_a.md'])
+})
+
+test('readTickets reads the plan preamble\'s Outdated: yes as the outdated flag; any other value, or the key below the heading, is no flag', async () => {
+  const cwd = await dir({
+    '2026-07-20_a.md': '# A\n',
+    '2026-07-20_a.plan.md': 'Effort: 3\nOutdated: yes\n\n# [Plan] A\n',
+    '2026-07-20_b.md': '# B\n',
+    '2026-07-20_b.plan.md': 'Outdated: no\n\n# [Plan] B\n',
+    '2026-07-20_c.md': '# C\n',
+    '2026-07-20_c.plan.md': '# [Plan] C\n\nOutdated: yes\n',
+  })
+  const byFile = new Map((await readTickets(cwd)).map(t => [t.file, t]))
+  assert.equal(byFile.get('2026-07-20_a.md')?.outdated, true)
+  assert.equal(byFile.get('2026-07-20_a.md')?.effort, 3)
+  assert.equal(byFile.get('2026-07-20_b.md')?.outdated, undefined)
+  assert.equal(byFile.get('2026-07-20_c.md')?.outdated, undefined, 'the body is not a preamble')
 })

@@ -1,0 +1,17 @@
+{
+  "name": "@gemstack/skill-plan",
+  "version": "0.0.1",
+  "description": "The plan command for coding agents: write a ticket for a task and, under it, a plan naming the ways to do it and the one to take, then stop. A skill file only, no code.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/framework/the-framework.git",
+    "directory": "packages/skill-plan"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "SKILL.md"
+  ]
+}

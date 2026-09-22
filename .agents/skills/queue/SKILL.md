@@ -19,8 +19,8 @@ npx queue                        the open entries, in order of work, as one JSON
 
 ```
 npx queue add <text> [--priority N]
-                                 put an entry on the queue; --priority (0-10) places it in that
-                                 section; without it, the entry goes at the end of the file
+                                 put an entry on the queue; --priority (0-10) places it at the end of
+                                 that section; without it, the entry goes at the end of the file
 npx queue done <entry>           remove an entry: one quoted argument, exactly as `npx queue`
                                  printed it; done means deleted
 ```

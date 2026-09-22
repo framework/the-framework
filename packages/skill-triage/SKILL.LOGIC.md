@@ -10,12 +10,12 @@ The `triage` command skill: the prompt of the agent a runner starts for putting 
 
 - **Nobody answers** - the agent never asks and decides by itself.
 - **The mode** - the word after the command: `quick`, `consensual`, or nothing for both; any other word, the agent says so and stops.
-- **Only planned tickets with both numbers** - a ticket without a plan, or whose plan gives no effort or no uncertainty, qualifies for nothing, in either mode; the numbers are read off the ticket rows, no plan is opened.
+- **Only planned tickets with both numbers** - a ticket without a plan, or whose listing gives no effort or no uncertainty, qualifies for nothing, in either mode; the numbers are the listing's, no plan is opened, so a rating the listing could not read (`Effort: 2 (maybe 3)`) is no rating.
 - **A quick win** - effort 2 or less and uncertainty 2 or less.
 - **Consensual work** - uncertainty 3 or less and not a quick win.
 - **Skipped** - a ticket already on the queue (an entry linking to it), held by someone, in review (a pull request named on it), or whose plan is outdated.
-- **Queueing** - each remaining ticket goes on the agent queue, lowest effort first, as a link to the ticket labeled with its title, at the ticket's priority, 5 when it has none or it is not a number from 0 to 10, in either mode.
-- **A failed write** - a queue write that fails is tried once more after reading the queue again, a ticket the new reading shows queued left alone; a write that fails again ends the run with the failure said.
+- **Queueing** - each remaining ticket goes on the agent queue one by one, lowest effort first, as a link to the ticket labeled with its title, at the ticket's priority, 5 when it has none or it is not a number from 0 to 10, in either mode and in one pass when both modes run; an entry lands at the end of its priority section, so the order of the writes is the order of work within a priority.
+- **A failed write** - a queue write that fails is tried once more after reading the queue again, a ticket the new reading shows queued left alone; a write that fails again ends the run with the failure said, the remaining tickets left for the next run.
 - **Only queue, never do** - the queue is the only thing it changes; it implements no ticket however small or clear its plan, so a human can still veto it on the queue.
 - **Nothing qualifies** - it says so and stops.
 - **No ticketing system, no AI queue** - it shows an error to the user and stops; in capability words, naming no skill.

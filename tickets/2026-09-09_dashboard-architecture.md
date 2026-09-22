@@ -1,4 +1,5 @@
 Priority: 9
+Topics: [dashboard, modularity]
 Issue: [#1768](https://github.com/framework/the-framework/issues/1768)
 
 # Dashboard architecture

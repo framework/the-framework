@@ -7,15 +7,15 @@ in SPEC.md; a choice made while implementing is the implementer's judgment, not 
 decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 
 ## The tickets
-- Three callers: the command an agent runs; a long-lived program that keeps the branch
-  checked out, starts agents through this package's functions, and imports issues with
-  its own code, stamping `meta.json`; and a dashboard, which reads the tickets through
+- Two callers: the command an agent runs, and a dashboard, which reads the tickets through
   the command (`--local`: this machine's copy, no fetch, because it polls and the writer
   there keeps the checkout synced) and lifts a dead agent's claim through `release
   --force` as its widget's own pages, found by the package's `framework.tickets`
   declaration. A dashboard importing the package was the alternative and was not taken:
-  the dashboard names no skill. The executable is `tickets`. The package ships
-  `SKILL.md`, the agent's instructions.
+  the dashboard names no skill. The library a long-lived program called to keep the
+  branch checked out and claim tickets for the agents it starts stays in the package;
+  nothing calls it now. The executable is `tickets`. The package ships `SKILL.md`, the
+  agent's instructions.
 - A ticket is a markdown file in `tickets/`. Its plan and its claim sit beside it:
   `<name>.plan.md` and `<name>.lock.md`, `<name>` the filename without `.md`.
 - Tickets live on `agent-data`, the branch `@gemstack/agent-data` names, never on a code
@@ -80,8 +80,9 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   queue entry's link target can be pasted in as is; a sibling's name (`.plan.md`,
   `.lock.md`) is `invalid-path` to every command, `put` taking `.plan.md` and `meta.json`
   the exceptions.
-- No command reads `meta.json`: only the importing program does, for its one key
-  `lastImportedAt`.
+- `meta` reads `meta.json` for its one key, `lastImportedAt`, and `put meta.json` writes
+  it: the routine that syncs the tickets with the tracker records its import time that
+  way, no program of its own.
 - A read fetches origin once and reads everything from that copy: only origin has every
   writer's pushes, this command's own included. With no origin the local branch is read:
   writes are refused there, so nobody else can have moved it.

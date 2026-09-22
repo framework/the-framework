@@ -1,7 +1,7 @@
 {
   "name": "@gemstack/skill-plan-tickets",
   "version": "0.0.1",
-  "description": "The plan-tickets command for coding agents: queue a plan for every open ticket that has none, unattended. A skill file only, no code.",
+  "description": "The plan-tickets command for coding agents: queue a plan for the open tickets that have none or an outdated one, unattended. A skill file only, no code.",
   "license": "MIT",
   "repository": {
     "type": "git",

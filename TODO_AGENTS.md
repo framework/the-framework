@@ -6,6 +6,7 @@
 
 
 ## Priority 5
+- Rewrite the outdated plan of [Modular structure: what the four module PRs left behind](tickets/2026-09-20_modular-structure-leftovers.md)
 
 
 ## Priority 4

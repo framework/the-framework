@@ -5,17 +5,18 @@ description: Where the project's tickets live, how to read and change them, how 
 
 # Tickets
 
-The tickets (`tickets/<DATE>_<SLUG>.md`, with their `.plan.md` and `.lock.md` siblings) live on the branch `agent-data`, never on a code branch. A `tickets` link at the repository root, if present, shows a possibly stale copy; never write there. The command reads fresh.
+The tickets (`tickets/<DATE>_<SLUG>.md`, with their `.plan.md` and `.lock.md` siblings) live on the branch `agent-data`, never on a code branch. A `tickets` link at the repository root, if present, is a possibly stale copy: never write there.
 
-Read and change them with the `tickets` command, a dependency of this repository (`@gemstack/skill-tickets`), run as `npx tickets`. When that fails for a missing `node_modules`, install with the lockfile's package manager (`npm install` for `package-lock.json`) and run it again. Every change it makes is one commit pushed straight to the `agent-data` branch. A refusal exits 1 with a line on stderr; a wrong command line exits 2 with the usage.
+Read and change them with the `tickets` command, a dependency of this repository (`@gemstack/skill-tickets`), run as `npx tickets`. When that fails for a missing `node_modules`, install with the lockfile's package manager (`npm install` for `package-lock.json`) and run it again. Every change it makes is one commit pushed straight to the `agent-data` branch. Never pass `--local` or `--force`: they are a person's.
+
+Every command prints one JSON document; a refusal is `{"ok":false,"reason":…}` with why on stderr, exit 1; a wrong command line prints the usage on stderr, nothing on stdout, exit 2. Every `<file>` below is a ticket's filename (`2042-01-01_some-ticket.md`) or the `tickets/…` path a queue entry links to; `put` also takes the ticket's `.plan.md` and `meta.json`.
 
 ## Read
 
 ```
-npx tickets list                 every open ticket, as one JSON array: file, title, summary, priority, topics,
-                                 issue, pr, date, planned, effort, uncertainty, locked, lockedBy
-                                 (priority, topics, issue, pr, effort, uncertainty, locked, lockedBy
-                                 absent when unset; pr set means the ticket is in review)
+npx tickets list                 every open ticket, as one JSON array; a row: file, title, summary, date,
+                                 planned, and when set priority, topics, issue, pr (set: the ticket is in
+                                 review), effort, uncertainty, locked, lockedBy
 npx tickets show <file>          one ticket: its text, its plan, who holds it
 npx tickets meta                 when the tickets last caught up with the issue tracker:
                                  {"lastImportedAt": <ISO 8601>}, or {} when no import was recorded
@@ -24,13 +25,25 @@ npx tickets meta                 when the tickets last caught up with the issue 
 ## Change
 
 ```
-npx tickets put <file>           write one file under tickets/ from stdin, the whole file, creating it if new;
-                                 empty stdin writes an empty file
-                                 (npx tickets put <file> < draft.md): a ticket or a plan
+npx tickets put <file>           write one whole file under tickets/ from stdin, creating it if new
+                                 (npx tickets put <file> < draft.md): a ticket, its plan, or meta.json
+                                 holding the object meta shows
 npx tickets close <file>         once the work is merged, or the ticket is not wanted: remove the ticket
-                                 with its plan and lock; refused while someone else holds it; its queue
+                                 with its plan and claim; refused while someone else holds it; its queue
                                  entry, if any, stays: `npx queue done` it
 ```
+
+## Claim before you plan or work a ticket
+
+```
+npx tickets claim <file>         {"ok":true,"file":…,"holder":…}: the ticket is yours
+                                 {"ok":false,"reason":"claimed","holder":…}: someone else's: pick another,
+                                 and never remove or overwrite their claim
+npx tickets release <file>       lift your own claim when the plan or the work is done, and before you
+                                 stop unless you closed the ticket: nothing lifts a claim on a timeout
+```
+
+`put` ignores claims. You claim as `AGENT_ID` when it is set, else as your current branch: release from the branch you claimed on, or the claim stays until a person lifts it.
 
 ## Queue a ticket
 
@@ -40,33 +53,19 @@ When the repository has the `queue` skill, a ticket goes on the agent queue as a
 npx queue add "[<title>](tickets/<file>)" --priority <N>
 ```
 
-Once the work is committed and its pull request is open, `npx queue done` the entry, write the pull request into the ticket as its `PR:` line (`npx tickets put <file>` with the whole ticket, the line added above the title) and release your claim: the ticket is in review. Do not close it: it closes when the pull request merges, through the update from the issue tracker. The pull request's body names the ticket it closes with a line `Closes tickets/<file>`, and the issue with `Closes #<number>` when the ticket has one.
-
-## Claim before you plan or work a ticket
-
-```
-npx tickets claim <file>         {"ok":true,"file":…,"holder":…} — the ticket is yours
-                                 {"ok":false,"reason":"claimed","holder":…,"file":…} — someone else's
-                                 (no holder when the lock's line does not parse): pick another; never remove
-                                 or overwrite their lock. A claim guards claim, close and release;
-                                 put overwrites whoever holds the ticket
-npx tickets release <file>       lift your own claim when the plan or the work is done, and before you
-                                 stop unless you closed it; nothing lifts it on a timeout
-```
-
-Every `<file>` above takes a ticket's filename (`2042-01-01_some-ticket.md`) or the `tickets/…` path a queue entry links to; `put` also takes that ticket's `.plan.md` name, and writes a plan for a ticket that does not exist, without complaint, invisible to `show`. You claim as `AGENT_ID` when it is set, else as your current branch (so a rename or a branch switch between claim and release changes who you are: release from the branch you claimed on, or the lock stays until a person edits the branch).
+Once the work is committed and its pull request is open: `npx queue done` the entry, its exact text, write the pull request into the ticket as its `PR:` line (`put` the whole ticket, the line added above the title), and release your claim. The ticket is in review. Do not close it: it closes when the pull request merges, through the update from the issue tracker, which reads the line `Closes tickets/<file>` in the pull request's body; add `Closes #<number>` when the ticket has an issue.
 
 ## Formats
 
 ### A ticket: `tickets/<DATE>_<SLUG>.md`
 
-DATE: yyyy-mm-dd. SLUG: a succinct kebab-case slug of the ticket title.
+`<DATE>` is yyyy-mm-dd, `<SLUG>` a succinct kebab-case slug of the title.
 
 ```md
-Priority: 0-10 [optional, 10: critical — act immediately, 0: only if capacity]
+Priority: 0-10 [optional; 10: critical, act immediately; 0: only if capacity]
 Topics: [list-of-topics] [optional]
-Issue: [#42](https://example.com/org/repo/issues/42) [optional: the issue this ticket tracks in the project's issue tracker]
-PR: [#1790](https://example.com/org/repo/pull/1790) [optional: the pull request that closes this ticket, once one is open]
+Issue: [#42](https://example.com/org/repo/issues/42) [optional: the issue this ticket tracks]
+PR: [#1790](https://example.com/org/repo/pull/1790) [optional: the pull request that closes it]
 
 # Ticket title
 
@@ -78,57 +77,35 @@ PR: [#1790](https://example.com/org/repo/pull/1790) [optional: the pull request 
 
 ...
 
-[optional: more info (any heading and format you want)]
+[optional: more, under any heading]
 ```
 
-A ticket with a `PR:` line is in review: skip it when choosing work, and never queue it again while the line stands; remove the line to have it worked again. `Priority:`, `Effort:` and `Uncertainty:` are bare whole numbers above the `# ` title; anything else reads as absent for queue placement and the scales, and a ticket with no readable `Priority:` queues at 5.
+A ticket with a `PR:` line is in review: skip it when choosing work, and never queue it while the line stands; remove the line to have it worked again. `Priority:` is a bare whole number from 0 to 10 above the `# ` title; anything else queues at 5.
 
 ### A claim: `tickets/<DATE>_<SLUG>.lock.md`
 
-Written by `npx tickets claim`, removed by `npx tickets release` or `npx tickets close`. One line: `CLAIMED: <holder>`.
+One line, `CLAIMED: <holder>`. Written by `claim`, removed by `release` or `close`.
 
 ### A plan: `tickets/<DATE>_<SLUG>.plan.md`
 
-The plan for an existing ticket (`tickets/2042-01-01_some-ticket.md` → `tickets/2042-01-01_some-ticket.plan.md`).
-
 ```md
-Effort: 0-10 [0: implementation is trivial, 10: implementation takes months]
-Uncertainty: 0-10 [0: implementation without meaningful alternatives, 10: highly uncertain how to implement]
-Outdated: yes [optional, only if the ticket was updated in a way that makes the plan outdated]
+Effort: 0-10 [0: trivial, 10: takes months]
+Uncertainty: 0-10 [0: no meaningful alternatives, 10: highly uncertain how to implement]
+Outdated: yes [optional: the ticket changed in a way that makes the plan outdated]
 
 # [Plan] Ticket title
 
-Single sentence describing this file's content.
+One sentence saying what this file holds.
 
-## TLDR [optional]
+## Problems [optional: what is uncertain to implement, and why]
 
-Brief overview of this file's content.
+## Solutions [optional: ways to solve each problem, shortcuts included]
 
-## Problems [optional]
+## Considerations [optional: everything to weigh, edge cases included]
 
-List of all significant aspects with low confidence on how to implement, with explanation why uncertain.
+## Implementation [optional: the concrete plan]
 
-## Solutions [optional]
-
-For each problem, list of ways to solve the problem (including meaningful shortcuts, for quicker implementation).
-
-## Considerations [optional]
-
-Exhaustive list of all significant aspects to be considered (including edge cases).
-
-## Implementation [optional]
-
-Concrete plan to implement the ticket.
+[optional: more, under any heading]
 ```
 
-Notes:
-- Covers both spiking (e.g. high-level research without implementation plan) and planning (e.g. concrete implementation proposal)
-- The `.plan.md` file can be modified multiple times over an extended period (e.g. a ticket requiring repeated human intervention, transitioning from spiking to concrete plan)
-- All sections are just proposals and optional: you can use any headings with any format
-- The uncertainty value:
-  - Gauges whether there are *significant* alternatives, minor variability such as syntax should be ignored
-  - Is used for evaluating whether human intervention is needed (0 => clearly no human intervention needed)
-- Example of how to gauge uncertainty and alternatives:
-  - List all aspects that need to be considered
-  - Give an uncertainty rating (0-10) to each aspect following this criteria: is there an obviously optimal way to implement it (0), or is it highly unclear whether it can be implemented in a better way (10)?
-  - Explore and suggest alternatives for each aspect with a low rating
+`Effort:` and `Uncertainty:` are bare whole numbers above the title, else absent. The uncertainty counts *significant* alternatives, not variability like syntax, and decides whether a human is needed before the work: 0 means clearly not.

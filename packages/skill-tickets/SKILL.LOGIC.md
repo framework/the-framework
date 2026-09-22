@@ -1,4 +1,4 @@
-The instructions every agent [1] reads before touching a ticket: where the tickets live, how to read and change them with the `tickets` command, how to claim a ticket so no two agents work the same one, how to put one on the agent queue [2], and the three formats, a ticket, a claim [3] and a plan. Linked into the agent's checkout [4] where the coding agent's harness looks for skills, it is what turns the command into a skill [5].
+The instructions every agent [1] reads before touching a ticket: where the tickets live, how to read and change them with the `tickets` command, how to claim a ticket so no two agents work the same one, how to put one on the agent queue [2], and the three formats, a ticket, a claim [3] and a plan. Linked into the agent's checkout [4] where the coding agent's harness looks for skills, it is what turns the command into a skill [5]. Every line is one an agent following the file would go wrong without: the file explains nothing the command's own answers already say.
 
 ## Context
 
@@ -19,15 +19,15 @@ The instructions every agent [1] reads before touching a ticket: where the ticke
 
 ## Business logic — TL;DR
 
-- **Where the tickets are and how to reach them** - tickets live on the `agent-data` branch, never on a code branch; the root `tickets` link is a possibly stale copy never to be written; the agent installs the repository's dependencies if needed and runs `npx tickets`, whose every change is one commit pushed straight to the branch.
+- **Where the tickets are and how to reach them** - tickets live on the `agent-data` branch, never on a code branch; the root `tickets` link is a possibly stale copy never to be written; the agent installs the repository's dependencies if needed and runs `npx tickets`, whose every change is one commit pushed straight to the branch, and never passes `--local` or `--force`.
+- **How the command answers, and how a ticket is named** - one JSON document per command; a refusal is `{"ok":false,"reason":…}` with why on stderr and exit 1, a wrong command line the usage on stderr and exit 2; every `<file>` is a ticket's filename or the `tickets/…` path a queue entry links to, and `put` also takes the ticket's `.plan.md` and `meta.json`.
 - **Reading** - `list` gives every open ticket as one JSON array of rows; `show <file>` gives one ticket with its text, its plan and who holds it; `meta` gives when the tickets last caught up with the issue tracker.
-- **Changing** - `put <file>` writes one whole file under `tickets/` from stdin, a ticket or a plan; `close <file>`, only once the work is merged, removes the ticket with its plan and claim, refused while someone else holds it, and leaves its queue entry to `npx queue done`.
-- **Queueing a ticket, and the ticket in review** - with the `queue` skill present, a ticket goes on the agent queue as a markdown link labeled with its title, at the ticket's own `Priority:` (5 when it has none); once its pull request is open the agent marks the entry done, writes the pull request into the ticket as its `PR:` line and releases its claim, and names the ticket (and its issue) in the pull request's body; the ticket closes when the pull request merges, never before.
-- **Claim before planning or working** - `claim <file>` makes the ticket the agent's or names who holds it; on someone else's the agent picks another and never removes or overwrites their claim; `release <file>` lifts the agent's own claim when done and before it stops, since nothing lifts a claim on a timeout.
-- **Naming a ticket, and who the agent is** - every `<file>` is a ticket's filename or the `tickets/…` path a queue entry links to; the agent claims as `AGENT_ID` when set, else as its current branch, so it releases from the branch it claimed on.
-- **The ticket format** - `tickets/<DATE>_<SLUG>.md`: optional `Priority:`, `Topics:`, `Issue:` and `PR:` above a `# ` title, a `PR:` line meaning the ticket is in review and is not to be chosen or queued, then `## TLDR` and `## Why it matters`; the numeric keys are bare whole numbers or they read as absent.
+- **Changing** - `put <file>` writes one whole file under `tickets/` from stdin, a ticket, its plan or `meta.json`; `close <file>`, once the work is merged or the ticket is not wanted, removes the ticket with its plan and claim, refused while someone else holds it, and leaves its queue entry to `npx queue done`.
+- **Claim before planning or working** - `claim <file>` makes the ticket the agent's or names who holds it; on someone else's the agent picks another and never removes or overwrites their claim; `release <file>` lifts the agent's own claim when done and before it stops, since nothing lifts a claim on a timeout; `put` ignores claims; the agent claims as `AGENT_ID` when set, else as its current branch, so it releases from the branch it claimed on.
+- **Queueing a ticket, and the ticket in review** - with the `queue` skill present, a ticket goes on the agent queue as a markdown link labeled with its title, at the ticket's own `Priority:` (5 when it has none); once its pull request is open the agent marks the entry done by its exact text, writes the pull request into the ticket as its `PR:` line and releases its claim, and names the ticket (and its issue) in the pull request's body; the ticket closes when the pull request merges, never before.
+- **The ticket format** - `tickets/<DATE>_<SLUG>.md`: optional `Priority:`, `Topics:`, `Issue:` and `PR:` above a `# ` title, a `PR:` line meaning the ticket is in review and is not to be chosen or queued, then `## TLDR` and `## Why it matters`; `Priority:` is a bare whole number from 0 to 10, anything else queues at 5.
 - **The claim format** - `tickets/<DATE>_<SLUG>.lock.md`, one line, `CLAIMED: <holder>`, written by `claim`, removed by `release` or `close`.
-- **The plan format** - `tickets/<DATE>_<SLUG>.plan.md`: `Effort:` and `Uncertainty:` on a 0 to 10 scale, an optional `Outdated: yes`, a `# [Plan]` title, and free sections; the uncertainty gauges significant alternatives and decides whether a human is needed.
+- **The plan format** - `tickets/<DATE>_<SLUG>.plan.md`: `Effort:` and `Uncertainty:` on a 0 to 10 scale, an optional `Outdated: yes`, a `# [Plan]` title, a one-sentence description and free sections; the uncertainty counts significant alternatives and decides whether a human is needed.
 
 ## Business logic
 
@@ -39,7 +39,17 @@ See `## Context`.
 
 #### Business logic
 
-The agent is told that the tickets (`tickets/<DATE>_<SLUG>.md`, with their `.plan.md` and `.lock.md` siblings) live on the branch `agent-data` [7], never on a code branch, and that a `tickets` link at the repository root, if present, shows a possibly stale copy it must never write to: the command reads fresh. It reads and changes them with the `tickets` command, a dependency of the repository (`@gemstack/skill-tickets`): with no `node_modules` it first installs with the lockfile's package manager (`npm install` for `package-lock.json`), then runs `npx tickets`. It is told that every change the command makes is one commit pushed straight to the `agent-data` branch, that a refusal exits 1 with a line on stderr, and that a wrong command line exits 2 with the usage.
+The agent is told that the tickets (`tickets/<DATE>_<SLUG>.md`, with their `.plan.md` and `.lock.md` siblings) live on the branch `agent-data` [7], never on a code branch, and that a `tickets` link at the repository root, if present, is a possibly stale copy it must never write to. It reads and changes them with the `tickets` command, a dependency of the repository (`@gemstack/skill-tickets`): with no `node_modules` it first installs with the lockfile's package manager (`npm install` for `package-lock.json`), then runs `npx tickets`. It is told that every change the command makes is one commit pushed straight to the `agent-data` branch, and never to pass `--local` or `--force`, which are a person's.
+
+### How the command answers, and how a ticket is named
+
+#### Context
+
+**Problem**: the agent parses the command's output and names tickets from queue entries; it must know the one shape every answer takes and the two spellings of a ticket's name, and nothing else about the command's internals.
+
+#### Business logic
+
+Every command prints one JSON document; a refusal is `{"ok":false,"reason":…}` on stdout, the reason in words on stderr, exit 1; a wrong command line prints the usage on stderr and nothing on stdout, exit 2. The refusal reasons themselves are not listed: the stderr line says what happened. Every `<file>` takes a ticket's filename (`2042-01-01_some-ticket.md`) or the `tickets/…` path a queue entry [6] links to; `put` also takes the ticket's `.plan.md` and `meta.json`.
 
 ### Reading
 
@@ -49,27 +59,17 @@ See `## Context`.
 
 #### Business logic
 
-`npx tickets list` gives every open ticket as one JSON array, each row with file, title, summary, priority, topics, issue, pr, date, planned, effort, uncertainty, locked and lockedBy, where priority, topics, issue, pr, effort, uncertainty, locked and lockedBy are absent when unset. `npx tickets show <file>` gives one ticket: its text, its plan, and who holds it.
+`npx tickets list` gives every open ticket as one JSON array, each row with file, title, summary, date and planned, and when set priority, topics, issue, pr, effort, uncertainty, locked and lockedBy; a set pr means the ticket is in review. `npx tickets show <file>` gives one ticket: its text, its plan, and who holds it. `npx tickets meta` gives when the tickets last caught up with the issue tracker, `{"lastImportedAt": <ISO 8601>}`, or `{}` when no import was recorded.
 
 ### Changing
 
 #### Context
 
-**User story**: the agent updates a ticket, writes its plan, and closes the ticket once its pull request is merged.
+**User story**: the agent updates a ticket, writes its plan, records an import time, and closes the ticket once its pull request is merged.
 
 #### Business logic
 
-`npx tickets put <file>` writes one file under `tickets/` from stdin, the whole file, creating it if new, and empty stdin writes an empty file; the agent is shown the shape `npx tickets put <file> < draft.md` for a ticket or a plan. `npx tickets close <file>` is for once the work is merged: it removes the ticket with its plan and claim [3], is refused while someone else holds the ticket, and leaves the ticket's queue entry [6], if any, in place for the agent to `npx queue done`.
-
-### Queueing a ticket
-
-#### Context
-
-**Business logic story**: the tickets never touch the agent queue [2]; the link between a ticket and its queue entry is written and read by the queue's users, so the skill tells the agent how to write it.
-
-#### Business logic
-
-When the repository has the `queue` skill [5], a ticket goes on the agent queue as a link, the ticket's title as the label, at the ticket's own `Priority:`, or 5 when it has none: `npx queue add "[<title>](tickets/<file>)" --priority <N>`. Once the work is committed and its pull request is open, the agent runs `npx queue done` for the entry, writes the pull request into the ticket as its `PR:` line with `npx tickets put`, and releases its claim; the ticket is in review. The agent does not close it: the ticket closes when the pull request merges, through the update from the issue tracker, which reads the pull request's `Closes tickets/<file>` line (and the issue tracker closes the issue named by `Closes #<number>`).
+`npx tickets put <file>` writes one whole file under `tickets/` from stdin, creating it if new; the agent is shown the shape `npx tickets put <file> < draft.md`, for a ticket, its plan, or `meta.json` holding the object `meta` shows. `npx tickets close <file>` is for once the work is merged, or the ticket is not wanted: it removes the ticket with its plan and claim [3], is refused while someone else holds the ticket, and leaves the ticket's queue entry [6], if any, in place for the agent to `npx queue done`.
 
 ### Claim before planning or working
 
@@ -79,17 +79,17 @@ When the repository has the `queue` skill [5], a ticket goes on the agent queue 
 
 #### Business logic
 
-Before planning or working a ticket the agent runs `npx tickets claim <file>`: `{"ok":true,"file":…,"holder":…}` means the ticket is the agent's; `{"ok":false,"reason":"claimed","holder":…,"file":…}` means it is someone else's, with no holder when the claim's line does not parse, and the agent then picks another ticket and never removes or overwrites their claim. The agent is told that a claim guards `claim`, `close` and `release`, while `put` overwrites whoever holds the ticket. `npx tickets release <file>` lifts the agent's own claim when the plan or the work is done, and before the agent stops unless it closed the ticket, because nothing lifts a claim on a timeout.
+Before planning or working a ticket the agent runs `npx tickets claim <file>`: `{"ok":true,"file":…,"holder":…}` means the ticket is the agent's; `{"ok":false,"reason":"claimed","holder":…}` means it is someone else's, and the agent then picks another ticket and never removes or overwrites their claim. `npx tickets release <file>` lifts the agent's own claim when the plan or the work is done, and before the agent stops unless it closed the ticket, because nothing lifts a claim on a timeout. `put` ignores claims. The agent claims as `AGENT_ID` when it is set, else as its current branch [8], so it must release from the branch it claimed on, or the claim stays until a person lifts it.
 
-### Naming a ticket, and who the agent is
+### Queueing a ticket
 
 #### Context
 
-See `## Context`.
+**Business logic story**: the tickets never touch the agent queue [2]; the link between a ticket and its queue entry is written and read by the queue's users, so the skill tells the agent how to write it.
 
 #### Business logic
 
-Every `<file>` takes a ticket's filename (`2042-01-01_some-ticket.md`) or the `tickets/…` path a queue entry [6] links to; `put` also takes that ticket's `.plan.md` name, and writes a plan for a ticket that does not exist without complaint, invisible to `show`. The agent claims as `AGENT_ID` when it is set, else as its current branch, so a rename or a branch switch between claim and release changes who it is: it must release from the branch it claimed on, or the claim [3] stays until a person edits the branch.
+When the repository has the `queue` skill [5], a ticket goes on the agent queue as a link, the ticket's title as the label, at the ticket's own `Priority:`, or 5 when it has none: `npx queue add "[<title>](tickets/<file>)" --priority <N>`. Once the work is committed and its pull request is open, the agent runs `npx queue done` with the entry's exact text, writes the pull request into the ticket as its `PR:` line by `put` of the whole ticket with the line added above the title, and releases its claim; the ticket is in review. The agent does not close it: the ticket closes when the pull request merges, through the update from the issue tracker, which reads the line `Closes tickets/<file>` in the pull request's body; the agent adds `Closes #<number>` when the ticket has an issue.
 
 ### The ticket format
 
@@ -99,7 +99,7 @@ Every `<file>` takes a ticket's filename (`2042-01-01_some-ticket.md`) or the `t
 
 #### Business logic
 
-A ticket is `tickets/<DATE>_<SLUG>.md`, `<DATE>` as `yyyy-mm-dd` and `<SLUG>` a succinct kebab-case slug of the title. Above the `# ` title stand the optional keys: `Priority:` from 0 to 10 (10 is critical, act immediately; 0 is only if capacity), `Topics:` as a bracketed list, `Issue:` as a markdown link to the issue the ticket tracks in the project's issue tracker, and `PR:` as a markdown link to the pull request that closes the ticket once merged, present while the ticket is in review, when it is skipped for work and never queued again until the line is removed. Then the title, a `## TLDR` section, a `## Why it matters` section, and optionally more, under any heading and in any format. `Priority:`, `Effort:` and `Uncertainty:` are bare whole numbers above the `# ` title; anything else reads as absent for queue placement and the scales, and a ticket with no readable `Priority:` queues at 5.
+A ticket is `tickets/<DATE>_<SLUG>.md`, `<DATE>` as `yyyy-mm-dd` and `<SLUG>` a succinct kebab-case slug of the title. Above the `# ` title stand the optional keys: `Priority:` from 0 to 10 (10 is critical, act immediately; 0 is only if capacity), `Topics:` as a bracketed list, `Issue:` as a markdown link to the issue the ticket tracks, and `PR:` as a markdown link to the pull request that closes it. Then the title, a `## TLDR` section, a `## Why it matters` section, and optionally more under any heading. A ticket with a `PR:` line is in review: skipped when choosing work and never queued while the line stands; removing the line has it worked again. `Priority:` is a bare whole number from 0 to 10 above the `# ` title; anything else queues at 5.
 
 ### The claim format
 
@@ -109,7 +109,7 @@ See `## Context`.
 
 #### Business logic
 
-A claim [3] is `tickets/<DATE>_<SLUG>.lock.md`, written by `npx tickets claim` and removed by `npx tickets release` or `npx tickets close`: one line, `CLAIMED: <holder>` [8].
+A claim [3] is `tickets/<DATE>_<SLUG>.lock.md`: one line, `CLAIMED: <holder>` [8], written by `claim` and removed by `release` or `close`.
 
 ### The plan format
 
@@ -119,4 +119,4 @@ A claim [3] is `tickets/<DATE>_<SLUG>.lock.md`, written by `npx tickets claim` a
 
 #### Business logic
 
-A plan is `tickets/<DATE>_<SLUG>.plan.md`, the plan for an existing ticket of the same stem. Above its `# [Plan] <ticket title>` heading stand `Effort:` from 0 to 10 (0: the implementation is trivial, 10: it takes months), `Uncertainty:` from 0 to 10 (0: an implementation without meaningful alternatives, 10: highly uncertain how to implement), and optionally `Outdated: yes`, only when the ticket was updated in a way that makes the plan outdated. Below the heading comes a single sentence describing the file's content, then optional sections the agent may use or replace with any headings and format: `## TLDR`, `## Problems` (every significant aspect with low confidence on how to implement, with why), `## Solutions` (for each problem, ways to solve it, meaningful shortcuts included), `## Considerations` (an exhaustive list of significant aspects, edge cases included), `## Implementation` (the concrete plan). The plan covers both spiking (high-level research without an implementation plan) and planning (a concrete proposal), and may be modified repeatedly over an extended period, such as a ticket needing repeated human intervention. The uncertainty value gauges whether there are significant alternatives, ignoring minor variability such as syntax, and is used to evaluate whether human intervention is needed: 0 means clearly none. To gauge it, the agent lists every aspect to consider, rates each from 0 (an obviously optimal way to implement it) to 10 (highly unclear whether it can be implemented better), and explores and suggests alternatives for each aspect with a low rating.
+A plan is `tickets/<DATE>_<SLUG>.plan.md`. Above its `# [Plan] <ticket title>` heading stand `Effort:` from 0 to 10 (0: trivial, 10: takes months), `Uncertainty:` from 0 to 10 (0: no meaningful alternatives, 10: highly uncertain how to implement), and optionally `Outdated: yes`, when the ticket changed in a way that makes the plan outdated. Below the heading comes one sentence saying what the file holds, then optional sections: `## Problems` (what is uncertain to implement, and why), `## Solutions` (ways to solve each problem, shortcuts included), `## Considerations` (everything to weigh, edge cases included), `## Implementation` (the concrete plan), and more under any heading. `Effort:` and `Uncertainty:` are bare whole numbers above the title, else absent. The uncertainty counts significant alternatives, not variability like syntax, and decides whether a human is needed before the work: 0 means clearly not.

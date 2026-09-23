@@ -1,5 +1,4 @@
 ## Priority 8
-- [Spike: Is it possible to make the extension headless?](tickets/2026-07-28_spike-headless-extension.md)
 
 
 ## Priority 7

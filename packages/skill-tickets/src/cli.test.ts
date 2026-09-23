@@ -125,7 +125,7 @@ test('claim writes the lock as one pushed commit naming the holder; the second c
     assert.deepEqual((await run(a!, ['release', '2026-08-30_a.md'])).json, { ok: false, reason: 'no-lock', file: '2026-08-30_a.md' })
     // Now b gets it, and learns a claimed it before, though a's claim is gone.
     assert.deepEqual((await run(b!, ['claim', '2026-08-30_a.md'])).json, { ok: true, file: 'tickets/2026-08-30_a.md', holder: 'agent-a1', earlier: ['agent-a0'] })
-    // Released again and claimed a third time: every earlier holder, newest first, each once.
+    // Released again and claimed a third time: a0's own earlier claim is left out, b's is named.
     assert.equal((await run(b!, ['release', '2026-08-30_a.md'])).code, 0)
     assert.equal((await run(a!, ['release', '2026-08-30_a.md'])).code, 1)
     assert.deepEqual((await run(a!, ['claim', '2026-08-30_a.md'])).json.earlier, ['agent-a1'], 'your own earlier claim is not listed')

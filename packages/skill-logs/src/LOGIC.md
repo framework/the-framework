@@ -17,7 +17,7 @@ The `logs` skill's implementation: what a run [1] is (a card [2] and a diary [3]
 ## Business logic — TL;DR
 
 - **The one name** (`names.ts`) - `agents`, the directory at the branch root the runs live under; importable from browser code.
-- **What a run is** (`run.ts`) - the card's ten fields and the recording program's `caller`; the four statuses; a run id as a safe file name; a person's directory from a git email; how a card and a diary are written and read back; the four kinds of diary line that are the agent's; newest first; the public card without `caller`.
+- **What a run is** (`run.ts`) - the card's ten fields and the recording program's `caller`; the five statuses; a run id as a safe file name; a person's directory from a git email; how a card and a diary are written and read back; the four kinds of diary line that are the agent's; newest first; the public card without `caller`.
 - **Recording and reading runs for the recording program** (`store.ts`) - one commit per record, patch or delete, through the branch's write cycle; the runs listed newest first off the checkout; a run recorded again stays where it sits.
 - **The `logs` command** (`cli.ts`) - the list with `--branch` and `--limit` (20 by default), `show <id>` with the agent's diary lines, reads off origin's copy fetched once, the refusals `not-a-repo`, `no-run` and `git-failed`, and the exit codes 0, 1 and 2.
 - **Where the skill is** (`bin-dir.ts`) - the executable's directory for an agent's PATH, the skill's name `logs`, and the package directory holding `SKILL.md`.

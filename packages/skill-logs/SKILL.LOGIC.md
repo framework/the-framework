@@ -23,7 +23,7 @@ The instructions the `logs` skill gives an agent [1], as business logic: where t
 - **How to read it** - the `logs` command, a dependency of the repository, run as `npx logs` after installing with the lockfile's package manager; the agent only reads (the command's dashboard verbs are not its own); it refuses with exit 1 and a line on stderr, and answers a wrong command line with the usage and exit 2.
 - **The two reads** - the list of cards newest first, the newest 20 unless `--limit` says otherwise, narrowed by `--branch`; and `show <id>` for one run with what the agent said.
 - **Before planning or working a ticket, read its earlier runs** - claiming the ticket names who claimed it before, each a run's id, shaped like `2026-09-08T18-14-30-111Z`, read with `npx logs show <id>`, or else a branch, read with `npx logs --branch <name>`, where no run means no record and the agent reads the branch itself: a `stopped` or `failed` run says what to avoid, a `done` run with a `pr` says to read the pull request before doing the work again.
-- **The card** - the fields and their meaning, the four statuses, cost in US dollars, absent when unknown; `caller` is the writing program's and never printed.
+- **The card** - the fields and their meaning, the five statuses, cost in US dollars, absent when unknown; `caller` is the writing program's and never printed.
 - **The diary** - four kinds of line in the order they happened; any other kind is left out of `show`.
 
 ## Business logic

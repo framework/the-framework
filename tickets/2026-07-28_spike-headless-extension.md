@@ -14,14 +14,13 @@ Issue: [#1332](https://github.com/framework/the-framework/issues/1332)
 
 **What is left here:**
 
-- **A crash to fix:** the daemon's browser only launches if the daemon was started with the bridge already on. Turning the bridge on and picking the browser in the same daemon session fails the launch, and the failure crashes the daemon instead of reporting an error (hit by the maintainer on 2026-08-27). Wanted: an error saying "restart the dashboard first", no crash.
-- **Linux:** untried; a headed browser needs a display (Xvfb), not built. Windows untested.
+- **Linux:** untried; a headed browser needs a display (Xvfb), not built. Windows untested. **Waits for web runs to come back:** the web-run driver was deleted when runs moved to the agent scheduler, so nothing uses the bridge browser for a run today, and Linux support would have no user and no way to dogfood it. Do not queue this ticket before then.
 
-Filed separately: #1720 (ship the extension in the npm package, so the daemon's browser works outside a checkout); #1719 (an agent's browser outliving a hard-killed agent, closed).
+Done since: the crash when the bridge is switched on after the daemon started is fixed (#1723): the launch now fails with "restart the dashboard" instead of crashing the daemon. #1720 (ship the extension in the npm package) is done (#1789). #1719 (an agent's browser outliving a hard-killed agent) was closed.
 
 ## Why it matters
 
-The extension path is the shipped direction for web runs. The Driver tab is what lets one browser serve 50 sessions, and the daemon's own browser is what lets web runs work without the user's Chrome open. The crash above sits on the recommended setting's first-use path.
+The extension path is the shipped direction for web runs. The Driver tab is what lets one browser serve 50 sessions, and the daemon's own browser is what lets web runs work without the user's Chrome open.
 
 ## Source
 

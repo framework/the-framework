@@ -17,7 +17,7 @@ The `logs` skill: the record of every run [1] agents [2] made on a project, kept
 ## Business logic — TL;DR
 
 - **What the agent is told** (`SKILL.md`) - where the record lives, how to read it with `npx logs`, and the rule to read a ticket's earlier runs, named by its claim, before planning or working it: a `stopped` or `failed` run says what to avoid, a `done` run with a `pr` says to read the pull request first.
-- **The record's shape** (`src/run.ts`) - the card's eleven fields, the four statuses, the recording program's own bookkeeping under `caller`, the diary's four kinds of line, a run id and a person's directory as safe file names.
+- **The record's shape** (`src/run.ts`) - the card's ten fields, the four statuses, the recording program's own bookkeeping under `caller`, the diary's four kinds of line, a run id and a person's directory as safe file names.
 - **Recording** (`src/store.ts`) - a run lands as one committed and pushed change through the `agent-data` branch's write cycle, under the person the repository commits as, or where it already sits; the branch and the pull request are patched on later, one commit each; a run is deleted as one commit.
 - **The `logs` command** (`bin/`, `src/cli.ts`) - the list newest first with `--branch` and `--limit` (20 by default), `show <id>` with the agent's diary lines, one JSON document per reply, the refusals `not-a-repo`, `no-run` and `git-failed` with exit 1, a wrong command line with exit 2.
 - **Where the skill is found** (`src/bin-dir.ts`, `src/names.ts`, `src/index.ts`) - the executable's directory for an agent's PATH, the skill's name and directory for the coding agent, the runs directory name, and the entry points the product imports.

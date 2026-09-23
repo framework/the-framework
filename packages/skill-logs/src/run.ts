@@ -1,7 +1,6 @@
 // A run: one agent's work on the project, from its start to its end, recorded as two files on the
 // branch — the card, `<id>.json`, and the diary, `<id>.jsonl`. This module is the pure half: what
-// the two files hold, how they are read back, and how a run is matched. Nothing here touches git
-// or a disk.
+// the two files hold, and how they are read back. Nothing here touches git or a disk.
 
 /** How a run stands: still going, or how it ended. */
 export type RunStatus = 'running' | 'done' | 'stopped' | 'failed' | 'waiting'

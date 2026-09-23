@@ -1,4 +1,4 @@
-Fixes what a run [1] is on the `agent-data` branch [2]: the card [3], `<id>.json`, and the diary [4], `<id>.jsonl`; how each is written and read back; which fields and lines are the skill's and which are the recording program's [5]; and how a run is matched to a ticket, ordered, and shown. Nothing here touches git or a disk.
+Fixes what a run [1] is on the `agent-data` branch [2]: the card [3], `<id>.json`, and the diary [4], `<id>.jsonl`; how each is written and read back; which fields and lines are the skill's and which are the recording program's [5]; and how runs are ordered and shown. Nothing here touches git or a disk.
 
 ## Context
 
@@ -22,7 +22,7 @@ Fixes what a run [1] is on the `agent-data` branch [2]: the card [3], `<id>.json
 
 ## Business logic — TL;DR
 
-- **The card's fields** - eleven plain fields are the skill's; everything else the recording program keeps sits under one key, `caller`, stored as given and never read.
+- **The card's fields** - ten plain fields are the skill's; everything else the recording program keeps sits under one key, `caller`, stored as given and never read.
 - **How a run stands** - `running`, `done`, `stopped`, `failed` or `waiting`, and nothing else.
 - **A run id is a safe file name** - letters, digits, `-` and `_` only, so an id can never climb out of a directory; the card is `<id>.json`, the diary `<id>.jsonl`.
 - **A person's directory from a git email** - `agents/<who>/` is the email the recording repository commits as, lowercased and made safe; `anonymous` when unusable.

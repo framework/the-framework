@@ -1,4 +1,4 @@
-Claims a ticket for one holder [1] at a time and releases it again: the claim [2] is a file beside the ticket on the `agent-data` branch [3], `tickets/<stem>.lock.md`, holding the one line `CLAIMED: <holder>`, so two agents [4] never plan or work the same ticket, on this machine or on any other. Every claim and every release lands as one commit on the branch through the caller's write cycle (the rules in `store.ts`): a commit that could not be pushed still counts, and a write that could not commit claims or releases nothing.
+Claims a ticket for one holder [1] at a time and releases it again: the claim [2] is a file beside the ticket on the `agent-data` branch [3], `tickets/<stem>.lock.md`, holding the one line `CLAIMED: <holder>`, so two agents [4] never plan or work the same ticket, on this machine or on any other; the claim file's history names every earlier holder. Every claim and every release lands as one commit on the branch through the caller's write cycle (the rules in `store.ts`): a commit that could not be pushed still counts, and a write that could not commit claims or releases nothing.
 
 ## Context
 

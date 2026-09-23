@@ -21,7 +21,7 @@ npx logs show <id>               one run: its card, plus `diary`, the lines of w
 
 ## Before you plan or work a ticket, read its earlier runs
 
-A ticket may have been worked before. Claiming it names who claimed it before you: a run's id, read with `npx logs show <id>`, or a branch, read with `npx logs --branch <name>`. A `stopped` or `failed` run tells you what to avoid: read what its agent said before it ended. A `done` run with a `pr` means the work may already be there: read the pull request before doing it again.
+A ticket may have been worked before. Claiming it names who claimed it before you: a run's id, shaped like `2026-09-08T18-14-30-111Z`, read with `npx logs show <id>`, or else a branch, read with `npx logs --branch <name>`; no run on that branch means no record: read the branch itself. A `stopped` or `failed` run tells you what to avoid: read what its agent said before it ended. A `done` run with a `pr` means the work may already be there: read the pull request before doing it again.
 
 ## The card
 

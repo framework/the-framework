@@ -4,8 +4,8 @@ The `@gemstack/skill-update-tickets` npm package: the `update-tickets` command s
 
 [1] command skill: a skill file (`SKILL.md`) whose body is a job's prompt, marked so that only a person or a runner invokes it; a runner starts the agent with the skill's slash command and the coding agent's harness expands it.
 [2] agent: the unit of work: one task worked by a coding agent under a runner's control, in its own checkout, on its own branch.
-[3] capability skill: a skill that says how to do one thing and ships its command — `branches`, `tickets`, `queue`, `logs`; a command skill composes them and none of them knows another.
+[3] capability skill: a skill that says how to do one thing and ships its command — `branches`, `tickets`, `queue`, `logs`, `github`; a command skill composes them and none of them knows another.
 
 ## Business logic — TL;DR
 
-- **The job** (`SKILL.md`) - bringing the project's tickets up to date with its issue tracker and its merged pull requests, unattended; the routine the scheduler fires on the interval the project's schedule gives it.
+- **The job** (`SKILL.md`) - bringing the project's tickets up to date with its issue tracker and its merged pull requests, unattended; the routine the scheduler fires when the project's schedule says so.

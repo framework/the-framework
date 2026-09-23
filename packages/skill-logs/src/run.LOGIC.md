@@ -2,7 +2,7 @@ Fixes what a run [1] is on the `agent-data` branch [2]: the card [3], `<id>.json
 
 ## Context
 
-**User story**: an agent [6] runs `npx logs` before working a ticket and reads cards it can trust: every field means the same for every run whichever program recorded it, and none of that program's private bookkeeping is in the way; the user opens a run's page on another machine and sees the same record.
+**User story**: an agent [6] reads the earlier runs of a ticket before working it and reads cards it can trust: every field means the same for every run whichever program recorded it, and none of that program's private bookkeeping is in the way; the user opens a run's page on another machine and sees the same record.
 
 **Business logic story**: the recording program records a run at the agent's end through `store.ts`, and the `logs` command reads runs off origin through `cli.ts`; both go through the shapes fixed here.
 
@@ -12,14 +12,13 @@ Fixes what a run [1] is on the `agent-data` branch [2]: the card [3], `<id>.json
 
 [1] run: the `logs` skill's record of one agent on the `agent-data` branch: a card and a diary. Never the unit of work.
 [2] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
-[3] card: the run's `<id>.json`: what was asked, the ticket, the branch, the pull request, how it ended, what it cost.
+[3] card: the run's `<id>.json`: what was asked, the branch, the pull request, how it ended, what it cost.
 [4] diary: the run's `<id>.jsonl`: what the agent said.
 [5] recording program: the program that ran an agent and records its run when the agent ends; in the product, the scheduler (`agent-scheduler`).
 [6] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [7] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
 [8] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later. The driver implementations are `claude-code`, `codex`, `github-actions`, `claude-web` and `fake`.
 [9] turn: one prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
-[10] queue entry: an item on the agent queue, `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down.
 
 ## Business logic — TL;DR
 
@@ -32,7 +31,6 @@ Fixes what a run [1] is on the `agent-data` branch [2]: the card [3], `<id>.json
 - **The diary is JSON lines** - one JSON object with a `kind` per line; a line that is not one is skipped, and a torn line ends the read.
 - **The four kinds that are the agent's** - `said`, `result`, `ended` and `cost`, each with the fields its kind needs; every other kind is the recording program's and is left out of what the agent reads.
 - **The two late facts** - only the branch and the pull request may be patched onto a card after it lands.
-- **Which run worked a ticket** - the card's ticket is that exact path or ends with `/<file>`, so a file name and a linked path both find it.
 - **Newest first** - ids sort by time, so the id order reversed is the time order.
 - **What the command prints** - the skill's fields only, never `caller`.
 
@@ -46,7 +44,7 @@ Fixes what a run [1] is on the `agent-data` branch [2]: the card [3], `<id>.json
 
 #### Business logic
 
-The card [3] is the skill's and small. Its fields: `id`, the run's [1] name and, in the product, the agent id [7]; `startedAt` and `endedAt`, timestamps, the end absent while the run is going; `status`, how the run stands; `intent`, what the agent [6] was asked to do; `driver` [8], the coding agent program that ran, as the recording program [5] names it; `model`; `branch`, the branch the work is on; `pr`, the pull request the work is on, as a number and a URL; `ticket`, the ticket the run worked, as the recording program names tickets (a path or a file name); and `cost`, in US dollars. Every field but `id`, `startedAt` and `status` is absent when unknown. Everything else the recording program keeps sits under one more key, `caller`, as one object the skill stores as given and never reads.
+The card [3] is the skill's and small. Its fields: `id`, the run's [1] name and, in the product, the agent id [7]; `startedAt` and `endedAt`, timestamps, the end absent while the run is going; `status`, how the run stands; `intent`, what the agent [6] was asked to do; `driver` [8], the coding agent program that ran, as the recording program [5] names it; `model`; `branch`, the branch the work is on; `pr`, the pull request the work is on, as a number and a URL; and `cost`, in US dollars. Every field but `id`, `startedAt` and `status` is absent when unknown. Everything else the recording program keeps sits under one more key, `caller`, as one object the skill stores as given and never reads.
 
 ### How a run stands
 
@@ -96,7 +94,7 @@ See `## Context`.
 
 #### Business logic
 
-A card [3] is written as pretty-printed JSON with one trailing newline, the skill's fields first in a fixed order (`id`, `startedAt`, `endedAt`, `status`, `intent`, `driver`, `model`, `branch`, `pr`, `ticket`, `cost`) and `caller` last; a field that is absent is not written. What is written reads back as the same card.
+A card [3] is written as pretty-printed JSON with one trailing newline, the skill's fields first in a fixed order (`id`, `startedAt`, `endedAt`, `status`, `intent`, `driver`, `model`, `branch`, `pr`, `cost`) and `caller` last; a field that is absent is not written. What is written reads back as the same card.
 
 ### The diary is JSON lines
 
@@ -127,16 +125,6 @@ Four kinds of line are the agent's [6], and the skill knows only those: `said`, 
 #### Business logic
 
 Only two facts may be patched onto a card [3] after it lands: `branch` and `pr`. Nothing else on a card changes afterwards.
-
-### Which run worked a ticket
-
-#### Context
-
-**User story**: an agent [6] asks `npx logs --ticket <file>` for a ticket by its file name, or by the path a queue entry [10] links to, and finds the same runs either way.
-
-#### Business logic
-
-A run [1] worked a ticket when its card [3] names that exact path, or names a path ending in `/` followed by it; a run with no ticket matches nothing, and a mere suffix of the file name (`01_fix.md` for `2026-09-01_fix.md`) does not match. Where tickets live is the recording program's [5] business, not the skill's.
 
 ### Newest first
 

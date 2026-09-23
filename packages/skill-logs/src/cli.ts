@@ -1,7 +1,7 @@
 import { parseArgs } from 'node:util'
 import { checkoutRoot, gitReason, nodeGitRunner, openBranchReader, type BranchReader, type GitRunner, DATA_BRANCH } from '@gemstack/agent-data'
 import { RUNS_DIR } from './names.js'
-import { agentLines, isRunId, newestFirst, parseDiary, parseRunCard, publicCard, runCardFile, runDiaryFile, runIdOfFile, workedTicket, type RunCard, type RunPatch } from './run.js'
+import { agentLines, isRunId, newestFirst, parseDiary, parseRunCard, publicCard, runCardFile, runDiaryFile, runIdOfFile, type RunCard, type RunPatch } from './run.js'
 import { deleteRun, findRun, listRuns, patchRun, readDiary, runFiles } from './store.js'
 
 /**
@@ -29,10 +29,9 @@ export const DEFAULT_LIMIT = 20
 
 export const USAGE = `usage: logs [command]
 
-  (no command) [--ticket <file>] [--branch <name>] [--limit N]
+  (no command) [--branch <name>] [--limit N]
                                      the runs, newest first (the newest ${DEFAULT_LIMIT} unless --limit says
-                                     otherwise); --ticket keeps the runs that worked one ticket,
-                                     --branch the runs on one branch
+                                     otherwise); --branch keeps the runs on one branch
   show <id>                          one run: its card, and what the agent said, its result,
                                      how it ended, what it cost
 
@@ -103,10 +102,9 @@ type Command = (args: string[], io: CliIo, git: GitRunner) => Promise<unknown>
 
 /** The bare command: the runs, newest first, filtered and capped. */
 const list: Command = async (args, io, git) => {
-  const { values } = parse(args, { ticket: { type: 'string' }, branch: { type: 'string' }, limit: { type: 'string' }, ...READ_FLAGS }, 0)
+  const { values } = parse(args, { branch: { type: 'string' }, limit: { type: 'string' }, ...READ_FLAGS }, 0)
   const limit = values.limit === undefined ? DEFAULT_LIMIT : limitArg(values.limit)
-  const keep = (card: RunCard): boolean =>
-    (values.ticket === undefined || workedTicket(card, values.ticket)) && (values.branch === undefined || card.branch === values.branch)
+  const keep = (card: RunCard): boolean => values.branch === undefined || card.branch === values.branch
   const shown = values.full ? (card: RunCard) => card : publicCard
   if (values.local) {
     const root = await inRepo(() => checkoutRoot(io.cwd, git))

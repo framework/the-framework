@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { checkoutRoot, gitReason, listBranchDir, nodeBranchFileFs, nodeGitRunner, openBranchReader, readBranchFile, writeFileBranchDetached, type BranchReader, type GitRunner, DATA_BRANCH } from '@gemstack/agent-data'
 import { isTicketFile, isTicketPath, META_FILE, TICKETS_DIR, ticketLockName, ticketPlanName, ticketStem } from './names.js'
 import { readTicket, readTickets, readTicketsMeta, type TicketsFs } from './tickets.js'
-import { applyClaims, applyRelease, claimMessage, lockHolder, releaseMessage } from './locks.js'
+import { applyClaims, applyRelease, claimHistory, claimMessage, lockHolder, releaseMessage } from './locks.js'
 import { holderOf } from './holder.js'
 
 /**
@@ -34,7 +34,7 @@ export const USAGE = `usage: tickets <command>
   meta [--local]                     when the tickets last caught up with the issue tracker
   put <file>                         write one file under tickets/ from stdin (a ticket, a plan, meta.json)
   close <file>                       remove a ticket with its plan and lock (not while someone else holds it)
-  claim <file>                       claim a ticket before planning or working it
+  claim <file>                       claim a ticket before planning or working it; names who claimed it before
   release <file> [--force]           lift your own claim; --force lifts anyone's (a person's act)
 
 JSON on stdout. Exit code 1 for a refusal or a git failure (the reason on stderr), 2 for a usage error.`
@@ -162,9 +162,9 @@ const COMMANDS: Record<string, Command> = {
     const { positionals } = parse(args, {}, 1)
     const file = ticketArg(positionals[0]!)
     const holder = await identity(io.cwd, git)
-    type ClaimOutcome = { ok: true } | { ok: false; reason: 'no-ticket' } | { ok: false; reason: 'claimed'; holder?: string }
+    type ClaimOutcome = { ok: true; earlier: string[] } | { ok: false; reason: 'no-ticket' } | { ok: false; reason: 'claimed'; holder?: string }
     // Assigned inside the op, which a lost race re-runs: typed wide so the read below sees every case.
-    let outcome = { ok: true } as ClaimOutcome
+    let outcome = { ok: true, earlier: [] } as ClaimOutcome
     await write(io.cwd, claimMessage([{ ticket: file, holder }]), async dir => {
       const fs = nodeBranchFileFs()
       if (!(await fs.read(join(dir, TICKETS_DIR, file)).then(() => true, () => false))) {
@@ -174,7 +174,10 @@ const COMMANDS: Record<string, Command> = {
       // A claim to plan or to work: an existing plan is not in the way, only someone's lock is.
       const locked = await applyClaims(dir, [{ ticket: file, holder }], 'drain', fs)
       if (locked.length) {
-        outcome = { ok: true }
+        // Who claimed it before, read off the lock's history at origin's tip: this claim is not
+        // committed yet, so every holder there is an earlier one, bar this holder claiming again.
+        const patch = await git(['log', '-p', '--format=', '--no-renames', '--', `${TICKETS_DIR}/${ticketLockName(file)}`], dir)
+        outcome = { ok: true, earlier: claimHistory(patch).filter(h => h !== holder) }
         return
       }
       // The holder as the lock names it; a lock that names nobody readable is still a claim.
@@ -185,7 +188,7 @@ const COMMANDS: Record<string, Command> = {
       if (outcome.reason === 'no-ticket') throw noTicket(file)
       throw new Refused({ ...outcome, file }, `${TICKETS_DIR}/${file} is claimed by ${outcome.holder ?? 'someone else'}: pick another ticket`)
     }
-    return { ok: true, file: `${TICKETS_DIR}/${file}`, holder }
+    return { ok: true, file: `${TICKETS_DIR}/${file}`, holder, earlier: outcome.earlier }
   },
 
   async release(args, io, git) {

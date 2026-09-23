@@ -7,4 +7,4 @@ What the tests cover:
 - **Writing a card** - the skill's fields first, `caller` last, a trailing newline, absent fields not written, and the result reads back as the same card.
 - **The diary** - a line without a `kind` and a value that is not an object are not lines; the agent's four kinds are kept with any extra fields they carry, among the writing program's own kinds; a known kind with missing or wrong fields (`said` without a text, `ended` with status `running`, `cost` with a text `usd`) is not the agent's line; a diary is written one object per line.
 - **A torn line** - ends the read and keeps every line before it.
-- **Matching and ordering** - a run worked a ticket by its exact path or its file name, not by a suffix of the file name, and a run with no ticket matches nothing; newest first is the id order reversed.
+- **Ordering** - newest first is the id order reversed.

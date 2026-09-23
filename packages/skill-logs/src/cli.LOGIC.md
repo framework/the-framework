@@ -2,7 +2,7 @@ The `logs` command line: the reads an agent [1] (or a person) makes in a shell, 
 
 ## Context
 
-**User story**: before planning or working a ticket, an agent [1] runs `npx logs --ticket <file>` and sees, newest first, what earlier agents did on it; `npx logs show <id>` then tells what one of them said before it ended. The agent sees only the record's own fields, never the daemon's bookkeeping.
+**User story**: before planning or working a ticket, an agent [1] runs `npx logs show <id>` for each run its claim on the ticket names, and reads what that agent said before it ended; `npx logs` lists the latest runs newest first, `--branch` the runs on one branch. The agent sees only the record's own fields, never the daemon's bookkeeping.
 
 **Business logic story**: the command opens the branch through the one-shot reader of `file-branch.ts`: one fetch from `origin`, then every read off origin's copy of the branch; without a remote, the local branch is read. The checkout [4] a daemon keeps under `.branches/agent-data` is never touched, and nothing lands in the clone: no local branch, no file.
 
@@ -18,7 +18,7 @@ The `logs` command line: the reads an agent [1] (or a person) makes in a shell, 
 [4] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch. Also "the `agent-data` branch's checkout".
 [5] diary: the run's `<id>.jsonl`: what the agent said.
 [6] recording program: the program that ran an agent and records its run when the agent ends; in the product, the scheduler (`agent-scheduler`).
-[7] card: the run's `<id>.json`: what was asked, the ticket, the branch, the pull request, how it ended, what it cost.
+[7] card: the run's `<id>.json`: what was asked, the branch, the pull request, how it ended, what it cost.
 [8] queue entry: an item on the agent queue, `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down.
 [9] dashboard: a program that shows a project's runs to a person, such as The Framework's; it finds this command through the package's `framework.runs` declaration.
 
@@ -26,7 +26,7 @@ The `logs` command line: the reads an agent [1] (or a person) makes in a shell, 
 
 - **One JSON document, one exit code** - a result on stdout with exit 0; a refusal as `{ "ok": false, "reason": … }` on stdout plus one line on stderr with exit 1; a command line that could not be read as the usage on stderr, nothing on stdout, exit 2.
 - **Read off origin, from anywhere in the repository** - the branch is fetched from `origin` once and every read goes to that copy; with no remote, the local branch; outside a repository, the refusal `not-a-repo`.
-- **The bare command lists the runs** - newest first, the newest 20 unless `--limit` says otherwise, narrowed by `--ticket <file>` and `--branch <name>`, the skill's fields only.
+- **The bare command lists the runs** - newest first, the newest 20 unless `--limit` says otherwise, narrowed by `--branch <name>`, the skill's fields only.
 - **`show <id>` prints one run** - its card and the agent's four kinds of diary line, never the recording program's; an id no run has is the refusal `no-run`.
 - **For a dashboard: `--local` and `--full`** - with either read, `--local` reads the checkout kept at `.branches/agent-data` instead of fetching; `--full` prints the whole card, `caller` included, and for `show` every diary line.
 - **For a dashboard: `delete <id>` and `patch <id>`** - remove a run, or set its branch and pull request, as one commit through the kept checkout, pushed; an id no run has is `no-run`, a write that did not land is `write-failed`.
@@ -59,7 +59,7 @@ The command first checks that it runs inside a git working tree; outside one it 
 
 #### Context
 
-**User story**: `npx logs`, `npx logs --ticket <file>`, `npx logs --branch <name>`, `npx logs --limit N`, alone or combined.
+**User story**: `npx logs`, `npx logs --branch <name>`, `npx logs --limit N`, alone or combined.
 
 #### Business logic
 

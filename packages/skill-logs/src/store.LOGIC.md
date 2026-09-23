@@ -12,7 +12,7 @@ The recording program's [1] side of the runs [2]: reads and writes of `agents/<w
 
 [1] recording program: the program that ran an agent and records its run when the agent ends; in the product, the scheduler (`agent-scheduler`).
 [2] run: the `logs` skill's record of one agent on the `agent-data` branch: a card and a diary. Never the unit of work.
-[3] card: the run's `<id>.json`: what was asked, the ticket, the branch, the pull request, how it ended, what it cost.
+[3] card: the run's `<id>.json`: what was asked, the branch, the pull request, how it ended, what it cost.
 [4] diary: the run's `<id>.jsonl`: what the agent said.
 [5] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs. Born as an orphan, written through one sync → commit → push cycle.
 [6] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch. Also "the `agent-data` branch's checkout".

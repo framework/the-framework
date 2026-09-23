@@ -28,8 +28,6 @@ export interface RunCard {
   branch?: string
   /** The pull request the work is on. */
   pr?: { number: number; url: string }
-  /** The ticket the run worked, as the writer names tickets: a path, or a file name. */
-  ticket?: string
   /** What the run cost, in US dollars. */
   cost?: number
   /** The writer's own record, under one key: stored as given, never read. */
@@ -127,7 +125,7 @@ export function parseRunCard(json: string): RunCard | undefined {
   const r = raw as Record<string, unknown>
   if (typeof r['id'] !== 'string' || !isRunId(r['id']) || typeof r['startedAt'] !== 'string' || !isStatus(r['status'])) return undefined
   const card: RunCard = { id: r['id'], startedAt: r['startedAt'], status: r['status'] }
-  for (const key of ['endedAt', 'intent', 'driver', 'model', 'branch', 'ticket'] as const) {
+  for (const key of ['endedAt', 'intent', 'driver', 'model', 'branch'] as const) {
     if (typeof r[key] === 'string') card[key] = r[key]
   }
   if (typeof r['cost'] === 'number') card.cost = r['cost']
@@ -142,8 +140,8 @@ export function parseRunCard(json: string): RunCard | undefined {
 
 /** A card as it is written: the package's fields first, `caller` last, pretty, one trailing newline. */
 export function formatRunCard(card: RunCard): string {
-  const { id, startedAt, endedAt, status, intent, driver, model, branch, pr, ticket, cost, caller } = card
-  const ordered = { id, startedAt, endedAt, status, intent, driver, model, branch, pr, ticket, cost, caller }
+  const { id, startedAt, endedAt, status, intent, driver, model, branch, pr, cost, caller } = card
+  const ordered = { id, startedAt, endedAt, status, intent, driver, model, branch, pr, cost, caller }
   return JSON.stringify(ordered, null, 2) + '\n'
 }
 
@@ -191,15 +189,6 @@ export function isDiaryLine(line: AnyDiaryLine): line is DiaryLine & AnyDiaryLin
 /** The agent's own lines of a diary: what it said, its results, how it ended, what it cost. Everything else is the writer's. */
 export function agentLines(lines: readonly AnyDiaryLine[]): Array<DiaryLine & AnyDiaryLine> {
   return lines.filter(isDiaryLine)
-}
-
-/**
- * Whether a card's run worked `ticket`: the card names that exact path, or a path ending in
- * `/<ticket>` — so a ticket's file name and the path a queue entry links to both find it. Where
- * tickets live is the writer's business, not the package's.
- */
-export function workedTicket(card: RunCard, ticket: string): boolean {
-  return card.ticket !== undefined && (card.ticket === ticket || card.ticket.endsWith(`/${ticket}`))
 }
 
 /** Newest first: the writer's ids sort by time, so the id order is the time order, reversed. */

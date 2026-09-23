@@ -28,6 +28,21 @@ export function lockHolder(md: string): string | undefined {
   return holder || undefined
 }
 
+/**
+ * The holders a lock file's history named, newest first, each once: the claim lines its commits
+ * added, read from `git log -p` of the lock. A released claim leaves the file but not the history,
+ * so this is who worked or planned the ticket before, however their claim ended.
+ */
+export function claimHistory(patch: string): string[] {
+  const holders: string[] = []
+  for (const line of patch.split('\n')) {
+    if (!line.startsWith('+') || line.startsWith('+++')) continue
+    const holder = lockHolder(line.slice(1))
+    if (holder !== undefined && !holders.includes(holder)) holders.push(holder)
+  }
+  return holders
+}
+
 /** One claim: the ticket's filename inside `tickets/`, and who holds it. */
 export interface TicketClaim {
   ticket: string

@@ -12,7 +12,6 @@ export {
   formatDiary,
   isDiaryLine,
   agentLines,
-  workedTicket,
   newestFirst,
   publicCard,
   type RunCard,

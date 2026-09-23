@@ -36,7 +36,9 @@ npx tickets close <file>         once the work is merged, or the ticket is not w
 ## Claim before you plan or work a ticket
 
 ```
-npx tickets claim <file>         {"ok":true,"file":…,"holder":…}: the ticket is yours
+npx tickets claim <file>         {"ok":true,"file":…,"holder":…,"earlier":[…]}: the ticket is yours;
+                                 earlier: who claimed it before you, newest first, each a run's id or
+                                 a branch; read what they did before you start
                                  {"ok":false,"reason":"claimed","holder":…}: someone else's: pick another,
                                  and never remove or overwrite their claim
 npx tickets release <file>       lift your own claim when the plan or the work is done, and before you

@@ -32,7 +32,6 @@ export interface LogCard {
   model?: string
   branch?: string
   pr?: { number: number; url: string }
-  ticket?: string
   caller?: Record<string, unknown>
 }
 

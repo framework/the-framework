@@ -96,7 +96,7 @@ test('claim writes the lock as one pushed commit naming the holder; the second c
   try {
     const first = await run(a!, ['claim', '2026-08-30_a.md'])
     assert.equal(first.code, 0)
-    assert.deepEqual(first.json, { ok: true, file: 'tickets/2026-08-30_a.md', holder: 'agent-a0' })
+    assert.deepEqual(first.json, { ok: true, file: 'tickets/2026-08-30_a.md', holder: 'agent-a0', earlier: [] })
     assert.equal(await git(['show', `${DATA_BRANCH}:tickets/2026-08-30_a.lock.md`], bare), 'CLAIMED: agent-a0\n')
     assert.equal((await git(['log', '-1', '--format=%s %an', DATA_BRANCH], bare)).trim(), 'claim tickets/2026-08-30_a a0')
     // The agent's own clone holds no local copy of the branch: the write was a remote writer's.
@@ -114,7 +114,7 @@ test('claim writes the lock as one pushed commit naming the holder; the second c
     assert.equal(show.json.holder, 'agent-a0')
     assert.equal(show.json.ticket.lockedBy, 'agent-a0')
     // Claiming again yourself is fine: the lock is yours already.
-    assert.equal((await run(a!, ['claim', '2026-08-30_a.md'])).code, 0)
+    assert.deepEqual((await run(a!, ['claim', '2026-08-30_a.md'])).json, { ok: true, file: 'tickets/2026-08-30_a.md', holder: 'agent-a0', earlier: [] })
     // Only the holder may release.
     const notMine = await run(b!, ['release', '2026-08-30_a.md'])
     assert.equal(notMine.code, 1)
@@ -123,8 +123,12 @@ test('claim writes the lock as one pushed commit naming the holder; the second c
     assert.equal(mine.code, 0)
     await assert.rejects(git(['show', `${DATA_BRANCH}:tickets/2026-08-30_a.lock.md`], bare))
     assert.deepEqual((await run(a!, ['release', '2026-08-30_a.md'])).json, { ok: false, reason: 'no-lock', file: '2026-08-30_a.md' })
-    // Now b gets it.
-    assert.equal((await run(b!, ['claim', '2026-08-30_a.md'])).json.holder, 'agent-a1')
+    // Now b gets it, and learns a claimed it before, though a's claim is gone.
+    assert.deepEqual((await run(b!, ['claim', '2026-08-30_a.md'])).json, { ok: true, file: 'tickets/2026-08-30_a.md', holder: 'agent-a1', earlier: ['agent-a0'] })
+    // Released again and claimed a third time: a0's own earlier claim is left out, b's is named.
+    assert.equal((await run(b!, ['release', '2026-08-30_a.md'])).code, 0)
+    assert.equal((await run(a!, ['release', '2026-08-30_a.md'])).code, 1)
+    assert.deepEqual((await run(a!, ['claim', '2026-08-30_a.md'])).json.earlier, ['agent-a1'], 'your own earlier claim is not listed')
     // A ticket that does not exist cannot be claimed.
     assert.equal((await run(b!, ['claim', '2026-08-28_nope.md'])).json.reason, 'no-ticket')
   } finally {

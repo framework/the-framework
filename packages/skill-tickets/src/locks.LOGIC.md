@@ -1,4 +1,4 @@
-Claims a ticket for one holder [1] at a time and releases it again: the claim [2] is a file beside the ticket on the `agent-data` branch [3], `tickets/<stem>.lock.md`, holding the one line `CLAIMED: <holder>`, so two agents [4] never plan or work the same ticket, on this machine or on any other. Every claim and every release lands as one commit on the branch through the caller's write cycle (the rules in `store.ts`): a commit that could not be pushed still counts, and a write that could not commit claims or releases nothing.
+Claims a ticket for one holder [1] at a time and releases it again: the claim [2] is a file beside the ticket on the `agent-data` branch [3], `tickets/<stem>.lock.md`, holding the one line `CLAIMED: <holder>`, so two agents [4] never plan or work the same ticket, on this machine or on any other; the claim file's history names every earlier holder. Every claim and every release lands as one commit on the branch through the caller's write cycle (the rules in `store.ts`): a commit that could not be pushed still counts, and a write that could not commit claims or releases nothing.
 
 ## Context
 
@@ -23,6 +23,7 @@ Claims a ticket for one holder [1] at a time and releases it again: the claim [2
 - **How claims land** - one commit for the whole batch; a batch that could not commit claims nothing and says why; a batch committed but not pushed keeps its claims and logs the gap.
 - **Releasing a claim** - the claim is removed when it exists and, if the release names a holder, still names that holder; otherwise the release reports "no-lock" or "not-holder" and touches nothing.
 - **How a release lands** - one commit; a release that could not commit reports an error and changes nothing; one committed but not pushed stands, the gap logged.
+- **Who claimed a ticket before** - every holder the claim file's history named, newest first, each once, whether their claim was released or closed.
 
 ## Business logic
 
@@ -95,3 +96,13 @@ See `## Context`.
 #### Business logic
 
 A release lands as one commit named "release tickets/<stem>", pushed; a release that found no claim, or someone else's, changes nothing and commits nothing. A release that could not commit reports an error and changes nothing: the write cycle restores the checkout, so the committed state keeps telling the truth about the claim [2]. A release committed but not pushed stands, and the gap is logged ("[tickets] the release of <file> could not be pushed").
+
+### Who claimed a ticket before
+
+#### Context
+
+**User story**: an agent [4] about to work a ticket reads what earlier agents did on it, so it neither repeats a failure nor redoes work already done; the record of those agents' runs names them by the holder [1] their claim [2] carried, and a released claim leaves no file behind.
+
+#### Business logic
+
+The earlier holders [1] of a ticket are read from the history of its claim file on the `agent-data` branch [3], every commit that changed `tickets/<stem>.lock.md`, as git prints their changes newest first. Every line such a change added that is a claim line gives a holder; the list keeps each holder once, at its newest place, so the list is newest first. Lines a change removed, and added lines that are not a claim line, give nobody. A claim that was released or closed is still in the list, since its commit stays in the branch's history. The history is the claim file's path's, so a ticket written again under a closed ticket's file name inherits the closed ticket's holders.

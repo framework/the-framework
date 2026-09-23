@@ -24,7 +24,7 @@ The `tickets` command: the six operations an agent [1], or a person in a shell, 
 - **Writes are one pushed commit each, on a throwaway checkout** - `put`, `close`, `claim` and `release` each make one commit on a throwaway checkout of origin's tip and push it straight to the branch; nothing lands in the caller's checkout; with no remote the write is refused as `no-remote`.
 - **Who the command acts as** - `close`, `claim` and `release` act as `AGENT_ID` when it is set, else as the current branch; a checkout on no branch refuses `no-identity`.
 - **`put`** - writes one whole file under `tickets/` from stdin, a ticket, a plan or `meta.json`, creating it if new and overwriting it whoever holds the ticket; never a claim.
-- **`claim`** - claims the ticket to implement: a plan is not in the way, only someone else's claim is; a ticket the caller already holds is claimed again without a write; someone else's claim is refused as `claimed`, naming the holder when the claim line parses.
+- **`claim`** - claims the ticket to implement: a plan is not in the way, only someone else's claim is; a ticket the caller already holds is claimed again without a write; a claim names every earlier holder, newest first; someone else's claim is refused as `claimed`, naming the holder when the claim line parses.
 - **`release`** - lifts only the caller's own claim; an unclaimed ticket is `no-lock`, someone else's claim is `not-holder`; with `--force`, the dashboard's flag, it lifts whoever's claim and needs no identity.
 - **`close`** - removes the ticket with its plan and claim and nothing else; refused as `not-holder` while someone else holds it; the queue entry linking the ticket stays.
 
@@ -106,11 +106,11 @@ See `## Context`.
 
 #### Context
 
-**User story**: before planning or working a ticket, an agent [1] claims it and is told whether it is now its own or someone else's; on someone else's it picks another ticket and never removes or overwrites their claim [4].
+**User story**: before planning or working a ticket, an agent [1] claims it and is told whether it is now its own or someone else's, and, when its own, who claimed it before, so it reads what those agents did first; on someone else's it picks another ticket and never removes or overwrites their claim [4].
 
 #### Business logic
 
-`claim <file>` claims the ticket to implement, by the batch rule of `locks.ts` in its "implement" side: an existing plan is not in the way, only a claim is. A ticket with no claim gets one naming the holder [5]; a ticket already claimed by this very holder is claimed again without a write and without a commit; both answer `{"ok":true,"file":"tickets/<file>","holder":…}`. A ticket that does not exist refuses `no-ticket`. A ticket someone else holds refuses `claimed`, `{"ok":false,"reason":"claimed","holder":…,"file":…}`, the holder present only when the claim's line parses (a claim naming nobody readable is still a claim), and tells the person "tickets/<file> is claimed by <holder>: pick another ticket", "someone else" standing in for an unreadable holder. A refused claim commits nothing.
+`claim <file>` claims the ticket to implement, by the batch rule of `locks.ts` in its "implement" side: an existing plan is not in the way, only a claim is. A ticket with no claim gets one naming the holder [5]; a ticket already claimed by this very holder is claimed again without a write and without a commit; both answer `{"ok":true,"file":"tickets/<file>","holder":…,"earlier":[…]}`. `earlier` lists the holders [5] the ticket's claim named before, by the history rule of `locks.ts`, read on the throwaway checkout of origin's tip before this claim is committed; this very holder is left out, so a holder claiming again sees only the others: it knows its own past work. A ticket that does not exist refuses `no-ticket`. A ticket someone else holds refuses `claimed`, `{"ok":false,"reason":"claimed","holder":…,"file":…}`, the holder present only when the claim's line parses (a claim naming nobody readable is still a claim), and tells the person "tickets/<file> is claimed by <holder>: pick another ticket", "someone else" standing in for an unreadable holder. A refused claim commits nothing.
 
 ### `release`
 

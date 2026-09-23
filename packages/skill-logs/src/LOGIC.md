@@ -7,7 +7,7 @@ The `logs` skill's implementation: what a run [1] is (a card [2] and a diary [3]
 ## Glossary
 
 [1] run: the `logs` skill's record of one agent on the `agent-data` branch: a card and a diary. Never the unit of work.
-[2] card: the run's `<id>.json`: what was asked, the ticket, the branch, the pull request, how it ended, what it cost.
+[2] card: the run's `<id>.json`: what was asked, the branch, the pull request, how it ended, what it cost.
 [3] diary: the run's `<id>.jsonl`: what the agent said.
 [4] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [5] recording program: the program that ran an agent and records its run when the agent ends; in the product, the scheduler (`agent-scheduler`).
@@ -17,9 +17,9 @@ The `logs` skill's implementation: what a run [1] is (a card [2] and a diary [3]
 ## Business logic — TL;DR
 
 - **The one name** (`names.ts`) - `agents`, the directory at the branch root the runs live under; importable from browser code.
-- **What a run is** (`run.ts`) - the card's eleven fields and the recording program's `caller`; the four statuses; a run id as a safe file name; a person's directory from a git email; how a card and a diary are written and read back; the four kinds of diary line that are the agent's; which run worked a ticket; newest first; the public card without `caller`.
+- **What a run is** (`run.ts`) - the card's ten fields and the recording program's `caller`; the five statuses; a run id as a safe file name; a person's directory from a git email; how a card and a diary are written and read back; the four kinds of diary line that are the agent's; newest first; the public card without `caller`.
 - **Recording and reading runs for the recording program** (`store.ts`) - one commit per record, patch or delete, through the branch's write cycle; the runs listed newest first off the checkout; a run recorded again stays where it sits.
-- **The `logs` command** (`cli.ts`) - the list with `--ticket`, `--branch` and `--limit` (20 by default), `show <id>` with the agent's diary lines, reads off origin's copy fetched once, the refusals `not-a-repo`, `no-run` and `git-failed`, and the exit codes 0, 1 and 2.
+- **The `logs` command** (`cli.ts`) - the list with `--branch` and `--limit` (20 by default), `show <id>` with the agent's diary lines, reads off origin's copy fetched once, the refusals `not-a-repo`, `no-run` and `git-failed`, and the exit codes 0, 1 and 2.
 - **Where the skill is** (`bin-dir.ts`) - the executable's directory for an agent's PATH, the skill's name `logs`, and the package directory holding `SKILL.md`.
 - **The entry point** (`index.ts`) - what the product imports, plus a `names` entry point for browser code.
 - **The tests** (`run.test.ts`, `store.test.ts`, `cli.test.ts`) - the shapes and their safety rules; recording, listing, patching and deleting against a real repository; the command's replies, refusals and exit codes from an agent's clone.

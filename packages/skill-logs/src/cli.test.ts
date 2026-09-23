@@ -17,7 +17,7 @@ const card = (id: string, over: Record<string, unknown> = {}) => ({ id, startedA
 
 /** The runs on the branch: two people, three runs, one diary with the writer's lines among the agent's. */
 const RUNS: Record<string, string> = {
-  [`a@a/${R1}.json`]: JSON.stringify(card(R1, { intent: 'first try', ticket: 'tickets/2026-07-01_fix.md', branch: 'agent-r1', status: 'failed', caller: { pid: 1, host: 'laptop' } })),
+  [`a@a/${R1}.json`]: JSON.stringify(card(R1, { intent: 'first try', branch: 'agent-r1', status: 'failed', caller: { pid: 1, host: 'laptop' } })),
   [`a@a/${R1}.jsonl`]: [
     '{"kind":"session","driver":"claude-code"}',
     '{"kind":"said","text":"Reading the ticket."}',
@@ -27,7 +27,7 @@ const RUNS: Record<string, string> = {
     '{"kind":"ended","status":"failed","detail":"API 500"}',
     '',
   ].join('\n'),
-  [`b@b/${R2}.json`]: JSON.stringify(card(R2, { intent: 'second try', ticket: 'tickets/2026-07-01_fix.md', branch: 'agent-r2', pr: { number: 3, url: 'https://x/pull/3' }, cost: 1.25 })),
+  [`b@b/${R2}.json`]: JSON.stringify(card(R2, { intent: 'second try', branch: 'agent-r2', pr: { number: 3, url: 'https://x/pull/3' }, cost: 1.25 })),
   [`b@b/${R2}.jsonl`]: '{"kind":"ended","status":"done"}\n',
   [`b@b/${R3}.json`]: JSON.stringify(card(R3, { intent: 'unrelated', branch: 'agent-r3' })),
   'b@b/notes.md': 'not a run\n',
@@ -81,7 +81,7 @@ async function run(cwd: string, argv: string[]) {
   return { code, json: out.length ? JSON.parse(out.join('\n')) : undefined, stderr: err.join('\n') }
 }
 
-test('the bare command lists every person\'s runs off origin, newest first, the package\'s fields only; --ticket, --branch and --limit narrow it', async () => {
+test('the bare command lists every person\'s runs off origin, newest first, the package\'s fields only; --branch and --limit narrow it', async () => {
   const { agents, cleanup } = await rig(1)
   const [a] = agents
   try {
@@ -91,15 +91,10 @@ test('the bare command lists every person\'s runs off origin, newest first, the 
       all.json.map((c: { id: string }) => c.id),
       [R3, R2, R1],
     )
-    assert.deepEqual(all.json[2], { ...card(R1), intent: 'first try', ticket: 'tickets/2026-07-01_fix.md', branch: 'agent-r1', status: 'failed' }, 'caller is the writer\'s, not printed')
-    // By the ticket's file name, or the path a queue entry links to.
-    const byFile = await run(a!, ['--ticket', '2026-07-01_fix.md'])
-    assert.deepEqual(byFile.json.map((c: { id: string; status: string }) => [c.id, c.status]), [[R2, 'done'], [R1, 'failed']])
-    assert.deepEqual((await run(a!, ['--ticket', 'tickets/2026-07-01_fix.md'])).json.map((c: { id: string }) => c.id), [R2, R1])
-    assert.deepEqual((await run(a!, ['--ticket', 'other.md'])).json, [])
+    assert.deepEqual(all.json[2], { ...card(R1), intent: 'first try', branch: 'agent-r1', status: 'failed' }, 'caller is the writer\'s, not printed')
     assert.deepEqual((await run(a!, ['--branch', 'agent-r3'])).json.map((c: { id: string }) => c.id), [R3])
     assert.deepEqual((await run(a!, ['--limit', '1'])).json.map((c: { id: string }) => c.id), [R3])
-    assert.deepEqual((await run(a!, ['--ticket', '2026-07-01_fix.md', '--limit', '1'])).json.map((c: { id: string }) => c.id), [R2], 'the cap counts matches')
+    assert.deepEqual((await run(a!, ['--branch', 'agent-r1', '--limit', '1'])).json.map((c: { id: string }) => c.id), [R1], 'the cap counts matches')
     // Nothing lands locally: the agent's clone holds no copy of the branch.
     await assert.rejects(git(['rev-parse', '--verify', DATA_BRANCH], a!))
     assert.equal((await git(['status', '--porcelain'], a!)).trim(), '')
@@ -132,7 +127,6 @@ test('show prints the card with the agent\'s lines of the diary, never the write
     assert.deepEqual(shown.json, {
       ...card(R1),
       intent: 'first try',
-      ticket: 'tickets/2026-07-01_fix.md',
       branch: 'agent-r1',
       status: 'failed',
       diary: [

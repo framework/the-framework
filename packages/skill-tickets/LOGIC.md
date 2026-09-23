@@ -14,7 +14,7 @@ The `tickets` skill [1]: the project's tickets as markdown files under `tickets/
 
 ## Business logic — TL;DR
 
-- **What the agent is told** (`SKILL.md`) - where the tickets live, the seven commands with the one shape every answer takes, claiming before planning or working and releasing after, queueing a ticket as a link at its priority, and the ticket, claim and plan formats; every line one an agent would go wrong without.
+- **What the agent is told** (`SKILL.md`) - where the tickets live, the seven commands with the one shape every answer takes, claiming before planning or working, told who claimed before, and releasing after, queueing a ticket as a link at its priority, and the ticket, claim and plan formats; every line one an agent would go wrong without.
 - **The executable** (`bin/`) - the `tickets` command on every agent's PATH, handing the shell to the command's rules.
 - **The rules and the library** (`src/`) - the filename gates, the ticket rows, the holder, the claim and release rules, the branch's checkout, sync and root link, the command itself, and the widget's own rules.
 - **The widget** (`dashboard/`) - the Tickets page the dashboard mounts at `/tickets`: every project's backlog filtered, sorted and grouped, one ticket's page with its claim's release, its plan with the way back to the agent that wrote it, and the ticket as a link for what other widgets offer on one; every read and write through the `tickets` command, every other service through the dashboard's host.

@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { join } from 'node:path'
 import type { FileBranchWrite } from '@gemstack/agent-data'
-import { claimTickets, releaseTicket, lockContent, lockHolder, claimMessage, releaseMessage } from './locks.js'
+import { claimTickets, releaseTicket, lockContent, lockHolder, claimMessage, releaseMessage, claimHistory } from './locks.js'
 import type { TicketDeps, TicketsFunnel } from './store.js'
 
 const ROOT = '/repo'
@@ -144,4 +144,26 @@ test('lockHolder reads the claim and rejects non-claims', () => {
   assert.equal(lockHolder('# A real plan\n\nCLAIMED elsewhere…'), undefined)
   assert.equal(lockHolder('CLAIMED:'), undefined)
   assert.equal(lockHolder(''), undefined)
+})
+
+test('claimHistory lists the holders the lock\'s commits added, newest first, each once', () => {
+  const patch = [
+    'diff --git a/tickets/x.lock.md b/tickets/x.lock.md',
+    'deleted file mode 100644',
+    '--- a/tickets/x.lock.md',
+    '+++ /dev/null',
+    '-CLAIMED: run-3',
+    'diff --git a/tickets/x.lock.md b/tickets/x.lock.md',
+    'new file mode 100644',
+    '--- /dev/null',
+    '+++ b/tickets/x.lock.md',
+    '+CLAIMED: run-3',
+    '-CLAIMED: run-1',
+    '+CLAIMED: run-2',
+    '+CLAIMED: run-3',
+    '+not a claim',
+    '+CLAIMED: run-1',
+  ].join('\n')
+  assert.deepEqual(claimHistory(patch), ['run-3', 'run-2', 'run-1'])
+  assert.deepEqual(claimHistory(''), [])
 })

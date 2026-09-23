@@ -37,7 +37,7 @@ test('a run is recorded under the person the repo commits as, one pushed commit;
   try {
     const wrote = await writeRun(root, card(R2, { intent: 'second', caller: { pid: 1 } }), [{ kind: 'said', text: 'hi' }, { kind: 'ended', status: 'done' }])
     assert.deepEqual(wrote, { ok: true, changed: true, pushed: true })
-    assert.deepEqual(await writeRun(root, card(R1, { intent: 'first', ticket: 'tickets/a.md' }), []), { ok: true, changed: true, pushed: true })
+    assert.deepEqual(await writeRun(root, card(R1, { intent: 'first' }), []), { ok: true, changed: true, pushed: true })
     const person = join(fileBranchPath(root, DATA_BRANCH), RUNS_DIR, 'dev@example.com')
     assert.deepEqual(JSON.parse(await readFile(join(person, `${R2}.json`), 'utf8')), { ...card(R2), intent: 'second', caller: { pid: 1 } })
     assert.equal(await readFile(join(person, `${R2}.jsonl`), 'utf8'), '{"kind":"said","text":"hi"}\n{"kind":"ended","status":"done"}\n')
@@ -46,7 +46,7 @@ test('a run is recorded under the person the repo commits as, one pushed commit;
 
     assert.deepEqual((await listRuns(root)).map(c => c.id), [R2, R1], 'newest first')
     assert.deepEqual((await listRuns(root, { since: Date.parse('2026-07-04T12:00:00.000Z') })).map(c => c.id), [R2], 'since keeps the runs started at or after it')
-    assert.deepEqual(await findRun(root, R1), { ...card(R1), intent: 'first', ticket: 'tickets/a.md' })
+    assert.deepEqual(await findRun(root, R1), { ...card(R1), intent: 'first' })
     assert.equal(await findRun(root, 'nope'), undefined)
     assert.equal(await findRun(root, '../escape'), undefined)
     assert.deepEqual(await readDiary(root, R2), [{ kind: 'said', text: 'hi' }, { kind: 'ended', status: 'done' }])

@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { ANONYMOUS_DIR, agentLines, formatDiary, formatRunCard, isRunId, newestFirst, parseDiary, parseRunCard, personDir, publicCard, runIdOfFile, workedTicket } from './run.js'
+import { ANONYMOUS_DIR, agentLines, formatDiary, formatRunCard, isRunId, newestFirst, parseDiary, parseRunCard, personDir, publicCard, runIdOfFile } from './run.js'
 
 test('a run id is letters, digits, dashes and underscores; a card file is named after one', () => {
   assert.equal(isRunId('2026-09-08T18-14-30-111Z'), true)
@@ -55,7 +55,6 @@ test('a card reads back with the package\'s fields and the writer\'s under calle
     model: 'opus',
     branch: 'agent-r1',
     pr: { number: 7, url: 'https://x/pull/7' },
-    ticket: 'tickets/2026-09-01_fix.md',
     cost: 0.62,
     caller: { pid: 923, host: 'laptop' },
   })
@@ -114,12 +113,7 @@ test('a torn line ends the diary read and keeps what came before', () => {
   assert.deepEqual(parseDiary('{"kind":"said","text":"a"}\n{"kind":"sai'), [{ kind: 'said', text: 'a' }])
 })
 
-test('a run worked a ticket by its exact path or its file name; newest first is the id order reversed', () => {
-  const card = { id: 'r1', startedAt: 't', status: 'done' as const, ticket: 'tickets/2026-09-01_fix.md' }
-  assert.equal(workedTicket(card, 'tickets/2026-09-01_fix.md'), true)
-  assert.equal(workedTicket(card, '2026-09-01_fix.md'), true)
-  assert.equal(workedTicket(card, '01_fix.md'), false, 'a suffix of the file name is not the file')
-  assert.equal(workedTicket({ id: 'r1', startedAt: 't', status: 'done' }, '2026-09-01_fix.md'), false)
+test('newest first is the id order reversed', () => {
   assert.deepEqual(newestFirst([{ id: '2026-07-01T00-00-00-000Z' }, { id: '2026-09-01T00-00-00-000Z' }, { id: '2026-08-01T00-00-00-000Z' }]).map(c => c.id), [
     '2026-09-01T00-00-00-000Z',
     '2026-08-01T00-00-00-000Z',

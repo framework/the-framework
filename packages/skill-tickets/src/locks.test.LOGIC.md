@@ -9,4 +9,5 @@ What the tests cover:
 - **Releasing** - a release removes the claim and lands as "release tickets/<stem>"; a ticket with no claim reports "no-lock" and commits nothing.
 - **A release that could not land** - one that could not commit reports an error and leaves the claim in place; one committed but not pushed stands, the claim gone and the gap logged.
 - **A release naming its holder** - frees exactly the claim naming that holder, leaves anyone else's untouched with "not-holder" and nothing committed, and reports "no-lock" when the claim is gone.
+- **Who claimed before** - the holders the history's added claim lines name, newest first, each once, removed lines and non-claim lines ignored; an empty history names nobody.
 - **Reading the claim line** - the holder is read back from `CLAIMED: <holder>`, leading blank lines skipped and spaces inside the name kept; a plan-like text, a bare `CLAIMED:` and an empty file name no holder.

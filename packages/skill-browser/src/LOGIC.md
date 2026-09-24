@@ -15,7 +15,7 @@ The rules of the `browser` skill [1]: finding and launching a headless Chrome, s
 [5] screen page: the page the browser's process serves at its root: the browser's address bar (back, forward, reload, the address) over a live picture of the page, which takes clicks, scrolling and typing. Its address carries the token.
 [6] state file: `skill-browser/<hash>.json` under the machine's temporary directory, the hash taken from the project's root: how the `browser` command finds the project's browser's process (its pid, its port and its token), or learns why it could not start.
 [7] token: 32 random hexadecimal characters the browser's process draws when it starts; every request to it must carry it, in the address's `t` parameter or the `x-browser-token` header.
-[8] screen line: the diary line `{"kind":"screen","url":<the screen page's address>,"label":<what it shows>}` the browser's process appends when the agent opens a page, and the same with `"ended":true` when the browser goes away; the dashboard frames the newest open one live in the agent's transcript.
+[8] screen line: the diary line `{"kind":"screen","url":<the screen page's address>,"label":<what it shows>,"at":<when it was written>}` the browser's process appends when the agent opens a page, and the same with `"ended":true` when the browser goes away; the dashboard frames the newest open one live in the agent's transcript.
 
 ## Business logic — TL;DR
 

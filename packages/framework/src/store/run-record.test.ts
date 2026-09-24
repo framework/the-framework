@@ -72,3 +72,12 @@ test('a diary agent-driver\'s own log wrote reads back as the framework\'s event
   assert.deepEqual(fromDiaryLine({ kind: 'ended', status: 'waiting' }), { kind: 'end', ok: false, waiting: true })
   assert.deepEqual(fromDiaryLine({ kind: 'ended', status: 'stopped', detail: 'by hand' }), { kind: 'end', ok: false, stopped: true, detail: 'by hand' })
 })
+
+test('a line\'s time is its event\'s, on every kind; a line with none reads with none', () => {
+  const at = '2026-09-25T10:00:00.000Z'
+  assert.deepEqual(fromDiaryLine({ kind: 'said', text: 'hi', at }), { kind: 'driver', event: { type: 'text', text: 'hi' }, at })
+  assert.deepEqual(fromDiaryLine({ kind: 'result', text: 'done', at }), { kind: 'driver', event: { type: 'result', text: 'done' }, at })
+  assert.deepEqual(fromDiaryLine({ kind: 'ended', status: 'waiting', at }), { kind: 'end', ok: false, waiting: true, at })
+  assert.deepEqual(fromDiaryLine({ kind: 'screen', url: 'http://127.0.0.1:1/', label: 'browser', at }), { kind: 'screen', url: 'http://127.0.0.1:1/', label: 'browser', at })
+  assert.deepEqual(fromDiaryLine({ kind: 'said', text: 'old' }), { kind: 'driver', event: { type: 'text', text: 'old' } })
+})

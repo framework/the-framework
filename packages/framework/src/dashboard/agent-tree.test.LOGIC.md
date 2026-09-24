@@ -5,7 +5,8 @@ What the tests cover, against a real git repository with worktrees, branches and
 - **Origin's copy of the branch** - a branch only origin's copy holds is read from it.
 - **A squash merge** - once the branch is gone, the commit the agent's pull request merged as is read, with that commit's own change marked.
 - **A true merge** - a branch the default branch already contains is read from its merge commit instead; with no merge commit to read, the branch still answers.
-- **Gone** - an agent whose branch never reached this machine, an agent that recorded no branch, a merge commit this machine has not fetched, and a pull request on the branch whose number is not the agent's all answer gone.
+- **Changed nothing** - an agent that finished `done` on this machine with no checkout, its recorded branch missing and no pull request answers the default branch's last commit: its files listed with nothing marked, a file's content as the default branch holds it, and no diff.
+- **Gone** - with its recorded branch missing and no pull request, an agent on this machine that is `running`, `waiting`, `failed` or `stopped`, an agent from another machine, and an agent whose record names no machine all answer gone; so do an agent that finished `done` on this machine whose pull request's merge commit this machine has not fetched, and one whose branch's pull request has a number that is not the agent's.
 - **Still looking** - while the pull request lookup has not answered and there is no branch, the answer is that it is not known yet.
 - **A file deleted on disk** - has no content to show.
 

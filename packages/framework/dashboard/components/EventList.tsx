@@ -2,7 +2,6 @@ import type { ChoiceRequest, FrameworkEvent } from '../../src/index.js'
 import { formatFrameworkEvent } from '../../src/client.js'
 import { useMemo, useState, type ReactNode } from 'react'
 import { eventKindLabel } from '../lib/event-labels.js'
-import { receivedAt } from '../lib/event-times.js'
 import { pendingChoices } from '../lib/live-state.js'
 import { AnsweredChoice } from './AnsweredChoice.js'
 import { ChoicePanel } from './ChoicePanel.js'
@@ -32,8 +31,8 @@ import {
 //     screen itself (InlineScreen); an earlier one stays its one line, and an `ended` one is hidden.
 // The kind badge shows once per agent of same-group rows — a 200-line driver turn used to be 200
 // identical badges (#948). A driver `start` breaks out of the AGENT group so the user's turn gets
-// its own YOU badge. Live rows carry their arrival time at each group boundary; replayed events were
-// never live, so they show none. Scrolling rides shadcn's Base UI message-scroller (#712): live
+// its own YOU badge. A row at a group boundary shows the time its diary line was written, the same
+// live, reloaded or replayed; a line written with no time shows none. Scrolling rides shadcn's Base UI message-scroller (#712): live
 // follows the edge (`autoScroll`) but yields the moment the reader scrolls up, replay renders static
 // from the top, and the "Jump to latest" chip is the scroller's own inert-when-not-scrollable button.
 
@@ -143,9 +142,9 @@ function promptFirst(events: FrameworkEvent[]): FrameworkEvent[] {
   return [events[at]!, ...events.slice(0, at), ...events.slice(at + 1)]
 }
 
-/** HH:MM:SS in the reader's locale, for the arrival-time column. */
-function formatTime(ms: number): string {
-  return new Date(ms).toLocaleTimeString()
+/** HH:MM:SS in the reader's locale, for the column that says when each line was written. */
+function formatTime(at: string): string {
+  return new Date(at).toLocaleTimeString()
 }
 
 /** How a special `choice` row renders (#1455 item 6): the still-open gate is the interactive
@@ -289,7 +288,7 @@ export function EventList({
               const choiceRow = choiceRows?.rows.get(e)
               const prev = i > 0 ? rows[i - 1] : undefined
               const chunkHead = !prev || rowGroup(prev) !== rowGroup(e)
-              const at = receivedAt(e)
+              const at = e.at
               return (
                 // Every row carries the same -mx/px pair so a washed row's band and a plain row's
                 // text share the exact same columns; only the background differs.

@@ -42,7 +42,7 @@ export async function readLiveDiary(checkout: string, id: string): Promise<AnyDi
 /** Close a checkout's live record from outside its process: the `ended` line appended, the card's status set. Best-effort. */
 export async function endLiveCard(checkout: string, card: RunCard, status: Exclude<RunStatus, 'running'>, detail: string, at: string): Promise<RunCard> {
   const ended: RunCard = { ...card, status, endedAt: at }
-  await appendFile(join(liveDir(checkout), logDiaryFile(card.id)), JSON.stringify({ kind: 'ended', status, detail }) + '\n').catch(() => {})
+  await appendFile(join(liveDir(checkout), logDiaryFile(card.id)), JSON.stringify({ kind: 'ended', status, detail, at }) + '\n').catch(() => {})
   await writeFile(join(liveDir(checkout), logCardFile(card.id)), JSON.stringify(ended, null, 2) + '\n').catch(() => {})
   return ended
 }

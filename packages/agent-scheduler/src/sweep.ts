@@ -89,9 +89,9 @@ async function checkoutExists(repo: string, id: string): Promise<boolean> {
 
 function failedStart(card: RunCard, stderr: string, now: Date) {
   const detail = `its process died before the run started: ${stderr.split('\n').slice(-5).join('\n')}`
-  return { card: { ...card, status: 'failed' as const, endedAt: now.toISOString() }, diary: [{ kind: 'ended', status: 'failed', detail }] }
+  return { card: { ...card, status: 'failed' as const, endedAt: now.toISOString() }, diary: [{ kind: 'ended', status: 'failed', detail, at: now.toISOString() }] }
 }
 
 function gone(card: RunCard, now: Date) {
-  return { card: { ...card, status: 'stopped' as const, endedAt: now.toISOString() }, diary: [{ kind: 'ended', status: 'stopped', detail: 'its process is gone and left no checkout' }] }
+  return { card: { ...card, status: 'stopped' as const, endedAt: now.toISOString() }, diary: [{ kind: 'ended', status: 'stopped', detail: 'its process is gone and left no checkout', at: now.toISOString() }] }
 }

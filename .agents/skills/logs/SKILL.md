@@ -53,4 +53,6 @@ One JSON object per line. Four kinds are the agent's, in the order they happened
 {"kind":"ended","status":"failed","detail":"…"}  how the run ended; detail when it did not end well
 ```
 
+Each line may also carry `at`, the time it was written, in the card's format.
+
 Any other kind of line is the writing program's own; `show` leaves it out.

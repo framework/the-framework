@@ -17,8 +17,9 @@ const listing = (checkouts: Checkout[]): BranchesFor => async () => ({ list: asy
 const noCheckout = listing([])
 
 /** The deps for a run with no checkout, the given record, and the given pull requests on its branch. */
-function deps(agent: { branch?: string; pr?: { number: number } }, prs: { value?: LinkedPr[]; pending?: boolean } = {}): AgentFilesDeps {
+function deps(agent: { status?: string; host?: string; branch?: string; pr?: { number: number } }, prs: { value?: LinkedPr[]; pending?: boolean } = {}): AgentFilesDeps {
   return {
+    host: 'this-machine',
     branches: noCheckout,
     agent: async (_root, id) => ({ id, ...agent }),
     prs: async () => ({ value: prs.value, pending: prs.pending ?? false }),
@@ -143,13 +144,28 @@ test('a branch the default branch already contains (a true merge) reads its merg
   assert.equal(noPr.source, 'branch', 'with no merge commit to read, the branch still answers')
 })
 
+/** A run that finished on this machine. */
+const endedHere = { status: 'done', host: 'this-machine' }
+
+test('a run that finished here with no checkout, no branch and no pull request changed nothing, and the project reads with nothing marked', async () => {
+  const at = await resolveAgentFiles(root, 'run-x', deps({ ...endedHere, branch: 'agent-committed-nothing' }))
+  assert.deepEqual(at, { source: 'unchanged', ref: git(root, 'rev-parse', 'main') })
+  const tree = await readAgentTree(root, at)
+  assert.deepEqual(tree, { source: 'unchanged', files: git(root, 'ls-tree', '-r', '--name-only', 'main').split('\n'), changes: {} })
+  assert.equal((await readAgentFileContent(root, at, 'a.txt'))?.text, git(root, 'show', 'main:a.txt'), 'a file reads as the default branch has it')
+  assert.equal(await readAgentFileDiff(root, at, 'a.txt'), null, 'nothing changed, so nothing diffs')
+})
+
 test('no checkout, no branch and no merge commit on this machine: gone', async () => {
-  assert.deepEqual(await resolveAgentFiles(root, 'run-x', deps({ branch: 'agent-never-pushed' })), { source: 'gone' })
-  assert.deepEqual(await resolveAgentFiles(root, 'run-x', deps({})), { source: 'gone' }, 'a run that recorded no branch')
+  assert.deepEqual(await resolveAgentFiles(root, 'run-x', deps({ status: 'done', host: 'other-machine', branch: 'agent-never-pushed' })), { source: 'gone' }, 'a run from another machine: its branch may just not be here')
+  for (const status of ['running', 'waiting', 'failed', 'stopped']) {
+    assert.deepEqual(await resolveAgentFiles(root, 'run-x', deps({ status, host: 'this-machine', branch: 'agent-renamed-away' })), { source: 'gone' }, `a ${status} run: its record may not name its branch's last name`)
+  }
+  assert.deepEqual(await resolveAgentFiles(root, 'run-x', deps({ status: 'done' })), { source: 'gone' }, 'a run that names no machine')
   const unfetched = { value: [{ number: 7, url: 'u', state: 'MERGED', title: '', mergeCommit: 'f'.repeat(40) }] }
-  assert.deepEqual(await resolveAgentFiles(root, 'run-x', deps({ branch: 'agent-gone', pr: { number: 7 } }, unfetched)), { source: 'gone' }, 'a merge commit this machine has not fetched')
+  assert.deepEqual(await resolveAgentFiles(root, 'run-x', deps({ ...endedHere, branch: 'agent-gone', pr: { number: 7 } }, unfetched)), { source: 'gone' }, 'a merge commit this machine has not fetched')
   const other = { value: [{ number: 8, url: 'u', state: 'MERGED', title: '', mergeCommit: git(root, 'rev-parse', 'HEAD') }] }
-  assert.deepEqual(await resolveAgentFiles(root, 'run-x', deps({ branch: 'agent-gone', pr: { number: 7 } }, other)), { source: 'gone' }, 'another pull request on the branch is not this run’s')
+  assert.deepEqual(await resolveAgentFiles(root, 'run-x', deps({ ...endedHere, branch: 'agent-gone', pr: { number: 7 } }, other)), { source: 'gone' }, 'another pull request on the branch is not this run’s')
   assert.deepEqual(await readAgentTree(root, { source: 'gone' }), { source: 'gone' })
 })
 

@@ -66,6 +66,15 @@ describe('FileTree (#815)', () => {
     await waitFor(() => expect(screen.getByText('From the merge of #42')).toBeTruthy())
   })
 
+  test('a run that changed nothing shows the project’s files with nothing marked, and says so in the caption', async () => {
+    onAgentTree.mockResolvedValue({ source: 'unchanged', files, changes: {} })
+    render(<FileTree projectId="p1" agentId="run-1" files={[]} selected={new Set()} onToggle={noop} />)
+    await waitFor(() => expect(screen.getByText('This run changed no files')).toBeTruthy())
+    expect(screen.getByText('README.md')).toBeTruthy()
+    expect(screen.queryByLabelText(/committed/)).toBeNull()
+    expect(screen.queryByText(/gone from this machine/)).toBeNull()
+  })
+
   test('a run whose changes are gone says so, instead of showing the project unmarked', async () => {
     onAgentTree.mockResolvedValue({ source: 'gone' })
     render(<FileTree projectId="p1" agentId="run-1" files={files} selected={new Set()} onToggle={noop} />)

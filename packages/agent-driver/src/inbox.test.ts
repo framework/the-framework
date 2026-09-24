@@ -78,7 +78,11 @@ test('the log: a card and a diary in the record shape, current as the turn strea
     assert.deepEqual(card.caller, { pid: 42, sessionId: 'fake-session', host: 'box' })
     assert.ok(card.startedAt && card.endedAt)
 
-    const diary = (await readFile(join(dir, 'log', 'run-1.jsonl'), 'utf8')).trim().split('\n').map(l => JSON.parse(l))
+    const lines = (await readFile(join(dir, 'log', 'run-1.jsonl'), 'utf8')).trim().split('\n').map(l => JSON.parse(l))
+    // Every line says when it was written; the rest of each line is the event.
+    for (const line of lines) assert.equal(new Date(line.at).toISOString(), line.at, `a time on ${line.kind}`)
+    assert.equal(lines.at(-1).at, card.endedAt, 'the ended line and the card agree on the end')
+    const diary = lines.map(({ at: _at, ...line }) => line)
     assert.deepEqual(diary.map(l => l.kind), ['start', 'action', 'said', 'result', 'cost', 'start', 'said', 'result', 'question', 'ended'])
     assert.deepEqual(diary[2], { kind: 'said', text: 'Working.' })
     assert.deepEqual(diary[4], { kind: 'cost', usd: 0.5 })

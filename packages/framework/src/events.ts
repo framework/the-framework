@@ -141,8 +141,12 @@ export function pickedIds(picked: string | readonly string[]): string[] {
  * ended (`end`). **The rest of this union is a reading vocabulary for runs recorded before the
  * daemon stopped running agents** — the framework's own narration back then. They are kept
  * because that history is still on the data branch and still has to render.
+ *
+ * Every event read from a diary line that says when it was written carries that time as `at`
+ * (ISO 8601), so the timeline shows the same times live, after a reload, and once the run has
+ * ended. Lines written before the diary kept times have none, and show none.
  */
-export type FrameworkEvent =
+export type FrameworkEvent = { at?: string } & (
   /**
    * Emitted once at start: which agent is wrapped, the workspace, and a link. `model` is the
    * model id the driver was started with (#1438), recorded per leg — a continuation (#762) emits
@@ -295,3 +299,4 @@ export type FrameworkEvent =
    * Ctrl+C), so a surface can show "stopped" rather than "failed".
    */
   | { kind: 'end'; ok: boolean; stopped?: boolean; waiting?: boolean; detail?: string }
+)

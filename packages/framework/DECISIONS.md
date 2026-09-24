@@ -86,6 +86,9 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - A question stays open while the run waits on it, and closes when the agent goes on or
   the run ends for good. Picked over a run's end closing it, which left a waiting run's
   question on screen as text nobody could answer.
+- A run that finished `done` on this machine and left no checkout, branch or pull request
+  changed nothing, and its Files tab shows the project's files with nothing marked. Picked
+  over saying its changes are gone, which read as lost work. No other run is judged so.
 
 ## Sweeping origin's scratch refs
 - A branch on origin is a run's, and may be swept once landed, unclaimed by a pull request,

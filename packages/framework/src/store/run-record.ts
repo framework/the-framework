@@ -19,9 +19,17 @@ export function fromRunCard(card: RunCard): AgentMeta {
 
 /**
  * One diary line as one framework event: what the agent said, its result, the run's end and its
- * cost are the shape's four kinds; a line of any other kind is a framework event as written.
+ * cost are the shape's four kinds; a line of any other kind is a framework event as written. The
+ * line's time, `at`, is the event's, whatever the kind.
  */
 export function fromDiaryLine(line: AnyDiaryLine): FrameworkEvent {
+  const { at, ...rest } = line
+  const event = eventOf(rest as AnyDiaryLine)
+  return typeof at === 'string' ? { ...event, at } : event
+}
+
+/** A diary line with no time on it, as the event it reads as. */
+function eventOf(line: AnyDiaryLine): FrameworkEvent {
   switch (line.kind) {
     case 'said':
       return { kind: 'driver', event: { type: 'text', text: String(line['text']) } }

@@ -13,7 +13,7 @@ The `browser` skill [1]: a headless Chrome of the agent's [2] own, on an empty p
 [3] diary: the agent's record of what happened, one JSON line each, in the file `<id>.jsonl` the tool running the agent writes; when the tool keeps one, the agent's environment names it as `AGENT_DIARY`, and the tool appends an `ended` line when the agent ends.
 [4] the browser's process: the background process that keeps one project's browser: its Chrome, its connection to the page, and the loopback HTTP server that takes the agent's commands and serves the screen page. Started, detached, by the first `browser open`; one per project.
 [5] screen page: the page the browser's process serves at its root: the browser's address bar (back, forward, reload, the address) over a live picture of the page, which takes clicks, scrolling and typing. Its address carries the process's token.
-[6] screen line: the diary line `{"kind":"screen","url":<the screen page's address>,"label":<what it shows>}` the browser's process appends when the agent opens a page, and the same with `"ended":true` when the browser goes away; the dashboard frames the newest open one live in the agent's transcript.
+[6] screen line: the diary line `{"kind":"screen","url":<the screen page's address>,"label":<what it shows>,"at":<when it was written>}` the browser's process appends when the agent opens a page, and the same with `"ended":true` when the browser goes away; the dashboard frames the newest open one live in the agent's transcript.
 
 ## Business logic — TL;DR
 

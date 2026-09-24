@@ -3,7 +3,6 @@ import type { FrameworkEvent } from '../../src/index.js'
 import type { LiveFeedEvent } from '../../src/dashboard-rpc/index.js'
 import { onEvents, type EventChannel } from '../rpc/events.js'
 import { currentAgentEvents } from './live-state.js'
-import { stampReceived } from './event-times.js'
 
 // The live agent feed (#405), shared. The dashboard is a projection of the selected run's diary,
 // the file the run's own tool writes as the agent works, streamed over Server-Sent Events that
@@ -109,7 +108,6 @@ export function useLiveEvents(projectId: string | null, agentId?: string | null,
             swap()
             return
           }
-          stampReceived(event)
           if (buffer) buffer.push(event)
           else setEvents(prev => [...prev, event])
         })

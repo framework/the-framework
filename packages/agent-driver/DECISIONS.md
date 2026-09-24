@@ -32,3 +32,6 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   unchanged and a dashboard reads them live with the reader it has for records. Picked
   over the driver's own event shape converted at the end (two shapes, a converter, and a
   live file nobody else reads).
+- Every diary line says when it was written, in `at`. Picked over the dashboard noting when
+  a line reached the browser, which gave a reloaded page one time for every line and a
+  finished run none.

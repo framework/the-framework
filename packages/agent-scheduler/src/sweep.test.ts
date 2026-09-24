@@ -4,13 +4,13 @@ import { mkdir, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { logCardFile, logDiaryFile } from 'agent-driver'
 import { createCheckout, worktreePath } from '@gemstack/skill-branches'
-import { findRun, readDiary, type RunCard } from '@gemstack/skill-logs'
+import { findRun, type RunCard } from '@gemstack/skill-logs'
 import { liveDir, readLiveCard } from './live-card.js'
 import { markerCard, writeMarker } from './records.js'
 import { acquireRunLock } from './run-lock.js'
 import { runStderrPath, writeState, DEFAULT_STATE } from './state.js'
 import { sweep } from './sweep.js'
-import { git, removeRepo, testRepo } from './test-repo.js'
+import { git, readUntimedDiary, removeRepo, testRepo } from './test-repo.js'
 
 // The sweep on real checkouts: the live card and diary as agent-driver's log leaves them, and the
 // markers on the branch. The agent is never run.
@@ -31,7 +31,11 @@ async function liveRun(repo: string, id: string, host: string, pid: number, stat
   const dir = liveDir(checkout.path)
   await mkdir(dir, { recursive: true })
   await writeFile(join(dir, logCardFile(id)), JSON.stringify(card, null, 2) + '\n')
-  const lines = [{ kind: 'start', prompt: '/work-queue' }, { kind: 'said', text: 'working…' }, ...(status !== 'running' ? [{ kind: 'ended', status }] : [])]
+  const lines = [
+    { kind: 'start', prompt: '/work-queue', at: card.startedAt },
+    { kind: 'said', text: 'working…', at: '2026-09-16T14:02:00.000Z' },
+    ...(status !== 'running' ? [{ kind: 'ended', status, at: card.endedAt }] : []),
+  ]
   await writeFile(join(dir, logDiaryFile(id)), lines.map(l => JSON.stringify(l) + '\n').join(''))
   await git(['config', 'core.excludesFile', '/dev/null'], checkout.path).catch(() => {})
   const { excludeFromGit } = await import('@gemstack/agent-data')
@@ -54,7 +58,7 @@ test('a running checkout under a dead pid on this machine is ended, recorded fai
     const card = await findRun(repo, 'dead')
     assert.equal(card?.status, 'failed')
     assert.equal(card?.endedAt, NOW.toISOString())
-    const diary = (await readDiary(repo, 'dead'))!
+    const diary = await readUntimedDiary(repo, 'dead')
     assert.deepEqual(diary.find(l => l.kind === 'said'), { kind: 'said', text: 'working…' })
     assert.deepEqual(diary.at(-1), { kind: 'ended', status: 'failed', detail: 'its process died before the run ended' })
     assert.equal((await readLiveCard(worktreePath(repo, 'alive'), 'alive'))?.status, 'running')
@@ -94,7 +98,7 @@ test('a marker of this machine with no checkout behind it: failed with the stder
     await writeMarker(repo, markerCard({ id: 'theirs', startedAt: '2026-09-16T14:03:00.000Z', prompt: '/work-queue', driver: 'fake', model: 'opus', mark: { ...mark, host: 'other-box' } }))
     const result = await sweep(repo, { host: 'this-box', isAlive: () => false, now: () => NOW })
     assert.deepEqual(result.recorded.sort((a, b) => a.id.localeCompare(b.id)), [{ id: 'crashed', status: 'failed' }, { id: 'vanished', status: 'stopped' }])
-    assert.match((await readDiary(repo, 'crashed'))![0]!['detail'] as string, /cannot find module agent-driver/)
+    assert.match((await readUntimedDiary(repo, 'crashed'))[0]!['detail'] as string, /cannot find module agent-driver/)
     assert.equal((await findRun(repo, 'theirs'))?.status, 'running', "another machine's marker is that machine's")
   } finally {
     await removeRepo(repo)

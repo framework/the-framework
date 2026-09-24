@@ -38,7 +38,8 @@ export type RunPatch = Partial<Pick<RunCard, 'branch' | 'pr'>>
 
 /**
  * A diary line the package knows. A writer may put more fields on any of them, and any other
- * kind of line beside them; both pass through untouched and are ignored here.
+ * kind of line beside them; both pass through untouched and are ignored here. One such field is
+ * common: `at`, when the line was written (ISO 8601).
  */
 export type DiaryLine =
   /** Something the agent said. */

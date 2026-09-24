@@ -162,22 +162,13 @@ export type FrameworkEvent =
   /** The wrapped agent's own progress, forwarded verbatim (never gated on). */
   | { kind: 'driver'; event: DriverEvent }
   /**
-   * The agent's browser preview is up and listening on this loopback port (#813).
-   *
-   * Only the port travels. The dashboard reaches the stream through the daemon, which proxies
-   * to this port, so the agent's bridge stays same-origin-invisible and unreachable from the web.
-   * Frames themselves never enter the log: someone will type a password into that pane.
+   * A live screen something the agent ran is showing: a page on this machine's loopback, shown in
+   * the chat where the line is, while it is the newest open screen at that address and the run
+   * has not ended. `label` names what it showed then. The same address with `ended` says the
+   * screen has gone. A diary line a command appends itself (agent-driver's `DIARY_ENV`); the
+   * framework knows nothing of what the page is.
    */
-  | { kind: 'browser-stream'; port: number }
-  /**
-   * The agent's browser is showing this page (#1455 item 6b): emitted for the first real
-   * (http/https) page and again on every change of page, so the transcript can host the live
-   * preview at its point of use rather than only in the rail. Only the URL travels — frames
-   * never enter the log, same rule as `browser-stream`. Re-emitted after each `session` so the
-   * row survives the dashboard's last-session slice (#829); readers fold repeats of the same
-   * URL in place rather than stacking duplicates, like `view` re-shows.
-   */
-  | { kind: 'browser'; url: string }
+  | { kind: 'screen'; url: string; label: string; ended?: true }
   /** A framework-level log line. */
   | { kind: 'log'; message: string }
   /**

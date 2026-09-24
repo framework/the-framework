@@ -6,6 +6,7 @@ import { receivedAt } from '../lib/event-times.js'
 import { pendingChoices } from '../lib/live-state.js'
 import { AnsweredChoice } from './AnsweredChoice.js'
 import { ChoicePanel } from './ChoicePanel.js'
+import { InlineScreen, isLoopbackScreen } from './InlineScreen.js'
 import { Markdown } from './Markdown.js'
 import { Badge } from './ui/badge.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
@@ -27,6 +28,8 @@ import {
 //   - Choice gates, when the log knows its project (#1455 item 6): an open gate renders the same
 //     interactive ChoicePanel the rail used to hold, so the question is answered from the flow;
 //     a resolved one collapses to the AnsweredChoice ✓ card and hides its "✓ chose" line.
+//   - Screens: the newest open `screen` line at an address, before the run's end, is the live
+//     screen itself (InlineScreen); an earlier one stays its one line, and an `ended` one is hidden.
 // The kind badge shows once per agent of same-group rows — a 200-line driver turn used to be 200
 // identical badges (#948). A driver `start` breaks out of the AGENT group so the user's turn gets
 // its own YOU badge. Live rows carry their arrival time at each group boundary; replayed events were
@@ -100,14 +103,14 @@ function rowTone(e: FrameworkEvent): string {
  *   - milestones (a CLEAN `end`, `ready-for-merge`) — green, how far the agent got; a stopped or
  *     failed end is not a milestone (failure is already red, stopped stays neutral), and
  *     `handoff` stays muted because its body reports per-rung outcomes that may be mixed
- *   - pushed surfaces (`view`, `browser-stream`, `browser`) — primary, the agent showing you something
+ *   - pushed surfaces (`view`, `screen`) — primary, the agent showing you something
  */
 function badgeTone(e: FrameworkEvent): string {
   const semantic = rowTone(e)
   if (semantic) return semantic
   if (e.kind === 'choice' || e.kind === 'choice-resolved') return 'text-warning'
   if ((e.kind === 'end' && e.ok) || e.kind === 'ready-for-merge') return 'text-success'
-  if (e.kind === 'view' || e.kind === 'browser-stream' || e.kind === 'browser') return 'text-primary'
+  if (e.kind === 'view' || e.kind === 'screen') return 'text-primary'
   return ''
 }
 
@@ -193,6 +196,28 @@ function foldChoiceRows(events: FrameworkEvent[]): {
   return { rows, hidden }
 }
 
+/**
+ * Which `screen` rows are live and which are hidden. Live: the newest line at its address with no
+ * `ended` line for it after, no run `end` after it, and a loopback address. Every `ended` line is
+ * hidden: the live row going back to its one line says the screen has gone.
+ */
+export function foldScreenRows(events: readonly FrameworkEvent[]): { live: Set<FrameworkEvent>; hidden: Set<FrameworkEvent> } {
+  const hidden = new Set<FrameworkEvent>()
+  const newest = new Map<string, number>()
+  let lastEnd = -1
+  events.forEach((e, at) => {
+    if (e.kind === 'end') lastEnd = at
+    if (e.kind !== 'screen') return
+    if (e.ended) {
+      hidden.add(e)
+      newest.delete(e.url)
+    } else newest.set(e.url, at)
+  })
+  const live = new Set<FrameworkEvent>()
+  for (const [url, at] of newest) if (at > lastEnd && isLoopbackScreen(url)) live.add(events[at]!)
+  return { live, hidden }
+}
+
 // A conversation message (a prompt or a reply), rendered as compact Markdown. A short one renders
 // as-is. A long one clamps to its first line with a chevron beside it and expands in place on click —
 // the chevron stays on that first line (never a lone chevron on its own row), and the same rendered
@@ -250,7 +275,8 @@ export function EventList({
   agentId?: string | null | undefined
 }) {
   const choiceRows = useMemo(() => (projectId ? foldChoiceRows(events) : undefined), [projectId, events])
-  const shown = promptFirst(events).filter(e => !choiceRows?.hidden.has(e))
+  const screenRows = useMemo(() => foldScreenRows(events), [events])
+  const shown = promptFirst(events).filter(e => !choiceRows?.hidden.has(e) && !screenRows.hidden.has(e))
   return (
     <MessageScrollerProvider autoScroll={stick} defaultScrollPosition={openAt ?? (stick ? 'end' : 'start')}>
       <MessageScroller className="flex-1">
@@ -291,6 +317,10 @@ export function EventList({
                       ) : (
                         <AnsweredChoice choice={choiceRow.choice} pick={choiceRow.pick} />
                       )}
+                    </div>
+                  ) : e.kind === 'screen' && screenRows.live.has(e) ? (
+                    <div className="min-w-0 flex-1 font-sans">
+                      <InlineScreen url={e.url} label={e.label} />
                     </div>
                   ) : (
                     <span className={`min-w-0 flex-1 whitespace-pre-wrap break-words ${rowTone(e) || 'text-foreground'}`}>

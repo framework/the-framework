@@ -287,3 +287,49 @@ describe('EventList row wash (#1508)', () => {
     expect(container.querySelector('[class*="bg-info"], [class*="bg-danger"], [class*="bg-success"]')).toBeNull()
   })
 })
+
+// A screen line (a command the agent ran showing a page, e.g. its browser): the newest open one is
+// the live page framed in the chat, where the agent used it; an older one, or one after the run
+// ended, is its one line; an `ended` line is hidden.
+describe('EventList screen rows', () => {
+  const at = (n: number) => `http://127.0.0.1:${n}/?t=x`
+  const frames = () => [...document.querySelectorAll('iframe')].map(f => f.getAttribute('src'))
+
+  test('the newest screen at an address is live; the one before it is its line', () => {
+    const events: FrameworkEvent[] = [
+      { kind: 'screen', url: at(1), label: 'browser · http://localhost:3000/' },
+      { kind: 'driver', event: { type: 'text', text: 'looking' } },
+      { kind: 'screen', url: at(1), label: 'browser · http://localhost:3000/b' },
+    ]
+    render(<EventList events={events} stick={false} />)
+    expect(frames()).toEqual([at(1)])
+    expect(screen.getByText('◆ browser · http://localhost:3000/')).toBeTruthy()
+    expect(document.querySelector('iframe')?.getAttribute('title')).toBe('browser · http://localhost:3000/b')
+  })
+
+  test('an ended screen is gone: no frame, and its ended line is hidden', () => {
+    const events: FrameworkEvent[] = [
+      { kind: 'screen', url: at(1), label: 'browser · http://localhost:3000/' },
+      { kind: 'screen', url: at(1), label: 'browser · closed', ended: true },
+    ]
+    render(<EventList events={events} stick={false} />)
+    expect(frames()).toEqual([])
+    expect(screen.queryByText('◆ browser · closed')).toBeNull()
+    expect(screen.getByText('◆ browser · http://localhost:3000/')).toBeTruthy()
+  })
+
+  test('the run ending ends every screen', () => {
+    const events: FrameworkEvent[] = [
+      { kind: 'screen', url: at(1), label: 'browser · http://localhost:3000/' },
+      { kind: 'end', ok: true },
+    ]
+    render(<EventList events={events} stick={false} />)
+    expect(frames()).toEqual([])
+  })
+
+  test('only a loopback address is framed', () => {
+    render(<EventList events={[{ kind: 'screen', url: 'https://example.com/', label: 'somewhere' }]} stick={false} />)
+    expect(frames()).toEqual([])
+    expect(screen.getByText('◆ somewhere')).toBeTruthy()
+  })
+})

@@ -19,7 +19,7 @@ The instructions an agent [1] reads before using the browser: what the browser i
 - **One browser per project** - the browser belongs to the project's git root, so every command runs from inside the same project.
 - **Refusals and usage errors** - a refusal exits 1 with the reason on stderr (an address the server did not answer, a page that did not answer within 30 seconds, among others), while an error page such as a 404 prints like any page; a wrong command line exits 2 with the usage.
 - **A person may be using it too** - a person watching the agent sees this browser live where the agent opened it and can click and type in it; if the page is not what the last print showed, read it again.
-- **When it closes** - close it when done, `close` with none open saying so and succeeding; it also closes after 30 minutes unused, and when the agent ends if the tool running it keeps a diary.
+- **When it closes** - close it when done, `close` with none open saying so and succeeding; it also closes after 30 minutes unused, and when the agent ends if the tool running it keeps a diary; an agent stopping on a question keeps it.
 
 ## Business logic
 
@@ -100,4 +100,4 @@ See `## Context`.
 
 #### Business logic
 
-The agent is told to close the browser when it is done, and that with none open `close` says so and succeeds. It also closes after 30 minutes unused, and when the agent ends if the tool running the agent keeps a diary of it.
+The agent is told to close the browser when it is done, and that with none open `close` says so and succeeds. It also closes after 30 minutes unused, and when the agent ends if the tool running the agent keeps a diary of it; an agent that stops to ask a question keeps it for the answer.

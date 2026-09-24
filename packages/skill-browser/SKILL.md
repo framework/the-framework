@@ -32,4 +32,4 @@ A refusal exits 1 with the reason on stderr (no browser open, no such element, a
 
 A person watching your run sees this browser live where you opened it, and can click and type in it too: if the page is not what your last print showed, read it again.
 
-Close it when you are done (with none open, `close` says so and succeeds). It also closes after 30 minutes unused, and when your run ends if the tool running you keeps a diary of the run.
+Close it when you are done (with none open, `close` says so and succeeds). It also closes after 30 minutes unused, and when your run ends if the tool running you keeps a diary of the run; stopping to ask a question does not close it.

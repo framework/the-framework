@@ -52,6 +52,18 @@ export interface ScreenLine {
 
 const BOUNDARY = 'frame'
 
+/** How long a command may take before the agent is told the page did not answer. */
+export const COMMAND_MS = 30_000
+
+/** `work`, or a refusal once `ms` pass; the work itself goes on. */
+function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
+  let timer: NodeJS.Timeout | undefined
+  const late = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new PageError(`the page did not answer within ${ms / 1000}s: read it again, or close the browser and open it again`)), ms)
+  })
+  return Promise.race([work, late]).finally(() => clearTimeout(timer))
+}
+
 export async function runHost(opts: HostOptions): Promise<void> {
   const token = randomBytes(16).toString('hex')
   let chrome: Chrome
@@ -70,8 +82,18 @@ export async function runHost(opts: HostOptions): Promise<void> {
   let screenUrl = ''
   let screenShown = false
 
+  /** Dialogs the page opened since the last command answered, each accepted as it opened. */
+  let dialogs: string[] = []
+  /** The last attach, so two callers never attach to a new tab at once. */
+  let attaching: Promise<CdpSession> | undefined
+
   /** The page the agent is on, connected, with the screencast running on it. Follows a new tab. */
-  const current = async (): Promise<CdpSession> => {
+  const current = (): Promise<CdpSession> => {
+    const run = (attaching ?? Promise.resolve(undefined)).catch(() => undefined).then(() => attach())
+    attaching = run
+    return run
+  }
+  const attach = async (): Promise<CdpSession> => {
     const target: PageTarget | undefined = activePage(await listPages(chrome.endpoint).catch(() => []))
     if (!target) throw new PageError('the browser has no page open')
     if (page?.open && target.id === pageId) return page
@@ -80,6 +102,12 @@ export async function runHost(opts: HostOptions): Promise<void> {
       latest = Buffer.from(String(params['data']), 'base64')
       for (const res of viewers) res.write(framePart(BOUNDARY, latest))
       void next.send('Page.screencastFrameAck', { sessionId: params['sessionId'] }).catch(() => {})
+    })
+    // A dialog blocks the page until answered: every one is accepted at once, and the next
+    // answer to the agent names it.
+    next.on('Page.javascriptDialogOpening', params => {
+      dialogs.push(`${String(params['type'])} ${JSON.stringify(String(params['message'] ?? ''))}`)
+      void next.send('Page.handleJavaScriptDialog', { accept: true, ...(params['type'] === 'prompt' ? { promptText: String(params['defaultPrompt'] ?? '') } : {}) }).catch(() => {})
     })
     await next.send('Page.enable')
     await next.send('Page.startScreencast', { format: 'jpeg', quality: 60, maxWidth: 1280, maxHeight: 800 })
@@ -101,6 +129,9 @@ export async function runHost(opts: HostOptions): Promise<void> {
     if (!opts.diary) return
     await appendFile(opts.diary, JSON.stringify(line) + '\n').catch(() => {})
   }
+
+  /** The command before, so the next one starts once it has answered. */
+  let queue: Promise<unknown> = Promise.resolve()
 
   let ending: Promise<void> | undefined
   const end = (): Promise<void> =>
@@ -197,10 +228,16 @@ export async function runHost(opts: HostOptions): Promise<void> {
     if (url.pathname === '/command') {
       let answer: HostAnswer
       try {
-        answer = await command(body as HostCommand)
+        // One command at a time: two at once on one page would cancel each other's loads. The
+        // next waits for this one's answer, which comes within COMMAND_MS whatever the page does.
+        const turn = queue.then(() => withTimeout(command(body as HostCommand), COMMAND_MS))
+        queue = turn.catch(() => {})
+        answer = await turn
       } catch (err) {
         answer = { ok: false, reason: err instanceof Error ? err.message : String(err) }
       }
+      if (dialogs.length && answer.ok) answer = { ...answer, output: [...dialogs.map(d => `Dialog, accepted: ${d}`), '', answer.output].join('\n') }
+      dialogs = []
       return void res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(answer))
     }
     res.writeHead(404).end()
@@ -275,6 +312,6 @@ async function readBody(req: IncomingMessage): Promise<unknown> {
 }
 
 async function writeState(file: string, state: HostState | { error: string }): Promise<void> {
-  await mkdir(dirname(file), { recursive: true })
+  await mkdir(dirname(file), { recursive: true, mode: 0o700 })
   await writeFile(file, JSON.stringify(state), { mode: 0o600 })
 }

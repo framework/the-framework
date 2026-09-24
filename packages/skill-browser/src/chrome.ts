@@ -69,10 +69,16 @@ export async function launchChrome(chromePath: string, timeoutMs = 20_000): Prom
   const close = async (): Promise<void> => {
     if (closed) return
     closed = true
-    child.kill()
-    // Chrome still holds files in the profile for a moment after the signal.
-    await new Promise(resolve => setTimeout(resolve, 300))
-    await rm(profile, { recursive: true, force: true }).catch(() => {})
+    // The profile goes once Chrome has exited, since until then it still writes there; a Chrome
+    // that does not exit within 5 seconds of the signal is killed outright.
+    if (child.exitCode === null && child.signalCode === null) {
+      const exited = new Promise(resolve => child.once('exit', resolve))
+      child.kill()
+      const force = setTimeout(() => child.kill('SIGKILL'), 5000)
+      await exited
+      clearTimeout(force)
+    }
+    await rm(profile, { recursive: true, force: true, maxRetries: 3 }).catch(() => {})
   }
   const failed = new Promise<never>((_, reject) => {
     child.once('error', err => reject(new Error(`Chrome could not start: ${err.message}`)))

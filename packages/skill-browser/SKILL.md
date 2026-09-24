@@ -15,13 +15,18 @@ npx browser type <n> <text>      replace what element n holds with the text; on 
 npx browser press <key>          Enter, Tab, Escape, Backspace, Space, ArrowUp, ArrowDown, ArrowLeft, ArrowRight
 npx browser screenshot [file]    save what the page shows as a PNG and print its path (a temporary file
                                  when none is named; never name one inside the repository)
-npx browser eval <script>        run JavaScript in the page and print what it returns, as JSON
+npx browser eval <script>        run a JavaScript expression in the page and print its value, as JSON
+                                 (`document.title`, not `return document.title`)
 npx browser close                close the browser
 ```
 
-`open`, `read`, `click`, `type` and `press` print the page once it has loaded: its title, its address, its text, then its elements (links, buttons, fields) numbered `[n]`. `click` and `type` take that number, from the last print: when the page changes, the numbers do too. An address without `http://` or `https://` gets `http://`; no other kind opens.
+Quote a `<text>` or `<script>` with spaces as one argument: `npx browser type 2 'Ada Lovelace'`.
 
-A refusal exits 1 with the reason on stderr (no browser open, no such element, a page that did not load); a wrong command line exits 2 with the usage.
+`open`, `read`, `click`, `type` and `press` print the page once it has loaded: its title, its address, its text (the first 10,000 characters), then its elements (links, buttons, fields; the first 300) numbered `[n]`. `click` and `type` take that number, from the last print: when the page changes, the numbers do too. The numbers are written on the page's elements as `data-browser-ref` attributes. An address without `http://` or `https://` gets `http://`; no other kind opens. A dialog the page opens (alert, confirm, prompt) is accepted at once, and the next print begins with a `Dialog, accepted:` line naming it.
+
+The browser belongs to the project the command runs in (its git root): run every command from inside the same project.
+
+A refusal exits 1 with the reason on stderr (no browser open, no such element, a page that did not load, a page that did not answer within 30 seconds); a wrong command line exits 2 with the usage.
 
 A person watching your run sees this browser live where you opened it, and can click and type in it too: if the page is not what your last print showed, read it again.
 

@@ -29,22 +29,25 @@ const READ_SCRIPT = `(() => {
   const selector = 'a[href],button,input:not([type=hidden]),textarea,select,summary,[role=button],[role=link],[role=checkbox],[role=tab],[role=menuitem],[contenteditable=""],[contenteditable=true]'
   const items = []
   let n = 0
+  let more = 0
   for (const el of document.querySelectorAll(selector)) {
-    if (!shown(el) || n >= ${ELEMENT_LIMIT}) continue
+    if (!shown(el)) continue
+    if (n >= ${ELEMENT_LIMIT}) { more++; continue }
     n++
     el.setAttribute(REF, String(n))
     const tag = el.tagName.toLowerCase()
     const type = tag === 'input' ? (el.type || 'text') : ''
     const kind = el.getAttribute('role') || (tag === 'a' ? 'link' : tag === 'input' ? (type === 'text' ? 'input' : 'input[' + type + ']') : tag)
     const label = clean(el.getAttribute('aria-label') || (el.labels && el.labels[0] && el.labels[0].innerText) || (tag === 'input' || tag === 'textarea' || tag === 'select' ? '' : el.innerText) || el.getAttribute('placeholder') || el.getAttribute('title') || el.getAttribute('alt') || el.getAttribute('name'))
-    let more = ''
-    if (tag === 'a') more = ' -> ' + el.getAttribute('href')
-    else if (type === 'checkbox' || type === 'radio') more = el.checked ? ' (checked)' : ' (not checked)'
-    else if (tag === 'input' || tag === 'textarea' || tag === 'select') more = ' value=' + JSON.stringify(el.value)
-    if (el.disabled) more += ' (disabled)'
-    items.push('[' + n + '] ' + kind + ' ' + JSON.stringify(label) + more)
+    let extra = ''
+    if (tag === 'a') extra = ' -> ' + el.getAttribute('href')
+    else if (type === 'checkbox' || type === 'radio') extra = el.checked ? ' (checked)' : ' (not checked)'
+    else if (tag === 'input' || tag === 'textarea' || tag === 'select') extra = ' value=' + JSON.stringify(el.value)
+    if (el.disabled) extra += ' (disabled)'
+    items.push('[' + n + '] ' + kind + ' ' + JSON.stringify(label) + extra)
   }
   const text = (document.body ? document.body.innerText : '').replace(/\\n{3,}/g, '\\n\\n').trim()
+  if (more) items.push('… ' + more + ' more elements not listed: find them with eval')
   return { title: document.title, url: location.href, text, items }
 })()`
 
@@ -56,13 +59,18 @@ interface ReadResult {
 }
 
 async function evaluate<T>(page: CdpSession, expression: string): Promise<T> {
-  const res = await page.send<{ result: { value?: unknown }; exceptionDetails?: { exception?: { description?: string }; text?: string } }>('Runtime.evaluate', {
+  const res = await page.send<{ result: { value?: unknown; unserializableValue?: string }; exceptionDetails?: { exception?: { description?: string }; text?: string } }>('Runtime.evaluate', {
     expression,
     returnByValue: true,
     awaitPromise: true,
   })
   if (res.exceptionDetails) throw new PageError(res.exceptionDetails.exception?.description ?? res.exceptionDetails.text ?? 'the script threw')
-  return res.result.value as T
+  return (res.result.unserializableValue !== undefined ? new Unserializable(res.result.unserializableValue) : res.result.value) as T
+}
+
+/** A value JSON cannot hold (`Infinity`, `NaN`, `-0`, a BigInt), as DevTools spells it. */
+class Unserializable {
+  constructor(readonly text: string) {}
 }
 
 /**
@@ -155,10 +163,12 @@ export async function type(page: CdpSession, ref: number, text: string): Promise
         el.dispatchEvent(new Event('change', { bubbles: true }))
         return 'selected'
       }
+      const textual = el.tagName === 'TEXTAREA' || el.isContentEditable || (el.tagName === 'INPUT' && !['checkbox', 'radio', 'button', 'submit', 'reset', 'image', 'file', 'range', 'color'].includes(el.type))
+      if (!textual) return 'element [${ref}] takes no text: click it instead'
       el.focus()
       if (typeof el.select === 'function') el.select()
       else if (el.isContentEditable) document.getSelection().selectAllChildren(el)
-      return document.activeElement === el ? 'focused' : 'element [${ref}] does not take text'
+      return document.activeElement === el ? 'focused' : 'element [${ref}] does not take the focus'
     })()`,
   )
   if (outcome === 'selected') return settle(page)
@@ -198,5 +208,6 @@ export async function screenshot(page: CdpSession): Promise<Buffer> {
 /** Run `script` in the page and print what it returns, as JSON. */
 export async function run(page: CdpSession, script: string): Promise<string> {
   const value = await evaluate<unknown>(page, script)
+  if (value instanceof Unserializable) return value.text
   return value === undefined ? 'undefined' : JSON.stringify(value, null, 2)
 }

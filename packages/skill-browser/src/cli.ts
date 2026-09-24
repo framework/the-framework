@@ -1,8 +1,8 @@
 import { spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { readFile, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, open, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolveChromePath } from './chrome.js'
 import type { HostAnswer, HostCommand, HostState } from './host.js'
@@ -80,6 +80,7 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
   }
 
   const file = stateFile(projectRoot(io.cwd))
+  if (!(await ownDirectory(dirname(file)))) return refuse(`${dirname(file)} is not this user's own directory: remove it, then run the command again.`)
   let state = await liveState(file)
   if (!state) {
     if (name !== 'open') return refuse('No browser is open. Start one with `browser open <address>`.')
@@ -94,7 +95,11 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
   if (!answer.ok) return refuse(answer.reason)
   if (answer.png !== undefined) {
     const path = resolve(io.cwd, args[0] ?? join(tmpdir(), `browser-${Date.now()}.png`))
-    await writeFile(path, Buffer.from(answer.png, 'base64'))
+    try {
+      await writeFile(path, Buffer.from(answer.png, 'base64'))
+    } catch (err) {
+      return refuse(`The screenshot could not be saved to ${path}: ${err instanceof Error ? err.message : String(err)}`)
+    }
     io.stdout(path)
     return 0
   }
@@ -120,12 +125,46 @@ async function readState(file: string): Promise<HostState | { error: string } | 
   }
 }
 
-/** Start the browser's process, detached so it outlives this command, and wait for its state file. */
+/**
+ * The state directory, private to this user: made so when missing, closed to others when it is
+ * this user's; `false` when it is someone else's, since a state file there says where commands go.
+ */
+async function ownDirectory(dir: string): Promise<boolean> {
+  await mkdir(dir, { recursive: true, mode: 0o700 })
+  const info = await stat(dir)
+  if (process.getuid !== undefined && info.uid !== process.getuid()) return false
+  if ((info.mode & 0o077) !== 0) await chmod(dir, 0o700)
+  return true
+}
+
+/**
+ * Start the browser's process, detached so it outlives this command, and wait for its state file.
+ * A lock file lets only one command start it: a second `open` meanwhile waits for the first's.
+ */
 async function startHost(file: string, chromePath: string, env: NodeJS.ProcessEnv): Promise<HostState | { error: string }> {
-  await rm(file, { force: true })
-  const main = fileURLToPath(new URL('./host-main.js', import.meta.url))
-  const child = spawn(process.execPath, [main, '--state', file, '--chrome', chromePath, '--idle-ms', String(IDLE_MS)], { detached: true, stdio: 'ignore', env })
-  child.unref()
+  const lock = `${file}.starting`
+  const held = await open(lock, 'wx').then(handle => handle.close().then(() => true), () => false)
+  if (!held) {
+    // A lock older than the wait below was left by a command that died while starting.
+    const age = Date.now() - ((await stat(lock).catch(() => undefined))?.mtimeMs ?? 0)
+    if (age > 35_000) {
+      await rm(lock, { force: true })
+      return startHost(file, chromePath, env)
+    }
+  } else {
+    await rm(file, { force: true })
+    const main = fileURLToPath(new URL('./host-main.js', import.meta.url))
+    const child = spawn(process.execPath, [main, '--state', file, '--chrome', chromePath, '--idle-ms', String(IDLE_MS)], { detached: true, stdio: 'ignore', env })
+    child.unref()
+  }
+  try {
+    return await waitForState(file)
+  } finally {
+    if (held) await rm(lock, { force: true })
+  }
+}
+
+async function waitForState(file: string): Promise<HostState | { error: string }> {
   const deadline = Date.now() + 30_000
   while (Date.now() < deadline) {
     const state = await readState(file)
@@ -141,6 +180,7 @@ async function send(state: HostState, command: HostCommand): Promise<HostAnswer>
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-browser-token': state.token },
       body: JSON.stringify(command),
+      signal: AbortSignal.timeout(90_000),
     })
     return (await res.json()) as HostAnswer
   } catch (err) {

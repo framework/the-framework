@@ -22,6 +22,8 @@ const PAGES: Record<string, string> = {
     <a href="/two">Page two</a>
     <form onsubmit="event.preventDefault(); document.getElementById('out').textContent = 'Submitted'"><input placeholder="search"></form>`,
   '/two': '<!doctype html><title>Two</title><p>Second page</p>',
+  '/dialog': `<!doctype html><title>Dialog</title><p id="out">waiting</p>
+    <button onclick="alert('hello'); document.getElementById('out').textContent = confirm('sure?') ? 'confirmed' : 'refused'">Ask</button>`,
 }
 
 async function site(): Promise<{ url: string; server: Server }> {
@@ -111,6 +113,43 @@ test('the run ending closes its browser, and the ended run gets no more lines', 
     await appendFile(diary, JSON.stringify({ kind: 'ended', status: 'done' }) + '\n')
     assert.ok(await until(() => gone(stateFile(cwd))), 'the browser closes once the diary says the run ended')
     assert.equal((await lines(diary)).at(-1)?.['kind'], 'ended')
+  } finally {
+    await cli('close')
+    server.close()
+  }
+})
+
+test('a dialog never blocks the page: it is accepted and named; wrong input is refused in words', needsChrome, async () => {
+  const { url, server } = await site()
+  const { cli } = await project()
+  try {
+    await cli('open', `${url}/dialog`)
+    const asked = await cli('click', '1')
+    assert.equal(asked.code, 0, asked.err)
+    assert.match(asked.out, /^Dialog, accepted: alert "hello"\nDialog, accepted: confirm "sure\?"\n/)
+    assert.match(asked.out, /confirmed/)
+    const typed = await cli('type', '1', 'x')
+    assert.equal(typed.code, 1)
+    assert.match(typed.err, /takes no text: click it instead/)
+    assert.equal((await cli('eval', '1/0')).out, 'Infinity')
+    const shot = await cli('screenshot', '/nonexistent-dir/shot.png')
+    assert.equal(shot.code, 1)
+    assert.match(shot.err, /could not be saved/)
+  } finally {
+    await cli('close')
+    server.close()
+  }
+})
+
+test('two opens at once start one browser', needsChrome, async () => {
+  const { url, server } = await site()
+  const { diary, cli } = await project()
+  try {
+    const [a, b] = await Promise.all([cli('open', url), cli('open', `${url}/two`)])
+    assert.equal(a.code, 0, a.err)
+    assert.equal(b.code, 0, b.err)
+    const screens = new Set((await lines(diary)).map(line => line['url']))
+    assert.equal(screens.size, 1, 'both opens went to the same browser')
   } finally {
     await cli('close')
     server.close()

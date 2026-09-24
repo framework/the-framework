@@ -27,7 +27,7 @@ The browser's process [1]: started by the first `browser open` in a project, it 
 - **The screen lines in the diary** - the diary is the one named in the environment of the command that started the process; every `open` appends a screen line [5] with the screen page's address and "browser · <the page's address>"; when the process ends after at least one, it appends "browser · closed" with `ended`, unless the agent already ended; with no diary, nothing is written.
 - **The person's input** - an input from the screen page goes to the page as `screen.ts` maps it; an input it does not know is answered 400.
 - **When it ends** - on `close`; on an `ended` line reaching the diary after the process started; on the diary's file going away; after 30 minutes (the caller's figure) with no command and no input; when Chrome exits, or the process is told to stop.
-- **Ending** - the viewers' streams and the server closed, the `ended` screen line written when due, Chrome closed and its profile removed, and the state file removed.
+- **Ending** - the viewers' streams and the server closed, the `ended` screen line written when due, Chrome closed and its profile removed, and the state file removed unless a newer browser has already written its own.
 
 ## Business logic
 
@@ -140,7 +140,7 @@ See `## Context` of `screen.ts`.
 Every two seconds the process checks, in order:
 
 - When no command and no input has arrived for the idle time it was started with (30 minutes, from `cli.ts`), it ends. Watching the screen page, and the screen page asking for the address every second, do not count.
-- When it was given a diary: the diary's file gone (the agent's checkout reclaimed) counts as the agent having ended, and it ends. Otherwise the part of the diary written since the last check (since the process started, for the first), counted in bytes, is read; a line with `"kind":"ended"` in it, the line the tool running the agent appends when the agent ends, counts as the agent having ended, and it ends. An `ended` line written before the process started, such as an earlier session's, does not count.
+- When it was given a diary: the diary's file gone (the agent's checkout reclaimed) counts as the agent having ended, and it ends. Otherwise the whole lines written since the last check (since the process started, for the first), up to the last line break, are read, counted in bytes; a line still being written is left for the next check, when it is read complete. Each line is read as JSON, a line that is not JSON skipped; a line whose `kind` is `ended`, the line the tool running the agent appends when the agent ends, counts as the agent having ended, and it ends. An `ended` line written before the process started, such as an earlier session's, does not count.
 
 It also ends when `close` is run, when Chrome exits, and when the process is told to terminate or interrupted.
 
@@ -152,4 +152,4 @@ See `## Context`.
 
 #### Business logic
 
-Ending happens once, whatever asked for it first: the checks stop, every open picture stream is ended, the connection to the page is closed, the server stops and drops every connection, the `ended` screen line is appended when due (see "The screen lines in the diary"), Chrome is closed and its profile removed, and the state file [7] is removed, so the next `browser` call finds no browser open.
+Ending happens once, whatever asked for it first: the checks stop, every open picture stream is ended, the connection to the page is closed, the server stops and drops every connection, the `ended` screen line is appended when due (see "The screen lines in the diary"), Chrome is closed and its profile removed, and the state file [7] is removed when it still holds this process's token, so the next `browser` call finds no browser open; when it holds another token, it belongs to a browser started after this one closed, and it stays.

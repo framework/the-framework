@@ -14,12 +14,12 @@ The instructions an agent [1] reads before using the browser: what the browser i
 ## Business logic — TL;DR
 
 - **What the browser is and how to reach it** - a headless Chrome of the agent's own on an empty profile, with nobody's logins; run as `npx browser` from the repository's dependency `@gemstack/skill-browser`, installing with the lockfile's package manager when `node_modules` is missing; it needs a Chrome on the machine or `CHROME_PATH`.
-- **The commands** - `open <address>`, `read`, `click <n>`, `type <n> <text>`, `press <key>` (nine keys), `screenshot [file]`, `eval <script>` (an expression), `close`; a text or script with spaces is quoted as one argument.
-- **How a page reads back** - `open`, `read`, `click`, `type` and `press` print the page once loaded: title, address, the first 10,000 characters of text, then the first 300 elements numbered `[n]`, the numbers written on the page's elements as `data-browser-ref`; the numbers are those of the last print and change with the page; an address without `http://` or `https://` gets `http://`, and no other kind opens; a dialog the page opens is accepted at once and named at the top of the next print.
+- **The commands** - `open <address>`, `read`, `click <n>`, `type <n> <text>` (a date or time field given as `2024-01-31`, `13:45`, `2024-01`), `press <key>` (nine keys), `screenshot [file]`, `eval <script>` (an expression, `await` allowed, an element printing as `{}`), `close`; a text or script with spaces is quoted as one argument.
+- **How a page reads back** - `open`, `read`, `click`, `type` and `press` print the page once loaded, or after 10 seconds as it stands: title, address, the first 10,000 characters of text, then the first 300 elements numbered `[n]`, the numbers written on the page's elements as `data-browser-ref`; nothing inside an iframe or a shadow root is printed, `eval` reaches it; the numbers are those of the last print and change with the page; an address without `http://` or `https://` gets `http://`, and no other kind opens; a dialog the page opens is accepted at once and named at the top of the next print.
 - **One browser per project** - the browser belongs to the project's git root, so every command runs from inside the same project.
-- **Refusals and usage errors** - a refusal exits 1 with the reason on stderr, a page that did not answer within 30 seconds among them; a wrong command line exits 2 with the usage.
+- **Refusals and usage errors** - a refusal exits 1 with the reason on stderr (an address the server did not answer, a page that did not answer within 30 seconds, among others), while an error page such as a 404 prints like any page; a wrong command line exits 2 with the usage.
 - **A person may be using it too** - a person watching the agent sees this browser live where the agent opened it and can click and type in it; if the page is not what the last print showed, read it again.
-- **When it closes** - close it when done; it also closes when the agent ends and after 30 minutes unused.
+- **When it closes** - close it when done, `close` with none open saying so and succeeding; it also closes after 30 minutes unused, and when the agent ends if the tool running it keeps a diary.
 
 ## Business logic
 
@@ -44,10 +44,10 @@ See `## Context`.
 - `open <address>` opens the address, starting the browser if none is open.
 - `read` prints the page again.
 - `click <n>` clicks element n.
-- `type <n> <text>` replaces what element n holds with the text; on a select, it picks that option.
+- `type <n> <text>` replaces what element n holds with the text; on a select, it picks that option; on a date or time field, the value is given as `2024-01-31`, `13:45`, `2024-01`.
 - `press <key>` presses one of Enter, Tab, Escape, Backspace, Space, ArrowUp, ArrowDown, ArrowLeft, ArrowRight.
 - `screenshot [file]` saves what the page shows as a PNG and prints its path, a temporary file when none is named; the agent is told never to name one inside the repository.
-- `eval <script>` runs a JavaScript expression in the page and prints its value, as JSON: `document.title`, not `return document.title`.
+- `eval <script>` runs a JavaScript expression in the page and prints its value, as JSON: `document.title`, not `return document.title`; `await` works; an element prints as `{}`, so the agent asks for its properties.
 - `close` closes the browser.
 
 A text or script with spaces is quoted as one argument: `npx browser type 2 'Ada Lovelace'`.
@@ -60,7 +60,7 @@ A text or script with spaces is quoted as one argument: `npx browser type 2 'Ada
 
 #### Business logic
 
-`open`, `read`, `click`, `type` and `press` print the page once it has loaded: its title, its address, its text (the first 10,000 characters), then its elements (links, buttons, fields; the first 300) numbered `[n]`. `click` and `type` take that number from the last print; when the page changes, the numbers do too. The agent is told the numbers are written on the page's elements as `data-browser-ref` attributes. An address without `http://` or `https://` gets `http://`; no other kind of address opens. A dialog the page opens (alert, confirm, prompt) is accepted at once, and the next print begins with a `Dialog, accepted:` line naming it.
+`open`, `read`, `click`, `type` and `press` print the page once it has loaded, or after 10 seconds as it stands: its title, its address, its text (the first 10,000 characters), then its elements (links, buttons, fields; the first 300) numbered `[n]`. `click` and `type` take that number from the last print; when the page changes, the numbers do too. What is inside an iframe or a shadow root is not printed; the agent reaches it with `eval`. The agent is told the numbers are written on the page's elements as `data-browser-ref` attributes. An address without `http://` or `https://` gets `http://`; no other kind of address opens. A dialog the page opens (alert, confirm, prompt) is accepted at once, and the next print begins with a `Dialog, accepted:` line naming it.
 
 ### One browser per project
 
@@ -80,7 +80,7 @@ See `## Context`.
 
 #### Business logic
 
-A refusal (no browser open, no such element, a page that did not load, a page that did not answer within 30 seconds) exits 1 with the reason on stderr; a wrong command line exits 2 with the usage.
+A refusal (no browser open, no such element, an address the server did not answer, a page that did not answer within 30 seconds) exits 1 with the reason on stderr; an error page such as a 404 is no refusal and prints like any page; a wrong command line exits 2 with the usage.
 
 ### A person may be using it too
 
@@ -100,4 +100,4 @@ See `## Context`.
 
 #### Business logic
 
-The agent is told to close the browser when it is done, and that it also closes when the agent ends and after 30 minutes unused.
+The agent is told to close the browser when it is done, and that with none open `close` says so and succeeds. It also closes after 30 minutes unused, and when the agent ends if the tool running the agent keeps a diary of it.

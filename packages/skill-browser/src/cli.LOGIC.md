@@ -17,7 +17,7 @@ The `browser` command: the eight commands an agent [1], or a person in a shell, 
 
 - **The command line** - `open <address>`, `read`, `click <n>`, `type <n> <text>`, `press <key>`, `screenshot [file]`, `eval <script>`, `close`, each with exactly its arguments; no command, an unknown command or a wrong number of arguments prints the usage on stderr and exits 2; `--help` or `-h` prints it on stdout and exits 0.
 - **One browser per project** - the project is the git root of the current directory, or the directory itself outside a repository; its state file [3] is named by a hash of that root, in a directory that must be this user's own and is kept closed to others.
-- **Finding the browser, or starting it** - a state file whose process answers is used; a stale one is removed; with no browser, every command but `open` is refused, and `open` finds a Chrome and starts the browser's process [2] detached, with this command's environment, waiting up to 30 seconds for it; a lock file lets only one `open` start it, and a second `open` meanwhile waits for the first's browser.
+- **Finding the browser, or starting it** - a state file whose process answers is used; a stale one, or one holding an error, is removed; with no browser, `close` prints "No browser is open." and exits 0, every other command but `open` is refused, and `open` finds a Chrome and starts the browser's process [2] detached, with this command's environment, waiting up to 30 seconds for it; a lock file lets only one `open` start it, and a second `open` meanwhile waits for the first's browser.
 - **Forwarding the command** - the command goes to the process with the token [4]; its answer's text is printed on stdout; a refusal is its reason on stderr and exit 1; a process that stops answering, or does not answer within 90 seconds, is a refusal.
 - **A screenshot** - saved at the given path, relative to the current directory, or a new temporary file, and its path printed; a file that cannot be written is a refusal.
 
@@ -53,9 +53,10 @@ After the command line is read and before the browser is looked for, the `skill-
 
 #### Business logic
 
-A state file that holds a pid, port and token is used when the process answers a request for its state at `127.0.0.1` on that port with the token; when it does not answer, the file is removed. A state file holding an error, or one that cannot be read, counts as no browser. With no browser:
+A state file that holds a pid, port and token is used when the process answers a request for its state at `127.0.0.1` on that port with the token; when it does not answer, the file is removed. A state file holding an error is removed the same way; one that cannot be read counts as no browser. With no browser:
 
-- Any command but `open` is refused: "No browser is open. Start one with `browser open <address>`."
+- `close` has nothing to do: it prints "No browser is open." on stdout and exits 0.
+- Any other command but `open` is refused: "No browser is open. Start one with `browser open <address>`."
 - `open` finds a Chrome by the rules of `chrome.ts`; with none, it is refused: "No Chrome on this machine: install Google Chrome, or set CHROME_PATH to a Chrome or Chromium executable." Otherwise it takes the lock file `<state file>.starting`, created only when no such file exists. The `open` that takes it removes any old state file and starts the browser's process [2] (`host-main.ts`) detached, so it outlives this call, with its output discarded, this command's environment (so `AGENT_DIARY` reaches it), and an idle time of 30 minutes, and removes the lock once its wait below is over. An `open` that finds the lock taken starts nothing and waits for the same state file, so two `open`s at once start one browser; a lock more than 35 seconds old, left by a command that died while starting, is removed and the start tried again. Either way the command then reads the state file every 100 ms: the process's pid, port and token are used as soon as they appear; an error there is refused as "The browser could not start: <error>"; no file after 30 seconds is refused as "The browser could not start: it did not answer within 30s".
 
 ### Forwarding the command

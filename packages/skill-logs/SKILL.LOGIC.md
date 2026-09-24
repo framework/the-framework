@@ -24,7 +24,7 @@ The instructions the `logs` skill gives an agent [1], as business logic: where t
 - **The two reads** - the list of cards newest first, the newest 20 unless `--limit` says otherwise, narrowed by `--branch`; and `show <id>` for one run with what the agent said.
 - **Before planning or working a ticket, read its earlier runs** - claiming the ticket names who claimed it before, each a run's id, shaped like `2026-09-08T18-14-30-111Z`, read with `npx logs show <id>`, or else a branch, read with `npx logs --branch <name>`, where no run means no record and the agent reads the branch itself: a `stopped` or `failed` run says what to avoid, a `done` run with a `pr` says to read the pull request before doing the work again.
 - **The card** - the fields and their meaning, the five statuses, cost in US dollars, absent when unknown; `caller` is the writing program's and never printed.
-- **The diary** - four kinds of line in the order they happened; any other kind is left out of `show`.
+- **The diary** - four kinds of line in the order they happened, each possibly carrying `at`, the time it was written; any other kind is left out of `show`.
 
 ## Business logic
 
@@ -86,4 +86,4 @@ See `## Context`.
 
 #### Business logic
 
-The diary [6] is one JSON object per line. Four kinds are the agent's [1], in the order they happened: `said`, something the agent said; `result`, the agent's final answer for a turn [8]; `cost`, what a stretch of the run [2] cost, in US dollars; and `ended`, how the run ended, with a detail when it did not end well. Any other kind of line is the writing program's own, and `show` leaves it out.
+The diary [6] is one JSON object per line. Four kinds are the agent's [1], in the order they happened: `said`, something the agent said; `result`, the agent's final answer for a turn [8]; `cost`, what a stretch of the run [2] cost, in US dollars; and `ended`, how the run ended, with a detail when it did not end well. Each line may also carry `at`, the time it was written, in the same format as the card's times. Any other kind of line is the writing program's own, and `show` leaves it out.

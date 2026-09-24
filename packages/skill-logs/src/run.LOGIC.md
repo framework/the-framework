@@ -114,7 +114,7 @@ The diary [4] is one JSON object per line, in the order things happened, each wi
 
 #### Business logic
 
-Four kinds of line are the agent's [6], and the skill knows only those: `said`, something the agent said, with a `text`; `result`, the agent's final answer for a turn [9], with a `text`; `ended`, how the run [1] ended, with a `status` that is `done`, `stopped`, `failed` or `waiting` (never `running`) and an optional `detail` text; and `cost`, what a stretch of the run cost, with an optional `usd` number. A line of one of these kinds whose required fields are missing or of the wrong type is not the agent's line. A line may carry more fields than its kind needs; they pass through untouched. Every line of another kind is the recording program's [5] own: stored, never read by the skill, and left out of what the agent is shown.
+Four kinds of line are the agent's [6], and the skill knows only those: `said`, something the agent said, with a `text`; `result`, the agent's final answer for a turn [9], with a `text`; `ended`, how the run [1] ended, with a `status` that is `done`, `stopped`, `failed` or `waiting` (never `running`) and an optional `detail` text; and `cost`, what a stretch of the run cost, with an optional `usd` number. A line of one of these kinds whose required fields are missing or of the wrong type is not the agent's line. A line may carry more fields than its kind needs; they pass through untouched. One such field is common: `at`, the time the line was written (ISO 8601). Every line of another kind is the recording program's [5] own: stored, never read by the skill, and left out of what the agent is shown.
 
 ### The two late facts
 

@@ -141,7 +141,8 @@ async function runOnce(repo: string, opts: RunOptions): Promise<RunOutcome> {
       checkout = opts.branch !== undefined ? await attachCheckout(repo, { agentId: id, branch: opts.branch }, git) : await createCheckout(repo, { agentId: id }, git)
     } catch (err) {
       const detail = `could not create a checkout: ${errorMessage(err)}`
-      await recordRun(repo, { ...markerCard({ id, startedAt, prompt: opts.prompt, driver: opts.driver.id, ...modelOf(opts.model), mark }), status: 'failed', endedAt: clock() }, [{ kind: 'ended', status: 'failed', detail }], logs)
+      const endedAt = clock()
+      await recordRun(repo, { ...markerCard({ id, startedAt, prompt: opts.prompt, driver: opts.driver.id, ...modelOf(opts.model), mark }), status: 'failed', endedAt }, [{ kind: 'ended', status: 'failed', detail, at: endedAt }], logs)
       return { id, status: 'failed', checkout: { reclaimed: false, reason: 'no checkout' }, detail }
     }
     // Awaited here, not returned: the lock is let go in `finally`, and a bare `return` of the
@@ -421,7 +422,7 @@ async function sessionToEnd(repo: string, run: SessionRun, dir: string, inbox: s
   // The record: the two files the session kept, copied onto the branch unchanged.
   const live = driverSession?.log
   const card = (await readLiveCard(run.checkout.path, run.id)) ?? { ...run.card, status, endedAt: run.clock(), branch, ...(pr ? { pr } : {}) }
-  const diary = live ? await readLiveDiary(run.checkout.path, run.id) : [...(run.priorDiary ?? []), { kind: 'ended', status, ...(detail !== undefined ? { detail } : {}) }]
+  const diary = live ? await readLiveDiary(run.checkout.path, run.id) : [...(run.priorDiary ?? []), { kind: 'ended', status, ...(detail !== undefined ? { detail } : {}), at: card.endedAt ?? run.clock() }]
   const recorded = await recordRun(repo, card, diary, run.logs)
   if (!recorded.ok && !recorded.committed) run.log(`[agent-scheduler] the run's record could not be written: ${recorded.error}`)
 

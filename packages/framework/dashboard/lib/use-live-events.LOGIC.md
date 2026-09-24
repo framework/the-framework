@@ -48,7 +48,7 @@ Changing either the project or the agent starts a new subscription to that strea
 
 #### Business logic
 
-Every subscription first sends everything already recorded in the stream, then follows what is appended. The events arriving from a replay and the events arriving live are the same events and render identically; the only difference the dashboard keeps is that a live event is stamped with the moment it arrived, so elapsed times are shown for what the user watched happen and never invented for a past agent.
+Every subscription first sends everything already recorded in the stream, then follows what is appended. The events arriving from a replay and the events arriving live are the same events and render identically: each carries the time its diary line was written, when the line says, so a replayed event shows the same time a live one does.
 
 ### A reconnect never shows less than what is on screen
 

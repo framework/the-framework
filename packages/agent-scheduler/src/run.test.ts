@@ -4,13 +4,13 @@ import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { appendInbox, FakeDriver, type Driver, type DriverSession, type DriverStartOptions, type FakeDriverSession } from 'agent-driver'
 import { worktreePath } from '@gemstack/skill-branches'
-import { findRun, readDiary } from '@gemstack/skill-logs'
+import { findRun } from '@gemstack/skill-logs'
 import { inboxPath, readLiveCard } from './live-card.js'
 import { acquireRunLock, lockHolder, releaseRunLock } from './run-lock.js'
 import { HOLD_MERGE_LINE, resumeRun, runCommand, STOPPED_DETAIL } from './run.js'
 import type { GitHost } from './git-host.js'
 import { sweep } from './sweep.js'
-import { git, removeRepo, testRepo } from './test-repo.js'
+import { git, readUntimedDiary, removeRepo, testRepo } from './test-repo.js'
 
 // One run end to end on a real repository, with the agent faked: the marker, the checkout, the
 // live card the session keeps, the record with what the agent said and cost, the reclaim; a run
@@ -128,7 +128,7 @@ test('a run: marker, checkout, the live card, the prompt once, the record, the c
     assert.equal(recorded?.driver, 'fake')
     assert.equal(recorded?.caller?.['sessionId'], 's-1')
     assert.deepEqual(recorded?.caller?.['scheduler'], { command: 'work-queue', host: 'this-box', pid: 4242 })
-    const diary = (await readDiary(repo, outcome.id))!
+    const diary = await readUntimedDiary(repo, outcome.id)
     assert.deepEqual(diary.map(line => line.kind), ['start', 'said', 'result', 'cost', 'ended'])
     assert.deepEqual(diary.find(l => l.kind === 'said'), { kind: 'said', text: 'Fixed it and committed.' })
     assert.deepEqual(diary.at(-1), { kind: 'ended', status: 'done' })
@@ -152,7 +152,7 @@ test("an agent that commits nothing: done, no PR, its empty branch goes with the
     assert.equal(failed.detail, 'claude: not logged in')
     const card = await findRun(repo, failed.id)
     assert.equal(card?.status, 'failed')
-    assert.deepEqual((await readDiary(repo, failed.id))!.at(-1), { kind: 'ended', status: 'failed', detail: 'claude: not logged in' })
+    assert.deepEqual((await readUntimedDiary(repo, failed.id)).at(-1), { kind: 'ended', status: 'failed', detail: 'claude: not logged in' })
   } finally {
     await removeRepo(repo)
   }
@@ -222,7 +222,7 @@ test('a signal to the run\'s process stops it: the session aborted, the run reco
     assert.deepEqual(outcome.checkout, { reclaimed: true })
     const card = await findRun(repo, outcome.id)
     assert.equal(card?.status, 'stopped')
-    const diary = (await readDiary(repo, outcome.id))!
+    const diary = await readUntimedDiary(repo, outcome.id)
     assert.deepEqual(diary.find(l => l.kind === 'said'), { kind: 'said', text: 'Working…' })
     assert.deepEqual(diary.at(-1), { kind: 'ended', status: 'stopped', detail: STOPPED_DETAIL })
   } finally {
@@ -242,7 +242,7 @@ test('a run whose last turn asked ends waiting and keeps its checkout; the answe
     const waiting = await findRun(repo, first.id)
     assert.equal(waiting?.status, 'waiting')
     assert.equal(waiting?.caller?.['sessionId'], 's-ask')
-    const before = (await readDiary(repo, first.id))!
+    const before = await readUntimedDiary(repo, first.id)
     assert.deepEqual(before.map(l => l.kind), ['start', 'said', 'result', 'question', 'ended'])
     assert.deepEqual(before.at(-1), { kind: 'ended', status: 'waiting' })
 
@@ -265,7 +265,7 @@ test('a run whose last turn asked ends waiting and keeps its checkout; the answe
     const done = await findRun(repo, first.id)
     assert.equal(done?.status, 'done')
     assert.equal(done?.startedAt, NOW.toISOString(), 'the start is the original one')
-    const after = (await readDiary(repo, first.id))!
+    const after = await readUntimedDiary(repo, first.id)
     assert.deepEqual(after.map(l => l.kind), ['start', 'said', 'result', 'question', 'ended', 'start', 'said', 'result', 'ended'], 'the diary goes on from where it stopped')
     assert.deepEqual(after.at(-1), { kind: 'ended', status: 'done' })
     const resumePrompt = after.find((l, i) => l.kind === 'start' && i > 4)
@@ -289,7 +289,7 @@ test('a line already in the inbox when the turn ends becomes the next turn of th
     }
     const outcome = await runCommand(repo, { prompt: '/work-queue', model: 'opus', driver: chatty, now: () => NOW, gitHost: noGitHost })
     assert.equal(outcome.status, 'done')
-    const diary = (await readDiary(repo, outcome.id))!
+    const diary = await readUntimedDiary(repo, outcome.id)
     assert.deepEqual(diary.filter(l => l.kind === 'start').map(l => l['prompt']), ['/work-queue', 'also add a test'])
     assert.deepEqual(diary.filter(l => l.kind === 'said').map(l => l['text']), ['First turn done.', 'Second turn done.'])
   } finally {
@@ -312,7 +312,7 @@ test('a line written after the last turn took the inbox, while the card still sa
     const outcome = await runCommand(repo, { prompt: '/work-queue', model: 'opus', driver: recording, now: () => NOW, gitHost })
     assert.equal(outcome.status, 'done')
     assert.deepEqual(outcome.checkout, { reclaimed: true })
-    const diary = (await readDiary(repo, outcome.id))!
+    const diary = await readUntimedDiary(repo, outcome.id)
     assert.deepEqual(diary.map(l => l.kind), ['start', 'said', 'result', 'ended', 'start', 'said', 'result', 'ended'])
     assert.deepEqual(diary.filter(l => l.kind === 'start').map(l => l['prompt']), ['/work-queue', 'one more thing'])
     assert.equal((await findRun(repo, outcome.id))?.status, 'done')

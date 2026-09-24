@@ -17,8 +17,10 @@ import type { DriverEvent } from './types.js'
  * The diary: `said` (a text chunk), `result` (a turn's final text), `cost` (a turn's price,
  * `usd`), `question` (the question a turn ended on), `ended` (the status and a detail), and every
  * other event as a line of its own kind (`start`, `session`, `action`, `rate-limit`, `error`,
- * `notice`). The agent's environment names the diary ({@link DIARY_ENV}), so a command it runs
- * may append whole lines of its own kinds there too.
+ * `notice`). Every line the log writes carries `at`, the time it was written (ISO 8601), so a
+ * reader shows when each thing happened, whenever it reads the diary. The agent's environment
+ * names the diary ({@link DIARY_ENV}), so a command it runs may append whole lines of its own
+ * kinds there too, with an `at` of their own to be shown with a time.
  */
 
 /** How the run ended: finished, stopped, failed, or waiting on an answer to the question its last turn asked. */
@@ -108,7 +110,7 @@ export class SessionLog {
 
   /** Fold one event in: a diary line, and the card's cost or session id when the event carries one. */
   record(event: DriverEvent): Promise<void> {
-    const line = diaryLine(event)
+    const line = { ...diaryLine(event), at: this.clock() }
     if (event.type === 'result' && event.usage?.costUsd !== undefined) this.card.cost = (this.card.cost ?? 0) + event.usage.costUsd
     if ((event.type === 'session' || event.type === 'result') && event.sessionId) {
       this.card.caller = { ...this.card.caller, sessionId: event.sessionId }
@@ -116,7 +118,7 @@ export class SessionLog {
     return this.queue(async () => {
       await appendFile(this.diaryPath, JSON.stringify(line) + '\n')
       if (event.type === 'result' && line.kind === 'result' && event.usage?.costUsd !== undefined) {
-        await appendFile(this.diaryPath, JSON.stringify({ kind: 'cost', usd: event.usage.costUsd }) + '\n')
+        await appendFile(this.diaryPath, JSON.stringify({ kind: 'cost', usd: event.usage.costUsd, at: line.at }) + '\n')
       }
       await this.writeCard()
     })
@@ -131,9 +133,10 @@ export class SessionLog {
 
   /** Close the log: the `ended` line and the card's status and end time. */
   end(status: LogEndStatus, detail?: string): Promise<void> {
-    this.card = { ...this.card, status, endedAt: this.clock() }
+    const at = this.clock()
+    this.card = { ...this.card, status, endedAt: at }
     return this.queue(async () => {
-      await appendFile(this.diaryPath, JSON.stringify({ kind: 'ended', status, ...(detail !== undefined ? { detail } : {}) }) + '\n')
+      await appendFile(this.diaryPath, JSON.stringify({ kind: 'ended', status, ...(detail !== undefined ? { detail } : {}), at }) + '\n')
       await this.writeCard()
     })
   }

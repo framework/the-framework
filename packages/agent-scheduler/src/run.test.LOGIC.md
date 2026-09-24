@@ -1,4 +1,4 @@
-What the tests cover, one run end to end on a real repository with the coding agent faked:
+What the tests cover, one run end to end on a real repository with the coding agent faked. Every line of a recorded diary a test reads is checked to carry its time as an ISO 8601 timestamp:
 
 - **A run that commits** - the marker, the checkout under `.branches/` for the run's id, the live card mid-run (`running`, the intent, the birth branch, the mark with the pid and the host, the workspace), the branch the agent renamed and the pull request read back from the git host for that branch, the cost, the record (`done`, branch, pull request, cost, model, driver, the session id and the mark under `caller`) with a diary of the prompt, what the agent said, its result, the cost and the end, and the checkout reclaimed once the branch is on origin.
 - **A run that commits nothing** - `done`, no pull request, the checkout and its empty branch gone.

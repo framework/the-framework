@@ -19,4 +19,4 @@ A run's [1] live record [2]: the card and the diary `agent-driver`'s session kee
 
 - **Where the files are** - `.the-framework/` in the checkout, the dashboard's directory; the card is `<id>.json`, the diary `<id>.jsonl`, the inbox `inbox.jsonl`.
 - **Reading a card as this tool's** - a card is read only when it parses and carries the tool's mark [6]; a checkout without one is not this tool's and is left alone. The diary is read line by line, every line that parses.
-- **Closing from outside** - a dead run's end is appended to the diary as an `ended` line with the status and a detail, and the card rewritten with that status and the end time, both best-effort.
+- **Closing from outside** - a dead run's end is appended to the diary as an `ended` line with the status, a detail and the end time as the line's time, and the card rewritten with that status and the end time, both best-effort.

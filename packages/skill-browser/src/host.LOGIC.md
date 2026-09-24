@@ -12,7 +12,7 @@ The browser's process [1]: started by the first `browser open` in a project, it 
 [2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [3] screen page: the page the browser's process serves at its root: the browser's address bar (back, forward, reload, the address) over a live picture of the page, which takes clicks, scrolling and typing. Its address carries the token.
 [4] token: 32 random hexadecimal characters the browser's process draws when it starts; every request to it must carry it, in the address's `t` parameter or the `x-browser-token` header.
-[5] screen line: the diary line `{"kind":"screen","url":<the screen page's address>,"label":<what it shows>}` the browser's process appends when the agent opens a page, and the same with `"ended":true` when the browser goes away; the dashboard frames the newest open one live in the agent's transcript.
+[5] screen line: the diary line `{"kind":"screen","url":<the screen page's address>,"label":<what it shows>,"at":<when it was written>}` the browser's process appends when the agent opens a page, and the same with `"ended":true` when the browser goes away; the dashboard frames the newest open one live in the agent's transcript.
 [6] diary: the agent's record of what happened, one JSON line each, in the file `<id>.jsonl` the tool running the agent writes; when the tool keeps one, the agent's environment names it as `AGENT_DIARY`, and the tool appends an `ended` line when the agent ends.
 [7] state file: `skill-browser/<hash>.json` under the machine's temporary directory, the hash taken from the project's root: how the `browser` command finds the project's browser's process (its pid, its port and its token), or learns why it could not start.
 
@@ -117,7 +117,7 @@ Any failure (a refusal from `page.ts`, the page closing, Chrome's own error) ans
 
 #### Business logic
 
-After every successful `open`, the process appends a screen line [5] to the diary [6]: the screen page's address and the label "browser · <the address the read printed>" (the address the agent gave when the read has none). Every `open` appends one, so the newest line marks where the agent last opened a page. When the process ends after at least one `open` and the agent has not ended (see "When it ends"), it appends the same address with the label "browser · closed" and `"ended": true`, so the dashboard stops framing it; after the agent ended, it appends nothing, because nothing should follow the agent's end. With no diary, no line is ever written. A failure to append is ignored.
+After every successful `open`, the process appends a screen line [5] to the diary [6]: the screen page's address and the label "browser · <the address the read printed>" (the address the agent gave when the read has none). Every `open` appends one, so the newest line marks where the agent last opened a page. When the process ends after at least one `open` and the agent has not ended (see "When it ends"), it appends the same address with the label "browser · closed" and `"ended": true`, so the dashboard stops framing it; after the agent ended, it appends nothing, because nothing should follow the agent's end. Every screen line carries `at`, the time it was written (ISO 8601), so the dashboard shows when it happened. With no diary, no line is ever written. A failure to append is ignored.
 
 ### The person's input
 

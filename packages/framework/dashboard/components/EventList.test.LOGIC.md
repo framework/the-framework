@@ -1,6 +1,7 @@
 What the tests cover, for the transcript of an agent's [1] events [2]:
 
 - **Conversation rows** - the user's prompt wears the "you" badge and the agent's reply the "agent" badge; a prompt's text renders inline; a reply renders as Markdown (bold text becomes bold, not literal asterisks); a message longer than 100 characters folds to its first line and offers "Expand message", while a short one renders whole with no fold control; a trailing block supplied by the caller renders inside the scrolling area, after the last row, rather than floating over it.
+- **Times** - a row whose event carries the time its line was written shows that time in the reader's locale, and a row whose event carries none shows no time.
 - **Row color** - the coding agent's [3] own error line, an error the agent reported itself, and a failed end are red; a stopped end and a clean finish are not red; the user's own turn is blue.
 - **Badge color** - a gate's [4] badge is amber while its question text keeps the plain tone; a clean end's badge is green and a stopped end's stays muted; a failed end's badge stays red, since failure wins over the kind's color; a pushed view's [5] badge takes the primary accent.
 - **Prompt placement** - the first prompt is hoisted above the session row emitted before it; a later prompt stays where it happened, after the earlier exchange; a transcript with no prompt at all keeps its order, the session row staying first.

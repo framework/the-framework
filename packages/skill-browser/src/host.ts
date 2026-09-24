@@ -42,7 +42,7 @@ export interface HostCommand {
 
 export type HostAnswer = { ok: true; output: string; png?: string } | { ok: false; reason: string }
 
-/** The screen line a diary gets: where the live view is, and what it showed then. */
+/** The screen line a diary gets: where the live view is, and what it showed then. Written with `at`, its time, as every diary line is. */
 export interface ScreenLine {
   kind: 'screen'
   url: string
@@ -127,7 +127,7 @@ export async function runHost(opts: HostOptions): Promise<void> {
 
   const writeScreen = async (line: ScreenLine): Promise<void> => {
     if (!opts.diary) return
-    await appendFile(opts.diary, JSON.stringify(line) + '\n').catch(() => {})
+    await appendFile(opts.diary, JSON.stringify({ ...line, at: new Date().toISOString() }) + '\n').catch(() => {})
   }
 
   /** The command before, so the next one starts once it has answered. */

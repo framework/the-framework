@@ -24,14 +24,14 @@ Renders an agent's [1] transcript: every event [2] the agent emitted, one row ea
 
 ## Business logic — TL;DR
 
-- **One row per event, as the terminal's line** - every event [2] is one row: a kind badge, the terminal's one-line text for that event, and on live rows the arrival time.
+- **One row per event, as the terminal's line** - every event [2] is one row: a kind badge, the terminal's one-line text for that event, and, on a row that opens a group, the time its diary line was written.
 - **The conversation reads as messages** - the user's prompt and the agent's reply render as Markdown, clamped to one line beyond 100 characters and expanding in place on click.
 - **The first prompt opens the transcript** - the first prompt is hoisted above the rows emitted before it, so the transcript starts with what the user asked.
 - **A gate is answered where it happened** - when the transcript knows its project, an open gate [4] renders as the interactive gate panel inline, an answered one as a collapsed card that replaces its "✓ chose" line, and a gate whose agent ended unanswered stays text.
 - **A screen is live where the agent used it** - the newest `screen` line at an address, on this machine's loopback and with neither an `ended` line for that address nor the agent's end after it (an end waiting on an answer does not count), is the live page itself, framed in the transcript; an earlier or ended one stays its one line, and every `ended` line is hidden.
 - **Badges once per group, colored as a scanning aid** - the kind badge shows on the first of consecutive rows of one group, "YOU" for the user's prompt; only failures, the user's turn, gates, milestones and pushed surfaces get a color.
 - **Failures read red, the user's turn blue** - a failed row is red on a red wash, the user's prompt blue on a blue wash, a clean finish and the ready-for-merge [6] signal on a green wash; a stopped agent stays neutral.
-- **Arrival times only when live** - a row that arrived live shows its arrival time at each group boundary; replayed rows show none.
+- **The time each line was written** - a row that opens a group shows the time its diary line was written, the same live, after a reload and once the agent has ended; a line with no time shows none.
 - **Following the newest row** - a live transcript keeps the newest row in view until the reader scrolls up and offers "Jump to latest"; a replay opens at its end or its start as the caller decides.
 
 ## Business logic
@@ -44,7 +44,7 @@ See `## Context`.
 
 #### Business logic
 
-Each event [2] is one row with three columns: a fixed-width badge column, the row's body, and, on live rows that open a group (see "Badges once per group, colored as a scanning aid"), the arrival time. Unless a rule below gives the event a special body, the body is the one-line text the terminal prints for the same event (the wording rules live in `src/terminal.ts`), with its leading indentation trimmed. For example: the coding agent's [5] actions read as "· <action>" lines, a finished turn [7] as "‹ turn complete", the agent's end as "✓ finished", "■ stopped" or "✗ failed: <detail>", the spend as "spend: $<cost> over N turns", and the agent settling [8] as "◆ done for now — waiting for your next message". An error the agent reported itself keeps its headline and its detail lines. The transcript is monospaced, except for the interactive rows described below, which use the dashboard's regular typeface because they are controls rather than text.
+Each event [2] is one row with three columns: a fixed-width badge column, the row's body, and, on rows that open a group (see "Badges once per group, colored as a scanning aid"), the time the event's diary line was written. Unless a rule below gives the event a special body, the body is the one-line text the terminal prints for the same event (the wording rules live in `src/terminal.ts`), with its leading indentation trimmed. For example: the coding agent's [5] actions read as "· <action>" lines, a finished turn [7] as "‹ turn complete", the agent's end as "✓ finished", "■ stopped" or "✗ failed: <detail>", the spend as "spend: $<cost> over N turns", and the agent settling [8] as "◆ done for now — waiting for your next message". An error the agent reported itself keeps its headline and its detail lines. The transcript is monospaced, except for the interactive rows described below, which use the dashboard's regular typeface because they are controls rather than text.
 
 ### The conversation reads as messages
 
@@ -118,15 +118,15 @@ See `## Context`.
 
 A row reports a failure when it is the coding agent [5] (or its transport) erroring mid-run, an error the agent reported itself, or an end that is neither successful nor a stop. A failing row's text is red and its whole line is washed with a faint red tint, findable from the scrollbar's distance. The user's prompt is blue on a faint blue wash. A clean end and the ready-for-merge [6] signal keep their text tone on a faint green wash. A stopped agent's end is neither a failure nor a milestone: it keeps the neutral tone, since the user asked for the stop. Every other row keeps the muted transcript tone with no wash.
 
-### Arrival times only when live
+### The time each line was written
 
 #### Context
 
-**Problem**: an event [2] carries no timestamp; the dashboard stamps each one as it arrives (the rule in `lib/event-times.ts`), and a replayed event was never live, so it must show no time rather than a wrong one.
+**User story**: the user reads when each thing happened, and reads the same times while the agent runs, after reloading the page, and once the agent has ended or is waiting on an answer.
 
 #### Business logic
 
-A row that opens a group and arrived live shows its arrival time, as hours, minutes and seconds in the reader's locale, at the right edge, with the full date and time in a tooltip. Rows replayed from the archive [3] show no time.
+An event [2] read from a diary line that says when it was written carries that time (`src/store/run-record.ts`). A row that opens a group and whose event carries a time shows it, as hours, minutes and seconds in the reader's locale, at the right edge, with the full date and time in a tooltip. A row whose event carries no time, such as one read from a line written before the diary kept times, shows no time.
 
 ### Following the newest row
 

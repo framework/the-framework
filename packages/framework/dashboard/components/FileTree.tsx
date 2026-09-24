@@ -64,13 +64,15 @@ function sourceCaption(tree: AgentTree): string | undefined {
   if (tree.source === 'checkout') return 'From the run’s checkout'
   if (tree.source === 'branch') return `From branch ${tree.branch}`
   if (tree.source === 'merge') return `From the merge of #${tree.number}`
+  if (tree.source === 'unchanged') return 'This run changed no files'
   return undefined
 }
 
 // The project panel's file tree (#492): a lazy, collapsible tree built from the flat
 // `git ls-files` list (onProjectFiles, shared with the `#` picker #504). A run's tree is its own
 // read (onAgentTree): its checkout, then its branch, then its merge commit, so a finished run keeps
-// showing what it changed, and says so in one line once none of those is left. It is a viewer,
+// showing what it changed; a run that changed nothing shows the project's files with nothing
+// marked, and a run whose changes none of those still holds says so in one line. It is a viewer,
 // not an editor: hovering a file previews it. With no files, it renders nothing.
 //
 // Folders are native `<details>`: open/closed state, keyboard operation and the disclosure

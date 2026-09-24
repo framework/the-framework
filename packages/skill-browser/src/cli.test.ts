@@ -96,7 +96,9 @@ test('the agent opens a page, reads it, types, picks, clicks and presses; the ch
 
     assert.equal((await cli('close')).code, 0)
     assert.ok(await until(() => gone(stateFile(cwd))), 'the state file goes with the browser')
-    assert.deepEqual((await lines(diary)).at(-1), { kind: 'screen', url: view, label: 'browser · closed', ended: true })
+    const { at, ...closed } = (await lines(diary)).at(-1) ?? {}
+    assert.deepEqual(closed, { kind: 'screen', url: view, label: 'browser · closed', ended: true })
+    assert.equal(new Date(String(at)).toISOString(), at, 'the line says when it was written')
     const after = await cli('read')
     assert.equal(after.code, 1)
     assert.match(after.err, /No browser is open/)

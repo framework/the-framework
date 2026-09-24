@@ -1,4 +1,4 @@
-What the tests cover, against a real repository with an origin and an `agent-data` branch, the live card and diary written as a run's session leaves them:
+What the tests cover, against a real repository with an origin and an `agent-data` branch, the live card and diary written as a run's session leaves them, each diary line with its time. Every line of a recorded diary a test reads is checked to carry its time as an ISO 8601 timestamp:
 
 - **A dead run of this machine** - a checkout whose live card says `running` and whose lock no live process holds is ended, recorded `failed` with what the agent said and `its process died before the run ended`, and reclaimed; one on this machine whose lock a live process holds, and a dead-looking one on another machine, are left `running`.
 - **An ended, unrecorded run; a waiting one** - a checkout whose card says the run ended is recorded as it ended and reclaimed; one whose card says `waiting` is recorded and kept, for the answer.

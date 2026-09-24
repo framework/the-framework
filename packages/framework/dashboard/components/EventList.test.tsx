@@ -32,6 +32,16 @@ describe('EventList conversation rows', () => {
     expect(screen.getByText('agent')).toBeTruthy()
   })
 
+  test('a row shows the time its line was written, and a line with no time shows none', () => {
+    const at = '2026-09-25T10:04:05.000Z'
+    const events: FrameworkEvent[] = [
+      { kind: 'driver', event: { type: 'start', prompt: 'hello' }, at },
+      { kind: 'driver', event: { type: 'text', text: 'hi' } },
+    ]
+    render(<EventList events={events} stick={false} />)
+    expect(screen.getAllByText(new Date(at).toLocaleTimeString())).toHaveLength(1)
+  })
+
   test('a prompt renders its text inline', () => {
     render(<EventList events={[{ kind: 'driver', event: { type: 'start', prompt: 'what is your name?' } }]} stick={false} />)
     expect(screen.getByText('what is your name?')).toBeTruthy()

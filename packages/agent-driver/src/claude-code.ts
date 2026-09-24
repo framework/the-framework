@@ -6,7 +6,7 @@ import { readClaudeQuota } from './claude-code-quota.js'
 import { combineFraming, combineSignals, makeEmit, readWorkspaceFile } from './session-support.js'
 import { runCliSession, type SpawnLike } from './cli-session.js'
 import { finishTurn } from './inbox.js'
-import { attachLog, type SessionLog } from './session-log.js'
+import { agentEnv, attachLog, type SessionLog } from './session-log.js'
 import type { Driver, DriverEvent, DriverPromptOptions, DriverQuota, DriverRateLimit, DriverSession, DriverStartOptions, DriverTurn, DriverUsage } from './types.js'
 
 /** Claude Code permission modes we pass through to the CLI. */
@@ -116,7 +116,7 @@ export class ClaudeCodeSession implements DriverSession {
         bin: this.config.bin ?? 'claude',
         args: this.buildArgs(system, id),
         cwd: this.cwd,
-        env: this.config.env ?? process.env,
+        env: agentEnv(this.config.env ?? process.env, this.log),
         prompt: text,
         spawn: this.config.spawn ?? (nodeSpawn as unknown as SpawnLike),
         emit: emitFn,

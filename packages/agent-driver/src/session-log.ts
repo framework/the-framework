@@ -17,7 +17,8 @@ import type { DriverEvent } from './types.js'
  * The diary: `said` (a text chunk), `result` (a turn's final text), `cost` (a turn's price,
  * `usd`), `question` (the question a turn ended on), `ended` (the status and a detail), and every
  * other event as a line of its own kind (`start`, `session`, `action`, `rate-limit`, `error`,
- * `notice`).
+ * `notice`). The agent's environment names the diary ({@link DIARY_ENV}), so a command it runs
+ * may append whole lines of its own kinds there too.
  */
 
 /** How the run ended: finished, stopped, failed, or waiting on an answer to the question its last turn asked. */
@@ -52,6 +53,14 @@ export interface WrittenCard extends LogCard {
   status: 'running' | LogEndStatus
   endedAt?: string
   cost?: number
+}
+
+/** The variable that names the diary in the agent's environment, when the session keeps one. */
+export const DIARY_ENV = 'AGENT_DIARY'
+
+/** The agent's environment: the given one, plus where the diary is when the session keeps a log. */
+export function agentEnv(env: NodeJS.ProcessEnv, log: SessionLog | undefined): NodeJS.ProcessEnv {
+  return log ? { ...env, [DIARY_ENV]: log.diaryPath } : env
 }
 
 /** The card's file name for a run id, and the diary's. */

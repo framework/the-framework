@@ -361,3 +361,26 @@ test('StreamJsonParser stays silent on a malformed rate_limit_event (#517)', () 
     [],
   )
 })
+
+test('a session that keeps a log names its diary in the agent environment; one without does not', async () => {
+  const { mkdtemp, rm } = await import('node:fs/promises')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const dir = await mkdtemp(join(tmpdir(), 'claude-diary-env-'))
+  try {
+    const seen: NodeJS.ProcessEnv[] = []
+    const spawn: SpawnLike = (cmd, args, opts) => {
+      seen.push(opts.env)
+      return fakeSpawn([JSON.stringify({ type: 'result', result: 'ok' })])(cmd, args, opts)
+    }
+    const driver = new ClaudeCodeDriver({ spawn, env: { KEEP: '1' } })
+    const logged = await driver.start({ cwd: dir, log: { dir, card: { id: 'r1' } } })
+    await logged.prompt('go')
+    await logged.log!.settled()
+    await (await driver.start({ cwd: dir })).prompt('go')
+    assert.deepEqual(seen[0], { KEEP: '1', AGENT_DIARY: join(dir, 'r1.jsonl') })
+    assert.deepEqual(seen[1], { KEEP: '1' })
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})

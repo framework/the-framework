@@ -1,7 +1,7 @@
 import { execFile, spawn as nodeSpawn } from 'node:child_process'
 import { runCliSession, type AgentCliParser, type SpawnLike } from './cli-session.js'
 import { finishTurn } from './inbox.js'
-import { attachLog, type SessionLog } from './session-log.js'
+import { agentEnv, attachLog, type SessionLog } from './session-log.js'
 import { combineFraming, combineSignals, makeEmit, readWorkspaceFile } from './session-support.js'
 import type { Driver, DriverEvent, DriverPromptOptions, DriverSession, DriverStartOptions, DriverTurn, DriverUsage } from './types.js'
 
@@ -105,7 +105,7 @@ export class CodexSession implements DriverSession {
       bin: this.config.bin ?? 'codex',
       args: this.buildArgs(gitDir, resumeId),
       cwd: this.cwd,
-      env: this.config.env ?? process.env,
+      env: agentEnv(this.config.env ?? process.env, this.log),
       prompt,
       spawn: this.config.spawn ?? (nodeSpawn as unknown as SpawnLike),
       emit,

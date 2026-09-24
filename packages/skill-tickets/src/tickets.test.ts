@@ -40,6 +40,15 @@ test('readTickets reads the Issue: link, split into its label and URL, and leave
   assert.equal(bare?.issue, undefined)
 })
 
+test('readTickets reads the Waiting: line as written, and leaves it off when absent or empty', async () => {
+  const [waiting] = await readTickets(await dir({ '2026-07-20_thing.md': 'Priority: 3\nWaiting: web runs to come back\n\n# Thing\n' }))
+  assert.equal(waiting?.waiting, 'web runs to come back')
+  const [none] = await readTickets(await dir({ '2026-07-20_thing.md': '# Thing\n\nWaiting: in the body, not a key\n' }))
+  assert.equal(none?.waiting, undefined)
+  const [empty] = await readTickets(await dir({ '2026-07-20_thing.md': 'Waiting:\n\n# Thing\n' }))
+  assert.equal(empty?.waiting, undefined)
+})
+
 test('readTickets reads the PR: link the same way, the ticket in review, and leaves it off when absent', async () => {
   const [inReview] = await readTickets(await dir({ '2026-07-20_thing.md': 'Issue: [#42](https://example.com/org/repo/issues/42)\nPR: [#1790](https://example.com/org/repo/pull/1790)\n\n# Thing\n' }))
   assert.deepEqual(inReview?.pr, { label: '#1790', url: 'https://example.com/org/repo/pull/1790' })

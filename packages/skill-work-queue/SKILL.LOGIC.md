@@ -12,6 +12,7 @@ The `work-queue` command skill: the prompt of the agent a runner starts on the q
 - **One task** - it takes one queued task and no other.
 - **Commit, then publish** - it commits on its own branch; once the work is committed it marks the queue entry done and publishes the work: its branch pushed and a pull request opened, set to merge on its own once its checks pass, whose body names the ticket it closes (`Closes tickets/<file>`) and the issue the ticket tracks (`Closes #<number>`) when it has one. Said in capability words: which command publishes is the branches skill's to say.
 - **The ticket goes into review, not closed** - the pull request is written on the ticket as its `PR:` line and the claim released; the ticket closes when the pull request merges, never here.
+- **A ticket that waits** - a task whose ticket already has a `Waiting:` line is not done, a plan included: its queue entry is marked done and any claim released; a ticket with nothing to do until something outside the work happens gets what it waits on as its `Waiting:` line above the title, its entry marked done and the claim released; a waiting ticket is never closed here.
 - **A task without a pull request** - a plan to write, for instance, ends when what it writes is committed where it belongs, and any claim still held is released.
 - **Nothing queued** - it says so and stops.
 - **No ticketing system, no AI queue** - it shows an error to the user and stops; the note is in capability words and names no skill.

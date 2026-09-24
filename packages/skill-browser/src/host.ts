@@ -265,15 +265,19 @@ export async function runHost(opts: HostOptions): Promise<void> {
     void (async () => {
       if (Date.now() - lastUse > opts.idleMs) return end()
       if (opts.diary) {
-        const fresh = await readFrom(opts.diary, diaryOffset)
-        if (fresh === undefined) {
+        const read = await readFrom(opts.diary, diaryOffset)
+        if (read === undefined) {
           runEnded = true
           return end()
         }
+        // A diary written back shorter (a run resumed from its record) is followed from its end.
+        if (read.size < diaryOffset) diaryOffset = read.size
+        const fresh = read.bytes
         // Only whole lines are read: a line still being written is read again, complete, next time.
         const whole = fresh.lastIndexOf(0x0a) + 1
         diaryOffset += whole
-        if (diaryLines(fresh.subarray(0, whole)).some(line => line['kind'] === 'ended')) {
+        // A run that stops on a question ends `waiting` and keeps its browser for the answer.
+        if (diaryLines(fresh.subarray(0, whole)).some(line => line['kind'] === 'ended' && line['status'] !== 'waiting')) {
           runEnded = true
           return end()
         }
@@ -290,16 +294,16 @@ export async function runHost(opts: HostOptions): Promise<void> {
   await ending
 }
 
-/** The file's bytes from `offset` on, or `undefined` when the file is gone. */
-async function readFrom(path: string, offset: number): Promise<Buffer | undefined> {
+/** The file's bytes from `offset` on and its size, or `undefined` when the file is gone. */
+async function readFrom(path: string, offset: number): Promise<{ bytes: Buffer; size: number } | undefined> {
   const handle = await open(path, 'r').catch(() => undefined)
   if (!handle) return undefined
   try {
     const { size } = await handle.stat()
-    if (size <= offset) return Buffer.alloc(0)
+    if (size <= offset) return { bytes: Buffer.alloc(0), size }
     const buffer = Buffer.alloc(size - offset)
     const { bytesRead } = await handle.read(buffer, 0, buffer.length, offset)
-    return buffer.subarray(0, bytesRead)
+    return { bytes: buffer.subarray(0, bytesRead), size }
   } finally {
     await handle.close()
   }

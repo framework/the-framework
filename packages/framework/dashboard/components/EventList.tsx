@@ -198,15 +198,17 @@ function foldChoiceRows(events: FrameworkEvent[]): {
 
 /**
  * Which `screen` rows are live and which are hidden. Live: the newest line at its address with no
- * `ended` line for it after, no run `end` after it, and a loopback address. Every `ended` line is
- * hidden: the live row going back to its one line says the screen has gone.
+ * `ended` line for it after, no run `end` after it other than one waiting on an answer, and a
+ * loopback address. Every `ended` line is hidden: the live row going back to its one line says
+ * the screen has gone.
  */
 export function foldScreenRows(events: readonly FrameworkEvent[]): { live: Set<FrameworkEvent>; hidden: Set<FrameworkEvent> } {
   const hidden = new Set<FrameworkEvent>()
   const newest = new Map<string, number>()
   let lastEnd = -1
   events.forEach((e, at) => {
-    if (e.kind === 'end') lastEnd = at
+    // A run waiting on an answer keeps its screens: the page is what its question is about.
+    if (e.kind === 'end' && !e.waiting) lastEnd = at
     if (e.kind !== 'screen') return
     if (e.ended) {
       hidden.add(e)

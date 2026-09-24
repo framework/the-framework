@@ -106,11 +106,15 @@ test('the agent opens a page, reads it, types, picks, clicks and presses; the ch
   }
 })
 
-test('the run ending closes its browser, and the ended run gets no more lines', needsChrome, async () => {
+test('the run ending closes its browser, a question does not, and the ended run gets no more lines', needsChrome, async () => {
   const { url, server } = await site()
   const { cwd, diary, cli } = await project()
   try {
     assert.equal((await cli('open', url)).code, 0)
+    // A run that stops on a question keeps its browser for the answer.
+    await appendFile(diary, JSON.stringify({ kind: 'ended', status: 'waiting' }) + '\n')
+    await new Promise(r => setTimeout(r, 2500))
+    assert.equal((await cli('read')).code, 0, 'still open while the run waits')
     // The line arrives in two writes, the way a check can catch a writer halfway.
     const ended = JSON.stringify({ kind: 'ended', status: 'done' }) + '\n'
     await appendFile(diary, ended.slice(0, 9))

@@ -327,6 +327,15 @@ describe('EventList screen rows', () => {
     expect(frames()).toEqual([])
   })
 
+  test('a run waiting on an answer keeps its screen live', () => {
+    const events: FrameworkEvent[] = [
+      { kind: 'screen', url: at(1), label: 'browser · http://localhost:3000/' },
+      { kind: 'end', ok: true, waiting: true },
+    ]
+    render(<EventList events={events} stick={false} />)
+    expect(frames()).toEqual([at(1)])
+  })
+
   test('only a loopback address is framed', () => {
     render(<EventList events={[{ kind: 'screen', url: 'https://example.com/', label: 'somewhere' }]} stick={false} />)
     expect(frames()).toEqual([])

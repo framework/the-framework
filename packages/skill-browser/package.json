@@ -1,0 +1,43 @@
+{
+  "name": "@gemstack/skill-browser",
+  "version": "0.0.1",
+  "description": "A browser for coding agents: a headless Chrome the agent opens, reads, clicks and types into with the browser command, shown live to a person watching the run.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/framework/the-framework.git",
+    "directory": "packages/skill-browser"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "bin/browser",
+    "SKILL.md"
+  ],
+  "bin": {
+    "browser": "bin/browser"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./SKILL.md": "./SKILL.md"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "pnpm build && tsc -p tsconfig.test.json && node --test --test-timeout=120000 'dist-test/**/*.test.js'",
+    "clean": "rm -rf dist dist-test"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^7.0.2"
+  }
+}

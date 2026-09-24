@@ -236,7 +236,10 @@ export async function runHost(opts: HostOptions): Promise<void> {
       } catch (err) {
         answer = { ok: false, reason: err instanceof Error ? err.message : String(err) }
       }
-      if (dialogs.length && answer.ok) answer = { ...answer, output: [...dialogs.map(d => `Dialog, accepted: ${d}`), '', answer.output].join('\n') }
+      if (dialogs.length) {
+        const named = dialogs.map(d => `Dialog, accepted: ${d}`)
+        answer = answer.ok ? { ...answer, output: [...named, '', answer.output].join('\n') } : { ok: false, reason: [...named, answer.reason].join('\n') }
+      }
       dialogs = []
       return void res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(answer))
     }

@@ -23,6 +23,6 @@ The rules of the `browser` skill [1]: finding and launching a headless Chrome, s
 - **Speaking to the page** (`cdp.ts`) - the page the agent is on (the first page Chrome lists) and one DevTools connection to it, reached only from the browser's process.
 - **Reading and acting on the page** (`page.ts`) - the page as title, address, text and numbered elements; opening an address, clicking, typing, pressing a key, a screenshot and a script, each waiting for the page to settle.
 - **The screen page** (`screen.ts`) - what a person's clicks, scrolling, typing and address bar become, only the input it knows passing on; the live picture as a stream of JPEG frames.
-- **The browser's process** (`host.ts`, `host-main.ts`) - its token-guarded loopback server, the agent's commands, the screen lines in the diary, and the five ways it ends.
-- **The `browser` command** (`cli.ts`, `cli.test.ts`) - the eight commands, finding the project's browser's process by its state file or starting it on `open`, forwarding the command, and the exit codes.
+- **The browser's process** (`host.ts`, `host-main.ts`) - its token-guarded loopback server, the agent's commands one at a time and each answered within 30 seconds, the page's dialogs accepted and named, the screen lines in the diary, and the five ways it ends.
+- **The `browser` command** (`cli.ts`, `cli.test.ts`) - the eight commands, finding the project's browser's process by its state file or starting it on `open`, forwarding the command, and the exit codes; a lock so two `open`s at once start one browser, and a state directory private to this user.
 - **The entry point** (`index.ts`) - re-exports the command's runner and names, and the screen line's shape.

@@ -11,13 +11,13 @@ What the agent [1] does to the page, each a few DevTools requests: reading the p
 
 ## Business logic — TL;DR
 
-- **Reading the page** - `Title:`, `URL:`, the page's text (cut at 10,000 characters, saying how many more there were), then up to 300 visible elements, each numbered [2] with its kind, its label and what it holds.
+- **Reading the page** - `Title:`, `URL:`, the page's text (cut at 10,000 characters, saying how many more there were), then up to 300 visible elements, each numbered [2] with its kind, its label and what it holds, and a last line counting the elements left out.
 - **Waiting for the page to settle** - 250 ms for a navigation to begin, then until the document says it has loaded (up to 10 seconds), then 200 ms more; a slow page is read as it stands.
 - **Opening an address** - `http` or `https` as given, an address with no scheme gets `http://` (`localhost:3000` included), any other scheme is refused; an address Chrome cannot open is refused with Chrome's reason.
 - **Clicking** - a real mouse click at the middle of the numbered element, scrolled into view first; a number the page no longer has is refused.
-- **Typing** - on a select, picks the option whose text or value is the text; on anything else, focuses it, selects what it holds and types the text over it; an element that takes no text is refused.
+- **Typing** - on a select, picks the option whose text or value is the text; on a text field, text area or editable element, focuses it, selects what it holds and types the text over it; any other element (a button, a checkbox, …) is refused with "click it instead".
 - **Pressing a key** - one of nine keys, as a key press the page sees; any other key is refused with the list.
-- **A screenshot and a script** - the visible part of the page as a PNG; a script's return value as indented JSON, `undefined` when it returns nothing, and a script that throws is refused with its error.
+- **A screenshot and a script** - the visible part of the page as a PNG; a script's return value as indented JSON, `undefined` when it returns nothing, a value JSON cannot hold (`Infinity`, `NaN`, `-0`, a BigInt) as DevTools spells it, and a script that throws is refused with its error.
 
 ## Business logic
 
@@ -35,7 +35,7 @@ A read first removes every element number [2] the previous read wrote, then walk
 - The label is the first of: its accessible label, the text of its first form label, its own text (not for inputs, text areas and selects), its placeholder, title, alt text, or name; whitespace collapsed, cut to 80 characters.
 - More is ` -> <href>` for a link, ` (checked)` or ` (not checked)` for a checkbox or radio button, ` value="<value>"` for any other input, text area or select, and ` (disabled)` added for a disabled element.
 
-The read prints `Title: <title>`, `URL: <address>`, a blank line, the page's visible text with runs of three or more line breaks collapsed to two, or "(no text on the page)", a blank line, and then "Elements (the number is what click and type take):" followed by the list, or "Elements: none". Text beyond 10,000 characters is cut and followed by "… (<n> more characters not shown)".
+The read prints `Title: <title>`, `URL: <address>`, a blank line, the page's visible text with runs of three or more line breaks collapsed to two, or "(no text on the page)", a blank line, and then "Elements (the number is what click and type take):" followed by the list, or "Elements: none". When more than 300 shown elements were found, the list ends with "… <n> more elements not listed: find them with eval"; those carry no number. Text beyond 10,000 characters is cut and followed by "… (<n> more characters not shown)".
 
 ### Waiting for the page to settle
 
@@ -75,7 +75,7 @@ The numbered element is scrolled to the middle of the view, and the mouse is mov
 
 #### Business logic
 
-The numbered element is scrolled into view (a missing number is refused as for a click). On a select, the first option whose trimmed text or whose value equals the text is chosen and the page is told the select changed, as a person's choice would; with no such option the refusal is "no option "<text>"; the options are <each option's text>". On any other element, it is focused and what it holds is selected (a field's content, or an editable element's children), and the text is typed in its place; an element that does not take the focus is refused: "element [<n>] does not take text". The page then settles.
+The numbered element is scrolled into view (a missing number is refused as for a click). On a select, the first option whose trimmed text or whose value equals the text is chosen and the page is told the select changed, as a person's choice would; with no such option the refusal is "no option "<text>"; the options are <each option's text>". An element that takes no text is refused: "element [<n>] takes no text: click it instead"; the elements that take text are text areas, editable elements, and inputs of every type but checkbox, radio, button, submit, reset, image, file, range and color. Such an element is focused and what it holds is selected (a field's content, or an editable element's children), and the text is typed in its place; one that does not take the focus is refused: "element [<n>] does not take the focus". The page then settles.
 
 ### Pressing a key
 
@@ -95,4 +95,4 @@ See `## Context`.
 
 #### Business logic
 
-A screenshot is the visible part of the page as PNG bytes. A script runs in the page, a promise it returns awaited; its value comes back as JSON indented by two spaces, or "undefined" when it returns nothing. A script that throws is refused with the error's description, or "the script threw".
+A screenshot is the visible part of the page as PNG bytes. A script runs in the page, a promise it returns awaited; its value comes back as JSON indented by two spaces, or "undefined" when it returns nothing; a value JSON cannot hold (`Infinity`, `NaN`, `-0`, a BigInt) comes back as DevTools spells it, such as `Infinity` or `12n`. A script that throws is refused with the error's description, or "the script threw".

@@ -9,7 +9,7 @@ The browser's Chrome: which Chrome executable to run, how it is launched (headle
 - **Which Chrome** - `CHROME_PATH` when it names an existing file, else the first well-known install path of the platform that exists, else the first of four Chrome and Chromium names found on `PATH`; none means the machine has no Chrome.
 - **How it is launched** - headless, debugging on `127.0.0.1` at a port Chrome picks, on a fresh profile directory `skill-browser-…` under the temporary directory, 1280×800, opening a blank page, with the first-run and default-browser prompts off.
 - **Waiting until it answers** - the port Chrome writes into the profile is read and its version endpoint polled every 100 ms, up to 20 seconds; Chrome failing to start, exiting as it starts, or not answering in time fails the launch with a sentence, and Chrome is closed.
-- **Closing** - Chrome is killed and, 300 ms later, its profile directory removed; closing twice does nothing more.
+- **Closing** - Chrome is asked to exit, killed outright when it has not within 5 seconds, and its profile directory is removed once it has exited; closing twice does nothing more.
 
 ## Business logic
 
@@ -51,4 +51,4 @@ Every 100 ms the port is read from the profile's `DevToolsActivePort` file and, 
 
 #### Business logic
 
-Closing kills Chrome, waits 300 ms because Chrome still holds files in the profile for a moment, and removes the profile directory, ignoring a failure to remove it. A second close does nothing.
+Closing, when Chrome is still running, sends it the signal to terminate and waits for it to exit, killing it outright when it has not exited 5 seconds after the signal, because until it exits Chrome still writes in the profile. The profile directory is then removed, retried up to three times, a final failure ignored. A second close does nothing.

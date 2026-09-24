@@ -1,4 +1,4 @@
-The browser's process [1]: started by the first `browser open` in a project, it launches Chrome, keeps the connection to the page the agent [2] is on with the live picture running, serves the agent's commands and the screen page [3] over a token-guarded [4] HTTP server on loopback, writes the screen lines [5] into the agent's diary [6], and ends, closing Chrome, on the first of five events.
+The browser's process [1]: started by the first `browser open` in a project, it launches Chrome, keeps the connection to the page the agent [2] is on with the live picture running, serves the agent's commands, one at a time, and the screen page [3] over a token-guarded [4] HTTP server on loopback, writes the screen lines [5] into the agent's diary [6], and ends, closing Chrome, on the first of five events.
 
 ## Context
 
@@ -21,8 +21,10 @@ The browser's process [1]: started by the first `browser open` in a project, it 
 - **Starting** - draws the token [4], launches Chrome and connects to its page, listens on `127.0.0.1` at a free port, and only then writes the state file [7] with its pid, port and token (readable by its owner only); a Chrome that cannot start, or shows no page, leaves the error in the state file instead.
 - **The page the agent is on, and its live picture** - every command and input first finds the page the agent is on, following a new tab; on a new page it connects, starts a JPEG screencast (quality 60, at most 1280×800) and drops the old connection.
 - **The token guards everything** - a request without the token is refused with 403; the screen page, its picture stream and its state are the only reads, the agent's commands and the person's input the only writes.
+- **One command at a time, answered within 30 seconds** - a command starts once the one before it has answered; a command that takes longer than 30 seconds is refused, while its work goes on in the page.
+- **Dialogs** - an alert, confirm or prompt the page opens is accepted at once, and the next answer to the agent, a refusal included, begins with one `Dialog, accepted:` line per dialog.
 - **The agent's commands** - `open`, `read`, `click`, `type`, `press` answer the page as read after the action; `screenshot` the PNG; `eval` the script's JSON; `close` answers "The browser is closed." and then ends; a refusal answers its sentence.
-- **The screen lines in the diary** - every `open` appends a screen line [5] with the screen page's address and "browser · <the page's address>"; when the process ends after at least one, it appends "browser · closed" with `ended`, unless the agent already ended; with no diary, nothing is written.
+- **The screen lines in the diary** - the diary is the one named in the environment of the command that started the process; every `open` appends a screen line [5] with the screen page's address and "browser · <the page's address>"; when the process ends after at least one, it appends "browser · closed" with `ended`, unless the agent already ended; with no diary, nothing is written.
 - **The person's input** - an input from the screen page goes to the page as `screen.ts` maps it; an input it does not know is answered 400.
 - **When it ends** - on `close`; on an `ended` line reaching the diary after the process started; on the diary's file going away; after 30 minutes (the caller's figure) with no command and no input; when Chrome exits, or the process is told to stop.
 - **Ending** - the viewers' streams and the server closed, the `ended` screen line written when due, Chrome closed and its profile removed, and the state file removed.
@@ -37,7 +39,7 @@ The browser's process [1]: started by the first `browser open` in a project, it 
 
 #### Business logic
 
-The process draws a token [4] of 16 random bytes in hexadecimal and launches Chrome by the rules of `chrome.ts`. When Chrome cannot start, the state file holds `{"error": <the sentence>}` and the process ends. It then connects to the page the agent is on; when Chrome shows no page ("the browser has no page open") or the connection fails, Chrome is closed and the state file holds that error. Otherwise it listens on `127.0.0.1` at a port the system picks, the screen page's address becomes `http://127.0.0.1:<port>/?t=<token>`, the diary's current size is noted (see "When it ends"), and the state file is written as `{"pid", "port", "token"}`, its directory made when missing, readable and writable by its owner only.
+The process draws a token [4] of 16 random bytes in hexadecimal and launches Chrome by the rules of `chrome.ts`. When Chrome cannot start, the state file holds `{"error": <the sentence>}` and the process ends. It then connects to the page the agent is on; when Chrome shows no page ("the browser has no page open") or the connection fails, Chrome is closed and the state file holds that error. Otherwise it listens on `127.0.0.1` at a port the system picks, the screen page's address becomes `http://127.0.0.1:<port>/?t=<token>`, the diary's current size is noted (see "When it ends"), and the state file is written as `{"pid", "port", "token"}`, readable and writable by its owner only, its directory made when missing and then open to its owner only.
 
 ### The page the agent is on, and its live picture
 
@@ -47,7 +49,7 @@ The process draws a token [4] of 16 random bytes in hexadecimal and launches Chr
 
 #### Business logic
 
-Before every command and every input, the page the agent is on is found by the rule of `cdp.ts`; none is refused as "the browser has no page open". The same page, still connected, is kept. A different page is connected to, and on it the process starts a screencast: Chrome sends a JPEG frame at quality 60, at most 1280×800, whenever the page's picture changes; each frame becomes the newest frame, is sent at once to everyone watching the stream, and is acknowledged so Chrome sends the next. The previous page's connection is then closed. While anyone watches, the newest frame is also sent again every second, because a still page sends no frames and a moving image in a browser paints a frame only once the next one begins.
+Before every command and every input, the page the agent is on is found by the rule of `cdp.ts`; none is refused as "the browser has no page open". The same page, still connected, is kept. A different page is connected to, and on it the process starts a screencast: Chrome sends a JPEG frame at quality 60, at most 1280×800, whenever the page's picture changes; each frame becomes the newest frame, is sent at once to everyone watching the stream, and is acknowledged so Chrome sends the next. The process also listens on it for dialogs (see "Dialogs"). The previous page's connection is then closed. Finding and connecting to the page happens one caller at a time: a command and a person's input arriving together never connect to a new tab twice; the second waits for the first to finish, then finds the page again. While anyone watches, the newest frame is also sent again every second, because a still page sends no frames and a moving image in a browser paints a frame only once the next one begins.
 
 ### The token guards everything
 
@@ -65,6 +67,26 @@ Every request must carry the token [4] in the `t` parameter of its address or in
 - `POST /input` takes one input from the screen page (see "The person's input").
 - `POST /command` takes one of the agent's commands and answers `{"ok": true, "output", "png"?}` or `{"ok": false, "reason"}`, always with 200.
 - Any other request is answered 404. A body is JSON, at most 1,000,000 characters; a larger one fails the request with 500 "request too large", and one that is not JSON reads as nothing. An error while serving answers 500 with its message.
+
+### One command at a time, answered within 30 seconds
+
+#### Context
+
+**Problem**: two commands at once on one page would cancel each other's loads (two `open`s from two shells, say); and a page that never finishes (a script stuck in a loop) must not leave the agent waiting for good.
+
+#### Business logic
+
+The agent's commands form a queue: each starts only once the one before it has answered. A command not done within 30 seconds is answered as a refusal, "the page did not answer within 30s: read it again, or close the browser and open it again"; the work it started is not stopped and goes on in the page, and the next command in the queue starts at once. The person's input does not wait in this queue.
+
+### Dialogs
+
+#### Context
+
+**Problem**: an alert, confirm or prompt blocks the page until someone answers it, and the agent cannot see it.
+
+#### Business logic
+
+Every dialog the page the agent is on opens is accepted as soon as it opens: an alert dismissed, a confirm answered OK, a prompt answered with its default text. Each is remembered as its type and its message in quotes (`confirm "sure?"`). The next answer to a command begins with one line per dialog remembered, `Dialog, accepted: <type> "<message>"`, in the order they opened: on a success followed by a blank line and the answer's own output, on a refusal followed by the reason. The remembered dialogs are cleared with every answer.
 
 ### The agent's commands
 
@@ -91,7 +113,7 @@ Any failure (a refusal from `page.ts`, the page closing, Chrome's own error) ans
 
 **User story**: the person watching sees the browser live at the row where the agent opened it, and sees it go when the browser closes.
 
-**Business logic story**: the process learns the diary's path from `AGENT_DIARY` (see `host-main.ts`); the dashboard reads the diary and frames the newest open screen line at an address (the rule of the framework's transcript).
+**Business logic story**: the process learns the diary's path from `AGENT_DIARY` in the environment of the `browser open` that started it (see `host-main.ts`), and keeps that diary for its whole life: a later command run from another environment, another agent's or a person's shell in the same project, reuses the browser and its `open`s write into that first diary, or into none when the browser was started with no diary; the dashboard reads the diary and frames the newest open screen line at an address (the rule of the framework's transcript).
 
 #### Business logic
 
@@ -118,7 +140,7 @@ See `## Context` of `screen.ts`.
 Every two seconds the process checks, in order:
 
 - When no command and no input has arrived for the idle time it was started with (30 minutes, from `cli.ts`), it ends. Watching the screen page, and the screen page asking for the address every second, do not count.
-- When it was given a diary: the diary's file gone (the agent's checkout reclaimed) counts as the agent having ended, and it ends. Otherwise the part of the diary written since the last check (since the process started, for the first) is read; a line with `"kind":"ended"` in it, the line the tool running the agent appends when the agent ends, counts as the agent having ended, and it ends. An `ended` line written before the process started, such as an earlier session's, does not count.
+- When it was given a diary: the diary's file gone (the agent's checkout reclaimed) counts as the agent having ended, and it ends. Otherwise the part of the diary written since the last check (since the process started, for the first), counted in bytes, is read; a line with `"kind":"ended"` in it, the line the tool running the agent appends when the agent ends, counts as the agent having ended, and it ends. An `ended` line written before the process started, such as an earlier session's, does not count.
 
 It also ends when `close` is run, when Chrome exits, and when the process is told to terminate or interrupted.
 

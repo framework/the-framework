@@ -16,10 +16,10 @@ The `browser` command: the eight commands an agent [1], or a person in a shell, 
 ## Business logic — TL;DR
 
 - **The command line** - `open <address>`, `read`, `click <n>`, `type <n> <text>`, `press <key>`, `screenshot [file]`, `eval <script>`, `close`, each with exactly its arguments; no command, an unknown command or a wrong number of arguments prints the usage on stderr and exits 2; `--help` or `-h` prints it on stdout and exits 0.
-- **One browser per project** - the project is the git root of the current directory, or the directory itself outside a repository; its state file [3] is named by a hash of that root.
-- **Finding the browser, or starting it** - a state file whose process answers is used; a stale one is removed; with no browser, every command but `open` is refused, and `open` finds a Chrome and starts the browser's process [2] detached, with this command's environment, waiting up to 30 seconds for it.
-- **Forwarding the command** - the command goes to the process with the token [4]; its answer's text is printed on stdout; a refusal is its reason on stderr and exit 1; a process that stops answering is a refusal.
-- **A screenshot** - saved at the given path, relative to the current directory, or a new temporary file, and its path printed.
+- **One browser per project** - the project is the git root of the current directory, or the directory itself outside a repository; its state file [3] is named by a hash of that root, in a directory that must be this user's own and is kept closed to others.
+- **Finding the browser, or starting it** - a state file whose process answers is used; a stale one is removed; with no browser, every command but `open` is refused, and `open` finds a Chrome and starts the browser's process [2] detached, with this command's environment, waiting up to 30 seconds for it; a lock file lets only one `open` start it, and a second `open` meanwhile waits for the first's browser.
+- **Forwarding the command** - the command goes to the process with the token [4]; its answer's text is printed on stdout; a refusal is its reason on stderr and exit 1; a process that stops answering, or does not answer within 90 seconds, is a refusal.
+- **A screenshot** - saved at the given path, relative to the current directory, or a new temporary file, and its path printed; a file that cannot be written is a refusal.
 
 ## Business logic
 
@@ -43,6 +43,8 @@ The command is `browser <command>`. `open`, `click`, `press` and `eval` take exa
 
 The project is the root git names for the current directory; outside a repository it is the current directory itself. The state file [3] is `skill-browser/<the first 16 hexadecimal characters of the SHA-256 of the root>.json` under the machine's temporary directory.
 
+After the command line is read and before the browser is looked for, the `skill-browser` directory is made when missing, open to its owner only. When it belongs to another user, every command is refused: "<directory> is not this user's own directory: remove it, then run the command again.", because a state file there says where commands go. When it is this user's but open to others, it is closed to them.
+
 ### Finding the browser, or starting it
 
 #### Context
@@ -54,7 +56,7 @@ The project is the root git names for the current directory; outside a repositor
 A state file that holds a pid, port and token is used when the process answers a request for its state at `127.0.0.1` on that port with the token; when it does not answer, the file is removed. A state file holding an error, or one that cannot be read, counts as no browser. With no browser:
 
 - Any command but `open` is refused: "No browser is open. Start one with `browser open <address>`."
-- `open` finds a Chrome by the rules of `chrome.ts`; with none, it is refused: "No Chrome on this machine: install Google Chrome, or set CHROME_PATH to a Chrome or Chromium executable." Otherwise it removes any old state file and starts the browser's process [2] (`host-main.ts`) detached, so it outlives this call, with its output discarded, this command's environment (so `AGENT_DIARY` reaches it), and an idle time of 30 minutes. It then reads the state file every 100 ms: the process's pid, port and token are used as soon as they appear; an error there is refused as "The browser could not start: <error>"; no file after 30 seconds is refused as "The browser could not start: it did not answer within 30s".
+- `open` finds a Chrome by the rules of `chrome.ts`; with none, it is refused: "No Chrome on this machine: install Google Chrome, or set CHROME_PATH to a Chrome or Chromium executable." Otherwise it takes the lock file `<state file>.starting`, created only when no such file exists. The `open` that takes it removes any old state file and starts the browser's process [2] (`host-main.ts`) detached, so it outlives this call, with its output discarded, this command's environment (so `AGENT_DIARY` reaches it), and an idle time of 30 minutes, and removes the lock once its wait below is over. An `open` that finds the lock taken starts nothing and waits for the same state file, so two `open`s at once start one browser; a lock more than 35 seconds old, left by a command that died while starting, is removed and the start tried again. Either way the command then reads the state file every 100 ms: the process's pid, port and token are used as soon as they appear; an error there is refused as "The browser could not start: <error>"; no file after 30 seconds is refused as "The browser could not start: it did not answer within 30s".
 
 ### Forwarding the command
 
@@ -64,7 +66,7 @@ See `## Context`.
 
 #### Business logic
 
-The command and its arguments are posted to the process on `127.0.0.1` at its port, with the token [4] in the `x-browser-token` header. When the answer says no, its reason is printed on stderr and the exit code is 1. When the process cannot be reached or answers with something unreadable, the refusal is "The browser stopped answering: <the error>". Otherwise the answer's text (the page as read, the script's JSON, "The browser is closed.") is printed on stdout and the exit code is 0.
+The command and its arguments are posted to the process on `127.0.0.1` at its port, with the token [4] in the `x-browser-token` header. When the answer says no, its reason is printed on stderr and the exit code is 1. When the process cannot be reached, answers with something unreadable, or has not answered after 90 seconds, the refusal is "The browser stopped answering: <the error>". Otherwise the answer's text (the page as read, the script's JSON, "The browser is closed.") is printed on stdout and the exit code is 0.
 
 ### A screenshot
 
@@ -74,4 +76,4 @@ The command and its arguments are posted to the process on `127.0.0.1` at its po
 
 #### Business logic
 
-The PNG the process answers is written to the path the agent named, resolved against the current directory, or, when none was named, to `browser-<milliseconds since 1970>.png` in the machine's temporary directory; the file's full path is printed on stdout.
+The PNG the process answers is written to the path the agent named, resolved against the current directory, or, when none was named, to `browser-<milliseconds since 1970>.png` in the machine's temporary directory; the file's full path is printed on stdout. When the file cannot be written, the refusal is "The screenshot could not be saved to <path>: <the error>".

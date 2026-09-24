@@ -11,23 +11,25 @@ A headless Chrome of your own, on an empty profile: nobody's logins are in it. D
 npx browser open <address>       open the address, starting the browser if none is open
 npx browser read                 print the page again
 npx browser click <n>            click element n
-npx browser type <n> <text>      replace what element n holds with the text; on a select, pick that option
+npx browser type <n> <text>      replace what element n holds with the text; on a select, pick that option;
+                                 on a date or time field, give the value as 2024-01-31, 13:45, 2024-01
 npx browser press <key>          Enter, Tab, Escape, Backspace, Space, ArrowUp, ArrowDown, ArrowLeft, ArrowRight
 npx browser screenshot [file]    save what the page shows as a PNG and print its path (a temporary file
                                  when none is named; never name one inside the repository)
 npx browser eval <script>        run a JavaScript expression in the page and print its value, as JSON
-                                 (`document.title`, not `return document.title`)
+                                 (`document.title`, not `return document.title`; `await` works; an
+                                 element prints as `{}`, so ask for its properties)
 npx browser close                close the browser
 ```
 
 Quote a `<text>` or `<script>` with spaces as one argument: `npx browser type 2 'Ada Lovelace'`.
 
-`open`, `read`, `click`, `type` and `press` print the page once it has loaded: its title, its address, its text (the first 10,000 characters), then its elements (links, buttons, fields; the first 300) numbered `[n]`. `click` and `type` take that number, from the last print: when the page changes, the numbers do too. The numbers are written on the page's elements as `data-browser-ref` attributes. An address without `http://` or `https://` gets `http://`; no other kind opens. A dialog the page opens (alert, confirm, prompt) is accepted at once, and the next print begins with a `Dialog, accepted:` line naming it.
+`open`, `read`, `click`, `type` and `press` print the page once it has loaded (or after 10 seconds, as it stands): its title, its address, its text (the first 10,000 characters), then its elements (links, buttons, fields; the first 300) numbered `[n]`. What is inside an iframe or a shadow root is not printed; reach it with `eval`. `click` and `type` take that number, from the last print: when the page changes, the numbers do too. The numbers are written on the page's elements as `data-browser-ref` attributes. An address without `http://` or `https://` gets `http://`; no other kind opens. A dialog the page opens (alert, confirm, prompt) is accepted at once, and the next print begins with a `Dialog, accepted:` line naming it.
 
 The browser belongs to the project the command runs in (its git root): run every command from inside the same project.
 
-A refusal exits 1 with the reason on stderr (no browser open, no such element, a page that did not load, a page that did not answer within 30 seconds); a wrong command line exits 2 with the usage.
+A refusal exits 1 with the reason on stderr (no browser open, no such element, an address the server did not answer, a page that did not answer within 30 seconds; an error page such as a 404 prints like any page); a wrong command line exits 2 with the usage.
 
 A person watching your run sees this browser live where you opened it, and can click and type in it too: if the page is not what your last print showed, read it again.
 
-Close it when you are done. It also closes when your run ends, and after 30 minutes unused.
+Close it when you are done (with none open, `close` says so and succeeds). It also closes after 30 minutes unused, and when your run ends if the tool running you keeps a diary of the run.

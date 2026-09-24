@@ -3,6 +3,7 @@ What the tests cover, over a tickets directory on disk and over the same files r
 - **A missing directory** - a directory that does not exist lists nothing, holds no ticket and has no import stamp.
 - **The format read off a ticket** - the keys above the title give the priority (lowercased) and the topics, the `# ` line gives the title, the first prose line after `## TLDR` gives the summary, the filename gives the date, and an unplanned ticket says so; `show` returns the same row plus the whole text.
 - **The issue link** - an `Issue:` line's markdown link is split into its label and its URL; a ticket without one carries no link.
+- **The waiting line** - a `Waiting:` line above the title is read as written; one in the body, or one with no text, gives none.
 - **A ticket's date** - the filename's date wins over the modification time when the filename carries one; without a date prefix the modification time stands in; read off git with no modification time at all, the Unix epoch does.
 - **Preamble noise** - a leftover `Status:` line above the title is not a field.
 - **Topics** - a bracketed multi-topic list reads as bare tags; a ticket without a `Topics:` line carries none.

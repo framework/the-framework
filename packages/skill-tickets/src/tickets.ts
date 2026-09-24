@@ -24,6 +24,8 @@ export interface Ticket {
   issue?: TicketLink
   /** The optional `PR:` key: the pull request that closes this ticket once merged, written by the agent that opened it. Same link shape. */
   pr?: TicketLink
+  /** The optional `Waiting:` key: what the ticket waits on before anyone can work it, as written. Absent when the ticket is not waiting. */
+  waiting?: string
   /**
    * ISO 8601. The `<DATE>_<SLUG>.md` filename's date when it has one — the format every ticket is
    * written in — else the file's modification time, for the rare ticket that predates the format;
@@ -99,10 +101,10 @@ function titleFromFile(file: string): string {
 
 /**
  * Read the head of a ticket: the `key: value` block above the title (`Priority:`, `Topics:`,
- * `Issue:`, `PR:` — all optional), the `# ` heading, and the `## TLDR`. Deliberately tolerant: a ticket
+ * `Issue:`, `PR:`, `Waiting:` — all optional), the `# ` heading, and the `## TLDR`. Deliberately tolerant: a ticket
  * predating the format still lists, with whatever it has.
  */
-function describe(md: string): { title?: string; summary: string; priority?: string; topics?: string[]; issue?: TicketLink; pr?: TicketLink } {
+function describe(md: string): { title?: string; summary: string; priority?: string; topics?: string[]; issue?: TicketLink; pr?: TicketLink; waiting?: string } {
   const lines = md.split('\n')
   const headingAt = lines.findIndex(line => line.startsWith('# '))
   const heading = headingAt === -1 ? undefined : lines[headingAt]!.slice(2).trim()
@@ -129,6 +131,8 @@ function describe(md: string): { title?: string; summary: string; priority?: str
   const prLine = preamble.find(line => line.toLowerCase().startsWith('pr:'))?.slice('pr:'.length).trim()
   const prMatch = prLine ? /\[([^\]]+)\]\(([^)]+)\)/.exec(prLine) : null
   const pr = prMatch ? { label: prMatch[1]!, url: prMatch[2]! } : undefined
+  // `Waiting: web runs to come back` — free text; an empty value waits on nothing.
+  const waiting = preamble.find(line => line.toLowerCase().startsWith('waiting:'))?.slice('waiting:'.length).trim()
   // The TLDR is the ticket in one line, which is exactly what a list row wants.
   const tldrAt = lines.findIndex(line => line.trim().toLowerCase() === '## tldr')
   const body = tldrAt === -1 ? lines.slice(headingAt + 1) : lines.slice(tldrAt + 1)
@@ -139,6 +143,7 @@ function describe(md: string): { title?: string; summary: string; priority?: str
     ...(topics && topics.length > 0 ? { topics } : {}),
     ...(issue ? { issue } : {}),
     ...(pr ? { pr } : {}),
+    ...(waiting ? { waiting } : {}),
     summary,
   }
 }
@@ -190,7 +195,7 @@ function planMeta(md: string | undefined): { effort?: number; uncertainty?: numb
  * so an unreadable or malformed lock still locks.
  */
 async function ticketRow(dir: string, file: string, head: string, siblings: Set<string>, fs: TicketsFs): Promise<Ticket> {
-  const { title, summary, priority, topics, issue, pr } = describe(head)
+  const { title, summary, priority, topics, issue, pr, waiting } = describe(head)
   const planName = ticketPlanName(file)
   const lockName = ticketLockName(file)
   const [date, plan, lock] = await Promise.all([
@@ -207,6 +212,7 @@ async function ticketRow(dir: string, file: string, head: string, siblings: Set<
     ...(topics ? { topics } : {}),
     ...(issue ? { issue } : {}),
     ...(pr ? { pr } : {}),
+    ...(waiting ? { waiting } : {}),
     date,
     planned: siblings.has(planName),
     ...(siblings.has(lockName) ? { locked: true } : {}),

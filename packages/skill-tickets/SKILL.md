@@ -16,7 +16,8 @@ Every command prints one JSON document; a refusal is `{"ok":false,"reason":…}`
 ```
 npx tickets list                 every open ticket, as one JSON array; a row: file, title, summary, date,
                                  planned, and when set priority, topics, issue, pr (set: the ticket is in
-                                 review), effort, uncertainty, outdated (the plan says so), locked, lockedBy
+                                 review), waiting (what it waits on), effort, uncertainty, outdated (the
+                                 plan says so), locked, lockedBy
 npx tickets show <file>          one ticket: its text, its plan, who holds it
 npx tickets meta                 when the tickets last caught up with the issue tracker:
                                  {"lastImportedAt": <ISO 8601>}, or {} when no import was recorded
@@ -68,6 +69,7 @@ Priority: 0-10 [optional; 10: critical, act immediately; 0: only if capacity]
 Topics: [list-of-topics] [optional]
 Issue: [#42](https://example.com/org/repo/issues/42) [optional: the issue this ticket tracks]
 PR: [#1790](https://example.com/org/repo/pull/1790) [optional: the pull request that closes it]
+Waiting: what it waits on [optional: no agent is handed it until a person removes the line]
 
 # Ticket title
 
@@ -82,7 +84,7 @@ PR: [#1790](https://example.com/org/repo/pull/1790) [optional: the pull request 
 [optional: more, under any heading]
 ```
 
-A ticket with a `PR:` line is in review: skip it when choosing work, and never queue it while the line stands; remove the line to have it worked again. `Priority:` is a bare whole number from 0 to 10 above the `# ` title; anything else queues at 5.
+A ticket with a `PR:` line is in review: skip it when choosing work, and never queue it while the line stands; remove the line to have it worked again. A `Waiting:` line names what the ticket waits on outside the work: skip the ticket when choosing work, and never queue it, nor a plan for it, while the line stands; only a person removes the line, when the wait is over. `Priority:` is a bare whole number from 0 to 10 above the `# ` title; anything else queues at 5.
 
 ### A claim: `tickets/<DATE>_<SLUG>.lock.md`
 

@@ -83,6 +83,10 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
   if (!(await ownDirectory(dirname(file)))) return refuse(`${dirname(file)} is not this user's own directory: remove it, then run the command again.`)
   let state = await liveState(file)
   if (!state) {
+    if (name === 'close') {
+      io.stdout('No browser is open.')
+      return 0
+    }
     if (name !== 'open') return refuse('No browser is open. Start one with `browser open <address>`.')
     const chromePath = resolveChromePath(io.env)
     if (!chromePath) return refuse('No Chrome on this machine: install Google Chrome, or set CHROME_PATH to a Chrome or Chromium executable.')
@@ -110,7 +114,11 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
 /** The state of a browser that answers, or `undefined` (a stale file is removed). */
 async function liveState(file: string): Promise<HostState | undefined> {
   const state = await readState(file)
-  if (!state || 'error' in state) return undefined
+  if (!state) return undefined
+  if ('error' in state) {
+    await rm(file, { force: true })
+    return undefined
+  }
   const alive = await fetch(`http://127.0.0.1:${state.port}/state?t=${state.token}`).then(res => res.ok, () => false)
   if (alive) return state
   await rm(file, { force: true })

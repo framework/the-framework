@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto'
-import { appendFile, mkdir, open, rm, stat, writeFile } from 'node:fs/promises'
+import { appendFile, mkdir, open, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { dirname } from 'node:path'
@@ -145,7 +145,9 @@ export async function runHost(opts: HostOptions): Promise<void> {
       await closed
       if (screenShown && !runEnded) await writeScreen({ kind: 'screen', url: screenUrl, label: 'browser · closed', ended: true })
       await chrome.close()
-      await rm(opts.stateFile, { force: true })
+      // A browser started after this one closed writes the same file: only this one's goes.
+      const state = await readFile(opts.stateFile, 'utf8').catch(() => '')
+      if (state.includes(token)) await rm(opts.stateFile, { force: true })
     })())
 
   const command = async (cmd: HostCommand): Promise<HostAnswer> => {
@@ -268,8 +270,10 @@ export async function runHost(opts: HostOptions): Promise<void> {
           runEnded = true
           return end()
         }
-        diaryOffset += fresh.length
-        if (/"kind":"ended"/.test(fresh.toString('utf8'))) {
+        // Only whole lines are read: a line still being written is read again, complete, next time.
+        const whole = fresh.lastIndexOf(0x0a) + 1
+        diaryOffset += whole
+        if (diaryLines(fresh.subarray(0, whole)).some(line => line['kind'] === 'ended')) {
           runEnded = true
           return end()
         }
@@ -299,6 +303,20 @@ async function readFrom(path: string, offset: number): Promise<Buffer | undefine
   } finally {
     await handle.close()
   }
+}
+
+/** The diary lines in `bytes`, each parsed; a line that is not JSON is skipped. */
+function diaryLines(bytes: Buffer): Record<string, unknown>[] {
+  return bytes
+    .toString('utf8')
+    .split('\n')
+    .flatMap(line => {
+      try {
+        return line.trim() ? [JSON.parse(line) as Record<string, unknown>] : []
+      } catch {
+        return []
+      }
+    })
 }
 
 async function readBody(req: IncomingMessage): Promise<unknown> {

@@ -58,11 +58,13 @@ interface ReadResult {
   items: string[]
 }
 
-async function evaluate<T>(page: CdpSession, expression: string): Promise<T> {
+/** Run `expression` in the page; `repl` lets it use `await` at its top level, as a console does. */
+async function evaluate<T>(page: CdpSession, expression: string, repl = false): Promise<T> {
   const res = await page.send<{ result: { value?: unknown; unserializableValue?: string }; exceptionDetails?: { exception?: { description?: string }; text?: string } }>('Runtime.evaluate', {
     expression,
     returnByValue: true,
     awaitPromise: true,
+    ...(repl ? { replMode: true } : {}),
   })
   if (res.exceptionDetails) throw new PageError(res.exceptionDetails.exception?.description ?? res.exceptionDetails.text ?? 'the script threw')
   return (res.result.unserializableValue !== undefined ? new Unserializable(res.result.unserializableValue) : res.result.value) as T
@@ -161,7 +163,16 @@ export async function type(page: CdpSession, ref: number, text: string): Promise
         el.value = option.value
         el.dispatchEvent(new Event('input', { bubbles: true }))
         el.dispatchEvent(new Event('change', { bubbles: true }))
-        return 'selected'
+        return 'set'
+      }
+      // A date or time field takes no typed characters: its value is set as a person's picker
+      // would, and a value the field does not accept is refused.
+      if (el.tagName === 'INPUT' && ['date', 'time', 'datetime-local', 'month', 'week'].includes(el.type)) {
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, text)
+        if (el.value !== text) return JSON.stringify(text) + ' is not a ' + el.type + ' value; give it as ' + ({ date: '2024-01-31', time: '13:45', 'datetime-local': '2024-01-31T13:45', month: '2024-01', week: '2024-W05' })[el.type]
+        el.dispatchEvent(new Event('input', { bubbles: true }))
+        el.dispatchEvent(new Event('change', { bubbles: true }))
+        return 'set'
       }
       const textual = el.tagName === 'TEXTAREA' || el.isContentEditable || (el.tagName === 'INPUT' && !['checkbox', 'radio', 'button', 'submit', 'reset', 'image', 'file', 'range', 'color'].includes(el.type))
       if (!textual) return 'element [${ref}] takes no text: click it instead'
@@ -171,7 +182,7 @@ export async function type(page: CdpSession, ref: number, text: string): Promise
       return document.activeElement === el ? 'focused' : 'element [${ref}] does not take the focus'
     })()`,
   )
-  if (outcome === 'selected') return settle(page)
+  if (outcome === 'set') return settle(page)
   if (outcome !== 'focused') throw new PageError(outcome)
   await page.send('Input.insertText', { text })
   await settle(page)
@@ -207,7 +218,7 @@ export async function screenshot(page: CdpSession): Promise<Buffer> {
 
 /** Run `script` in the page and print what it returns, as JSON. */
 export async function run(page: CdpSession, script: string): Promise<string> {
-  const value = await evaluate<unknown>(page, script)
+  const value = await evaluate<unknown>(page, script, true)
   if (value instanceof Unserializable) return value.text
   return value === undefined ? 'undefined' : JSON.stringify(value, null, 2)
 }

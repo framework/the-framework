@@ -23,7 +23,8 @@ const PAGES: Record<string, string> = {
     <form onsubmit="event.preventDefault(); document.getElementById('out').textContent = 'Submitted'"><input placeholder="search"></form>`,
   '/two': '<!doctype html><title>Two</title><p>Second page</p>',
   '/dialog': `<!doctype html><title>Dialog</title><p id="out">waiting</p>
-    <button onclick="alert('hello'); document.getElementById('out').textContent = confirm('sure?') ? 'confirmed' : 'refused'">Ask</button>`,
+    <button onclick="alert('hello'); document.getElementById('out').textContent = confirm('sure?') ? 'confirmed' : 'refused'">Ask</button>
+    <input type="date" aria-label="Day">`,
 }
 
 async function site(): Promise<{ url: string; server: Server }> {
@@ -110,7 +111,11 @@ test('the run ending closes its browser, and the ended run gets no more lines', 
   const { cwd, diary, cli } = await project()
   try {
     assert.equal((await cli('open', url)).code, 0)
-    await appendFile(diary, JSON.stringify({ kind: 'ended', status: 'done' }) + '\n')
+    // The line arrives in two writes, the way a check can catch a writer halfway.
+    const ended = JSON.stringify({ kind: 'ended', status: 'done' }) + '\n'
+    await appendFile(diary, ended.slice(0, 9))
+    await new Promise(r => setTimeout(r, 2500))
+    await appendFile(diary, ended.slice(9))
     assert.ok(await until(() => gone(stateFile(cwd))), 'the browser closes once the diary says the run ended')
     assert.equal((await lines(diary)).at(-1)?.['kind'], 'ended')
   } finally {
@@ -132,6 +137,11 @@ test('a dialog never blocks the page: it is accepted and named; wrong input is r
     assert.equal(typed.code, 1)
     assert.match(typed.err, /takes no text: click it instead/)
     assert.equal((await cli('eval', '1/0')).out, 'Infinity')
+    assert.equal((await cli('eval', 'await Promise.resolve(7)')).out, '7')
+    assert.match((await cli('type', '2', '2024-01-31')).out, /\[2\] input\[date\] "Day" value="2024-01-31"/)
+    const badDay = await cli('type', '2', 'soon')
+    assert.equal(badDay.code, 1)
+    assert.match(badDay.err, /is not a date value; give it as 2024-01-31/)
     const shot = await cli('screenshot', '/nonexistent-dir/shot.png')
     assert.equal(shot.code, 1)
     assert.match(shot.err, /could not be saved/)
@@ -156,11 +166,13 @@ test('two opens at once start one browser', needsChrome, async () => {
   }
 })
 
-test('a command before open refuses; a wrong command line is a usage error', async () => {
+test('a command before open refuses, close has nothing to do; a wrong command line is a usage error', async () => {
   const { cli } = await project()
   const read = await cli('read')
   assert.equal(read.code, 1)
   assert.match(read.err, /browser open <address>/)
+  const close = await cli('close')
+  assert.deepEqual([close.code, close.out], [0, 'No browser is open.'])
   assert.equal((await cli('click')).code, 2)
   assert.equal((await cli('fly', 'away')).code, 2)
 })

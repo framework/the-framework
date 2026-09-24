@@ -1,0 +1,9 @@
+What the tests cover, against a real Chrome on the machine (the two tests that need it are skipped when there is none), a small local site with a form, and a fresh directory per test with a diary named in the command's environment as a tool running an agent names it:
+
+- **A whole session** - `open` prints the page's title and its numbered elements (a text input with its empty value, a select with its value, a link with its address); `type` fills an input and picks a select option by its text; `click` on a button shows the page's result; `type` then `press Enter` submits a form; `eval` prints the page's title as JSON; `screenshot` with a file name writes a PNG at that name in the current directory and prints its path; clicking a link prints the next page.
+- **The screen line** - the first `open` appends a screen line labelled "browser · <the page's address>", whose address serves the screen page, while the same address without the token is refused with 403.
+- **Closing** - `close` exits 0, the state file goes away, the diary's last line is the same address with the label "browser · closed" and `ended`, and a later `read` is refused with "No browser is open" and exit 1.
+- **The agent ending** - an `ended` line appended to the diary closes the browser (its state file goes away), and nothing is written after that line.
+- **Before open, and usage errors** - `read` with no browser open is refused with exit 1 and names `browser open <address>`; `click` with no number and an unknown command exit 2.
+- **Addresses** - `localhost:3000/a` becomes `http://localhost:3000/a`, an `https` address stays as it is, and `file:` and `javascript:` addresses are refused.
+- **The screen page's input** - a click maps to two requests; a click at a coordinate that is not a number, an address that is not `http` or `https`, an unknown key, an empty text and an unknown input type map to none.

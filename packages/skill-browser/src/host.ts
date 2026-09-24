@@ -228,8 +228,8 @@ export async function runHost(opts: HostOptions): Promise<void> {
           runEnded = true
           return end()
         }
-        diaryOffset += Buffer.byteLength(fresh)
-        if (/"kind":"ended"/.test(fresh)) {
+        diaryOffset += fresh.length
+        if (/"kind":"ended"/.test(fresh.toString('utf8'))) {
           runEnded = true
           return end()
         }
@@ -246,16 +246,16 @@ export async function runHost(opts: HostOptions): Promise<void> {
   await ending
 }
 
-/** The file's content from `offset` on, or `undefined` when the file is gone. */
-async function readFrom(path: string, offset: number): Promise<string | undefined> {
+/** The file's bytes from `offset` on, or `undefined` when the file is gone. */
+async function readFrom(path: string, offset: number): Promise<Buffer | undefined> {
   const handle = await open(path, 'r').catch(() => undefined)
   if (!handle) return undefined
   try {
     const { size } = await handle.stat()
-    if (size <= offset) return ''
+    if (size <= offset) return Buffer.alloc(0)
     const buffer = Buffer.alloc(size - offset)
-    await handle.read(buffer, 0, buffer.length, offset)
-    return buffer.toString('utf8')
+    const { bytesRead } = await handle.read(buffer, 0, buffer.length, offset)
+    return buffer.subarray(0, bytesRead)
   } finally {
     await handle.close()
   }

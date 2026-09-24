@@ -10,8 +10,8 @@ import { delimiter, join } from 'node:path'
  * the person at the machine; the throwaway profile so the agent never sees their logins.
  */
 
-/** The prefix of every profile this package makes: what marks a Chrome as the agent's. */
-export const PROFILE_PREFIX = 'skill-browser-'
+/** The prefix of every profile this package makes. */
+const PROFILE_PREFIX = 'skill-browser-'
 
 /** Where Chrome usually lives, per platform. First hit wins. */
 const CHROME_PATHS: Record<string, string[]> = {

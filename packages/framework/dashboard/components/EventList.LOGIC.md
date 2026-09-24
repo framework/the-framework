@@ -1,4 +1,4 @@
-Renders an agent's [1] transcript: every event [2] the agent emitted, one row each, in the order it happened — for a running agent, whose rows arrive live, and for a finished agent replayed from the archive [3] alike. Most rows read as the one-line text the terminal prints; the user's prompts and the agent's replies, gates [4] and the browser preview get their own row treatment, so the transcript reads like a conversation whose interactions can be acted on where they happened.
+Renders an agent's [1] transcript: every event [2] the agent emitted, one row each, in the order it happened — for a running agent, whose rows arrive live, and for a finished agent replayed from the archive [3] alike. Most rows read as the one-line text the terminal prints; the user's prompts and the agent's replies, gates [4] and live screens [15] get their own row treatment, so the transcript reads like a conversation whose interactions can be acted on where they happened.
 
 ## Context
 
@@ -20,6 +20,7 @@ Renders an agent's [1] transcript: every event [2] the agent emitted, one row ea
 [12] handoff: what happens to an agent's work when the agent ends, as one ladder of four levels: `local` (keep the work in its checkout), `push` (push its branch), `pr` (also open a pull request — the default), `merge` (also merge it).
 [13] hands-off: said of an agent whose work leaves this machine, so its first prompt is the whole agent: an agent whose location is `web`.
 [14] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
+[15] screen: a live page on this machine that something the agent ran is showing, such as its browser, announced by a `screen` line the command appended to the agent's diary: the page's address, a label naming what it showed then, and, on the line that says it has gone, `ended`.
 
 ## Business logic — TL;DR
 
@@ -27,6 +28,7 @@ Renders an agent's [1] transcript: every event [2] the agent emitted, one row ea
 - **The conversation reads as messages** - the user's prompt and the agent's reply render as Markdown, clamped to one line beyond 100 characters and expanding in place on click.
 - **The first prompt opens the transcript** - the first prompt is hoisted above the rows emitted before it, so the transcript starts with what the user asked.
 - **A gate is answered where it happened** - when the transcript knows its project, an open gate [4] renders as the interactive gate panel inline, an answered one as a collapsed card that replaces its "✓ chose" line, and a gate whose agent ended unanswered stays text.
+- **A screen is live where the agent used it** - the newest `screen` line at an address, on this machine's loopback and with neither an `ended` line for that address nor the agent's end after it, is the live page itself, framed in the transcript; an earlier or ended one stays its one line, and every `ended` line is hidden.
 - **Badges once per group, colored as a scanning aid** - the kind badge shows on the first of consecutive rows of one group, "YOU" for the user's prompt; only failures, the user's turn, gates, milestones and pushed surfaces get a color.
 - **Failures read red, the user's turn blue** - a failed row is red on a red wash, the user's prompt blue on a blue wash, a clean finish and the ready-for-merge [6] signal on a green wash; a stopped agent stays neutral.
 - **Arrival times only when live** - a row that arrived live shows its arrival time at each group boundary; replayed rows show none.
@@ -82,6 +84,18 @@ Gate rows get special treatment only when the transcript knows its project. For 
 
 Without a project, every gate row keeps its text.
 
+### A screen is live where the agent used it
+
+#### Context
+
+**User story**: the agent opens its browser on the app it changed; the person watching the agent sees that browser live in the transcript, at the row where the agent opened it, and can click and type in it too. Once the agent closes it, or the agent ends, the row goes back to a line saying what it showed.
+
+**Problem**: a `screen` line is written by whatever command the agent ran, not by the tool that runs the agent, so its address cannot be trusted to be a harmless page.
+
+#### Business logic
+
+Every `screen` line of the transcript is sorted, in order, by address. A line with `ended` is hidden and makes every earlier line at its address not live; a line without it becomes its address's newest line. A newest line is live when it comes after the agent's last end (any `end` event in the transcript) and its address is `http` on `127.0.0.1`, `localhost` or `[::1]`. A live row's body is the page at that address, framed in the transcript (`InlineScreen.tsx`); every other `screen` row reads as the terminal's line, "◆ <label>". So a browser the agent opened three times keeps one live frame, at its latest opening, and its two earlier openings read as their lines; closing it hides the `ended` line and turns the last opening back into its line; an address anywhere else is never framed. This applies whether or not the transcript knows its project.
+
 ### Badges once per group, colored as a scanning aid
 
 #### Context
@@ -92,7 +106,7 @@ Without a project, every gate row keeps its text.
 
 Consecutive rows of the same group share one badge, shown on the group's first row. The group is the event's kind, except that the user's prompt forms its own group apart from the rest of the coding agent's events, so each of the user's turns opens a new group. The badge word is "you" for the prompt, and otherwise the kind's plain-language label (the label rules in `lib/event-labels.ts`: "agent" for the coding agent's own events, "waiting" for the agent settling [8], "cost" for a usage report, "resume" for a session id update, and every other kind's name with hyphens turned to spaces, such as "ready for merge"); the badge is shown uppercased. The badge column is wide enough for "ready for merge" on one line, and the body column aligns whether or not the row shows a badge.
 
-The badge's color is a navigation aid: a failing row's badge is red and the user's prompt's badge is blue (those two win over everything below); a gate [4] and its resolution are amber, the rows the reader most wants to find; a clean end and the ready-for-merge [6] signal are green, as milestones; a pushed surface (a view [11], a browser preview, a browser page, an app preview) takes the dashboard's primary accent, as the agent showing the user something; every other badge is muted. A stopped or failed end is not a milestone and stays out of green, and the handoff [12] report stays muted because its body may report mixed outcomes.
+The badge's color is a navigation aid: a failing row's badge is red and the user's prompt's badge is blue (those two win over everything below); a gate [4] and its resolution are amber, the rows the reader most wants to find; a clean end and the ready-for-merge [6] signal are green, as milestones; a pushed surface (a view [11] or a screen [15]) takes the dashboard's primary accent, as the agent showing the user something; every other badge is muted. A stopped or failed end is not a milestone and stays out of green, and the handoff [12] report stays muted because its body may report mixed outcomes.
 
 ### Failures read red, the user's turn blue
 

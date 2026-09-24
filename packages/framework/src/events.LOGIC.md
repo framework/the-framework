@@ -41,7 +41,7 @@ Fixes the vocabulary of the event stream [1]: every kind of event an agent's [2]
 
 - **The opening events** - the session opening, the session id once known and the intent say what the agent is and what it was asked; a continuation opens with its own session opening, so readers keep the latest.
 - **The coding agent's progress, forwarded** - every progress event the coding agent reports is forwarded verbatim onto the stream and never decided on.
-- **What the agent shows the user** - a view updates in place by title, a reported error stays in the log as history, a log line narrates, and the agent's browser travels as a page URL and a stream port only, never as frames.
+- **What the agent shows the user** - a view updates in place by title, a reported error stays in the log as history, a log line narrates, and a screen a command the agent ran is showing travels as its address and a label only, never as frames.
 - **A gate and its pick** - a gate is a question, at least one option and, for a single-select gate, a recommended option; a checklist pre-checks options instead; the pick is one option id or the chosen subset, and says whether the user or nobody picked.
 - **Ready for merge and the pull request text** - the ready-for-merge signal flips the agent from building to ready without blocking it; the pull request title and description the agent wrote travel as an event the handoff uses, the latest one winning.
 - **Facts that must survive a reload** - what the handoff is armed to do, the branch, the pull request once opened, and the cloud anchor each travel as events because only an event reaches a tab opened later.
@@ -80,15 +80,14 @@ Every progress event the driver [13] reports is wrapped and forwarded verbatim o
 
 #### Context
 
-**User story**: while the agent [2] works, the user sees a plan or a summary appear in the dashboard's right rail, an error the agent hit stays visible on the page, and the agent's browser, when it has one, is watched live in the agent view [6].
+**User story**: while the agent [2] works, the user sees a plan or a summary appear in the dashboard's right rail, an error the agent hit stays visible on the page, and a screen a command the agent ran is showing, such as its browser, is watched and used live in the agent view [6], where the agent used it.
 
 #### Business logic
 
 - A view [8]: a markdown document the agent [2] pushed, with a title and an id that is stable per title, so pushing a view with the same title again updates it in place rather than adding a duplicate. Non-blocking: the agent goes on.
 - An error: something went wrong that only the user can fix, reported by the agent itself through its error signal, with a headline (the first line) and an optional detail (the rest). It is an event, not a status: it says what happened at that point and stays in the log as history, and nothing clears it, because nothing can undo it. Conditions that are true now and clear themselves once gone (the project-level errors a sweep [16] finds between agents) are a different thing, in `project-errors.ts`.
 - A log line: one line of The Framework's own narration ("Finishing the session (await limit reached).", "Handed off: …").
-- The browser's page: the URL the agent's browser is showing, emitted for the first real `http` or `https` page and again on every change of page, so the agent view can host the live preview at the point in the stream where it was used. Only the URL travels. It is emitted again after each session opening, because the dashboard shows only the events since the latest session opening; readers fold repeats of the same URL in place, like a re-shown view.
-- The browser stream: the agent's browser preview is up and listening on a loopback port. Only the port travels: the dashboard reaches the stream through the daemon, which proxies to that port, so the agent's own browser endpoint is never reachable from the web. Frames never enter the log, because someone will type a password into that pane.
+- A screen: a live page something the agent ran is showing (a browser, say), with its address and a label naming what it showed at that moment ("browser · <page address>"). The line is not written by the tool that runs the agent: the command itself appends it to the diary, whose path the agent's environment carries (`AGENT_DIARY`, agent-driver's rule), and The Framework knows nothing of what the page is. The same address with `ended` says the screen has gone. The dashboard shows the newest line at an address as the live page when the address is on this machine's loopback and neither an `ended` line for that address nor an end of the agent follows it; only the address and the label travel, never frames.
 
 ### A gate and its pick
 

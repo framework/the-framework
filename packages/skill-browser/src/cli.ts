@@ -65,11 +65,11 @@ export function stateFile(root: string): string {
 
 export async function runCli(argv: string[], io: CliIo): Promise<number> {
   const [name, ...args] = argv
-  if (name === undefined || name === '--help' || name === '-h') {
+  if (name === '--help' || name === '-h') {
     io.stdout(USAGE)
-    return name === undefined ? 2 : 0
+    return 0
   }
-  const arity = ARITY[name as HostCommand['name']]
+  const arity = name !== undefined && Object.hasOwn(ARITY, name) ? ARITY[name as HostCommand['name']] : undefined
   if (!arity || args.length < arity[0] || args.length > arity[1]) {
     io.stderr(USAGE)
     return 2

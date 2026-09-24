@@ -15,7 +15,7 @@ export type {
 export { isTransientQuotaReason } from './types.js'
 export { parseQuestion, continuationPrompt, fencedBlocks, QUESTION_TAG, type Question, type QuestionOption } from './question.js'
 export { appendInbox, takeInbox, promptOf, type InboxLine } from './inbox.js'
-export { SessionLog, logCardFile, logDiaryFile, diaryLine, type LogCard, type LogEndStatus, type SessionLogOptions, type WrittenCard } from './session-log.js'
+export { SessionLog, logCardFile, logDiaryFile, diaryLine, agentEnv, DIARY_ENV, type LogCard, type LogEndStatus, type SessionLogOptions, type WrittenCard } from './session-log.js'
 export { readClaudeQuota, parseQuotaReadout, type ReadClaudeQuotaOptions } from './claude-code-quota.js'
 export { checkDriverReady, probeCli, type CliProbe, type DriverReadiness, type DriverReadyOptions, type ReadyDriver } from './ready.js'
 export { FakeDriver, FakeDriverSession, type FakeTurn, type FakeDriverOptions } from './fake.js'

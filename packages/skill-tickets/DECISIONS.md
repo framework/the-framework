@@ -37,6 +37,11 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   of closed issues. Picked over the agent holding its claim until the merge (a close by
   anyone but the holder is refused), over a workflow on the git host (not every user has
   one) and over a routine of its own (an agent per close).
+- A ticket that waits on something outside the work says so in a `Waiting:` line above its
+  title, and no agent is handed it or a plan for it until a person removes the line.
+  Picked over the agent writing the wait into the ticket's text, which the listing never
+  shows, so the ticket was queued again every six hours; and over the agent closing the
+  ticket, which is a person's call.
 - A ticket's row, the same fields in `list` and `show`: the title from its `# ` line, the
   summary from the first prose line after `## TLDR`, else after the title, scanning past
   headings, `Priority:` lowercased.

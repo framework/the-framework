@@ -27,3 +27,6 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   never a skill's name or command. Picked over the run that started the agent publishing
   for it: the agent publishes through the branches skill it already reads. Picked over
   closing the ticket at commit time: a pull request closed unmerged lost the ticket.
+- A ticket with nothing to do until something outside the work happens gets a `Waiting:`
+  line, and its entry is marked done; the agent never closes it. Picked over closing the
+  ticket to stop it coming back.

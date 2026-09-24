@@ -26,3 +26,7 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   tickets named by the pull requests merged since the last import closed too, which is
   how a ticket closes at its merge; an error in capability words when the tracker or the
   last-import time is missing — never a skill's name or command.
+- The project's schedule starts `update-tickets` only when an issue changed since the last
+  import, or a pull request merged since then has a line `Closes tickets/<file>` naming a
+  real ticket. Picked over starting it on any merged pull request, which ran the job about
+  forty times a week to change nothing.

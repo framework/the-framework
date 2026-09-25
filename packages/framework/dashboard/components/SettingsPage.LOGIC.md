@@ -11,7 +11,7 @@ The Settings page: every preference [1] the user can set, on one page, each chan
 [1] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 [2] the Overview: the dashboard's cross-project page at `/`.
 [3] project home: a project's own page with the launcher (the Start form) and its composer (the prompt editor, also used to say something to an agent).
-[4] sweep: a background job the daemon runs on its clock: the notification watchers, the data sync, the cloud scratch sweep, cloud work adoption.
+[4] sweep: a background job the daemon runs on its clock: the data sync, the cloud scratch sweep, cloud work adoption.
 [5] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [6] agent view: one agent's page.
 [7] coding agent: the CLI doing the actual work: Claude Code or Codex.
@@ -33,7 +33,7 @@ The Settings page: every preference [1] the user can set, on one page, each chan
 - **Appearance: theme and editor** - "Theme" follows the system by default; "Editor" offers "Auto-detect" plus the editors found on the daemon's machine.
 - **Agent: which coding agent, which model, and post-merge cleanup** - "Agent" (Claude Code by default) and "Model" (empty means the coding agent's own default), both handed to a project's start hook [8] with every start; "Post-merge cleanup" (off by default), the default of the launcher's box of that name.
 - **Devices, after "Agent"** - the saved devices follow directly, because a device is the other place an agent can run.
-- **Notifications: how they reach you, and what about** - two delivery rows ("Browser", "Discord") and two category rows ("Human Queue", "New activity"), each showing both the preference and whether delivery can happen, with Discord's setup one button away.
+- **Notifications: how they reach you, and what about** - a delivery row ("Browser") showing both the preference and whether the browser lets it deliver, and two category rows ("Human Queue", "New activity").
 - **Automation: the spend offset** - "Spend offset" is the number the usage panel's handle moves, from −50 to 50 percentage points, read off the projects' schedulers and written through every project's offset hook [20]; a write that fails says why.
 - **Automation: run on a schedule** - after the spend offset, one checkbox per scheduled command of every project, "Run /<command> on a schedule", checked when the command runs on this machine; flipping it writes the schedule switch [21] through that project's switch hook [22]; a write that fails says why.
 - **Claude web: the bridge, and which browser does its work** - "Browser bridge" is off by default; while on, one exclusive choice decides whether the daemon runs the bridge browser or the user's own Chrome does the work, each option carrying its own setup.
@@ -104,16 +104,15 @@ The "Devices" section follows the "Agent" section directly, because a saved devi
 
 #### Context
 
-**User story**: the user is told when an agent [5] waits for an answer or a pull request is ready to review, and optionally when an agent starts or finishes; in the browser while the dashboard is open, or on Discord with no dashboard open.
+**User story**: the user is told when an agent [5] waits for an answer or a pull request is ready to review, and optionally when an agent starts or finishes; in the browser while the dashboard is open.
 
-**Problem**: a notification toggle is a preference [1]; whether the notification can be delivered is a capability the browser or the daemon may withhold. A row that showed only the preference could promise a delivery that never happens, so each row shows both, the same way the notifications bell does.
+**Problem**: a notification toggle is a preference [1]; whether the notification can be delivered is a capability the browser may withhold. A row that showed only the preference could promise a delivery that never happens, so the "Browser" row shows both, the same way the notifications bell does.
 
 #### Business logic
 
-The "Notifications" section has four rows. Two say how a notification reaches the user and two say what it is about; a notification is delivered only when its delivery method and its category are both on (the composition rule is in `src/preference-defaults.ts`).
+The "Notifications" section has three rows. One says whether a notification reaches the user in the browser and two say what it is about; a notification is delivered only when browser delivery and its category are both on (the composition rule is in `src/preference-defaults.ts`).
 
 - "Browser" ("Desktop notifications while the dashboard is open."): on when nothing is stored. When the browser has blocked notifications for the dashboard, the row is greyed, its description becomes "Blocked in your browser settings", the checkbox reads as off whatever the preference says, and it cannot be changed. The browser's permission is re-read every few seconds, so a permission granted or revoked in the browser shows on the page without a reload.
-- "Discord": off when nothing is stored. Its description depends on whether the daemon has a Discord webhook: "Deliver to Discord, so notifications reach you with no dashboard open." when it has one, "Not configured — no webhook is set on the daemon" when it has none. Until the daemon has answered which channels it can deliver on, the row reads as configured rather than lighting up "not configured" on a page still loading. The checkbox can be ticked either way: the webhook is where to post, the toggle is whether to. A button beside the checkbox opens the Discord webhook dialog (`DiscordDialogs.tsx`); it is labeled "Webhook" when a webhook is already set and "Set up" otherwise. Saving in that dialog re-reads the daemon's channels for every reader at once, so this row, the Onboarding checklist above it and the bell agree immediately.
 - "Human Queue" ("An agent awaiting your answer, or a PR ready to review."): the intervention [16] category; on when nothing is stored.
 - "New activity" ("Also ping when an agent starts or finishes."): the activity category; off when nothing is stored.
 

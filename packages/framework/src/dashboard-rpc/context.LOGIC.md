@@ -10,7 +10,7 @@ Gives every call the dashboard makes the daemon's own capabilities, wired once w
 [2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [3] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 [4] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
-[5] sweep: a background job the daemon runs on its clock: the data sync, the notification watchers, the cloud scratch sweep, cloud work adoption. None of them starts an agent.
+[5] sweep: a background job the daemon runs on its clock: the data sync, the cloud scratch sweep, cloud work adoption. None of them starts an agent.
 [6] the Claude web bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge browser is the Chrome for Testing the daemon runs for it.
 [7] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
 [8] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
@@ -34,7 +34,7 @@ Gives every call the dashboard makes the daemon's own capabilities, wired once w
 
 #### Business logic
 
-The capabilities the daemon wires, once, when it comes up: starting an agent, adding a project, the preferences [3] store over the registry, the Discord credentials store (which also reconnects the daemon's Discord services on a save, so the bot connects without a restart), the quota source behind the usage panel, what each project currently suffers from as the daemon's sweeps last recorded it, the daemon's own bridge browser, and the two facts about relayed [7] agents described below. A call that reads a capability nobody wired fails with an error naming it ("the dashboard's RPC context has no …") instead of silently answering as if nothing were configured: an unwired capability is a wiring bug, not a legitimate state of the product.
+The capabilities the daemon wires, once, when it comes up: starting an agent, adding a project, the preferences [3] store over the registry, the quota source behind the usage panel, what each project currently suffers from as the daemon's sweeps last recorded it, the daemon's own bridge browser, and the two facts about relayed [7] agents described below. A call that reads a capability nobody wired fails with an error naming it ("the dashboard's RPC context has no …") instead of silently answering as if nothing were configured: an unwired capability is a wiring bug, not a legitimate state of the product.
 
 ### A project id resolves through the registry
 

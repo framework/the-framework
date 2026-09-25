@@ -24,6 +24,11 @@ export const USAGE = `usage: agent-runner <command>
                                 whether a run can start here: the coding agent's CLI installed and logged in; what a dashboard's check hook runs
   init                          this tool's lines in the dashboard's .the-framework/hooks.yml, so its Start works; a line already there is kept
 
+When a run ends waiting on a question, or ends done with a pull request it did not have, the \`ended:\` line in the
+project's .agent-runner/config.yml runs, if there is one, in the project's root, with MESSAGE (one line for a person),
+RUN_ID, STATUS, QUESTION and PR_URL in its environment. The file is this machine's: keep it out of git (this tool hides
+.agent-runner/ from git once a run has started here).
+
 JSON on stdout. Exit code 1 for a refusal or a failure (the reason on stderr), 2 for a usage error.`
 
 export interface CliIo {

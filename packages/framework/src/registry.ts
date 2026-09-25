@@ -52,13 +52,13 @@ export interface Preferences {
    * Also notify on plain agent activity — an agent started, an agent finished (#627). The default-off
    * counterpart to the always-on "needs you" notifications: it keeps you loosely informed of the
    * pipeline moving even when nothing needs you. A *category* toggle: it composes with the method
-   * toggles ({@link notifyBrowser} / {@link notifyDiscord}), so activity reaches whichever are on.
+   * toggle {@link notifyBrowser}.
    */
   notifyNewActivity?: boolean
   /**
    * The "needs you" category (#627): notify when an agent is awaiting your answer or a PR is ready
    * to review. A *category* toggle, like {@link notifyNewActivity}, composing with the method
-   * toggles ({@link notifyBrowser} / {@link notifyDiscord}). **Absent = on**: unlike the other
+   * toggle {@link notifyBrowser}. **Absent = on**: unlike the other
    * flat opt-in booleans, human-intervention pings are the baseline The Framework leans on, so an
    * unset preference keeps them firing; a user turns them off explicitly.
    */
@@ -79,13 +79,6 @@ export interface Preferences {
   editor?: string
   /** Dashboard color theme (#725): `system` (follow the OS, the default), `light`, or `dark`. Absent = system. */
   theme?: 'system' | 'light' | 'dark'
-  /**
-   * Post a Discord message when a new item lands on the "needs you" queue (#627). Absent = off:
-   * unlike the in-browser toggle, Discord reaches you when no dashboard is open, so it is opt-in.
-   * Gates the daemon watcher *on top of* a `DISCORD_WEBHOOK` being set (the webhook is where to
-   * post; this is whether to).
-   */
-  notifyDiscord?: boolean
   /**
    * The browser bridge (#1237): let an extension running in the user's own Claude session report
    * the question a Claude web agent is parked on, so it shows in the dashboard rather than only on
@@ -110,32 +103,6 @@ export interface Preferences {
   onboardingDismissed?: boolean
 }
 
-/**
- * The credentials the daemon needs to reach a third party, set from the dashboard (#1095).
- *
- * Their tier is the {@link Registry.daemonToken} one, not {@link Preferences}: top-level, so
- * neither the browser bundle nor the per-project override map can ever carry them. Nothing
- * reads a value back out to a client — the dashboard is told only that one is *present*
- * ({@link DiscordCredentialStatus}) — so the registry file stays the one place they exist.
- *
- * The alternative was a second file. This one already holds `daemonToken`, which authenticates
- * every request to a network-reachable daemon, so the file is a secret store since #1051; a
- * second one would only spread the same exposure over two paths to keep 0600 on.
- */
-export interface RegistrySecrets {
-  /** Where Discord notifications are posted (#627). Overridden by `DISCORD_WEBHOOK` when that is set. */
-  discordWebhook?: string
-}
-
-/** The {@link RegistrySecrets} keys, as a `Record` so the compiler enforces completeness both
- * ways — the same shape (and the same #944 lesson) as the preference tables below. */
-const SECRET_KEYS: Record<keyof RegistrySecrets, true> = {
-  discordWebhook: true,
-}
-
-/** A bot token is ~70 chars and a webhook URL ~120; bounded so a hostile write can't bloat the file. */
-const MAX_SECRET_LENGTH = 500
-
 /** The persisted registry file shape (#410): the project list plus the user preferences. */
 export interface Registry {
   projects: ProjectRecord[]
@@ -146,8 +113,6 @@ export interface Registry {
    * browser bundle. Absent on a loopback-only machine.
    */
   daemonToken?: string
-  /** Third-party credentials set from the dashboard (#1095). Absent until one is saved. */
-  secrets?: RegistrySecrets
 }
 
 /** A read/write handle for the user preferences, wired into the dashboard's context by the daemon. */
@@ -164,7 +129,7 @@ export interface PreferencesStore {
 /** The registry file name: a single file under `$XDG_CONFIG_HOME` (dotted under `$HOME`). */
 export const REGISTRY_FILE = 'the-framework.json'
 
-/** Owner read/write only: the file holds the daemon token (#1051) and the Discord credentials (#1095). */
+/** Owner read/write only: the file holds the daemon token (#1051). */
 export const REGISTRY_FILE_MODE = 0o600
 
 /**
@@ -209,7 +174,7 @@ export interface RegistryFs {
   rename?(from: string, to: string): Promise<void>
   /**
    * Narrow a file's permissions. Optional, and best-effort at the call site: this file holds the
-   * daemon token (#1051) and the Discord credentials (#1095), so it is written owner-only — but a
+   * daemon token (#1051), so it is written owner-only — but a
    * filesystem that cannot express that (Windows, a FAT volume) must not fail the write.
    */
   chmod?(path: string, mode: number): Promise<void>
@@ -256,7 +221,6 @@ type BooleanPreferenceKey = {
  */
 const BOOLEAN_PREFERENCES: Record<BooleanPreferenceKey, true> = {
   notifyBrowser: true,
-  notifyDiscord: true,
   notifyNewActivity: true,
   notifyHumanIntervention: true,
   bridge: true,
@@ -327,24 +291,6 @@ export function sanitizeCustomPresets(value: unknown): CustomPreset[] {
 }
 
 /**
- * The known secrets, kept only as non-empty trimmed strings (#1095) — the same "a hand-edited
- * file can't smuggle junk in" rule the daemon token gets. An unknown key is dropped, so the
- * block cannot become a scratch space for whatever a caller passes.
- */
-function sanitizeSecrets(value: unknown): RegistrySecrets | undefined {
-  if (typeof value !== 'object' || value === null) return undefined
-  const raw = value as Record<string, unknown>
-  const secrets: RegistrySecrets = {}
-  for (const key of Object.keys(SECRET_KEYS) as Array<keyof RegistrySecrets>) {
-    const entry = raw[key]
-    if (typeof entry !== 'string') continue
-    const trimmed = entry.trim().slice(0, MAX_SECRET_LENGTH)
-    if (trimmed) secrets[key] = trimmed
-  }
-  return Object.keys(secrets).length ? secrets : undefined
-}
-
-/**
  * Read the whole registry. Forgiving: a missing / unreadable / malformed file — or one in a shape
  * this no longer writes — yields an empty registry, never throws. Projects are deduped by resolved
  * path and unknown preference fields are dropped.
@@ -363,13 +309,11 @@ export async function readRegistry(
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return empty
   const obj = parsed as Record<string, unknown>
   const projects = Array.isArray(obj.projects) ? dedupeProjects(obj.projects) : []
-  const secrets = sanitizeSecrets(obj.secrets)
   return {
     projects,
     preferences: sanitizePreferences(obj.preferences),
     // #1051: kept only as a non-empty string, so a hand-edited registry can't smuggle a junk token.
     ...(typeof obj.daemonToken === 'string' && obj.daemonToken ? { daemonToken: obj.daemonToken } : {}),
-    ...(secrets ? { secrets } : {}),
   }
 }
 
@@ -383,19 +327,18 @@ export async function readRegistry(
  * now only ever damages the temp file. The temp is left behind on failure rather than swept up:
  * one stray file is the cheaper half of that trade.
  *
- * Written owner-only (#1095): the file carries the daemon token and the Discord credentials, so
- * a default-umask 0644 in a shared home would hand them to every other account on the machine.
+ * Written owner-only (#1095): the file carries the daemon token, so a default-umask 0644 in a
+ * shared home would hand it to every other account on the machine.
  * The mode is set on the temp file, before the rename — narrowing after it would leave a window
  * where the real path is readable. Best-effort: a filesystem with no permission bits still writes.
  */
 async function writeRegistry(registry: Registry, fs: RegistryFs, env: NodeJS.ProcessEnv): Promise<void> {
   const file = registryPath(env)
-  const { projects, preferences, daemonToken, secrets } = registry
+  const { projects, preferences, daemonToken } = registry
   const contents = {
     projects,
     preferences,
     ...(daemonToken ? { daemonToken } : {}),
-    ...(secrets && Object.keys(secrets).length ? { secrets } : {}),
   }
   const json = JSON.stringify(contents, null, 2)
   await fs.mkdir(dirname(file))
@@ -531,49 +474,6 @@ export async function ensureDaemonToken(
   })
 }
 
-/**
- * The stored third-party credentials (#1095), or `{}` when none are set. Daemon-side only —
- * every caller is a service that needs the value itself, never a client read: what the dashboard
- * gets told is presence, in {@link RegistrySecrets}'s doc sense.
- */
-export async function readSecrets(
-  fs: RegistryFs = nodeRegistryFs(),
-  env: NodeJS.ProcessEnv = process.env,
-): Promise<RegistrySecrets> {
-  return (await readRegistry(fs, env)).secrets ?? {}
-}
-
-/**
- * Merge a patch into the stored credentials (#1095), leaving everything else in the file alone.
- *
- * A patch, not a whole-object write, because the caller is a UI that edits one field: the bot
- * dialog must not clear the webhook by not knowing it. An explicit `null` (or a blank string)
- * clears a key — that is the Clear button — while `undefined` leaves it as it was, so "not
- * mentioned" and "removed" stay different things. Serialized with the other mutators.
- */
-export async function writeSecrets(
-  patch: Partial<Record<keyof RegistrySecrets, string | null>>,
-  fs: RegistryFs = nodeRegistryFs(),
-  env: NodeJS.ProcessEnv = process.env,
-): Promise<void> {
-  return serialize(async () => {
-    const registry = await readRegistry(fs, env)
-    const next: Record<string, string> = { ...registry.secrets }
-    for (const key of Object.keys(SECRET_KEYS) as Array<keyof RegistrySecrets>) {
-      const value = patch[key]
-      if (value === undefined) continue
-      const trimmed = (value ?? '').trim()
-      if (trimmed) next[key] = trimmed
-      else delete next[key]
-    }
-    // Destructured off rather than overwritten: clearing the last credential must drop the key,
-    // and `exactOptionalPropertyTypes` will not let an explicit `undefined` stand in for absent.
-    const { secrets: _cleared, ...rest } = registry
-    const secrets = sanitizeSecrets(next)
-    await writeRegistry(secrets ? { ...rest, secrets } : rest, fs, env)
-  })
-}
-
 /** The persisted daemon token (#1051), or `undefined` when none exists. A pure read, so a process
  * that only prints the reachable URL never generates one. */
 export async function readDaemonToken(
@@ -589,9 +489,8 @@ export async function readDaemonToken(
  * `onChange` is handed **the keys the caller wrote**, not the merged result, so a listener can
  * tell "this write switched the setting on" from "it was already on and something else changed"
  * (#1161). It runs after the write has landed, and its failure is swallowed: the save succeeded,
- * and a listener must not be able to report otherwise. Same shape as the Discord store's
- * `onChange` (#1095), for the same reason — a setting saved in the browser has to reach the
- * daemon's own services without a restart.
+ * and a listener must not be able to report otherwise: a setting saved in the browser has to
+ * reach the daemon's own services without a restart.
  */
 export function registryPreferencesStore(
   fs: RegistryFs = nodeRegistryFs(),

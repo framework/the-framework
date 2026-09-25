@@ -1,6 +1,5 @@
 import { setDashboardContext } from './context.js'
 import { registryPreferencesStore } from '../registry.js'
-import { registryDiscordCredentialsStore } from '../discord-credentials-store.js'
 import { defaultQuotaSource } from '../dashboard/quota.js'
 import type { DashboardContext } from '../dashboard/rpc-serve.js'
 import type { DashboardOptions } from '../dashboard/server.js'
@@ -19,7 +18,6 @@ export function testDashboardContext(over: Partial<DashboardContext> = {}): Dash
     eventsSource: () => undefined,
     remote: { target: () => undefined, list: () => [] },
     preferences: registryPreferencesStore(),
-    discord: registryDiscordCredentialsStore(),
     quota: defaultQuotaSource(async () => undefined),
     projectErrors: () => [],
     bridgeBrowser: { status: async () => ({ state: 'off' }), start: async () => {}, stop: async () => {}, act: async () => {} },

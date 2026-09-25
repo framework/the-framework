@@ -4,56 +4,42 @@ import type { Preferences } from './registry.js'
  * What an unset preference means, and the bounds the controls that write them share.
  *
  * A leaf module (no `node:*`) so `client.ts` can export it and the dashboard reads the same values
- * the daemon acts on. The notification defaults used to be named predicates in the dashboard and
- * open-coded at each daemon call site, in three different spellings, with a comment warning the
- * reader not to copy the sibling's polarity. That warning is what a default with one home does not
- * need.
+ * the daemon acts on.
  *
  * No cycle: `registry.ts` re-exports the bounds from here, and the `Preferences` import going the
  * other way is type-only, so it erases.
  */
 
 /**
- * Notifications are a 2×2, and naming the axes is the point (B5).
- *
- * There are four preference keys and they are not four settings: `notifyBrowser` and
- * `notifyDiscord` say *how* a notification reaches you, `notifyHumanIntervention` and
- * `notifyNewActivity` say *what it is about*. Nothing in the names said which axis a key belonged
- * to, and the composition ("deliver this category by this method") was open-coded per call site —
- * which is how one of them got the category's polarity wrong by copying its sibling. The axes are
- * named here so a caller asks the one question it actually has.
- *
- * The stored keys are unchanged: a settings file written before this still reads.
+ * Notifications have two axes (B5): `notifyBrowser` says whether they reach you in the browser at
+ * all, and `notifyHumanIntervention` / `notifyNewActivity` say *what* they are about. A category
+ * delivers only while the browser switch is on too.
  */
-
-/** How a notification reaches you. */
-export type NotifyMethod = 'browser' | 'discord'
 
 /** What a notification is about. */
 export type NotifyCategory = 'humanIntervention' | 'newActivity'
 
-/** The preference key each axis value is stored under. */
-const METHOD_KEYS = { browser: 'notifyBrowser', discord: 'notifyDiscord' } as const satisfies Record<NotifyMethod, keyof Preferences>
+/** The preference key each category is stored under. */
 const CATEGORY_KEYS = {
   humanIntervention: 'notifyHumanIntervention',
   newActivity: 'notifyNewActivity',
 } as const satisfies Record<NotifyCategory, keyof Preferences>
 
 /**
- * What each cell means when nobody has said.
+ * What each switch means when nobody has said.
  *
- * The polarities are not uniform, and that is the point of writing them down once: the browser
- * bell and the "needs you" baseline fire unless you turn them off, while everything that reaches
- * outward (Discord) or is loosely informative (plain activity) is opt-in.
+ * The polarities are not uniform, and that is the point of writing them down once: browser
+ * delivery and the "needs you" category fire unless you turn them off, while plain activity is
+ * opt-in.
  */
 export const NOTIFICATION_DEFAULTS = {
-  methods: { browser: true, discord: false },
+  browser: true,
   categories: { humanIntervention: true, newActivity: false },
-} as const satisfies { methods: Record<NotifyMethod, boolean>; categories: Record<NotifyCategory, boolean> }
+} as const satisfies { browser: boolean; categories: Record<NotifyCategory, boolean> }
 
-/** Whether a delivery method is switched on, with its default applied. */
-export function notifyMethodEnabled(preferences: Preferences, method: NotifyMethod): boolean {
-  return preferences[METHOD_KEYS[method]] ?? NOTIFICATION_DEFAULTS.methods[method]
+/** Whether browser delivery is switched on, with its default applied. */
+export function browserNotifyEnabled(preferences: Preferences): boolean {
+  return preferences.notifyBrowser ?? NOTIFICATION_DEFAULTS.browser
 }
 
 /** Whether a category is switched on, with its default applied. */
@@ -61,14 +47,9 @@ export function notifyCategoryEnabled(preferences: Preferences, category: Notify
   return preferences[CATEGORY_KEYS[category]] ?? NOTIFICATION_DEFAULTS.categories[category]
 }
 
-/**
- * Whether this cell of the 2×2 delivers: both the method and the category have to be on.
- *
- * One function rather than an `&&` at each call site — that open-coding is exactly what let a
- * category's polarity be wrong in one place and right in another.
- */
-export function notifies(preferences: Preferences, method: NotifyMethod, category: NotifyCategory): boolean {
-  return notifyMethodEnabled(preferences, method) && notifyCategoryEnabled(preferences, category)
+/** Whether a category delivers: both browser delivery and the category have to be on. */
+export function notifies(preferences: Preferences, category: NotifyCategory): boolean {
+  return browserNotifyEnabled(preferences) && notifyCategoryEnabled(preferences, category)
 }
 
 /**

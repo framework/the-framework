@@ -5,7 +5,6 @@ import { RPC_HANDLERS, RPC_EVENT_STREAM } from '../dashboard-rpc/index.js'
 import { errorMessage } from '../error-message.js'
 import type { FrameworkEvent } from '../events.js'
 import type { PreferencesStore } from '../registry.js'
-import type { DiscordCredentialsStore } from '../discord-credentials.js'
 import type { QuotaSource } from './quota.js'
 import type { BridgeBrowserOwner } from '../bridge-browser.js'
 import type { ProjectErrorsReader } from '../project-errors.js'
@@ -56,8 +55,6 @@ export interface DashboardContext {
   preferences: PreferencesStore
   /** The quota source behind the usage panel (#533). */
   quota: QuotaSource
-  /** The Discord credentials store (#1095), which also reloads the Discord services on a save. */
-  discord: DiscordCredentialsStore
   /** What a project currently suffers from (#1500): the daemon's error state, read per project. */
   projectErrors: ProjectErrorsReader
   /** The daemon's own bridge browser (#1332): status, and show/hide/restart on request. */

@@ -25,7 +25,7 @@ Names the one set of rules the dashboard [1] runs in the browser: every decision
 - **Nothing server-only may be reached** - no rule shared here, and nothing any of them reaches in turn, may use a capability that exists only outside a browser; a rule with a server half keeps that half in a separate module.
 - **Which questions an agent still waits on** - the one rule (`open-choices.ts`) the agent's page applies to its events, the same the daemon applies before it delivers an answer.
 - **How an agent's activity reads** - an agent [3]'s events [4] rendered as terminal text, which options a pick [5] chose, the driver session [6] behind the agent, the errors it hit, and where its handoff [2] stands.
-- **The defaults and limits the user adjusts** - the notification defaults, whether a notification method and category is on, and the default and maximum spend offset [7].
+- **The defaults and limits the user adjusts** - the notification defaults, whether browser delivery and a notification category are on, and the default and maximum spend offset [7].
 - **What the two notification feeds count as new** - the identity of an intervention [8] and of an activity item, and what counts as already there when a feed is first read, so the browser and the daemon never disagree about which item is new.
 - **What is truly local** - whether an address is a loopback address, so the daemon's decision to demand a token and the dashboard [1]'s label for the connection agree.
 - **Rules about the cloud side** - a question the Claude web bridge [9] holds rendered as a gate [10], and the word for what a web agent [3]'s cloud side is doing, so every surface derives the same one.

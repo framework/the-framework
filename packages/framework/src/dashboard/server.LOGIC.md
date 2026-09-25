@@ -58,7 +58,7 @@ Every request is dispatched in this order:
 - A path under `/_widgets/` is one of a project's widgets' [9] files, served only when the project is registered, the package is a widget of that project and the file lies inside the widget module's own directory, else 404 (`widget-serve.ts`); a failure while reading it answers 500 rather than taking the daemon down.
 - Everything else is served from the built dashboard: the file when it exists, else the app shell (`static.ts`).
 
-The RPC surface acts through what the daemon wires into it, all of it required: the daemon's own start and add-project closures, the events source and the lookup for agents [5] relayed from a device [3], the preferences [6] store, the Discord credentials store, the quota [7] source, each project's current errors, and the daemon's own bridge browser. The mount is also told the bound host, so it can reject a rebound `Host`.
+The RPC surface acts through what the daemon wires into it, all of it required: the daemon's own start and add-project closures, the events source and the lookup for agents [5] relayed from a device [3], the preferences [6] store, the quota [7] source, each project's current errors, and the daemon's own bridge browser. The mount is also told the bound host, so it can reject a rebound `Host`.
 
 ### The shared token on a non-loopback bind
 

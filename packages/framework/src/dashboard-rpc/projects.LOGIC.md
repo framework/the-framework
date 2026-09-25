@@ -13,7 +13,7 @@ Everything the dashboard asks the daemon about projects [1]: the list of registe
 [3] command: one of the project's skills written to be run by a person, never picked up by the coding agent on its own (its front matter says `disable-model-invocation: true`), read off the folders the coding agents read them from (`.claude/skills/`, `.agents/skills/`); typed as `/<name>`, optionally followed by an argument.
 [4] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. The Framework starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
 [5] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
-[6] sweep: a background job the daemon runs on its clock: the data sync, the notification watchers, the cloud scratch sweep, cloud work adoption.
+[6] sweep: a background job the daemon runs on its clock: the data sync, the cloud scratch sweep, cloud work adoption.
 [7] start hook: the one shell line under `start` in a project's `.the-framework/hooks.yml`, which the daemon runs when the user presses Start.
 [8] check hook: the one shell line under `check` in a project's `.the-framework/hooks.yml`, which the daemon runs when the launcher asks what would stop an agent; it answers a list of problems and a list of warnings.
 [9] switch hook: the one shell line under `switch` in a project's `.the-framework/hooks.yml`, which the daemon runs with a scheduled command's name and `on` or `off` when the user sets that command's schedule switch [10].

@@ -1,10 +1,10 @@
-Fixes what an unset preference [1] means, and the spend offset's [2] reach and default, in one place the daemon and the dashboard both read: the notification defaults as a two-by-two of method (browser, Discord) by category (needs a human, new activity) and the rule that a notification is delivered only when both its method and its category are on; the spend offset, reaching 50 percentage points either way and sitting half a day of the quota week ahead of the quota boundary [3] until someone sets it. The spend offset is not a preference: each project's scheduler holds it; only its bound and its default live here.
+Fixes what an unset preference [1] means, and the spend offset's [2] reach and default, in one place the daemon and the dashboard both read: the notification defaults as browser delivery plus two categories (needs a human, new activity) and the rule that a notification is delivered only when both browser delivery and its category are on; the spend offset, reaching 50 percentage points either way and sitting half a day of the quota week ahead of the quota boundary [3] until someone sets it. The spend offset is not a preference: each project's scheduler holds it; only its bound and its default live here.
 
 ## Context
 
-**User story**: the user opens Settings and finds the browser bell and the "needs you" notifications on, Discord and plain activity off; the quota panel's line sits a little ahead of the boundary. Whatever the user changes is stored; whatever is left alone means exactly this.
+**User story**: the user opens Settings and finds the browser bell and the "needs you" notifications on, plain activity off; the quota panel's line sits a little ahead of the boundary. Whatever the user changes is stored; whatever is left alone means exactly this.
 
-**Problem**: a default that lives in one place cannot be spelled three ways. Each notification default was once a predicate in the dashboard and open-coded at each daemon call site, and one call site got a category's polarity wrong by copying its sibling; the controls that write the spend offset (the usage panel's slider and the Settings number) are in the browser while the default the daemon's quota reading falls back to is in the daemon, so the bound and the default have to be numbers both import.
+**Problem**: a default that lives in one place cannot be spelled three ways. Each notification default was once a predicate in the dashboard and open-coded at each call site, and one call site got a category's polarity wrong by copying its sibling; the controls that write the spend offset (the usage panel's slider and the Settings number) are in the browser while the default the daemon's quota reading falls back to is in the daemon, so the bound and the default have to be numbers both import.
 
 ## Glossary
 
@@ -16,21 +16,21 @@ Fixes what an unset preference [1] means, and the spend offset's [2] reach and d
 
 ## Business logic — TL;DR
 
-- **Notifications are a two-by-two** - four preference keys form two axes, how a notification reaches the user (browser, Discord) and what it is about (an intervention, new activity), and a notification is delivered only when both its method and its category are on.
-- **The notification defaults** - browser on and Discord off; interventions on and new activity off: what fires unless turned off is the browser bell and the "needs you" baseline, while anything that reaches outward or is merely informative is opt-in.
+- **Notifications have two axes** - three preference keys: whether notifications reach the user in the browser, and what they are about (an intervention, new activity); a notification is delivered only when both browser delivery and its category are on.
+- **The notification defaults** - browser delivery on; interventions on and new activity off: what fires unless turned off is the browser bell and the "needs you" baseline, while what is merely informative is opt-in.
 - **The spend offset** - the dashboard's controls reach 50 points either way, and when no scheduler names one it sits 100/14 points, about 7.1, ahead of the boundary: half a day of the week, so unattended work is not stopped the moment the account is exactly on pace.
 
 ## Business logic
 
-### Notifications are a two-by-two
+### Notifications have two axes
 
 #### Context
 
-**Problem**: the four stored keys are not four settings. Two say how a notification reaches the user and two say what it is about, and nothing in their names says which axis a key belongs to, so the composition "deliver this category by this method" went wrong when open-coded per call site.
+**Problem**: the three stored keys are not three settings of one kind. One says whether a notification reaches the user in the browser and two say what it is about, and nothing in their names says which axis a key belongs to, so the composition "deliver this category" went wrong when open-coded per call site.
 
 #### Business logic
 
-The methods are browser and Discord, stored as the preferences [1] "notify by browser" and "notify by Discord". The categories are intervention [4], stored as "notify on human intervention", and new activity, stored as "notify on new activity". A method is on when its preference says so, or when the preference is unset and its default is on; a category likewise. A notification of a category by a method is delivered exactly when that method is on and that category is on; the daemon asks that one question rather than combining the two itself.
+Browser delivery is stored as the preference [1] "notify by browser". The categories are intervention [4], stored as "notify on human intervention", and new activity, stored as "notify on new activity". Browser delivery is on when its preference says so, or when the preference is unset and its default is on; a category likewise. A notification of a category is delivered exactly when browser delivery is on and that category is on, and one function answers that question.
 
 ### The notification defaults
 
@@ -40,7 +40,7 @@ See `## Context`.
 
 #### Business logic
 
-Unset, the browser method is on and the Discord method is off; the intervention [4] category is on and the new activity category is off. The polarities are deliberately not uniform: the browser bell and the "needs you" baseline fire unless the user turns them off, while everything that reaches outward (Discord) or is loosely informative (plain activity) is opt-in.
+Unset, browser delivery is on; the intervention [4] category is on and the new activity category is off. The polarities are deliberately not uniform: the browser bell and the "needs you" baseline fire unless the user turns them off, while what is loosely informative (plain activity) is opt-in.
 
 ### The spend offset
 

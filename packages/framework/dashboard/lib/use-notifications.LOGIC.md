@@ -4,8 +4,6 @@ Fires a browser notification when something new appears in one of the dashboard'
 
 **User story**: the user leaves the dashboard open in a background tab. When an agent parks on a question, when a pull request lands for review, when work is left unpushed, or when an agent starts or finishes, the operating system shows a notification; clicking it opens the pull request on the git host, or brings the dashboard tab forward. What was already waiting when the tab was opened is not announced, so opening the dashboard never produces a burst of notifications about things the user already knows.
 
-**Business logic story**: the daemon delivers the same two feeds to Discord on its own schedule, whether or not a dashboard is open. Both surfaces use the same rule for what counts as the same item and the same rule for what counts as already there, so a user with both enabled hears about the same things and never twice about one thing.
-
 **Problem**: an item's identity has to survive re-reads. The feeds are re-read on a timer, and every read returns everything currently waiting, not only what changed. Without a stable identity per item, every read would announce everything again.
 
 ## Glossary
@@ -33,7 +31,7 @@ Fires a browser notification when something new appears in one of the dashboard'
 
 #### Context
 
-**User story**: in Settings the user chooses which feeds to be notified about and by which method. Browser notifications also require the browser's own permission, which the user grants once.
+**User story**: in Settings the user chooses which feeds to be notified about and whether to be notified in the browser. Browser notifications also require the browser's own permission, which the user grants once.
 
 #### Business logic
 
@@ -55,8 +53,6 @@ Every item carries a stable identity, and an item is announced at most once:
 - An open question [5] is identified by the project [4], the agent [3] parked on it and the gate [6] it is parked on. The agent is part of the identity because a gate's own id is only unique within one agent, so two agents in one project parked on their first gate would otherwise count as one item and only one of them would be announced.
 - Unpushed work is identified by the project and the agent whose branch holds it.
 - An activity [2] item is identified by whether the agent started or finished, plus the project and the agent, so one agent produces two announcements over its life, one when it starts and one when it lands, each fired once.
-
-These are the same identities the daemon's Discord delivery uses.
 
 ### What counts as already there
 

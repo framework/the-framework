@@ -17,13 +17,13 @@ Holds the browser's view of the user's preferences [1]: loads them from the daem
 ## Business logic — TL;DR
 
 - **One shared answer for the whole dashboard** - the values are fetched from the daemon once and every screen reads the same copy, so no two surfaces disagree.
-- **Nothing is stored in the browser** - preferences live with the daemon, and the secrets the daemon holds never reach the browser at all.
+- **Nothing is stored in the browser** - preferences live with the daemon, and the daemon token never reaches the browser at all.
 - **A change applies at once, then persists** - the new value is in force before the round trip, only the keys that changed are sent, and what the daemon stores back is adopted.
 - **A failed write is silent** - a save the daemon refuses or never answers leaves the chosen value on screen and raises nothing.
 - **Catching up with other tabs** - returning to the dashboard re-reads the preferences, except while the user's own write is still in flight.
 - **The project's saved prompts** - a project's saved prompts [2] are read from and written to a file committed in the repository, so everyone who clones it has them; the project is the one in the browser's address.
 - **The theme** - the dashboard follows the operating system unless the user picked light or dark.
-- **Which notifications are on by default** - browser delivery and the "Human Queue" category are on unless turned off; Discord delivery and "New activity" are off until switched on.
+- **Which notifications are on by default** - browser delivery and the "Human Queue" category are on unless turned off; "New activity" is off until switched on.
 
 ## Business logic
 
@@ -45,13 +45,13 @@ Before the browser is running — while the page is being rendered ahead of time
 
 #### Context
 
-**Problem**: settings the daemon must act on cannot live in the browser. The daemon posts notifications when no browser is open, and it must read which ones the user wants without one.
+**Problem**: settings the daemon must act on cannot live in the browser. The daemon decides at start-up whether the bridge and its browser run, with no browser open, and it must read what the user wants without one.
 
 #### Business logic
 
 Preferences [1] are kept by the daemon in the registry file and nowhere else; the dashboard keeps them only for as long as the page is open, and writes none of them to the browser's own storage. Two browsers, two tabs and the daemon itself therefore all act on the same values.
 
-The secrets the registry file also holds — the daemon token and the Discord credentials — are not preferences and never travel to the browser. The dashboard is only ever told whether a credential is present.
+The daemon token the registry file also holds is not a preference and never travels to the browser.
 
 ### A change applies at once, then persists
 
@@ -119,17 +119,16 @@ An unset theme means "system": the dashboard follows the operating system's own 
 
 #### Context
 
-**User story**: the user opens the notifications menu and switches delivery — "Browser", "Discord" — and subject — "Human Queue" ("An agent awaiting you, or a PR to review"), "New activity" ("An agent started or finished").
+**User story**: the user opens the notifications menu and switches delivery — "Browser" — and subject — "Human Queue" ("An agent awaiting you, or a PR to review"), "New activity" ("An agent started or finished").
 
-**Problem**: the daemon acts on the same four settings, and their defaults are not uniform, so the browser must not keep a second copy of them. It reads the one set of defaults the daemon reads, in `preference-defaults.ts`.
+**Problem**: the three settings' defaults are not uniform, so they must have one home rather than a copy per reader. The browser reads the one set of defaults in `preference-defaults.ts`.
 
 #### Business logic
 
-Notifications are two independent axes: how a notification reaches the user, and what it is about. A notification is delivered only when both its method and its category are on.
+Notifications are two independent axes: whether a notification reaches the user in the browser, and what it is about. A notification is delivered only when both browser delivery and its category are on.
 
 Unset means:
 
 - Browser delivery: on. The browser's own notification permission is still the real gate, which is handled in `notification-permission.ts`.
-- Discord delivery: off, because it reaches the user with no dashboard open. The daemon also needs a webhook configured — that is where to post, this is whether to.
 - The "Human Queue" category, an intervention [5]: on. It is the baseline The Framework leans on, so it fires until the user turns it off.
 - The "New activity" category: off. It is loosely informative, so it is opt in.

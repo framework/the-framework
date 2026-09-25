@@ -9,6 +9,7 @@ import { inboxPath, liveDir, LIVE_DIR, readLiveCard, readLiveDiary } from './liv
 import { markerCard, recordRun, runnerMark, writeMarker, type RunnerMark } from './records.js'
 import { projectGitHost, type GitHost, type MergeOutcome } from './git-host.js'
 import { acquireRunLock, isPidAlive, releaseRunLock } from './run-lock.js'
+import { runEndedLine } from './ended.js'
 
 /**
  * One run (#1774): a checkout from the branches package, a session from agent-driver, the prompt
@@ -76,6 +77,8 @@ export interface RunOptions {
   driver: Driver
   /** The branch to work on, an existing one; a fresh `agent-<id>` when absent. */
   branch?: string
+  /** The pull request that branch already has: a follow-up's, so its end does not announce it as new. */
+  branchPr?: { number: number; url: string }
   /** The follow-up's prompt: a fresh agent's once this run ends done with a pull request, this run's id after it. */
   then?: string
   /** The coding agent a follow-up run is on, given its id; this run's own when absent. */
@@ -150,6 +153,7 @@ async function runOnce(repo: string, opts: RunOptions): Promise<RunOutcome> {
       prompt: agentPrompt(opts.prompt, opts.then),
       driver: opts.driver,
       ...modelOf(opts.model),
+      ...(opts.branchPr ? { prBefore: opts.branchPr } : {}),
       continued: false,
       git,
       gitHost: opts.gitHost ?? projectGitHost,
@@ -282,6 +286,7 @@ async function followUp(repo: string, first: RunOutcome, then: string, opts: Fol
     prompt: `${then} ${first.id}`,
     id,
     branch: first.branch,
+    branchPr: first.pr,
     driver: opts.nextDriver ? opts.nextDriver(id) : opts.driver,
     ...pick(opts, ['model', 'host', 'pid', 'isAlive', 'now', 'git', 'gitHost', 'logs', 'log']),
   })
@@ -307,6 +312,8 @@ interface SessionRun {
   prompt: string
   driver: Driver
   model?: string
+  /** The pull request the run's branch had before this session: its end announces only a new one. */
+  prBefore?: { url: string }
   continued: boolean
   resumeSessionId?: string
   git: GitRunner
@@ -348,6 +355,7 @@ async function sessionToEnd(repo: string, run: SessionRun, dir: string, inbox: s
   let detail: string | undefined
   let branch = run.checkout.branch
   let pr: RunOutcome['pr']
+  let question: string | undefined
   let driverSession: DriverSession | undefined
   try {
     driverSession = await run.driver.start({
@@ -370,6 +378,7 @@ async function sessionToEnd(repo: string, run: SessionRun, dir: string, inbox: s
     while (driverSession) {
       status = 'done'
       detail = undefined
+      question = undefined
       let lastText = ''
       try {
         for (const [i, prompt] of prompts.entries()) {
@@ -386,10 +395,11 @@ async function sessionToEnd(repo: string, run: SessionRun, dir: string, inbox: s
       if (stopped.aborted) {
         status = 'stopped'
         detail = STOPPED_DETAIL
-      } else if (status === 'done' && parseQuestion(lastText)) {
+      } else if (status === 'done') {
         // The last turn asked and nothing waited in the inbox: the run ends here, waiting, and
         // keeps its checkout for the answer to resume it.
-        status = 'waiting'
+        question = parseQuestion(lastText)?.title
+        if (question !== undefined) status = 'waiting'
       }
 
       // Where the work ended up: the agent renames its branch itself, and the pull request it
@@ -421,6 +431,9 @@ async function sessionToEnd(repo: string, run: SessionRun, dir: string, inbox: s
   const diary = live ? await readLiveDiary(run.checkout.path, run.id) : [...(run.priorDiary ?? []), { kind: 'ended', status, ...(detail !== undefined ? { detail } : {}), at: card.endedAt ?? run.clock() }]
   const recorded = await recordRun(repo, card, diary, run.logs)
   if (!recorded.ok && !recorded.committed) run.log(`[agent-runner] the run's record could not be written: ${recorded.error}`)
+
+  // The person's line, when this end needs them: a question, or a pull request new to this session.
+  await runEndedLine(repo, { id: run.id, prompt: run.card.intent ?? '', status, ...(question !== undefined ? { question } : {}), ...(pr ? { pr } : {}), ...((run.prBefore ?? run.card.pr) ? { prBefore: run.prBefore ?? run.card.pr } : {}) }, { log: run.log })
 
   // The checkout goes once the remote has everything it holds (the branches rule); a dirty tree
   // or a branch that could not be pushed keeps it, and the sweep tries again later. A

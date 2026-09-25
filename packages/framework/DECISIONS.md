@@ -50,6 +50,9 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   else the branch as the agent named it; the framework derives no session name from a branch.
   Picked over stripping the package's prefix here, which was the framework knowing how the
   package names a branch.
+- Notifications are the browser's only: the bell alerts in the open tab. Posting to a
+  channel is a skill's, fired by the tool that runs the agent when a run ends. Picked over
+  the dashboard's Discord watchers, which posted only while the dashboard was running.
 
 ## Starting a run
 - A Start runs the project's own `start` line, in the project's hooks file, and the line

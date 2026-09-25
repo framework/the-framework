@@ -1,6 +1,6 @@
 import { useEffect, useSyncExternalStore } from 'react'
 import type { CustomPreset, Preferences } from '../../src/index.js'
-import { notifyMethodEnabled, notifyCategoryEnabled } from '../../src/client.js'
+import { browserNotifyEnabled, notifyCategoryEnabled } from '../../src/client.js'
 import { onPreferences, patchPreferences, onProjectPresets, saveProjectPresets } from '../rpc/preferences.js'
 import { parseRoute } from './route.js'
 
@@ -203,22 +203,16 @@ export function resolvedDark(theme: ThemePreference, systemDark: boolean): boole
   return theme === 'dark' || (theme === 'system' && systemDark)
 }
 
-// The notification defaults are the framework's (#627), not the dashboard's: the daemon acts on
-// the same values, and the polarities are not uniform, so a second copy here is how the two sides
-// drift. These stay as named readers because the call sites read better for it — and each one now
-// says which axis it is asking about (B5).
+// The notification defaults are the framework's (#627), not the dashboard's: the polarities are
+// not uniform, so they have one home. These stay as named readers because the call sites read
+// better for it — and each one says which axis it is asking about (B5).
 
 /** Browser delivery; the browser permission is still the real gate. */
 export function notificationsEnabled(preferences: Preferences): boolean {
-  return notifyMethodEnabled(preferences, 'browser')
+  return browserNotifyEnabled(preferences)
 }
 
-/** Discord delivery. The daemon's webhook is the other gate (where to post; this is whether to). */
-export function discordEnabled(preferences: Preferences): boolean {
-  return notifyMethodEnabled(preferences, 'discord')
-}
-
-/** The "New activity" category: pings on a session starting or finishing. Composes with the methods above. */
+/** The "New activity" category: pings on a session starting or finishing. Composes with browser delivery above. */
 export function newActivityEnabled(preferences: Preferences): boolean {
   return notifyCategoryEnabled(preferences, 'newActivity')
 }

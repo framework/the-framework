@@ -13,8 +13,6 @@ import {
   registryPath,
   writePreferences,
   patchPreferences,
-  readSecrets,
-  writeSecrets,
   REGISTRY_FILE,
   REGISTRY_FILE_MODE,
   type Preferences,
@@ -178,11 +176,11 @@ test('readRegistry reads only the object form; a shape it no longer writes is an
 test('readRegistry reads the object form with preferences and drops unknown/non-boolean fields', async () => {
   const raw = JSON.stringify({
     projects: [APP_A],
-    preferences: { bridge: true, notifyDiscord: 'yes', bogus: 1, notifyBrowser: true, bridgeBrowser: true },
+    preferences: { bridge: true, notifyNewActivity: 'yes', bogus: 1, notifyBrowser: true, bridgeBrowser: true },
   })
   assert.deepEqual(await readRegistry(memFs({ [FILE]: raw }), ENV), {
     projects: [APP_A],
-    preferences: { bridge: true, notifyBrowser: true, bridgeBrowser: true }, // notifyDiscord (non-boolean) + bogus dropped
+    preferences: { bridge: true, notifyBrowser: true, bridgeBrowser: true }, // notifyNewActivity (non-boolean) + bogus dropped
   })
 })
 
@@ -195,7 +193,6 @@ test('every boolean preference survives a save; the sanitizer cannot silently dr
   }[keyof Preferences]
   const allOn: Record<BooleanKey, boolean> = {
     notifyBrowser: true,
-    notifyDiscord: true,
     notifyNewActivity: true,
     notifyHumanIntervention: true,
     bridge: true,
@@ -275,12 +272,6 @@ test('writePreferences persists sanitized prefs and preserves the project list',
   })
   // The project list still reads back unchanged.
   assert.deepEqual(await listProjects(fs, ENV), [APP_A, APP_B])
-})
-
-test('writePreferences round-trips the notifyDiscord toggle (#627)', async () => {
-  const fs = memFs({ [FILE]: JSON.stringify({ projects: [APP_A], preferences: {} }) })
-  await writePreferences({ notifyDiscord: true }, fs, ENV)
-  assert.deepEqual(await readPreferences(fs, ENV), { notifyDiscord: true })
 })
 
 test('writePreferences round-trips the notifyNewActivity toggle (#627)', async () => {
@@ -390,11 +381,11 @@ test('registryPreferencesStore tells its listener which keys were written (#1161
   const fs = memFs()
   const written: Preferences[] = []
   const store = registryPreferencesStore(fs, ENV, patch => written.push(patch))
-  await store.save({ notifyDiscord: true })
+  await store.save({ notifyNewActivity: true })
   await store.patch?.({ bridge: true })
-  assert.deepEqual(written, [{ notifyDiscord: true }, { bridge: true }])
+  assert.deepEqual(written, [{ notifyNewActivity: true }, { bridge: true }])
   // The patch still merged, so the listener's narrower view is not the stored one.
-  assert.deepEqual(await store.read(), { notifyDiscord: true, bridge: true })
+  assert.deepEqual(await store.read(), { notifyNewActivity: true, bridge: true })
 })
 
 test('a preferences listener that throws does not fail the write (#1161)', async () => {
@@ -403,8 +394,8 @@ test('a preferences listener that throws does not fail the write (#1161)', async
   const store = registryPreferencesStore(fs, ENV, () => {
     throw new Error('the daemon is mid-shutdown')
   })
-  await store.save({ notifyDiscord: true })
-  assert.deepEqual(await store.read(), { notifyDiscord: true })
+  await store.save({ notifyNewActivity: true })
+  assert.deepEqual(await store.read(), { notifyNewActivity: true })
 })
 
 test('the registry file is never written in place, only renamed over (#991)', async () => {
@@ -502,59 +493,9 @@ test('two concurrent first-binds settle on one shared token, not two (#1051)', a
   assert.equal(a, b)
 })
 
-// The stored credentials (#1095). They sit at the daemon-token tier — top level, never in
-// `preferences` — so they cannot reach the browser bundle or a per-project override.
-
-test('a saved secret round-trips and lands at the top level, not in preferences (#1095)', async () => {
-  const fs = memFs()
-  await writeSecrets({ discordWebhook: 'https://hook' }, fs, ENV)
-
-  assert.deepEqual(await readSecrets(fs, ENV), { discordWebhook: 'https://hook' })
-  const written = JSON.parse(fs.files.get(FILE)!)
-  assert.equal(written.secrets.discordWebhook, 'https://hook')
-  assert.deepEqual(written.preferences, {})
-})
-
-test('a secrets patch leaves the credential it does not mention alone (#1095)', async () => {
-  const fs = memFs()
-  await writeSecrets({ discordWebhook: 'https://hook' }, fs, ENV)
-  await writeSecrets({ discordWebhook: 'https://other' }, fs, ENV)
-
-  assert.deepEqual(await readSecrets(fs, ENV), { discordWebhook: 'https://other' })
-})
-
-test('null clears one credential, and clearing the last one drops the block (#1095)', async () => {
-  const fs = memFs()
-  await writeSecrets({ discordWebhook: 'https://hook' }, fs, ENV)
-
-  await writeSecrets({ discordWebhook: null }, fs, ENV)
-  assert.deepEqual(await readSecrets(fs, ENV), {})
-  assert.equal('secrets' in JSON.parse(fs.files.get(FILE)!), false)
-})
-
-test('a hand-edited secrets block is sanitized: unknown keys and non-strings dropped (#1095)', async () => {
-  const raw = JSON.stringify({
-    projects: [],
-    preferences: {},
-    secrets: { discordWebhook: '  https://hook  ', discordBotToken: 42, sshKey: 'nope' },
-  })
-  assert.deepEqual(await readSecrets(memFs({ [FILE]: raw }), ENV), { discordWebhook: 'https://hook' })
-})
-
-test('saving a secret keeps the project list and preferences (#1095)', async () => {
-  const fs = memFs()
-  await addProject('/repos/app-a', APP_A.addedAt, fs, ENV)
-  await writePreferences({ bridge: true }, fs, ENV)
-  await writeSecrets({ discordWebhook: 'https://hook' }, fs, ENV)
-
-  assert.deepEqual(await listProjects(fs, ENV), [APP_A])
-  assert.deepEqual(await readPreferences(fs, ENV), { bridge: true })
-  assert.deepEqual(await readSecrets(fs, ENV), { discordWebhook: 'https://hook' })
-})
-
 test('the registry file is written owner-only, and the mode is set before the rename (#1095)', async () => {
   const fs = memFs()
-  await writeSecrets({ discordWebhook: 'https://hook' }, fs, ENV)
+  await ensureDaemonToken(fs, ENV)
 
   assert.equal(fs.modes.get(FILE), REGISTRY_FILE_MODE)
   // The temp file carried the mode across the rename, so the real path was never world-readable.
@@ -564,16 +505,7 @@ test('the registry file is written owner-only, and the mode is set before the re
 test('a filesystem with no chmod still writes the registry (#1095)', async () => {
   const fs = memFs()
   const { chmod: _dropped, ...noChmod } = fs
-  await writeSecrets({ discordWebhook: 'https://hook' }, noChmod, ENV)
+  const token = await ensureDaemonToken(noChmod, ENV)
 
-  assert.deepEqual(await readSecrets(noChmod, ENV), { discordWebhook: 'https://hook' })
-})
-
-test('a token stays put when a secret is saved beside it (#1051/#1095)', async () => {
-  const fs = memFs()
-  const token = await ensureDaemonToken(fs, ENV)
-  await writeSecrets({ discordWebhook: 'https://hook' }, fs, ENV)
-
-  assert.equal(await readDaemonToken(fs, ENV), token)
-  assert.deepEqual(await readSecrets(fs, ENV), { discordWebhook: 'https://hook' })
+  assert.equal(await readDaemonToken(noChmod, ENV), token)
 })

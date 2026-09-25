@@ -5,7 +5,7 @@ The browser's typed stubs for what the dashboard asks the daemon about projects:
 [1] command: one of the project's skills written to be run by a person, never picked up by the coding agent on its own (its front matter says `disable-model-invocation: true`), read off the folders the coding agents read them from (`.claude/skills/`, `.agents/skills/`); typed as `/<name>`, optionally followed by an argument.
 [2] start hook: the one shell line under `start:` in the project's `.the-framework/hooks.yml`, which starts an agent.
 [3] launcher: the Start form on a project's own page (the project home).
-[5] sweep: a background job the daemon runs on its clock: the notification watchers, the data sync, the cloud scratch sweep, cloud work adoption.
+[5] sweep: a background job the daemon runs on its clock: the data sync, the cloud scratch sweep, cloud work adoption.
 [6] schedule switch: a person's choice, on one machine, whether a scheduled command (a line of the project's `agent-schedule.md`) runs there; the project's scheduler keeps it in its state file. The switch hook, the one shell line under `switch:` in `.the-framework/hooks.yml`, sets it.
 
 ## Business logic — TL;DR

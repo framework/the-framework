@@ -9,14 +9,11 @@ import type { ProjectScheduler, SchedulerCommand } from '../../src/index.js'
 import { useDetectedEditors } from '../lib/editors.js'
 import { usePreferences, updatePreferences, themePreference, type ThemePreference } from '../lib/preferences.js'
 import { useNotificationPermission } from '../lib/notification-permission.js'
-import { useNotifyChannels, reloadNotifyChannels } from '../lib/notify-channels.js'
 import { OnboardingChecklist } from './OnboardingChecklist.js'
 import { BridgeSettings } from './BridgeSettings.js'
 import { BridgeBrowserSettings } from './BridgeBrowserSettings.js'
 import { DevicesSettings } from './DevicesSettings.js'
-import { DiscordWebhookDialog } from './DiscordDialogs.js'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
-import { Button } from './ui/button.js'
 import { Checkbox } from './ui/checkbox.js'
 import { ScrollArea } from './ui/scroll-area.js'
 import { cn } from '../lib/utils.js'
@@ -46,15 +43,11 @@ export function SettingsPage({
   const editors = useDetectedEditors()
   const theme = themePreference(preferences)
   // One shared table with the launcher (#958), rules already applied.
-  // A notification toggle is a preference; whether it can deliver is a capability (#948). Both are
-  // shown, the same way the bell does, so a row cannot promise delivery that will not happen.
+  // A notification toggle is a preference; whether it can deliver is the browser's permission
+  // (#948). Both are shown, the same way the bell does, so the row cannot promise delivery that
+  // will not happen.
   const permission = useNotificationPermission()
-  // Shared with the checklist above and the bell (#1095), so a credential saved in one of the
-  // setup dialogs settles every one of them at once rather than each on its own timer.
-  const channels = useNotifyChannels()
-  const webhookReady = channels === null || channels.discordWebhook
   const browserBlocked = permission === 'denied'
-  const [discordWebhookOpen, setDiscordWebhookOpen] = useState(false)
 
   return (
     <ScrollArea className="min-h-0 flex-1">
@@ -131,21 +124,6 @@ export function SettingsPage({
             onChange={next => updatePreferences({ notifyBrowser: next })}
           />
           <ToggleRow
-            label="Discord"
-            description={
-              webhookReady
-                ? 'Deliver to Discord, so notifications reach you with no dashboard open.'
-                : 'Not configured — no webhook is set on the daemon'
-            }
-            checked={preferences.notifyDiscord ?? false}
-            onChange={next => updatePreferences({ notifyDiscord: next })}
-            action={
-              <Button variant="outline" size="sm" onClick={() => setDiscordWebhookOpen(true)}>
-                {channels?.discordWebhook ? 'Webhook' : 'Set up'}
-              </Button>
-            }
-          />
-          <ToggleRow
             label="Human Queue"
             description="An agent awaiting your answer, or a PR ready to review."
             checked={preferences.notifyHumanIntervention ?? true}
@@ -182,13 +160,6 @@ export function SettingsPage({
           )}
         </Section>
       </div>
-
-      <DiscordWebhookDialog
-        open={discordWebhookOpen}
-        onOpenChange={setDiscordWebhookOpen}
-        channels={channels}
-        onSaved={reloadNotifyChannels}
-      />
     </ScrollArea>
   )
 }
@@ -280,7 +251,6 @@ function ToggleRow({
   checked,
   onChange,
   disabled = false,
-  action,
 }: {
   label: string
   description: string
@@ -288,8 +258,6 @@ function ToggleRow({
   onChange: (next: boolean) => void
   /** A capability the daemon or browser withholds, e.g. notifications the browser has blocked. */
   disabled?: boolean
-  /** What supplies the capability the toggle needs (#1095): the Discord rows open their setup dialog. */
-  action?: ReactNode
 }) {
   return (
     <Row
@@ -297,15 +265,12 @@ function ToggleRow({
       description={description}
       dimmed={disabled}
       control={
-        <span className="flex items-center gap-2">
-          {action}
-          <Checkbox
-            checked={checked}
-            disabled={disabled}
-            onCheckedChange={next => onChange(next === true)}
-            aria-label={label}
-          />
-        </span>
+        <Checkbox
+          checked={checked}
+          disabled={disabled}
+          onCheckedChange={next => onChange(next === true)}
+          aria-label={label}
+        />
       }
     />
   )

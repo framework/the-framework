@@ -18,5 +18,3 @@ export const patchPreferences = rpc<typeof impl.patchPreferences>('patchPreferen
 export const onProjectPresets = rpc<typeof impl.onProjectPresets>('onProjectPresets')
 export const saveProjectPresets = rpc<typeof impl.saveProjectPresets>('saveProjectPresets')
 export const onEditors = rpc<typeof impl.onEditors>('onEditors')
-export const onNotifyChannels = rpc<typeof impl.onNotifyChannels>('onNotifyChannels')
-export const saveDiscordCredentials = rpc<typeof impl.saveDiscordCredentials>('saveDiscordCredentials')

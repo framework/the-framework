@@ -135,8 +135,7 @@ export function App() {
 
   // The "New activity" category (#627): the default-off feed of agents starting/finishing. Its only
   // client consumer is the browser notification below, so it is polled exactly when that will fire —
-  // both the category (`notifyNewActivity`) and the browser method (`notifyBrowser`) on. (Discord
-  // delivery, if enabled, is the daemon's own watcher, independent of this poll.)
+  // both the category (`notifyNewActivity`) and the browser method (`notifyBrowser`) on.
   const browserActivity = newActivityEnabled(preferences) && notificationsEnabled(preferences)
   const { value: activity } = usePolled<ProjectionRead<Activity>>(browserActivity ? onActivity : null, EMPTY_ACTIVITY, 15000, [browserActivity])
   useActivityNotifications(activity, browserActivity)

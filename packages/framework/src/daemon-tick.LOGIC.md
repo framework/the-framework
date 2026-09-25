@@ -2,13 +2,13 @@ The daemon's one background clock: a single interval that fires every 30 seconds
 
 ## Context
 
-**Business logic story**: every background job of the daemon (the data sync, the notification watchers, the cloud scratch sweep, cloud work adoption) is wired as one job on this clock in `daemon-services.ts`. The clock decides when each job's turn comes, what happens when a turn is slow or fails, and how the daemon's shutdown waits for the turn in flight.
+**Business logic story**: every background job of the daemon (the data sync, the cloud scratch sweep, cloud work adoption) is wired as one job on this clock in `daemon-services.ts`. The clock decides when each job's turn comes, what happens when a turn is slow or fails, and how the daemon's shutdown waits for the turn in flight.
 
 **Problem**: one timer per sweep means timers that drift apart, turns that overlap, and failures nobody sees. A sweep failing silently is indistinguishable from one that was never scheduled at all.
 
 ## Glossary
 
-[1] sweep: a background job the daemon runs on its clock: the data sync, the notification watchers, the cloud scratch sweep, cloud work adoption. None of them starts an agent.
+[1] sweep: a background job the daemon runs on its clock: the data sync, the cloud scratch sweep, cloud work adoption. None of them starts an agent.
 [2] tick: one beat of the daemon's single background clock; each sweep says how many ticks it waits between turns.
 
 ## Business logic — TL;DR

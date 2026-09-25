@@ -32,7 +32,7 @@ The browser's side of the daemon's call surface: one module of typed stubs per g
 - **Reads** (`reads.ts`) - everything the pages read about a project or an agent [1]: the agent history and one agent's replay, documents and tickets, the cross-project rollups, a checkout's [4] files and diffs, its git status and what the agent left behind, which decides its next step [5], and the Claude web bridge's [6] state.
 - **The live event stream** (`events.ts`) - the subscription to one agent's events [7] as they are written, re-exported from the transport because a stream is not a call.
 - **Actions** (`control.ts`) - everything the user does to an agent or a project: what the user says to an agent (stop, pick [8], message), the bridge's answer and its browser, starting an agent, pull request and merge, removing a checkout or deleting an agent, opening a checkout in an app, and the release of a ticket's claim.
-- **Preferences** (`preferences.ts`) - reading, replacing or patching the preferences [10], a project's shared saved prompts, the installed editors, and whether the Discord credentials are set and saving them.
+- **Preferences** (`preferences.ts`) - reading, replacing or patching the preferences [10], a project's shared saved prompts, and the installed editors.
 - **Quota** (`quota.ts`) - the quota [11] reading against the quota boundary [12], and setting the spend offset [14] through every project's offset hook.
 - **Devices** (`devices.ts`) - whether each saved device [13] answers, checked by the daemon with the token the browser holds and never keeps.
 - **Widgets** (`widgets.ts`) - which widgets [16] the registered projects bring, and a widget running one of its own package's commands in one project.

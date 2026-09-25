@@ -5,12 +5,10 @@ import { onDashboard } from '../rpc/reads.js'
 import { onOnboarding, sendAddProject } from '../rpc/projects.js'
 import { usePolled } from '../lib/use-async.js'
 import { usePreferences, updatePreferences, notificationsEnabled } from '../lib/preferences.js'
-import { useNotifyChannels, reloadNotifyChannels } from '../lib/notify-channels.js'
 import { useNotificationPermission } from '../lib/notification-permission.js'
 import { startPicks, useStartAgent } from '../lib/use-start-agent.js'
 import { AddProjectPanel } from './AddProjectPanel.js'
 import { UpdateTicketsButton, UPDATE_TICKETS_PROMPT } from './UpdateTicketsButton.js'
-import { DiscordWebhookDialog, DISCORD_WEBHOOK_DESCRIPTION } from './DiscordDialogs.js'
 import { Button } from './ui/button.js'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
@@ -19,8 +17,8 @@ import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 // is actually in rather than a static list to read past.
 //
 // Every "done" is derived from a real fact — a registered project, a non-empty queue, a ticket on
-// disk, a granted browser permission, a daemon that holds the Discord credentials — so a step
-// cannot be ticked by clicking it, and a step done outside the dashboard shows up ticked anyway.
+// disk, a granted browser permission — so a step cannot be ticked by clicking it, and a step done
+// outside the dashboard shows up ticked anyway.
 //
 // It renders in two places: the Overview, where it can be dismissed, and the settings page, where
 // it cannot — that is what dismissing it promises you can come back to.
@@ -64,9 +62,6 @@ export function OnboardingChecklist({
   // read fans out over every project to answer the tickets question.
   const { value: data, reload } = usePolled<DashboardData | null>(onDashboard, null, 10_000, [])
   const { value: suggestion, reload: reloadSuggestion } = usePolled<OnboardingSuggestion | null>(onOnboarding, null, 30_000, [])
-  // Shared with the settings rows and the bell (#1095): a credential saved in a dialog below has
-  // to tick its row here too, and a second poll of the same fact is how those two disagree.
-  const channels = useNotifyChannels()
   const preferences = usePreferences()
   const permission = useNotificationPermission()
   const { start, busy: starting, error: startError } = useStartAgent()
@@ -74,7 +69,6 @@ export function OnboardingChecklist({
   const [addingProject, setAddingProject] = useState(false)
   const [addingCwd, setAddingCwd] = useState(false)
   const [addError, setAddError] = useState<string | null>(null)
-  const [discordWebhookOpen, setDiscordWebhookOpen] = useState(false)
 
   // The project onboarding acts on: the one this server runs in when it is registered, else the
   // only/most recent one. Onboarding is a first-agent flow, so there is rarely a second candidate.
@@ -190,18 +184,6 @@ export function OnboardingChecklist({
           </Button>
         ),
     },
-    {
-      key: 'discord-notification',
-      label: 'Add Discord notifications',
-      description: DISCORD_WEBHOOK_DESCRIPTION,
-      done: channels?.discordWebhook ?? false,
-      optional: true,
-      action: (
-        <Button size="sm" variant="outline" onClick={() => setDiscordWebhookOpen(true)}>
-          Add the webhook
-        </Button>
-      ),
-    },
   ]
 
   const doneCount = steps.filter(s => s.done).length
@@ -272,12 +254,6 @@ export function OnboardingChecklist({
           onClose={() => setAddingProject(false)}
         />
       )}
-      <DiscordWebhookDialog
-        open={discordWebhookOpen}
-        onOpenChange={setDiscordWebhookOpen}
-        channels={channels}
-        onSaved={reloadNotifyChannels}
-      />
     </Card>
   )
 }

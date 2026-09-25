@@ -81,4 +81,4 @@ See `## Context`.
 
 #### Business logic
 
-Mounting the surface installs one context every RPC reads: the daemon's start closure (a prompt, the start options and the project), its add-project closure, the events source for relayed [3] agents, the relayed-agent lookup (which device [4] an agent runs on, and a project's relayed agents), the preferences [5] store, the quota [6] source, the Discord credentials store, which also reloads the Discord services on a save, each project's current errors, and the daemon's bridge browser with its show, hide and restart.
+Mounting the surface installs one context every RPC reads: the daemon's start closure (a prompt, the start options and the project), its add-project closure, the events source for relayed [3] agents, the relayed-agent lookup (which device [4] an agent runs on, and a project's relayed agents), the preferences [5] store, the quota [6] source, each project's current errors, and the daemon's bridge browser with its show, hide and restart.

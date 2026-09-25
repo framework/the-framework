@@ -6,7 +6,6 @@ import { agentBranchFor } from './agent-handoff.js'
 import { projectBranches, type BranchesFor, type BranchState } from '../store/branches.js'
 import { openPrs, type PrLister } from './pull-requests.js'
 import { interventionKey } from './keys.js'
-import { postDiscordWebhook } from './discord-webhook.js'
 
 // Pure identity + diff, in the leaf `keys.ts` so the dashboard shares them rather than copying.
 export { interventionKey } from './keys.js'
@@ -20,8 +19,8 @@ export { interventionKey } from './keys.js'
 
 /**
  * One item awaiting the human. Two kinds: an open `pr` to review/merge or close, and an
- * `awaiting` run paused on a choice gate. The card, the browser hook, and the Discord watcher
- * all iterate the flat list, branching on `kind` for the fields that differ.
+ * `awaiting` run paused on a choice gate. The card and the browser hook both iterate the flat
+ * list, branching on `kind` for the fields that differ.
  */
 export interface Intervention {
   projectId: string
@@ -32,8 +31,8 @@ export interface Intervention {
    */
   kind: 'pr' | 'awaiting' | 'unpushed'
   title: string
-  /** Where to act: the PR on the git host (`pr`), or the dashboard (the other two, when the URL is known). */
-  url: string
+  /** The PR on the git host (`pr` only): where a click takes the user. */
+  url?: string
   /** The PR number (`pr` only). */
   number?: number
   /** The question's id (`awaiting` only) — its stable identity, so it notifies exactly once. */
@@ -65,12 +64,6 @@ export interface InterventionsDeps {
    * work that has sat unpushed for dozens of agents is not news, and the agent list stays the record.
    */
   handoffLimit?: number
-  /**
-   * The dashboard's own URL, so an `awaiting` item can link back to it. Only the daemon knows
-   * it (the card path resolves the project client-side and needs no URL), so it is optional; an
-   * awaiting item's `url` is empty when it is unset.
-   */
-  dashboardUrl?: string
 }
 
 /** How many recent finished agents are inspected per project by default. */
@@ -146,7 +139,6 @@ export async function buildInterventions(
         projectName: project.name,
         kind: 'awaiting',
         title: choice.title,
-        url: deps.dashboardUrl ?? '',
         awaitId: choice.id,
         agentId: meta.id,
         ...(meta.updatedAt ? { createdAt: meta.updatedAt } : {}),
@@ -221,7 +213,6 @@ async function unpushedFor(
       kind: 'unpushed',
       // What was asked, else the name the provider gave the branch, else the branch: never a prefix cut off here.
       title: agent.intent?.trim() || state.name || branch,
-      url: deps.dashboardUrl ?? '',
       agentId: agent.id,
       branch,
       commits: state.commits.length,
@@ -229,39 +220,4 @@ async function unpushedFor(
     })
   }
   return items
-}
-
-/**
- * How one intervention reads on Discord. Beside {@link Intervention} rather than inside the
- * watcher that posts it: it switches on every `kind`, so adding a kind is a change here, not in
- * a transport module that has no other opinion about what an intervention is.
- *
- * A PR reads `#123 Title — url`; a paused agent (#636) has no number and only the dashboard url,
- * so it reads `Title — awaiting your answer` with the link appended when the daemon knows it.
- * Unpushed work (#860) names the branch, since that is the actionable part.
- */
-export function interventionLine(item: Intervention): string {
-  if (item.kind === 'awaiting') return `${item.title} — awaiting your answer${item.url ? ` — ${item.url}` : ''}`
-  if (item.kind === 'unpushed') {
-    const count = item.commits === 1 ? '1 commit' : `${item.commits ?? 0} commits`
-    return `${item.title} — ${count} on ${item.branch ?? ''}, never pushed${item.url ? ` — ${item.url}` : ''}`
-  }
-  return `#${item.number} ${item.title} — ${item.url}`
-}
-
-/**
- * Post the given interventions to a Discord webhook as one message, resolving whether Discord
- * accepted it (#940). `fetch` is injectable for tests.
- */
-export async function postInterventionsDiscord(
-  webhook: string,
-  items: Intervention[],
-  fetchImpl: typeof fetch = fetch,
-): Promise<boolean> {
-  if (items.length === 0) return true
-  const content =
-    items.length === 1
-      ? `🔔 Needs you (${items[0]!.projectName}): ${interventionLine(items[0]!)}`
-      : `🔔 ${items.length} items need you:\n${items.map(i => `• ${interventionLine(i)}`).join('\n')}`
-  return postDiscordWebhook(webhook, content, fetchImpl)
 }

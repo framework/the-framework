@@ -120,15 +120,6 @@ test('buildInterventions adds no awaiting item for a run that is not waiting, or
   assert.deepEqual((await buildInterventions([project('a', '/a')], { prs: noPrs, liveAgents: waiting, events: unreadable })).items, [])
 })
 
-test('buildInterventions links an awaiting item to the dashboard URL when given, else empty', async () => {
-  const liveAgents = async (): Promise<LiveAgent[]> => [live(runningAgentMeta({ status: 'waiting' }))]
-  const events = async () => waitingOn('g', 'q?')
-  const { items: withUrl } = await buildInterventions([project('a', '/a')], { prs: noPrs, liveAgents, events, dashboardUrl: 'http://localhost:4200' })
-  assert.equal(withUrl[0]!.url, 'http://localhost:4200')
-  const { items: withoutUrl } = await buildInterventions([project('a', '/a')], { prs: noPrs, liveAgents, events })
-  assert.equal(withoutUrl[0]!.url, '')
-})
-
 test('buildInterventions surfaces PRs and awaiting runs together, newest first', async () => {
   const prs = async (cwd: string): Promise<OpenPr[]> =>
     cwd === '/a' ? [{ number: 5, title: 'pr', url: 'u5', isDraft: false, createdAt: '2026-07-10T00:00:00Z' }] : []

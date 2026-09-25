@@ -165,10 +165,9 @@ The Context [18] (`lib/use-context-set.ts`) is held here, once, and handed to th
 
 #### Business logic
 
-- Two feeds notify: the interventions [7] and the activity feed. Each fires only when its category is on in the preferences [17] and browser delivery is on. The defaults are on for browser delivery and for the interventions' category, off for "New activity"; they are the daemon's own defaults (`src/preference-defaults.ts`), so the page and the daemon's Discord watcher agree. The browser's own notification permission is the last gate, checked in `lib/use-notifications.ts`.
+- Two feeds notify: the interventions [7] and the activity feed. Each fires only when its category is on in the preferences [17] and browser delivery is on. The defaults are on for browser delivery and for the interventions' category, off for "New activity"; they are the framework's own defaults (`src/preference-defaults.ts`), kept in one place. The browser's own notification permission is the last gate, checked in `lib/use-notifications.ts`.
 - The interventions are polled whether or not they notify, since the badge and the Overview [4] need them; the activity feed is polled only while its notification would fire.
 - The notifier is handed the whole read, the items and which projects the read actually reached, so an outage is never taken for an empty backlog. That baseline rule and the wording of each notification live in `lib/use-notifications.ts`.
-- Discord delivery is the daemon's own watcher and does not depend on this page being open.
 
 ### The browser tab reports the state
 

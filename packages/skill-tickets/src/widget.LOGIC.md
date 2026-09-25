@@ -22,6 +22,7 @@ The rules of the package's dashboard widget [1] (`../dashboard/`), kept apart fr
 - **A ticket as a link** - its title pointing at `tickets/<file>` at the priority its `Priority:` earns (5 when unreadable); a plan ask is the plan sentence pointing nowhere, at the same priority.
 - **A ticket's lane on the Overview card** - claimed when an agent holds it, whatever its priority; high priority when nobody holds it and its `Priority:` starts with a whole number of 7 or more; otherwise off the card.
 - **Reading the command's answers** - `list` prints rows, kept when they carry the five plain facts; `show` prints one ticket with its text, its plan and its holder, or a refusal that reads as "no such ticket"; `meta` prints the last-import stamp; a command that could not run, or printed the wrong shape, is an error with its reason.
+- **Held back from work** - a ticket with a `PR:` line is in review, one with a `Waiting:` line is waiting, in review first when both; the pages start no agent on it or on its plan, offer it to no queue, and keep it out of the high-priority lane; a waiting one has a lane of its own, "Waiting".
 
 ## Business logic
 
@@ -74,6 +75,16 @@ The pages run the `tickets` command through the dashboard and get its JSON outpu
 #### Business logic
 
 `list` answers rows: those of its output that carry a file, a title, a summary, a date and a planned flag are kept, anything else is dropped; an output that is not a list, or a command that could not run, is an error with the reason. `show` answers one ticket: its row with its whole text, its plan's text when it has one, its holder when claimed; a refusal (`ok: false`) reads as no such ticket; an output that is not a ticket, or a command that could not run, is an error with the reason. `meta` answers when the tickets last caught up with the tracker; on any failure nothing is known.
+
+### Held back from work
+
+#### Context
+
+**User story**: a ticket whose pull request is open, or that waits on something outside the work, is not something a person starts or queues; the tickets skill tells an agent the same.
+
+#### Business logic
+
+A ticket whose row carries a pull request (its `PR:` line) is in review; one whose row carries a non-empty `Waiting:` text is waiting; a ticket with both is in review. The pages start no agent on a held-back ticket, nor on its plan, and offer it to no link action. An unclaimed ticket in review is in no lane of the Overview card, whatever its priority: nobody can start it. An unclaimed waiting ticket is in the "Waiting" lane at any priority: only a person removes the line once the wait is over, and nothing else reminds them. A claimed one stays in "Claimed".
 
 ### A ticket's lane on the Overview card
 

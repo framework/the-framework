@@ -21,6 +21,7 @@ Lists one project's tickets as one-liner rows — priority, topics, who holds th
 - **Who holds a ticket** - a hammer and the holder's name mark a claimed ticket, and lead to the agent holding it.
 - **The plan column** - a plan that exists is a link to read it; a ticket with none offers to start an agent that writes it.
 - **Starting work from a row** - one click starts an agent implementing that one ticket and nothing else.
+- **In review or waiting** - such a row offers no start and no plan, and says why: an "In review <pr>" badge linking the pull request, or a "Waiting" badge with what it waits on on hover.
 - **Configure first, then run** - every start on the panel also offers a trip to this project's launcher with the same prompt waiting there.
 - **Catching the tickets up with the issue tracker** - a line saying when the tickets last caught up, and a button that starts an agent to catch them up again.
 - **Nothing to show** - a project with no ticket offers the import; a project filtered down to nothing says how many are hidden and clears the filters from there.
@@ -144,3 +145,13 @@ A project whose every ticket is hidden by the surrounding page's filters instead
 While any start on this panel is in flight, every start button on it is disabled — the work starts, the plan starts and the update alike — and comes back when it settles. The chevrons stay live.
 
 A refusal is shown as red text above the rows, or inside the empty state's card, and stays until the next start.
+
+### In review or waiting
+
+#### Context
+
+**Problem**: the tickets skill never hands an agent a ticket whose pull request is open, or one that waits on something outside the work, nor a plan for it; a row that offered to start one would do what the skill forbids.
+
+#### Business logic
+
+A ticket in review (a `PR:` line) or waiting (a `Waiting:` line), by the rule in `src/widget.ts`, has an empty start column and, when it has no plan, an empty plan column; a plan that exists is still a link to read it. Among the row's tags, a ticket in review shows "In review <label>", a link to its pull request that opens in a new tab; a waiting one shows "Waiting", with "Waiting: <what it waits on>" on hover.

@@ -13,7 +13,7 @@ What the tests cover:
 - **Starting from a flat row** - "Start work on …" starts an agent in that row's own project, with the ticket's file named in the prompt, then reports the started agent under that same project.
 - **"Configure first, then run" from a flat row** - asks the dashboard for that row's own project's launcher with the row's work prompt, not the first project listed, and starts no agent.
 - **Adding the shown tickets** - "Add to queue: all 2 tickets shown below" (the label of the action a mounted widget offers on links, then the set) hands the shown tickets to that action once for their project, as links in the shown order: each the ticket's title pointing at its file, with its priority as a number (5 when it has none); no agent is started; the button then reads "Queued" and is disabled, and arms again the moment the shown set changes, counting the new set ("Add to queue: the ticket shown below").
-- **Claimed tickets are left alone** - a claimed ticket is never handed over, and the label counts only what the click adds ("Add to queue: the one unclaimed ticket shown below").
+- **Claimed tickets are left alone** - a claimed ticket is never handed over, and the label counts only what the click adds ("Add to queue: the one ready ticket shown below").
 - **No offer when there is nothing to offer** - with every ticket hidden by the filters, or with every shown ticket claimed, neither the queue button nor the plan button appears.
 - **Adding plans** - "Add to queue: plans for all 2 tickets shown below" hands one plan ask per shown ticket, as a link with no target, at the ticket's priority; no implementation link goes with it and no agent starts; the button then reads "Queued" and is disabled.
 - **Which tickets still need a plan** - tickets already planned and tickets claimed are skipped, and the label counts what is left ("Add to queue: a plan for the one unplanned ticket shown below"); what is already queued is the action's own to skip, so every unplanned, unclaimed ticket is handed over.
@@ -21,9 +21,11 @@ What the tests cover:
 - **No widget, no buttons** - when no mounted widget offers an action on links, the heading has neither button.
 - **Selection scopes the heading buttons** - every row carries a checkbox; ticking rows shows "2 selected" and makes both heading buttons speak for and act on the selection only ("Add to queue: the 2 selected tickets", "Add to queue: a plan for the selected ticket"), leaving the rest of the shown set untouched; changing the selection re-arms a rested button for the new set.
 - **Clearing the selection** - "Clear selection" removes the readout and hands both buttons back to the whole shown set.
-- **A claimed ticket in the selection** - is still skipped, and the label counts without it ("Add to queue: the one unclaimed selected ticket").
+- **A claimed ticket in the selection** - is still skipped, and the label counts without it ("Add to queue: the one ready selected ticket").
 - **A selected ticket the filters hide** - is neither counted in the readout nor acted on, the buttons speak for the shown set again, and the tick itself survives the filter and comes back with its row.
 - **Selecting in the flat list** - works the same way, and each selected row is handed to the action in its own project.
 - **Reading through the command** - every project's tickets come from `tickets list --local`, run in that project; a project whose command fails is named with the command's reason and the others still show; no project with the package reads "No project has the tickets package."
 - **Opening pages** - a row opens the widget's own page for the ticket, `/tickets/<project>/<file>`; an update started in a section starts `/update-tickets` in that section's project.
 - **A claim's holder** - a claim naming one of the project's runs reads as the run's session name and opens the run.
+- **In review or waiting** - a ticket in review and a waiting one are handed to neither add; only the ready ticket is queued, and the plan add asks only its plan.
+- **All held back** - a set of tickets all in review or waiting shows neither add, with or without a selection.

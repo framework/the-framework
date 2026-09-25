@@ -14,7 +14,7 @@ The Hot tickets card on the dashboard's Overview: across every project that has 
 ## Business logic — TL;DR
 
 - **The read** - `tickets list --local` and the project's runs, in every project that has the package, all projects at once, again every 30 seconds; a project whose command fails is named with the command's reason and the others still show.
-- **The two lanes** - "Claimed": every ticket an agent holds, with the holder; "High priority": every unclaimed ticket at priority 7 or up, with its priority; every other ticket is off the card; an empty lane dims to its header; "Nothing claimed or high priority." when both are empty.
+- **The three lanes** - "Claimed": every ticket an agent holds, with the holder; "High priority": every unclaimed ticket at priority 7 or up that is neither in review nor waiting, with its priority; "Waiting": every unclaimed ticket with a `Waiting:` line, at any priority, with what it waits on; every other ticket is off the card; an empty lane dims to its header; "Nothing claimed, high priority or waiting." when all are empty.
 - **A row** - the ticket's title (its summary on hover) opens the ticket's own page; a holder that is one of the project's runs is named by the run's name, or its id, and opens the run, any other holder is shown as written; the project's name; then the actions the installed widgets offer on the ticket as a link.
 
 ## Business logic
@@ -37,7 +37,7 @@ For each project the dashboard lists as having this package, the card asks the d
 
 #### Business logic
 
-Each ticket is placed by the rule in `src/widget.ts`: a claimed ticket in "Claimed", an unclaimed one whose priority reads 7 or more in "High priority", and every other ticket is left off. The two lanes are stacked, "Claimed" first, each headed by its name and its count; a lane with nothing dims to its header line so the populated lane carries the card. Every ticket in a lane is shown, never a "+N more". When both lanes are empty the card says "Nothing claimed or high priority.", not "no tickets": the backlog may be full.
+Each ticket is placed by the rule in `src/widget.ts`: a claimed ticket in "Claimed", an unclaimed one with a `Waiting:` line in "Waiting" whatever its priority, since only a person removes the line once the wait is over, an unclaimed one whose priority reads 7 or more in "High priority", and every other ticket is left off. The three lanes are stacked, "Claimed", "High priority", then "Waiting", each headed by its name and its count; a lane with nothing dims to its header line so the populated lane carries the card. Every ticket in a lane is shown, never a "+N more". A ticket in review is in no lane unless claimed, and a ticket in review or waiting is never in "High priority": nobody can start it. Claimed, it stays in "Claimed"; in "Claimed" or "Waiting" its row offers no link action. When all lanes are empty the card says "Nothing claimed, high priority or waiting.", not "no tickets": the backlog may be full.
 
 ### A row
 
@@ -47,4 +47,4 @@ See `## Context`.
 
 #### Business logic
 
-A row shows the ticket's title, with its summary (or its title again) on hover; a click opens the ticket's own page in this widget (`/tickets/<project>/<file>`). In the "Claimed" lane the row names the holder: when the claim names one of the project's runs, the run's name (its id until it has one), and a click opens that run's page; any other holder is shown as the claim wrote it and opens nothing. In the "High priority" lane the row shows the ticket's priority instead. Then the project's name, only when more than one project has the package, and the actions the installed widgets offer on links, given the ticket as a link (its title, pointing at `tickets/<file>`, at its own priority) in its own project: "Add to queue" where the project has the queue package, nothing where it does not.
+A row shows the ticket's title, with its summary (or its title again) on hover; a click opens the ticket's own page in this widget (`/tickets/<project>/<file>`). In the "Claimed" lane the row names the holder: when the claim names one of the project's runs, the run's name (its id until it has one), and a click opens that run's page; any other holder is shown as the claim wrote it and opens nothing. In the "High priority" lane the row shows the ticket's priority instead; in "Waiting", what it waits on, cut short with the whole text on hover. Then the project's name, only when more than one project has the package, and the actions the installed widgets offer on links, given the ticket as a link (its title, pointing at `tickets/<file>`, at its own priority) in its own project: "Add to queue" where the project has the queue package, nothing where it does not.

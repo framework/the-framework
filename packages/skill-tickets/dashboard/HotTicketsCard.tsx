@@ -1,10 +1,10 @@
 import { Flame } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, LinkActions, Tooltip, TooltipContent, TooltipTrigger, cn, usePolled, useWidgetHost, type WidgetCardProps, type WidgetProject } from 'framework/widget'
-import { holderAgent, hotLane, readListed, ticketLink, type HotLane } from '../src/widget.js'
+import { heldBack, holderAgent, hotLane, readListed, ticketLink, type HotLane } from '../src/widget.js'
 import type { WorkspaceTicket } from './lib/types.js'
 
-// The Overview's hot-tickets card: a cross-project glance at what agents hold and what is flagged
-// high priority, nothing else. Its data is `tickets list --local` in each project, the list an
+// The Overview's hot-tickets card: a cross-project glance at what agents hold, what is flagged
+// high priority, and what waits on a person, nothing else. Its data is `tickets list --local` in each project, the list an
 // agent reads, with each claim's holder matched to the project's runs the dashboard knows. A row
 // opens the ticket's own page; a claim opens the run holding it; beside every row sit the actions
 // the installed widgets offer on a ticket as a link ("Add to queue" where the project has a queue
@@ -25,10 +25,11 @@ interface Read {
 
 const NOTHING_READ: Read = { hot: [], errors: [] }
 
-/** The two lanes, each with the dot colour of the rest of the status vocabulary: warning = held, info = flagged. */
+/** The three lanes, each with the dot colour of the rest of the status vocabulary: warning = held, info = flagged, muted = parked on a person. */
 const LANES: { key: HotLane; label: string; dot: string }[] = [
   { key: 'claimed', label: 'Claimed', dot: 'bg-warning' },
   { key: 'high-priority', label: 'High priority', dot: 'bg-info' },
+  { key: 'waiting', label: 'Waiting', dot: 'bg-muted-foreground' },
 ]
 
 export function HotTicketsCard({ projects }: WidgetCardProps) {
@@ -80,7 +81,7 @@ export function HotTicketsCard({ projects }: WidgetCardProps) {
         ) : read.hot.length === 0 ? (
           // Named lanes, not "no tickets": the card is a shortlist, and its empty state must not
           // claim the backlog is empty when merely nothing qualifies.
-          <p className="py-2 text-sm text-muted-foreground">Nothing claimed or high priority.</p>
+          <p className="py-2 text-sm text-muted-foreground">Nothing claimed, high priority or waiting.</p>
         ) : (
           // The lanes stacked, not side by side: the card shares the Overview's narrow column with
           // the other packages' cards, and a row needs its width for the title.
@@ -121,7 +122,7 @@ function Lane({ lane, tickets, showProject }: { lane: (typeof LANES)[number]; ti
                   </TooltipTrigger>
                   <TooltipContent className="max-w-[24rem]">{ticket.summary || ticket.title}</TooltipContent>
                 </Tooltip>
-                {/* The one fact that earns the lane: who holds it, else the priority that flagged it. */}
+                {/* The one fact that earns the lane: who holds it, the priority that flagged it, or what it waits on. */}
                 {lane.key === 'claimed' && holder && (
                   ticket.lockedByAgent ? (
                     <button
@@ -136,12 +137,17 @@ function Lane({ lane, tickets, showProject }: { lane: (typeof LANES)[number]; ti
                     <span className="inline-block max-w-[8rem] shrink-0 truncate rounded border border-border px-1 text-[10px] text-warning">{holder}</span>
                   )
                 )}
+                {lane.key === 'waiting' && ticket.waiting && (
+                  <span title={`Waiting: ${ticket.waiting}`} className="inline-block max-w-[10rem] shrink-0 truncate text-[10px] text-muted-foreground">
+                    {ticket.waiting}
+                  </span>
+                )}
                 {lane.key === 'high-priority' && ticket.priority && (
                   <span className="shrink-0 rounded border border-border px-1 text-[10px] uppercase tracking-wide text-muted-foreground">{ticket.priority}</span>
                 )}
                 {/* The project's name only where the card spans several: with one it says nothing. */}
                 {showProject && <span className="shrink-0 text-xs text-muted-foreground">{project.name}</span>}
-                <LinkActions projects={[project.id]} targets={[{ projectId: project.id, links: [ticketLink(ticket)] }]} resetKey={`${project.id}:${ticket.file}`} size="xs" variant="ghost" />
+                {!heldBack(ticket) && <LinkActions projects={[project.id]} targets={[{ projectId: project.id, links: [ticketLink(ticket)] }]} resetKey={`${project.id}:${ticket.file}`} size="xs" variant="ghost" />}
               </li>
             )
           })}

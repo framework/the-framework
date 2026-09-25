@@ -50,6 +50,10 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - The live record is agent-driver's log, written in the run record's shape, and the run
   copies the two files onto the branch unchanged. Picked over the tool's own live log in
   the dashboard's shape, converted at the end: one shape, one file, no temporary label.
+- A run's live directory is hidden from git in the run's checkout alone, by a `.gitignore`
+  of `*` inside it, one already there kept. Picked over a rule in the repository's shared
+  exclude file, which every checkout reads, the project's own included, and over the
+  dashboard forcing its add past that rule.
 - A run ends `waiting` when its last turn asked and nothing waited in the inbox: recorded
   so, its checkout kept for the answer. The answer, or a text, resumes the same run: the
   same id, the same record, the same branch, the session resumed by the id the record

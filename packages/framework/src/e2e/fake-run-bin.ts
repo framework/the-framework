@@ -25,7 +25,7 @@ import { hostname } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { FakeDriver, QUESTION_TAG, continuationPrompt, logDiaryFile, parseQuestion, type LogEndStatus } from 'agent-driver'
-import { excludeFromGit, nodeGitRunner } from '@gemstack/agent-data'
+import { nodeGitRunner } from '@gemstack/agent-data'
 import { agentBranchName, attachCheckout, createCheckout, reclaimWorktree, worktreeBranch, worktreePath } from '@gemstack/skill-branches'
 import { findRun, parseRunCard, readDiary, writeRun, type AnyDiaryLine, type RunCard } from '@gemstack/skill-logs'
 import { agentIdFromStartedAt } from '../agent-id.js'
@@ -54,7 +54,9 @@ async function exists(path: string): Promise<boolean> {
 /** One session of the run in `checkout`: the prompt, the log, the inbox, the record, the reclaim. */
 async function session(id: string, checkout: string, prompt: string, card: Omit<RunCard, 'status'>, continued: boolean): Promise<void> {
   const dir = join(checkout, THE_FRAMEWORK_DIR)
-  await excludeFromGit(checkout, `/${THE_FRAMEWORK_DIR}`).catch(() => {})
+  // Hidden from git in this checkout alone, as the runner does: a `.gitignore` of `*`, the project's own kept.
+  await mkdir(dir, { recursive: true })
+  await writeFile(join(dir, '.gitignore'), '*\n', { flag: 'wx' }).catch(() => {})
   const stop = new AbortController()
   process.on('SIGINT', () => stop.abort())
   process.on('SIGTERM', () => stop.abort())

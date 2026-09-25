@@ -18,5 +18,6 @@ A run's [1] live record [2]: the card and the diary `agent-driver`'s session kee
 ## Business logic — TL;DR
 
 - **Where the files are** - `.the-framework/` in the checkout, the dashboard's directory; the card is `<id>.json`, the diary `<id>.jsonl`, the inbox `inbox.jsonl`.
+- **Hidden in the checkout alone** - a `.gitignore` of `*` in that directory keeps the checkout clean for the reclaim, unless one is already there, which is kept (a project's own must ignore the live files, as the dashboard's does); never a rule in the repository's shared exclude file, which would hide the project's own directory too.
 - **Reading a card as this tool's** - a card is read only when it parses and carries the tool's mark [6]; a checkout without one is not this tool's and is left alone. The diary is read line by line, every line that parses.
 - **Closing from outside** - a dead run's end is appended to the diary as an `ended` line with the status, a detail and the end time as the line's time, and the card rewritten with that status and the end time, both best-effort.

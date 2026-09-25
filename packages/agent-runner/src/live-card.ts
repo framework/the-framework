@@ -1,4 +1,4 @@
-import { appendFile, readFile, writeFile } from 'node:fs/promises'
+import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { logCardFile, logDiaryFile } from 'agent-driver'
 import { parseDiary, parseRunCard, type AnyDiaryLine, type RunCard, type RunStatus } from '@gemstack/skill-logs'
@@ -23,6 +23,20 @@ export function liveDir(checkout: string): string {
 
 export function inboxPath(checkout: string): string {
   return join(liveDir(checkout), INBOX_FILE)
+}
+
+/**
+ * Keep the live directory out of git in this checkout alone, so the tree stays clean for the
+ * reclaim: a `.gitignore` of `*` inside it. Never a rule in the repository's shared exclude file,
+ * which every checkout reads, the project's own included, where it would stop the dashboard from
+ * tracking its directory. A `.gitignore` already there is kept as it is.
+ */
+export async function hideLiveDir(checkout: string): Promise<void> {
+  const dir = liveDir(checkout)
+  await mkdir(dir, { recursive: true })
+  await writeFile(join(dir, '.gitignore'), '*\n', { flag: 'wx' }).catch((err: NodeJS.ErrnoException) => {
+    if (err.code !== 'EEXIST') throw err
+  })
 }
 
 /** A checkout's live card, or `undefined` when it holds none, it does not parse, or it is not this tool's (no mark). */

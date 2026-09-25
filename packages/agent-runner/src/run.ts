@@ -2,10 +2,10 @@ import { hostname } from 'node:os'
 import { mkdir, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { continuationPrompt, logDiaryFile, parseQuestion, promptOf, takeInbox, type Driver, type DriverSession, type LogEndStatus } from 'agent-driver'
-import { excludeFromGit, nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
+import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
 import { agentBranchName, attachCheckout, createCheckout, reclaimWorktree, worktreeBranch, worktreePath } from '@gemstack/skill-branches'
 import { findRun, readDiary, type AnyDiaryLine, type LogsDeps, type RunCard, type RunStatus } from '@gemstack/skill-logs'
-import { inboxPath, liveDir, LIVE_DIR, readLiveCard, readLiveDiary } from './live-card.js'
+import { hideLiveDir, inboxPath, liveDir, readLiveCard, readLiveDiary } from './live-card.js'
 import { markerCard, recordRun, runnerMark, writeMarker, type RunnerMark } from './records.js'
 import { projectGitHost, type GitHost, type MergeOutcome } from './git-host.js'
 import { acquireRunLock, isPidAlive, releaseRunLock } from './run-lock.js'
@@ -332,7 +332,7 @@ async function session(repo: string, run: SessionRun): Promise<RunOutcome> {
     await writeFile(join(dir, logDiaryFile(run.id)), run.priorDiary.map(line => JSON.stringify(line) + '\n').join(''))
   }
   // A checkout with an untracked directory in it is a dirty tree, which the branches rule never reclaims.
-  await excludeFromGit(run.checkout.path, `/${LIVE_DIR}`).catch(() => {})
+  await hideLiveDir(run.checkout.path).catch(() => {})
 
   // A signal stops the run: the first aborts the session, which ends the agent's process tree.
   // The handlers stay until this process is done, so a second signal, or one that comes while the

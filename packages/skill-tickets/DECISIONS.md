@@ -3,8 +3,8 @@ to the implementer's judgment. Flag conflicts instead of silently deviating. Kee
 outdated decisions (no history).
 
 A bullet is a person's pick, and says what it was picked over. What the code does belongs
-in SPEC.md; a choice made while implementing is the implementer's judgment, not a
-decision. An AI proposes a bullet and asks; it never adds or rewrites one.
+in the LOGIC.md files; a choice made while implementing is the implementer's judgment,
+not a decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 
 ## The tickets
 - Two callers: the command an agent runs, and a dashboard, which reads the tickets through
@@ -59,7 +59,11 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - A claim the program committed but could not push still counts: the commit already guards
   this machine's readers, and the gap is logged. A write that could not commit claims
   nothing. The program's release is judged the same way: committed counts, pushed or not.
-  A queue edit is not: it counts only once pushed.
+- A claim answers who claimed the ticket before: every holder the lock file's history
+  names, newest first, each once, the claimer itself left out. The history keeps a
+  released claim, and every agent that works a ticket claims it, so the answer arrives
+  when the agent needs it. Picked over the run record naming its ticket (the run starts
+  before the agent picks one) and over the agent tagging its own run (it has to remember).
 - Claiming a ticket you already hold succeeds and writes nothing, so a re-run does not
   read its own lock as someone else's.
 - The holder is never typed: `AGENT_ID` when non-blank, else the current branch. The id
@@ -97,8 +101,8 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   A file no command may touch refuses with `invalid-path`. Anything a command throws
   refuses with `git-failed`. Outside a repository a command refuses `not-a-repo`; only
   git's own "not a git repository" reads as that.
-- `list` answers with a JSON array; every other result and every refusal is an object with
-  `ok`.
+- `list` answers with a JSON array and `meta` with the bare stamp object (`{}` when none);
+  every other result and every refusal is an object with `ok`.
 - The command's write is one commit per command, pushed straight to origin through a
   throwaway worktree at origin's tip; a push that loses a race is re-applied on the new
   tip by `@gemstack/agent-data`. The program's writes go through its persistent checkout's

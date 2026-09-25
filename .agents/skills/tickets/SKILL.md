@@ -46,7 +46,7 @@ npx tickets release <file>       lift your own claim when the plan or the work i
                                  stop unless you closed the ticket: nothing lifts a claim on a timeout
 ```
 
-`put` ignores claims. You claim as `AGENT_ID` when it is set, else as your current branch: release from the branch you claimed on, or the claim stays until a person lifts it.
+`put` ignores claims. You claim as `AGENT_ID` when it is set and not blank, else as your current branch: release from the branch you claimed on, or the claim stays until a person lifts it.
 
 ## Queue a ticket
 

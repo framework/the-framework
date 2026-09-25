@@ -10,8 +10,7 @@ What the tests cover:
 - **A missing ticket** - reads "This ticket does not exist." rather than rendering blank.
 - **A claimed ticket** - shows the "claimed" badge with the holder named inline, so the user knows whose claim they are about to lift, and offers "Release lock"; an unclaimed ticket shows neither.
 - **Releasing** - lifts that ticket's claim and takes the badge and the button away at once, without waiting for the next read.
-- **A refused release** - shows the command's reason and leaves the claim standing.
-- **Back** - returns to the tickets list.
+- **A failed release** - shows why it failed and leaves the claim standing.
 - **Read and release through the command** - the ticket is read with `tickets show <file> --local` in its project; the release runs `tickets release <file> --force` as an act on the project, never as a plain read; a command that cannot run is named as such, not shown as a missing ticket.
 - **A claim's holder** - a claim naming one of the project's runs reads as its session name and opens the run.
 - **The way back** - "Tickets" opens the widget's list page.

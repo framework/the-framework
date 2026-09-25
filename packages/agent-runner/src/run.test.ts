@@ -275,6 +275,34 @@ test('a run whose last turn asked ends waiting and keeps its checkout; the answe
   }
 })
 
+test("the person's ended line runs when a run ends waiting and when it ends done with a new pull request, never again for the same one", async () => {
+  const repo = await testRepo()
+  try {
+    const out = join(repo, '..', 'ended.txt')
+    await mkdir(join(repo, '.agent-runner'), { recursive: true })
+    await writeFile(join(repo, '.agent-runner', 'config.yml'), `ended: printf '%s|%s|%s|%s\\n' "$STATUS" "$QUESTION" "$PR_URL" "$MESSAGE" >> '${out}'\n`)
+    const lines = async () => (await readFile(out, 'utf8').catch(() => '')).split('\n').filter(Boolean)
+
+    const asking = new FakeDriver({ turns: [{ text: QUESTION }], sessionId: 's-ask' })
+    const first = await runCommand(repo, { prompt: '/work-queue', driver: asking, now: () => NOW, gitHost: noGitHost })
+    assert.equal(first.status, 'waiting')
+    assert.deepEqual(await lines(), ['waiting|Ship it?||repo: "/work-queue" is waiting for you: Ship it?'])
+
+    const gitHost = fakeGitHost('agent-fix-it')
+    gitHost.open()
+    const second = await resumeRun(repo, { id: first.id, answer: 'Approve', driver: committingDriver(), now: () => NOW, gitHost })
+    assert.equal(second.status, 'done')
+    assert.deepEqual((await lines())[1], 'done||https://example.com/x/y/pull/12|repo: "/work-queue" opened a pull request: https://example.com/x/y/pull/12')
+
+    // Continued again, the same pull request: nothing new for the person.
+    const third = await resumeRun(repo, { id: first.id, text: 'one more thing', driver: new FakeDriver({ turns: [{ text: 'Done.' }] }), now: () => NOW, gitHost })
+    assert.equal(third.status, 'done')
+    assert.equal((await lines()).length, 2)
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
 test('a line already in the inbox when the turn ends becomes the next turn of the same run', async () => {
   const repo = await testRepo()
   try {
@@ -391,6 +419,9 @@ function publishingDriver(gitHost: ReturnType<typeof fakeGitHost>, seen: { promp
 test('a run with a follow-up: its agent is told not to arm the merge, a fresh agent works its branch with the run\'s id, and the request is merged once that one ends done', async () => {
   const repo = await testRepo()
   try {
+    const out = join(repo, '..', 'ended.txt')
+    await mkdir(join(repo, '.agent-runner'), { recursive: true })
+    await writeFile(join(repo, '.agent-runner', 'config.yml'), `ended: printf '%s\\n' "$MESSAGE" >> '${out}'\n`)
     const gitHost = fakeGitHost('agent-fix-it')
     const { calls } = gitHost
     const seen: { prompt?: string } = {}
@@ -449,6 +480,7 @@ test('a run with a follow-up: its agent is told not to arm the merge, a fresh ag
     assert.equal(recorded?.intent, `/post-merge-cleanup ${outcome.id}`)
     assert.deepEqual(recorded?.caller?.['runner'], { host: 'this-box', pid: 4242 })
     assert.equal((await git(['rev-parse', 'refs/remotes/origin/agent-fix-it'], repo)).trim(), (await git(['rev-parse', 'agent-fix-it'], repo)).trim(), 'the follow-up\'s commit is on the same branch, pushed')
+    assert.deepEqual((await readFile(out, 'utf8')).split('\n').filter(Boolean), ['repo: "/work-queue" opened a pull request: https://example.com/x/y/pull/12'], 'the pull request is announced once, by the run that opened it, not again by its follow-up')
   } finally {
     await removeRepo(repo)
   }

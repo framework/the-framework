@@ -2,7 +2,6 @@ import { createServer, type Server, type IncomingMessage, type ServerResponse } 
 import { timingSafeEqual } from 'node:crypto'
 import type { AddressInfo } from 'node:net'
 import type { PreferencesStore } from '../registry.js'
-import type { DiscordCredentialsStore } from '../discord-credentials.js'
 import type { QuotaSource } from './quota.js'
 import type { ProjectErrorsReader } from '../project-errors.js'
 import type { BridgeBrowserOwner } from '../bridge-browser.js'
@@ -43,12 +42,6 @@ export interface DashboardOptions {
    * write it through the wired dashboard context.
    */
   preferences: PreferencesStore
-  /**
-   * The Discord credentials store (#1095): `onNotifyChannels` reports what it holds and
-   * `saveDiscordCredentials` writes through it. The daemon passes one that also reloads its
-   * Discord services, so a pasted token takes effect with no restart.
-   */
-  discord: DiscordCredentialsStore
   /** Where the usage panel reads the quota from (#533). */
   quota: QuotaSource
   /** What a project currently suffers from (#1500), for the project list to carry. */
@@ -148,7 +141,6 @@ export function startDashboard(opts: DashboardOptions): Promise<Dashboard> {
       eventsSource: opts.eventsSource,
       remote: opts.remote,
       preferences: opts.preferences,
-      discord: opts.discord,
       projectErrors: opts.projectErrors,
       bridgeBrowser: opts.bridgeBrowser,
       quota,

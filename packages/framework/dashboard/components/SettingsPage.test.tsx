@@ -22,7 +22,6 @@ vi.mock('../rpc/reads.js', async importOriginal => ({
   ...(await importOriginal<typeof import('../rpc/reads.js')>()),
   onBridgeToken: vi.fn(async () => null),
   onBridgeBrowser: vi.fn(async () => ({ state: 'off' as const })),
-  onNotifyChannels: vi.fn(async () => ({})),
   onPreferences: vi.fn(async () => ({})),
   onDetectedEditors: vi.fn(async () => []),
   onDashboard: vi.fn(async () => null),

@@ -13,13 +13,9 @@ export {
   onProjectPresets,
   saveProjectPresets,
   onEditors,
-  onNotifyChannels,
-  saveDiscordCredentials,
   type SavePreferencesResult,
   type PatchPreferencesResult,
-  type NotifyChannels,
 } from './preferences.js'
-export type { CredentialSource, DiscordCredentialStatus, DiscordCredentialsPatch } from '../discord-credentials.js'
 export { type EditorInfo } from '../dashboard/open-in-app.js'
 export { onQuota } from './quota.js'
 export { checkDevices, type DeviceCheck } from './devices.js'

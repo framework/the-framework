@@ -1,10 +1,6 @@
-import type { ProjectSummary, ProjectionRead } from './projects.js'
-
-// The daemon-side half of notifications (#627): a background poll of a projection over the
-// registered projects that fires even when no dashboard is open — that is what a Discord
-// message buys over the browser notification. One engine, two callers: the "needs you" queue
-// (#627) and the "New activity" feed. They differ only in what they project and how an item
-// is identified, so those are parameters rather than a second copy of the poll.
+// The baseline half of the browser's notifications (#627): what a feed already held versus what
+// is new. One engine, two feeds: the "needs you" queue and the "New activity" feed. They differ
+// only in how an item is identified, so that is a parameter rather than a second copy.
 
 /**
  * Tracks which items have been announced, so only new ones notify. Identity is the caller's
@@ -42,68 +38,5 @@ export class SeenTracker<T> {
     for (const item of items) this.seen.add(this.keyOf(item))
     for (const project of whole) this.warmedUp.add(project)
     return fresh
-  }
-}
-
-/** A running watcher; call {@link KeyedWatcher.stop} to end it. */
-export interface KeyedWatcher {
-  stop: () => void
-  /** Run one poll now. Exposed so the daemon and tests can drive it deterministically. */
-  poll: () => Promise<void>
-}
-
-/** Options for {@link startKeyedWatcher}. */
-export interface KeyedWatcherOptions<T> {
-  /** The projects to scan each poll (the daemon passes the registry, mapped to summaries). */
-  projects: () => Promise<ProjectSummary[]>
-  /**
-   * Project the scanned projects into the items being watched, and name the projects that were read
-   * whole — the ones whose share of the items is all of it, rather than all that could be reached.
-   */
-  build: (projects: ProjectSummary[]) => Promise<ProjectionRead<T>>
-  /** The stable identity of an item, so the same one is only ever announced once. */
-  keyOf: (item: T) => string
-  /** Which project an item belongs to: the baseline is kept per project (#1623). */
-  scopeOf: (item: T) => string
-  /** Called with the genuinely-new items each poll (empty polls are skipped). */
-  onNew: (items: T[]) => void | Promise<void>
-}
-
-/**
- * Watch a projection and hand each poll's new items to `onNew`. A project's first *whole* read only
- * seeds that project's baseline. Forgiving — a failed project scan or projection just yields no new
- * items that cycle, and earns no baseline: the baseline must come from a real read, or a first poll
- * that could not reach the git host would make the next good one announce everything pre-existing as new.
- *
- * Owns no timer (E4): the daemon's one clock calls {@link KeyedWatcher.poll}, so the cadence is
- * declared where every other background job's is.
- */
-export function startKeyedWatcher<T>(opts: KeyedWatcherOptions<T>): KeyedWatcher {
-  const tracker = new SeenTracker(opts.keyOf, opts.scopeOf)
-  let stopped = false
-  let running = false
-
-  const poll = async (): Promise<void> => {
-    if (stopped || running) return
-    running = true
-    try {
-      let read: ProjectionRead<T>
-      try {
-        read = await opts.build(await opts.projects())
-      } catch {
-        return
-      }
-      const fresh = tracker.observe(read.items, read.whole)
-      if (fresh.length > 0 && !stopped) await opts.onNew(fresh)
-    } finally {
-      running = false
-    }
-  }
-
-  return {
-    stop: () => {
-      stopped = true
-    },
-    poll,
   }
 }

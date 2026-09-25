@@ -1,4 +1,4 @@
-export { RUNNER_DIR, RUNS_DIR, DASHBOARD_DIR, DASHBOARD_HOOKS } from './names.js'
+export { RUNNER_DIR, RUNS_DIR, RUNNER_CONFIG, DASHBOARD_DIR, DASHBOARD_HOOKS } from './names.js'
 export { markerCard, writeMarker, withdrawMarker, recordRun, runnerMark, type RunnerMark } from './records.js'
 export { runCommand, resumeRun, runIdFrom, agentPrompt, HOLD_MERGE_LINE, type RunOptions, type ResumeOptions, type RunOutcome } from './run.js'
 export { sweep, type SweepDeps, type SweepResult } from './sweep.js'

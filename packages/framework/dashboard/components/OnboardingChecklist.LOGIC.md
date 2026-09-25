@@ -1,8 +1,8 @@
-The "Onboarding" card: the five things a new install needs (fewer while no project has a queue, or none has a package providing tickets), each shown in the state it is actually in. A step is ticked only because a fact holds — a registered project, a non-empty agent queue [2], a ticket on disk, a granted browser permission, a Discord webhook held by the daemon — never because it was clicked, and each open step carries the action that gets it done, including a one-click first project and a one-click import of the project's issues.
+The "Onboarding" card: the four things a new install needs (fewer while no project has a queue, or none has a package providing tickets), each shown in the state it is actually in. A step is ticked only because a fact holds — a registered project, a non-empty agent queue [2], a ticket on disk, a granted browser permission — never because it was clicked, and each open step carries the action that gets it done, including a one-click first project and a one-click import of the project's issues.
 
 ## Context
 
-**User story**: on first launch the user sees "Onboarding — 0 of 5 set up.", adds the directory the daemon runs in as a project with one click, fills `tickets/` from the project's issue tracker with another, and watches the rows tick as the facts change, even for steps done outside the dashboard. On the Overview [4] the card can be dismissed; the Settings [5] page always shows it, which is what dismissing promises.
+**User story**: on first launch the user sees "Onboarding — 0 of 4 set up.", adds the directory the daemon runs in as a project with one click, fills `tickets/` from the project's issue tracker with another, and watches the rows tick as the facts change, even for steps done outside the dashboard. On the Overview [4] the card can be dismissed; the Settings [5] page always shows it, which is what dismissing promises.
 
 ## Glossary
 
@@ -10,20 +10,17 @@ The "Onboarding" card: the five things a new install needs (fewer while no proje
 [2] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down. An item on it is a queue entry.
 [3] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 [4] the Overview: the dashboard's cross-project page at `/`.
-[5] Settings: the settings page.
 [6] launcher: the Start form on a project's own page.
 [9] agent view: one agent's page.
-[10] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds.
 
 ## Business logic — TL;DR
 
 - **Every "done" is a fact** - the card re-reads the dashboard's state every 10 seconds and derives each tick from it; nothing is ticked by clicking, and a step done elsewhere shows ticked anyway.
-- **The card, its count and its dismissal** - "Onboarding" with "<n> of 5 set up."; on the Overview [4] an X hides it for good by writing the dismissal to the preferences [3], and the Settings [5] page always shows it.
+- **The card, its count and its dismissal** - "Onboarding" with "<n> of 4 set up."; on the Overview [4] an X hides it for good by writing the dismissal to the preferences [3], and the Settings [5] page always shows it.
 - **"Add a project"** - done once any project is registered; offers "Add <directory> as project" for the directory the daemon runs in when it is not registered yet, and "Select & add project directory".
 - **"Populate the queue of AI tasks"** - on the board only while some registered project has a queue at all (a queue comes from a package the project depends on); done once any project's agent queue [2] has an open entry; the one essential step with no button, it is done by agents.
 - **"Populate tickets/"** - on the board only while some registered project has a package providing tickets; optional; done once any project has tickets; "Update tickets" starts an agent [1] with the project's `update-tickets` command on the target project and lands the user on it, or, through its chevron, opens that project's launcher [6] with the prompt.
 - **"Add browser notifications"** - optional; done once the browser permission is granted and browser delivery is on; "Enable" turns delivery on and asks the browser for permission.
-- **"Add Discord notifications"** - optional; done once the daemon holds a Discord webhook; "Add the webhook" opens the dialog that saves one.
 
 ## Business logic
 
@@ -45,7 +42,7 @@ See `## Context`.
 
 #### Business logic
 
-The card is titled "Onboarding" with "<done> of 5 set up." under it. On the Overview [4] the header has an X button named "Remove, you can resume the onboarding on the settings page" (also its tooltip); clicking it writes the dismissal to the preferences [3], and the Overview no longer shows the card. The Settings [5] page renders the same card without the X.
+The card is titled "Onboarding" with "<done> of 4 set up." under it. On the Overview [4] the header has an X button named "Remove, you can resume the onboarding on the settings page" (also its tooltip); clicking it writes the dismissal to the preferences [3], and the Overview no longer shows the card. The Settings [5] page renders the same card without the X.
 
 ### "Add a project"
 
@@ -92,13 +89,3 @@ The step is listed only while at least one registered project has a queue, that 
 
 - Description: "Desktop pings while the dashboard is open, so a session waiting on you does not sit unnoticed." Optional. Done when the browser's notification permission is granted and browser delivery is on in the preferences [3].
 - The action depends on the browser's permission state: "Enable" while it is undecided or already granted, which turns browser delivery on in the preferences and, if the permission is still undecided, asks the browser for it (the request rides the click, as browsers require); "Blocked in your browser settings" when the permission is denied; "Not supported by this browser" when the browser has no notifications.
-
-### "Add Discord notifications"
-
-#### Context
-
-**User story**: with no dashboard open at all, an intervention [10] still reaches the user on Discord.
-
-#### Business logic
-
-Description: "Delivers notifications to Discord, so an agent waiting on you reaches you with no dashboard open." Optional. Done when the daemon holds a Discord webhook; the fact is shared with the Settings [5] rows and the notifications bell so a webhook saved anywhere ticks this row too. "Add the webhook" opens the Discord webhook dialog (`DiscordDialogs.tsx`); after a save the shared fact is re-read.

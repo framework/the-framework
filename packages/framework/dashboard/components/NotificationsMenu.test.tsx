@@ -1,22 +1,14 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { Preferences } from '../../src/index.js'
 import { hoverTooltip } from '../test-utils.js'
 
 const updatePreferences = vi.hoisted(() => vi.fn())
-// The daemon's channel capability (#948), read through the shared store since #1095: both
-// configured unless a test overrides it. Mocked at the lib layer like the preferences below,
-// so a test sets the fact directly rather than racing a module-level cache to fill.
-const channels = vi.hoisted(() => ({
-  value: { discordWebhook: true, sources: {}, editable: true } as unknown,
-}))
-vi.mock('../lib/notify-channels.js', () => ({ useNotifyChannels: () => channels.value }))
 let prefs: Preferences = {}
 vi.mock('../lib/preferences.js', () => ({
   usePreferences: () => prefs,
   updatePreferences,
   notificationsEnabled: (p: Preferences) => p.notifyBrowser ?? true,
-  discordEnabled: (p: Preferences) => p.notifyDiscord ?? false,
   newActivityEnabled: (p: Preferences) => p.notifyNewActivity ?? false,
   humanInterventionEnabled: (p: Preferences) => p.notifyHumanIntervention ?? true,
 }))
@@ -25,7 +17,6 @@ const { NotificationsMenu } = await import('./NotificationsMenu.js')
 
 beforeEach(() => {
   prefs = {}
-  channels.value = { discordWebhook: true, sources: {}, editable: true }
   updatePreferences.mockReset()
   vi.stubGlobal('Notification', { permission: 'granted', requestPermission: vi.fn() })
 })
@@ -40,23 +31,20 @@ const open = () => fireEvent.click(bell())
 const bellTooltip = async () => (await hoverTooltip(bell())).textContent
 
 describe('NotificationsMenu (#676)', () => {
-  test('the popover groups methods and categories, both "Human Queue" and "New activity" toggleable', () => {
+  test('the popover groups the method and the categories, both "Human Queue" and "New activity" toggleable', () => {
     render(<NotificationsMenu />)
     open()
     expect(screen.getByText('Deliver to')).toBeTruthy()
     expect(screen.getByText('Browser')).toBeTruthy()
-    expect(screen.getByText('Discord')).toBeTruthy()
     expect(screen.getByText('Notify me about')).toBeTruthy()
     expect(screen.getByText('Human Queue')).toBeTruthy()
     expect(screen.queryByText('Always on')).toBeNull() // #627: now a real toggle, no static row
     expect(screen.getByText('New activity')).toBeTruthy()
   })
 
-  test('toggling Discord, New activity, and Human Queue writes each preference through', () => {
+  test('toggling New activity and Human Queue writes each preference through', () => {
     render(<NotificationsMenu />)
     open()
-    fireEvent.click(screen.getByText('Discord'))
-    expect(updatePreferences).toHaveBeenCalledWith({ notifyDiscord: true })
     fireEvent.click(screen.getByText('New activity'))
     expect(updatePreferences).toHaveBeenCalledWith({ notifyNewActivity: true })
     // Defaults on, so the click turns it OFF (#627).
@@ -74,10 +62,10 @@ describe('NotificationsMenu (#676)', () => {
     expect((globalThis.Notification as unknown as { requestPermission: () => void }).requestPermission).toHaveBeenCalled()
   })
 
-  test('the bell reads active when a granted method is on, idle otherwise', async () => {
+  test('the bell reads active when Browser is on and granted, idle otherwise', async () => {
     const { rerender } = render(<NotificationsMenu />) // default: browser on + granted
     expect(await bellTooltip()).toBe('Notifications on')
-    prefs = { notifyBrowser: false } // no method effectively on
+    prefs = { notifyBrowser: false }
     rerender(<NotificationsMenu />)
     expect(await bellTooltip()).toBe('Notifications')
   })
@@ -89,20 +77,17 @@ describe('NotificationsMenu (#676)', () => {
     expect(screen.getByText('Blocked in your browser settings')).toBeTruthy()
   })
 
-  // #948: the toggle is a preference; delivery needs the daemon env var. An unconfigured
-  // channel must neither light the bell nor read as if it will page you.
-  test('Discord on with no webhook does not light the bell and says why', async () => {
-    channels.value = { discordWebhook: false, sources: {}, editable: true }
-    prefs = { notifyDiscord: true, notifyBrowser: false }
+  test('Browser on but not yet granted leaves the bell idle', async () => {
+    vi.stubGlobal('Notification', { permission: 'default', requestPermission: vi.fn() })
     render(<NotificationsMenu />)
-    await waitFor(async () => expect(await bellTooltip()).toBe('Notifications'))
-    open()
-    expect(screen.getByText('Not configured — add a webhook in Settings')).toBeTruthy()
+    expect(await bellTooltip()).toBe('Notifications')
   })
 
-  test('a configured webhook keeps the bell lit for Discord delivery', async () => {
-    prefs = { notifyDiscord: true, notifyBrowser: false }
+  test('with no browser notification support the menu offers only the categories', () => {
+    vi.stubGlobal('Notification', undefined)
     render(<NotificationsMenu />)
-    await waitFor(async () => expect(await bellTooltip()).toBe('Notifications on'))
+    open()
+    expect(screen.queryByText('Deliver to')).toBeNull()
+    expect(screen.getByText('Human Queue')).toBeTruthy()
   })
 })

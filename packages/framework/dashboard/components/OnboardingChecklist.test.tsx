@@ -9,15 +9,11 @@ const onDashboard = vi.hoisted(() => vi.fn())
 const onOnboarding = vi.hoisted(() => vi.fn())
 vi.mock('../rpc/reads.js', () => ({ onDashboard }))
 vi.mock('../rpc/projects.js', () => ({ onOnboarding, sendAddProject: vi.fn(), sendPickProjectDirectory: vi.fn() }))
-vi.mock('../rpc/preferences.js', () => ({ saveDiscordCredentials: vi.fn() }))
 vi.mock('../lib/preferences.js', () => ({
   usePreferences: () => ({}),
   updatePreferences: vi.fn(),
   notificationsEnabled: () => false,
-  discordBotEnabled: () => false,
-  discordEnabled: () => false,
 }))
-vi.mock('../lib/notify-channels.js', () => ({ useNotifyChannels: () => null, reloadNotifyChannels: vi.fn() }))
 vi.mock('../lib/notification-permission.js', () => ({ useNotificationPermission: () => 'default' }))
 // One stable object, so a test can steer the start and its error without a re-mock.
 const startAgent = vi.hoisted(() => ({ start: vi.fn(), busy: false, error: null as string | null }))
@@ -68,8 +64,8 @@ describe('OnboardingChecklist (#1139)', () => {
     render(<OnboardingChecklist onAgentStarted={vi.fn()} onSelectProject={() => {}} />)
     await waitFor(() => expect(screen.getByText('Add a project')).toBeTruthy())
 
-    // Four integrations/inputs are optional; adding a project and filling the queue are not.
-    expect(screen.getAllByText('Optional')).toHaveLength(3)
+    // Tickets and browser notifications are optional; adding a project and filling the queue are not.
+    expect(screen.getAllByText('Optional')).toHaveLength(2)
     const marked = (label: string) => screen.getByText(label).querySelector('span')?.textContent === 'Optional'
     expect(marked('Add a project')).toBe(false)
     expect(marked('Populate the queue of AI tasks')).toBe(false)

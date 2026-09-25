@@ -9,7 +9,7 @@ Keeps, per project [1], the states a sweep [2] of the daemon finds that the user
 ## Glossary
 
 [1] project: a repository the user registered in the dashboard, identified by an id derived from its path.
-[2] sweep: a background job the daemon runs on its clock: the data sync, the notification watchers, the cloud scratch sweep, cloud work adoption. None of them starts an agent.
+[2] sweep: a background job the daemon runs on its clock: the data sync, the cloud scratch sweep, cloud work adoption. None of them starts an agent.
 [3] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs. Born as an orphan, written through one sync → commit → push cycle.
 [4] tick: one beat of the daemon's single background clock; each sweep says how many ticks it waits between turns.
 

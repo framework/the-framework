@@ -5,12 +5,11 @@ import { startDashboard, type Dashboard } from './dashboard/index.js'
 import { createProjectRuntime } from './daemon-runtime.js'
 import { defaultQuotaSource } from './dashboard/quota.js'
 import { loosestSpendOffset, readSchedulerState } from './dashboard/scheduler-state.js'
-import { startBackgroundServices, type BackgroundServices } from './daemon-services.js'
+import { startBackgroundServices } from './daemon-services.js'
 import { projectErrorStore } from './project-errors.js'
 import { resolveDashboardBundle } from './dashboard/bundle.js'
 import { isActivated } from './project.js'
 import { addProject, ensureDaemonToken, listProjects, nodeRegistryFs, readPreferences, registryPreferencesStore, type Preferences } from './registry.js'
-import { registryDiscordCredentialsStore } from './discord-credentials-store.js'
 import { isLoopbackHost } from './loopback-host.js'
 import { bridgeSessionsFrom } from './dashboard/bridge-sessions.js'
 import { bridgeQuestions } from './dashboard/bridge-store.js'
@@ -171,9 +170,6 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
     }
     return (opts.bridgeBrowser ?? (o => startBridgeBrowser(o)))({ daemonUrl, token: bridgeToken, dir: bridgeBrowserDir(env), report })
   }, console.log)
-  // Assigned below, read from the credentials store's `onChange` (#1095): the dashboard mount has
-  // to exist before the services do, and a save can only arrive over a mount that is already up.
-  let services: BackgroundServices | undefined
   const dashboard: Dashboard = await startDashboard({
     host,
     port,
@@ -188,11 +184,7 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
     relay: { tailEvents: runtime.tailRelayEvents, rpc: runtime.onRelayRpc },
     // The browser bridge (#1237): absent unless the preference is on, which 404s every route.
     ...(bridgeToken ? { bridgeToken, bridgeSessions: () => listBridgeSessions(env) } : {}),
-    // Configure Discord from the dashboard (#1095). `onChange` is the half that makes the step
-    // finishable in-product: the credential is written to the registry, then this daemon's own
-    // Discord services are rebuilt against it, so the bot connects without a restart.
-    discord: registryDiscordCredentialsStore({ env, onChange: () => services?.reloadDiscord() }),
-    // The bridge browser follows its switch the same way (#1332): on launches it, off closes it.
+    // The bridge browser follows its switch (#1332): on launches it, off closes it, without a restart.
     preferences: registryPreferencesStore(nodeRegistryFs(), env, written => {
       if (written.bridgeBrowser === true) void bridgeBrowser.start()
       if (written.bridgeBrowser === false) void bridgeBrowser.stop()
@@ -226,11 +218,10 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
     await runProjectHooks(record.path, 'open', { log: console.log })
   }
 
-  // Everything that runs in the background beside serving the dashboard: the Discord watchers,
-  // the data sync and the cloud sweeps.
-  services = startBackgroundServices({
+  // Everything that runs in the background beside serving the dashboard: the data sync and the
+  // cloud sweeps.
+  const services = startBackgroundServices({
     env,
-    dashboardUrl: dashboard.url,
     projectErrors,
     log: console.log,
   })

@@ -53,12 +53,12 @@ describe('preferences', () => {
   })
 
   test('the initial load populates the cache when no optimistic write raced it', async () => {
-    onPreferences.mockResolvedValue({ notifyBrowser: false, notifyDiscord: true })
+    onPreferences.mockResolvedValue({ notifyBrowser: false, notifyNewActivity: true })
     const { usePreferences } = await import('./preferences.js')
 
     const { result } = renderHook(() => usePreferences())
     await flush()
-    expect(result.current).toEqual({ notifyBrowser: false, notifyDiscord: true })
+    expect(result.current).toEqual({ notifyBrowser: false, notifyNewActivity: true })
   })
 
   // A stale tab reverting settings it never touched (#1148).

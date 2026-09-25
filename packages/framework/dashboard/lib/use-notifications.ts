@@ -3,10 +3,9 @@ import type { Activity, Intervention } from '../../src/index.js'
 import { SeenTracker, activityKey, interventionKey, type ProjectionRead } from '../../src/client.js'
 
 // Browser notifications for the two feeds the shell already polls (#627): the "needs you"
-// queue and the "new activity" feed. One engine — identity and baseline are both the same code
-// the daemon's Discord notifier runs, imported from the framework so the two surfaces cannot
-// drift (#935 unified the server side; this is the client side of the same move). What differs
-// per feed is wording and where a click goes, which is what a spec is.
+// queue and the "new activity" feed. One engine — identity and baseline are imported from the
+// framework, beside the item types they read, so they cannot drift from them. What differs per
+// feed is wording and where a click goes, which is what a spec is.
 //
 // Two guards keep it quiet: it never fires unless enabled AND the browser permission is granted,
 // and a project's backlog is absorbed as a baseline the first time that project is read whole —
@@ -16,7 +15,7 @@ import { SeenTracker, activityKey, interventionKey, type ProjectionRead } from '
 // opened while the daemon could not reach the git host spent both of them on empty lists, and the first
 // fetch that did reach the git host announced every already-open pull request as new.
 
-/** The per-feed half: identity (shared with the daemon's notifier) plus wording and click target. */
+/** The per-feed half: identity plus wording and click target. */
 interface NotificationSpec<T> {
   keyOf: (item: T) => string
   title: (first: T, count: number) => string

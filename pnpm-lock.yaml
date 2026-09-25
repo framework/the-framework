@@ -14,6 +14,9 @@ importers:
       '@gemstack/skill-browser':
         specifier: workspace:*
         version: link:packages/skill-browser
+      '@gemstack/skill-discord':
+        specifier: workspace:*
+        version: link:packages/skill-discord
       '@gemstack/skill-github':
         specifier: workspace:*
         version: link:packages/skill-github
@@ -230,6 +233,15 @@ importers:
         version: 7.0.2
 
   packages/skill-browser:
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.43
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
+  packages/skill-discord:
     devDependencies:
       '@types/node':
         specifier: ^20.0.0

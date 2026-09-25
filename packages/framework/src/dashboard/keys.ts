@@ -2,14 +2,13 @@ import type { Activity } from './activity.js'
 import type { Intervention } from './interventions.js'
 
 /**
- * The stable identity of a watched item, and the "only what is new" diff both notifier paths run.
+ * The stable identity of a watched item, which the browser notifications dedupe on.
  *
  * A leaf module on purpose: `activity.ts` and `interventions.ts` build their items by reading the
- * store, so they import `node:*` and cannot be reached from the browser bundle. These four
- * functions are pure and depend on nothing but the item, so they live here and are re-exported
- * from `client.ts` — which is what lets the dashboard share them instead of keeping the copy it
- * used to keep. A copy is not free here: the key IS the identity the daemon dedupes on, so a
- * drifted one silently double-notifies or silently never notifies, with nothing to type-check.
+ * store, so they import `node:*` and cannot be reached from the browser bundle. These functions
+ * are pure and depend on nothing but the item, so they live here and are re-exported from
+ * `client.ts` — which is what lets the dashboard share them instead of keeping a copy that could
+ * drift from the item types.
  *
  * The type imports are erased at compile time, so they add no edge to the graph `client.test.ts`
  * walks.
@@ -17,9 +16,8 @@ import type { Intervention } from './interventions.js'
 
 /**
  * The stable identity of an intervention. A PR is its url (survives title edits and re-sorts);
- * the other two are keyed on the project plus the thing waiting — the agent and the gate it is
- * parked on, or the agent whose branch is unpushed — since their url is the shared dashboard URL
- * and would otherwise collide.
+ * the other two have no url and are keyed on the project plus the thing waiting — the agent and
+ * the gate it is parked on, or the agent whose branch is unpushed.
  *
  * The agent is part of the awaiting key because a gate id is only unique within its own agent:
  * every agent's first gate is `await-choices`. Two agents running in one project (#736) and both
@@ -28,7 +26,7 @@ import type { Intervention } from './interventions.js'
 export function interventionKey(item: Intervention): string {
   if (item.kind === 'awaiting') return `awaiting:${item.projectId}:${item.agentId ?? ''}:${item.awaitId ?? ''}`
   if (item.kind === 'unpushed') return `unpushed:${item.projectId}:${item.agentId ?? ''}`
-  return item.url
+  return item.url ?? ''
 }
 
 /**

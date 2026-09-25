@@ -1,4 +1,4 @@
-Keeps the one file The Framework owns for the user, the registry [1] at `~/.the-framework.json`: the projects the user registered, the preferences [2] behind the dashboard's Settings [3] page, the daemon token that authenticates a dashboard exposed to the network, and the Discord webhook. Every read forgives a damaged or hand-edited file; every write is validated, atomic, owner-only and serialized with the other writes.
+Keeps the one file The Framework owns for the user, the registry [1] at `~/.the-framework.json`: the projects the user registered, the preferences [2] behind the dashboard's Settings [3] page, and the daemon token that authenticates a dashboard exposed to the network. Every read forgives a damaged or hand-edited file; every write is validated, atomic, owner-only and serialized with the other writes.
 
 ## Context
 
@@ -29,7 +29,6 @@ Keeps the one file The Framework owns for the user, the registry [1] at `~/.the-
 - **Saving preferences: replace or patch** - a save replaces the block, a patch merges only the keys it names; blank clears; the dashboard's store tells the daemon which keys were written.
 - **Atomic, owner-only, serialized writes** - written to a temporary file with owner-only permission and renamed over the real one, one mutation after another.
 - **The daemon token** - created once, on demand, only for a daemon bound to a non-loopback address, and reused after.
-- **Third-party credentials** - the Discord webhook, kept beside the token, never in the preferences, patched key by key and cleared with `null`.
 
 ## Business logic
 
@@ -61,7 +60,7 @@ A project's id is derived from its absolute path and never changes: the folder's
 
 #### Business logic
 
-A project is registered by path. The path is first made absolute and normalized, so a trailing slash or a `..` segment does not make a different project. A path already registered returns its existing record untouched, registration time included. Otherwise a record with the id, the absolute path and the registration time given is appended, and the file is written back with the preferences [2], the token and the credentials preserved.
+A project is registered by path. The path is first made absolute and normalized, so a trailing slash or a `..` segment does not make a different project. A path already registered returns its existing record untouched, registration time included. Otherwise a record with the id, the absolute path and the registration time given is appended, and the file is written back with the preferences [2] and the token preserved.
 
 ### Reading forgivingly
 
@@ -71,7 +70,7 @@ A project is registered by path. The path is first made absolute and normalized,
 
 #### Business logic
 
-A file that is missing, unreadable, not JSON, or whose top level is not an object (an array, a number, a bare string) reads as an empty registry: no projects, no preferences [2], no token, no credentials. Reading never fails. Only well-formed project records are kept (an id, a path and a registration time, all text); records are deduplicated by normalized path, the first one winning. The preferences, the token and the credentials each go through the validation described below, so an unknown or wrongly typed value never reaches the daemon.
+A file that is missing, unreadable, not JSON, or whose top level is not an object (an array, a number, a bare string) reads as an empty registry: no projects, no preferences [2], no token. Reading never fails. Only well-formed project records are kept (an id, a path and a registration time, all text); records are deduplicated by normalized path, the first one winning. The preferences and the token each go through the validation described below, so an unknown or wrongly typed value never reaches the daemon.
 
 ### The on/off preferences
 
@@ -84,9 +83,8 @@ A file that is missing, unreadable, not JSON, or whose top level is not an objec
 Each of these keys of the preferences [2] is kept only when its value is a true or a false; anything else is dropped. Absent means the default given here:
 
 - `notifyBrowser`: notify in the browser; absent means on.
-- `notifyDiscord`: notify on Discord too; absent means off, because Discord reaches the user when no dashboard is open, and it also needs the webhook described below.
 - `notifyHumanIntervention`: the "needs you" category, an intervention [4]; absent means on, the baseline The Framework leans on.
-- `notifyNewActivity`: the activity category, an agent started or finished; absent means off. The two categories compose with the two methods above: a notification is delivered by a method only when both its category and that method are on.
+- `notifyNewActivity`: the activity category, an agent started or finished; absent means off. The two categories compose with `notifyBrowser`: a notification is delivered only when both its category and `notifyBrowser` are on.
 - `bridge`: switch the bridge [5] on; absent means off, because it opens the daemon's one route reachable from another origin.
 - `bridgeBrowser`: let the daemon run its own bridge browser; absent means off, because it downloads a browser and keeps a signed-in claude.ai session on disk. It only matters with `bridge` on.
 - `onboardingDismissed`: the Onboarding checklist on the Overview [6] has been dismissed; absent means show it, and dismissing hides it only there, the same checklist staying available on Settings.
@@ -133,17 +131,17 @@ A key this version does not know, whether a hand edit added it or an earlier ver
 
 #### Business logic
 
-Preferences [2] are saved in one of two ways. A save replaces the whole block with the one given, validated as above. A patch merges only the keys it names over the stored block, validates the merged result with the same rules, writes it and returns what was stored, so a write touches only what it names. Clearing needs no special value: a blank string or an empty list is dropped by validation, which is how "Open in editor" is reset and the last custom preset removed. Either way the project list, the token and the credentials are preserved. The store handed to the dashboard tells its listener which keys the caller wrote, not the merged result, so the daemon can tell "this write switched a setting on" from "it was already on and something else changed"; the listener runs after the write has landed, and a listener that fails does not fail the save.
+Preferences [2] are saved in one of two ways. A save replaces the whole block with the one given, validated as above. A patch merges only the keys it names over the stored block, validates the merged result with the same rules, writes it and returns what was stored, so a write touches only what it names. Clearing needs no special value: a blank string or an empty list is dropped by validation, which is how "Open in editor" is reset and the last custom preset removed. Either way the project list and the token are preserved. The store handed to the dashboard tells its listener which keys the caller wrote, not the merged result, so the daemon can tell "this write switched a setting on" from "it was already on and something else changed"; the listener runs after the write has landed, and a listener that fails does not fail the save.
 
 ### Atomic, owner-only, serialized writes
 
 #### Context
 
-**Problem**: a direct write truncates the file before filling it, so a crash or a full disk mid-write would leave a half file, which reads as an empty registry and silently loses every project and setting. The file holds a token and a credential, so a write with default permissions in a shared home would hand them to every other account on the machine. And one daemon writes the file from several places at once.
+**Problem**: a direct write truncates the file before filling it, so a crash or a full disk mid-write would leave a half file, which reads as an empty registry and silently loses every project and setting. The file holds a token, so a write with default permissions in a shared home would hand it to every other account on the machine. And one daemon writes the file from several places at once.
 
 #### Business logic
 
-The file is written as indented JSON; the token and the credentials are written only when present. Each write goes to a temporary file beside the real one (the file's name plus the writing process's id and `.tmp`), has its permission narrowed to owner read and write only (`0600`) while it is still the temporary file, and is then renamed over the real file. A reader therefore sees the whole old file or the whole new one, never a mixture, and the real path is never readable by others. A write that fails part way damages only the temporary file, which is left behind. The permission narrowing is best-effort: a filesystem that cannot express it (Windows, a FAT volume) still gets the write. Every mutation of the file (registering a project, saving or patching preferences [2], creating the token, saving a credential) runs after the previous one has finished, so a write is never computed from a read taken before another write landed; a mutation that fails hands its error to its caller and does not block the next.
+The file is written as indented JSON; the token is written only when present. Each write goes to a temporary file beside the real one (the file's name plus the writing process's id and `.tmp`), has its permission narrowed to owner read and write only (`0600`) while it is still the temporary file, and is then renamed over the real file. A reader therefore sees the whole old file or the whole new one, never a mixture, and the real path is never readable by others. A write that fails part way damages only the temporary file, which is left behind. The permission narrowing is best-effort: a filesystem that cannot express it (Windows, a FAT volume) still gets the write. Every mutation of the file (registering a project, saving or patching preferences [2], creating the token) runs after the previous one has finished, so a write is never computed from a read taken before another write landed; a mutation that fails hands its error to its caller and does not block the next.
 
 ### The daemon token
 
@@ -154,13 +152,3 @@ The file is written as indented JSON; the token and the credentials are written 
 #### Business logic
 
 The token is 32 random bytes rendered as base64url, so it drops into a `?token=` query string without encoding. It is created only when the daemon asks for it on a non-loopback bind, persisted at the top level of the file, never inside the preferences [2] (which are shipped to the browser), and reused on every later request. So a loopback-only machine never grows one, a process that only reads the token (to print the reachable URL) never creates one, and two daemons asking at once settle on one token, not two. On read the token is kept only when it is non-empty text; a number, an empty string, `null` or an object written by hand reads as no token.
-
-### Third-party credentials
-
-#### Context
-
-**User story**: the user pastes a Discord webhook on Settings [3] and later clears it with a Clear button; the dashboard shows whether one is set, never the value.
-
-#### Business logic
-
-The file's `secrets` block holds the credentials the daemon needs to reach a third party, today one: `discordWebhook`, where Discord notifications are posted (the `DISCORD_WEBHOOK` environment variable takes precedence over it when set). They sit at the top level beside the token, never inside the preferences [2], so neither the browser bundle nor any per-project setting can carry them, and only daemon-side services read a value back. Saving is a patch: a key not mentioned stays as it was; `null` or a blank value clears the key; clearing the last one removes the block from the file. Values are trimmed and cut to 500 characters; a key that is not a known credential, or a value that is not text, is dropped on read.

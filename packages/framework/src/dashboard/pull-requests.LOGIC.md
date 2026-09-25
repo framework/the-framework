@@ -70,7 +70,7 @@ Out of a branch's history, an open pull request always counts, whatever its age:
 
 #### Context
 
-**Business logic story**: the interventions feed lists every project's open pull requests, and its notification watcher keeps a baseline of what it has already announced (`interventions.ts`, `keyed-watcher.ts`).
+**Business logic story**: the interventions feed lists every project's open pull requests, and the browser notifications keep a baseline of what they have already announced (`interventions.ts`, `keyed-watcher.ts`).
 
 #### Business logic
 

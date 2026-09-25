@@ -2,7 +2,6 @@ import { resolveAgentCheckout } from '../store/index.js'
 import { defaultProjectsProvider, type ProjectsProvider } from '../dashboard/projects.js'
 import type { DashboardContext, EventsSource, RemoteAgents } from '../dashboard/rpc-serve.js'
 import type { PreferencesStore } from '../registry.js'
-import type { DiscordCredentialsStore } from '../discord-credentials.js'
 import type { QuotaSource } from '../dashboard/quota.js'
 import type { ProjectErrorsReader } from '../project-errors.js'
 import type { BridgeBrowserOwner } from '../bridge-browser.js'
@@ -89,14 +88,6 @@ export function contextRemote(): RemoteAgents {
 /** The user-preferences store (#410), over the registry file. */
 export function contextPreferences(): PreferencesStore {
   return fromContext('preferences')
-}
-
-/**
- * The Discord credentials store (#1095): it writes the credential to the registry, then rebuilds
- * this daemon's own Discord services against it, so the bot connects without a restart.
- */
-export function contextDiscord(): DiscordCredentialsStore {
-  return fromContext('discord')
 }
 
 /** The quota source behind the usage panel (#533). */

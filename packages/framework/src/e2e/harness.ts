@@ -13,7 +13,6 @@ import { promisify } from 'node:util'
 import { setDashboardContext } from '../dashboard-rpc/context.js'
 import { createProjectRuntime, type ProjectRuntime } from '../daemon-runtime.js'
 import { registryPreferencesStore, projectId } from '../registry.js'
-import { registryDiscordCredentialsStore } from '../discord-credentials-store.js'
 import { fromDiaryLine, projectBranches, projectRuns, resolveAgentDiary, type AgentMeta, type AgentStatus, type AnyDiaryLine } from '../store/index.js'
 import { withFileBranch, DATA_BRANCH } from '@gemstack/agent-data'
 import { worktreePath } from '@gemstack/skill-branches'
@@ -172,7 +171,6 @@ export async function makeWorld(): Promise<StoryWorld> {
     eventsSource: runtime.remoteEventsSource,
     remote: runtime.remoteAgents,
     preferences: registryPreferencesStore(),
-    discord: registryDiscordCredentialsStore(),
     // The story sets one view; both questions are answered off it, since a story that cares about
     // the model's own week states that window in the view it sets (#1619).
     quota: { read: async () => quota.view, stop: () => {} },

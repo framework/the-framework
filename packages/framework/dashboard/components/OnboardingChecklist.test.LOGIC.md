@@ -1,6 +1,6 @@
 What the tests cover:
 
-- **Optional versus essential** - three steps carry the "Optional" badge; "Add a project" and "Populate the queue of AI tasks" do not, while "Populate tickets/" does.
+- **Optional versus essential** - two steps carry the "Optional" badge; "Add a project" and "Populate the queue of AI tasks" do not, while "Populate tickets/" does.
 - **The queue step needs a queue** - with no registered project having a queue, the step is not on the board.
 - **The tickets step needs a tickets package** - with no registered project providing tickets, "Populate tickets/" is not on the board.
 - **Checkboxes, not radio buttons** - an open step is drawn as an empty square named "Not done", never as a circle.

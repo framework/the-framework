@@ -34,15 +34,13 @@ export {
 export {
   buildInterventions,
   interventionKey,
-  interventionLine,
-  postInterventionsDiscord,
   type Intervention,
   type InterventionsDeps,
 } from './interventions.js'
 export { buildOpenQuestions, type OpenQuestion, type OpenQuestionsDeps } from './open-questions.js'
 export { bridgeChoiceRequest, type BridgeOption, type BridgeQuestion } from './bridge-question.js'
-export { buildActivity, activityKey, activityLine, postActivityDiscord, type Activity, type ActivityDeps } from './activity.js'
-export { startKeyedWatcher, SeenTracker, type KeyedWatcher, type KeyedWatcherOptions } from './keyed-watcher.js'
+export { buildActivity, activityKey, type Activity, type ActivityDeps } from './activity.js'
+export { SeenTracker } from './keyed-watcher.js'
 export { BRIDGE_PREFIX, handleBridgeRequest, type BridgeHandlers, type BridgeSession, type BridgeEvent, type BridgeHello, type BridgeStart } from './bridge-endpoints.js'
 export { bridgeStarts, resetBridgeStarts, BridgeStarts, START_CLAIM_TTL_MS, MAX_START_PROMPT, type BridgeStartRequest, type BridgeStartState, type BridgeStartInput } from './bridge-starts.js'
 export { WEB_START_PREFIX, DAEMON_URL_ENV, handleWebStartRequest, type WebStartHandlers } from './web-start-endpoints.js'

@@ -104,7 +104,13 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   tip by `@gemstack/agent-data`. The program's writes go through its persistent checkout's
   cycle instead.
 - The Overview's Hot tickets card is this package's, reading `list --local` like the page, with
-  two lanes: claimed, and unclaimed at priority 7 or up. Picked over the dashboard's own card
-  fed by the tickets provider, which also had a lane for queued tickets: that lane was the
-  dashboard knowing both this package and the queue's. A row's way onto the queue is the
-  action the queue package offers on links, drawn beside the row where a project has it.
+  three lanes: claimed; unclaimed at priority 7 or up, neither in review nor waiting; and
+  waiting, at any priority. Picked over the dashboard's own card fed by the tickets provider,
+  which also had a lane for queued tickets: that lane was the dashboard knowing both this
+  package and the queue's. A row's way onto the queue is the action the queue package offers
+  on links, drawn beside the row where a project has it.
+- The pages never start, plan or queue a ticket in review or waiting, the rule the skill gives
+  an agent: the row says why instead. Waiting has its own lane on the Hot tickets card,
+  because only a person removes the line once the wait is over. Picked over a separate
+  Waiting card (one more box for a short list) and over no list at all (a waiting ticket is
+  forgotten). A ticket in review gets no lane: its open pull request is listed already.

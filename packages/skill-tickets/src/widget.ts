@@ -174,8 +174,8 @@ export function heldBack(ticket: { pr?: unknown; waiting?: string | undefined })
   return undefined
 }
 
-/** The two lanes of the Overview's hot-tickets card: what an agent holds, and what is flagged to do soon. */
-export type HotLane = 'claimed' | 'high-priority'
+/** The three lanes of the Overview's hot-tickets card: what an agent holds, what is flagged to do soon, and what waits on a person. */
+export type HotLane = 'claimed' | 'high-priority' | 'waiting'
 
 /** Where the ticket format's 0-10 scale starts reading as high. */
 const HIGH_PRIORITY_FLOOR = 7
@@ -193,11 +193,13 @@ export function isHighPriority(priority: string | undefined): boolean {
 /**
  * A ticket's lane on the hot-tickets card, or null when it is in neither: claimed, an agent holds
  * it (planning it or implementing it); high-priority, nobody holds it but its priority is high,
- * what a person would likely start next, so never one in review or waiting. A claim outranks
- * the flag: work under way is the fact. Everything else is left off the card, which is a shortlist, not the backlog.
+ * what a person would likely start next, so never one in review or waiting; waiting, a
+ * `Waiting:` line at any priority, since only a person removes it once the wait is over and
+ * nothing else reminds them. A claim outranks both: work under way is the fact. Everything else is left off the card, which is a shortlist, not the backlog.
  */
 export function hotLane(ticket: { locked?: boolean | undefined; priority?: string | undefined; pr?: unknown; waiting?: string | undefined }): HotLane | null {
   if (ticket.locked) return 'claimed'
+  if (ticket.waiting) return 'waiting'
   if (isHighPriority(ticket.priority) && !heldBack(ticket)) return 'high-priority'
   return null
 }

@@ -66,9 +66,11 @@ test('heldBack: a PR: line is in review, a Waiting: line is waiting, in review f
   assert.equal(heldBack({ waiting: '' }), undefined)
 })
 
-test('hotLane: a ticket in review or waiting is never high priority, since nobody can start it; a claim still shows', () => {
+test('hotLane: a ticket in review is in no lane; a waiting one is in Waiting at any priority; a claim outranks both', () => {
   assert.equal(hotLane({ priority: '9', pr: { label: '#12', url: 'u' } }), null)
-  assert.equal(hotLane({ priority: '9', waiting: 'the vendor' }), null)
+  assert.equal(hotLane({ priority: '9', waiting: 'the vendor' }), 'waiting')
+  assert.equal(hotLane({ priority: '2', waiting: 'the vendor' }), 'waiting')
+  assert.equal(hotLane({ waiting: 'the vendor', pr: { label: '#12', url: 'u' } }), 'waiting')
   assert.equal(hotLane({ locked: true, priority: '9', waiting: 'the vendor' }), 'claimed')
 })
 

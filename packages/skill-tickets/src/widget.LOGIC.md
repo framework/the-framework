@@ -22,7 +22,7 @@ The rules of the package's dashboard widget [1] (`../dashboard/`), kept apart fr
 - **A ticket as a link** - its title pointing at `tickets/<file>` at the priority its `Priority:` earns (5 when unreadable); a plan ask is the plan sentence pointing nowhere, at the same priority.
 - **A ticket's lane on the Overview card** - claimed when an agent holds it, whatever its priority; high priority when nobody holds it and its `Priority:` reads 7 or more on the 0-10 scale; otherwise off the card.
 - **Reading the command's answers** - `list` prints rows, kept when they carry the five plain facts; `show` prints one ticket with its text, its plan and its holder, or a refusal that reads as "no such ticket"; `meta` prints the last-import stamp; a command that could not run, or printed the wrong shape, is an error with its reason.
-- **Held back from work** - a ticket with a `PR:` line is in review, one with a `Waiting:` line is waiting, in review first when both; the pages start no agent on it or on its plan, offer it to no queue, and keep it out of the high-priority lane.
+- **Held back from work** - a ticket with a `PR:` line is in review, one with a `Waiting:` line is waiting, in review first when both; the pages start no agent on it or on its plan, offer it to no queue, and keep it out of the high-priority lane; a waiting one has a lane of its own, "Waiting".
 
 ## Business logic
 
@@ -84,7 +84,7 @@ The pages run the `tickets` command through the dashboard and get its JSON outpu
 
 #### Business logic
 
-A ticket whose row carries a pull request (its `PR:` line) is in review; one whose row carries a non-empty `Waiting:` text is waiting; a ticket with both is in review. The pages start no agent on a held-back ticket, nor on its plan, and offer it to no link action. An unclaimed held-back ticket is in no lane of the Overview card, whatever its priority: nobody can start it. A claimed one stays in "Claimed".
+A ticket whose row carries a pull request (its `PR:` line) is in review; one whose row carries a non-empty `Waiting:` text is waiting; a ticket with both is in review. The pages start no agent on a held-back ticket, nor on its plan, and offer it to no link action. An unclaimed ticket in review is in no lane of the Overview card, whatever its priority: nobody can start it. An unclaimed waiting ticket is in the "Waiting" lane at any priority: only a person removes the line once the wait is over, and nothing else reminds them. A claimed one stays in "Claimed".
 
 ### A ticket's lane on the Overview card
 

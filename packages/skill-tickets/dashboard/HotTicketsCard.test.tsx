@@ -39,14 +39,27 @@ describe('HotTicketsCard', () => {
     expect(host.agents).toHaveBeenCalledWith('p2')
   })
 
-  test('a high-priority ticket in review or waiting stays off the card: nobody can start it', async () => {
+  test('a high-priority ticket in review stays off the card; a waiting one, of any priority, is in Waiting with what it waits on', async () => {
     render({
-      p1: { 'list --local': [ticket('urgent.md', { priority: '9' }), ticket('reviewed.md', { priority: '9', pr: { label: '#12', url: 'u' } }), ticket('blocked.md', { priority: '9', waiting: 'the vendor' })] },
+      p1: {
+        'list --local': [
+          ticket('urgent.md', { priority: '9' }),
+          ticket('reviewed.md', { priority: '9', pr: { label: '#12', url: 'u' } }),
+          ticket('blocked.md', { priority: '9', waiting: 'the vendor' }),
+          ticket('low-blocked.md', { priority: '2', waiting: 'the design review' }),
+        ],
+      },
       p2: { 'list --local': [] },
     })
     expect(await screen.findByText('urgent')).toBeTruthy()
     expect(screen.queryByText('reviewed')).toBeNull()
-    expect(screen.queryByText('blocked')).toBeNull()
+    expect(screen.getByText('Waiting')).toBeTruthy()
+    expect(screen.getByText('blocked')).toBeTruthy()
+    expect(screen.getByText('low-blocked')).toBeTruthy()
+    expect(screen.getByText('the vendor')).toBeTruthy()
+    expect(screen.getByText('the design review')).toBeTruthy()
+    // The lane's count: the two waiting tickets.
+    expect(screen.getByText('Waiting').nextElementSibling?.textContent).toBe('2')
   })
 
   test('a row opens the ticket\'s page; a claim held by one of the project\'s runs opens that run', async () => {
@@ -90,7 +103,7 @@ describe('HotTicketsCard', () => {
 
   test('says what the empty state means, and names a project whose command failed while the others show', async () => {
     render({ p1: { 'list --local': [] }, p2: { 'list --local': [] } })
-    expect(await screen.findByText('Nothing claimed or high priority.')).toBeTruthy()
+    expect(await screen.findByText('Nothing claimed, high priority or waiting.')).toBeTruthy()
     cleanup()
     render({ p1: { 'list --local': [ticket('urgent.md', { priority: '8' })] } })
     expect((await screen.findByRole('alert')).textContent).toBe('Could not read the tickets of beta: no answer for p2: tickets list --local')

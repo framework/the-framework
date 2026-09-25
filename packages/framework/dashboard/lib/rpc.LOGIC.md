@@ -15,7 +15,7 @@ Carries everything the browser asks of the daemon: every call goes out the same 
 
 ## Business logic — TL;DR
 
-- **One way to call the daemon** - a call is addressed by the daemon's own name for it, with its arguments and its answer as JSON, back to the address the dashboard was served from.
+- **One way to call the daemon** - a call is addressed by the daemon's own name for it, with its arguments and its answer as JSON, back to the address the dashboard was served from; an optional argument left out arrives left out.
 - **Authentication needs no setup** - the call is same-origin, so the browser attaches the daemon's credential itself; the daemon decides whether one is required.
 - **A failed call carries the daemon's own reason** - a refused call fails with the reason the daemon gave, and with a plain statement of the call and the status when it gave none.
 - **An answer that is not the daemon's** - a reply that is not the daemon's own is reported as such, instead of surfacing as a parsing error inside whatever screen made the call.
@@ -34,7 +34,7 @@ See `## Context`.
 
 #### Business logic
 
-Every call the dashboard makes goes to the daemon at the address the page itself was served from, addressed by the name the daemon exports the call under. The arguments travel as JSON and the answer comes back as JSON. Nothing about where a call's code sits in the dashboard affects how it travels, so moving or renaming a file in the browser cannot break a call.
+Every call the dashboard makes goes to the daemon at the address the page itself was served from, addressed by the name the daemon exports the call under. The arguments travel as JSON and the answer comes back as JSON. An optional argument the caller left out at the end is not sent, so the daemon sees it absent; JSON would otherwise write it as `null`, a value the daemon acts on. Nothing about where a call's code sits in the dashboard affects how it travels, so moving or renaming a file in the browser cannot break a call.
 
 ### Authentication needs no setup
 

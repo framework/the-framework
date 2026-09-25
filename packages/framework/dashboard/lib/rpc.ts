@@ -27,10 +27,14 @@ export function rpc<F extends (...args: never[]) => unknown>(
   name: string,
 ): (...args: Parameters<F>) => Promise<Awaited<ReturnType<F>>> {
   const call = async (...args: unknown[]): Promise<unknown> => {
+    // An optional argument left out must arrive left out: JSON writes a trailing `undefined` as
+    // `null`, which the implementation reads as a value (`--driver null`).
+    let sent = args.length
+    while (sent > 0 && args[sent - 1] === undefined) sent--
     const res = await fetch(`${RPC_PREFIX}/${name}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(args),
+      body: JSON.stringify(args.slice(0, sent)),
     })
     // A non-JSON body means something other than the mount answered (a proxy, an error page), and
     // reporting "unexpected token <" from deep in a component is how that used to surface.

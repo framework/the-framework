@@ -27,4 +27,5 @@ What the tests cover:
 - **Reading through the command** - every project's tickets come from `tickets list --local`, run in that project; a project whose command fails is named with the command's reason and the others still show; no project with the package reads "No project has the tickets package."
 - **Opening pages** - a row opens the widget's own page for the ticket, `/tickets/<project>/<file>`; an update started in a section starts `/update-tickets` in that section's project.
 - **A claim's holder** - a claim naming one of the project's runs reads as the run's session name and opens the run.
-- **In review or waiting** - a ticket in review and a waiting one are handed to neither add; only the ready ticket is queued, and the plan add counts only it.
+- **In review or waiting** - a ticket in review and a waiting one are handed to neither add; only the ready ticket is queued, and the plan add asks only its plan.
+- **All held back** - a set of tickets all in review or waiting shows neither add, with or without a selection.

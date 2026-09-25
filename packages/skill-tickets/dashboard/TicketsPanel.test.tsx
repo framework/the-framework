@@ -81,6 +81,7 @@ describe('TicketsPanel (#697/#1144)', () => {
         tickets={[
           ticket({ file: 'a.md', title: 'Reviewed', pr: { label: '#12', url: 'https://example.com/pull/12' } }),
           ticket({ file: 'b.md', title: 'Blocked', waiting: 'the vendor answer' }),
+          ticket({ file: 'c.md', title: 'Planned', planned: true, waiting: 'the vendor answer' }),
         ]}
         loaded
         onOpen={() => {}}
@@ -92,7 +93,10 @@ describe('TicketsPanel (#697/#1144)', () => {
       expect(screen.queryByRole('button', { name: new RegExp(`create a plan for ${title}`, 'i') })).toBeNull()
     }
     expect(screen.getByRole('link', { name: 'In review #12' }).getAttribute('href')).toBe('https://example.com/pull/12')
-    expect(screen.getByText('Waiting').getAttribute('title')).toBe('Waiting: the vendor answer')
+    expect(screen.getAllByText('Waiting')[0]?.getAttribute('title')).toBe('Waiting: the vendor answer')
+    // A plan that exists is still there to read.
+    expect(screen.getByRole('button', { name: /view the plan for planned/i })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /start work on planned/i })).toBeNull()
   })
 
   test('a claimed ticket shows the hammer marker with its holder inline (#1420/#1144)', async () => {

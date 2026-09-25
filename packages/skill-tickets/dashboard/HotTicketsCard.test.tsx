@@ -60,6 +60,18 @@ describe('HotTicketsCard', () => {
     expect(host.openAgent).toHaveBeenCalledWith('p1', 'run-1')
   })
 
+  test('a claimed ticket in review stays in Claimed but offers no link action', async () => {
+    const run = vi.fn<LinkAction['run']>(async () => ({ ok: true as const }))
+    render(
+      { p1: { 'list --local': [ticket('held.md', { locked: true, lockedBy: 'someone', pr: { label: '#12', url: 'u' } }), ticket('urgent.md', { priority: '8' })] }, p2: { 'list --local': [] } },
+      {},
+      { ...NO_WIDGETS, linkActions: [{ label: 'Add to queue', doneLabel: 'Queued', run, package: '@x/queue', projects: ['p1'] }] },
+    )
+    expect(await screen.findByText('held')).toBeTruthy()
+    // Only the ready ticket's row offers the action.
+    expect(screen.getAllByRole('button', { name: 'Add to queue' })).toHaveLength(1)
+  })
+
   test('with no other widget installed the rows offer nothing on the ticket; with a link action mounted, each row offers it on the ticket as a link', async () => {
     const answers: Answers = { p1: { 'list --local': [ticket('urgent.md', { priority: '8' })] }, p2: { 'list --local': [] } }
     render(answers)

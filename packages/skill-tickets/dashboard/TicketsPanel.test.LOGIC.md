@@ -17,4 +17,4 @@ What the tests cover:
 - **"Configure first, then run"** - the start column's chevron asks the dashboard for this project's launcher with that ticket's work prompt, the plan column's chevron with the plan ask, and the update's chevron with the update command from either the filled or the empty state; none of them starts an agent.
 - **Filtered down to nothing** - an empty list with hidden tickets reads "3 tickets hidden by the current filters" and offers no import, because those tickets already exist.
 - **No project** - renders nothing at all.
-- **In review or waiting** - neither row offers a start or a plan; the one in review shows "In review #12" linking its pull request, the waiting one "Waiting" with what it waits on on hover.
+- **In review or waiting** - neither row offers a start or a plan; the one in review shows "In review #12" linking its pull request, the waiting one "Waiting" with what it waits on on hover; a planned waiting ticket keeps the link to read its plan.

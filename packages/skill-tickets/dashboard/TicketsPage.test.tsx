@@ -372,10 +372,31 @@ describe('TicketsPage add the shown set to the AI queue', () => {
     ])
     await controls()
     render()
-    expect(await screen.findByRole('button', { name: 'Add to queue: a plan for the one unplanned ticket shown below' })).toBeTruthy()
+    fireEvent.click(await screen.findByRole('button', { name: 'Add to queue: a plan for the one unplanned ticket shown below' }))
+    await waitFor(() => expect(addToQueue).toHaveBeenCalledTimes(1))
+    expect(handed('p1')).toEqual([[plan('a.md')]])
     fireEvent.click(screen.getByRole('button', { name: 'Add to queue: the one ready ticket shown below' }))
-    await screen.findByRole('button', { name: 'Queued' })
-    expect(handed('p1')).toEqual([[link('First', 'a.md')]])
+    await waitFor(() => expect(addToQueue).toHaveBeenCalledTimes(2))
+    expect(handed('p1')).toEqual([[plan('a.md')], [link('First', 'a.md')]])
+  })
+
+  test('a set of tickets all in review or waiting is not an offer, selected or not', async () => {
+    onAllTickets.mockResolvedValue([
+      {
+        projectId: 'p1',
+        projectName: 'Alpha',
+        tickets: [
+          ticket({ file: 'b.md', title: 'Second', pr: { label: '#12', url: 'https://example.com/pull/12' } }),
+          ticket({ file: 'c.md', title: 'Third', waiting: 'the vendor' }),
+        ],
+      },
+    ])
+    await controls()
+    render()
+    await screen.findByText('Second')
+    expect(screen.queryByRole('button', { name: /add to queue:/i })).toBeNull()
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Second' }))
+    expect(screen.queryByRole('button', { name: /add to queue:/i })).toBeNull()
   })
 
   test('nothing shown, no buttons: an empty shown set is not an offer', async () => {

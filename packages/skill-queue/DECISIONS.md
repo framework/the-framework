@@ -13,10 +13,11 @@ not a decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   package was the alternative and was not taken: the dashboard names no skill. The
   executable is `queue`. The package ships `SKILL.md`, the agent's instructions.
 - The queue is one markdown file on the branch, `TODO_AGENTS.md`: sections `## Priority
-  10` down to `## Priority 0`, any `## Priority N` counts, in any case; any `-`, `*` or
-  `N.` list item with text is an entry, wherever it sits. Entries are placed to keep the
-  file sorted high to low; the command never re-sorts, and agents take file order. The
-  Queue page groups the entries by priority, highest first, unranked last.
+  10` down to `## Priority 0`, any `## Priority N` with N of one or two digits counts, in
+  any case; any `-`, `*` or `N.` list item with text is an entry, wherever it sits.
+  Entries are placed to keep the file sorted high to low; the command never re-sorts, and
+  agents take file order. The Queue page groups the entries by priority, highest first,
+  unranked last.
 - An entry is plain trimmed text: the task a future agent is started with. The package
   does not know tickets: a caller that queues a ticket writes the entry itself as a
   markdown link to the ticket, and reads the link back to claim the ticket for the agent

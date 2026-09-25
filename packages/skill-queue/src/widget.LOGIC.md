@@ -51,7 +51,7 @@ A link with a target is queued as the markdown link `[<text>](<target>)`; a link
 
 #### Business logic
 
-The open entries are read first, with the bare command (origin's copy of the queue, so every writer's pushes count), and a batch whose read could not run stops there with the read's error, adding nothing; an empty batch reads nothing and is done. Then the links are queued in the order given, one command each, skipping every link already queued, and the outcome is done once every command answered a result. The batch stops at the first link whose command could not run (its error is the outcome's) or whose command answered a refusal, an output whose `ok` is `false`: the outcome is then "the queue refused: <reason>", or "the queue refused" when the refusal names no reason. 
+The open entries are read first, with the bare command (origin's copy of the queue, so every writer's pushes count), and a batch whose read could not run stops there with the read's error, adding nothing; a read that answers anything but a list counts as an empty queue, so nothing is skipped as already queued; an empty batch reads nothing and is done. Then the links are queued in the order given, one command each, skipping every link already queued, and the outcome is done once every command answered a result. The batch stops at the first link whose command could not run (its error is the outcome's) or whose command answered a refusal, an output whose `ok` is `false`: the outcome is then "the queue refused: <reason>", or "the queue refused" when the refusal names no reason. 
 
 ### Already queued
 

@@ -12,7 +12,7 @@ Gives an agent [1] in a shell, the user, the dashboard's server and the schedule
 ## Business logic — TL;DR
 
 - **One JSON document, one line, an exit code** - the result or the refusal on stdout, the reason for a person on stderr, exit 0 for a result and 1 for a refusal or a failure; a failure no command expected (gh dying mid-call) is `git-host-failed` with its line.
-- **A command line that cannot be read** - an unknown command, an unknown flag, a `--state` other than `open`, `merged` or `all`, a missing `--title`, an empty `--branch`, a pull request number that is not a positive integer, or the wrong argument count prints the usage on stderr, nothing on stdout, and exits 2.
+- **A command line that cannot be read** - an unknown command, an unknown flag, a `--state` other than `open`, `merged` or `all`, a missing or blank `--title` (the title is sent trimmed), an empty `--branch` to `open` (`requests` ignores an empty `--branch` or `--since`), a pull request number that is not a positive integer, or the wrong argument count prints the usage on stderr, nothing on stdout, and exits 2.
 - **Where a command acts** - on the repository the working directory is in, as gh finds it.
 - **`requests`** - the pull requests matching `--branch`, `--state` and `--since`, as a bare JSON array; gh unable to answer is the refusal `git-host-failed` with gh's line ("the pull requests could not be read: …").
 - **`open`** - the request of `--branch` or the current branch, with `--title`, `--body`, `--draft` and `--merge` as `open.ts` reads them; the refusals `no-branch`, `open-failed` and `merge-failed`, each with a line naming the branch or the request and gh's detail.

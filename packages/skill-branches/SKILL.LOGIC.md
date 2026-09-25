@@ -10,16 +10,16 @@ The instructions every agent [1] reads as its `branches` skill [2]: its work goe
 
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] skill: a capability an agent is taught, as a package with the instructions the agent reads (its `SKILL.md`, linked into the checkout where the coding agent's harness looks for skills) and a command it runs through `npx`.
-[3] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
+[3] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as the branch it was created on.
 [4] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
 [5] coding agent: the CLI doing the actual work: Claude Code or Codex.
 [6] reclaim: removing a finished agent's checkout once its work is on the remote.
-[7] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
+[7] cloud session: a Claude Code session hosted on claude.ai rather than on this machine.
 
 ## Business logic — TL;DR
 
 - **The work goes on `agent-<name>`, and the agent pushes it itself** - the branch and its push are the agent's, unless whoever started it said they publish for it; what happens to a pushed branch next is another skill's.
-- **How the command is run** - `npx branches` inside the checkout, after an install with the lockfile's package manager when `node_modules` is missing; `status`, `name` and `push` are the agent's commands, the rest are the caller's.
+- **How the command is run** - `npx branches` inside the checkout, after an install with the lockfile's package manager when `node_modules` is missing; `status`, `name` and `push` with no flag are the agent's commands, the rest are the caller's.
 - **Where the agent is** - `npx branches status` prints JSON whose `branch` is the branch the agent is on, and that branch decides everything below.
 - **On an `agent-` branch, the checkout is all the agent touches** - read and write only there, never edit the linked dependency files and skill directories, and stop when something needed lies outside.
 - **Name the work before the first change** - `npx branches name <name>`, `[a-z0-9-]+` starting with a letter or digit, saying what the work is; unless the branch already differs from the directory's name, which means it is named already.
@@ -49,7 +49,7 @@ The agent [1] is told that its work goes on a branch named `agent-<name>`, unles
 
 #### Business logic
 
-The agent [1] is told that `branches` is a dependency of the repository, the package `@gemstack/skill-branches`; that when `node_modules` is missing it installs with the package manager the lockfile belongs to (`npm install` for a `package-lock.json`); and that it then runs `npx branches` inside its checkout [3]: through `npx`, since on a fresh clone no bare `branches` command exists. Of the commands, `status`, `name` and `push` are the agent's; the rest belong to whoever started it.
+The agent [1] is told that `branches` is a dependency of the repository, the package `@gemstack/skill-branches`; that when `node_modules` is missing it installs with the package manager the lockfile belongs to (`npm install` for a `package-lock.json`); and that it then runs `npx branches` inside its checkout [3]: through `npx`, since on a fresh clone no bare `branches` command exists. Of the commands, `status`, `name` and `push` with no flag are the agent's; the rest belong to whoever started it.
 
 ### Where the agent is
 

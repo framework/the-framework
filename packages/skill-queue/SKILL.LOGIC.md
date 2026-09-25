@@ -4,14 +4,14 @@ The instructions every agent [1] reads before touching the agent queue [2]: wher
 
 **User story**: an agent about to work the agent queue [2] reads what agents will work next, takes the first entry, queues a task it discovered at the right priority, and removes the entry it finished, so the user's queue in the dashboard is always the work that remains, in the order it will be done.
 
-**Business logic story**: everything the skill says the command does is enforced by the rules in `src/cli.ts` and `src/queue.ts`; an agent started with `/work-queue` takes entries in the same order.
+**Business logic story**: everything the skill says the command does is enforced by the rules in `src/cli.ts` and `src/queue.ts`, and the one-commit write by `@gemstack/agent-data`; an agent started with the `work-queue` command skill takes entries in the same order.
 
 ## Glossary
 
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down.
 [3] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
-[4] skill: one of the four capabilities an agent is taught — `branches`, `tickets`, `queue`, `logs` — each a package with the instructions the agent reads (its `SKILL.md`), a command on the agent's PATH, and an API the product calls.
+[4] skill: a capability an agent is taught: a package with the instructions the agent reads (its `SKILL.md`) and a command the agent runs through `npx`.
 [5] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [6] queue entry: an item on the agent queue.
 

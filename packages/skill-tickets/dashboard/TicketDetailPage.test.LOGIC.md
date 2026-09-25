@@ -15,3 +15,4 @@ What the tests cover:
 - **Read and release through the command** - the ticket is read with `tickets show <file> --local` in its project; the release runs `tickets release <file> --force` as an act on the project, never as a plain read; a command that cannot run is named as such, not shown as a missing ticket.
 - **A claim's holder** - a claim naming one of the project's runs reads as its session name and opens the run.
 - **The way back** - "Tickets" opens the widget's list page.
+- **In review or waiting** - the page says "in review", or what the ticket waits on, and offers no "Add to queue".

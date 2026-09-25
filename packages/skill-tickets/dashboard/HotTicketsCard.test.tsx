@@ -39,6 +39,16 @@ describe('HotTicketsCard', () => {
     expect(host.agents).toHaveBeenCalledWith('p2')
   })
 
+  test('a high-priority ticket in review or waiting stays off the card: nobody can start it', async () => {
+    render({
+      p1: { 'list --local': [ticket('urgent.md', { priority: '9' }), ticket('reviewed.md', { priority: '9', pr: { label: '#12', url: 'u' } }), ticket('blocked.md', { priority: '9', waiting: 'the vendor' })] },
+      p2: { 'list --local': [] },
+    })
+    expect(await screen.findByText('urgent')).toBeTruthy()
+    expect(screen.queryByText('reviewed')).toBeNull()
+    expect(screen.queryByText('blocked')).toBeNull()
+  })
+
   test('a row opens the ticket\'s page; a claim held by one of the project\'s runs opens that run', async () => {
     render(
       { p1: { 'list --local': [ticket('held.md', { locked: true, lockedBy: 'run-1' })] }, p2: { 'list --local': [] } },

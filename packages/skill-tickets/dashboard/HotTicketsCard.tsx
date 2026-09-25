@@ -1,6 +1,6 @@
 import { Flame } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, LinkActions, Tooltip, TooltipContent, TooltipTrigger, cn, usePolled, useWidgetHost, type WidgetCardProps, type WidgetProject } from 'framework/widget'
-import { holderAgent, hotLane, readListed, ticketLink, type HotLane } from '../src/widget.js'
+import { heldBack, holderAgent, hotLane, readListed, ticketLink, type HotLane } from '../src/widget.js'
 import type { WorkspaceTicket } from './lib/types.js'
 
 // The Overview's hot-tickets card: a cross-project glance at what agents hold and what is flagged
@@ -141,7 +141,7 @@ function Lane({ lane, tickets, showProject }: { lane: (typeof LANES)[number]; ti
                 )}
                 {/* The project's name only where the card spans several: with one it says nothing. */}
                 {showProject && <span className="shrink-0 text-xs text-muted-foreground">{project.name}</span>}
-                <LinkActions projects={[project.id]} targets={[{ projectId: project.id, links: [ticketLink(ticket)] }]} resetKey={`${project.id}:${ticket.file}`} size="xs" variant="ghost" />
+                {!heldBack(ticket) && <LinkActions projects={[project.id]} targets={[{ projectId: project.id, links: [ticketLink(ticket)] }]} resetKey={`${project.id}:${ticket.file}`} size="xs" variant="ghost" />}
               </li>
             )
           })}

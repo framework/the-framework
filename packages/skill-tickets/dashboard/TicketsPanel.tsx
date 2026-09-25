@@ -1,6 +1,6 @@
 import { ExternalLink, ClipboardPlus, ClipboardList, Hammer, Play } from 'lucide-react'
 import { Badge, Button, Checkbox, StartAgentButton, Tooltip, TooltipTrigger, TooltipContent, cn, formatRelative, formatAge, formatDateTime, useAction, useLoaded, useWidgetHost } from 'framework/widget'
-import { UPDATE_TICKETS_PROMPT, planTicketPrompt, readMeta, workOnTicketPrompt, type TicketsMeta } from '../src/widget.js'
+import { UPDATE_TICKETS_PROMPT, heldBack, planTicketPrompt, readMeta, workOnTicketPrompt, type TicketsMeta } from '../src/widget.js'
 import type { WorkspaceTicket } from './lib/types.js'
 import { UpdateTicketsButton } from './UpdateTicketsButton.js'
 import { priorityTone } from './lib/ticket-priority.js'
@@ -64,6 +64,8 @@ export function TicketRow({
   // The holder as a person reads it: the agent's session name once it has one, else the id the
   // lock names as written (#1748).
   const holder = ticket.lockedByAgent?.name ?? ticket.lockedBy
+  // In review or waiting: no agent is started on it nor on its plan, the tickets skill's own rule.
+  const held = heldBack(ticket)
   return (
     <li className="flex items-stretch transition-colors hover:bg-accent/60">
       {/* The selection checkbox, the row's left edge — the list idiom of issue trackers: pick some rows and the
@@ -82,21 +84,23 @@ export function TicketRow({
           Its chevron opens the launcher with the same ask (#1507), since the model and where the
           agent runs are nowhere on this row. */}
       <div className="flex w-16 shrink-0 items-center justify-center">
-        <StartAgentButton
-          variant="ghost"
-          size="icon-sm"
-          icon={<Play className="h-4 w-4" aria-hidden />}
-          ariaLabel={`Start work on ${ticket.title}`}
-          menuAriaLabel={`Other ways to work on ${ticket.title}`}
-          tooltip="Spin up an agent working on this ticket"
-          busy={busy}
-          onStart={onStartWork}
-          onConfigure={onConfigureWork}
-          prompt={workOnTicketPrompt(ticket.file)}
-          configureDescription="Opens the launcher with this ticket's prompt, so you can set the model and where it runs."
-          // Quiet like the plan column's create button: an available action, not a state.
-          className="text-muted-foreground/50 hover:text-foreground"
-        />
+        {!held && (
+          <StartAgentButton
+            variant="ghost"
+            size="icon-sm"
+            icon={<Play className="h-4 w-4" aria-hidden />}
+            ariaLabel={`Start work on ${ticket.title}`}
+            menuAriaLabel={`Other ways to work on ${ticket.title}`}
+            tooltip="Spin up an agent working on this ticket"
+            busy={busy}
+            onStart={onStartWork}
+            onConfigure={onConfigureWork}
+            prompt={workOnTicketPrompt(ticket.file)}
+            configureDescription="Opens the launcher with this ticket's prompt, so you can set the model and where it runs."
+            // Quiet like the plan column's create button: an available action, not a state.
+            className="text-muted-foreground/50 hover:text-foreground"
+          />
+        )}
       </div>
       <button type="button" onClick={onOpen} className="flex min-w-0 flex-1 items-center gap-2 py-2 pl-0 pr-3 text-left text-sm">
         {/* The title is the row's one flexible column: it truncates when long and stretches
@@ -162,6 +166,24 @@ export function TicketRow({
             </TooltipContent>
           </Tooltip>
         )}
+        {/* In review: the pull request that closes it, one click away. Waiting: what it waits on,
+            in the tooltip. Either one is why the row offers no start and no plan. */}
+        {held === 'in-review' && ticket.pr && (
+          <a
+            href={ticket.pr.url}
+            target="_blank"
+            rel="noreferrer"
+            title="In review: this pull request closes the ticket once merged"
+            className="shrink-0 rounded-full border border-info/40 px-1.5 text-[10px] text-info hover:opacity-80"
+          >
+            In review {ticket.pr.label}
+          </a>
+        )}
+        {held === 'waiting' && (
+          <span title={`Waiting: ${ticket.waiting}`} className="shrink-0 rounded-full border border-warning/40 px-1.5 text-[10px] text-warning">
+            Waiting
+          </span>
+        )}
         {ticket.effort !== undefined && (
           <Badge className="shrink-0 border-transparent px-1 text-[10px] text-muted-foreground">Effort: {ticket.effort}</Badge>
         )}
@@ -210,7 +232,7 @@ export function TicketRow({
             </TooltipTrigger>
             <TooltipContent>View the plan</TooltipContent>
           </Tooltip>
-        ) : (
+        ) : held ? null : (
           <StartAgentButton
             variant="ghost"
             size="icon-sm"

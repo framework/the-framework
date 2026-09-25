@@ -37,7 +37,7 @@ For each project the dashboard lists as having this package, the card asks the d
 
 #### Business logic
 
-Each ticket is placed by the rule in `src/widget.ts`: a claimed ticket in "Claimed", an unclaimed one whose priority reads 7 or more in "High priority", and every other ticket is left off. The two lanes are stacked, "Claimed" first, each headed by its name and its count; a lane with nothing dims to its header line so the populated lane carries the card. Every ticket in a lane is shown, never a "+N more". When both lanes are empty the card says "Nothing claimed or high priority.", not "no tickets": the backlog may be full.
+Each ticket is placed by the rule in `src/widget.ts`: a claimed ticket in "Claimed", an unclaimed one whose priority reads 7 or more in "High priority", and every other ticket is left off. The two lanes are stacked, "Claimed" first, each headed by its name and its count; a lane with nothing dims to its header line so the populated lane carries the card. Every ticket in a lane is shown, never a "+N more". A ticket in review or waiting is never in "High priority", nobody can start it; claimed, it stays in "Claimed" and its row offers no link action. When both lanes are empty the card says "Nothing claimed or high priority.", not "no tickets": the backlog may be full.
 
 ### A row
 

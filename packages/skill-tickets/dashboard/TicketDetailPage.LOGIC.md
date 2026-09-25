@@ -21,7 +21,7 @@ One ticket's own page: its whole markdown rather than the one line the list show
 
 - **The ticket as it is written** - the whole file rendered as markdown, re-read every 10 seconds, with a plain answer when there is no such ticket, and the command's own reason when it could not run.
 - **What is known about the ticket** - one line of facts under the summary, in a fixed order, ending with the ticket's file name.
-- **Acting on the ticket** - the ticket is offered as a link to the actions the installed widgets offer on links; with the queue package that is one "Add to queue" button, which then says "Queued"; without any such package, no button.
+- **Acting on the ticket** - the ticket is offered as a link to the actions the installed widgets offer on links; with the queue package that is one "Add to queue" button, which then says "Queued"; without any such package, no button; a ticket in review or waiting is offered to none, and its meta says "in review · <pr>" (a link) or "waiting · <what>".
 - **The way back** - "Tickets" above the page opens the widget's list.
 - **Lifting a claim** - a claimed ticket offers to release the claim with `tickets release <file> --force`, because nothing else ever will.
 
@@ -63,7 +63,7 @@ The claim badge reads "claimed" in the warning color, followed by the holder [5]
 
 #### Business logic
 
-The page hands the ticket as a link [7] (its title, pointing at its file, at the priority its own `Priority:` earns on the 0–10 scale, 5 when it has none; `src/widget.ts`) to the dashboard's slot for the installed widgets' [8] link actions, beside the release button. Each widget of the ticket's project that offers an action on links puts one button there; the queue package's widget offers "Add to queue", which writes the ticket's title, linked back to its file, in the section its priority earns. No agent [2] is started. A project whose packages offer no action on links shows no button.
+The page hands the ticket as a link [7] (its title, pointing at its file, at the priority its own `Priority:` earns on the 0–10 scale, 5 when it has none; `src/widget.ts`) to the dashboard's slot for the installed widgets' [8] link actions, beside the release button. Each widget of the ticket's project that offers an action on links puts one button there; the queue package's widget offers "Add to queue", which writes the ticket's title, linked back to its file, in the section its priority earns. No agent [2] is started. A project whose packages offer no action on links shows no button. A ticket in review (a `PR:` line) or waiting (a `Waiting:` line) is offered to no action, since the skill never queues one; its meta row says "in review · <label>", linking the pull request, or "waiting · <what it waits on>".
 
 What the button says once done ("Queued" with a check mark), that it then stays disabled while the same ticket is shown, and how a refusal is shown (the action's reason, as an alert line), are the slot's rules. The buttons are disabled while the release is in flight.
 

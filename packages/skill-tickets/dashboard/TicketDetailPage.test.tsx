@@ -94,6 +94,18 @@ describe('TicketDetailPage (#1144)', () => {
     expect(meta.textContent?.startsWith('2d ago')).toBe(true)
   })
 
+  test('a ticket in review or waiting is never offered to the queue, and says which', async () => {
+    onTicket.mockResolvedValue(ticket({ pr: { label: '#12', url: 'https://example.com/pull/12' } }))
+    render(<TicketDetailPage projectId="p1" slug="2026-07-20_do-the-thing.md" />)
+    expect(await screen.findByText('in review')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Add to queue' })).toBeNull()
+    cleanup()
+    onTicket.mockResolvedValue(ticket({ waiting: 'the vendor answer' }))
+    render(<TicketDetailPage projectId="p1" slug="2026-07-20_do-the-thing.md" />)
+    expect(await screen.findByText(/the vendor answer/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Add to queue' })).toBeNull()
+  })
+
   test('shows the effort and uncertainty the plan recorded, with the rest of the meta (#1144/#1265)', async () => {
     onTicket.mockResolvedValue(ticket({ planned: true, effort: 2, uncertainty: 0 }))
     render(<TicketDetailPage projectId="p1" slug="2026-07-20_do-the-thing.md" />)

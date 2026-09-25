@@ -159,6 +159,21 @@ export function readMeta(result: CommandResult): TicketsMeta {
   return typeof stamp === 'string' ? { lastImportedAt: stamp } : {}
 }
 
+/** Why no agent is started on a ticket, nor a plan for it, and no page queues it: in review (a `PR:` line) or waiting (a `Waiting:` line). */
+export type HeldBack = 'in-review' | 'waiting'
+
+/**
+ * Whether a ticket is held back from work, and why: in review, its pull request open, until the
+ * tracker update closes it; waiting on something outside the work until a person removes the
+ * line. The same rule the tickets skill gives an agent, so a page offers no start, no plan and
+ * no queue entry the agent would refuse.
+ */
+export function heldBack(ticket: { pr?: unknown; waiting?: string | undefined }): HeldBack | undefined {
+  if (ticket.pr) return 'in-review'
+  if (ticket.waiting) return 'waiting'
+  return undefined
+}
+
 /** The two lanes of the Overview's hot-tickets card: what an agent holds, and what is flagged to do soon. */
 export type HotLane = 'claimed' | 'high-priority'
 
@@ -178,11 +193,11 @@ export function isHighPriority(priority: string | undefined): boolean {
 /**
  * A ticket's lane on the hot-tickets card, or null when it is in neither: claimed, an agent holds
  * it (planning it or implementing it); high-priority, nobody holds it but its priority is high,
- * what a person would likely start next. A claim outranks the flag: work under way is the
- * fact. Everything else is left off the card, which is a shortlist, not the backlog.
+ * what a person would likely start next, so never one in review or waiting. A claim outranks
+ * the flag: work under way is the fact. Everything else is left off the card, which is a shortlist, not the backlog.
  */
-export function hotLane(ticket: { locked?: boolean | undefined; priority?: string | undefined }): HotLane | null {
+export function hotLane(ticket: { locked?: boolean | undefined; priority?: string | undefined; pr?: unknown; waiting?: string | undefined }): HotLane | null {
   if (ticket.locked) return 'claimed'
-  if (isHighPriority(ticket.priority)) return 'high-priority'
+  if (isHighPriority(ticket.priority) && !heldBack(ticket)) return 'high-priority'
   return null
 }

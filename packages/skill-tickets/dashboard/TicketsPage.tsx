@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Button, LinkActions, ScrollArea, usePolled, useAction, useWidgetHost, type ProjectLinks, type WidgetLink, type WidgetProject } from 'framework/widget'
-import { holderAgent, planLink, planTicketPrompt, readListed, ticketLink, workOnTicketPrompt } from '../src/widget.js'
+import { heldBack, holderAgent, planLink, planTicketPrompt, readListed, ticketLink, workOnTicketPrompt } from '../src/widget.js'
 import type { ProjectTickets, WorkspaceTicket } from './lib/types.js'
 import {
   defaultView,
@@ -154,12 +154,16 @@ export function TicketsPage({ projects }: { projects: WidgetProject[] }) {
   // What the queue-add buttons act on — the shown rows, narrowed to the selected ones the moment
   // any row is selected, minus what each add would waste. Both skip claimed tickets: a ticket
   // some agent already holds (#1420) is being worked, and its entry would outlive that work as
-  // queue noise. The plan add also skips planned tickets, whose plan already exists. In the
+  // queue noise. Both skip tickets in review or waiting too: no agent is handed one, nor its
+  // plan. The plan add also skips planned tickets, whose plan already exists. In the
   // shown order, each row carrying its own project, so a cross-project view needs no special
   // case: every entry lands on its own project's queue.
   const scope = hasSelection ? selectedShown : flatRows
-  const targets = scope.filter(r => !r.ticket.locked)
-  const claimedShown = scope.length - targets.length
+  const ready = scope.filter(r => !heldBack(r.ticket))
+  const heldShown = scope.length - ready.length
+  const targets = ready.filter(r => !r.ticket.locked)
+  const claimedShown = ready.length - targets.length
+  const skippedShown = scope.length - targets.length
   const planTargets = targets.filter(r => !r.ticket.planned)
   const planSkipped = scope.length - planTargets.length
   // One flip per acted-on set and per button: once this exact set is added the button says so and
@@ -173,14 +177,14 @@ export function TicketsPage({ projects }: { projects: WidgetProject[] }) {
   // "Add to queue: all 5 tickets shown below".
   const queueObject = hasSelection
     ? targets.length === 1
-      ? `the ${claimedShown > 0 ? 'one unclaimed ' : ''}selected ticket`
-      : claimedShown > 0
-        ? `the ${targets.length} unclaimed selected tickets`
+      ? `the ${skippedShown > 0 ? 'one ready ' : ''}selected ticket`
+      : skippedShown > 0
+        ? `the ${targets.length} ready selected tickets`
         : `the ${targets.length} selected tickets`
     : targets.length === 1
-      ? `the ${claimedShown > 0 ? 'one unclaimed ' : ''}ticket shown below`
-      : claimedShown > 0
-        ? `the ${targets.length} unclaimed tickets shown below`
+      ? `the ${skippedShown > 0 ? 'one ready ' : ''}ticket shown below`
+      : skippedShown > 0
+        ? `the ${targets.length} ready tickets shown below`
         : `all ${targets.length} tickets shown below`
   const planObject = hasSelection
     ? planTargets.length === 1
@@ -245,8 +249,8 @@ export function TicketsPage({ projects }: { projects: WidgetProject[] }) {
                 tooltip={
                   <>
                     Each {hasSelection ? 'selected ' : ''}ticket gets its plan asked for — the same &quot;Create tickets/….plan.md&quot; entry the plan-tickets
-                    command queues — worked highest priority first and, within a priority, in the order shown below. Tickets already planned or held by an agent
-                    stay as they are, and what is already there is left alone.
+                    command queues — worked highest priority first and, within a priority, in the order shown below. Tickets already planned, held by an agent,
+                    in review or waiting stay as they are, and what is already there is left alone.
                     {hasSelection && ' The rest of the shown set stays put.'}
                   </>
                 }
@@ -265,6 +269,8 @@ export function TicketsPage({ projects }: { projects: WidgetProject[] }) {
                     {hasSelection && ' The rest of the shown set stays put.'}
                     {claimedShown === 1 && ` The claimed ticket ${hasSelection ? 'selected' : 'shown'} is left to the agent holding it.`}
                     {claimedShown > 1 && ` The ${claimedShown} claimed tickets ${hasSelection ? 'selected' : 'shown'} are left to the agents holding them.`}
+                    {heldShown === 1 && ` The ticket in review or waiting ${hasSelection ? 'selected' : 'shown'} is left out.`}
+                    {heldShown > 1 && ` The ${heldShown} tickets in review or waiting ${hasSelection ? 'selected' : 'shown'} are left out.`}
                   </>
                 }
               />

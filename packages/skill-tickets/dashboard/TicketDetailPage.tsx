@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ExternalLink, LockOpen } from 'lucide-react'
 import { Badge, Button, LinkActions, Markdown, cn, formatAge, formatDateTime, useAction, usePolled, useWidgetHost } from 'framework/widget'
-import { holderAgent, readShown, ticketLink } from '../src/widget.js'
+import { heldBack, holderAgent, readShown, ticketLink } from '../src/widget.js'
 import type { WorkspaceTicketDetail } from './lib/types.js'
 import { TicketPageShell, TicketPageNote } from './TicketPageShell.js'
 import { priorityTone } from './lib/ticket-priority.js'
@@ -87,8 +87,9 @@ export function TicketDetailPage({
                   <LockOpen className="h-3.5 w-3.5" /> Release lock
                 </Button>
               )}
-              {/* The ticket as a link, for whatever the installed widgets offer on one (#1774). */}
-              <LinkActions projects={[projectId]} targets={[{ projectId, links: [ticketLink(ticket)] }]} resetKey={ticket.file} disabled={busy} />
+              {/* The ticket as a link, for whatever the installed widgets offer on one (#1774);
+                  none for a ticket in review or waiting, which is never queued. */}
+              {!heldBack(ticket) && <LinkActions projects={[projectId]} targets={[{ projectId, links: [ticketLink(ticket)] }]} resetKey={ticket.file} disabled={busy} />}
             </div>
           </div>
           {ticket.summary && <p className="mt-2 text-sm text-muted-foreground">{ticket.summary}</p>}
@@ -120,6 +121,16 @@ export function TicketDetailPage({
               </Badge>
             ))}
             {ticket.planned && <Badge className="border-transparent px-0 text-[10px] uppercase">planned</Badge>}
+            {ticket.pr && (
+              <a href={ticket.pr.url} target="_blank" rel="noreferrer" className="text-[10px] text-info hover:underline">
+                <span className="uppercase">in review</span> · {ticket.pr.label}
+              </a>
+            )}
+            {ticket.waiting && (
+              <Badge className="border-transparent px-0 text-[10px] text-warning">
+                <span className="uppercase">waiting</span>&nbsp;· {ticket.waiting}
+              </Badge>
+            )}
             {/* The holder inline (#1420): the detail page has the room, so the name is plainly
                 readable instead of hiding behind a native tooltip. One of this project's agents
                 (#1748) is named by its session and opens its page; anyone else is shown as written. */}

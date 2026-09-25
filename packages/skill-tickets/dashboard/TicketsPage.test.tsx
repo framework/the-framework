@@ -353,7 +353,27 @@ describe('TicketsPage add the shown set to the AI queue', () => {
     await controls()
     render()
     // The label counts only what the click will add, never promising the claimed row.
-    fireEvent.click(await screen.findByRole('button', { name: 'Add to queue: the one unclaimed ticket shown below' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Add to queue: the one ready ticket shown below' }))
+    await screen.findByRole('button', { name: 'Queued' })
+    expect(handed('p1')).toEqual([[link('First', 'a.md')]])
+  })
+
+  test('tickets in review or waiting are left out of both adds, and the label says so', async () => {
+    onAllTickets.mockResolvedValue([
+      {
+        projectId: 'p1',
+        projectName: 'Alpha',
+        tickets: [
+          ticket({ file: 'a.md', title: 'First' }),
+          ticket({ file: 'b.md', title: 'Second', pr: { label: '#12', url: 'https://example.com/pull/12' } }),
+          ticket({ file: 'c.md', title: 'Third', waiting: 'the vendor' }),
+        ],
+      },
+    ])
+    await controls()
+    render()
+    expect(await screen.findByRole('button', { name: 'Add to queue: a plan for the one unplanned ticket shown below' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Add to queue: the one ready ticket shown below' }))
     await screen.findByRole('button', { name: 'Queued' })
     expect(handed('p1')).toEqual([[link('First', 'a.md')]])
   })
@@ -512,7 +532,7 @@ describe('TicketsPage selection scopes the queue buttons', () => {
     await screen.findByText('First')
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select First' }))
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select Second' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Add to queue: the one unclaimed selected ticket' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add to queue: the one ready selected ticket' }))
     await screen.findByRole('button', { name: 'Queued' })
     expect(handed('p1')).toEqual([[link('First', 'a.md')]])
   })

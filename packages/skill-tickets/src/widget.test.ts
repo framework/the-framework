@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { holderAgent, hotLane, isHighPriority, planAgentFor, planLink, planPath, planTicketPrompt, readListed, readMeta, readShown, routeOf, ticketLink, workOnTicketPrompt } from './widget.js'
+import { heldBack, holderAgent, hotLane, isHighPriority, planAgentFor, planLink, planPath, planTicketPrompt, readListed, readMeta, readShown, routeOf, ticketLink, workOnTicketPrompt } from './widget.js'
 
 const FILE = '2026-08-30_login-page.md'
 
@@ -55,6 +55,21 @@ test('the command\'s answers are read back: a list, one ticket or its refusal, t
   assert.deepEqual(readMeta({ ok: true, output: { lastImportedAt: '2026-09-01T00:00:00Z' } }), { lastImportedAt: '2026-09-01T00:00:00Z' })
   assert.deepEqual(readMeta({ ok: true, output: {} }), {})
   assert.deepEqual(readMeta({ ok: false, error: 'x' }), {})
+})
+
+test('heldBack: a PR: line is in review, a Waiting: line is waiting, in review first when both; anything else is free to work', () => {
+  const pr = { label: '#12', url: 'https://example.com/pull/12' }
+  assert.equal(heldBack({ pr }), 'in-review')
+  assert.equal(heldBack({ waiting: 'the vendor' }), 'waiting')
+  assert.equal(heldBack({ pr, waiting: 'the vendor' }), 'in-review')
+  assert.equal(heldBack({}), undefined)
+  assert.equal(heldBack({ waiting: '' }), undefined)
+})
+
+test('hotLane: a ticket in review or waiting is never high priority, since nobody can start it; a claim still shows', () => {
+  assert.equal(hotLane({ priority: '9', pr: { label: '#12', url: 'u' } }), null)
+  assert.equal(hotLane({ priority: '9', waiting: 'the vendor' }), null)
+  assert.equal(hotLane({ locked: true, priority: '9', waiting: 'the vendor' }), 'claimed')
 })
 
 test('hotLane: a claimed ticket is in the claimed lane whatever its priority, an unclaimed one at 7 or up is high priority, the rest are off the card', () => {

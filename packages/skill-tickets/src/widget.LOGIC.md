@@ -76,16 +76,6 @@ The pages run the `tickets` command through the dashboard and get its JSON outpu
 
 `list` answers rows: those of its output that carry a file, a title, a summary, a date and a planned flag are kept, anything else is dropped; an output that is not a list, or a command that could not run, is an error with the reason. `show` answers one ticket: its row with its whole text, its plan's text when it has one, its holder when claimed; a refusal (`ok: false`) reads as no such ticket; an output that is not a ticket, or a command that could not run, is an error with the reason. `meta` answers when the tickets last caught up with the tracker; on any failure nothing is known.
 
-### A ticket's lane on the Overview card
-
-#### Context
-
-**User story**: the Overview's Hot tickets card is a shortlist: what agents hold, and what a person would likely start next.
-
-#### Business logic
-
-A ticket an agent holds (its claim exists) is in the "Claimed" lane, whatever its priority: work under way is the fact. An unclaimed ticket whose `Priority:` reads 7 or more is in the "High priority" lane: the ticket format's own 0-10 scale, where 10 acts immediately and 0 is only-if-capacity, so 7 and up read as "do this soon". A word (`high`, `urgent`, `p0`) is not on that scale and never qualifies, and neither does the P0-first reading. Every other ticket is in no lane and left off the card.
-
 ### Held back from work
 
 #### Context
@@ -95,3 +85,13 @@ A ticket an agent holds (its claim exists) is in the "Claimed" lane, whatever it
 #### Business logic
 
 A ticket whose row carries a pull request (its `PR:` line) is in review; one whose row carries a non-empty `Waiting:` text is waiting; a ticket with both is in review. The pages start no agent on a held-back ticket, nor on its plan, and offer it to no link action. An unclaimed held-back ticket is in no lane of the Overview card, whatever its priority: nobody can start it. A claimed one stays in "Claimed".
+
+### A ticket's lane on the Overview card
+
+#### Context
+
+**User story**: the Overview's Hot tickets card is a shortlist: what agents hold, and what a person would likely start next.
+
+#### Business logic
+
+A ticket an agent holds (its claim exists) is in the "Claimed" lane, whatever its priority: work under way is the fact. An unclaimed ticket whose `Priority:` reads 7 or more is in the "High priority" lane: the ticket format's own 0-10 scale, where 10 acts immediately and 0 is only-if-capacity, so 7 and up read as "do this soon". A word (`high`, `urgent`, `p0`) is not on that scale and never qualifies, and neither does the P0-first reading. Every other ticket is in no lane and left off the card.

@@ -3,8 +3,8 @@ to the implementer's judgment. Flag conflicts instead of silently deviating. Kee
 outdated decisions (no history).
 
 A bullet is a person's pick, and says what it was picked over. What the code does belongs
-in SPEC.md; a choice made while implementing is the implementer's judgment, not a
-decision. An AI proposes a bullet and asks; it never adds or rewrites one.
+in the LOGIC.md files; a choice made while implementing is the implementer's judgment,
+not a decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 
 ## The checkout
 - One checkout per agent, a git worktree of the user's repository under `.branches/`,
@@ -135,8 +135,8 @@ push.
   project, found from the `.branches/` layout even from inside a checkout; `name`,
   `status` and a bare `push` act on the checkout the command runs in, found from anywhere
   inside it; `status` also takes the path of a checkout root.
-- `list` answers with a bare JSON array; every other result and every refusal is an object
-  whose `ok` tells the two apart.
+- `list` and `show` answer with a bare JSON array; every other result and every refusal is
+  an object whose `ok` tells the two apart.
 - Outside a repository, a command that needs one refuses with `not-a-repo`: only git's own
   "not a git repository" reads as that; every other failure stays `git-failed`.
 - The skill tells the agent where it is: on `agent-*` the checkout is its whole workspace,
@@ -144,8 +144,8 @@ push.
   edited; on any other branch under `.branches/` it was continued on that branch on
   purpose and stays; anywhere else it is a plain clone, and the agent makes its
   `agent-<name>` branch with git before its first change, another name if that one exists
-  locally or on origin. `status` and `name` are the agent's commands; the rest are the
-  caller's.
+  locally or on origin. `status`, `name` and a bare `push` are the agent's commands; the
+  rest are the caller's.
 - Each agent tool (Claude Code, Codex) looks for skills in its own folder at the checkout
   root: `.claude/skills`, `.agents/skills`. In every checkout it makes, the package links
   its own folder, which holds `SKILL.md`, into both as `branches`, hidden through the

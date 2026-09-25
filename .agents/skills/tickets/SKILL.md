@@ -29,9 +29,9 @@ npx tickets meta                 when the tickets last caught up with the issue 
 npx tickets put <file>           write one whole file under tickets/ from stdin, creating it if new
                                  (npx tickets put <file> < draft.md): a ticket, its plan, or meta.json
                                  holding the object meta shows
-npx tickets close <file>         once the work is merged, or the ticket is not wanted: remove the ticket
-                                 with its plan and claim; refused while someone else holds it; its queue
-                                 entry, if any, stays: `npx queue done` it
+npx tickets close <file>         when the ticket is not wanted, or for the tracker update once its pull
+                                 request merged: remove the ticket with its plan and claim; refused while
+                                 someone else holds it; its queue entry, if any, stays: `npx queue done` it
 ```
 
 ## Claim before you plan or work a ticket
@@ -46,7 +46,7 @@ npx tickets release <file>       lift your own claim when the plan or the work i
                                  stop unless you closed the ticket: nothing lifts a claim on a timeout
 ```
 
-`put` ignores claims. You claim as `AGENT_ID` when it is set, else as your current branch: release from the branch you claimed on, or the claim stays until a person lifts it.
+`put` ignores claims. You claim as `AGENT_ID` when it is set and not blank, else as your current branch: release from the branch you claimed on, or the claim stays until a person lifts it.
 
 ## Queue a ticket
 

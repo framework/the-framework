@@ -4,7 +4,7 @@ The instructions every agent [1] reads before touching a ticket: where the ticke
 
 **User story**: an agent starting on a task finds the project's roadmap in its tickets, picks one it may work, claims it, plans or implements it, and hands the ticket's bookkeeping back in a state the user and the next agent can trust: a claim lifted, a ticket closed once merged, a queue entry [6] removed.
 
-**Business logic story**: everything the skill says the command does is enforced by the rules in `src/cli.ts`; the formats are what `src/tickets.ts` parses and `src/names.ts` judges; the dashboard queues a ticket by the same rules with code of its own.
+**Business logic story**: everything the skill says the command does is enforced by the rules in `src/cli.ts`; the formats are what `src/tickets.ts` parses and `src/names.ts` judges; the dashboard offers a ticket to the queue as a link at the priority `src/names.ts` gives it.
 
 ## Glossary
 
@@ -12,7 +12,7 @@ The instructions every agent [1] reads before touching a ticket: where the ticke
 [2] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down.
 [3] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
 [4] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
-[5] skill: one of the four capabilities an agent is taught — `branches`, `tickets`, `queue`, `logs` — each a package with the instructions the agent reads (its `SKILL.md`), a command on the agent's PATH, and an API the product calls.
+[5] skill: a capability an agent is taught: a package with the instructions the agent reads (its `SKILL.md`) and a command the agent runs through `npx`.
 [6] queue entry: an item on the agent queue.
 [7] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [8] holder: who a claim names: the agent's id when the program that started the agent set it in `AGENT_ID` (the scheduler does), else the branch the `tickets` command ran on.
@@ -22,10 +22,10 @@ The instructions every agent [1] reads before touching a ticket: where the ticke
 - **Where the tickets are and how to reach them** - tickets live on the `agent-data` branch, never on a code branch; the root `tickets` link is a possibly stale copy never to be written; the agent installs the repository's dependencies if needed and runs `npx tickets`, whose every change is one commit pushed straight to the branch, and never passes `--local` or `--force`.
 - **How the command answers, and how a ticket is named** - one JSON document per command; a refusal is `{"ok":false,"reason":…}` with why on stderr and exit 1, a wrong command line the usage on stderr and exit 2; every `<file>` is a ticket's filename or the `tickets/…` path a queue entry links to, and `put` also takes the ticket's `.plan.md` and `meta.json`.
 - **Reading** - `list` gives every open ticket as one JSON array of rows; `show <file>` gives one ticket with its text, its plan and who holds it; `meta` gives when the tickets last caught up with the issue tracker.
-- **Changing** - `put <file>` writes one whole file under `tickets/` from stdin, a ticket, its plan or `meta.json`; `close <file>`, once the work is merged or the ticket is not wanted, removes the ticket with its plan and claim, refused while someone else holds it, and leaves its queue entry to `npx queue done`.
+- **Changing** - `put <file>` writes one whole file under `tickets/` from stdin, a ticket, its plan or `meta.json`; `close <file>`, when the ticket is not wanted or for the tracker update once its pull request merged, removes the ticket with its plan and claim, refused while someone else holds it, and leaves its queue entry to `npx queue done`.
 - **Claim before planning or working** - `claim <file>` makes the ticket the agent's, naming who claimed it before so the agent reads what they did first, or names who holds it; on someone else's the agent picks another and never removes or overwrites their claim; `release <file>` lifts the agent's own claim when done and before it stops, since nothing lifts a claim on a timeout; `put` ignores claims; the agent claims as `AGENT_ID` when set, else as its current branch, so it releases from the branch it claimed on.
 - **Queueing a ticket, and the ticket in review** - with the `queue` skill present, a ticket goes on the agent queue as a markdown link labeled with its title, at the ticket's own `Priority:` (5 when it has none); once its pull request is open the agent marks the entry done by its exact text, writes the pull request into the ticket as its `PR:` line and releases its claim, and names the ticket (and its issue) in the pull request's body; the ticket closes when the pull request merges, never before.
-- **The ticket format** - `tickets/<DATE>_<SLUG>.md`: optional `Priority:`, `Topics:`, `Issue:`, `PR:` and `Waiting:` above a `# ` title, a `PR:` line meaning the ticket is in review and a `Waiting:` line that it waits on something outside the work, either one meaning it is not to be chosen or queued, and a waiting one not planned either, then `## TLDR` and `## Why it matters`; `Priority:` is a bare whole number from 0 to 10, anything else queues at 5.
+- **The ticket format** - `tickets/<DATE>_<SLUG>.md`: optional `Priority:`, `Topics:`, `Issue:`, `PR:` and `Waiting:` above a `# ` title, a `PR:` line meaning the ticket is in review and a `Waiting:` line that it waits on something outside the work, either one meaning it is not to be chosen or queued, and for a waiting one no plan queued either, then `## TLDR` and `## Why it matters`; `Priority:` is a bare whole number from 0 to 10, anything else queues at 5.
 - **The claim format** - `tickets/<DATE>_<SLUG>.lock.md`, one line, `CLAIMED: <holder>`, written by `claim`, removed by `release` or `close`.
 - **The plan format** - `tickets/<DATE>_<SLUG>.plan.md`: `Effort:` and `Uncertainty:` on a 0 to 10 scale, an optional `Outdated: yes`, a `# [Plan]` title, a one-sentence description and free sections; the uncertainty counts significant alternatives and decides whether a human is needed.
 
@@ -65,21 +65,21 @@ See `## Context`.
 
 #### Context
 
-**User story**: the agent updates a ticket, writes its plan, records an import time, and closes the ticket once its pull request is merged.
+**User story**: the agent updates a ticket, writes its plan, records an import time, and closes a ticket that is not wanted; the tracker update closes one whose pull request merged.
 
 #### Business logic
 
-`npx tickets put <file>` writes one whole file under `tickets/` from stdin, creating it if new; the agent is shown the shape `npx tickets put <file> < draft.md`, for a ticket, its plan, or `meta.json` holding the object `meta` shows. `npx tickets close <file>` is for once the work is merged, or the ticket is not wanted: it removes the ticket with its plan and claim [3], is refused while someone else holds the ticket, and leaves the ticket's queue entry [6], if any, in place for the agent to `npx queue done`.
+`npx tickets put <file>` writes one whole file under `tickets/` from stdin, creating it if new; the agent is shown the shape `npx tickets put <file> < draft.md`, for a ticket, its plan, or `meta.json` holding the object `meta` shows. `npx tickets close <file>` is for a ticket that is not wanted, or for the tracker update once its pull request merged: it removes the ticket with its plan and claim [3], is refused while someone else holds the ticket, and leaves the ticket's queue entry [6], if any, in place for the agent to `npx queue done`.
 
 ### Claim before planning or working
 
 #### Context
 
-**Problem**: two agents, possibly on different machines, may pick the same ticket; the claim [3] is what keeps them apart, and only the agent itself can lift its own.
+**Problem**: two agents, possibly on different machines, may pick the same ticket; the claim [3] is what keeps them apart, and among agents only the holder lifts its own; a person can lift any.
 
 #### Business logic
 
-Before planning or working a ticket the agent runs `npx tickets claim <file>`: `{"ok":true,"file":…,"holder":…,"earlier":[…]}` means the ticket is the agent's, and `earlier` lists who claimed it before, newest first, each a run's id or a branch [8]: the agent reads what they did before it starts, so it neither repeats an earlier failure nor redoes work already done; `{"ok":false,"reason":"claimed","holder":…}` means it is someone else's, and the agent then picks another ticket and never removes or overwrites their claim. `npx tickets release <file>` lifts the agent's own claim when the plan or the work is done, and before the agent stops unless it closed the ticket, because nothing lifts a claim on a timeout. `put` ignores claims. The agent claims as `AGENT_ID` when it is set, else as its current branch [8], so it must release from the branch it claimed on, or the claim stays until a person lifts it.
+Before planning or working a ticket the agent runs `npx tickets claim <file>`: `{"ok":true,"file":…,"holder":…,"earlier":[…]}` means the ticket is the agent's, and `earlier` lists who claimed it before, newest first, each a run's id or a branch [8]: the agent reads what they did before it starts, so it neither repeats an earlier failure nor redoes work already done; `{"ok":false,"reason":"claimed","holder":…}` means it is someone else's, and the agent then picks another ticket and never removes or overwrites their claim. `npx tickets release <file>` lifts the agent's own claim when the plan or the work is done, and before the agent stops unless it closed the ticket, because nothing lifts a claim on a timeout. `put` ignores claims. The agent claims as `AGENT_ID` when it is set and not blank, else as its current branch [8], so it must release from the branch it claimed on, or the claim stays until a person lifts it.
 
 ### Queueing a ticket
 

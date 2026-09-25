@@ -3,8 +3,8 @@ to the implementer's judgment. Flag conflicts instead of silently deviating. Kee
 outdated decisions (no history).
 
 A bullet is a person's pick, and says what it was picked over. What the code does belongs
-in SPEC.md; a choice made while implementing is the implementer's judgment, not a
-decision. An AI proposes a bullet and asks; it never adds or rewrites one.
+in the LOGIC.md files; a choice made while implementing is the implementer's judgment,
+not a decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 
 ## The git host as a skill
 - GitHub is a skill: this package teaches an agent how to work with GitHub and declares the
@@ -43,4 +43,6 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 ## The command
 - Every command prints one JSON document on stdout: the result or the refusal. A refusal
   adds one line for a person on stderr and exits 1. A malformed command line: the usage on
-  stderr, exit 2. The same contract as the other skills' commands.
+  stderr, exit 2. The same contract as the other skills' commands, but for `watch`: it
+  logs one line per read on stderr and exits 0 whatever its outcome, `ok` only when it
+  merged.

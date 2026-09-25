@@ -8,7 +8,7 @@ The rules of the `tickets` skill [1] and the library behind them: how tickets, p
 
 ## Glossary
 
-[1] skill: one of the four capabilities an agent is taught — `branches`, `tickets`, `queue`, `logs` — each a package with the instructions the agent reads (its `SKILL.md`), a command on the agent's PATH, and an API the product calls.
+[1] skill: a capability an agent is taught: a package with the instructions the agent reads (its `SKILL.md`) and a command the agent runs through `npx`.
 [2] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
 [3] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [4] holder: who a claim names: the agent's id when the program that started the agent set it in `AGENT_ID` (the scheduler does), else the branch the `tickets` command ran on.

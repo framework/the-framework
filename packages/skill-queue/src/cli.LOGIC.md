@@ -73,7 +73,7 @@ The command is `queue [command]`; its usage names the bare command, `add` and `d
 
 #### Business logic
 
-`add <text> [--priority N]` puts the text, with surrounding whitespace removed, on the queue as one entry. With `--priority`, the value must be a whole number from 0 to 10, and the entry lands in that `## Priority N` section by the placement rule of `queue.ts`, the section created where the file's order calls for it when there is none. Without `--priority`, the entry is appended at the end of the file, in whatever section ends it. A branch with no queue file gets one, holding the new entry. The write lands as "queue add: <entry>" and answers `{"ok":true,"entry":…}` with `priority` added when one was given.
+`add <text> [--priority N]` puts the text, with surrounding whitespace removed, on the queue as one entry. The text is not checked further: an inner line break splits it into an entry and a stray line, and a leading `[x]` writes a checked line that is never an open entry. With `--priority`, the value must be a whole number from 0 to 10, and the entry lands in that `## Priority N` section by the placement rule of `queue.ts`, the section created where the file's order calls for it when there is none. Without `--priority`, the entry is appended at the end of the file, in whatever section ends it. A branch with no queue file gets one, holding the new entry. The write lands as "queue add: <entry>" and answers `{"ok":true,"entry":…}` with `priority` added when one was given.
 
 ### `queue done`
 

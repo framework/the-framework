@@ -10,7 +10,7 @@ What the tests cover:
 - **Every control is beside the row, not inside it** - starting, selecting, clicking a topic and following the issue link never open the ticket; the issue link points at the issue's own address and shows its label.
 - **Selection** - a row carries a "Select <title>" tick box only where the surrounding page acts on a selection, shows what the page says it is, and toggles by file name without opening the ticket.
 - **Click-to-filter** - a topic badge hands its topic back, and the claim marker asks for the list to be narrowed to claimed tickets.
-- **A claim naming one of the project's agents** - shows that agent's session name and opens that agent's page on click; a holder the project has no record of is shown exactly as the claim wrote it and opens nothing.
+- **A claim naming one of the project's agents** - shows that agent's session name and opens that agent's page on click; a holder the project has no record of is shown exactly as the claim wrote it.
 - **Updating the tickets** - an empty `tickets/` offers "Update tickets" rather than a dead end, and a filled one offers the same button beside the stamp; both ask the dashboard to start the `/update-tickets` command in this project.
 - **A refused import** - shows the dashboard's reason ("already active"), from either state of the panel.
 - **The last-import stamp** - read with `tickets meta --local` in the project, reads "Updated from the tracker 3h ago" when the project has one, and "No record of an import yet" when it does not, rather than inventing a date; the empty state carries the update button alone, with no stamp row.

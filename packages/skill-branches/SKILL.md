@@ -9,7 +9,7 @@ Your work goes on a branch named `agent-<name>`, unless whoever started you cont
 
 ## The command
 
-`branches` is a dependency of this repository (`@gemstack/skill-branches`). If `node_modules` is missing, install with the lockfile's package manager (`npm install` for `package-lock.json`). Then run `npx branches` inside your checkout. `status`, `name` and `push` are yours; the rest are the caller's.
+`branches` is a dependency of this repository (`@gemstack/skill-branches`). If `node_modules` is missing, install with the lockfile's package manager (`npm install` for `package-lock.json`). Then run `npx branches` inside your checkout, never a bare `branches`: a fresh clone has none. `status`, `name` and `push` (with no flag) are yours; the rest are the caller's.
 
 ## Where you are
 
@@ -35,7 +35,7 @@ It renames your branch to `agent-<name>` and prints it in `branch`: `agent-<name
 git switch -c agent-<name>
 ```
 
-Everything above applies.
+From then on, work as on an `agent-` branch; nothing in a plain clone is a link.
 
 ## Commit as you go
 

@@ -19,7 +19,7 @@ Reads what a branch holds and where it stands: the commits and files it carries 
 - **What the branch holds** - its own commits beyond the base [3], newest first, and the files changed since it left the base with their line counts, a binary file flagged; without a base, both lists are empty.
 - **Where it stands** - `hasRemote` when the repository has a remote; `pushed` when `origin` has the branch at exactly this tip; `merged` when the base already contains the branch.
 - **The name the agent gave its work** - `name`: the branch minus this package's `agent-` prefix; absent for a branch the package did not mint, and for a checkout still on the branch it was created on (`agent-<agent id>`); a branch no checkout is on is named by its suffix, since nothing tells its birth name apart. The reader draws this where it labels a branch, and never cuts the prefix itself.
-- **What the checkout left uncommitted** - the paths a `git status` of the checkout on the branch reports (a rename by its new path, a quoted path unquoted); absent when no checkout under `.branches/` is on the branch, so "nobody asked" and "asked, clean" read differently.
+- **What the checkout left uncommitted** - the paths a `git status` of the checkout on the branch reports (a rename by its new path, a quoted path read without its surrounding quotes (git's escapes inside stay as they are)); absent when no checkout under `.branches/` is on the branch, so "nobody asked" and "asked, clean" read differently.
 - **Forgiving** - a git read that fails reads as empty, never as an error.
 
 ## Business logic
@@ -62,4 +62,4 @@ See `## Context`.
 
 #### Business logic
 
-When a checkout [1] under `.branches/` is on the branch, the state carries `pendingFiles`: every path `git status` reports there, modified, staged, deleted or untracked, a rename by its new path, a quoted path unquoted; an empty list when the tree is clean. When no checkout is on the branch, the field is absent. A status git cannot read leaves the field absent too.
+When a checkout [1] under `.branches/` is on the branch, the state carries `pendingFiles`: every path `git status` reports there, modified, staged, deleted or untracked, a rename by its new path, a quoted path read without its surrounding quotes (git's escapes inside stay as they are); an empty list when the tree is clean. When no checkout is on the branch, the field is absent. A status git cannot read leaves the field absent too.

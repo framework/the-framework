@@ -3,8 +3,8 @@ to the implementer's judgment. Flag conflicts instead of silently deviating. Kee
 outdated decisions (no history).
 
 A bullet is a person's pick, and says what it was picked over. What the code does belongs
-in SPEC.md; a choice made while implementing is the implementer's judgment, not a
-decision. An AI proposes a bullet and asks; it never adds or rewrites one.
+in the LOGIC.md files; a choice made while implementing is the implementer's judgment,
+not a decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 
 ## The logs
 - Three callers: the command an agent runs, which only reads; the program that ran an
@@ -26,7 +26,7 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   `agents/<id>.json` with the person inside the card was the alternative and was not
   taken: the grouping stays visible in a file listing.
 - The card is small and the package's: `id`, `startedAt`, `endedAt`, `status`, `intent`,
-  `driver`, `model`, `branch`, `pr`, `ticket`, `cost`. Everything else a writer records
+  `driver`, `model`, `branch`, `pr`, `cost`. Everything else a writer records
   sits under one key of its own, `caller`, which the package stores and never reads.
   Owning the writer's whole record, renamed field by field, was rejected: a program's
   private fields would become a standalone package's public API. Under semver these
@@ -41,9 +41,9 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - Agents only read. A note an agent leaves on its own run was considered and deferred: the
   record lands on the branch only when the run is over, so a note would need a file of its
   own or a record written at the start.
-- The skill says when to look back: before planning or working a ticket, read its runs.
-  Leaving that to the caller's prompts was the alternative and was not taken: outside the
-  caller nobody would ever read the logs.
+- The skill says when to look back: before planning or working a ticket, read the runs its
+  claim names. Leaving that to the caller's prompts was the alternative and was not taken:
+  outside the caller nobody would ever read the logs.
 
 ## Flow: the command
 - `logs` lists newest first and prints the package's fields only, never `caller`, except
@@ -51,9 +51,6 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   business.
 - `logs` prints the newest 20 runs unless `--limit` says otherwise: a list of every run,
   each with its prompt, is more than an agent should read for a look back.
-- `--ticket <file>` matches a card whose ticket is that path or ends with `/<file>`, so a
-  ticket's filename and the path a queue entry links to both find it. The package does
-  not know where tickets live.
 - `show` prints the card with the four kinds of diary line, never the whole diary,
   except with `--full`: the dashboard replays the whole diary through the command. An
   agent cannot read a hundred kilobytes of a writer's bookkeeping.
@@ -72,9 +69,9 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 ## Flow: what the writer records
 - A run is recorded once, when it is over, as one commit carrying both files. Two late
   facts, the branch the work landed on and the pull request, are patched onto the card
-  afterwards, one commit each. A run is deleted as one commit, both files. A run a dead
-  writer left marked running is recorded again by the next writer that notices, ended,
-  where it already sits. Nothing else on a card changes after it lands.
+  afterwards, one commit per patch, either or both. A run is deleted as one commit, both
+  files. A run a dead writer left marked running is recorded again by the next writer that
+  notices, ended, where it already sits. Nothing else on a card changes after it lands.
 - The writer's persistent checkout is `.branches/agent-data`, and its writes go through
   that checkout's serialized cycle, the same as the other skills'. The command reads it
   only with `--local`, and writes through its cycle only for `delete` and `patch`.

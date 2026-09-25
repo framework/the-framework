@@ -3,21 +3,21 @@ to the implementer's judgment. Flag conflicts instead of silently deviating. Kee
 outdated decisions (no history).
 
 A bullet is a person's pick, and says what it was picked over. What the code does belongs
-in SPEC.md; a choice made while implementing is the implementer's judgment, not a
-decision. An AI proposes a bullet and asks; it never adds or rewrites one.
+in the LOGIC.md files; a choice made while implementing is the implementer's judgment,
+not a decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 
 ## The queue
-- Three callers: the command an agent runs; a long-lived program that keeps the branch
-  checked out and drains the queue through this package's functions; and a dashboard,
-  which reads the queue through the command (`--local`, `--full`) and adds to it through
-  the command as its widget's action, found by the package's `framework.queue`
-  declaration. A dashboard importing the package was the alternative and was not taken:
-  the dashboard names no skill. The executable is `queue`. The package ships `SKILL.md`,
-  the agent's instructions.
+- Two callers: the command an agent runs, and a dashboard, which reads the queue through
+  the command (`--local`, `--full`) and adds to it through the command as its widget's
+  action, found by the package's `framework.queue` declaration. A dashboard importing the
+  package was the alternative and was not taken: the dashboard names no skill. The
+  executable is `queue`. The package ships `SKILL.md`, the agent's instructions.
 - The queue is one markdown file on the branch, `TODO_AGENTS.md`: sections `## Priority
-  10` down to `## Priority 0`, any `## Priority N` counts, in any case; any `-`, `*` or
-  `N.` list item with text is an entry, wherever it sits. Entries are placed to keep the
-  file sorted high to low; nothing re-sorts on read.
+  10` down to `## Priority 0`, any `## Priority N` with N of one or two digits counts, in
+  any case; any `-`, `*` or `N.` list item with text is an entry, wherever it sits.
+  Entries are placed to keep the file sorted high to low; the command never re-sorts, and
+  agents take file order. The Queue page groups the entries by priority, highest first,
+  unranked last.
 - An entry is plain trimmed text: the task a future agent is started with. The package
   does not know tickets: a caller that queues a ticket writes the entry itself as a
   markdown link to the ticket, and reads the link back to claim the ticket for the agent
@@ -46,9 +46,7 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   result and every refusal is an object with `ok`.
 - The command's write is one commit per command, pushed straight to origin through a
   throwaway worktree at origin's tip; a push that loses a race is re-applied on the new
-  tip by `@gemstack/agent-data`. The program's writes go through its persistent checkout's
-  cycle instead; its `queue done` of an entry already gone succeeds, changing nothing. A
-  program's queue edit counts only once pushed.
+  tip by `@gemstack/agent-data`.
 - `queue done` takes the entry as `queue` printed it, trimmed, removes the first such
   line, and refuses a line the queue does not have, an empty one included, decided inside
   the write.

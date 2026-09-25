@@ -21,7 +21,8 @@ import { deleteRun, findRun, listRuns, patchRun, readDiary, runFiles } from './s
  * `{ ok: false, reason }` so a caller parsing the output learns why, and on stderr so a person does.
  *
  * Reads go to origin's copy of the branch, fetched once, so a command sees every run every
- * machine pushed. The persistent checkout a daemon keeps is never touched.
+ * machine pushed. The persistent checkout is read only with `--local` and written only by
+ * `delete` and `patch`.
  */
 
 /** How many runs the bare command prints unless told otherwise: enough to see what happened lately, not the whole history. */

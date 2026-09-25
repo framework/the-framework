@@ -19,7 +19,7 @@ Once your branch is pushed (your branches skill says how), open its pull request
 npx github open --title "<one line naming what the change does>" --body "<what changed, and why>"
 ```
 
-It opens the pull request for the branch you are on and prints it in `request` (`number`, `url`). A branch that already has an open pull request gets no second one: that one is answered, with `existing` true. Add `--merge` when the work may land on its own: the pull request then merges once its checks pass, also where the repository does not allow auto-merge (`merge` in the answer says `auto-armed`, `merged` or `watching`). Add `--draft` for a pull request a person should look at first; a draft is never armed to merge. Unless whoever started you said they publish for you: then you open nothing.
+It opens the pull request for the branch you are on and prints it in `request` (`number`, `url`). A branch that already has an open pull request gets no second one: that one is answered, with `existing` true. Add `--merge` when the work may land on its own: the pull request then merges once its checks pass, also where the repository does not allow auto-merge (`merge` in the answer says `auto-armed`, `merged` or `watching`). Add `--draft` instead for a pull request a person should look at first; with `--merge` too, `--draft` is dropped. Unless whoever started you said they publish for you: then you open nothing.
 
 A pull request whose body has a line `Closes #<number>` closes that issue when it merges.
 
@@ -29,7 +29,7 @@ A pull request whose body has a line `Closes #<number>` closes that issue when i
 npx github requests [--branch <b>] [--state open|merged|all] [--since <iso>]
 ```
 
-The project's pull requests, newest first: `number`, `url`, `state` (`open`, `merged`, `closed`), `title`, `draft`, `branch`, `head`, `createdAt`, `mergedAt`, `mergeCommit` (the commit a merged request landed as).
+The project's newest 50 pull requests, newest first (`--since` keeps those created since, or merged since with `--state merged`): `number`, `url`, `state` (`open`, `merged`, `closed`), `title`, `draft`, `branch`, `head`, `createdAt`, `mergedAt`, `mergeCommit` (the commit a merged request landed as).
 
 For a pull request's discussion and diff, and for the project's issues, use `gh` directly: `gh pr view <number> --comments`, `gh pr diff <number>`, `gh issue list`, `gh issue view <number> --comments`, `gh issue comment <number> --body "<text>"`. `gh` is installed and logged in where you run.
 

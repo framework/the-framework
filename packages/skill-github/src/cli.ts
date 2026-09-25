@@ -25,7 +25,7 @@ import { GIT_HOST_NAME, homeUrlFor } from './home.js'
 export const USAGE = `usage: github <command>
 
   requests [--branch <b>] [--state open|merged|all] [--since <iso>]
-                               the project's pull requests, newest first: number, url, state, title, draft, branch, head, createdAt, mergedAt
+                               the project's pull requests, newest first: number, url, state, title, draft, branch, head, createdAt, mergedAt, mergeCommit
   open [--branch <b>] --title <t> [--body <text>] [--draft] [--merge]
                                open the pull request of branch <b> (default: the current branch; it must be on the remote already); an open one is answered as it is; --merge lands it on green
   merge <number>               land pull request <number>: a draft is marked ready, then the merge is armed as --merge arms it

@@ -13,8 +13,7 @@
   },
   "cost": 0.339199,
   "caller": {
-    "scheduler": {
-      "command": "post-merge-cleanup",
+    "runner": {
       "host": "Suleimans-MacBook-Pro.local",
       "pid": 2467
     },

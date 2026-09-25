@@ -9,8 +9,7 @@
   "branch": "agent-2026-09-22T22-18-31-346Z",
   "cost": 0.26172460000000003,
   "caller": {
-    "scheduler": {
-      "command": "update-tickets",
+    "runner": {
       "host": "Suleimans-MacBook-Pro.local",
       "pid": 55009
     },

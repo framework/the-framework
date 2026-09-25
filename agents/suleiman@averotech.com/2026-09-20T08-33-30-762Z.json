@@ -8,8 +8,7 @@
   "model": "opus",
   "branch": "agent-2026-09-20T08-33-30-762Z",
   "caller": {
-    "scheduler": {
-      "command": "triage-quick",
+    "runner": {
       "host": "Suleimans-MacBook-Pro.local",
       "pid": 93533
     },

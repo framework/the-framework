@@ -9,8 +9,7 @@
   "branch": "agent-2026-09-22T22-18-47-442Z",
   "cost": 0.2587408,
   "caller": {
-    "scheduler": {
-      "command": "triage consensual",
+    "runner": {
       "host": "Suleimans-MacBook-Pro.local",
       "pid": 61907
     },

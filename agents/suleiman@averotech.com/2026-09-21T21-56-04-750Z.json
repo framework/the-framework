@@ -13,8 +13,7 @@
   },
   "cost": 0.294696,
   "caller": {
-    "scheduler": {
-      "command": "Append",
+    "runner": {
       "host": "Suleimans-MacBook-Pro.local",
       "pid": 87346
     },

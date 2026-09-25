@@ -7,8 +7,7 @@
   "driver": "claude-code",
   "model": "opus",
   "caller": {
-    "scheduler": {
-      "command": "work-queue",
+    "runner": {
       "host": "Suleimans-MacBook-Pro.local"
     }
   }

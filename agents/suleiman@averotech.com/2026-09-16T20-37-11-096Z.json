@@ -9,8 +9,7 @@
   "branch": "agent-plan-ship-bridge-extension",
   "cost": 0.9736499999999999,
   "caller": {
-    "scheduler": {
-      "command": "work-queue",
+    "runner": {
       "host": "Suleimans-MacBook-Pro.local",
       "pid": 45798
     },

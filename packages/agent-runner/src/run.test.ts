@@ -132,6 +132,13 @@ test('a run: marker, checkout, the live card, the prompt once, the record, the c
     assert.deepEqual(diary.map(line => line.kind), ['start', 'said', 'result', 'cost', 'ended'])
     assert.deepEqual(diary.find(l => l.kind === 'said'), { kind: 'said', text: 'Fixed it and committed.' })
     assert.deepEqual(diary.at(-1), { kind: 'ended', status: 'done' })
+
+    // The live directory was hidden in the run's checkout alone: the project's own is still
+    // one it can track, as the dashboard does when it adds the project.
+    await mkdir(join(repo, '.the-framework'))
+    await writeFile(join(repo, '.the-framework', '.gitignore'), '*\n!.gitignore\n')
+    await git(['add', '.the-framework'], repo)
+    assert.equal((await git(['diff', '--cached', '--name-only'], repo)).trim(), '.the-framework/.gitignore')
   } finally {
     await removeRepo(repo)
   }
@@ -622,6 +629,22 @@ test('the git host is the package the project declares: a run reads its pull req
     assert.deepEqual(outcome.then?.merge, { outcome: 'watching' })
     const calls = (await readFile(join(dir, 'calls.log'), 'utf8')).trim().split('\n')
     assert.deepEqual(calls, ['requests --branch agent-fix-it', 'requests --branch agent-fix-it', 'merge 7'], 'each run reads its branch, then the merge once')
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test("a checkout whose project tracks its own .gitignore in the live directory keeps it as it is", async () => {
+  const repo = await testRepo()
+  try {
+    await mkdir(join(repo, '.the-framework'))
+    await writeFile(join(repo, '.the-framework', '.gitignore'), '*\n!.gitignore\n')
+    await git(['add', '.the-framework'], repo)
+    await git(['commit', '-qm', 'add the project'], repo)
+    await git(['push', '-q', 'origin', 'HEAD'], repo)
+    const outcome = await runCommand(repo, { prompt: '/work-queue', model: 'opus', driver: new FakeDriver({ turns: [{ text: 'Nothing to do.' }] }), now: () => NOW, gitHost: noGitHost })
+    assert.equal(outcome.status, 'done')
+    assert.deepEqual(outcome.checkout, { reclaimed: true }, 'the checkout stayed clean: its tracked .gitignore unchanged, the live files ignored')
   } finally {
     await removeRepo(repo)
   }

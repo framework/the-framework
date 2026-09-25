@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { logCardFile, logDiaryFile } from 'agent-driver'
 import { createCheckout, worktreePath } from '@gemstack/skill-branches'
 import { findRun, type RunCard } from '@gemstack/skill-logs'
-import { liveDir, readLiveCard } from './live-card.js'
+import { hideLiveDir, liveDir, readLiveCard } from './live-card.js'
 import { markerCard, writeMarker } from './records.js'
 import { acquireRunLock, runStderrPath } from './run-lock.js'
 import { sweep } from './sweep.js'
@@ -37,8 +37,7 @@ async function liveRun(repo: string, id: string, host: string, pid: number, stat
   ]
   await writeFile(join(dir, logDiaryFile(id)), lines.map(l => JSON.stringify(l) + '\n').join(''))
   await git(['config', 'core.excludesFile', '/dev/null'], checkout.path).catch(() => {})
-  const { excludeFromGit } = await import('@gemstack/agent-data')
-  await excludeFromGit(checkout.path, '/.the-framework').catch(() => {})
+  await hideLiveDir(checkout.path)
   await writeMarker(repo, markerCard({ id, startedAt: card.startedAt, prompt: '/work-queue', driver: 'fake', model: 'opus', mark }))
   return card
 }

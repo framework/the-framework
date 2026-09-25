@@ -1,8 +1,8 @@
-Decides whether a finished agent's [1] checkout [2] may be removed, and removes it: the one implementation behind every surface that reclaims [3] a checkout (the scheduler at a run's end and in its sweep [4], the dashboard's "Remove" button, the `branches remove` and `branches prune` commands). One rule governs it: only what is on the remote may go, a clean tree whose tip the remote has, pushed here when the caller allows, so every deletion is recoverable and nothing local is ever the last copy of anything. Every refusal says why the checkout stays. Beside it, one way out for a person: discarding a checkout whatever it holds.
+Decides whether a finished agent's [1] checkout [2] may be removed, and removes it: the one implementation behind every surface that reclaims [3] a checkout (`agent-runner` at a run's end and in its sweep [4], the dashboard's "Remove" button, the `branches remove` and `branches prune` commands). One rule governs it: only what is on the remote may go, a clean tree whose tip the remote has, pushed here when the caller allows, so every deletion is recoverable and nothing local is ever the last copy of anything. Every refusal says why the checkout stays. Beside it, one way out for a person: discarding a checkout whatever it holds.
 
 ## Context
 
-**User story**: the scheduler reclaims [3] the checkout [2] of each finished agent [1] it ran when the run ends, and its sweep [4] reclaims those whose process died, so the disk holds nothing but live work; the user sees on the dashboard the checkouts still on disk, each with a "Remove" button, and a checkout with uncommitted work stays until the user commits or throws it away. Nothing the product removes on its own is ever lost: it is on the remote first.
+**User story**: the runner (`agent-runner`) reclaims [3] the checkout [2] of each finished agent [1] it ran when the run ends, and its sweep [4] reclaims those whose process died, so the disk holds nothing but live work; the user sees on the dashboard the checkouts still on disk, each with a "Remove" button, and a checkout with uncommitted work stays until the user commits or throws it away. Nothing the product removes on its own is ever lost: it is on the remote first.
 
 **Problem**: the one question every keep-or-remove decision reduces to is "is this recoverable from the remote", never "how did the agent end". Git alone cannot answer it: it does not know whether the caller allows a push, whether a pushed commit already covers everything the checkout holds, or which branch the checkout was born on. And a directory under `.branches/` that git no longer knows as a worktree makes every git command run in it act on the user's own checkout, so it must be recognized before anything runs.
 
@@ -11,7 +11,7 @@ Decides whether a finished agent's [1] checkout [2] may be removed, and removes 
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch. The user's own working copy is "the project's checkout" or "the user's checkout".
 [3] reclaim: removing a finished agent's checkout once its work is on the remote.
-[4] sweep: the scheduler's (`agent-scheduler`) pass on every tick that records and reclaims the runs of this machine whose process died, and only this machine's.
+[4] sweep: `agent-runner`'s pass, run by the scheduler on every tick, that records and reclaims the runs of this machine whose process died, and only this machine's.
 [6] cloud anchor: an empty commit a web agent pushes before its task leaves this machine, unique to the agent: the branch the cloud session later pushes descends from it.
 [7] birth branch: the branch a checkout is created on, `agent-<agent id>`, which also names the checkout's directory; the agent's branch until the agent names its work.
 [8] worktree root: a directory that is itself the top level of a git worktree: the project's checkout, or an agent's checkout that git still knows as a worktree.
@@ -42,13 +42,13 @@ See `## Context`.
 
 #### Business logic
 
-A checkout [2] is removed only once the remote has everything it holds: a clean tree, and a tip the remote has, whether it was there already or was pushed on the way. Every deletion is therefore recoverable from the remote. Nothing is committed on the agent's [1] behalf: a checkout holding uncommitted work is kept until a person commits or deletes it, and nothing of it is pushed. There is one way for the rule to fail, and it is legible: the branch's tip is not on the remote and could not or may not be pushed, so the checkout stays and the refusal says so. Whether the agent still runs is never asked here; the caller decides when to reclaim [3], and the scheduler, the dashboard's "Remove" button and the `branches` command line all go through this one decision.
+A checkout [2] is removed only once the remote has everything it holds: a clean tree, and a tip the remote has, whether it was there already or was pushed on the way. Every deletion is therefore recoverable from the remote. Nothing is committed on the agent's [1] behalf: a checkout holding uncommitted work is kept until a person commits or deletes it, and nothing of it is pushed. There is one way for the rule to fail, and it is legible: the branch's tip is not on the remote and could not or may not be pushed, so the checkout stays and the refusal says so. Whether the agent still runs is never asked here; the caller decides when to reclaim [3], and the runner, the dashboard's "Remove" button and the `branches` command line all go through this one decision.
 
 ### What the caller knows and git does not
 
 #### Context
 
-**Business logic story**: the caller knows whether a push is allowed, the branch the checkout [2] was created on, what serves the tree while the agent [1] runs, and, for a `web` agent, its cloud anchor [6]. None of that is readable from git, so it comes in as the caller's word. The scheduler and the dashboard's "Remove" button allow the push and name the birth branch [7]; no caller names a cloud anchor. The command line passes only whether a push is allowed (`--no-push` in `cli.ts`).
+**Business logic story**: the caller knows whether a push is allowed, the branch the checkout [2] was created on, what serves the tree while the agent [1] runs, and, for a `web` agent, its cloud anchor [6]. None of that is readable from git, so it comes in as the caller's word. The runner and the dashboard's "Remove" button allow the push and name the birth branch [7]; no caller names a cloud anchor. The command line passes only whether a push is allowed (`--no-push` in `cli.ts`).
 
 #### Business logic
 

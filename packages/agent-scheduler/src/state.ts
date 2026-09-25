@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { excludeFromGit, nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
-import { DEFAULT_MODEL, DEFAULT_SPEND_OFFSET, RUNS_DIR, STATE_DIR, STATE_FILE } from './names.js'
+import { DEFAULT_MODEL, DEFAULT_SPEND_OFFSET, STATE_DIR, STATE_FILE } from './names.js'
 
 /**
  * The tool's state (#1774): one JSON file under `.agent-scheduler/` at the repository root,
@@ -10,8 +10,8 @@ import { DEFAULT_MODEL, DEFAULT_SPEND_OFFSET, RUNS_DIR, STATE_DIR, STATE_FILE } 
  * is, so no tracked file changes and nothing rides a sweeping `git add -A`.
  *
  * What is here is what would otherwise live in a process's memory: whether the scheduler is on,
- * whether it should outlive whatever started it, the model and the spend cushion this user's runs
- * take, which scheduled commands this machine switched on or off, the pid of the scheduler's own process when one runs, and the last tick with what it
+ * whether it should outlive whatever started it, the model this user's scheduled runs start on
+ * and the spend cushion they take, which scheduled commands this machine switched on or off, the pid of the scheduler's own process when one runs, and the last tick with what it
  * decided per command. A restart loses nothing.
  */
 
@@ -51,7 +51,7 @@ export interface State {
   on: boolean
   /** Whether the scheduler's process outlives whatever started it. Read by `stop --unless-keep-alive` only, the line a dashboard runs when it closes. */
   keepAlive: boolean
-  /** The model every run starts on. */
+  /** The model every scheduled run starts on. */
   model: string
   /** How far past the spend boundary a run may still start, in percentage points. */
   spendOffset: number
@@ -77,11 +77,6 @@ export function statePath(repo: string): string {
   return join(stateDir(repo), STATE_FILE)
 }
 
-/** Where a spawned run's stderr lands, so a run that dies before writing anything leaves a trace. */
-export function runStderrPath(repo: string, id: string): string {
-  return join(stateDir(repo), RUNS_DIR, `${id}.stderr`)
-}
-
 /** The state as written, defaults filled in; the default state when there is none or it does not parse. */
 export async function readState(repo: string): Promise<State> {
   const raw = await readFile(statePath(repo), 'utf8').catch(() => undefined)
@@ -99,7 +94,7 @@ export async function readState(repo: string): Promise<State> {
  * a repository whose exclude file cannot be written still has a scheduler.
  */
 export async function writeState(repo: string, state: State, git: GitRunner = nodeGitRunner()): Promise<void> {
-  await mkdir(join(stateDir(repo), RUNS_DIR), { recursive: true })
+  await mkdir(stateDir(repo), { recursive: true })
   await excludeFromGit(repo, `/${STATE_DIR}`, undefined, git).catch(() => {})
   await writeFile(statePath(repo), JSON.stringify(state, null, 2) + '\n')
 }

@@ -2,7 +2,7 @@ import { appendFile, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { logCardFile, logDiaryFile } from 'agent-driver'
 import { parseDiary, parseRunCard, type AnyDiaryLine, type RunCard, type RunStatus } from '@gemstack/skill-logs'
-import { schedulerMark } from './records.js'
+import { runnerMark } from './records.js'
 
 /**
  * A run's live record: the card and the diary agent-driver keeps under `.the-framework/` in the
@@ -30,7 +30,7 @@ export async function readLiveCard(checkout: string, id: string): Promise<RunCar
   const raw = await readFile(join(liveDir(checkout), logCardFile(id)), 'utf8').catch(() => undefined)
   if (raw === undefined) return undefined
   const card = parseRunCard(raw)
-  return card && schedulerMark(card) ? card : undefined
+  return card && runnerMark(card) ? card : undefined
 }
 
 /** A checkout's live diary, every line that parses. */

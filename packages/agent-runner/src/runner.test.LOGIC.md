@@ -1,0 +1,9 @@
+What the tests cover, with the spawn and the CLIs' answers faked:
+
+- **The detached start** - `run --detach` writes the running marker with the prompt, and the host and no pid in the tool's mark, asks for the run's process with the id, the prompt and the driver, and answers the id and the driver at once; with no model given, neither the marker, the spawn nor the answer names one, so the coding agent starts on its own default; a model given is on the answer and the marker.
+- **The detached start on Codex** - the marker and the spawned run name Codex and no model; a model given by hand is passed on; a start with a follow-up has it on the marker's mark from the start and passes it to the spawned run.
+- **The detached continuation** - `run --detach --resume` spawns the continuation of a recorded run with the answer it was given, and answers that run's id; a run the project has no record of is refused and nothing is spawned; the spawned command line carries the text as its argument, or the answer and the model as options.
+- **The spawned run's command line** - the model, the driver and the follow-up (`--then`) are named only when the run has them.
+- **The coding agent** - a run's Codex has full access and the run's id as `AGENT_ID` in its environment; a run's Claude Code is Claude Code.
+- **A resume** - an ended run recorded on Codex is resumed on Codex, asked for by the record's name, and with no model named at the start nor at the resume.
+- **Can a run start here** - a ready coding agent gives no problem and no warning, on Codex too, and only the coding agent's CLI is probed; a logged-out Claude Code is a problem naming `claude auth login`.

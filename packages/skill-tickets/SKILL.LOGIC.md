@@ -15,7 +15,7 @@ The instructions every agent [1] reads before touching a ticket: where the ticke
 [5] skill: a capability an agent is taught: a package with the instructions the agent reads (its `SKILL.md`) and a command the agent runs through `npx`.
 [6] queue entry: an item on the agent queue.
 [7] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
-[8] holder: who a claim names: the agent's id when the program that started the agent set it in `AGENT_ID` (the scheduler does), else the branch the `tickets` command ran on.
+[8] holder: who a claim names: the agent's id when the program that started the agent set it in `AGENT_ID` (`agent-runner` does), else the branch the `tickets` command ran on.
 
 ## Business logic — TL;DR
 

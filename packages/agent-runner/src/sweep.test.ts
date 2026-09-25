@@ -7,8 +7,7 @@ import { createCheckout, worktreePath } from '@gemstack/skill-branches'
 import { findRun, type RunCard } from '@gemstack/skill-logs'
 import { liveDir, readLiveCard } from './live-card.js'
 import { markerCard, writeMarker } from './records.js'
-import { acquireRunLock } from './run-lock.js'
-import { runStderrPath, writeState, DEFAULT_STATE } from './state.js'
+import { acquireRunLock, runStderrPath } from './run-lock.js'
 import { sweep } from './sweep.js'
 import { git, readUntimedDiary, removeRepo, testRepo } from './test-repo.js'
 
@@ -25,8 +24,8 @@ const NOW = new Date('2026-09-16T14:30:00.000Z')
 /** A checkout with a live card and diary, as a run's session leaves them while it works. */
 async function liveRun(repo: string, id: string, host: string, pid: number, status: RunCard['status'] = 'running'): Promise<RunCard> {
   const checkout = await createCheckout(repo, { agentId: id })
-  const mark = { command: 'work-queue', host, pid }
-  const card: RunCard = { id, startedAt: '2026-09-16T14:01:00.000Z', status, intent: '/work-queue', driver: 'fake', model: 'opus', caller: { scheduler: mark, pid, host, kind: 'prompt' } }
+  const mark = { host, pid }
+  const card: RunCard = { id, startedAt: '2026-09-16T14:01:00.000Z', status, intent: '/work-queue', driver: 'fake', model: 'opus', caller: { runner: mark, pid, host, kind: 'prompt' } }
   if (status !== 'running') card.endedAt = '2026-09-16T14:20:00.000Z'
   const dir = liveDir(checkout.path)
   await mkdir(dir, { recursive: true })
@@ -89,10 +88,9 @@ test('a run that ended but whose process died before the record: recorded as it 
 test('a marker of this machine with no checkout behind it: failed with the stderr the spawn left, else stopped as gone', async () => {
   const repo = await testRepo()
   try {
-    await writeState(repo, DEFAULT_STATE)
-    const mark = { command: 'work-queue', host: 'this-box', pid: 999_999 }
+    const mark = { host: 'this-box', pid: 999_999 }
     await writeMarker(repo, markerCard({ id: 'crashed', startedAt: '2026-09-16T14:01:00.000Z', prompt: '/work-queue', driver: 'fake', model: 'opus', mark }))
-    await mkdir(join(repo, '.agent-scheduler', 'runs'), { recursive: true })
+    await mkdir(join(repo, '.agent-runner', 'runs'), { recursive: true })
     await writeFile(runStderrPath(repo, 'crashed'), 'node: cannot find module agent-driver\n')
     await writeMarker(repo, markerCard({ id: 'vanished', startedAt: '2026-09-16T14:02:00.000Z', prompt: '/work-queue', driver: 'fake', model: 'opus', mark }))
     await writeMarker(repo, markerCard({ id: 'theirs', startedAt: '2026-09-16T14:03:00.000Z', prompt: '/work-queue', driver: 'fake', model: 'opus', mark: { ...mark, host: 'other-box' } }))
@@ -109,7 +107,7 @@ test('a marker whose lock a live process holds and whose checkout is not there y
   const repo = await testRepo()
   try {
     // A detached run's marker carries no pid: the lock, taken before the marker, is what says it lives.
-    const mark = { command: 'work-queue', host: 'this-box' }
+    const mark = { host: 'this-box' }
     await writeMarker(repo, markerCard({ id: 'booting', startedAt: '2026-09-16T14:01:00.000Z', prompt: '/work-queue', driver: 'fake', model: 'opus', mark }))
     await hold(repo, 'booting', 1)
     const result = await sweep(repo, { host: 'this-box', isAlive: pid => pid === 1, now: () => NOW })
@@ -127,7 +125,7 @@ test('a run being resumed holds its lock: its kept checkout still saying waiting
     // The resume has written the record running and holds the lock; its session has not reopened the live card yet.
     await liveRun(repo, 'resuming', 'this-box', 999_999, 'waiting')
     await hold(repo, 'resuming', 1)
-    const mark = { command: 'work-queue', host: 'this-box', pid: 1 }
+    const mark = { host: 'this-box', pid: 1 }
     await writeMarker(repo, markerCard({ id: 'resuming', startedAt: '2026-09-16T14:01:00.000Z', prompt: '/work-queue', driver: 'fake', model: 'opus', mark }))
     const result = await sweep(repo, { host: 'this-box', isAlive: pid => pid === 1, now: () => NOW })
     assert.deepEqual(result, { recorded: [], reclaimed: [], kept: [] })

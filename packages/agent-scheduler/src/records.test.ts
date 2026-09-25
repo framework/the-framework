@@ -1,79 +1,52 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { DATA_BRANCH } from '@gemstack/agent-data'
-import { findRun, listRuns, readDiary } from '@gemstack/skill-logs'
-import { inFlight, lastStart, markerCard, recordRun, schedulerMark, withdrawMarker, writeMarker } from './records.js'
-import { git, removeRepo, testRepo } from './test-repo.js'
+import { markerCard, recordRun, writeMarker } from 'agent-runner'
+import { listRuns } from '@gemstack/skill-logs'
+import { commandOf, inFlight, lastStart } from './records.js'
+import { parseSchedule } from './schedule.js'
+import { removeRepo, testRepo } from './test-repo.js'
 
-// The marker is the logs skill's record, on the real branch: written before the agent exists,
-// counted per command across machines, written again at the end over the same file.
+// The runs a command has, counted off agent-runner's records on the real branch, every machine's.
 
-const mark = { command: 'work-queue', host: 'this-box', pid: 4242 }
-
-test('a marker is a running card on agent-data, pushed to origin, that the logs skill lists like any run', async () => {
-  const repo = await testRepo()
-  try {
-    const card = markerCard({ id: '2026-09-16T14-01-00-000Z', startedAt: '2026-09-16T14:01:00.000Z', prompt: '/work-queue', driver: 'claude-code', model: 'opus', mark })
-    const written = await writeMarker(repo, card)
-    assert.ok(written.ok && written.pushed, 'the marker reached origin, so another machine sees it')
-    const found = await findRun(repo, card.id)
-    assert.equal(found?.status, 'running')
-    assert.equal(found?.intent, '/work-queue')
-    assert.deepEqual(schedulerMark(found!), mark)
-    assert.deepEqual(await readDiary(repo, card.id), [])
-    assert.match(await git(['log', '-1', '--format=%s', `origin/${DATA_BRANCH}`], repo), /^logs: record run 2026-09-16T14-01-00-000Z/)
-  } finally {
-    await removeRepo(repo)
-  }
-})
+const mark = { host: 'this-box', pid: 4242 }
 
 test('the last start of a command is its newest card on any machine, whatever became of the run; a command never started has none', async () => {
   const repo = await testRepo()
   try {
     await writeMarker(repo, markerCard({ id: 'a1', startedAt: '2026-09-16T14:01:00.000Z', prompt: '/work-queue', driver: 'claude-code', model: 'opus', mark }))
-    await recordRun(repo, { id: 'a0', startedAt: '2026-09-16T09:00:00.000Z', status: 'done', caller: { scheduler: { command: 'work-queue', host: 'other-box' } } }, [])
-    await recordRun(repo, { id: 'a2', startedAt: '2026-09-16T14:02:00.000Z', status: 'failed', caller: { scheduler: { command: 'work-queue', host: 'other-box' } } }, [])
+    await recordRun(repo, { id: 'a0', startedAt: '2026-09-16T09:00:00.000Z', status: 'done', intent: '/work-queue', caller: { runner: { host: 'other-box' } } }, [])
+    await recordRun(repo, { id: 'a2', startedAt: '2026-09-16T14:02:00.000Z', status: 'failed', intent: '/work-queue', caller: { runner: { host: 'other-box' } } }, [])
     await recordRun(repo, { id: 'd1', startedAt: '2026-09-16T15:00:00.000Z', status: 'running', intent: 'a dashboard run' }, [])
-    assert.equal(await lastStart(repo, 'work-queue'), '2026-09-16T14:02:00.000Z')
-    assert.equal(await lastStart(repo, 'triage-quick'), undefined)
+    assert.equal(await lastStart(repo, 'work-queue', undefined), '2026-09-16T14:02:00.000Z')
+    assert.equal(await lastStart(repo, 'triage-quick', undefined), undefined)
   } finally {
     await removeRepo(repo)
   }
 })
 
-test('in flight counts the running cards of one command, whatever the machine; a card this tool did not write is not counted', async () => {
+test('in flight counts the running cards of one command, whatever the machine; a card agent-runner did not write is not counted', async () => {
   const repo = await testRepo()
   try {
     await writeMarker(repo, markerCard({ id: 'a1', startedAt: '2026-09-16T14:01:00.000Z', prompt: '/work-queue', driver: 'claude-code', model: 'opus', mark }))
     await writeMarker(repo, markerCard({ id: 'a2', startedAt: '2026-09-16T14:02:00.000Z', prompt: '/work-queue', driver: 'claude-code', model: 'opus', mark: { ...mark, host: 'other-box' } }))
-    await writeMarker(repo, markerCard({ id: 'b1', startedAt: '2026-09-16T14:03:00.000Z', prompt: '/triage', driver: 'claude-code', model: 'opus', mark: { ...mark, command: 'triage' } }))
+    await writeMarker(repo, markerCard({ id: 'b1', startedAt: '2026-09-16T14:03:00.000Z', prompt: '/triage', driver: 'claude-code', model: 'opus', mark }))
     await recordRun(repo, { id: 'd1', startedAt: '2026-09-16T13:00:00.000Z', status: 'running', intent: 'a dashboard run' }, [])
-    assert.deepEqual((await inFlight(repo, 'work-queue')).map(c => c.id).sort(), ['a1', 'a2'])
-    assert.deepEqual((await inFlight(repo, 'triage')).map(c => c.id), ['b1'])
+    assert.deepEqual((await inFlight(repo, 'work-queue', undefined)).map(c => c.id).sort(), ['a1', 'a2'])
+    assert.deepEqual((await inFlight(repo, 'triage', undefined)).map(c => c.id), ['b1'])
     assert.equal((await listRuns(repo)).length, 4)
   } finally {
     await removeRepo(repo)
   }
 })
 
-test('the record at the end overwrites the marker: same id, same file, and a withdrawn marker is gone', async () => {
-  const repo = await testRepo()
-  try {
-    const card = markerCard({ id: 'a1', startedAt: '2026-09-16T14:01:00.000Z', prompt: '/work-queue', driver: 'claude-code', model: 'opus', mark })
-    await writeMarker(repo, card)
-    await recordRun(repo, { ...card, status: 'done', endedAt: '2026-09-16T14:05:00.000Z', branch: 'agent-fix-it', cost: 1.12, pr: { number: 7, url: 'https://x/pull/7' } }, [{ kind: 'said', text: 'done' }, { kind: 'ended', status: 'done' }])
-    const found = await findRun(repo, 'a1')
-    assert.equal(found?.status, 'done')
-    assert.equal(found?.pr?.number, 7)
-    assert.deepEqual(schedulerMark(found!), mark)
-    assert.equal((await readDiary(repo, 'a1'))?.length, 2)
-    assert.deepEqual(await inFlight(repo, 'work-queue'), [])
-
-    await writeMarker(repo, markerCard({ id: 'a2', startedAt: '2026-09-16T14:06:00.000Z', prompt: '/work-queue', driver: 'claude-code', model: 'opus', mark }))
-    await withdrawMarker(repo, 'a2')
-    assert.equal(await findRun(repo, 'a2'), undefined)
-    assert.equal((await listRuns(repo)).length, 1)
-  } finally {
-    await removeRepo(repo)
-  }
+test('a run counts for the schedule line its prompt names, else for its prompt\'s first word; a run agent-runner did not start counts for none', () => {
+  const schedule = parseSchedule('- triage quick: every 6h\n- work-queue: when `npx queue`\n')
+  const card = (intent: string) => markerCard({ id: 'x', startedAt: '2026-09-16T14:01:00.000Z', prompt: intent, driver: 'claude-code', mark })
+  assert.equal(commandOf(card('/triage quick'), schedule), 'triage quick')
+  assert.equal(commandOf(card('/triage'), schedule), 'triage')
+  assert.equal(commandOf(card('/work-queue now'), schedule), 'work-queue')
+  assert.equal(commandOf(card('/post-merge-cleanup 2026-09-16T14-01-00-000Z'), schedule), 'post-merge-cleanup', 'a follow-up counts for its own command')
+  assert.equal(commandOf(card('Read the docs'), schedule), 'Read')
+  assert.equal(commandOf(card('/triage quick'), undefined), 'triage', 'no schedule: the first word')
+  assert.equal(commandOf({ id: 'd1', startedAt: '2026-09-16T13:00:00.000Z', status: 'running', intent: '/triage quick' }, schedule), undefined)
 })

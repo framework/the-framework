@@ -4,13 +4,13 @@ The recording program's [1] side of the runs [2]: reads and writes of `agents/<w
 
 **User story**: an agent's [8] run is on the branch, pushed, the moment the agent ends, so the user opens its page from another machine, a wiped laptop loses nothing, and every later agent's `npx logs` sees it; the user's own branches never carry the record.
 
-**Business logic story**: the scheduler records a run when an agent ends; the product later patches the branch the work landed on and the pull request onto its card, deletes the run when it removes the agent's records, and lists runs and reads diaries for its pages; a run whose process died while marked `running` is recorded again, ended, by the scheduler's next sweep on that machine.
+**Business logic story**: the runner (`agent-runner`) records a run when an agent ends; the product later patches the branch the work landed on and the pull request onto its card, deletes the run when it removes the agent's records, and lists runs and reads diaries for its pages; a run whose process died while marked `running` is recorded again, ended, by the runner's next sweep on that machine, which the scheduler runs on every tick.
 
 **Problem**: a run written but not committed would be swept into the next unrelated commit, or reset away, by the checkout's write cycle; a run recorded twice under two people would exist twice.
 
 ## Glossary
 
-[1] recording program: the program that ran an agent and records its run when the agent ends; in the product, the scheduler (`agent-scheduler`).
+[1] recording program: the program that ran an agent and records its run when the agent ends; in the product, the runner (`agent-runner`).
 [2] run: the `logs` skill's record of one agent on the `agent-data` branch: a card and a diary. Never the unit of work.
 [3] card: the run's `<id>.json`: what was asked, the branch, the pull request, how it ended, what it cost.
 [4] diary: the run's `<id>.jsonl`: what the agent said.

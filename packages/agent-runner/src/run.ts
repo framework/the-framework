@@ -6,17 +6,16 @@ import { excludeFromGit, nodeGitRunner, type GitRunner } from '@gemstack/agent-d
 import { agentBranchName, attachCheckout, createCheckout, reclaimWorktree, worktreeBranch, worktreePath } from '@gemstack/skill-branches'
 import { findRun, readDiary, type AnyDiaryLine, type LogsDeps, type RunCard, type RunStatus } from '@gemstack/skill-logs'
 import { inboxPath, liveDir, LIVE_DIR, readLiveCard, readLiveDiary } from './live-card.js'
-import { markerCard, recordRun, schedulerMark, writeMarker, type SchedulerMark } from './records.js'
+import { markerCard, recordRun, runnerMark, writeMarker, type RunnerMark } from './records.js'
 import { projectGitHost, type GitHost, type MergeOutcome } from './git-host.js'
 import { acquireRunLock, isPidAlive, releaseRunLock } from './run-lock.js'
-import { promptCommand, readSchedule } from './schedule.js'
 
 /**
  * One run (#1774): a checkout from the branches package, a session from agent-driver, the prompt
  * once, and the agent's own loop to the end. No system prompt and no gates: the
  * command's skill file is the whole instruction, and the agent publishes its own work through
  * the skills in its checkout. This process records the run and reclaims the checkout when the
- * agent stops; a run that dies is caught by the sweep on a later tick.
+ * agent stops; a run that dies is caught by the sweep, which a scheduler runs on every tick.
  *
  * The session keeps the run's live record itself, the card and the diary under `.the-framework/`
  * in the checkout, in the run record's shape; this process adds its mark, the pid and the host,
@@ -30,8 +29,8 @@ import { promptCommand, readSchedule } from './schedule.js'
  * through the driver, the run is recorded `stopped`, the checkout reclaimed. That is what a
  * dashboard's Stop sends, the pid being on the live card; nothing else steers a run.
  *
- * One-shot: `agent-scheduler run <prompt>` needs no scheduler running. The tick spawns the same
- * thing with the marker already written and the id chosen.
+ * One-shot: `agent-runner run <prompt>` runs on its own. A scheduler's tick spawns the same thing
+ * with the marker already written and the id chosen.
  *
  * A run may name a follow-up (`run --then <prompt>`): once it ends done with a pull request, a
  * fresh agent, a run of its own with its own record, works on the same branch from the prompt,
@@ -70,10 +69,8 @@ export interface RunOptions {
   prompt: string
   /** The run's id; minted from the start time when absent. */
   id?: string
-  /** Whether the run's marker is already on the branch: the tick writes it before it spawns. A person's run marks itself. */
+  /** Whether the run's marker is already on the branch: a scheduler's tick writes it before it spawns. A person's run marks itself. */
   marked?: boolean
-  /** The command the run is for, as the schedule names it; read off the prompt and the schedule when absent. */
-  command?: string
   /** The model the session starts on; the tool's own default when absent. */
   model?: string
   driver: Driver
@@ -121,17 +118,16 @@ async function runOnce(repo: string, opts: RunOptions): Promise<RunOutcome> {
   const pid = opts.pid ?? process.pid
   const startedAt = clock()
   const id = opts.id ?? runIdFrom(startedAt)
-  const command = opts.command ?? promptCommand(opts.prompt, await readSchedule(repo))
-  const mark: SchedulerMark = { command, host, pid, ...(opts.then !== undefined ? { then: opts.then } : {}) }
+  const mark: RunnerMark = { host, pid, ...(opts.then !== undefined ? { then: opts.then } : {}) }
   const log = opts.log ?? (() => {})
   const logs = opts.logs ?? {}
 
   await acquireRunLock(repo, id, { pid, isAlive: opts.isAlive ?? isPidAlive })
   try {
-    // A person's run marks itself; the tick's run was marked before it was spawned.
+    // A person's run marks itself; a scheduler's run was marked before it was spawned.
     if (!opts.marked) {
       const marked = await writeMarker(repo, markerCard({ id, startedAt, prompt: opts.prompt, driver: opts.driver.id, ...modelOf(opts.model), mark }), logs)
-      if (!marked.ok && !marked.committed) log(`[agent-scheduler] the run's record could not be written: ${marked.error}`)
+      if (!marked.ok && !marked.committed) log(`[agent-runner] the run's record could not be written: ${marked.error}`)
     }
 
     // The checkout: the branches package's one sequence, on a fresh branch or the one given.
@@ -150,7 +146,7 @@ async function runOnce(repo: string, opts: RunOptions): Promise<RunOutcome> {
     return await session(repo, {
       id,
       checkout,
-      card: { id, startedAt, status: 'running', intent: opts.prompt, driver: opts.driver.id, ...modelOf(opts.model), branch: checkout.branch, caller: { scheduler: mark, pid, host, kind: 'prompt', workspace: checkout.path } },
+      card: { id, startedAt, status: 'running', intent: opts.prompt, driver: opts.driver.id, ...modelOf(opts.model), branch: checkout.branch, caller: { runner: mark, pid, host, kind: 'prompt', workspace: checkout.path } },
       prompt: agentPrompt(opts.prompt, opts.then),
       driver: opts.driver,
       ...modelOf(opts.model),
@@ -222,7 +218,7 @@ async function resumeOnce(repo: string, opts: ResumeOptions): Promise<{ outcome:
     // Every process of this run is gone by now, so a record still saying running is one whose
     // process died before it could end it: the sweep's to close first.
     if (card.status === 'running') throw new Error(`run ${opts.id} is still recorded running`)
-    const previous = schedulerMark(card)
+    const previous = runnerMark(card)
     if (!previous) throw new Error(`run ${opts.id} is not this tool's`)
     const diary = (await readDiary(repo, opts.id, logs)) ?? []
     const sessionId = typeof card.caller?.['sessionId'] === 'string' ? (card.caller['sessionId'] as string) : undefined
@@ -244,11 +240,11 @@ async function resumeOnce(repo: string, opts: ResumeOptions): Promise<{ outcome:
     const checkout = kept ? { path, branch } : await attachCheckout(repo, { agentId: opts.id, branch }, git)
 
     // The record is written running again over the ended one, so every reader sees the run in flight.
-    const mark: SchedulerMark = { command: previous.command, host, pid, ...(previous.then !== undefined ? { then: previous.then } : {}) }
-    const runningCard: RunCard = { ...card, status: 'running', caller: { ...card.caller, scheduler: mark, pid, host, workspace: checkout.path } }
+    const mark: RunnerMark = { host, pid, ...(previous.then !== undefined ? { then: previous.then } : {}) }
+    const runningCard: RunCard = { ...card, status: 'running', caller: { ...card.caller, runner: mark, pid, host, workspace: checkout.path } }
     delete runningCard.endedAt
     const reopened = await recordRun(repo, runningCard, diary, logs)
-    if (!reopened.ok && !reopened.committed) log(`[agent-scheduler] the run's record could not be written: ${reopened.error}`)
+    if (!reopened.ok && !reopened.committed) log(`[agent-runner] the run's record could not be written: ${reopened.error}`)
 
     const model = opts.model ?? card.model
     const outcome = await session(repo, {
@@ -424,10 +420,10 @@ async function sessionToEnd(repo: string, run: SessionRun, dir: string, inbox: s
   const card = (await readLiveCard(run.checkout.path, run.id)) ?? { ...run.card, status, endedAt: run.clock(), branch, ...(pr ? { pr } : {}) }
   const diary = live ? await readLiveDiary(run.checkout.path, run.id) : [...(run.priorDiary ?? []), { kind: 'ended', status, ...(detail !== undefined ? { detail } : {}), at: card.endedAt ?? run.clock() }]
   const recorded = await recordRun(repo, card, diary, run.logs)
-  if (!recorded.ok && !recorded.committed) run.log(`[agent-scheduler] the run's record could not be written: ${recorded.error}`)
+  if (!recorded.ok && !recorded.committed) run.log(`[agent-runner] the run's record could not be written: ${recorded.error}`)
 
   // The checkout goes once the remote has everything it holds (the branches rule); a dirty tree
-  // or a branch that could not be pushed keeps it, and the sweep tries again on a later tick. A
+  // or a branch that could not be pushed keeps it, and the sweep tries again later. A
   // waiting run keeps it on purpose: the answer resumes the run there.
   if (status === 'waiting') {
     return outcomeOf(run.id, status, branch, pr, card.cost, { reclaimed: false, reason: 'waiting' }, detail)

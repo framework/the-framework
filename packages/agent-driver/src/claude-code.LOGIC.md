@@ -62,7 +62,7 @@ Every turn [2] spawns the `claude` command, found on `PATH` unless the driver [1
 
 #### Business logic
 
-Unless told otherwise, Claude Code runs with the `acceptEdits` permission mode, so file writes need no approval; installs, builds and tests still would, and are denied. The driver [1] can be configured with `bypassPermissions` for a fully autonomous agent [7] that also installs and runs things, with `plan`, or with `default`. Configured to skip permission checks altogether, the driver passes `--dangerously-skip-permissions` instead of a permission mode; that is meant only for a sandbox with no network. The product's own choice for every agent is `bypassPermissions` (`packages/agent-scheduler/src/scheduler.ts`).
+Unless told otherwise, Claude Code runs with the `acceptEdits` permission mode, so file writes need no approval; installs, builds and tests still would, and are denied. The driver [1] can be configured with `bypassPermissions` for a fully autonomous agent [7] that also installs and runs things, with `plan`, or with `default`. Configured to skip permission checks altogether, the driver passes `--dangerously-skip-permissions` instead of a permission mode; that is meant only for a sandbox with no network. The product's own choice for every agent is `bypassPermissions` (`packages/agent-runner/src/runner.ts`).
 
 ### Framing becomes the system prompt
 

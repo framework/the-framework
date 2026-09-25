@@ -17,7 +17,7 @@ The `logs` command line: the reads an agent [1] (or a person) makes in a shell, 
 [3] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [4] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch. Also "the `agent-data` branch's checkout".
 [5] diary: the run's `<id>.jsonl`: what the agent said.
-[6] recording program: the program that ran an agent and records its run when the agent ends; in the product, the scheduler (`agent-scheduler`).
+[6] recording program: the program that ran an agent and records its run when the agent ends; in the product, the runner (`agent-runner`).
 [7] card: the run's `<id>.json`: what was asked, the branch, the pull request, how it ended, what it cost.
 [8] dashboard: a program that shows a project's runs to a person, such as The Framework's; it finds this command through the package's `framework.runs` declaration.
 

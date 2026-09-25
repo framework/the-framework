@@ -12,7 +12,7 @@ The `tickets` command: the six operations an agent [1], or a person in a shell, 
 [2] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch. The user's own working copy is "the user's checkout".
 [3] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [4] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
-[5] holder: who a claim names: the agent's id when the program that started the agent set it in `AGENT_ID` (the scheduler does), else the branch the `tickets` command ran on.
+[5] holder: who a claim names: the agent's id when the program that started the agent set it in `AGENT_ID` (`agent-runner` does), else the branch the `tickets` command ran on.
 [6] queue entry: an item on the agent queue, `TODO_AGENTS.md` on the `agent-data` branch.
 
 ## Business logic — TL;DR

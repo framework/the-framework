@@ -4,7 +4,7 @@ Asks a coding agent's [1] CLI whether a session can start on this machine at all
 
 **User story**: the user picks Claude Code or Codex in the dashboard's launcher; a CLI that is missing or logged out is said under the prompt box before the Start, with the command that fixes it, and a run started anyway is refused before it creates anything, instead of dying before its first turn [2] with nothing to say why.
 
-**Business logic story**: installed is not the same as usable. A CLI that resolves fine and is logged out starts, and every session dies before its first turn. The scheduler (`packages/agent-scheduler`, `readyToRun`) adds its own `gh` warnings to this answer, and its `check` command, its person-started run and its tick all ask it.
+**Business logic story**: installed is not the same as usable. A CLI that resolves fine and is logged out starts, and every session dies before its first turn. The runner (`packages/agent-runner`, `readyToRun`) passes this answer on as it is, and its `check` command, its person-started run and the scheduler's tick all ask it.
 
 **Problem**: a wrong "you are logged out" would block a setup that works, which is worse than the dead session this exists to prevent. So only a CLI that says no out loud is a problem; an answer that cannot be read passes.
 

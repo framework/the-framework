@@ -1,4 +1,4 @@
-The project's pull requests as one read, in one shape, for every caller: an agent listing them, the dashboard's server reading a run's request, the Human Queue's open requests or the sweep's view of a branch, the scheduler reading a run's request into its record.
+The project's pull requests as one read, in one shape, for every caller: an agent listing them, the dashboard's server reading a run's request, the Human Queue's open requests or the sweep's view of a branch, `agent-runner` reading a run's request into its record.
 
 ## Business logic — TL;DR
 

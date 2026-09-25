@@ -1,4 +1,4 @@
-Makes a checkout [1] as an agent [2] gets it, in one sequence whichever surface asks for it (the scheduler starting a run, or the `branches` command line): the git worktree itself, then `.branches/` hidden from git, the user's installed dependency trees linked in, the skills [3] linked in where the coding agent [4] looks for them, and the branch links [5] under `.branches/` brought up to date. A new agent gets a fresh branch of its own; a continued agent gets back the branch its work is on.
+Makes a checkout [1] as an agent [2] gets it, in one sequence whichever surface asks for it (`agent-runner` starting a run, or the `branches` command line): the git worktree itself, then `.branches/` hidden from git, the user's installed dependency trees linked in, the skills [3] linked in where the coding agent [4] looks for them, and the branch links [5] under `.branches/` brought up to date. A new agent gets a fresh branch of its own; a continued agent gets back the branch its work is on.
 
 ## Context
 

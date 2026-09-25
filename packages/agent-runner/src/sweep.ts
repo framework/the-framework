@@ -3,13 +3,12 @@ import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
 import { agentBranchName, reclaimWorktree, worktreeDirEntries, worktreePath } from '@gemstack/skill-branches'
 import { listRuns, type LogsDeps, type RunCard } from '@gemstack/skill-logs'
 import { endLiveCard, readLiveCard, readLiveDiary } from './live-card.js'
-import { lockHolder } from './run-lock.js'
-import { recordRun, schedulerMark } from './records.js'
-import { runStderrPath } from './state.js'
+import { lockHolder, runStderrPath } from './run-lock.js'
+import { recordRun, runnerMark } from './records.js'
 
 /**
- * The belt (#1774): what a run's own process could not do because it died. Runs on every tick,
- * before anything is decided, and only for this machine — a pid means nothing on another.
+ * The belt (#1774): what a run's own process could not do because it died. A scheduler runs it on
+ * every tick, before anything is decided, and it acts only for this machine — a pid means nothing on another.
  *
  * A checkout whose live card says `running` under a dead pid is a run that died mid-work: its
  * record is written `failed` from what it left, and the checkout is reclaimed under the branches
@@ -49,7 +48,7 @@ export async function sweep(repo: string, deps: SweepDeps): Promise<SweepResult>
   // Checkouts first: the live card is the truth about a run this machine started.
   for (const entry of await worktreeDirEntries(repo).catch(() => [])) {
     let card = await readLiveCard(entry.path, entry.agentId)
-    const mark = card && schedulerMark(card)
+    const mark = card && runnerMark(card)
     if (!card || !mark || mark.host !== deps.host) continue
     seen.add(card.id)
     if (await lockHolder(repo, card.id, deps.isAlive)) continue
@@ -71,7 +70,7 @@ export async function sweep(repo: string, deps: SweepDeps): Promise<SweepResult>
   // Then the branch: a running card of this machine's with nothing on disk never started.
   for (const card of await listRuns(repo, {}, logs)) {
     if (card.status !== 'running' || seen.has(card.id)) continue
-    const mark = schedulerMark(card)
+    const mark = runnerMark(card)
     if (!mark || mark.host !== deps.host) continue
     if (await lockHolder(repo, card.id, deps.isAlive)) continue
     if (await checkoutExists(repo, card.id)) continue // a checkout with no live card yet: the run is opening it

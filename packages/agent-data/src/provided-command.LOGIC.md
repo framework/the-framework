@@ -1,4 +1,4 @@
-Which of a project's installed packages provides one kind of The Framework's data (the tickets, the agent queue, the runs, the checkouts, the git host), and how such a package's command is run to read it. Neither The Framework nor the scheduler names a package: a package says in its own `package.json` what it provides, and when two installed packages say the same thing, the project's own `package.json` says which one it takes.
+Which of a project's installed packages provides one kind of The Framework's data (the tickets, the agent queue, the runs, the checkouts, the git host), and how such a package's command is run to read it. Neither The Framework nor the runner (`agent-runner`) names a package: a package says in its own `package.json` what it provides, and when two installed packages say the same thing, the project's own `package.json` says which one it takes.
 
 ## Context
 

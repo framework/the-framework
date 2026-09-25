@@ -1,0 +1,17 @@
+{
+  "name": "@gemstack/skill-question",
+  "version": "0.0.1",
+  "description": "How a coding agent asks the person to decide: end the reply with one await-choices block and wait for the answer. A skill file only, no code.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/framework/the-framework.git",
+    "directory": "packages/skill-question"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "SKILL.md"
+  ]
+}

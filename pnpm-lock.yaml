@@ -306,6 +306,8 @@ importers:
 
   packages/skill-post-merge-cleanup: {}
 
+  packages/skill-question: {}
+
   packages/skill-queue:
     dependencies:
       '@gemstack/agent-data':

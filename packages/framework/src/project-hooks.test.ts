@@ -28,7 +28,7 @@ test('the file: open and close lists of shell lines; missing means none; the wro
   assert.throws(() => parseProjectHooks('opne:\n  - echo hi\n'), /unknown key "opne"; the keys are open, close, start, resume, check, offset and switch/)
   assert.throws(() => parseProjectHooks('open: echo hi\n'), /"open" must be a list of shell lines/)
   assert.throws(() => parseProjectHooks('close:\n  - 3\n'), /"close" must be a list of shell lines/)
-  assert.deepEqual(parseProjectHooks('start: npx agent-scheduler run --detach "$PROMPT"\nresume:\n'), { open: [], close: [], start: 'npx agent-scheduler run --detach "$PROMPT"' })
+  assert.deepEqual(parseProjectHooks('start: npx agent-runner run --detach "$PROMPT"\nresume:\n'), { open: [], close: [], start: 'npx agent-runner run --detach "$PROMPT"' })
   assert.throws(() => parseProjectHooks('start:\n  - echo hi\n'), /"start" must be one shell line/)
   assert.throws(() => parseProjectHooks('resume: 3\n'), /"resume" must be one shell line/)
   assert.deepEqual(parseProjectHooks('offset: npx agent-scheduler offset "$POINTS"\n'), { open: [], close: [], offset: 'npx agent-scheduler offset "$POINTS"' })

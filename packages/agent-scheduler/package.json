@@ -1,7 +1,7 @@
 {
   "name": "agent-scheduler",
   "version": "0.0.1",
-  "description": "Start coding agents on a schedule: a tracked schedule file says which command runs when and how many at once; the scheduler pulls the project's agent-data branch, checks, and starts one agent per due command in its own checkout, recording every run.",
+  "description": "Start coding agents on a schedule: a tracked schedule file says which command runs when and how many at once; the scheduler pulls the project's agent-data branch, checks, and asks agent-runner to run one agent per due command.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -26,8 +26,8 @@
     }
   },
   "scripts": {
-    "build": "pnpm -C ../agent-data build && pnpm -C ../skill-branches build && pnpm -C ../skill-logs build && pnpm -C ../agent-driver build && tsc -p tsconfig.build.json",
-    "typecheck": "pnpm -C ../agent-data build && pnpm -C ../skill-branches build && pnpm -C ../skill-logs build && pnpm -C ../agent-driver build && tsc --noEmit",
+    "build": "pnpm -C ../agent-data build && pnpm -C ../skill-branches build && pnpm -C ../skill-logs build && pnpm -C ../agent-driver build && pnpm -C ../agent-runner build && tsc -p tsconfig.build.json",
+    "typecheck": "pnpm -C ../agent-data build && pnpm -C ../skill-branches build && pnpm -C ../skill-logs build && pnpm -C ../agent-driver build && pnpm -C ../agent-runner build && tsc --noEmit",
     "test": "pnpm build && tsc -p tsconfig.test.json && node --test --test-timeout=60000 'dist-test/**/*.test.js'",
     "clean": "rm -rf dist dist-test"
   },
@@ -36,10 +36,11 @@
     "@gemstack/skill-branches": "workspace:*",
     "@gemstack/skill-logs": "workspace:*",
     "agent-driver": "workspace:*",
-    "yaml": "^2.5.0"
+    "agent-runner": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "yaml": "^2.5.0"
   }
 }

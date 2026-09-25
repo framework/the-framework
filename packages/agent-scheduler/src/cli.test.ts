@@ -9,7 +9,7 @@ import { removeRepo, testRepo } from './test-repo.js'
 
 // The contract on top of the functions: JSON on stdout, a line for a person on stderr, and an
 // exit code that says refusal or failure. The commands that spawn or talk to Claude are covered
-// by their modules; here the file-only ones run for real.
+// by their modules; here the file-only ones run for real. `run` and `check` are agent-runner's.
 
 interface Ran {
   code: number
@@ -55,30 +55,12 @@ test('usage errors exit 2 with the usage on stderr and nothing on stdout; outsid
   const repo = await testRepo()
   const elsewhere = await mkdtemp(join(tmpdir(), 'not-a-repo-'))
   try {
-    for (const argv of [[], ['nope'], ['model'], ['offset', 'many'], ['status', 'extra'], ['check', 'extra'], ['init', 'extra'], ['switch', 'work-queue'], ['switch', 'work-queue', 'maybe']]) {
+    for (const argv of [[], ['nope'], ['model'], ['offset', 'many'], ['status', 'extra'], ['init', 'extra'], ['run', 'Read the docs'], ['check'], ['switch', 'work-queue'], ['switch', 'work-queue', 'maybe']]) {
       const bad = await run(repo, ...argv)
       assert.equal(bad.code, 2, argv.join(' '))
       assert.equal(bad.out, undefined)
       assert.match(bad.err, /usage: agent-scheduler/)
     }
-    // A driver this tool cannot start, and a driver named for a run that already has one.
-    const unknown = await run(repo, 'run', 'Read the docs', '--driver', 'pi')
-    assert.equal(unknown.code, 2)
-    assert.match(unknown.err, /unknown driver "pi"; the drivers are claude-code and codex/)
-    const unknownCheck = await run(repo, 'check', '--driver', 'pi')
-    assert.equal(unknownCheck.code, 2)
-    assert.match(unknownCheck.err, /unknown driver "pi"/)
-    const renamed = await run(repo, 'run', '--resume', '2026-09-17T20-00-00-000Z', 'go on', '--driver', 'codex')
-    assert.equal(renamed.code, 2)
-    assert.match(renamed.err, /--resume takes no --driver/)
-    for (const flag of ['--id', '--command']) {
-      const relabelled = await run(repo, 'run', '--detach', '--resume', '2026-09-17T20-00-00-000Z', 'go on', flag, 'x')
-      assert.equal(relabelled.code, 2, flag)
-      assert.match(relabelled.err, /--resume takes no --id or --command/)
-    }
-    const followed = await run(repo, 'run', '--detach', '--resume', '2026-09-17T20-00-00-000Z', 'go on', '--then', '/post-merge-cleanup')
-    assert.equal(followed.code, 2)
-    assert.match(followed.err, /--resume takes no --then/)
     const outside = await run(elsewhere, 'status')
     assert.equal(outside.code, 1)
     assert.deepEqual(outside.out, { ok: false, reason: 'not-a-repo' })

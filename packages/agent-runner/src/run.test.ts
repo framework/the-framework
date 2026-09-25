@@ -114,7 +114,7 @@ test('a run: marker, checkout, the live card, the prompt once, the record, the c
     assert.equal(card['status'], 'running')
     assert.equal(card['intent'], '/work-queue')
     assert.equal(card['branch'], 'agent-2026-09-16T14-01-00-000Z')
-    assert.deepEqual(card['caller'], { scheduler: { command: 'work-queue', host: 'this-box', pid: 4242 }, pid: 4242, host: 'this-box', kind: 'prompt', workspace: seen.cwd })
+    assert.deepEqual(card['caller'], { runner: { host: 'this-box', pid: 4242 }, pid: 4242, host: 'this-box', kind: 'prompt', workspace: seen.cwd })
 
     // The checkout went: the branch reached origin, the record is the only trace.
     assert.equal(await stat(worktreePath(repo, outcome.id)).then(() => true, () => false), false)
@@ -127,7 +127,7 @@ test('a run: marker, checkout, the live card, the prompt once, the record, the c
     assert.equal(recorded?.model, 'opus')
     assert.equal(recorded?.driver, 'fake')
     assert.equal(recorded?.caller?.['sessionId'], 's-1')
-    assert.deepEqual(recorded?.caller?.['scheduler'], { command: 'work-queue', host: 'this-box', pid: 4242 })
+    assert.deepEqual(recorded?.caller?.['runner'], { host: 'this-box', pid: 4242 })
     const diary = await readUntimedDiary(repo, outcome.id)
     assert.deepEqual(diary.map(line => line.kind), ['start', 'said', 'result', 'cost', 'ended'])
     assert.deepEqual(diary.find(l => l.kind === 'said'), { kind: 'said', text: 'Fixed it and committed.' })
@@ -429,7 +429,7 @@ test('a run with a follow-up: its agent is told not to arm the merge, a fresh ag
     assert.equal(outcome.status, 'done')
     assert.deepEqual(outcome.pr, { number: 12, url: 'https://example.com/x/y/pull/12' })
     assert.equal((await findRun(repo, outcome.id))?.intent, '/work-queue', 'the record keeps the bare prompt')
-    assert.deepEqual((await findRun(repo, outcome.id))?.caller?.['scheduler'], { command: 'work-queue', host: 'this-box', pid: 4242, then: '/post-merge-cleanup' })
+    assert.deepEqual((await findRun(repo, outcome.id))?.caller?.['runner'], { host: 'this-box', pid: 4242, then: '/post-merge-cleanup' })
 
     const then = outcome.then!
     assert.notEqual(then.id, outcome.id, 'a fresh agent: a run of its own')
@@ -447,7 +447,7 @@ test('a run with a follow-up: its agent is told not to arm the merge, a fresh ag
     const recorded = await findRun(repo, then.id)
     assert.equal(recorded?.status, 'done')
     assert.equal(recorded?.intent, `/post-merge-cleanup ${outcome.id}`)
-    assert.deepEqual(recorded?.caller?.['scheduler'], { command: 'post-merge-cleanup', host: 'this-box', pid: 4242 })
+    assert.deepEqual(recorded?.caller?.['runner'], { host: 'this-box', pid: 4242 })
     assert.equal((await git(['rev-parse', 'refs/remotes/origin/agent-fix-it'], repo)).trim(), (await git(['rev-parse', 'agent-fix-it'], repo)).trim(), 'the follow-up\'s commit is on the same branch, pushed')
   } finally {
     await removeRepo(repo)
@@ -536,7 +536,7 @@ test("a run holds its lock while the agent works: a sweep of this machine leaves
         const fake = await new FakeDriver({ turns: [{ text: 'Done.' }] }).start(opts)
         return wrap(fake, async () => {
           // Mid-turn, the live card says running: the lock names the run's process, and a sweep on
-          // this machine, the scheduler's tick, finds the run held and touches nothing.
+          // this machine, a scheduler's tick, finds the run held and touches nothing.
           await fake.log?.settled()
           seen.holder = await lockHolder(repo, id, isAlive)
           seen.swept = await sweep(repo, { host: 'this-box', isAlive, now: () => NOW })

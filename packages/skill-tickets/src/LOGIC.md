@@ -11,7 +11,7 @@ The rules of the `tickets` skill [1] and the library behind them: how tickets, p
 [1] skill: a capability an agent is taught: a package with the instructions the agent reads (its `SKILL.md`) and a command the agent runs through `npx`.
 [2] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
 [3] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
-[4] holder: who a claim names: the agent's id when the program that started the agent set it in `AGENT_ID` (the scheduler does), else the branch the `tickets` command ran on.
+[4] holder: who a claim names: the agent's id when the program that started the agent set it in `AGENT_ID` (`agent-runner` does), else the branch the `tickets` command ran on.
 [5] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [6] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch. Also "the `agent-data` branch's checkout".
 [7] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down.

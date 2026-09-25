@@ -55,7 +55,7 @@ When anything already exists at a link's path (a directory, a file, or a link of
 
 #### Context
 
-**Problem**: a project whose repository does not commit its skills has no other way to give an agent [3] the `tickets`, `queue` and `logs` skills; a caller of the library can name them when it makes a checkout; the scheduler names none. The command line offers no way to name them.
+**Problem**: a project whose repository does not commit its skills has no other way to give an agent [3] the `tickets`, `queue` and `logs` skills; a caller of the library can name them when it makes a checkout; the runner (`agent-runner`) names none. The command line offers no way to name them.
 
 #### Business logic
 

@@ -142,8 +142,8 @@ export function commandSkill(name: string): string {
 }
 
 /**
- * The command a prompt typed by a person is filed under, so the run counts against that command's
- * cap and interval like a scheduled one: the schedule line whose name the prompt is, without its
+ * The command a run's prompt is counted under, so a run a person started counts against that
+ * command's cap and interval like a scheduled one: the schedule line whose name the prompt is, without its
  * slash (`/triage quick` → `triage quick`), else the prompt's first word (`/work-queue now` →
  * `work-queue`; a plain prompt's first word).
  */

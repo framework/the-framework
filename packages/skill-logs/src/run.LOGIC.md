@@ -14,7 +14,7 @@ Fixes what a run [1] is on the `agent-data` branch [2]: the card [3], `<id>.json
 [2] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [3] card: the run's `<id>.json`: what was asked, the branch, the pull request, how it ended, what it cost.
 [4] diary: the run's `<id>.jsonl`: what the agent said.
-[5] recording program: the program that ran an agent and records its run when the agent ends; in the product, the scheduler (`agent-scheduler`).
+[5] recording program: the program that ran an agent and records its run when the agent ends; in the product, the runner (`agent-runner`).
 [6] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [7] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
 [8] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later. The driver implementations are `claude-code`, `codex`, `github-actions`, `claude-web` and `fake`.

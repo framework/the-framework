@@ -2,7 +2,7 @@ Implements the `github` skill [1]: everything the product and an agent [2] ask o
 
 ## Context
 
-**User story**: an agent pushes its branch and runs `npx github open`; the user finds the pull request open, merged on green when the agent was allowed to land it. The dashboard's server runs the same command to list the project's pull requests, to open and land one when the user presses "Open PR" or "Merge PR", and to link to the project on GitHub; the scheduler runs it to read a run's pull request into its record and to land it once a follow-up run is done.
+**User story**: an agent pushes its branch and runs `npx github open`; the user finds the pull request open, merged on green when the agent was allowed to land it. The dashboard's server runs the same command to list the project's pull requests, to open and land one when the user presses "Open PR" or "Merge PR", and to link to the project on GitHub; `agent-runner` runs it to read a run's pull request into its record and to land it once a follow-up run is done.
 
 ## Glossary
 

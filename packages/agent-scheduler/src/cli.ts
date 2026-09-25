@@ -1,7 +1,7 @@
 import { parseArgs } from 'node:util'
 import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
 import { projectRoot } from '@gemstack/skill-branches'
-import { DRIVER_NAMES, detachResume, detachRun, isDriverName, readyToRun, resumeProject, runProject, schedulerStatus, startScheduler, stopScheduler, tickProject } from './scheduler.js'
+import { schedulerStatus, startScheduler, stopScheduler, tickProject } from './scheduler.js'
 import { initHooks } from './init.js'
 import { updateState, withSwitch } from './state.js'
 import { readSchedule } from './schedule.js'
@@ -14,21 +14,12 @@ import { readSchedule } from './schedule.js'
 
 export const USAGE = `usage: agent-scheduler <command>
 
-  tick                          pull agent-data, sweep, read agent-schedule.md, start what is due
-  run <prompt> [--model <id>] [--driver <claude-code|codex>] [--then <prompt>]
-                                one run of <prompt> in its own checkout, now, recorded; needs no scheduler; on Claude Code unless --driver says Codex;
-                                with --then, once it ends done with a pull request, a fresh agent on its branch gets that prompt and the run's id, and the merge waits for it
-  run --detach <prompt>         the same run in its own process, answered at once with its id: what a dashboard's start hook runs
-  run --resume <id> [<text>] [--answer <label>]
-                                continue an ended run: the same record, its session resumed; the text as the next prompt, or the answer to the question it ended on
-  run --detach --resume <id> …  the same continuing in its own process, answered at once: what a dashboard's resume hook runs
-  check [--driver <claude-code|codex>]
-                                whether a run can start here: the coding agent's CLI installed and logged in; what a dashboard's check hook runs
-  init                          this tool's lines in the dashboard's .the-framework/hooks.yml, so its Start works; a line already there is kept
+  tick                          pull agent-data, sweep, read agent-schedule.md, start what is due, each a run of agent-runner
+  init                          this tool's lines in the dashboard's .the-framework/hooks.yml, so it runs while the dashboard is open; a line already there is kept
   start [--keep-alive]          the scheduler on, ticking every minute in its own process
   stop [--unless-keep-alive]    the scheduler off; runs in flight go to the end; with the flag a keep-alive scheduler is left running
   status                        the state file, and whether the scheduler's process is alive
-  model <id>                    the model every run starts on (this user)
+  model <id>                    the model every scheduled run starts on (this user)
   offset <points>               how far past the spend boundary a run may still start (this user)
   switch <command> <on|off>     whether a command of agent-schedule.md runs on this machine, the command as its line names it (quoted when it has a word after it); what a dashboard's switch hook runs
 
@@ -86,71 +77,6 @@ const COMMANDS: Record<string, Command> = {
     const repo = await project(io.cwd, git)
     const record = await tickProject(repo, { git, log: io.stderr })
     return { ok: true, ...record }
-  },
-
-  async run(args, io, git) {
-    const { positionals, values } = parse(args, { id: { type: 'string' }, command: { type: 'string' }, model: { type: 'string' }, resume: { type: 'string' }, answer: { type: 'string' }, detach: { type: 'boolean' }, driver: { type: 'string' }, then: { type: 'string' } }, 0, 1)
-    const repo = await project(io.cwd, git)
-    const driver = values.driver
-    if (driver !== undefined && !isDriverName(driver)) throw new Usage(`unknown driver "${driver}"; the drivers are ${DRIVER_NAMES.join(' and ')}`)
-    if (values.resume !== undefined) {
-      if (driver !== undefined) throw new Usage('--resume takes no --driver: a run continues on the coding agent its record names')
-      if (values.id !== undefined || values.command !== undefined) throw new Usage('--resume takes no --id or --command: a run continues under its own')
-      if (values.then !== undefined) throw new Usage('--resume takes no --then: a run continues with the follow-up its record names')
-      if (positionals[0] === undefined && values.answer === undefined) throw new Usage('a text or --answer is needed to resume a run')
-    }
-    if (values.then !== undefined && !values.then.trim()) throw new Usage('--then needs a prompt')
-    // A person's run is refused before it spends a checkout when its coding agent cannot start;
-    // the tick asks the same before it marks, and a resumed run's agent already ran once here.
-    if (values.resume === undefined && values.id === undefined) {
-      const ready = await readyToRun(driver ?? 'claude-code')
-      if (ready.problems.length > 0) throw new Refused({ ok: false, reason: 'not-ready', ...ready }, ready.problems.join(' '))
-    }
-    const then = values.then !== undefined ? { then: values.then.trim() } : {}
-    if (values.detach && values.resume !== undefined) {
-      const resumed = await detachResume(repo, {
-        id: values.resume,
-        ...(positionals[0] !== undefined ? { text: positionals[0] } : {}),
-        ...(values.answer !== undefined ? { answer: values.answer } : {}),
-        ...(values.model !== undefined ? { model: values.model } : {}),
-      })
-      return { ok: true, detached: true, ...resumed }
-    }
-    if (values.detach) {
-      if (positionals[0] === undefined) throw new Usage('expected 1 argument(s), got 0')
-      if (values.id !== undefined) throw new Usage('--detach takes no --id: the run\'s id is minted and answered')
-      const started = await detachRun(repo, { prompt: positionals[0], ...(values.model !== undefined ? { model: values.model } : {}), ...(driver !== undefined ? { driver } : {}), ...then, log: io.stderr })
-      return { ok: true, detached: true, ...started }
-    }
-    if (values.resume !== undefined) {
-      const outcome = await resumeProject(repo, {
-        id: values.resume,
-        ...(positionals[0] !== undefined ? { text: positionals[0] } : {}),
-        ...(values.answer !== undefined ? { answer: values.answer } : {}),
-        ...(values.model !== undefined ? { model: values.model } : {}),
-        log: io.stderr,
-      })
-      return { ok: outcome.status === 'done' || outcome.status === 'waiting', ...outcome }
-    }
-    if (positionals[0] === undefined) throw new Usage('expected 1 argument(s), got 0')
-    const outcome = await runProject(repo, {
-      prompt: positionals[0],
-      ...(values.id !== undefined ? { id: values.id } : {}),
-      ...(values.command !== undefined ? { command: values.command } : {}),
-      ...(values.model !== undefined ? { model: values.model } : {}),
-      ...(driver !== undefined ? { driver } : {}),
-      ...then,
-      log: io.stderr,
-    })
-    return { ok: outcome.status === 'done' || outcome.status === 'waiting', ...outcome }
-  },
-
-  async check(args, io, git) {
-    const { values } = parse(args, { driver: { type: 'string' } }, 0)
-    const driver = values.driver ?? 'claude-code'
-    if (!isDriverName(driver)) throw new Usage(`unknown driver "${driver}"; the drivers are ${DRIVER_NAMES.join(' and ')}`)
-    await project(io.cwd, git)
-    return { ok: true, ...(await readyToRun(driver)) }
   },
 
   async init(args, io, git) {

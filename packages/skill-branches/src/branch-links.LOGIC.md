@@ -60,7 +60,7 @@ An entry that is not a symbolic link (the user's own file or directory), or a li
 
 #### Context
 
-**Business logic story**: the command line reconciles the links right after `create`, `attach`, `name`, `remove` and `prune` (`cli.ts`), the checkout sequence does so after every checkout it makes (`checkout.ts`), and nothing else runs it: a link left stale by a removal made elsewhere (the scheduler's reclaim, the dashboard's "Remove" button) goes at the next pass.
+**Business logic story**: the command line reconciles the links right after `create`, `attach`, `name`, `remove` and `prune` (`cli.ts`), the checkout sequence does so after every checkout it makes (`checkout.ts`), and nothing else runs it: a link left stale by a removal made elsewhere (`agent-runner`'s reclaim, the dashboard's "Remove" button) goes at the next pass.
 
 #### Business logic
 

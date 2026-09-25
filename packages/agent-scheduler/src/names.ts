@@ -9,14 +9,13 @@ export const STATE_DIR = '.agent-scheduler'
 /** The state the tool writes for this user: on or off, the model, the last tick and what it decided. */
 export const STATE_FILE = 'state.json'
 
-/** Under the state directory: one stderr file per run the tick spawned, and the scheduler's own log. */
-export const RUNS_DIR = 'runs'
+/** Under the state directory: the scheduler's own log. */
 export const SCHEDULER_LOG = 'scheduler.log'
 
 /** Where the agent's harness looks for a command: the project's tracked skill folder. */
 export const COMMANDS_DIR = '.claude/skills'
 
-/** The model a run starts on when the state names none. */
+/** The model a scheduled run starts on when the state names none. */
 export const DEFAULT_MODEL = 'opus'
 
 /**
@@ -33,9 +32,3 @@ export const TICK_MS = 60_000
 
 /** How long a command's check may run before it counts as failed. */
 export const CHECK_TIMEOUT_MS = 60_000
-
-/** The dashboard's directory in a project it knows: made and hidden from git when the project is added. */
-export const DASHBOARD_DIR = '.the-framework'
-
-/** The dashboard's hooks file, the lines it runs for the project: where `init` writes this tool's. */
-export const DASHBOARD_HOOKS = `${DASHBOARD_DIR}/hooks.yml`

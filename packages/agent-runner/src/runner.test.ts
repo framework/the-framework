@@ -1,12 +1,9 @@
 import { strict as assert } from 'node:assert'
-import { writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
 import { test } from 'node:test'
 import { findRun } from '@gemstack/skill-logs'
 import { CodexDriver, FakeDriver, type Driver } from 'agent-driver'
 import { runCommand } from './run.js'
-import { detachResume, detachRun, driverFor, readyToRun, resumeArgs, resumeProject, runArgs } from './scheduler.js'
-import { DEFAULT_STATE, writeState } from './state.js'
+import { detachResume, detachRun, driverFor, readyToRun, resumeArgs, resumeProject, runArgs } from './runner.js'
 import { removeRepo, testRepo } from './test-repo.js'
 
 // The detached start, with the spawn faked: the marker on the branch, the process asked for, the id answered.
@@ -16,25 +13,18 @@ const NOW = new Date('2026-09-17T20:00:00.000Z')
 test('run --detach writes the marker, spawns the run with its id, and answers the id at once', async () => {
   const repo = await testRepo()
   try {
-    await writeState(repo, { ...DEFAULT_STATE, model: 'sonnet' })
     const spawned: unknown[] = []
     const started = await detachRun(repo, { prompt: '/work-queue now', now: () => NOW }, { spawn: async (_repo, run) => { spawned.push(run) }, host: 'this-box' })
-    assert.deepEqual(started, { id: '2026-09-17T20-00-00-000Z', command: 'work-queue', driver: 'claude-code', model: 'sonnet' })
-    assert.deepEqual(spawned, [{ id: started.id, command: 'work-queue', prompt: '/work-queue now', driver: 'claude-code', model: 'sonnet' }])
+    assert.deepEqual(started, { id: '2026-09-17T20-00-00-000Z', driver: 'claude-code' }, 'no model given: the coding agent starts on its own default')
+    assert.deepEqual(spawned, [{ id: started.id, prompt: '/work-queue now', driver: 'claude-code' }])
     const card = await findRun(repo, started.id)
-    assert.equal(card?.status, 'running', 'the marker counts against the command\'s cap from now on')
+    assert.equal(card?.status, 'running', 'the marker says the run is in flight from now on')
     assert.equal(card?.intent, '/work-queue now')
-    assert.deepEqual(card?.caller?.['scheduler'], { command: 'work-queue', host: 'this-box' }, 'no pid yet: the process does not exist')
-    const plain = await detachRun(repo, { prompt: 'Read the docs', model: 'opus', now: () => new Date(NOW.getTime() + 1000) }, { spawn: async () => {}, host: 'this-box' })
-    assert.equal(plain.command, 'Read')
-    assert.equal(plain.model, 'opus')
-    // A prompt that is a schedule line's name is filed under that line, cap and interval included.
-    await writeFile(join(repo, 'agent-schedule.md'), '- triage quick: every 6h\n')
-    const scheduled = await detachRun(repo, { prompt: '/triage quick', now: () => new Date(NOW.getTime() + 2000) }, { spawn: async () => {}, host: 'this-box' })
-    assert.equal(scheduled.command, 'triage quick')
-    assert.deepEqual((await findRun(repo, scheduled.id))?.caller?.['scheduler'], { command: 'triage quick', host: 'this-box' })
-    const bare = await detachRun(repo, { prompt: '/triage', now: () => new Date(NOW.getTime() + 3000) }, { spawn: async () => {}, host: 'this-box' })
-    assert.equal(bare.command, 'triage')
+    assert.equal(card?.model, undefined)
+    assert.deepEqual(card?.caller?.['runner'], { host: 'this-box' }, 'no pid yet: the process does not exist')
+    const named = await detachRun(repo, { prompt: 'Read the docs', model: 'opus', now: () => new Date(NOW.getTime() + 1000) }, { spawn: async () => {}, host: 'this-box' })
+    assert.equal(named.model, 'opus')
+    assert.equal((await findRun(repo, named.id))?.model, 'opus')
   } finally {
     await removeRepo(repo)
   }
@@ -57,14 +47,13 @@ test('run --detach --resume spawns the resume of a recorded run and answers its 
   }
 })
 
-test('run --detach on Codex: the marker and the spawned run name Codex, and no model: the state\'s model is a Claude model', async () => {
+test('run --detach on Codex: the marker and the spawned run name Codex, and no model unless one is given', async () => {
   const repo = await testRepo()
   try {
-    await writeState(repo, { ...DEFAULT_STATE, model: 'sonnet' })
     const spawned: unknown[] = []
     const started = await detachRun(repo, { prompt: '/work-queue', driver: 'codex', now: () => NOW }, { spawn: async (_repo, run) => { spawned.push(run) }, host: 'this-box' })
-    assert.deepEqual(started, { id: '2026-09-17T20-00-00-000Z', command: 'work-queue', driver: 'codex' })
-    assert.deepEqual(spawned, [{ id: started.id, command: 'work-queue', prompt: '/work-queue', driver: 'codex' }])
+    assert.deepEqual(started, { id: '2026-09-17T20-00-00-000Z', driver: 'codex' })
+    assert.deepEqual(spawned, [{ id: started.id, prompt: '/work-queue', driver: 'codex' }])
     const card = await findRun(repo, started.id)
     assert.equal(card?.driver, 'codex')
     assert.equal(card?.model, undefined)
@@ -72,8 +61,8 @@ test('run --detach on Codex: the marker and the spawned run name Codex, and no m
     assert.equal(named.model, 'gpt-5', 'a model given by hand is passed on')
     const followed: unknown[] = []
     const withThen = await detachRun(repo, { prompt: '/work-queue', driver: 'codex', then: '/post-merge-cleanup', now: () => new Date(NOW.getTime() + 2000) }, { spawn: async (_repo, run) => { followed.push(run) }, host: 'this-box' })
-    assert.deepEqual(followed, [{ id: withThen.id, command: 'work-queue', prompt: '/work-queue', driver: 'codex', then: '/post-merge-cleanup' }])
-    assert.deepEqual((await findRun(repo, withThen.id))?.caller?.['scheduler'], { command: 'work-queue', host: 'this-box', then: '/post-merge-cleanup' }, 'the follow-up is on the record from the start')
+    assert.deepEqual(followed, [{ id: withThen.id, prompt: '/work-queue', driver: 'codex', then: '/post-merge-cleanup' }])
+    assert.deepEqual((await findRun(repo, withThen.id))?.caller?.['runner'], { host: 'this-box', then: '/post-merge-cleanup' }, 'the follow-up is on the record from the start')
   } finally {
     await removeRepo(repo)
   }
@@ -112,9 +101,9 @@ test('a resumed run continues on the tool its record names, and a Codex run with
 })
 
 test('a spawned run is told its tool, and its model only when it has one', () => {
-  assert.deepEqual(runArgs({ id: 'r1', command: 'work-queue', prompt: '/work-queue', model: 'opus' }), ['run', '/work-queue', '--id', 'r1', '--command', 'work-queue', '--model', 'opus'])
-  assert.deepEqual(runArgs({ id: 'r1', command: 'work-queue', prompt: '/work-queue', driver: 'codex' }), ['run', '/work-queue', '--id', 'r1', '--command', 'work-queue', '--driver', 'codex'])
-  assert.deepEqual(runArgs({ id: 'r1', command: 'work-queue', prompt: '/work-queue', then: '/post-merge-cleanup' }), ['run', '/work-queue', '--id', 'r1', '--command', 'work-queue', '--then', '/post-merge-cleanup'])
+  assert.deepEqual(runArgs({ id: 'r1', prompt: '/work-queue', model: 'opus' }), ['run', '/work-queue', '--id', 'r1', '--model', 'opus'])
+  assert.deepEqual(runArgs({ id: 'r1', prompt: '/work-queue', driver: 'codex' }), ['run', '/work-queue', '--id', 'r1', '--driver', 'codex'])
+  assert.deepEqual(runArgs({ id: 'r1', prompt: '/work-queue', then: '/post-merge-cleanup' }), ['run', '/work-queue', '--id', 'r1', '--then', '/post-merge-cleanup'])
 })
 
 test('ready to run: the coding agent\'s problems stop a run; nothing else is probed, the git host least of all', async () => {

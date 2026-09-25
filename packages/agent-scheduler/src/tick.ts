@@ -1,11 +1,11 @@
 import { stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { DriverQuota, DriverReadiness } from 'agent-driver'
+import { markerCard, runnerMark, type RunnerMark } from 'agent-runner'
 import type { FileBranchWrite } from '@gemstack/agent-data'
 import type { RunCard } from '@gemstack/skill-logs'
 import { COMMANDS_DIR } from './names.js'
 import { quotaBoundaryStatus, quotaHeadroom } from './quota-boundary.js'
-import { markerCard, type SchedulerMark } from './records.js'
 import { commandPrompt, commandSkill, isDue, type Schedule, type ScheduledCommand } from './schedule.js'
 import { isSwitchedOn, type ScheduleLine, type State, type TickDecision, type TickRecord } from './state.js'
 
@@ -49,7 +49,7 @@ export interface TickDeps {
   writeMarker: (card: RunCard) => Promise<FileBranchWrite>
   withdrawMarker: (id: string) => Promise<unknown>
   /** Start the run's process, detached; resolves once it is spawned. */
-  spawn: (run: { id: string; command: string; prompt: string; model: string }) => Promise<void>
+  spawn: (run: { id: string; prompt: string; model: string }) => Promise<void>
   /** The driver's id, for the marker's card. */
   driver: string
   /** Whether the scheduler was told to stop while this tick runs: then nothing more is started. */
@@ -125,7 +125,7 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
     }
     const id = deps.mint()
     const prompt = commandPrompt(command.name)
-    const mark: SchedulerMark = { command: command.name, host: deps.host }
+    const mark: RunnerMark = { host: deps.host }
     const marked = await deps.writeMarker(markerCard({ id, startedAt: deps.now().toISOString(), prompt, driver: deps.driver, model: deps.state.model, mark }))
     if (!marked.ok) {
       // The commit stayed local and would ride a later push: taken back, so no record says running for a run that never was.
@@ -144,7 +144,7 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
       continue
     }
     try {
-      await deps.spawn({ id, command: command.name, prompt, model: deps.state.model })
+      await deps.spawn({ id, prompt, model: deps.state.model })
       decide(`started ${id}`, id)
     } catch (err) {
       decide(`could not start: ${err instanceof Error ? err.message : String(err)}`)
@@ -169,7 +169,7 @@ function age(ms: number): string {
 }
 
 function describe(card: RunCard): string {
-  const host = (card.caller?.['scheduler'] as { host?: string } | undefined)?.host
+  const host = runnerMark(card)?.host
   return host ? `${card.id} on ${host}` : card.id
 }
 

@@ -10,7 +10,7 @@ Reads tickets off the `tickets/` directory of the `agent-data` branch [1] into r
 
 [1] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [2] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
-[3] holder: who a claim names: the agent's id when the program that started the agent set it in `AGENT_ID` (the scheduler does), else the branch the `tickets` command ran on.
+[3] holder: who a claim names: the agent's id when the program that started the agent set it in `AGENT_ID` (`agent-runner` does), else the branch the `tickets` command ran on.
 [4] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [5] sibling: a ticket's plan file (`<name>.plan.md`) or claim file (`<name>.lock.md`), written about the ticket and never a ticket of its own.
 [6] key block: the `key: value` lines above a ticket's or a plan's `# ` heading, where `Priority:`, `Topics:`, `Issue:`, `PR:`, `Waiting:`, `Effort:` and `Uncertainty:` are read from.

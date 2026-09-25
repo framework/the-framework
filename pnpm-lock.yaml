@@ -26,6 +26,9 @@ importers:
       '@gemstack/skill-tickets':
         specifier: workspace:*
         version: link:packages/skill-tickets
+      agent-runner:
+        specifier: workspace:*
+        version: link:packages/agent-runner
       agent-scheduler:
         specifier: workspace:*
         version: link:packages/agent-scheduler
@@ -51,7 +54,7 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
 
-  packages/agent-scheduler:
+  packages/agent-runner:
     dependencies:
       '@gemstack/agent-data':
         specifier: workspace:*
@@ -75,6 +78,34 @@ importers:
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
+
+  packages/agent-scheduler:
+    dependencies:
+      '@gemstack/agent-data':
+        specifier: workspace:*
+        version: link:../agent-data
+      '@gemstack/skill-branches':
+        specifier: workspace:*
+        version: link:../skill-branches
+      '@gemstack/skill-logs':
+        specifier: workspace:*
+        version: link:../skill-logs
+      agent-driver:
+        specifier: workspace:*
+        version: link:../agent-driver
+      agent-runner:
+        specifier: workspace:*
+        version: link:../agent-runner
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.43
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      yaml:
+        specifier: ^2.5.0
+        version: 2.9.0
 
   packages/framework:
     dependencies:

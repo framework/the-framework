@@ -1,4 +1,4 @@
-Landing a pull request: how a merge is armed, and the door a person or the scheduler uses to land one by number.
+Landing a pull request: how a merge is armed, and the door a person or `agent-runner` uses to land one by number.
 
 ## Business logic — TL;DR
 

@@ -1,8 +1,7 @@
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { excludeFromGit } from '@gemstack/agent-data'
-import { RUNS_DIR, STATE_DIR } from './names.js'
-import { stateDir } from './state.js'
+import { RUNNER_DIR, RUNS_DIR } from './names.js'
 
 /**
  * One process per run at a time (#1774). A run's process holds its run's lock from before it
@@ -30,7 +29,12 @@ export function isPidAlive(pid: number): boolean {
 const POLL_MS = 500
 
 export function runLockPath(repo: string, id: string): string {
-  return join(stateDir(repo), RUNS_DIR, `${id}.lock`)
+  return join(repo, RUNNER_DIR, RUNS_DIR, `${id}.lock`)
+}
+
+/** Where a spawned run's stderr lands, so a run that dies before writing anything leaves a trace. */
+export function runStderrPath(repo: string, id: string): string {
+  return join(repo, RUNNER_DIR, RUNS_DIR, `${id}.stderr`)
 }
 
 async function readHolder(repo: string, id: string): Promise<number | undefined> {
@@ -53,8 +57,8 @@ export async function acquireRunLock(
 ): Promise<void> {
   const path = runLockPath(repo, id)
   await mkdir(dirname(path), { recursive: true })
-  // Hidden from git like the state file: a lock written before any state must not dirty the tree.
-  await excludeFromGit(repo, `/${STATE_DIR}`).catch(() => {})
+  // Hidden from git: the tool's directory must not dirty the tree.
+  await excludeFromGit(repo, `/${RUNNER_DIR}`).catch(() => {})
   for (;;) {
     try {
       await writeFile(path, `${opts.pid}\n`, { flag: 'wx' })

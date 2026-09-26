@@ -83,7 +83,7 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
 
-  packages/agent-driver/github:
+  packages/agent-driver/github-actions:
     dependencies:
       '@agent-driver/claude':
         specifier: workspace:*

@@ -1,4 +1,4 @@
-Runs one turn [2] of an agent [1] on a GitHub-hosted runner instead of on the user's machine: `@agent-driver/github`'s `github-actions` driver [3] dispatches this workflow with the prompt, and the workflow run, "the run" below, checks the repository out, runs Claude Code on that prompt with every permission granted, pushes whatever the coding agent [4] left behind to the branch the driver named, and uploads the coding agent's transcript together with that branch name as one artifact keyed by the driver's correlation id [5]. The run is the far end of the driver in `packages/agent-driver/github/src/actions.ts`: the driver never sees the runner, only what the run pushes and uploads.
+Runs one turn [2] of an agent [1] on a GitHub-hosted runner instead of on the user's machine: `@agent-driver/github-actions`'s `github-actions` driver [3] dispatches this workflow with the prompt, and the workflow run, "the run" below, checks the repository out, runs Claude Code on that prompt with every permission granted, pushes whatever the coding agent [4] left behind to the branch the driver named, and uploads the coding agent's transcript together with that branch name as one artifact keyed by the driver's correlation id [5]. The run is the far end of the driver in `packages/agent-driver/github-actions/src/actions.ts`: the driver never sees the runner, only what the run pushes and uploads.
 
 ## Context
 
@@ -118,7 +118,7 @@ See `## Context`.
 
 #### Business logic
 
-The driver [3] side lives in `packages/agent-driver/github/src/actions.ts`; the contract between the two is:
+The driver [3] side lives in `packages/agent-driver/github-actions/src/actions.ts`; the contract between the two is:
 
 - The driver mints one correlation id [5] per turn [2], unique across driver processes, and passes it as the `correlation_id` input. It finds its run among the workflow's recent dispatched runs by that id in the run's name, and its artifact among the run's artifacts by that id in the artifact's name.
 - The driver names the branch the run pushes to, one stable name per driver session [7], and passes it as the `branch` input: the run's pushes chain on that branch from turn to turn.

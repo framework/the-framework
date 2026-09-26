@@ -39,13 +39,15 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 ## The adapters
 - Each driver is its own package, `@agent-driver/<name>`, on the contract `agent-driver`
   keeps: the types, the shared process core, the inbox, the question, the log and the
-  fake. A package is a coding agent on this machine (`claude`, `codex`) or a place a
-  coding agent runs elsewhere (`github` for a GitHub Actions runner; later `claude-web`
-  for a Claude Code cloud session), since what a place needs (dispatch, wait, read back)
-  is the same whichever agent runs there. They live together under
+  fake. A package is one of three kinds: a coding agent on this machine (`claude`,
+  `codex`); a shared place that runs any coding agent's CLI (`github-actions`:
+  dispatching, waiting and reading back are the same whichever agent runs, only the
+  workflow step and the output reader differ); or one vendor's own cloud (later
+  `claude-web`, `codex-web`, which share nothing). They live side by side under
   `packages/agent-driver/`. A caller installs only what it drives. Picked over one package
-  holding every driver, and over one package per agent holding every place. Claude Code in
-  a cloud session stays in the product until it has a seam apart from the browser bridge.
+  holding every driver, over one package per agent holding every place, and over one `web`
+  package for both vendors' clouds. Claude Code in a cloud session stays in the product
+  until it has a seam apart from the browser bridge.
 - Every adapter takes the same three parts of the person's own setup, `memory`,
   `connectors` and `skills`, and turns each off with its own coding agent's switches. A
   part it cannot keep out is a warning in its readiness check, never a silent "off".

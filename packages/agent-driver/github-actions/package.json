@@ -1,12 +1,12 @@
 {
-  "name": "@agent-driver/github",
+  "name": "@agent-driver/github-actions",
   "version": "0.0.1",
   "description": "A coding agent on a GitHub Actions runner behind the agent-driver contract: each turn one workflow run, its transcript replayed. Claude Code today.",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/framework/the-framework.git",
-    "directory": "packages/agent-driver/github"
+    "directory": "packages/agent-driver/github-actions"
   },
   "type": "module",
   "engines": {

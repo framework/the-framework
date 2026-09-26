@@ -24,11 +24,11 @@ Implements a branch of the project's repository used as a file store: files that
 - **The branch's checkout, hidden from git** - the branch is checked out once at `<repository>/.branches/<branch>`, registered with git as a worktree, and hidden through git's own ignore file rather than a committed `.gitignore`; a checkout found off its branch is put back on it, keeping what it holds, and is never made a second time.
 - **Adopted from origin or born an orphan** - a branch missing locally is taken from origin's copy; missing there too, it is born from the empty tree with the commit "create the <branch> branch", so no code commit is ever an ancestor.
 - **Only `origin` is the remote** - every fetch and push names `origin`; a repository without it is remote-less whatever other remotes it has, with a stated outcome for each operation.
-- **One write at a time** - writes and pulls to one branch of one repository run one after another within a process, never interleaved.
+- **One write at a time** - writes and pulls to one branch of one repository run one after another, never interleaved: within a process in the order requested, and across every process on the clone through the checkout's lock file (the rule in `checkout-lock.ts`); a write that waits past the lock's wait fails without touching the checkout.
 - **The write cycle** - sync with origin, apply the change to the checkout, commit whatever changed under the caller's message, push whenever the branch is ahead of origin's copy.
 - **Sync: rebase onto origin, and origin wins a conflict** - unpushed local commits are rebased onto origin's copy; when the rebase fails, the branch is checked out again at origin's copy and those commits are dropped, unreported; whatever the rebase did, the checkout ends on the branch.
 - **A push that loses a race re-applies the change once** - the attempt's commit is wound back, the cycle re-syncs and re-applies; a second failed push keeps the commit local and reports it, for the next cycle to carry out; never a force push.
-- **Another process holding a lock is waited out** - git's refusal to take a lock of the checkout, its index or the branch's ref, which two processes on one clone hand each other, resets the checkout, waits half a second and runs the cycle again, three times at most.
+- **A git command outside the lock is waited out** - git's refusal to take a lock of the checkout, its index or the branch's ref, which a git command run in the checkout outside this module causes, resets the checkout, waits half a second and runs the cycle again, three times at most.
 - **A failed change leaves the checkout clean** - any other failure, a timeout included, resets the checkout to its last commit, removes stray files, and is reported rather than thrown.
 - **The pull** - a write cycle with no change, run on the daemon's clock so this machine converges on what others pushed and pushes what an earlier cycle left stranded; a repository with no remote is an error it names.
 - **Reads from anywhere, and never a failure** - a file or a directory listing is read off the checkout, the local branch, or origin's copy, from any directory of the repository, an agent's checkout included; whatever is missing reads as absent.
@@ -72,11 +72,11 @@ Every fetch and push names `origin`. A repository whose only remote has another 
 
 #### Context
 
-**Problem**: a writer and the pull that interleaved on one checkout would commit each other's half-written files under the wrong message.
+**Problem**: a writer and the pull that interleaved on one checkout would commit each other's half-written files under the wrong message. The daemon, the scheduler and each run are separate processes on one clone: a failed cycle of one resets the checkout, and the reset wipes the change another has written but not yet committed, whose commit then fails with nothing to commit and whose record is lost.
 
 #### Business logic
 
-Within one process, every write cycle [3], pull, and checkout setup for one branch of one repository runs one after another, in the order requested: the next waits for the previous to finish, and a failed one does not block the ones behind it. Two processes on one clone are not guarded against each other.
+Every write cycle [3], pull, and checkout setup for one branch of one repository runs one after another. Within one process they run in the order requested: the next waits for the previous to finish, and a failed one does not block the ones behind it. Across processes on the clone, each one first takes the checkout's lock file (the rule in `checkout-lock.ts`) and lets go of it when done, so a process waits while another is in the checkout. A process that cannot take the lock within the wait fails that write or setup with the reason, without touching the checkout, and the next one tries again.
 
 ### The write cycle
 
@@ -117,11 +117,11 @@ Without a remote, a sync does nothing. With one, the branch is fetched from orig
 
 The change is an intent and the commit only its serialization, so the caller's change must be safe to run again. When the push fails on the first attempt, the attempt's commit is wound back to the tip the cycle started from (when a commit was made), the cycle syncs again, bringing in what the other writer pushed, and runs the change again against the fresher files, so the change lands exactly once. When the push fails on the second attempt too (the network, most likely), the commit stays local in the checkout [2] and the cycle reports the failure as "the <branch> branch could not be pushed: <git's reason>", marked as committed: the next write cycle [3] or pull rebases that commit onto whatever origin has by then, and its push carries it out together with the new change. A push killed on its time budget counts as a failed push and may have landed anyway; the next sync's rebase absorbs a commit origin already has. The branch is never force-pushed.
 
-### Another process holding a lock is waited out
+### A git command outside the lock is waited out
 
 #### Context
 
-**Problem**: the one-at-a-time rule is a process's own; two processes on one clone (the daemon's pull and a scheduler's, each on its own clock) can run a cycle on the same checkout at once, and git refuses the second with "Unable to create '…/index.lock': File exists", or with "cannot lock ref 'refs/heads/<branch>'" when both touch the branch itself, rather than waiting. On the scheduler's side a refused pull loses a whole tick.
+**Problem**: a git command run in the checkout outside this module (a person's own, or a process built before the checkout's lock file) does not take the lock, and git refuses a cycle that meets it with "Unable to create '…/index.lock': File exists", or with "cannot lock ref 'refs/heads/<branch>'" when both touch the branch itself, rather than waiting.
 
 #### Business logic
 

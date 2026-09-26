@@ -2,15 +2,16 @@ import { dirname, join } from 'node:path'
 import { BRANCHES_DIR } from './names.js'
 import { nodeGitRunner, type GitRunner } from './git.js'
 import { excludeFromGit } from './git-exclude.js'
+import { withCheckoutLock, type CheckoutLockDeps } from './checkout-lock.js'
 
 // A branch used as a file store: a branch of the project's repository that holds files nobody
 // edits in a working tree — the way `gh-pages` holds a site — read and written by programs, and
 // safe to push and pull eagerly because nothing on it is anyone's checkout. The caller names the
 // branch; this module knows git, not what the files mean.
 //
-// Two writers, one rule. A long-lived process (a daemon) keeps a persistent checkout of the
-// branch under `.branches/<branch>` and writes through {@link withFileBranch}: one serialized
-// cycle per branch — sync, apply, commit, push. A one-shot writer in any clone (a command an
+// Two writers, one rule. A long-lived process (a daemon, a scheduler, a run) keeps a persistent
+// checkout of the branch under `.branches/<branch>` and writes through {@link withFileBranch}: one
+// cycle at a time per branch, across every process on the clone — sync, apply, commit, push. A one-shot writer in any clone (a command an
 // agent runs) writes through {@link writeFileBranchDetached}: a throwaway worktree on origin's
 // tip, the same apply-commit-push, gone afterwards — it never touches the persistent checkout,
 // which is another process's. Both treat the change as an intent: when the push loses a race,
@@ -32,15 +33,17 @@ const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
 export interface FileBranchDeps {
   git?: GitRunner
   log?: (message: string) => void
+  lock?: CheckoutLockDeps
 }
 
 interface Resolved {
   git: GitRunner
   log: (message: string) => void
+  lock: CheckoutLockDeps
 }
 
 function resolveDeps(deps: FileBranchDeps): Resolved {
-  return { git: deps.git ?? nodeGitRunner(), log: deps.log ?? (() => {}) }
+  return { git: deps.git ?? nodeGitRunner(), log: deps.log ?? (() => {}), lock: deps.lock ?? {} }
 }
 
 /**
@@ -70,14 +73,17 @@ function errorMessage(err: unknown): string {
 }
 
 /**
- * One serialized cycle per branch of a project, so a writer and the eager pull can never
- * interleave: the promise chain is the lock, and every public entry point below joins it.
+ * One cycle at a time per branch of a project, so a writer and the eager pull can never
+ * interleave: within the process the promise chain orders them, and across processes on the
+ * clone the checkout's lock file does; every public entry point below joins both. Rejects when
+ * another process holds the lock past the wait.
  */
 const chains = new Map<string, Promise<unknown>>()
 
-function serialize<T>(repo: string, branch: string, task: () => Promise<T>): Promise<T> {
+function serialize<T>(repo: string, branch: string, lock: CheckoutLockDeps, task: () => Promise<T>): Promise<T> {
   const key = `${repo}\0${branch}`
-  const next = (chains.get(key) ?? Promise.resolve()).then(task, task)
+  const locked = () => withCheckoutLock(repo, branch, task, lock)
+  const next = (chains.get(key) ?? Promise.resolve()).then(locked, locked)
   chains.set(
     key,
     next.catch(() => {}),
@@ -192,14 +198,10 @@ async function syncCore(repo: string, branch: string, r: Resolved): Promise<void
  */
 export async function ensureFileBranch(repo: string, branch: string, deps: FileBranchDeps = {}): Promise<{ ok: boolean; error?: string }> {
   const r = resolveDeps(deps)
-  return serialize(repo, branch, async () => {
-    try {
-      await ensureCore(repo, branch, r)
-      return { ok: true }
-    } catch (err) {
-      return { ok: false, error: errorMessage(err) }
-    }
-  })
+  return serialize(repo, branch, r.lock, async () => {
+    await ensureCore(repo, branch, r)
+    return { ok: true }
+  }).catch(err => ({ ok: false, error: errorMessage(err) }))
 }
 
 /**
@@ -219,10 +221,10 @@ function resolveMessage(message: CommitMessage): string {
 }
 
 /**
- * git's refusal when another process holds a lock of the checkout — its index, or the branch's
- * ref: the failures two processes on one clone (a daemon and a scheduler, each with its own
- * in-process chain) hand each other. git does not wait for a lock, so the cycle waits instead
- * and runs again.
+ * git's refusal when another git command holds a lock of the checkout — its index, or the
+ * branch's ref: one run outside this module (a person's git in the checkout, or a process whose
+ * build predates the checkout's lock file). git does not wait for a lock, so the cycle waits
+ * instead and runs again.
  */
 const LOCK_RETRIES = 3
 const LOCK_WAIT_MS = 500
@@ -235,8 +237,10 @@ export function isGitLocked(err: unknown): boolean {
  * against the checkout, commit whatever it changed, push. The single funnel a long-lived
  * process's writes go through.
  *
- * Another process holding a lock of the checkout (its `index.lock`, or the branch's ref lock)
- * is waited out: the checkout is reset, the cycle waits half a second and runs again, three
+ * Every process on the clone takes the checkout's lock file first, and waits while another holds
+ * it (five minutes at most, then the write fails without touching the checkout). A git command
+ * outside that lock holding a lock of the checkout (its `index.lock`, or the branch's ref lock)
+ * is waited out too: the checkout is reset, the cycle waits half a second and runs again, three
  * times at most, before the failure is reported like any other.
  *
  * `op` must be re-runnable: when the push loses a race with another writer, the cycle re-syncs
@@ -256,13 +260,13 @@ export async function withFileBranch(
 ): Promise<FileBranchWrite> {
   const r = resolveDeps(deps)
   const path = fileBranchPath(repo, branch)
-  return serialize(repo, branch, async () => {
+  return serialize(repo, branch, r.lock, async (): Promise<FileBranchWrite> => {
     for (let locked = 0; ; locked++) {
       const outcome = await cycle(repo, branch, path, message, op, r)
       if (outcome.ok || !isGitLocked(outcome.error) || locked >= LOCK_RETRIES) return outcome
       await new Promise(resolve => setTimeout(resolve, LOCK_WAIT_MS))
     }
-  })
+  }).catch(err => ({ ok: false, committed: false, error: errorMessage(err) }))
 }
 
 /** One write cycle, unserialized: sync, apply, commit, push (twice on a lost race). Never throws. */

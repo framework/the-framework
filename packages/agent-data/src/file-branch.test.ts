@@ -1,4 +1,5 @@
 import { strict as assert } from 'node:assert'
+import { spawn } from 'node:child_process'
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -375,6 +376,76 @@ test('concurrent writes serialize instead of interleaving', async () => {
     )
     assert.deepEqual(order, ['a:start', 'a:end', 'b:start', 'b:end', 'c:start', 'c:end'])
     assert.equal(await git(['show', `${BRANCH}:queue.md`], repo), '- a\n- b\n- c\n')
+  } finally {
+    await rm(repo, RETRIED_RM)
+  }
+})
+
+test('two processes on one clone take turns in the checkout: every write of both lands', async () => {
+  const { repo, bare, cleanup } = await initSyncedRepos()
+  try {
+    await ensureFileBranch(repo, BRANCH)
+    // Each process writes its own files, slowly, so the other's cycle has every chance to reset
+    // the checkout under it: a daemon, a scheduler and a run's end record on one clone.
+    const module = new URL('./file-branch.js', import.meta.url).href
+    const writer = (name: string) => `
+      const { withFileBranch } = await import(${JSON.stringify(module)})
+      const { writeFile } = await import('node:fs/promises')
+      const { join } = await import('node:path')
+      const failed = []
+      for (let i = 0; i < 6; i++) {
+        const result = await withFileBranch(${JSON.stringify(repo)}, ${JSON.stringify(BRANCH)}, '${name} ' + i, async dir => {
+          await writeFile(join(dir, '${name}-' + i + '.md'), 'x')
+          await new Promise(resolve => setTimeout(resolve, 30))
+        })
+        if (!result.ok) failed.push(result.error)
+      }
+      process.stdout.write(JSON.stringify(failed))
+    `
+    const run = (name: string) =>
+      new Promise<string[]>((resolvePromise, rejectPromise) => {
+        const child = spawn(process.execPath, ['--input-type=module', '-e', writer(name)], { stdio: ['ignore', 'pipe', 'inherit'] })
+        let out = ''
+        child.stdout.on('data', chunk => (out += chunk))
+        child.once('error', rejectPromise)
+        child.once('exit', () => resolvePromise(JSON.parse(out || '["no output"]') as string[]))
+      })
+    const [a, b] = await Promise.all([run('a'), run('b')])
+    assert.deepEqual([...a, ...b], [], 'no write failed')
+    const files = (await git(['ls-tree', '--name-only', BRANCH], bare)).trim().split('\n').sort()
+    const want = ['a', 'b'].flatMap(name => Array.from({ length: 6 }, (_, i) => `${name}-${i}.md`)).sort()
+    assert.deepEqual(files, want)
+  } finally {
+    await cleanup()
+  }
+})
+
+test("the checkout's lock: a live holder is waited for, a dead one's is taken over, a wait past the budget fails untouched", async () => {
+  const repo = await initRepo('file-branch-lock-')
+  try {
+    await ensureFileBranch(repo, BRANCH)
+    const lock = join(repo, '.branches', `${BRANCH}.lock`)
+    const write = (content: string, deps: Parameters<typeof withFileBranch>[4]) =>
+      withFileBranch(repo, BRANCH, content, async dir => writeFile(join(dir, 'queue.md'), content), deps)
+    // Held by a live process: the write waits until it lets go.
+    await writeFile(lock, '424242 held')
+    let alive = true
+    setTimeout(() => void rm(lock, { force: true }), 300)
+    const started = Date.now()
+    assert.deepEqual(await write('- after the wait\n', { lock: { isAlive: () => alive } }), { ok: true, changed: true, pushed: false })
+    assert.ok(Date.now() - started >= 250, 'the write waited for the holder')
+    // Held by a process that is gone: taken over at once.
+    await writeFile(lock, '424242 dead')
+    alive = false
+    assert.deepEqual(await write('- over a dead holder\n', { lock: { isAlive: () => alive } }), { ok: true, changed: true, pushed: false })
+    // Held past the wait: the write fails and the checkout is not touched.
+    await writeFile(lock, '424242 held')
+    alive = true
+    const stuck = await write('- never\n', { lock: { isAlive: () => alive, waitMs: 200 } })
+    assert.equal(stuck.ok, false)
+    assert.match((stuck as { error: string }).error, /another process has held/)
+    assert.equal(await readFile(join(fileBranchPath(repo, BRANCH), 'queue.md'), 'utf8'), '- over a dead holder\n')
+    assert.equal(await readFile(lock, 'utf8'), '424242 held', "another holder's lock is never removed")
   } finally {
     await rm(repo, RETRIED_RM)
   }

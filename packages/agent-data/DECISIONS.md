@@ -44,10 +44,13 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 ## Flow: a write
 Fetch what others pushed → make the change → commit → push.
 
-- Two writers. A long-lived process (a daemon) writes in its own checkout,
-  `.branches/<branch>`, one write at a time per repository and branch, an in-memory lock:
-  two processes on one clone are not guarded. The pull is that same cycle with an empty
-  change, behind the same lock. A command an agent runs writes in a throwaway worktree
+- Two writers. A long-lived process (the daemon, the scheduler, a run) writes in the
+  clone's checkout, `.branches/<branch>`, one write at a time per repository and branch,
+  across every process on the clone: a lock file beside the checkout; a live holder is
+  waited for, a dead one's lock is taken over. Picked over a lock inside each process only
+  (the scheduler's reset wiped a run's end record in the same second) and over runs writing
+  through a throwaway worktree (the daemon and the scheduler would still share the
+  checkout). The pull is that same cycle with an empty change, behind the same lock. A command an agent runs writes in a throwaway worktree
   outside the project, at the remote's tip (parentless when origin has no such branch),
   pushes, and deletes it whether or not the push landed. It never touches the process's
   checkout: that checkout's next write commits everything it finds, and a failed write

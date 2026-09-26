@@ -49,12 +49,16 @@ test('readTickets reads the Waiting: line as written, and leaves it off when abs
   assert.equal(empty?.waiting, undefined)
 })
 
-test('readTickets reads the PR: link the same way, the ticket in review, and leaves it off when absent', async () => {
+test('readTickets reads the PR: link the same way, the ticket in review, keeps a bare value as the label, and leaves it off when absent or empty', async () => {
   const [inReview] = await readTickets(await dir({ '2026-07-20_thing.md': 'Issue: [#42](https://example.com/org/repo/issues/42)\nPR: [#1790](https://example.com/org/repo/pull/1790)\n\n# Thing\n' }))
   assert.deepEqual(inReview?.pr, { label: '#1790', url: 'https://example.com/org/repo/pull/1790' })
   assert.deepEqual(inReview?.issue, { label: '#42', url: 'https://example.com/org/repo/issues/42' })
-  const [bare] = await readTickets(await dir({ '2026-07-20_thing.md': 'PR: not a link\n\n# Thing\n' }))
-  assert.equal(bare?.pr, undefined)
+  const [bare] = await readTickets(await dir({ '2026-07-20_thing.md': 'PR: #1790\n\n# Thing\n' }))
+  assert.deepEqual(bare?.pr, { label: '#1790' })
+  const [empty] = await readTickets(await dir({ '2026-07-20_thing.md': 'PR:\n\n# Thing\n' }))
+  assert.equal(empty?.pr, undefined)
+  const [none] = await readTickets(await dir({ '2026-07-20_thing.md': '# Thing\n' }))
+  assert.equal(none?.pr, undefined)
 })
 
 test('readTickets dates a ticket by its filename, not its mtime, when the filename carries one', async () => {

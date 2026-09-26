@@ -92,7 +92,7 @@ A turn [3] sends one prompt to the coding agent [8], lets the coding agent's own
 
 - Extra framing [10] for this turn only, appended after the driver session's [2] framing.
 - A stop request [11] for this turn only.
-- A request to continue the coding agent's previous turn instead of starting fresh, so that a live chat [12] message lands in the ongoing conversation with its full context. It is best effort: a driver that cannot resume, or has no previous turn yet, runs a fresh turn, which is the normal case. The Claude Code, Codex and GitHub Actions drivers honor it (`@agent-driver/claude`'s `claude-code.ts`, `@agent-driver/codex`'s `codex.ts`, `@agent-driver/claude`'s `actions.ts`); the fake does not.
+- A request to continue the coding agent's previous turn instead of starting fresh, so that a live chat [12] message lands in the ongoing conversation with its full context. It is best effort: a driver that cannot resume, or has no previous turn yet, runs a fresh turn, which is the normal case. The Claude Code, Codex and GitHub Actions drivers honor it (`@agent-driver/claude`'s `claude-code.ts`, `@agent-driver/codex`'s `codex.ts`, `@agent-driver/github`'s `actions.ts`); the fake does not.
 
 A turn answers with the coding agent's final message as text, the coding agent's session id when it exposes one (the handle the dashboard links to and the driver later resumes), and the turn's usage [5] when the coding agent reports one. A driver's own id for the driver session is distinct from that session id.
 

@@ -315,6 +315,12 @@ test('CodexDriver with skills off runs from a kept home that holds only a link t
     await utimes(join(home, 'auth.json'), new Date(0), new Date(0))
     await spawnedWith(skillsOff)
     assert.equal(await readFile(join(personal, 'auth.json'), 'utf8'), 'refreshed')
+    // Two sessions starting at once over a saved login both start, and the person's login survives whole.
+    await rm(join(home, 'auth.json'))
+    await writeFile(join(home, 'auth.json'), 'refreshed again')
+    await Promise.all([spawnedWith(skillsOff), spawnedWith(skillsOff)])
+    assert.equal(await readFile(join(personal, 'auth.json'), 'utf8'), 'refreshed again')
+    assert.equal(await readlink(join(home, 'auth.json')), join(personal, 'auth.json'))
     // Two sessions starting at once both start: with no link yet, and with a link pointing elsewhere.
     await rm(join(home, 'auth.json'))
     await Promise.all([spawnedWith(skillsOff), spawnedWith(skillsOff)])
@@ -341,6 +347,7 @@ test('a Codex home that is the person\'s own is left as it is', async () => {
 
 test('the kept Codex home is under the state directory', () => {
   assert.equal(defaultCodexHome({ XDG_STATE_HOME: '/state' }), '/state/agent-driver/codex-home')
+  assert.equal(defaultCodexHome({ HOME: '/home/me' }), '/home/me/.local/state/agent-driver/codex-home')
 })
 
 test('codexReady asks codex, and warns about ~/.agents/skills only when skills are off and it holds some', async () => {
@@ -357,6 +364,10 @@ test('codexReady asks codex, and warns about ~/.agents/skills only when skills a
     assert.match(off.warnings[0]!, /no switch/)
     assert.ok(off.warnings[0]!.includes(dir))
     assert.deepEqual((await codexReady({ ...base, personal: { memory: false, connectors: false, skills: true } })).warnings, [], 'skills on: nothing to warn about')
+    const memoryOn = await codexReady({ ...base, personal: { memory: true, connectors: false, skills: false } })
+    assert.equal(memoryOn.warnings.length, 2)
+    assert.match(memoryOn.warnings[1]!, /`memory: on` does nothing for Codex while `skills` is off/)
+    assert.equal((await codexReady({ ...base, personal: { memory: true, connectors: false, skills: true } })).warnings.length, 0)
     assert.deepEqual((await codexReady(base)).warnings, [], 'no setup given: Codex as it is')
     assert.ok(probed.every(bin => bin === 'codex'))
   } finally {

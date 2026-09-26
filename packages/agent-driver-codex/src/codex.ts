@@ -1,5 +1,5 @@
 import { execFile, spawn as nodeSpawn } from 'node:child_process'
-import { copyFile, lstat, mkdir, readlink, readdir, rm, stat, symlink } from 'node:fs/promises'
+import { copyFile, lstat, mkdir, readlink, readdir, rename, rm, stat, symlink } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { runCliSession, finishTurn, agentEnv, attachLog, combineFraming, combineSignals, makeEmit, readWorkspaceFile, checkCliReady, type AgentCliParser, type CliSpec, type DriverReadiness, type DriverReadyOptions, type PersonalSetup, type SpawnLike, type SessionLog, type Driver, type DriverEvent, type DriverPromptOptions, type DriverSession, type DriverStartOptions, type DriverTurn, type DriverUsage } from 'agent-driver'
@@ -46,12 +46,12 @@ export interface CodexDriverOptions {
 
 /** The Codex home kept on this machine for every project: `$XDG_STATE_HOME/agent-driver/codex-home`, or under `~/.local/state`. */
 export function defaultCodexHome(env: NodeJS.ProcessEnv = process.env): string {
-  return join(env['XDG_STATE_HOME'] || join(homedir(), '.local', 'state'), 'agent-driver', 'codex-home')
+  return join(env['XDG_STATE_HOME'] || join(env['HOME'] || homedir(), '.local', 'state'), 'agent-driver', 'codex-home')
 }
 
 /** The person's own Codex home, where their login is: `CODEX_HOME`, else `~/.codex`. */
 export function personalCodexHome(env: NodeJS.ProcessEnv = process.env): string {
-  return env['CODEX_HOME'] || join(homedir(), '.codex')
+  return env['CODEX_HOME'] || join(env['HOME'] || homedir(), '.codex')
 }
 
 /**
@@ -76,12 +76,25 @@ export async function prepareCodexHome(home: string, personal: string): Promise<
     if ((await readlink(link)) === target) return
     await rm(link, { force: true })
   } else if (found?.isFile()) {
-    const theirs = await stat(target).catch(() => undefined)
-    if (!theirs || found.mtimeMs > theirs.mtimeMs) {
-      await mkdir(personal, { recursive: true })
-      await copyFile(link, target)
+    // Moved aside first, so of two sessions starting at once only one takes the file, and a link
+    // the other already put back is never copied onto the file it points at.
+    const aside = `${link}.${process.pid}.${Date.now()}`
+    const taken = await rename(link, aside).then(
+      () => true,
+      (err: NodeJS.ErrnoException) => {
+        if (err.code === 'ENOENT') return false
+        throw err
+      },
+    )
+    if (taken) {
+      const saved = await lstat(aside)
+      const theirs = await stat(target).catch(() => undefined)
+      if (saved.isFile() && (!theirs || saved.mtimeMs > theirs.mtimeMs)) {
+        await mkdir(personal, { recursive: true })
+        await copyFile(aside, target)
+      }
+      await rm(aside, { force: true })
     }
-    await rm(link, { force: true })
   } else if (found) {
     throw new Error(`${link} is neither a file nor a link; remove it to let Codex runs use this home`)
   }
@@ -370,6 +383,7 @@ export async function codexReady(opts: CodexReadyOptions = {}): Promise<DriverRe
     const dir = opts.agentsSkills ?? join(homedir(), '.agents', 'skills')
     const skills = await readdir(dir).catch(() => [])
     if (skills.some(name => !name.startsWith('.'))) ready.warnings.push(`Codex loads your skills in ${dir} even with \`skills\` off: it has no switch for that folder. Move them out to keep them out of runs.`)
+    if (opts.personal.memory) ready.warnings.push('`memory: on` does nothing for Codex while `skills` is off: Codex keeps its memories in your own Codex home, which runs then do not use. Turn `skills` on too to bring them back.')
   }
   return ready
 }

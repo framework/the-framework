@@ -35,8 +35,8 @@ does the same job on every machine; in the same file, each part comes back with 
     skills: on        Claude Code: your user settings (effort, model, hooks, a login through apiKeyHelper), the skills
                       synced from your claude.ai account, ~/.claude/CLAUDE.md, ~/.claude/skills.
                       Codex: ~/.codex/AGENTS.md, ~/.codex/skills, ~/.codex/config.toml (with a model provider or
-                      login set there). Skills in
-                      ~/.agents/skills load either way (\`check\` warns).
+                      login set there) and its memories, so Codex's memory: on needs skills: on too.
+                      Skills in ~/.agents/skills load either way; \`check\` warns while skills is off.
 
 JSON on stdout. Exit code 1 for a refusal or a failure (the reason on stderr), 2 for a usage error.`
 

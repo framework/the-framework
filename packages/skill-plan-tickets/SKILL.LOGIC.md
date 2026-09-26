@@ -8,14 +8,14 @@ The `plan-tickets` command skill: the prompt of the agent a runner starts for qu
 
 ## Business logic — TL;DR
 
-- **Capabilities first** - with no ticketing system or no AI queue, it shows an error to the user saying which and stops, before reading anything; in capability words, naming no skill.
+- **Capabilities first** - with no ticketing system or no AI queue, it shows an error to the user saying which and stops, as its first step; in capability words, naming no skill.
 - **Nobody answers** - the agent never asks and decides by itself.
 - **The listing decides** - the agent reads the open tickets as listed, and the queue, and opens no ticket; what a ticket needs, and in which order, is read off its row.
 - **Needs a plan** - the listing shows no plan, or shows the plan outdated.
 - **Skipped** - a ticket its listing shows locked (held by someone), with a pull request (in review), waiting (what it waits on named on it), or already on the queue: any entry, in any wording, with the ticket's file without `.md` anywhere in it, so a plan ask and a link to the ticket both count. The match is on text, so an entry for `<name>-more` also skips the ticket `<name>`, in the skill and the check alike; an entry for `<name>` never skips `<name>-more`.
-- **At most ten a run** - highest priority first, then oldest date first, then by the listing's file name, `.md` included, A to Z (`<name>-more.md` before `<name>.md`), so two runs keep the same ten in the same order; the rest wait for the next run. A ticket's priority is its own when that is a bare whole number from 0 to 10, else 5, the tickets skill's rule; the queue takes only 0 to 10.
+- **At most ten a run** - highest priority first, then oldest date first, then by the listing's file name, `.md` included, compared character by character in code order (`-` before `.`, so `<name>-more.md` before `<name>.md`), so two runs keep the same ten in the same order; the rest wait for the next run. A ticket's priority is its own when that is a bare whole number from 0 to 10, else 5, the tickets skill's rule; the queue takes only 0 to 10.
 - **The plan ask** - the plain sentence `Create tickets/<name>.plan.md`, `<name>` the ticket's file without `.md`, not a link to the ticket (a link asks for the ticket's work, not its plan), at the ticket's priority, queued one by one in that order; an entry lands at the end of its priority section, so the order of the writes is the order of work within a priority.
-- **A failed write** - a queue write that fails ends the run with an error to the user naming the ticket and the reason; the remaining tickets are left for the next run. The skill adds no retry of its own: the queue's command already tries a lost write once more by itself.
+- **A failed write** - a queue write that fails ends the run with an error to the user naming the ticket and the reason, then the last word; that ticket and the rest are left for the next run. The skill adds no retry of its own: the queue's command already tries a lost write once more by itself.
 - **Only queue** - the queue is the only thing it changes; it writes no plan itself.
 - **Nothing to queue** - no ticket needs a plan, or every one is skipped: it says so and stops.
-- **The last word** - a run that queued ends naming each entry it queued with its priority, each ticket it skipped and why, and how many wait for the next run, so the run's record in the logs says what it did.
+- **The last word** - a run that got as far as queueing, a failed write included, ends naming each entry it queued with its priority, each ticket that needs a plan but was skipped and why, and how many tickets that need a plan are left for the next run, so the run's record in the logs says what it did.

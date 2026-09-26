@@ -38,7 +38,7 @@ test('a run is recorded under the person the repo commits as, one pushed commit;
     const wrote = await writeRun(root, card(R2, { intent: 'second', caller: { pid: 1 } }), [{ kind: 'said', text: 'hi' }, { kind: 'ended', status: 'done' }])
     assert.deepEqual(wrote, { ok: true, changed: true, pushed: true })
     assert.deepEqual(await writeRun(root, card(R1, { intent: 'first' }), []), { ok: true, changed: true, pushed: true })
-    const person = join(fileBranchPath(root, DATA_BRANCH), RUNS_DIR, 'dev@example.com')
+    const person = join(await fileBranchPath(root, DATA_BRANCH), RUNS_DIR, 'dev@example.com')
     assert.deepEqual(JSON.parse(await readFile(join(person, `${R2}.json`), 'utf8')), { ...card(R2), intent: 'second', caller: { pid: 1 } })
     assert.equal(await readFile(join(person, `${R2}.jsonl`), 'utf8'), '{"kind":"said","text":"hi"}\n{"kind":"ended","status":"done"}\n')
     assert.equal((await git(['log', '-1', '--format=%s', DATA_BRANCH], bare)).trim(), `logs: record run ${R1}`)

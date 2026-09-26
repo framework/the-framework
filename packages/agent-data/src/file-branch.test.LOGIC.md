@@ -1,6 +1,7 @@
 What the tests cover, against real git repositories with a bare `origin` and a second clone standing in for another machine:
 
 - **Birth and checkout** - making the branch exist births it parentless (it shares no commit with `main`), checks it out at `.branches/<branch>`, hides the checkout from the project's own git status, and doing it again changes nothing and still reports success.
+- **A second worktree** - a write from a second worktree of the clone goes through the clone's one checkout: it lands and is pushed, the checkout's path from that worktree is the clone's, and a read from that worktree sees the file.
 - **Adoption** - a branch origin already has is adopted with its files, instead of a second history being born.
 - **A write** - commits on the branch under the caller's message, pushes it to origin, and leaves `main` untouched; a change that writes nothing commits nothing and reports no change; in a repository with no remote the write lands locally and reports that nothing was pushed.
 - **Stranded commits and conflicts** - a write syncs in what another machine pushed and carries out an earlier local-only commit together with its own; a stranded commit that conflicts with origin's version resolves toward origin, and the change is re-applied on top of origin's version.

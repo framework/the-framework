@@ -25,9 +25,9 @@ test('sync births the branch, links tickets/ at the root hidden from git, and na
   try {
     const result = await syncTickets(root)
     assert.ok(!result.ok && /no remote/.test(result.error), 'a repo nothing can reach is an error state, said')
-    const wt = ticketsCheckoutPath(root)
+    const wt = await ticketsCheckoutPath(root)
     assert.equal(wt, join(root, BRANCHES_DIR, DATA_BRANCH))
-    assert.equal(ticketsDir(root), join(wt, 'tickets'))
+    assert.equal(await ticketsDir(root), join(wt, 'tickets'))
     assert.equal((await git(['rev-parse', '--abbrev-ref', 'HEAD'], wt)).trim(), DATA_BRANCH)
     // Born an orphan and left clean between cycles: nothing of the package's is written on it.
     assert.match(await git(['log', '--format=%s', `refs/heads/${DATA_BRANCH}`], root), /^create the agent-data branch\n?$/)
@@ -87,7 +87,7 @@ test('sync converges with origin: the branch origin has is adopted, and a pushed
     await git(['commit', '-m', 'put tickets/2026-08-30_a.md'], other)
     await git(['push', 'origin', DATA_BRANCH], other)
     assert.deepEqual(await syncTickets(root), { ok: true })
-    assert.equal(await readFile(join(ticketsDir(root), '2026-08-30_a.md'), 'utf8'), '# A\n')
+    assert.equal(await readFile(join(await ticketsDir(root), '2026-08-30_a.md'), 'utf8'), '# A\n')
   } finally {
     for (const dir of [root, bare, otherParent]) await rm(dir, RETRIED_RM)
   }

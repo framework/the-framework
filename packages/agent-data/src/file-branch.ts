@@ -17,9 +17,22 @@ import { withCheckoutLock, type CheckoutLockDeps } from './checkout-lock.js'
 // which is another process's. Both treat the change as an intent: when the push loses a race,
 // the cycle re-syncs and re-applies rather than force-fitting a stale commit.
 
-/** The persistent checkout of `branch` under a project: `<repo>/.branches/<branch>`. */
-export function fileBranchPath(repo: string, branch: string): string {
-  return join(repo, BRANCHES_DIR, branch)
+/**
+ * The persistent checkout of `branch` for the repository `cwd` is in: `<home>/.branches/<branch>`,
+ * `<home>` being the clone's own directory ({@link fileBranchRepo}). git checks a branch out in
+ * one place per clone, so every worktree of the clone shares this one checkout.
+ */
+export async function fileBranchPath(cwd: string, branch: string, git: GitRunner = nodeGitRunner()): Promise<string> {
+  return checkoutPath(await cloneHome(cwd, git), branch)
+}
+
+function checkoutPath(home: string, branch: string): string {
+  return join(home, BRANCHES_DIR, branch)
+}
+
+/** The clone's own directory, or `cwd` itself when git cannot say (not a repo). */
+async function cloneHome(cwd: string, git: GitRunner): Promise<string> {
+  return (await fileBranchRepo(cwd, git)) ?? cwd
 }
 
 /**
@@ -149,7 +162,7 @@ async function attachBranch(path: string, branch: string, git: GitRunner): Promi
  * writer and the pull can run it inside the cycle they already hold the chain for.
  */
 async function ensureCore(repo: string, branch: string, r: Resolved): Promise<void> {
-  const path = fileBranchPath(repo, branch)
+  const path = checkoutPath(repo, branch)
   // Already checked out on the right branch: done. The common case, taken on every tick.
   if ((await attachedBranch(path, r.git)) === branch) return
   // The checkout is there but off its branch: back on it, never added a second time (git
@@ -180,7 +193,7 @@ async function ensureCore(repo: string, branch: string, r: Resolved): Promise<vo
  */
 async function syncCore(repo: string, branch: string, r: Resolved): Promise<void> {
   if (!(await hasRemote(repo, r.git))) return
-  const path = fileBranchPath(repo, branch)
+  const path = checkoutPath(repo, branch)
   await r.git(['fetch', 'origin', branch], repo).catch(() => {})
   if (!(await refExists(repo, `refs/remotes/origin/${branch}`, r.git))) return
   try {
@@ -196,8 +209,9 @@ async function syncCore(repo: string, branch: string, r: Resolved): Promise<void
  * in place (one `git rev-parse` against the checkout); never throws — a project this cannot be
  * set up in reports why and is left alone.
  */
-export async function ensureFileBranch(repo: string, branch: string, deps: FileBranchDeps = {}): Promise<{ ok: boolean; error?: string }> {
+export async function ensureFileBranch(cwd: string, branch: string, deps: FileBranchDeps = {}): Promise<{ ok: boolean; error?: string }> {
   const r = resolveDeps(deps)
+  const repo = await cloneHome(cwd, r.git)
   return serialize(repo, branch, r.lock, async () => {
     await ensureCore(repo, branch, r)
     return { ok: true }
@@ -252,14 +266,15 @@ export function isGitLocked(err: unknown): boolean {
  * Never throws: callers run on background ticks with nothing to catch it.
  */
 export async function withFileBranch(
-  repo: string,
+  cwd: string,
   branch: string,
   message: CommitMessage,
   op: (dir: string) => Promise<void>,
   deps: FileBranchDeps = {},
 ): Promise<FileBranchWrite> {
   const r = resolveDeps(deps)
-  const path = fileBranchPath(repo, branch)
+  const repo = await cloneHome(cwd, r.git)
+  const path = checkoutPath(repo, branch)
   return serialize(repo, branch, r.lock, async (): Promise<FileBranchWrite> => {
     for (let locked = 0; ; locked++) {
       const outcome = await cycle(repo, branch, path, message, op, r)
@@ -381,9 +396,9 @@ export async function readBranchFile(
   deps: FileBranchDeps = {},
 ): Promise<string | undefined> {
   const r = resolveDeps(deps)
-  const repo = (await fileBranchRepo(cwd, r.git)) ?? cwd
+  const repo = await cloneHome(cwd, r.git)
   if (!opts.fresh) {
-    const path = fileBranchPath(repo, branch)
+    const path = checkoutPath(repo, branch)
     const fromCheckout = await r.git(['rev-parse', '--abbrev-ref', 'HEAD'], path).then(
       out => out.trim() === branch,
       () => false,
@@ -414,7 +429,7 @@ export async function listBranchDir(
   deps: FileBranchDeps = {},
 ): Promise<string[]> {
   const r = resolveDeps(deps)
-  const repo = (await fileBranchRepo(cwd, r.git)) ?? cwd
+  const repo = await cloneHome(cwd, r.git)
   for (const ref of await readRefs(repo, branch, opts.fresh, r.git)) {
     const out = await r.git(['ls-tree', '--name-only', `${ref}:${dir}`], cwd).catch(() => undefined)
     if (out !== undefined) return out.split('\n').map(line => line.trim()).filter(Boolean)
@@ -440,7 +455,7 @@ export interface BranchReader {
  */
 export async function openBranchReader(cwd: string, branch: string, deps: FileBranchDeps = {}): Promise<BranchReader> {
   const r = resolveDeps(deps)
-  const repo = (await fileBranchRepo(cwd, r.git)) ?? cwd
+  const repo = await cloneHome(cwd, r.git)
   const [ref] = await readRefs(repo, branch, true, r.git)
   const at = (await refExists(repo, `refs/remotes/origin/${branch}`, r.git)) ? ref! : branch
   return {

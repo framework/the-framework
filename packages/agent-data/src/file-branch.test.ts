@@ -75,7 +75,7 @@ test('ensure births the branch parentless and checks it out under .branches/, hi
   const repo = await initRepo('file-branch-solo-')
   try {
     assert.deepEqual(await ensureFileBranch(repo, BRANCH), { ok: true })
-    const wt = fileBranchPath(repo, BRANCH)
+    const wt = await fileBranchPath(repo, BRANCH)
     assert.equal(wt, join(repo, '.branches', BRANCH))
     assert.equal((await git(['rev-parse', '--abbrev-ref', 'HEAD'], wt)).trim(), BRANCH)
     // Parentless: the file history shares no commit with the code history.
@@ -90,12 +90,30 @@ test('ensure births the branch parentless and checks it out under .branches/, hi
   }
 })
 
+test('a write from a second worktree of the clone goes through the clone\'s one checkout', async () => {
+  const { repo, cleanup } = await initSyncedRepos()
+  const second = join(await realpath(await mkdtemp(join(tmpdir(), 'file-branch-second-'))), 'wt')
+  try {
+    assert.equal((await withFileBranch(repo, BRANCH, 'from the clone', async dir => writeFile(join(dir, 'a.md'), 'a\n'))).ok, true)
+    await git(['worktree', 'add', '-b', 'other', second], repo)
+    // git checks a branch out in one place per clone: a second checkout under the worktree is refused.
+    const outcome = await withFileBranch(second, BRANCH, 'from the second worktree', async dir => writeFile(join(dir, 'b.md'), 'b\n'))
+    assert.deepEqual(outcome, { ok: true, changed: true, pushed: true })
+    assert.equal(await fileBranchPath(second, BRANCH), join(repo, '.branches', BRANCH))
+    assert.equal(await readFile(join(repo, '.branches', BRANCH, 'b.md'), 'utf8'), 'b\n')
+    assert.equal(await readBranchFile(second, BRANCH, 'b.md'), 'b\n')
+  } finally {
+    await rm(dirname(second), RETRIED_RM)
+    await cleanup()
+  }
+})
+
 test('ensure adopts the branch origin already has instead of birthing a second history', async () => {
   const { repo, other, cleanup } = await initSyncedRepos()
   try {
     await otherMachineWrites(other, 'a.md', 'from the other machine\n')
     assert.deepEqual(await ensureFileBranch(repo, BRANCH), { ok: true })
-    assert.equal(await readFile(join(fileBranchPath(repo, BRANCH), 'a.md'), 'utf8'), 'from the other machine\n')
+    assert.equal(await readFile(join(await fileBranchPath(repo, BRANCH), 'a.md'), 'utf8'), 'from the other machine\n')
   } finally {
     await cleanup()
   }
@@ -148,7 +166,7 @@ test('a write syncs in what another machine pushed, and carries an earlier stran
   try {
     // An earlier cycle that could not push: a local commit only this machine has.
     await ensureFileBranch(repo, BRANCH)
-    const wt = fileBranchPath(repo, BRANCH)
+    const wt = await fileBranchPath(repo, BRANCH)
     await writeFile(join(wt, 'stranded.md'), 'stranded\n')
     await git(['add', '-A'], wt)
     await git(['commit', '-m', 'stranded local commit'], wt)
@@ -171,7 +189,7 @@ test('a conflicting stranded commit resolves toward origin, and the op re-applie
   const { repo, bare, other, cleanup } = await initSyncedRepos()
   try {
     await ensureFileBranch(repo, BRANCH)
-    const wt = fileBranchPath(repo, BRANCH)
+    const wt = await fileBranchPath(repo, BRANCH)
     await writeFile(join(wt, 'queue.md'), '- stale local view\n')
     await git(['add', '-A'], wt)
     await git(['commit', '-m', 'stale'], wt)
@@ -258,7 +276,7 @@ test('a lost push whose re-sync finds the branch locked by another process still
     assert.equal(runs, 2)
     assert.equal(await git(['show', `${BRANCH}:queue.md`], bare), '- first\n- appended\n')
     assert.equal(await git(['show', `${BRANCH}:theirs.md`], bare), 'theirs\n')
-    const wt = fileBranchPath(repo, BRANCH)
+    const wt = await fileBranchPath(repo, BRANCH)
     assert.equal((await git(['symbolic-ref', 'HEAD'], wt)).trim(), `refs/heads/${BRANCH}`)
     assert.equal((await git(['rev-parse', BRANCH], repo)).trim(), (await git(['rev-parse', BRANCH], bare)).trim())
     // The next write finds the checkout where it was left, on the branch: it is never made a second time.
@@ -277,7 +295,7 @@ test('a checkout found off its branch is put back on it, keeping what it holds, 
     await withFileBranch(repo, BRANCH, 'seed', async dir => {
       await writeFile(join(dir, 'a.md'), 'a\n')
     })
-    const wt = fileBranchPath(repo, BRANCH)
+    const wt = await fileBranchPath(repo, BRANCH)
     // The state a cycle interrupted mid-rebase leaves: HEAD detached at the tip, a record committed on
     // it afterwards, the branch itself behind.
     await git(['checkout', '--detach'], wt)
@@ -335,7 +353,7 @@ test('another process holding the index is waited out: the cycle runs again and 
     const stuck = await withFileBranch(repo, BRANCH, 'again', async dir => writeFile(join(dir, 'queue.md'), '- twice\n'), { git: locked })
     assert.equal(stuck.ok, false)
     assert.match((stuck as { error: string }).error, /index\.lock/)
-    assert.equal(await readFile(join(fileBranchPath(repo, BRANCH), 'queue.md'), 'utf8'), '- once\n')
+    assert.equal(await readFile(join(await fileBranchPath(repo, BRANCH), 'queue.md'), 'utf8'), '- once\n')
   } finally {
     await cleanup()
   }
@@ -347,7 +365,7 @@ test('the eager pull converges a machine on what others pushed, and names a repo
     await ensureFileBranch(repo, BRANCH)
     await otherMachineWrites(other, 'queue.md', '- pushed elsewhere\n')
     assert.deepEqual(await pullFileBranch(repo, BRANCH), { ok: true })
-    assert.equal(await readFile(join(fileBranchPath(repo, BRANCH), 'queue.md'), 'utf8'), '- pushed elsewhere\n')
+    assert.equal(await readFile(join(await fileBranchPath(repo, BRANCH), 'queue.md'), 'utf8'), '- pushed elsewhere\n')
   } finally {
     await cleanup()
   }
@@ -444,7 +462,7 @@ test("the checkout's lock: a live holder is waited for, a dead one's is taken ov
     const stuck = await write('- never\n', { lock: { isAlive: () => alive, waitMs: 200 } })
     assert.equal(stuck.ok, false)
     assert.match((stuck as { error: string }).error, /another process has held/)
-    assert.equal(await readFile(join(fileBranchPath(repo, BRANCH), 'queue.md'), 'utf8'), '- over a dead holder\n')
+    assert.equal(await readFile(join(await fileBranchPath(repo, BRANCH), 'queue.md'), 'utf8'), '- over a dead holder\n')
     assert.equal(await readFile(lock, 'utf8'), '424242 held', "another holder's lock is never removed")
   } finally {
     await rm(repo, RETRIED_RM)

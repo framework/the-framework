@@ -1,4 +1,4 @@
-Binds the tickets to the `agent-data` branch [1] for a long-lived process (no program in the repository calls it): where the branch's persistent checkout [2] sits under a project (`<root>/.branches/agent-data`, the tickets in its `tickets/`), the write cycle every claim, release and import lands through (apply to that checkout, commit, push), and the sync that brings that process's view of the branch up to date: a `tickets` link at the repository root pointing into the checkout, hidden from git, and the branch converging with origin.
+Binds the tickets to the `agent-data` branch [1] for a long-lived process (no program in the repository calls it): where the branch's persistent checkout [2] sits (`.branches/agent-data` in the clone's own directory, the tickets in its `tickets/`), the write cycle every claim, release and import lands through (apply to that checkout, commit, push), and the sync that brings that process's view of the branch up to date: a `tickets` link at the repository root pointing into the checkout, hidden from git, and the branch converging with origin.
 
 ## Context
 
@@ -14,9 +14,9 @@ Binds the tickets to the `agent-data` branch [1] for a long-lived process (no pr
 
 ## Business logic — TL;DR
 
-- **Where the branch is checked out** - the persistent checkout is `<root>/.branches/agent-data`, and the tickets are its `tickets/` directory.
+- **Where the branch is checked out** - the persistent checkout is `.branches/agent-data` in the clone's own directory, from any worktree of the clone, and the tickets are its `tickets/` directory.
 - **The write cycle** - an operation on the branch's files runs against the persistent checkout, then commits and pushes as one commit, one cycle at a time; writing a file creates its directory.
-- **The `tickets` link at the repository root** - the sync links `tickets` at the project's root to `.branches/agent-data/tickets`, relatively, only when nothing of that name sits there; the link may dangle until the first ticket lands.
+- **The `tickets` link at the repository root** - the sync links `tickets` at the project's root to the persistent checkout's `tickets/`, relatively (`.branches/agent-data/tickets` from the clone's own directory), only when nothing of that name sits there; the link may dangle until the first ticket lands.
 - **The link is hidden from git** - two rules in the repository's exclude file, `/tickets` then `!/tickets/`, hide the link while the checkout's real `tickets/` directory keeps committing.
 - **Converging with origin** - the sync births the branch and its checkout when missing, adopts what origin has, pushes anything an earlier cycle left stranded, and reports why it could not converge ("no remote") instead of throwing.
 
@@ -30,7 +30,7 @@ See `## Context`.
 
 #### Business logic
 
-The branch's persistent checkout [2] is `<root>/.branches/agent-data` under the project's root, the place the `agent-data` package gives every branch it checks out, and the tickets are the `tickets/` directory inside it. That directory is where the product reads tickets from and where each write cycle applies its change.
+The branch's persistent checkout [2] is `.branches/agent-data` in the clone's own directory, whichever worktree of the clone the root is, the place the `agent-data` package gives every branch it checks out, and the tickets are the `tickets/` directory inside it. That directory is where the product reads tickets from and where each write cycle applies its change.
 
 ### The write cycle
 
@@ -50,7 +50,7 @@ An operation on the branch's files is applied to the persistent checkout [2], co
 
 #### Business logic
 
-When nothing sits at `<root>/tickets` (no file, no directory, not even a dangling link), the sync creates a symbolic link there to the relative path `.branches/agent-data/tickets`, relative so that a moved repository keeps working. The target may not exist yet, so the link dangles until the first ticket lands on the branch. Anything already at that path is the user's and is left alone all the way: it is neither replaced nor hidden from git. A link that cannot be made is skipped silently and the sync goes on.
+When nothing sits at `<root>/tickets` (no file, no directory, not even a dangling link), the sync creates a symbolic link there to the persistent checkout's `tickets/`, by a path relative to the root so that a moved repository keeps working: `.branches/agent-data/tickets` from the clone's own directory, and the way to the clone's checkout from a second worktree of it. The target may not exist yet, so the link dangles until the first ticket lands on the branch. Anything already at that path is the user's and is left alone all the way: it is neither replaced nor hidden from git. A link that cannot be made is skipped silently and the sync goes on.
 
 ### The link is hidden from git
 

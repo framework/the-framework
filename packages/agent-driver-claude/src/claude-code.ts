@@ -378,7 +378,8 @@ const CLAUDE_CLI: CliSpec = {
 
 /**
  * Whether a Claude Code session can start here: the CLI installed and logged in. Every part of
- * the person's setup has a switch in Claude Code, so none is ever a warning here.
+ * the person's setup has a switch in Claude Code, so no part is ever a warning here (running as
+ * root still is).
  */
 export function claudeCodeReady(opts: DriverReadyOptions = {}): Promise<DriverReadiness> {
   return checkCliReady(CLAUDE_CLI, opts)

@@ -36,7 +36,7 @@ does the same job on every machine; in the same file, each part comes back with 
                       synced from your claude.ai account, ~/.claude/CLAUDE.md, ~/.claude/skills.
                       Codex: ~/.codex/AGENTS.md, ~/.codex/skills, ~/.codex/config.toml (with a model provider or
                       login set there) and its memories, so Codex's memory: on needs skills: on too (\`check\` warns).
-                      Skills in ~/.agents/skills load either way; \`check\` warns while skills is off.
+                      Codex loads skills in ~/.agents/skills either way; \`check --driver codex\` warns about them.
 
 JSON on stdout. Exit code 1 for a refusal or a failure (the reason on stderr), 2 for a usage error.`
 

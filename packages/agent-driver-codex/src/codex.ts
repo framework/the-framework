@@ -382,7 +382,8 @@ export interface CodexReadyOptions extends DriverReadyOptions {
 /**
  * Whether a Codex session can start here: the CLI installed and logged in. With `skills` off, a
  * `~/.agents/skills` that holds skills is a warning: Codex reads that folder from the person's
- * home whatever its own home is, and no switch keeps it out.
+ * home whatever its own home is, and no switch keeps it out. With `skills` off, `memory: on` is a
+ * warning too: Codex keeps its memories in the person's own home, which the run does not use.
  */
 export async function codexReady(opts: CodexReadyOptions = {}): Promise<DriverReadiness> {
   const ready = await checkCliReady(CODEX_CLI, opts)

@@ -1,0 +1,1 @@
+The package's public entry point: the GitHub Actions driver with its driver session, its transcript replay, its option types and its fetch seam. The zip reader in `actions-zip.ts` is deliberately not exported: it is an implementation detail of the driver, not product API.

@@ -98,7 +98,7 @@ The driver [1] lists the run's artifacts and takes the one whose name contains t
 
 #### Context
 
-**Business logic story**: the transcript is a JSON array holding exactly the messages Claude Code streams one per line when it runs on this machine. The whole difference between a local turn [2] and a runner's turn is array versus lines, so the transcript is read by the same parser as a local turn (`claude-code.ts`).
+**Business logic story**: the transcript is a JSON array holding exactly the messages Claude Code streams one per line when it runs on this machine. The whole difference between a local turn [2] and a runner's turn is array versus lines, so the transcript is read by the same parser as a local turn (`@agent-driver/claude`'s `claude-code.ts`).
 
 #### Business logic
 

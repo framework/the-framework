@@ -1,12 +1,12 @@
 {
-  "name": "@agent-driver/claude",
+  "name": "@agent-driver/codex",
   "version": "0.0.1",
-  "description": "Claude Code behind the agent-driver contract: on this machine, and on a GitHub Actions runner; plus the reader of the account's quota.",
+  "description": "Codex behind the agent-driver contract, on this machine.",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/framework/the-framework.git",
-    "directory": "packages/agent-driver-claude"
+    "directory": "packages/agent-driver/codex"
   },
   "type": "module",
   "engines": {
@@ -22,8 +22,8 @@
     }
   },
   "scripts": {
-    "build": "pnpm -C ../agent-driver build && tsc -p tsconfig.build.json",
-    "typecheck": "pnpm -C ../agent-driver build && tsc --noEmit",
+    "build": "pnpm -C ../core build && tsc -p tsconfig.build.json",
+    "typecheck": "pnpm -C ../core build && tsc --noEmit",
     "test": "pnpm build && tsc -p tsconfig.test.json && node --test --test-timeout=60000 'dist-test/**/*.test.js'",
     "clean": "rm -rf dist dist-test"
   },

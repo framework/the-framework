@@ -1,4 +1,4 @@
-The repository's three GitHub workflows: the check every push and every pull request from a fork gets, the deploy that keeps the marketing website live, and the workflow that runs one turn [2] of an agent [1] on a GitHub-hosted runner for `@agent-driver/claude`'s `github-actions` driver [3]. The first two serve this repository's own development; the third is a piece of the product, carried by any repository that wants its agents to run on GitHub's runners, this one included.
+The repository's three GitHub workflows: the check every push and every pull request from a fork gets, the deploy that keeps the marketing website live, and the workflow that runs one turn [2] of an agent [1] on a GitHub-hosted runner for `@agent-driver/github`'s `github-actions` driver [3]. The first two serve this repository's own development; the third is a piece of the product, carried by any repository that wants its agents to run on GitHub's runners, this one included.
 
 ## Glossary
 

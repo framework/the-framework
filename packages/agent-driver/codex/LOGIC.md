@@ -1,4 +1,4 @@
-The `@agent-driver/codex` package: Codex behind the `agent-driver` contract (`packages/agent-driver`), on this machine. The runner (`packages/agent-runner`) runs a run's Codex through it. `package.json`, `tsconfig.json`, `tsconfig.build.json` and `tsconfig.test.json` configure the build and the test runner and carry no business logic; `dist/` and `dist-test/` are build output; each source file's `*.BUG-ANALYSIS.md` records when it was last reviewed for bugs.
+The `@agent-driver/codex` package: Codex behind the `agent-driver` contract (`../core`), on this machine. The runner (`packages/agent-runner`) runs a run's Codex through it. `package.json`, `tsconfig.json`, `tsconfig.build.json` and `tsconfig.test.json` configure the build and the test runner and carry no business logic; `dist/` and `dist-test/` are build output; each source file's `*.BUG-ANALYSIS.md` records when it was last reviewed for bugs.
 
 ## Context
 

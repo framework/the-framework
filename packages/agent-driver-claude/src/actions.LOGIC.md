@@ -26,7 +26,7 @@ Drives Claude Code on a GitHub Actions runner as a driver [1]: each turn [2] dis
 
 ## Business logic — TL;DR
 
-- **The shared end of a turn, and the log** - the session attaches the log when the caller asked for one, so every event is recorded before the caller sees it; every turn ends the shared way (`inbox.ts`): the question reported, the inbox drained into further turns of the same session.
+- **The shared end of a turn, and the log** - the session attaches the log when the caller asked for one, so every event is recorded before the caller sees it; every turn ends the shared way (`agent-driver`'s `inbox.ts`): the question reported, the inbox drained into further turns of the same session.
 - **One turn is one workflow run** - a turn [2] dispatches the workflow with the framing [9] placed ahead of the prompt, the correlation id [3], the run branch, and the model and session id when there are any, on the branch the previous run pushed or else the configured ref or `main`.
 - **The correlation id** - `<driver session id>-turn-<n>`, where the driver session [8] id carries a random tag so two callers, or two processes of one caller, never match each other's runs.
 - **Only ids reach the runner's shell** - a model id or session id containing anything but letters, digits, dots, underscores, colons and hyphens is refused before dispatch; the prompt is a workflow input and never goes through a shell.

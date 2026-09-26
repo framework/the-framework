@@ -2,9 +2,8 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { Readable, Writable } from 'node:stream'
 import { existsSync, readFileSync } from 'node:fs'
-import { ClaudeCodeDriver, StreamJsonParser } from './claude-code.js'
-import { runCliSession, type SpawnLike, type SpawnedProcess } from './cli-session.js'
-import type { DriverEvent } from './types.js'
+import { ClaudeCodeDriver, StreamJsonParser, claudeCodeReady } from './claude-code.js'
+import { runCliSession, type SpawnLike, type SpawnedProcess, type DriverEvent } from 'agent-driver'
 
 test('StreamJsonParser surfaces assistant text + tool names, keeps the result', () => {
   const p = new StreamJsonParser()
@@ -383,4 +382,39 @@ test('a session that keeps a log names its diary in the agent environment; one w
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
+})
+
+/** Runs one turn on a Claude Code driver with `opts`, and answers the arguments and the environment Claude Code was spawned with. */
+async function spawnedWith(opts: ConstructorParameters<typeof ClaudeCodeDriver>[0]): Promise<{ args: string[]; env: NodeJS.ProcessEnv }> {
+  let seen: { args: string[]; env: NodeJS.ProcessEnv } | undefined
+  const spawn: SpawnLike = (cmd, args, spawnOpts) => ((seen = { args: [...args], env: spawnOpts.env ?? {} }), fakeSpawn([JSON.stringify({ type: 'result', result: 'ok' })])(cmd, args, spawnOpts))
+  const session = await new ClaudeCodeDriver({ ...opts, spawn }).start({ cwd: '/ws' })
+  await session.prompt('go')
+  return seen!
+}
+
+test('ClaudeCodeDriver turns each part of the person\'s setup that is off into Claude Code\'s own switch, and only those', async () => {
+  const none = await spawnedWith({ env: {} })
+  assert.equal(none.env['CLAUDE_CODE_DISABLE_AUTO_MEMORY'], undefined, 'no setup given: Claude Code as it is')
+  assert.ok(!none.args.includes('--setting-sources'))
+  const off = await spawnedWith({ env: {}, extraArgs: ['--x'], personal: { memory: false, connectors: false, skills: false } })
+  assert.equal(off.env['CLAUDE_CODE_DISABLE_AUTO_MEMORY'], '1')
+  assert.equal(off.env['ENABLE_CLAUDEAI_MCP_SERVERS'], 'false')
+  assert.deepEqual(off.args.slice(-3), ['--setting-sources', 'project,local', '--x'], 'the caller\'s own extra args kept')
+  const memory = await spawnedWith({ env: {}, personal: { memory: true, connectors: false, skills: false } })
+  assert.equal(memory.env['CLAUDE_CODE_DISABLE_AUTO_MEMORY'], undefined)
+  assert.equal(memory.env['ENABLE_CLAUDEAI_MCP_SERVERS'], 'false')
+  const connectors = await spawnedWith({ env: {}, personal: { memory: false, connectors: true, skills: false } })
+  assert.equal(connectors.env['CLAUDE_CODE_DISABLE_AUTO_MEMORY'], '1')
+  assert.equal(connectors.env['ENABLE_CLAUDEAI_MCP_SERVERS'], undefined)
+  const skills = await spawnedWith({ env: {}, personal: { memory: false, connectors: false, skills: true } })
+  assert.ok(!skills.args.includes('--setting-sources'))
+})
+
+test('claudeCodeReady asks claude: its JSON login flag, the login command, the install page', async () => {
+  const answer = (auth: string) => (_bin: string, args: readonly string[]) => Promise.resolve({ ok: true, output: args[0] === '--version' ? '2.1.283' : auth })
+  assert.deepEqual(await claudeCodeReady({ isRoot: () => false, probe: answer('{"loggedIn": true}') }), { problems: [], warnings: [] })
+  assert.match((await claudeCodeReady({ isRoot: () => false, probe: answer('{"loggedIn": false}') })).problems[0]!, /claude auth login/)
+  const missing = await claudeCodeReady({ isRoot: () => false, probe: () => Promise.resolve({ ok: false, output: '' }) })
+  assert.match(missing.problems[0]!, /`claude` not found.*claude\.com\/claude-code/)
 })

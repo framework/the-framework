@@ -57,8 +57,40 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
 
+  packages/agent-driver-claude:
+    dependencies:
+      agent-driver:
+        specifier: workspace:*
+        version: link:../agent-driver
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.43
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
+  packages/agent-driver-codex:
+    dependencies:
+      agent-driver:
+        specifier: workspace:*
+        version: link:../agent-driver
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.43
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
   packages/agent-runner:
     dependencies:
+      '@agent-driver/claude':
+        specifier: workspace:*
+        version: link:../agent-driver-claude
+      '@agent-driver/codex':
+        specifier: workspace:*
+        version: link:../agent-driver-codex
       '@gemstack/agent-data':
         specifier: workspace:*
         version: link:../agent-data
@@ -84,6 +116,9 @@ importers:
 
   packages/agent-scheduler:
     dependencies:
+      '@agent-driver/claude':
+        specifier: workspace:*
+        version: link:../agent-driver-claude
       '@gemstack/agent-data':
         specifier: workspace:*
         version: link:../agent-data
@@ -112,6 +147,9 @@ importers:
 
   packages/framework:
     dependencies:
+      '@agent-driver/claude':
+        specifier: workspace:*
+        version: link:../agent-driver-claude
       '@base-ui-components/react':
         specifier: 1.0.0-rc.0
         version: 1.0.0-rc.0(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)

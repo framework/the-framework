@@ -4,7 +4,7 @@ The tool's process side: a run [1] in this process, the same run detached in its
 
 **User story**: the user presses Start in the dashboard and gets the run's id back at once while the agent works in its own process; answers a run's question and gets the same back; picks Claude Code or Codex in the launcher and reads under the prompt box, before the Start, what would stop the run; or types `agent-runner run "/work-queue"` and waits for the outcome in the shell.
 
-**Business logic story**: one run is `run.ts`'s; this file gives it the real project: this machine's host name, the `logs` package's markers, `agent-driver`'s readiness check and its Claude Code and Codex drivers. The processes it spawns are this same executable, `bin/agent-runner`. A scheduler's tick uses two of its pieces: the readiness check, and the spawn of a run whose marker the tick wrote.
+**Business logic story**: one run is `run.ts`'s; this file gives it the real project: this machine's host name, the `logs` package's markers, the readiness check and the driver of each coding agent, from its own package: `@agent-driver/claude` for Claude Code, `@agent-driver/codex` for Codex. The processes it spawns are this same executable, `bin/agent-runner`. A scheduler's tick uses two of its pieces: the readiness check, and the spawn of a run whose marker the tick wrote.
 
 ## Glossary
 
@@ -21,7 +21,7 @@ The tool's process side: a run [1] in this process, the same run detached in its
 - **A detached continuation on demand** - `run --detach --resume <id>`: the run's process spawned to continue it, its id answered at once; the line a dashboard's resume hook runs. A run the project has no record of is refused there and then.
 - **A run in this process** - the id given or minted now, marked already when the id was given, on Claude Code or, with `--driver codex`, on Codex; a follow-up it names runs on the same coding agent, made for the follow-up's own id; a resumed run, and the follow-up its record names, on the coding agent its record names.
 - **Either coding agent, unrestricted** - Claude Code with permissions bypassed, Codex with full access, `AGENT_ID` in the agent's environment: whichever coding agent runs, it pushes its branch and opens its pull request itself.
-- **The person's own setup, left out** - Claude Code starts without the person's own setup, auto-memory (`memory`), claude.ai connectors (`connectors`), and user settings with the skills synced from the claude.ai account, `~/.claude/CLAUDE.md` and `~/.claude/skills` (`skills`); each part comes back when this machine's `.agent-runner/config.yml` turns it on under `personal:`; the project's own instructions, skills and settings always load; Codex is started as it is either way.
+- **The person's own setup, left out** - either coding agent starts without the three parts of the person's own setup, `memory`, `connectors` and `skills`; each part comes back when this machine's `.agent-runner/config.yml` turns it on under `personal:`; the project's own instructions and skills always load; how a part is turned off is the coding agent's driver's business, and a part Codex cannot turn off is a warning before the run.
 - **The model** - the one given, to either coding agent; none given, none is named, on the card or to the coding agent, which starts on its own default.
 
 ## Business logic
@@ -36,7 +36,7 @@ The tool's process side: a run [1] in this process, the same run detached in its
 
 #### Business logic
 
-The answer is `agent-driver`'s readiness for the coding agent named (problems: its CLI not found, or not logged in; a warning: running as root), and nothing more: the project's git host is not probed, since a project with no git host package runs fine, and one whose git host cannot answer says so in the run's own log. A scheduler's tick asks it for Claude Code, the coding agent every scheduled run is on.
+The answer is the readiness check of the coding agent's own driver package (problems: its CLI not found, or not logged in; warnings: running as root, and, for Codex, skills in `~/.agents/skills` while this machine leaves `skills` out, which Codex has no switch for), and nothing more: the project's git host is not probed, since a project with no git host package runs fine, and one whose git host cannot answer says so in the run's own log. A scheduler's tick asks it for Claude Code, the coding agent every scheduled run is on.
 
 ### The detached run
 
@@ -88,19 +88,18 @@ Claude Code is started with permissions bypassed (an unattended run can answer n
 
 #### Context
 
-**User story**: the user's scheduled `/work-queue` does the same job on their laptop as on a teammate's machine: it does not quote the user's memory, try their Gmail connector, or reach for a skill only their claude.ai account has. A user who wants part of their own setup in their runs on one machine writes that part's line under `personal:` in `.agent-runner/config.yml` there (`memory: on`).
+**User story**: the user's scheduled `/work-queue` does the same job on their laptop as on a teammate's machine, on Claude Code or on Codex: it does not quote the user's memory, try their Gmail or Slack connector, or reach for a skill only they have. A user who wants part of their own setup in their runs on one machine writes that part's line under `personal:` in `.agent-runner/config.yml` there (`memory: on`).
 
-**Problem**: Claude Code started by hand loads the person's own setup on top of the project's: its auto-memory for the project, the connectors of their claude.ai account, their user settings with the skills synced from that account and settings such as the effort level, their `~/.claude/CLAUDE.md` and their `~/.claude/skills`. A run started on one machine then does a different job than the same prompt on another.
+**Problem**: a coding agent started by hand loads the person's own setup on top of the project's. Claude Code loads its auto-memory, the connectors of the claude.ai account, the user settings with the skills synced from that account, `~/.claude/CLAUDE.md` and `~/.claude/skills`. Codex loads the apps and plugins of the ChatGPT account, `~/.codex/AGENTS.md`, `~/.codex/skills` and `~/.codex/config.toml`, and its memories when that feature is on. A run started on one machine then does a different job than the same prompt on another.
 
 #### Business logic
 
-Each run, and each resume, reads `personal:` from `.agent-runner/config.yml` (`config.ts`) before it makes its coding agent, and what is wrong in it goes to the run's log (stderr on the command line; nowhere when a program calls without a log); a follow-up gets the same reading. A resume reads it again, so a run resumed after the file changed continues with the new parts. Each part is one switch of Claude Code's, given only while the part is off:
+Each run, and each resume, reads `personal:` from `.agent-runner/config.yml` (`config.ts`) before it makes its coding agent, and what is wrong in it goes to the run's log (stderr on the command line; nowhere when a program calls without a log); a follow-up gets the same reading. A resume reads it again, so a run resumed after the file changed continues with the new parts. The three parts go as they are to the coding agent's driver, which turns each part that is off into its own switches; this tool knows none of them:
 
-- `memory` off: `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` in the environment, so no auto-memory.
-- `connectors` off: `ENABLE_CLAUDEAI_MCP_SERVERS=false` in the environment, so no claude.ai connectors.
-- `skills` off: `--setting-sources project,local` on the command line, so no user settings: no skills synced from the claude.ai account, no `~/.claude/CLAUDE.md` or `~/.claude/skills`, and no personal effort level, model, hooks, `apiKeyHelper` or `env` entries. Claude Code offers no switch for the skills alone, so these go together. A person who logs in through their user settings (an `apiKeyHelper`, an `ANTHROPIC_BASE_URL`) needs `skills: on`: the readiness check probes Claude Code without these switches, so it does not catch that.
+- Claude Code (`@agent-driver/claude`): `memory` off drops the auto-memory, `connectors` off the claude.ai connectors, `skills` off the user settings, which carry the skills synced from the claude.ai account, `~/.claude/CLAUDE.md` and `~/.claude/skills`, and also the personal effort level, model and hooks. A person who logs in through their user settings (an `apiKeyHelper`, an `ANTHROPIC_BASE_URL`) needs `skills: on`.
+- Codex (`@agent-driver/codex`): `memory` off drops Codex's memories, `connectors` off the account's apps and plugins, `skills` off runs Codex from a Codex home of its own, kept on this machine and holding only a link to the person's login, so `~/.codex/AGENTS.md`, `~/.codex/skills` and `~/.codex/config.toml` stay out. Codex keeps its conversations in that home, so a run started with `skills` off is resumed from it; a run resumed after `skills` changed does not find its conversation. Skills in `~/.agents/skills` load whatever the parts say: Codex has no switch for that folder, and the readiness check warns while it holds skills.
 
-A part turned on gets no switch: that part comes from the environment the tool itself was started with, so a variable the person set in that shell still applies. The project's `CLAUDE.md`, its skills, its project and local settings, the MCP servers the run is given, and Claude Code's own built-in skills load whatever the parts say. Whether MCP servers the person added for all their projects (`claude mcp add -s user`) and their `~/.claude/agents` are left out with `skills` off was not tested: the tested machine had neither. Codex is started as it is: its own user files on the tested machine held nothing personal, and a live Codex run could not be tested.
+The project's own instructions (`CLAUDE.md`, `AGENTS.md`), its skills, and each coding agent's built-in skills load whatever the parts say.
 
 ### The model
 

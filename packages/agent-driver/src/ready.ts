@@ -10,9 +10,6 @@ import { execFile } from 'node:child_process'
  * the dead session this exists to prevent.
  */
 
-/** The coding agents this module can ask, by their driver ids. */
-export type ReadyDriver = 'claude-code' | 'codex'
-
 /** What stands in the way of a session: problems stop it, warnings are said and do not. Each line names its own fix. */
 export interface DriverReadiness {
   problems: string[]
@@ -21,49 +18,25 @@ export interface DriverReadiness {
 
 /**
  * Run `<bin> <args>`: whether it succeeded, and everything it said. stdout and stderr merged,
- * since the two CLIs disagree about where a status line belongs.
+ * since CLIs disagree about where a status line belongs.
  */
 export type CliProbe = (bin: string, args: readonly string[]) => Promise<{ ok: boolean; output: string }>
 
-interface CliSpec {
+/** How to ask one coding agent's CLI: what an adapter hands {@link checkCliReady}. */
+export interface CliSpec {
   bin: string
+  /** The fix when the CLI is missing, after "`<bin>` not found — ". */
   install: string
+  /** The arguments that ask the CLI whether it is logged in. */
   authArgs: readonly string[]
   /** Reads the CLI's answer to its login question. `undefined` when it could not say. */
   loggedIn: (result: { ok: boolean; output: string }) => boolean | undefined
+  /** The command that logs the CLI in. */
   login: string
 }
 
-const SPECS: Record<ReadyDriver, CliSpec> = {
-  'claude-code': {
-    bin: 'claude',
-    install: 'install Claude Code and make sure `claude` is on your PATH: https://claude.com/claude-code',
-    authArgs: ['auth', 'status'],
-    // Prints JSON (`{"loggedIn": true, ...}`) and exits 0 either way, so the flag is the answer.
-    // A version too old to know the subcommand prints usage, which reads as "could not say".
-    loggedIn: ({ output }) => {
-      try {
-        const value = (JSON.parse(output) as Record<string, unknown> | null)?.['loggedIn']
-        return typeof value === 'boolean' ? value : undefined
-      } catch {
-        return undefined
-      }
-    },
-    login: 'claude auth login',
-  },
-  codex: {
-    bin: 'codex',
-    install: 'install the Codex CLI and make sure `codex` is on your PATH: https://developers.openai.com/codex/cli',
-    authArgs: ['login', 'status'],
-    // A sentence, not JSON: "Logged in using ChatGPT", or "Not logged in". The negative first,
-    // since it contains the positive.
-    loggedIn: ({ output }) => (/not logged in/i.test(output) ? false : /logged in/i.test(output) ? true : undefined),
-    login: 'codex login',
-  },
-}
-
 export interface DriverReadyOptions {
-  /** The CLI binary to ask. Default the driver's own, on `PATH`. */
+  /** The CLI binary to ask. Default the spec's own, on `PATH`. */
   bin?: string
   /** The probe. Default {@link probeCli}. */
   probe?: CliProbe
@@ -81,8 +54,7 @@ export interface DriverReadyOptions {
  * and every session dies alike, saying nothing about why; but a container runs everything as root
  * legitimately.
  */
-export async function checkDriverReady(driver: ReadyDriver, opts: DriverReadyOptions = {}): Promise<DriverReadiness> {
-  const spec = SPECS[driver]
+export async function checkCliReady(spec: CliSpec, opts: DriverReadyOptions = {}): Promise<DriverReadiness> {
   const bin = opts.bin ?? spec.bin
   const probe = opts.probe ?? probeCli
   const problems: string[] = []

@@ -8,7 +8,7 @@ Drives Claude Code as a driver [1]: each turn [2] is one non-interactive invocat
 - The user revives a finished agent, and its first prompt continues where the earlier conversation left off.
 - The user picks a model for the agent; the dashboard shows the account's quota [8].
 
-**Business logic story**: Claude Code runs on the user's own login, a subscription in the normal case. The Framework holds no model key and passes none: Claude Code authenticates itself, keeps its own loop and its own tools, and The Framework only prompts it and reads what comes back. Running the process, deciding success on its exit code, stopping it and reaping its process tree are the rules of `cli-session.ts`, shared with the Codex driver.
+**Business logic story**: Claude Code runs on the user's own login, a subscription in the normal case. The Framework holds no model key and passes none: Claude Code authenticates itself, keeps its own loop and its own tools, and The Framework only prompts it and reads what comes back. Running the process, deciding success on its exit code, stopping it and reaping its process tree are the rules of `agent-driver`'s `cli-session.ts`, shared with the Codex driver.
 
 ## Glossary
 
@@ -25,10 +25,11 @@ Drives Claude Code as a driver [1]: each turn [2] is one non-interactive invocat
 [11] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [12] stop request: the caller's signal that a driver session, or one turn of it, must end now; the product raises one when the user stops the agent.
 [13] progress event: what a driver reports while a turn runs, for a caller to show and never to decide on: the prompt sent, the session id, streamed text, a tool used, the final result, a rate limit reading, an error, a notice.
+[14] personal setup: the three parts of the person's own setup a coding agent loads when started by hand, by the names every adapter takes: `memory` (what the coding agent remembers across sessions on its own), `connectors` (the apps and accounts linked to the person's login), `skills` (the person's own instructions, skills and settings files).
 
 ## Business logic — TL;DR
 
-- **The shared end of a turn, and the log** - the session attaches the log when the caller asked for one, so every event is recorded before the caller sees it; every turn ends the shared way (`inbox.ts`): the question reported, the inbox drained into further turns of the same session.
+- **The shared end of a turn, and the log** - the session attaches the log when the caller asked for one, so every event is recorded before the caller sees it; every turn ends the shared way (`agent-driver`'s `inbox.ts`): the question reported, the inbox drained into further turns of the same session.
 - **Starting and prompting Claude Code** - every turn [2] spawns `claude` in print mode with streamed JSON output, in the driver session's [3] directory, with the prompt over standard input.
 - **Permission mode** - Claude Code runs with `acceptEdits` unless the driver [1] was configured with another mode, or told to skip permission checks altogether; the product itself chooses `bypassPermissions`.
 - **Framing becomes the system prompt** - the driver session's framing [10] and the turn's extra framing are appended to Claude Code's system prompt, except on a resumed turn, whose conversation already carries them.
@@ -40,6 +41,8 @@ Drives Claude Code as a driver [1]: each turn [2] is one non-interactive invocat
 - **Usage off the result line** - token counts, and the price only when Claude Code reports one, never zero.
 - **Rate limit telemetry** - each rate-limit line becomes a rate limit [6] reading with its status and window passed through verbatim and its reset time converted to milliseconds; a malformed line stays silent.
 - **Reading the account's quota** - the driver reads the quota [8] through `claude-code-quota.ts`, with the same command and environment it runs turns with.
+- **The person's own setup** - each part of the personal setup [14] the caller turns off becomes Claude Code's own switch: `memory` off sets `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`, `connectors` off sets `ENABLE_CLAUDEAI_MCP_SERVERS=false`, `skills` off passes `--setting-sources project,local`; given none, Claude Code loads everything.
+- **Can a session start here** - `claude` asked `--version`, then `auth status`, whose JSON `loggedIn` flag is the answer; every part of the personal setup has a switch, so none is ever a warning.
 - **Ending the driver session** - only the temporary MCP configuration is freed; each turn's process is already gone when the turn ends.
 
 ## Business logic
@@ -52,7 +55,7 @@ See `## Context`.
 
 #### Business logic
 
-Every turn [2] spawns the `claude` command, found on `PATH` unless the driver [1] was configured with another command, as one non-interactive invocation: print mode with streamed JSON output, verbose so that every message is streamed (`-p --output-format stream-json --verbose`). It runs in the driver session's [3] directory, the agent's [7] checkout [11], with the environment of The Framework's own process unless the driver was configured with another; when the driver session keeps a log, that environment also carries `AGENT_DIARY`, the diary's path (the rule of `session-log.ts`). The prompt is fed over standard input, so a long prompt never hits the command-line length limit. Extra command-line arguments the driver was configured with are appended verbatim, last. Spawning, streaming, the exit code, the stop request [12] and the reaping of the process tree follow `cli-session.ts`: a non-zero exit fails the turn even when text streamed first.
+Every turn [2] spawns the `claude` command, found on `PATH` unless the driver [1] was configured with another command, as one non-interactive invocation: print mode with streamed JSON output, verbose so that every message is streamed (`-p --output-format stream-json --verbose`). It runs in the driver session's [3] directory, the agent's [7] checkout [11], with the environment of The Framework's own process unless the driver was configured with another; when the driver session keeps a log, that environment also carries `AGENT_DIARY`, the diary's path (the rule of `agent-driver`'s `session-log.ts`). The prompt is fed over standard input, so a long prompt never hits the command-line length limit. Extra command-line arguments the driver was configured with are appended verbatim, last. Spawning, streaming, the exit code, the stop request [12] and the reaping of the process tree follow `agent-driver`'s `cli-session.ts`: a non-zero exit fails the turn even when text streamed first.
 
 ### Permission mode
 
@@ -127,7 +130,7 @@ Claude Code streams one JSON object per line. A line that is not JSON, or is a J
 - A session id, on its first sighting and whenever it changes, becomes a `session` progress event [13] ahead of everything else on that line. It is announced on the very first line rather than held for the result, so a turn [2] that is stopped or dies mid-flight still leaves the handle needed to resume the driver session [3]. A repeated id is not announced again.
 - An assistant message yields one `text` progress event per text block, which is also accumulated, and one `action` progress event per tool use, carrying the tool's name only.
 - A rate-limit line yields a `rate-limit` progress event (see "Rate limit telemetry").
-- The result line's text is the turn's final message, and its usage [5] is the turn's usage. The `result` progress event itself is reported by `cli-session.ts` once the process has exited successfully, not by the parser.
+- The result line's text is the turn's final message, and its usage [5] is the turn's usage. The `result` progress event itself is reported by `agent-driver`'s `cli-session.ts` once the process has exited successfully, not by the parser.
 
 When the process ends with no result line, the accumulated assistant text stands in as the turn's text.
 
@@ -160,6 +163,34 @@ A rate-limit line becomes a rate limit [6] reading carrying its status and its w
 #### Business logic
 
 On request, the driver [1] reads where the account's quota [8] stands through the reader in `claude-code-quota.ts`, with the same command, environment and process spawner it runs turns [2] with, and with the caller's stop request [12]. The reading is account-wide and needs no driver session [3].
+
+### The person's own setup
+
+#### Context
+
+**User story**: the user's scheduled runs on Claude Code do the same job on every machine: they do not quote the user's memory, try their Gmail connector, or reach for a skill only their claude.ai account has, unless this machine turns that part on.
+
+**Business logic story**: the caller (the runner, `packages/agent-runner`) says which parts of the personal setup [14] to load; this driver alone knows how Claude Code turns each off. Each switch was checked against Claude Code's own start line (Claude Code 2.1.283).
+
+#### Business logic
+
+A driver given a personal setup turns each part that is off into one switch, and gives none for a part that is on, so that part follows the environment the driver was given:
+
+- `memory` off: `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` in the environment, so no auto-memory (the notes Claude Code keeps for the project; not `~/.claude/CLAUDE.md`).
+- `connectors` off: `ENABLE_CLAUDEAI_MCP_SERVERS=false` in the environment, so no connectors of the claude.ai account.
+- `skills` off: `--setting-sources project,local` on the command line, ahead of any extra arguments the driver was configured with, so no user settings: no skills synced from the claude.ai account, no `~/.claude/CLAUDE.md` or `~/.claude/skills`, and no personal effort level, model, hooks, `apiKeyHelper` or `env` entries. Claude Code offers no switch for the skills alone, so these go together; a person who logs in through their user settings needs `skills` on. Whether MCP servers added for all projects (`claude mcp add -s user`) and `~/.claude/agents` go too was not tested.
+
+A driver given no personal setup adds none of these, and Claude Code loads everything. The project's `CLAUDE.md`, its skills, its project and local settings, the MCP servers the driver was configured with, and Claude Code's built-in skills load either way.
+
+### Can a session start here
+
+#### Context
+
+**User story**: the user picks Claude Code in the dashboard's launcher, and a missing or logged-out `claude` is said under the prompt box before the Start.
+
+#### Business logic
+
+The readiness check (`agent-driver`'s `ready.ts`) asks `claude --version`, then `claude auth status`. That prints JSON and exits 0 whether logged in or not, so its `loggedIn` flag is the answer and the exit code is not; output that is not JSON with a true/false `loggedIn` (an older CLI printing its usage) is "could not say" and passes. A missing CLI is "`claude` not found — install Claude Code and make sure `claude` is on your PATH: https://claude.com/claude-code"; a logged-out one is "`claude` is not logged in. Run `claude auth login`, then start again." Every part of the personal setup [14] has a switch, so this driver adds no warning of its own.
 
 ### Ending the driver session
 

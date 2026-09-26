@@ -99,7 +99,7 @@ const COMMANDS: Record<string, Command> = {
     // A person's run is refused before it spends a checkout when its coding agent cannot start;
     // a scheduler asks the same before it marks, and a resumed run's agent already ran once here.
     if (values.resume === undefined && values.id === undefined) {
-      const ready = await readyToRun(driver ?? 'claude-code')
+      const ready = await readyToRun(repo, driver ?? 'claude-code')
       if (ready.problems.length > 0) throw new Refused({ ok: false, reason: 'not-ready', ...ready }, ready.problems.join(' '))
     }
     const then = values.then !== undefined ? { then: values.then.trim() } : {}
@@ -144,8 +144,8 @@ const COMMANDS: Record<string, Command> = {
     const { values } = parse(args, { driver: { type: 'string' } }, 0)
     const driver = values.driver ?? 'claude-code'
     if (!isDriverName(driver)) throw new Usage(`unknown driver "${driver}"; the drivers are ${DRIVER_NAMES.join(' and ')}`)
-    await project(io.cwd, git)
-    return { ok: true, ...(await readyToRun(driver)) }
+    const repo = await project(io.cwd, git)
+    return { ok: true, ...(await readyToRun(repo, driver)) }
   },
 
   async init(args, io, git) {

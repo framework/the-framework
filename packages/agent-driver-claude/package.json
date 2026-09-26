@@ -1,12 +1,12 @@
 {
-  "name": "agent-driver",
+  "name": "@agent-driver/claude",
   "version": "0.0.1",
-  "description": "The contract for driving a coding-agent CLI as a black box: start a session in a directory, prompt it for one full turn, stream what it does, resume it later; the pieces every adapter shares, and a scripted fake for tests. Adapters ship as @agent-driver/<agent>.",
+  "description": "Claude Code behind the agent-driver contract: on this machine, and on a GitHub Actions runner; plus the reader of the account's quota.",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/framework/the-framework.git",
-    "directory": "packages/agent-driver"
+    "directory": "packages/agent-driver-claude"
   },
   "type": "module",
   "engines": {
@@ -22,10 +22,13 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
-    "typecheck": "tsc --noEmit",
+    "build": "pnpm -C ../agent-driver build && tsc -p tsconfig.build.json",
+    "typecheck": "pnpm -C ../agent-driver build && tsc --noEmit",
     "test": "pnpm build && tsc -p tsconfig.test.json && node --test --test-timeout=60000 'dist-test/**/*.test.js'",
     "clean": "rm -rf dist dist-test"
+  },
+  "dependencies": {
+    "agent-driver": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

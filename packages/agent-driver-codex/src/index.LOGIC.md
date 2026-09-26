@@ -1,0 +1,1 @@
+The package's public entry point: the Codex driver with its driver session, its output parser and its option types (the sandbox, the person's own setup, the Codex home it runs from with `skills` off), the readiness check for Codex with its options, and the default place of that Codex home on this machine.

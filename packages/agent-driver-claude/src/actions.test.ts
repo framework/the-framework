@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { ActionsDriver, replayTranscript, type FetchLike } from './actions.js'
-import type { Driver, DriverEvent } from './types.js'
+import type { Driver, DriverEvent } from 'agent-driver'
 
 /**
  * A real `claude-code-action@v1` `execution_file`, trimmed: the same SDKMessage objects the

@@ -1,7 +1,11 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
+import { mkdir, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { findRun } from '@gemstack/skill-logs'
-import { CodexDriver, FakeDriver, type Driver } from 'agent-driver'
+import { FakeDriver, type Driver } from 'agent-driver'
+import { ClaudeCodeDriver } from '@agent-driver/claude'
+import { CodexDriver } from '@agent-driver/codex'
 import { runCommand } from './run.js'
 import { detachResume, detachRun, driverFor, readyToRun, resumeArgs, resumeProject, runArgs } from './runner.js'
 import { removeRepo, testRepo } from './test-repo.js'
@@ -68,38 +72,19 @@ test('run --detach on Codex: the marker and the spawned run name Codex, and no m
   }
 })
 
-test('a run\'s Codex has full access and the run\'s id in its environment, as its Claude Code has', () => {
-  const codex = driverFor('codex', 'run-1', { memory: false, connectors: false, skills: false })
+test('a run\'s coding agent is unrestricted, has the run\'s id, and gets this machine\'s setup parts as they are', () => {
+  const personal = { memory: true, connectors: false, skills: false }
+  const optsOf = (driver: Driver) => (driver as unknown as { opts: { sandbox?: string; permissionMode?: string; env?: NodeJS.ProcessEnv; personal?: unknown } }).opts
+  const codex = driverFor('codex', 'run-1', personal)
   assert.ok(codex instanceof CodexDriver)
-  const opts = (codex as unknown as { opts: { sandbox?: string; env?: NodeJS.ProcessEnv } }).opts
-  assert.equal(opts.sandbox, 'danger-full-access')
-  assert.equal(opts.env?.['AGENT_ID'], 'run-1')
-  assert.equal(driverFor('claude-code', 'run-1', { memory: false, connectors: false, skills: false }).id, 'claude-code')
-})
-
-test('a run\'s Claude Code leaves each part of the person\'s own setup out, unless this machine turns it on', () => {
-  // A part turned on gives no switch; the variables must not come from the shell running the tests.
-  delete process.env['CLAUDE_CODE_DISABLE_AUTO_MEMORY']
-  delete process.env['ENABLE_CLAUDEAI_MCP_SERVERS']
-  const optsOf = (driver: Driver) => (driver as unknown as { opts: { permissionMode?: string; env?: NodeJS.ProcessEnv; extraArgs?: string[] } }).opts
-  const clean = optsOf(driverFor('claude-code', 'run-1', { memory: false, connectors: false, skills: false }))
-  assert.equal(clean.permissionMode, 'bypassPermissions')
-  assert.equal(clean.env?.['AGENT_ID'], 'run-1')
-  assert.equal(clean.env?.['CLAUDE_CODE_DISABLE_AUTO_MEMORY'], '1')
-  assert.equal(clean.env?.['ENABLE_CLAUDEAI_MCP_SERVERS'], 'false')
-  assert.deepEqual(clean.extraArgs, ['--setting-sources', 'project,local'])
-  const memory = optsOf(driverFor('claude-code', 'run-1', { memory: true, connectors: false, skills: false }))
-  assert.equal(memory.env?.['CLAUDE_CODE_DISABLE_AUTO_MEMORY'], undefined)
-  assert.equal(memory.env?.['ENABLE_CLAUDEAI_MCP_SERVERS'], 'false')
-  assert.deepEqual(memory.extraArgs, ['--setting-sources', 'project,local'])
-  const connectors = optsOf(driverFor('claude-code', 'run-1', { memory: false, connectors: true, skills: false }))
-  assert.equal(connectors.env?.['CLAUDE_CODE_DISABLE_AUTO_MEMORY'], '1')
-  assert.equal(connectors.env?.['ENABLE_CLAUDEAI_MCP_SERVERS'], undefined)
-  assert.deepEqual(connectors.extraArgs, ['--setting-sources', 'project,local'])
-  const skills = optsOf(driverFor('claude-code', 'run-1', { memory: false, connectors: false, skills: true }))
-  assert.equal(skills.env?.['CLAUDE_CODE_DISABLE_AUTO_MEMORY'], '1')
-  assert.equal(skills.env?.['ENABLE_CLAUDEAI_MCP_SERVERS'], 'false')
-  assert.equal(skills.extraArgs, undefined)
+  assert.equal(optsOf(codex).sandbox, 'danger-full-access')
+  assert.equal(optsOf(codex).env?.['AGENT_ID'], 'run-1')
+  assert.deepEqual(optsOf(codex).personal, personal)
+  const claude = driverFor('claude-code', 'run-1', personal)
+  assert.ok(claude instanceof ClaudeCodeDriver)
+  assert.equal(optsOf(claude).permissionMode, 'bypassPermissions')
+  assert.equal(optsOf(claude).env?.['AGENT_ID'], 'run-1')
+  assert.deepEqual(optsOf(claude).personal, personal)
 })
 
 test('a resumed run continues on the tool its record names, and a Codex run with no model resumes with none', async () => {
@@ -138,10 +123,32 @@ test('ready to run: the coding agent\'s problems stop a run; nothing else is pro
     probed.push(bin)
     return { ok: true, output: args[0] === '--version' ? '2.1.0' : JSON.stringify({ loggedIn }) }
   }
-  assert.deepEqual(await readyToRun('claude-code', { probe: answers(true), isRoot: notRoot }), { problems: [], warnings: [] })
-  assert.deepEqual(await readyToRun('codex', { probe: answers(true), isRoot: notRoot }), { problems: [], warnings: [] })
+  const repo = await testRepo()
+  try {
+    assert.deepEqual(await readyToRun(repo, 'claude-code', { probe: answers(true), isRoot: notRoot }), { problems: [], warnings: [] })
+    assert.deepEqual(await readyToRun(repo, 'codex', { probe: answers(true), isRoot: notRoot, agentsSkills: join(repo, 'no-such-dir') }), { problems: [], warnings: [] })
   assert.ok(probed.every(bin => bin === 'claude' || bin === 'codex'), `only the coding agent's CLI is asked, not ${probed.join(', ')}`)
 
-  const out = await readyToRun('claude-code', { probe: answers(false), isRoot: notRoot })
-  assert.match(out.problems[0]!, /claude auth login/)
+    const out = await readyToRun(repo, 'claude-code', { probe: answers(false), isRoot: notRoot })
+    assert.match(out.problems[0]!, /claude auth login/)
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test('ready to run on Codex: skills in ~/.agents/skills are a warning while this machine leaves skills out, and not once it turns them on', async () => {
+  const repo = await testRepo()
+  try {
+    const agentsSkills = join(repo, 'agents-skills')
+    await mkdir(join(agentsSkills, 'my-skill'), { recursive: true })
+    const deps = { probe: async (_bin: string, args: readonly string[]) => ({ ok: true, output: args[0] === '--version' ? '0.144.4' : 'Logged in' }), isRoot: () => false, agentsSkills }
+    const out = await readyToRun(repo, 'codex', deps)
+    assert.deepEqual(out.problems, [])
+    assert.match(out.warnings[0]!, /no switch/)
+    await mkdir(join(repo, '.agent-runner'), { recursive: true })
+    await writeFile(join(repo, '.agent-runner', 'config.yml'), 'personal:\n  skills: on\n')
+    assert.deepEqual((await readyToRun(repo, 'codex', deps)).warnings, [])
+  } finally {
+    await removeRepo(repo)
+  }
 })

@@ -3,7 +3,7 @@ import { closeSync, mkdirSync, openSync } from 'node:fs'
 import { hostname } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { readClaudeQuota } from 'agent-driver'
+import { readClaudeQuota } from '@agent-driver/claude'
 import { isPidAlive, markerCard, readyToRun, runIdFrom, spawnRun, sweep, withdrawMarker, writeMarker } from 'agent-runner'
 import { DATA_BRANCH, nodeGitRunner, pullFileBranch, type GitRunner } from '@gemstack/agent-data'
 import { CHECK_TIMEOUT_MS, SCHEDULER_LOG, TICK_MS } from './names.js'
@@ -41,7 +41,7 @@ export async function tickProject(repo: string, opts: { git?: GitRunner; log?: (
     check: shell => runCheck(repo, shell, CHECK_TIMEOUT_MS),
     lastStart: command => lastStart(repo, command, schedule),
     inFlight: command => inFlight(repo, command, schedule),
-    ready: () => readyToRun('claude-code'),
+    ready: () => readyToRun(repo, 'claude-code'),
     quota: () => readClaudeQuota({ cwd: repo }),
     mint: () => runIdFrom(now().toISOString()),
     writeMarker: card => writeMarker(repo, card),

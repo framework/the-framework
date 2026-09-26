@@ -1,13 +1,12 @@
 import { strict as assert } from 'node:assert'
 import { execFileSync } from 'node:child_process'
-import { mkdtemp, realpath, rm } from 'node:fs/promises'
+import { lstat, mkdir, mkdtemp, readFile, readlink, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { Readable, Writable } from 'node:stream'
-import { CodexDriver, CodexJsonParser, parseCodexUsage } from './codex.js'
-import type { SpawnLike, SpawnedProcess } from './cli-session.js'
-import type { Driver, DriverEvent } from './types.js'
+import { CodexDriver, CodexJsonParser, codexReady, defaultCodexHome, parseCodexUsage } from './codex.js'
+import type { SpawnLike, SpawnedProcess, Driver, DriverEvent } from 'agent-driver'
 
 /** A real codex-cli 0.144.4 run, verbatim: "Create a file hello.txt containing exactly: hi". */
 const REAL_RUN = [
@@ -254,4 +253,87 @@ test('CodexDriver fails the turn on a non-zero exit (#539)', async () => {
   const session = await driver.start({ cwd: '/ws' })
   // A crash mid-build must not pass as a result, even though text streamed first.
   await assert.rejects(() => session.prompt('go'), /codex exited \(1\)/)
+})
+
+/** Runs one turn on a Codex driver with `opts`, and answers the arguments and the environment Codex was spawned with. */
+async function spawnedWith(opts: ConstructorParameters<typeof CodexDriver>[0]): Promise<{ args: readonly string[]; env: NodeJS.ProcessEnv }> {
+  let seen: { args: readonly string[]; env: NodeJS.ProcessEnv } | undefined
+  const inner = fakeSpawn(REAL_RUN)
+  const spawn: SpawnLike = (command, args, spawnOpts) => ((seen = { args, env: spawnOpts.env ?? {} }), inner(command, args, spawnOpts))
+  const session = await new CodexDriver({ ...opts, spawn }).start({ cwd: '/ws' })
+  await session.prompt('go')
+  return seen!
+}
+
+test('CodexDriver given no setup parts runs Codex as it is, in the person\'s own home', async () => {
+  const { args, env } = await spawnedWith({ env: { PATH: '/bin' } })
+  assert.ok(!args.some(arg => arg.startsWith('features.')))
+  assert.equal(env['CODEX_HOME'], undefined)
+})
+
+test('CodexDriver turns memory and connectors off with Codex\'s own feature switches, each alone', async () => {
+  const both = await spawnedWith({ env: {}, personal: { memory: false, connectors: false, skills: true } })
+  assert.deepEqual(both.args.filter((_, i, all) => all[i - 1] === '-c' && all[i]!.startsWith('features.')), ['features.memories=false', 'features.apps=false', 'features.plugins=false'])
+  assert.equal(both.env['CODEX_HOME'], undefined, 'skills on: the person\'s own home')
+  const memoryOn = await spawnedWith({ env: {}, personal: { memory: true, connectors: false, skills: true } })
+  assert.ok(!memoryOn.args.includes('features.memories=false'))
+  assert.ok(memoryOn.args.includes('features.plugins=false'))
+  const connectorsOn = await spawnedWith({ env: {}, personal: { memory: false, connectors: true, skills: true } })
+  assert.ok(connectorsOn.args.includes('features.memories=false'))
+  assert.ok(!connectorsOn.args.includes('features.apps=false') && !connectorsOn.args.includes('features.plugins=false'))
+})
+
+test('CodexDriver with skills off runs from a kept home that holds only a link to the person\'s login', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'codex-home-'))
+  try {
+    const personal = join(dir, 'personal')
+    const home = join(dir, 'state', 'codex-home')
+    await mkdir(personal)
+    await writeFile(join(personal, 'auth.json'), '{}')
+    const first = await spawnedWith({ env: { CODEX_HOME: personal }, codexHome: home, personal: { memory: true, connectors: true, skills: false } })
+    assert.equal(first.env['CODEX_HOME'], home)
+    assert.ok((await lstat(join(home, 'auth.json'))).isSymbolicLink())
+    assert.equal(await readlink(join(home, 'auth.json')), join(personal, 'auth.json'))
+    // What Codex saved there (its conversations) stays for the resume; a link pointing elsewhere is put back.
+    await writeFile(join(home, 'session.jsonl'), 'kept')
+    await rm(join(home, 'auth.json'))
+    await writeFile(join(home, 'auth.json'), 'a stale copy')
+    await spawnedWith({ env: { CODEX_HOME: personal }, codexHome: home, personal: { memory: true, connectors: true, skills: false } })
+    assert.equal(await readlink(join(home, 'auth.json')), join(personal, 'auth.json'))
+    assert.equal(await readFile(join(home, 'session.jsonl'), 'utf8'), 'kept')
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('the kept Codex home is under the state directory', () => {
+  assert.equal(defaultCodexHome({ XDG_STATE_HOME: '/state' }), '/state/agent-driver/codex-home')
+})
+
+test('codexReady asks codex, and warns about ~/.agents/skills only when skills are off and it holds some', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'agents-skills-'))
+  try {
+    const probed: string[] = []
+    const probe = (bin: string, args: readonly string[]) => (probed.push(bin), Promise.resolve({ ok: true, output: args[0] === '--version' ? '0.144.4' : 'Logged in using ChatGPT' }))
+    const base = { probe, isRoot: () => false, agentsSkills: dir }
+    assert.deepEqual(await codexReady({ ...base, personal: { memory: false, connectors: false, skills: false } }), { problems: [], warnings: [] }, 'an empty folder')
+    await mkdir(join(dir, 'my-skill'))
+    const off = await codexReady({ ...base, personal: { memory: false, connectors: false, skills: false } })
+    assert.deepEqual(off.problems, [])
+    assert.equal(off.warnings.length, 1)
+    assert.match(off.warnings[0]!, /no switch/)
+    assert.ok(off.warnings[0]!.includes(dir))
+    assert.deepEqual((await codexReady({ ...base, personal: { memory: false, connectors: false, skills: true } })).warnings, [], 'skills on: nothing to warn about')
+    assert.deepEqual((await codexReady(base)).warnings, [], 'no setup given: Codex as it is')
+    assert.ok(probed.every(bin => bin === 'codex'))
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('codexReady reads "Not logged in" as no, also off stderr, and a missing codex points at its install', async () => {
+  const out = await codexReady({ isRoot: () => false, probe: (_bin, args) => Promise.resolve(args[0] === '--version' ? { ok: true, output: '0.144.4' } : { ok: false, output: 'Not logged in' }) })
+  assert.match(out.problems[0]!, /codex login/)
+  const missing = await codexReady({ isRoot: () => false, probe: () => Promise.resolve({ ok: false, output: '' }) })
+  assert.match(missing.problems[0]!, /`codex` not found.*openai\.com\/codex/)
 })

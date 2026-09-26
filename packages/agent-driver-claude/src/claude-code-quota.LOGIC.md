@@ -84,4 +84,4 @@ A `claude` command that cannot be started at all, because it is not installed or
 
 #### Business logic
 
-Of the reasons this reader yields, `fetch-failed`, `timeout` and `unrecognized` describe one attempt: the account may well have a quota [1], and asking again may work. `agent-not-found` and `no-subscription` describe the setup: the install or the login itself, which no retry changes. The split is fixed in `types.ts`.
+Of the reasons this reader yields, `fetch-failed`, `timeout` and `unrecognized` describe one attempt: the account may well have a quota [1], and asking again may work. `agent-not-found` and `no-subscription` describe the setup: the install or the login itself, which no retry changes. The split is fixed in `agent-driver`'s `types.ts`.

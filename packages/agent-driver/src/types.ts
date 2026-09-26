@@ -48,6 +48,19 @@ export interface Driver {
   readQuota?(opts?: { signal?: AbortSignal }): Promise<DriverQuota>
 }
 
+/** The parts of the person's own setup a coding agent can load, by the names every adapter takes. */
+export const PERSONAL_PARTS = ['memory', 'connectors', 'skills'] as const
+
+/**
+ * Which parts of the person's own setup a coding agent loads: `true` loads the part, `false`
+ * keeps it out. `memory` is what the agent remembers across sessions on its own; `connectors` are
+ * the apps and accounts linked to the person's login; `skills` are the person's own instructions,
+ * skills and settings files. Every adapter takes the same three and turns each off with its own
+ * switches; a part an adapter cannot turn off is a warning in its readiness check, never a
+ * silent "off". An adapter given none loads everything, as its CLI does on its own.
+ */
+export type PersonalSetup = Record<(typeof PERSONAL_PARTS)[number], boolean>
+
 /** How to boot a {@link DriverSession}. */
 export interface DriverStartOptions {
   /** Absolute path to the workspace the agent reads and edits. */

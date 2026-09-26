@@ -1,10 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { StreamJsonParser } from './claude-code.js'
 import { readZip } from './actions-zip.js'
-import { combineFraming, makeEmit } from './session-support.js'
-import { finishTurn } from './inbox.js'
-import { attachLog, type SessionLog } from './session-log.js'
-import type { Driver, DriverEvent, DriverPromptOptions, DriverSession, DriverStartOptions, DriverTurn } from './types.js'
+import { combineFraming, makeEmit, finishTurn, attachLog, type SessionLog, type Driver, type DriverEvent, type DriverPromptOptions, type DriverSession, type DriverStartOptions, type DriverTurn } from 'agent-driver'
 
 /**
  * A {@link Driver} that runs the agent on **GitHub Actions** instead of on this

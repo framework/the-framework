@@ -6,7 +6,7 @@ Drives Codex as a driver [1]: each turn [2] is one non-interactive invocation of
 - The user picks Codex as the driver [1] and starts an agent [7]; the agent view shows what Codex says and which kinds of work it does, turn [2] by turn.
 - The user picks a model for the agent; the dashboard shows what the agent spent in tokens, and no price.
 
-**Business logic story**: Codex runs on the user's own ChatGPT login, a subscription in the normal case. The Framework holds no model key and passes none: Codex authenticates itself, keeps its own loop and its own tools, and The Framework only prompts it and reads what comes back. Running the process, deciding success on its exit code, stopping it and reaping its process tree are the rules of `cli-session.ts`, shared with the Claude Code driver. A turn has no time limit of its own.
+**Business logic story**: Codex runs on the user's own ChatGPT login, a subscription in the normal case. The Framework holds no model key and passes none: Codex authenticates itself, keeps its own loop and its own tools, and The Framework only prompts it and reads what comes back. Running the process, deciding success on its exit code, stopping it and reaping its process tree are the rules of `agent-driver`'s `cli-session.ts`, shared with the Claude Code driver. A turn has no time limit of its own.
 
 ## Glossary
 
@@ -22,10 +22,12 @@ Drives Codex as a driver [1]: each turn [2] is one non-interactive invocation of
 [10] framing: the standing instructions a caller gives a driver session, plus any extra instructions for one turn; the driver delivers them as the coding agent's system prompt, or ahead of the prompt when the coding agent has no system prompt flag.
 [11] live chat: the user's own messages to a running agent, each continuing the same driver session. One of them is a message.
 [12] progress event: what a driver reports while a turn runs, for a caller to show and never to decide on: the prompt sent, the session id, streamed text, a tool used, the final result, a rate limit reading, an error, a notice.
+[13] personal setup: the three parts of the person's own setup a coding agent loads when started by hand, by the names every adapter takes: `memory` (what the coding agent remembers across sessions on its own), `connectors` (the apps and accounts linked to the person's login), `skills` (the person's own instructions, skills and settings files).
+[14] Codex home: the folder Codex reads the person's login, instructions, skills, configuration and memories from, and saves its conversations in: `~/.codex` unless `CODEX_HOME` names another.
 
 ## Business logic — TL;DR
 
-- **The shared end of a turn, and the log** - the session attaches the log when the caller asked for one, so every event is recorded before the caller sees it; every turn ends the shared way (`inbox.ts`): the question reported, the inbox drained into further turns of the same session.
+- **The shared end of a turn, and the log** - the session attaches the log when the caller asked for one, so every event is recorded before the caller sees it; every turn ends the shared way (`agent-driver`'s `inbox.ts`): the question reported, the inbox drained into further turns of the same session.
 - **Starting and prompting Codex** - every turn [2] spawns `codex` in its non-interactive mode with streamed JSON output, pointed at the driver session's [3] directory, with the prompt over standard input.
 - **Sandboxed to the directory** - Codex runs under its `workspace-write` sandbox unless the driver [1] was configured with `read-only` or `danger-full-access`; under `workspace-write` the directory's git repository data is writable too, so the coding agent [4] can commit; the flag that bypasses Codex's approvals and sandbox is never passed.
 - **Framing rides ahead of the prompt** - Codex has no system prompt flag, so the driver session's framing [10] and the turn's extra framing are placed in front of the prompt, as their own block.
@@ -34,6 +36,8 @@ Drives Codex as a driver [1]: each turn [2] is one non-interactive invocation of
 - **What is read off the streamed output** - the thread id as the session id, announced at once as a `session` progress event, each completed message as streamed text with the last one as the turn's answer, and each started work item as a tool use named by its kind, with everything else ignored.
 - **Usage: tokens, never a price** - Codex's token counts are reported with the cached part split out of its inclusive input total, and no price, never zero.
 - **No quota reading** - the driver reports no quota [6] at all rather than a made-up number.
+- **The person's own setup** - each part of the personal setup [13] the caller turns off becomes Codex's own switch: `memory` off is `features.memories=false`, `connectors` off is `features.apps=false` and `features.plugins=false`, `skills` off runs Codex from a Codex home [14] of its own, kept on this machine and holding only a link to the person's login; given none, Codex loads everything.
+- **Can a session start here** - `codex` asked `--version`, then `login status`, read as a sentence; with `skills` off, skills in `~/.agents/skills` are a warning, since Codex has no switch for that folder.
 - **Ending the driver session** - nothing is freed; each turn's process is already gone when the turn ends.
 
 ## Business logic
@@ -46,7 +50,7 @@ See `## Context`.
 
 #### Business logic
 
-Every turn [2] spawns the `codex` command, found on `PATH` unless the driver [1] was configured with another command, as one non-interactive invocation with one JSON event per output line (`codex exec --json`). Codex is pointed at the driver session's [3] directory, the agent's [7] checkout [8], which is also the process's working directory, and it is told to skip its own git repository check, because Codex otherwise refuses to run in a directory that is not a git repository and a directory may legitimately not be one yet. The process runs with the environment of The Framework's own process unless the driver was configured with another; when the driver session keeps a log, that environment also carries `AGENT_DIARY`, the diary's path (the rule of `session-log.ts`). The prompt is fed over standard input, never as an argument, so a long prompt never hits the command-line length limit. Extra command-line arguments the driver was configured with are appended verbatim, last. Spawning, streaming, the exit code, the stop request [9] and the reaping of the process tree follow `cli-session.ts`: a non-zero exit fails the turn even when text streamed first.
+Every turn [2] spawns the `codex` command, found on `PATH` unless the driver [1] was configured with another command, as one non-interactive invocation with one JSON event per output line (`codex exec --json`). Codex is pointed at the driver session's [3] directory, the agent's [7] checkout [8], which is also the process's working directory, and it is told to skip its own git repository check, because Codex otherwise refuses to run in a directory that is not a git repository and a directory may legitimately not be one yet. The process runs with the environment of The Framework's own process unless the driver was configured with another; when the driver session keeps a log, that environment also carries `AGENT_DIARY`, the diary's path (the rule of `agent-driver`'s `session-log.ts`). The prompt is fed over standard input, never as an argument, so a long prompt never hits the command-line length limit. Extra command-line arguments the driver was configured with are appended verbatim, last. Spawning, streaming, the exit code, the stop request [9] and the reaping of the process tree follow `agent-driver`'s `cli-session.ts`: a non-zero exit fails the turn even when text streamed first.
 
 ### Sandboxed to the directory
 
@@ -108,7 +112,7 @@ Codex streams one JSON object per line. A line that is not JSON, such as a banne
 - The line closing the turn carries the usage [5] (see "Usage: tokens, never a price").
 - Everything else, including the line that opens the turn and the completion of a work item, is ignored.
 
-The `result` progress event itself is reported by `cli-session.ts` once the process has exited successfully, not by the parser.
+The `result` progress event itself is reported by `agent-driver`'s `cli-session.ts` once the process has exited successfully, not by the parser.
 
 ### Usage: tokens, never a price
 
@@ -132,6 +136,38 @@ The usage [5] reported for a turn [2] carries token counts and no price. Codex's
 
 The Codex driver [1] offers no quota [6] reading at all. A caller that finds none does not gate Codex agents [7] on a quota.
 
+### The person's own setup
+
+#### Context
+
+**User story**: the user's scheduled runs on Codex do the same job on every machine: they do not follow the user's own `AGENTS.md`, reach for a skill only they have, or use the Slack or Notion app of their ChatGPT account, unless this machine turns that part on. The user sets nothing up for it beyond logging in to Codex once.
+
+**Business logic story**: the caller (the runner, `packages/agent-runner`) says which parts of the personal setup [13] to load; this driver alone knows how Codex turns each off. Each switch was checked with real runs of codex-cli 0.144.4.
+
+#### Business logic
+
+A driver given a personal setup turns each part that is off into Codex's own switches, and gives none for a part that is on:
+
+- `memory` off: `-c features.memories=false` on the command line, so no memories. The feature is off by default; the switch keeps it off where a person turned it on.
+- `connectors` off: `-c features.apps=false -c features.plugins=false`, so none of the apps and plugins of the ChatGPT account (Slack, Notion, Figma and the like), which Codex otherwise loads whatever its home.
+- `skills` off: Codex runs with `CODEX_HOME` naming a Codex home [14] of the driver's own instead of the person's, so the person's `~/.codex/AGENTS.md`, `~/.codex/skills` and `~/.codex/config.toml` stay out. That home is `$XDG_STATE_HOME/agent-driver/codex-home` (`~/.local/state/agent-driver/codex-home` when the variable is unset) unless the driver was given another, and is made when a driver session starts: created when missing, holding a link named `auth.json` to the person's own login (`auth.json` in `CODEX_HOME`, else `~/.codex`), the link put back when it is missing or points elsewhere. It is kept, never a temporary folder: Codex saves its conversations in its home, so a session resumed with `skills` off finds the conversation it started there, and a conversation started with `skills` on is not found with `skills` off, nor the other way round. Codex writes a refreshed login through the link into the person's own file, so the person and the runs stay logged in as one. Codex's built-in skills load there as anywhere.
+
+Skills in `~/.agents/skills` load whatever the parts say: Codex reads that folder from the person's home directory, and changing the home directory would also move git's and `gh`'s own credentials. The readiness check warns about it (see "Can a session start here").
+
+A driver given no personal setup adds none of these, and Codex loads everything. The project's `AGENTS.md` and its skills load either way.
+
+### Can a session start here
+
+#### Context
+
+**User story**: the user picks Codex in the dashboard's launcher, and a missing or logged-out `codex`, or a personal skill a run cannot keep out, is said under the prompt box before the Start.
+
+#### Business logic
+
+The readiness check (`agent-driver`'s `ready.ts`) asks `codex --version`, then `codex login status`. That answers in a sentence: "not logged in" (any case) is no, checked first because it contains the positive; "logged in" is yes; anything else is "could not say" and passes. A missing CLI is "`codex` not found — install the Codex CLI and make sure `codex` is on your PATH: https://developers.openai.com/codex/cli"; a logged-out one is "`codex` is not logged in. Run `codex login`, then start again."
+
+When the caller's personal setup [13] has `skills` off and `~/.agents/skills` (or the folder the caller names) holds anything not starting with a dot, the answer carries the warning "Codex loads your skills in <folder> even with `skills` off: it has no switch for that folder. Move them out to keep them out of runs." A missing or empty folder, `skills` on, or no personal setup given adds nothing.
+
 ### Ending the driver session
 
 #### Context
@@ -140,4 +176,4 @@ See `## Context`.
 
 #### Business logic
 
-Ending a driver session [3] frees nothing: each turn's [2] process is spawned and reaped by that turn, so nothing durable is held. Ending twice is safe. While the driver session lives, the caller may read a file the coding agent [4] produced, by path relative to the driver session's directory (`session-support.ts`).
+Ending a driver session [3] frees nothing: each turn's [2] process is spawned and reaped by that turn, so nothing durable is held. Ending twice is safe. While the driver session lives, the caller may read a file the coding agent [4] produced, by path relative to the driver session's directory (`agent-driver`'s `session-support.ts`).

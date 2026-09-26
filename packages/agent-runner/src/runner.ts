@@ -3,9 +3,11 @@ import { closeSync, mkdirSync, openSync } from 'node:fs'
 import { hostname } from 'node:os'
 import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { ClaudeCodeDriver, CodexDriver, checkDriverReady, probeCli, type CliProbe, type Driver, type DriverReadiness } from 'agent-driver'
+import { probeCli, type CliProbe, type Driver, type DriverReadiness, type PersonalSetup } from 'agent-driver'
+import { ClaudeCodeDriver, claudeCodeReady } from '@agent-driver/claude'
+import { CodexDriver, codexReady } from '@agent-driver/codex'
 import { findRun } from '@gemstack/skill-logs'
-import { readPersonal, type PersonalSetup } from './config.js'
+import { readPersonal } from './config.js'
 import { markerCard, writeMarker } from './records.js'
 import { resumeRun, runCommand, runIdFrom, type RunOutcome } from './run.js'
 import { acquireRunLock, handOverRunLock, isPidAlive, releaseRunLock, runStderrPath } from './run-lock.js'
@@ -33,13 +35,19 @@ export function isDriverName(name: string): name is DriverName {
 /**
  * Whether a run on `driver` can start on this machine, asked before it spends a checkout: the
  * coding agent's CLI is installed and logged in (a problem when not: the session would die
- * before its first turn). What a dashboard's check hook runs, and what a person's run and a
- * scheduler's tick refuse on. The git host is not probed: a project with no git host package runs fine, and one
- * whose git host cannot answer says so in the run's own log.
+ * before its first turn), and a part of the person's own setup this machine leaves out that the
+ * coding agent cannot turn off (a warning). What a dashboard's check hook runs, and what a
+ * person's run and a scheduler's tick refuse on. The git host is not probed: a project with no
+ * git host package runs fine, and one whose git host cannot answer says so in the run's own log.
  */
-export async function readyToRun(driver: DriverName, deps: { probe?: CliProbe; isRoot?: () => boolean } = {}): Promise<DriverReadiness> {
-  const probe = deps.probe ?? probeCli
-  return checkDriverReady(driver, { probe, ...(deps.isRoot ? { isRoot: deps.isRoot } : {}) })
+export async function readyToRun(repo: string, driver: DriverName, deps: { probe?: CliProbe; isRoot?: () => boolean; agentsSkills?: string } = {}): Promise<DriverReadiness> {
+  const opts = { probe: deps.probe ?? probeCli, ...(deps.isRoot ? { isRoot: deps.isRoot } : {}) }
+  switch (driver) {
+    case 'claude-code':
+      return claudeCodeReady(opts)
+    case 'codex':
+      return codexReady({ ...opts, personal: await readPersonal(repo, () => {}), ...(deps.agentsSkills !== undefined ? { agentsSkills: deps.agentsSkills } : {}) })
+  }
 }
 
 /** The command line of a spawned run: the model, the coding agent and the follow-up named only when the run has them, so the run's own defaults apply otherwise. */
@@ -207,21 +215,16 @@ export async function resumeProject(
  * Codex's default sandbox (the workspace only) does not allow. The run's id is in the agent's
  * environment, so the claim it makes names the run (the tickets skill reads `AGENT_ID`).
  *
- * Claude Code starts without the person's own setup, so a run does the same job on every machine,
- * each part loaded only when this machine's config turns it on (`personal:` in `config.ts`):
- * `memory` (auto-memory), `connectors` (claude.ai connectors), `skills` (user settings, which carry
- * the skills synced from the claude.ai account, with `~/.claude/CLAUDE.md` and `~/.claude/skills`).
- * The project's own instructions, skills and settings always load. Codex is started as it is.
+ * The coding agent starts with the parts of the person's own setup this machine's config turns
+ * on (`personal:` in `config.ts`), and without the rest, so a run does the same job on every
+ * machine. How a part is turned off is the adapter's own business.
  */
-export function driverFor(name: DriverName, id: string, setup: PersonalSetup): Driver {
+export function driverFor(name: DriverName, id: string, personal: PersonalSetup): Driver {
   const env: NodeJS.ProcessEnv = { ...process.env, [AGENT_ID_ENV]: id }
   switch (name) {
-    case 'claude-code': {
-      if (!setup.memory) env['CLAUDE_CODE_DISABLE_AUTO_MEMORY'] = '1'
-      if (!setup.connectors) env['ENABLE_CLAUDEAI_MCP_SERVERS'] = 'false'
-      return new ClaudeCodeDriver({ permissionMode: 'bypassPermissions', env, ...(setup.skills ? {} : { extraArgs: ['--setting-sources', 'project,local'] }) })
-    }
+    case 'claude-code':
+      return new ClaudeCodeDriver({ permissionMode: 'bypassPermissions', env, personal })
     case 'codex':
-      return new CodexDriver({ sandbox: 'danger-full-access', env })
+      return new CodexDriver({ sandbox: 'danger-full-access', env, personal })
   }
 }

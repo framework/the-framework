@@ -3,11 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { readClaudeQuota } from './claude-code-quota.js'
-import { combineFraming, combineSignals, makeEmit, readWorkspaceFile } from './session-support.js'
-import { runCliSession, type SpawnLike } from './cli-session.js'
-import { finishTurn } from './inbox.js'
-import { agentEnv, attachLog, type SessionLog } from './session-log.js'
-import type { Driver, DriverEvent, DriverPromptOptions, DriverQuota, DriverRateLimit, DriverSession, DriverStartOptions, DriverTurn, DriverUsage } from './types.js'
+import { combineFraming, combineSignals, makeEmit, readWorkspaceFile, runCliSession, checkCliReady, type CliSpec, type DriverReadiness, type DriverReadyOptions, type PersonalSetup, finishTurn, agentEnv, attachLog, type SpawnLike, type SessionLog, type Driver, type DriverEvent, type DriverPromptOptions, type DriverQuota, type DriverRateLimit, type DriverSession, type DriverStartOptions, type DriverTurn, type DriverUsage } from 'agent-driver'
 
 /** Claude Code permission modes we pass through to the CLI. */
 export type PermissionMode = 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan'
@@ -41,6 +37,13 @@ export interface ClaudeCodeDriverOptions {
   mcpServers?: Record<string, McpServerSpec>
   /** Environment for the child process. Default `process.env`. */
   env?: NodeJS.ProcessEnv
+  /**
+   * Which parts of the person's own setup Claude Code loads. Default all of them, as Claude Code
+   * does on its own. `memory` off is `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`; `connectors` off is
+   * `ENABLE_CLAUDEAI_MCP_SERVERS=false`; `skills` off is `--setting-sources project,local`, which
+   * leaves out the person's `~/.claude` settings, `CLAUDE.md` and skills together.
+   */
+  personal?: PersonalSetup
   /** `spawn` override for tests. Default `node:child_process.spawn`. */
   spawn?: SpawnLike
 }
@@ -61,7 +64,7 @@ export class ClaudeCodeDriver implements Driver {
   constructor(private readonly opts: ClaudeCodeDriverOptions = {}) {}
 
   start(opts: DriverStartOptions): Promise<DriverSession> {
-    return Promise.resolve(new ClaudeCodeSession(this.opts, opts))
+    return Promise.resolve(new ClaudeCodeSession(withPersonal(this.opts), opts))
   }
 
   /** Where the account's subscription quota stands (#521). Account-wide, so no session. */
@@ -73,6 +76,17 @@ export class ClaudeCodeDriver implements Driver {
       ...(opts.signal !== undefined ? { signal: opts.signal } : {}),
     })
   }
+}
+
+/** The options with the person's setup parts that are off turned into Claude Code's own switches. */
+function withPersonal(opts: ClaudeCodeDriverOptions): ClaudeCodeDriverOptions {
+  const personal = opts.personal
+  if (!personal) return opts
+  const env: NodeJS.ProcessEnv = { ...(opts.env ?? process.env) }
+  if (!personal.memory) env['CLAUDE_CODE_DISABLE_AUTO_MEMORY'] = '1'
+  if (!personal.connectors) env['ENABLE_CLAUDEAI_MCP_SERVERS'] = 'false'
+  const extraArgs = [...(personal.skills ? [] : ['--setting-sources', 'project,local']), ...(opts.extraArgs ?? [])]
+  return { ...opts, env, ...(extraArgs.length > 0 ? { extraArgs } : {}) }
 }
 
 let sessionCounter = 0
@@ -341,4 +355,30 @@ function parseUsage(obj: Record<string, unknown>): DriverUsage | undefined {
     cacheReadTokens: num(usage['cache_read_input_tokens']),
     cacheCreationTokens: num(usage['cache_creation_input_tokens']),
   }
+}
+
+/** How the Claude Code CLI is asked whether a session can start. */
+const CLAUDE_CLI: CliSpec = {
+  bin: 'claude',
+  install: 'install Claude Code and make sure `claude` is on your PATH: https://claude.com/claude-code',
+  authArgs: ['auth', 'status'],
+  // Prints JSON (`{"loggedIn": true, ...}`) and exits 0 either way, so the flag is the answer.
+  // A version too old to know the subcommand prints usage, which reads as "could not say".
+  loggedIn: ({ output }) => {
+    try {
+      const value = (JSON.parse(output) as Record<string, unknown> | null)?.['loggedIn']
+      return typeof value === 'boolean' ? value : undefined
+    } catch {
+      return undefined
+    }
+  },
+  login: 'claude auth login',
+}
+
+/**
+ * Whether a Claude Code session can start here: the CLI installed and logged in. Every part of
+ * the person's setup has a switch in Claude Code, so none is ever a warning here.
+ */
+export function claudeCodeReady(opts: DriverReadyOptions = {}): Promise<DriverReadiness> {
+  return checkCliReady(CLAUDE_CLI, opts)
 }

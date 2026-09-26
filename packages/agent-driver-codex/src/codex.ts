@@ -1,9 +1,8 @@
 import { execFile, spawn as nodeSpawn } from 'node:child_process'
-import { runCliSession, type AgentCliParser, type SpawnLike } from './cli-session.js'
-import { finishTurn } from './inbox.js'
-import { agentEnv, attachLog, type SessionLog } from './session-log.js'
-import { combineFraming, combineSignals, makeEmit, readWorkspaceFile } from './session-support.js'
-import type { Driver, DriverEvent, DriverPromptOptions, DriverSession, DriverStartOptions, DriverTurn, DriverUsage } from './types.js'
+import { lstat, mkdir, readlink, readdir, rm, symlink } from 'node:fs/promises'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
+import { runCliSession, finishTurn, agentEnv, attachLog, combineFraming, combineSignals, makeEmit, readWorkspaceFile, checkCliReady, type AgentCliParser, type CliSpec, type DriverReadiness, type DriverReadyOptions, type PersonalSetup, type SpawnLike, type SessionLog, type Driver, type DriverEvent, type DriverPromptOptions, type DriverSession, type DriverStartOptions, type DriverTurn, type DriverUsage } from 'agent-driver'
 
 /**
  * Codex's sandbox policy for the shell commands the model writes.
@@ -28,8 +27,49 @@ export interface CodexDriverOptions {
   extraArgs?: string[]
   /** Environment for the child process. Default `process.env`. */
   env?: NodeJS.ProcessEnv
+  /**
+   * Which parts of the person's own setup Codex loads. Default all of them, as Codex does on
+   * its own. `memory` off is `features.memories=false`; `connectors` off is `features.apps=false`
+   * and `features.plugins=false`; `skills` off runs Codex from {@link codexHome}.
+   */
+  personal?: PersonalSetup
+  /**
+   * The Codex home a run with `skills` off uses in place of the person's own: a folder holding
+   * only a link to their login, so their `AGENTS.md`, skills and `config.toml` stay out. Kept,
+   * not temporary: Codex saves its conversations there, and a resume must find them. Default
+   * {@link defaultCodexHome}.
+   */
+  codexHome?: string
   /** `spawn` override for tests. Default `node:child_process.spawn`. */
   spawn?: SpawnLike
+}
+
+/** The clean Codex home kept on this machine: `$XDG_STATE_HOME/agent-driver/codex-home`, or under `~/.local/state`. */
+export function defaultCodexHome(env: NodeJS.ProcessEnv = process.env): string {
+  return join(env['XDG_STATE_HOME'] || join(homedir(), '.local', 'state'), 'agent-driver', 'codex-home')
+}
+
+/** The person's own Codex home, where their login is: `CODEX_HOME`, else `~/.codex`. */
+export function personalCodexHome(env: NodeJS.ProcessEnv = process.env): string {
+  return env['CODEX_HOME'] || join(homedir(), '.codex')
+}
+
+/**
+ * Make `home` a Codex home holding only a link to the login in `personal`, so a session started
+ * there is logged in as the person and loads none of their files. Created on first use, the link
+ * put back when it is missing or points elsewhere; the conversations Codex saves there are kept.
+ */
+export async function prepareCodexHome(home: string, personal: string): Promise<void> {
+  await mkdir(home, { recursive: true })
+  const link = join(home, 'auth.json')
+  const target = join(personal, 'auth.json')
+  try {
+    if ((await lstat(link)).isSymbolicLink() && (await readlink(link)) === target) return
+    await rm(link)
+  } catch {
+    // No link yet.
+  }
+  await symlink(target, link)
 }
 
 /**
@@ -55,8 +95,20 @@ export class CodexDriver implements Driver {
   readonly id = 'codex'
   constructor(private readonly opts: CodexDriverOptions = {}) {}
 
-  start(opts: DriverStartOptions): Promise<DriverSession> {
-    return Promise.resolve(new CodexSession(this.opts, opts))
+  async start(opts: DriverStartOptions): Promise<DriverSession> {
+    const env = this.opts.env ?? process.env
+    const personal = this.opts.personal
+    const args: string[] = []
+    if (personal?.memory === false) args.push('-c', 'features.memories=false')
+    if (personal?.connectors === false) args.push('-c', 'features.apps=false', '-c', 'features.plugins=false')
+    let sessionEnv = env
+    if (personal?.skills === false) {
+      const home = this.opts.codexHome ?? defaultCodexHome(env)
+      await prepareCodexHome(home, personalCodexHome(env))
+      sessionEnv = { ...env, CODEX_HOME: home }
+    }
+    const extraArgs = [...args, ...(this.opts.extraArgs ?? [])]
+    return new CodexSession({ ...this.opts, env: sessionEnv, ...(extraArgs.length > 0 ? { extraArgs } : {}) }, opts)
   }
 }
 
@@ -268,4 +320,37 @@ export function parseCodexUsage(raw: unknown): DriverUsage | undefined {
     cacheReadTokens: cached,
     cacheCreationTokens: 0,
   }
+}
+
+/** How the Codex CLI is asked whether a session can start. */
+const CODEX_CLI: CliSpec = {
+  bin: 'codex',
+  install: 'install the Codex CLI and make sure `codex` is on your PATH: https://developers.openai.com/codex/cli',
+  authArgs: ['login', 'status'],
+  // A sentence, not JSON: "Logged in using ChatGPT", or "Not logged in". The negative first,
+  // since it contains the positive.
+  loggedIn: ({ output }) => (/not logged in/i.test(output) ? false : /logged in/i.test(output) ? true : undefined),
+  login: 'codex login',
+}
+
+/** What {@link codexReady} takes: the CLI questions, and the setup parts a run turns off. */
+export interface CodexReadyOptions extends DriverReadyOptions {
+  personal?: PersonalSetup
+  /** The folder of skills Codex loads from the person's home whatever its own home is. Default `~/.agents/skills`. */
+  agentsSkills?: string
+}
+
+/**
+ * Whether a Codex session can start here: the CLI installed and logged in. With `skills` off, a
+ * `~/.agents/skills` that holds skills is a warning: Codex reads that folder from the person's
+ * home whatever its own home is, and no switch keeps it out.
+ */
+export async function codexReady(opts: CodexReadyOptions = {}): Promise<DriverReadiness> {
+  const ready = await checkCliReady(CODEX_CLI, opts)
+  if (opts.personal?.skills === false) {
+    const dir = opts.agentsSkills ?? join(homedir(), '.agents', 'skills')
+    const skills = await readdir(dir).catch(() => [])
+    if (skills.some(name => !name.startsWith('.'))) ready.warnings.push(`Codex loads your skills in ${dir} even with \`skills\` off: it has no switch for that folder. Move them out to keep them out of runs.`)
+  }
+  return ready
 }

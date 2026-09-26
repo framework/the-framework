@@ -11,30 +11,17 @@ export type {
   DriverQuota,
   DriverQuotaWindow,
   DriverQuotaUnavailableReason,
+  PersonalSetup,
 } from './types.js'
-export { isTransientQuotaReason } from './types.js'
+export { isTransientQuotaReason, PERSONAL_PARTS } from './types.js'
 export { parseQuestion, continuationPrompt, fencedBlocks, QUESTION_TAG, type Question, type QuestionOption } from './question.js'
-export { appendInbox, takeInbox, promptOf, type InboxLine } from './inbox.js'
-export { SessionLog, logCardFile, logDiaryFile, diaryLine, agentEnv, DIARY_ENV, type LogCard, type LogEndStatus, type SessionLogOptions, type WrittenCard } from './session-log.js'
-export { readClaudeQuota, parseQuotaReadout, type ReadClaudeQuotaOptions } from './claude-code-quota.js'
-export { checkDriverReady, probeCli, type CliProbe, type DriverReadiness, type DriverReadyOptions, type ReadyDriver } from './ready.js'
+export { appendInbox, takeInbox, promptOf, finishTurn, type InboxLine } from './inbox.js'
+export { SessionLog, attachLog, logCardFile, logDiaryFile, diaryLine, agentEnv, DIARY_ENV, type LogCard, type LogEndStatus, type SessionLogOptions, type WrittenCard } from './session-log.js'
+export { checkCliReady, probeCli, type CliProbe, type CliSpec, type DriverReadiness, type DriverReadyOptions } from './ready.js'
 export { FakeDriver, FakeDriverSession, type FakeTurn, type FakeDriverOptions } from './fake.js'
-export { CodexDriver, CodexSession, CodexJsonParser, type CodexDriverOptions, type CodexSandbox } from './codex.js'
-export {
-  ClaudeCodeDriver,
-  ClaudeCodeSession,
-  StreamJsonParser,
-  type ClaudeCodeDriverOptions,
-  type McpServerSpec,
-  type PermissionMode,
-} from './claude-code.js'
-export { ActionsDriver, ActionsSession, replayTranscript, type ActionsDriverOptions, type FetchLike } from './actions.js'
-// `makeEmit` is what a driver implemented outside this package builds its event stream with.
-export { makeEmit } from './session-support.js'
-// `readZip`/`ZipEntry` are deliberately absent (#947): the Actions driver's internal zip reader
-// rode this barrel onto the published surface with no importer outside the driver and its own
-// test — both of which take the module by path. An accidental export is a one-way door once
-// released.
+// What an adapter package builds its driver with: the event stream, the framing and stop
+// signals, reading a file back, the log, and the end of a turn.
+export { makeEmit, combineFraming, combineSignals, readWorkspaceFile } from './session-support.js'
 export {
   runCliSession,
   type AgentCliParser,

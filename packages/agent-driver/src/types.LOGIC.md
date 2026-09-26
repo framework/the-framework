@@ -23,10 +23,12 @@ Fixes the vocabulary of the driver [1] contract, in words: what every driver pro
 [15] cloud anchor: an empty commit a web agent pushes before its task leaves this machine, unique to the agent: the branch the cloud session later pushes descends from it.
 [16] quota boundary: the share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
 [17] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
+[18] personal setup: the three parts of the person's own setup a coding agent loads when started by hand: `memory` (what the coding agent remembers across sessions on its own), `connectors` (the apps and accounts linked to the person's login), `skills` (the person's own instructions, skills and settings files).
 
 ## Business logic — TL;DR
 
 - **What a driver promises** - a stable implementation id, a way to start a driver session [2] bound to a directory, and optionally a way to read the account's quota [7].
+- **The personal setup, one vocabulary for every adapter** - the three parts of the personal setup [18], each on or off; every adapter takes the same three and turns each off with its own switches, says in its readiness check a part it cannot turn off, and loads everything when given none.
 - **How a driver session is started** - with the directory the coding agent [8] reads and edits, the framing [10] every turn [3] carries, the model to pass through, a stop request [11] for the whole driver session, optionally the session id of an earlier driver session to continue, optionally a log (a directory and the card to start it with, exposed on the driver session for the caller to patch, end and reopen), and a listener for progress events [4] that can never break the coding agent.
 - **One turn, one final message** - a prompt goes in with optional extra framing, a stop request for this turn only, a best-effort request to continue the previous turn and optionally an inbox path, whose waiting lines become further turns before the prompt resolves; the final message, the session id and the usage [5] of the last turn come out.
 - **Reading code and ending the driver session** - a driver [1] may let the caller read a file the coding agent produced; ending the driver session frees what it holds and may be repeated safely.
@@ -48,6 +50,18 @@ See `## Context`.
 #### Business logic
 
 A driver [1] has a stable implementation id (see "The implementation ids") and can start a driver session [2] bound to a directory. It may also read where the account's quota [7] stands; that reading is account-wide and independent of any driver session, and an implementation that cannot report a quota omits the ability entirely rather than answering with a made-up number. Of the five implementations only `claude-code` reads a quota.
+
+### The personal setup, one vocabulary for every adapter
+
+#### Context
+
+**User story**: the user's scheduled runs do the same job on every machine, whichever coding agent [8] they are on, because the runner starts it without the person's own setup unless this machine turns a part on.
+
+**Problem**: every coding agent loads the person's own setup its own way, from its own files and its own account, and turns each piece off with its own switches. A caller that knew those switches would have to learn them again for every coding agent.
+
+#### Business logic
+
+The contract names the three parts of the personal setup [18]: `memory`, `connectors` and `skills`, each on (loaded) or off (kept out). Every adapter takes the same three as one of its options and turns each part that is off into its own coding agent's switches, which the caller never sees. An adapter given no personal setup loads everything, as its coding agent does when started by hand. A part an adapter cannot turn off is never reported as off in silence: its readiness check warns about it.
 
 ### How a driver session is started
 

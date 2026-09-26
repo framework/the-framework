@@ -7,26 +7,32 @@ in LOGIC.md; a choice made while implementing is the implementer's judgment, not
 decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 
 ## Commands
-- Two kinds of skill: capability skills (`branches`, `tickets`, `queue`, `logs`), each a
-  SKILL.md and a command, each saying how to do one thing; and command skills, each a
-  SKILL.md only, each a job that composes capabilities. A command assumes no capability
-  and names no skill; where the job is broken without a capability, it says so in
-  capability words and stops. Picked over a command naming the capabilities it uses,
+- Two kinds of skill: capability skills (`branches`, `tickets`, `queue`, `logs`,
+  `github`), each a SKILL.md and a command, each saying how to do one thing; and command
+  skills, each a SKILL.md only, each a job that composes capabilities. A command assumes
+  no capability and names no skill; where the job is broken without a capability, it says
+  so in capability words and stops. Picked over a command naming the capabilities it uses,
   which would tie the job to a package. A capability never names another skill.
 - One package per command, `@gemstack/skill-<command>`, the SKILL.md at the package root
   like the capability skills. Picked over one package holding every command, so a project
   installs the commands it wants and nothing else; the name follows Claude Code's own
   convention, a command is a skill.
-- A command is marked `disable-model-invocation`: a person or a runner fires it, the
-  agent never picks it on its own.
-- A runner fires a command by its name, `/update-tickets`; the agent's harness expands
-  the skill. The command's words are the rules of the job — note the time before fetching
-  and record it after, so nothing edited meanwhile is missed; only what changed since the
-  last import; one ticket per issue, updated in place, closed when the issue is; the
-  tickets named by the pull requests merged since the last import closed too, which is
-  how a ticket closes at its merge; an error in capability words when the tracker or the
-  last-import time is missing — never a skill's name or command.
+- A command is marked `disable-model-invocation`: a person or a runner fires it, the agent
+  never picks it on its own.
+- A runner fires a command by its name, `/update-tickets`; the agent's harness expands the
+  skill. The command's words are the rules of the job — note the time before fetching and
+  record it after, so nothing edited meanwhile is missed; only what changed since the last
+  import; one ticket per issue, updated in place, closed when the issue is; the tickets
+  named by the pull requests merged since the last import closed too, which is how a
+  ticket closes at its merge; an error in capability words when the tracker cannot be
+  reached, or tickets exist with no last-import time — never a skill's name or command; no
+  import time recorded when anything fails, so the next run fetches the same changes
+  again.
 - The project's schedule starts `update-tickets` only when an issue changed since the last
-  import, or a pull request merged since then has a line `Closes tickets/<file>` naming a
-  real ticket. Picked over starting it on any merged pull request, which ran the job about
+  import, or a pull request merged since then has a line `Closes tickets/` followed by a
+  file name. Picked over starting it on any merged pull request, which ran the job about
   forty times a week to change nothing.
+- An open issue with no ticket gets one only when it was opened or reopened since the last
+  import. Picked over giving one to every changed open issue with no ticket, which brings
+  back a ticket closed on purpose and makes one for every old issue a comment or a bot
+  touches.

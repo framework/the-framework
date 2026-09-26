@@ -4,7 +4,7 @@ The spend boundary [1]: how much of the account's quota [2] week unattended work
 
 **User story**: the user's subscription has a weekly allowance; scheduled agents may spend it at the pace the week passes, half a day ahead by default, and never faster, so when the user sits down to work there is always the share of the week that has not elapsed yet; the user moves that line with `agent-scheduler offset <points>`, and a stand-down reads as a setting (`at or past day 4 of the 47% line (+10 on the week's 37%)`), not as a bug.
 
-**Business logic story**: the tick reads the quota through `agent-driver` (which reads Claude Code's own usage readout) only when a command is due, under its cap and about to start, and asks this file once per tick. The boundary is copied rather than imported from The Framework because this tool depends on `agent-driver`, which reads the windows, and not on The Framework, which only draws the boundary in its usage panel and stands nothing down.
+**Business logic story**: the tick reads the quota through `@agent-driver/claude` (which reads Claude Code's own usage readout) only when a command is due, under its cap and about to start, and asks this file once per tick. The boundary is copied rather than imported from The Framework because this tool depends on `@agent-driver/claude`, which reads the windows, and not on The Framework, which only draws the boundary in its usage panel and stands nothing down.
 
 ## Glossary
 

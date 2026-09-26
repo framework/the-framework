@@ -13,10 +13,11 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - Standalone, beside `agent-driver`, not inside it. `agent-driver` depends on nothing; the
   runner needs git for its checkouts and its records, and inside the driver every user of
   the driver would get git and the skills with it. Either way was open; this one for now.
-- The runner depends on `agent-driver` for the session and the readiness check, on the
-  branches package for the checkout and the reclaim, on the logs package for the records,
-  and on `agent-data` for the branch. It never depends on The Framework, and The Framework
-  never depends on it.
+- The runner depends on `agent-driver` for the session contract, on each coding agent's
+  adapter (`@agent-driver/claude`, `@agent-driver/codex`) for its driver and its readiness
+  check, on the branches package for the checkout and the reclaim, on the logs package for
+  the records, and on `agent-data` for the branch. It never depends on The Framework, and
+  The Framework never depends on it.
 - The runner names no skill and reads no schedule: a run is the prompt it is given.
 
 ## The record
@@ -67,11 +68,12 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   it could not push. Picked over a restricted Codex with agent-runner pushing for it: a
   run would then end in two different ways, and agent-runner would do the agent's work.
 - A resumed run is on the coding agent its record names.
-- A run's Claude Code starts without the person's own setup: their auto-memory, their
-  claude.ai connectors, their user settings (with the skills synced from their claude.ai
-  account). A run does the same job on every machine. Each part comes back on one machine
-  with its own line under `personal:` in `.agent-runner/config.yml`. Picked over one line
-  for the whole setup, on by default or off by default.
+- A run's coding agent, Claude Code or Codex, starts without the person's own setup: their
+  memory, their account's connectors, apps and plugins, their own instructions, skills and
+  settings files. A run does the same job on every machine. Each part comes back on one
+  machine with its own line under `personal:` in `.agent-runner/config.yml`, the same line
+  for either coding agent. Picked over one line for the whole setup, on by default or off
+  by default.
 - A run with no model named starts on the coding agent's own default. Picked over the
   runner reading the scheduler's model: the runner reads no scheduler file, and the
   launcher already says "the CLI's own default".

@@ -1,21 +1,22 @@
-The `agent-driver` package is how The Framework works a repository without ever calling a model itself: it wraps a coding agent [1] the user already pays for as a driver [2], a black box started in a directory, prompted for one turn [3] at a time, streamed as progress events [4] and resumed later, and ships the implementations of that contract for Claude Code on this machine, Codex on this machine, Claude Code on a GitHub Actions runner, and a scripted fake for tests and offline demos. The product's agent [5] lifecycle in `packages/framework` speaks only this contract, which is what lets it add Claude Code in a cloud session [6] as a fifth implementation and swap one coding agent for another without changing anything above. `package.json`, `tsconfig.json`, `tsconfig.build.json` and `tsconfig.test.json` configure the build and the test runner and carry no business logic; `dist/` and `dist-test/` are build output; each source file's `*.BUG-ANALYSIS.md` records when it was last reviewed for bugs.
+The driver family: one contract for driving a coding agent [1] as a black box, and one package per driver [2] on it, all under this folder. A driver is a coding agent on this machine, a shared place that runs any coding agent's CLI, or one vendor's own cloud.
 
 ## Context
 
-**User story**: the user picks `claude` or `codex` as an agent's [5] driver [2] and where its turns [3] run; the agent view shows what the coding agent [1] says and does and what it spent, the dashboard shows the account's quota [7] for Claude Code, and stopping the agent leaves nothing of the coding agent running.
+**Business logic story**: two things vary independently: which coding agent [1] works (Claude Code, Codex) and where it runs (this machine, a GitHub Actions runner, the vendor's cloud). What depends on the coding agent is its command line, the reader of its output, its switches for the person's own setup and its login question; what depends on the place is how a turn reaches it and comes back. A shared place such as a GitHub Actions runner runs the coding agent's own CLI, so one package serves every coding agent and takes each one's output reader from its package. A vendor's own cloud (Claude Code on claude.ai, Codex cloud) is that vendor's site with its own login and its own way in, so each is a package of its own.
 
-**Business logic story**: every implementation runs on the user's own login to the coding agent [1], a subscription in the normal case, or on the OAuth token the repository holds for a runner; The Framework holds no model key. The seam is the prompt, the final message and the code left behind, never the coding agent's tool calls: a turn [3] succeeds on the process's exit code or the run's conclusion, and the caller shows the progress events [4] but never decides on them.
+| | this machine | a GitHub Actions runner | the vendor's cloud |
+|---|---|---|---|
+| Claude Code | `claude/` | `github-actions/` | Claude Code in a cloud session, still in the product (`packages/framework`) |
+| Codex | `codex/` | not yet | not yet |
 
 ## Glossary
 
 [1] coding agent: the CLI doing the actual work: Claude Code or Codex.
-[2] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later. The user's driver choice is `claude` or `codex`; the driver implementations are `claude-code`, `codex`, `github-actions`, `claude-web` and `fake`.
-[3] turn: one prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
-[4] progress event: what a driver reports while a turn runs, for a caller to show and never to decide on: the prompt sent, the session id, streamed text, a tool used, the final result, a rate limit reading, an error, a notice.
-[5] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
-[6] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
-[7] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
+[2] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later.
 
 ## Business logic — TL;DR
 
-- **The driver seam and its implementations** (`src/`) - the contract every driver [2] honors, the process core shared by the local implementations with its stop and reaping rules, the Claude Code, Codex, GitHub Actions and fake implementations, the question an agent asks, the inbox that reaches a running agent, the log a session keeps, the reader of Claude Code's quota [7], and the check that a coding agent's CLI is installed and logged in; told in `src/LOGIC.md`.
+- **The contract** (`core/`) - the `agent-driver` npm package: what every driver [2] promises, the three parts of the person's own setup every local driver takes, the pieces every driver shares, the readiness check each driver feeds its own CLI questions, and a scripted fake; told in `core/LOGIC.md`.
+- **Claude Code on this machine** (`claude/`) - the `@agent-driver/claude` npm package: Claude Code as a driver, its output reader, its switches for the person's own setup, whether `claude` can start, and the account's quota; told in `claude/LOGIC.md`.
+- **Codex on this machine** (`codex/`) - the `@agent-driver/codex` npm package: Codex as a driver, its switches for the person's own setup through a Codex home of its own, and whether `codex` can start; told in `codex/LOGIC.md`.
+- **A coding agent on a GitHub Actions runner** (`github-actions/`) - the `@agent-driver/github-actions` npm package: each turn one run of the project's agent workflow, its transcript read back and replayed; Claude Code today, read with `@agent-driver/claude`'s output reader; told in `github-actions/LOGIC.md`.

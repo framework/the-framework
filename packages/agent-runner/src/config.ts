@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { PERSONAL_PARTS, type PersonalSetup } from 'agent-driver'
 import { parseDocument } from 'yaml'
 import { RUNNER_CONFIG, RUNNER_DIR } from './names.js'
 
@@ -33,10 +34,6 @@ export async function readConfig(repo: string, log: (line: string) => void): Pro
 export function configFile(repo: string): string {
   return join(repo, RUNNER_DIR, RUNNER_CONFIG)
 }
-
-/** The parts of the person's own setup a run can load, each off unless this machine turns it on. */
-export const PERSONAL_PARTS = ['memory', 'connectors', 'skills'] as const
-export type PersonalSetup = Record<(typeof PERSONAL_PARTS)[number], boolean>
 
 /**
  * Which parts of the person's own setup this machine's runs load: the `personal:` map in the

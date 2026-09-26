@@ -7,7 +7,7 @@
  * down once a window in force passes it plus the user's cushion. Two properties fall out of it: nothing is left on the floor, since the boundary
  * reaches the full allowance exactly as the week resets; and work a person asks for cannot be
  * starved by work nobody asked for. Copied rather than imported because this tool depends on
- * agent-driver, which reads the windows, and not on The Framework, which only draws the boundary.
+ * @agent-driver/claude, which reads the windows, and not on The Framework, which only draws the boundary.
  */
 
 import type { DriverQuotaWindow } from 'agent-driver'

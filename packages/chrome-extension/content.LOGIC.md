@@ -69,7 +69,7 @@ The content script [1] runs on every `https://claude.ai/*` page, in the top fram
 
 #### Context
 
-**Business logic story**: an agent [10] that stops at a gate [11] writes, in its final message, a JSON object with a title and options, as the question protocol of `agent-driver` (`packages/agent-driver/src/question.ts`) defines it; on claude.ai it renders as a code block somewhere in the session's transcript, with prose around it.
+**Business logic story**: an agent [10] that stops at a gate [11] writes, in its final message, a JSON object with a title and options, as the question protocol of `agent-driver` (`packages/agent-driver/core/src/question.ts`) defines it; on claude.ai it renders as a code block somewhere in the session's transcript, with prose around it.
 
 #### Business logic
 

@@ -2,7 +2,7 @@ This machine's settings for the tool: `.agent-runner/config.yml` in the project,
 
 ## Context
 
-**User story**: the user wants their scheduled runs to do the same job on every machine, so by default a run's Claude Code leaves out the person's own setup (`runner.ts`). On a machine where they want part of it back, they write one line per part:
+**User story**: the user wants their scheduled runs to do the same job on every machine, so by default a run's coding agent, Claude Code or Codex, leaves out the person's own setup (`runner.ts`). On a machine where they want part of it back, they write one line per part:
 
 ```yaml
 personal:
@@ -15,7 +15,7 @@ personal:
 
 ## Glossary
 
-[1] part: one of the three pieces of the person's own setup a run can load, each turned on by its own line under `personal:`: `memory` (their auto-memory: the notes Claude Code keeps for the project; not `~/.claude/CLAUDE.md`), `connectors` (their claude.ai connectors), `skills` (their user settings, which carry the skills synced from their claude.ai account and settings such as the effort level, the model and a login through `apiKeyHelper`, together with their `~/.claude/CLAUDE.md` and `~/.claude/skills`).
+[1] part: one of the three pieces of the person's own setup a run's coding agent can load, each turned on by its own line under `personal:`: `memory` (what the coding agent remembers across sessions on its own: Claude Code's auto-memory, Codex's memories; not `~/.claude/CLAUDE.md`), `connectors` (the connectors of the person's claude.ai account; Codex's apps and plugins), `skills` (the person's own instructions, skills and settings files: for Claude Code their user settings, which carry the skills synced from their claude.ai account and settings such as the effort level, the model, hooks and a login through `apiKeyHelper` or an `env` entry, with `~/.claude/CLAUDE.md` and `~/.claude/skills`; for Codex `~/.codex/AGENTS.md`, `~/.codex/skills` and `~/.codex/config.toml`, with any model provider or login set there). For Codex, `memory` comes back only with `skills` on too, since Codex keeps its memories in the person's own Codex home. The part names are the `agent-driver` contract's, so every coding agent's driver takes the same three.
 
 ## Business logic — TL;DR
 
@@ -38,7 +38,7 @@ The file is read each time a setting is asked for (a run asks for `personal` whe
 
 #### Context
 
-See `runner.ts`, "The person's own setup, left out": each part [1] turned on here is loaded by a run's Claude Code.
+See `runner.ts`, "The person's own setup, left out": each part [1] turned on here is loaded by a run's coding agent, Claude Code or Codex.
 
 #### Business logic
 

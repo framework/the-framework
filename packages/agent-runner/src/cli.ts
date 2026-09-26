@@ -21,19 +21,22 @@ export const USAGE = `usage: agent-runner <command>
                                 continue an ended run: the same record, its session resumed; the text as the next prompt, or the answer to the question it ended on
   run --detach --resume <id> …  the same continuing in its own process, answered at once: what a dashboard's resume hook runs
   check [--driver <claude-code|codex>]
-                                whether a run can start here: the coding agent's CLI installed and logged in; what a dashboard's check hook runs
+                                whether a run can start here: the coding agent's CLI installed and logged in, and its warnings; what a dashboard's check hook runs
   init                          this tool's lines in the dashboard's .the-framework/hooks.yml, so its Start works; a line already there is kept
 
 When a run ends waiting on a question, or ends done with a pull request it did not have, the \`ended:\` line in the
 project's .agent-runner/config.yml runs, if there is one, in the project's root, with MESSAGE (one line for a person),
 RUN_ID, STATUS, QUESTION and PR_URL in its environment. The file is this machine's: keep it out of git (this tool hides
-.agent-runner/ from git once a run has started here). A run's Claude Code leaves out the person's own setup so it does the
-same job on every machine; in the same file, each part comes back with its own line under \`personal:\`:
+.agent-runner/ from git once a run has started here). A run's coding agent leaves out the person's own setup so it
+does the same job on every machine; in the same file, each part comes back with its own line under \`personal:\`:
   personal:
-    memory: on        your auto-memory (the notes Claude Code keeps for the project)
-    connectors: on    your claude.ai connectors
-    skills: on        your user settings (effort, model, a login through apiKeyHelper), the skills synced from
-                      your claude.ai account, ~/.claude/CLAUDE.md, ~/.claude/skills
+    memory: on        Claude Code's auto-memory; Codex's memories
+    connectors: on    your claude.ai connectors; Codex's apps and plugins
+    skills: on        Claude Code: your user settings (effort, model, hooks, a login through apiKeyHelper or env), the skills
+                      synced from your claude.ai account, ~/.claude/CLAUDE.md, ~/.claude/skills.
+                      Codex: ~/.codex/AGENTS.md, ~/.codex/skills, ~/.codex/config.toml (with a model provider or
+                      login set there) and its memories, so Codex's memory: on needs skills: on too (\`check\` warns).
+                      Codex loads skills in ~/.agents/skills either way; \`check --driver codex\` warns about them.
 
 JSON on stdout. Exit code 1 for a refusal or a failure (the reason on stderr), 2 for a usage error.`
 
@@ -99,7 +102,7 @@ const COMMANDS: Record<string, Command> = {
     // A person's run is refused before it spends a checkout when its coding agent cannot start;
     // a scheduler asks the same before it marks, and a resumed run's agent already ran once here.
     if (values.resume === undefined && values.id === undefined) {
-      const ready = await readyToRun(driver ?? 'claude-code')
+      const ready = await readyToRun(repo, driver ?? 'claude-code')
       if (ready.problems.length > 0) throw new Refused({ ok: false, reason: 'not-ready', ...ready }, ready.problems.join(' '))
     }
     const then = values.then !== undefined ? { then: values.then.trim() } : {}
@@ -144,8 +147,8 @@ const COMMANDS: Record<string, Command> = {
     const { values } = parse(args, { driver: { type: 'string' } }, 0)
     const driver = values.driver ?? 'claude-code'
     if (!isDriverName(driver)) throw new Usage(`unknown driver "${driver}"; the drivers are ${DRIVER_NAMES.join(' and ')}`)
-    await project(io.cwd, git)
-    return { ok: true, ...(await readyToRun(driver)) }
+    const repo = await project(io.cwd, git)
+    return { ok: true, ...(await readyToRun(repo, driver)) }
   },
 
   async init(args, io, git) {

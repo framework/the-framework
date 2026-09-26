@@ -48,7 +48,49 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
 
-  packages/agent-driver:
+  packages/agent-driver/claude:
+    dependencies:
+      agent-driver:
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.43
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
+  packages/agent-driver/codex:
+    dependencies:
+      agent-driver:
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.43
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
+  packages/agent-driver/core:
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.43
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
+  packages/agent-driver/github-actions:
+    dependencies:
+      '@agent-driver/claude':
+        specifier: workspace:*
+        version: link:../claude
+      agent-driver:
+        specifier: workspace:*
+        version: link:../core
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
@@ -59,6 +101,12 @@ importers:
 
   packages/agent-runner:
     dependencies:
+      '@agent-driver/claude':
+        specifier: workspace:*
+        version: link:../agent-driver/claude
+      '@agent-driver/codex':
+        specifier: workspace:*
+        version: link:../agent-driver/codex
       '@gemstack/agent-data':
         specifier: workspace:*
         version: link:../agent-data
@@ -70,7 +118,7 @@ importers:
         version: link:../skill-logs
       agent-driver:
         specifier: workspace:*
-        version: link:../agent-driver
+        version: link:../agent-driver/core
       yaml:
         specifier: ^2.5.0
         version: 2.9.0
@@ -84,6 +132,9 @@ importers:
 
   packages/agent-scheduler:
     dependencies:
+      '@agent-driver/claude':
+        specifier: workspace:*
+        version: link:../agent-driver/claude
       '@gemstack/agent-data':
         specifier: workspace:*
         version: link:../agent-data
@@ -95,7 +146,7 @@ importers:
         version: link:../skill-logs
       agent-driver:
         specifier: workspace:*
-        version: link:../agent-driver
+        version: link:../agent-driver/core
       agent-runner:
         specifier: workspace:*
         version: link:../agent-runner
@@ -112,6 +163,9 @@ importers:
 
   packages/framework:
     dependencies:
+      '@agent-driver/claude':
+        specifier: workspace:*
+        version: link:../agent-driver/claude
       '@base-ui-components/react':
         specifier: 1.0.0-rc.0
         version: 1.0.0-rc.0(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -141,7 +195,7 @@ importers:
         version: 2.27.2(@tiptap/core@2.27.2(@tiptap/pm@2.27.2))(@tiptap/pm@2.27.2)
       agent-driver:
         specifier: workspace:*
-        version: link:../agent-driver
+        version: link:../agent-driver/core
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1

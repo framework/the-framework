@@ -315,8 +315,11 @@ test('CodexDriver with skills off runs from a kept home that holds only a link t
     await utimes(join(home, 'auth.json'), new Date(0), new Date(0))
     await spawnedWith(skillsOff)
     assert.equal(await readFile(join(personal, 'auth.json'), 'utf8'), 'refreshed')
-    // Two sessions starting at once both start.
+    // Two sessions starting at once both start: with no link yet, and with a link pointing elsewhere.
     await rm(join(home, 'auth.json'))
+    await Promise.all([spawnedWith(skillsOff), spawnedWith(skillsOff)])
+    await rm(join(home, 'auth.json'))
+    await symlink(join(dir, 'elsewhere.json'), join(home, 'auth.json'))
     await Promise.all([spawnedWith(skillsOff), spawnedWith(skillsOff)])
     assert.equal(await readlink(join(home, 'auth.json')), join(personal, 'auth.json'))
   } finally {

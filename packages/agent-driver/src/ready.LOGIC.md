@@ -1,4 +1,4 @@
-Asks a coding agent's [1] CLI whether a session can start on this machine at all, before a run spends a checkout on it: the CLI is installed, and it is logged in. The answer is a list of problems, which stop a run, and a list of warnings, which are said and stop nothing; each line names its own fix. The questions are the adapter's: each adapter (`@agent-driver/claude`, `@agent-driver/codex`) hands in its CLI's binary, install page, login question, how to read the answer, and its login command, and adds warnings of its own.
+Asks a coding agent's [1] CLI whether a session can start on this machine at all, before a run spends a checkout on it: the CLI is installed, and it is logged in. The answer is a list of problems, which stop a run, and a list of warnings, which are said and stop nothing; each line names its own fix. The questions are the adapter's: each adapter (`@agent-driver/claude`, `@agent-driver/codex`) hands in its CLI's binary, install page, login question, how to read the answer, and its login command, and adds warnings of its own to the answer.
 
 ## Context
 

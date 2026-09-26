@@ -74,11 +74,14 @@ export async function prepareCodexHome(home: string, personal: string): Promise<
   })
   if (found?.isSymbolicLink()) {
     if ((await readlink(link)) === target) return
-    await rm(link)
+    await rm(link, { force: true })
   } else if (found?.isFile()) {
     const theirs = await stat(target).catch(() => undefined)
-    if (!theirs || found.mtimeMs > theirs.mtimeMs) await copyFile(link, target)
-    await rm(link)
+    if (!theirs || found.mtimeMs > theirs.mtimeMs) {
+      await mkdir(personal, { recursive: true })
+      await copyFile(link, target)
+    }
+    await rm(link, { force: true })
   } else if (found) {
     throw new Error(`${link} is neither a file nor a link; remove it to let Codex runs use this home`)
   }
@@ -119,7 +122,7 @@ export class CodexDriver implements Driver {
     if (personal?.connectors === false) args.push('-c', 'features.apps=false', '-c', 'features.plugins=false')
     let sessionEnv = env
     if (personal?.skills === false) {
-      const home = this.opts.codexHome ?? defaultCodexHome(env)
+      const home = resolve(this.opts.codexHome ?? defaultCodexHome(env))
       await prepareCodexHome(home, personalCodexHome(env))
       sessionEnv = { ...env, CODEX_HOME: home }
     }

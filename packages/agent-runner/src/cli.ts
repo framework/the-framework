@@ -31,10 +31,11 @@ RUN_ID, STATUS, QUESTION and PR_URL in its environment. The file is this machine
 does the same job on every machine; in the same file, each part comes back with its own line under \`personal:\`:
   personal:
     memory: on        Claude Code's auto-memory; Codex's memories
-    connectors: on    your claude.ai connectors; your ChatGPT account's apps and plugins
-    skills: on        Claude Code: your user settings (effort, model, a login through apiKeyHelper), the skills
+    connectors: on    your claude.ai connectors; Codex's apps and plugins
+    skills: on        Claude Code: your user settings (effort, model, hooks, a login through apiKeyHelper), the skills
                       synced from your claude.ai account, ~/.claude/CLAUDE.md, ~/.claude/skills.
-                      Codex: ~/.codex/AGENTS.md, ~/.codex/skills, ~/.codex/config.toml. Skills in
+                      Codex: ~/.codex/AGENTS.md, ~/.codex/skills, ~/.codex/config.toml (with a model provider or
+                      login set there). Skills in
                       ~/.agents/skills load either way (\`check\` warns).
 
 JSON on stdout. Exit code 1 for a refusal or a failure (the reason on stderr), 2 for a usage error.`

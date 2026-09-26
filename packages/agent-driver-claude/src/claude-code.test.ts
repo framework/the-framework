@@ -419,3 +419,11 @@ test('claudeCodeReady asks claude: its JSON login flag, the login command, the i
   const missing = await claudeCodeReady({ isRoot: () => false, probe: () => Promise.resolve({ ok: false, output: '' }) })
   assert.match(missing.problems[0]!, /`claude` not found.*claude\.com\/claude-code/)
 })
+
+test('ClaudeCodeDriver reads the quota with the personal setup\'s environment switches', async () => {
+  let env: NodeJS.ProcessEnv = {}
+  const spawn: SpawnLike = (cmd, args, spawnOpts) => ((env = spawnOpts.env ?? {}), fakeSpawn(['{}'])(cmd, args, spawnOpts))
+  await new ClaudeCodeDriver({ spawn, env: {}, personal: { memory: false, connectors: false, skills: false } }).readQuota()
+  assert.equal(env['CLAUDE_CODE_DISABLE_AUTO_MEMORY'], '1')
+  assert.equal(env['ENABLE_CLAUDEAI_MCP_SERVERS'], 'false')
+})

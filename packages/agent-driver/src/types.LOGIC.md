@@ -9,7 +9,7 @@ Fixes the vocabulary of the driver [1] contract, in words: what every driver pro
 [1] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later. The user's driver choice is `claude` or `codex`; the driver implementations are `claude-code`, `codex`, `github-actions`, `claude-web` and `fake`.
 [2] driver session: the coding agent's own conversation for one agent, which the driver can resume by its session id.
 [3] turn: one prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
-[4] progress event: what a driver reports while a turn runs, for a caller to show and never to decide on: the prompt sent, the session id, streamed text, a tool used, the final result, a rate limit reading, an error, a notice.
+[4] progress event: what a driver reports while a turn runs, for a caller to show and never to decide on: the prompt sent, the session id, streamed text, a tool used, the final result, a rate limit reading, an error, a notice, a question.
 [5] usage: what one turn spent, as the coding agent reports it: token counts, and a notional price in US dollars when the coding agent prices its turns.
 [6] rate limit: the coding agent's per-turn reading of whether the account may still spend against one quota window, and when that window resets.
 [7] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
@@ -118,7 +118,7 @@ Ending a driver session frees whatever the driver holds for it, the coding agent
 
 #### Business logic
 
-A driver [1] reports progress events [4] of eight kinds, for a caller to show but never to gate on:
+A driver [1] reports progress events [4] of nine kinds, for a caller to show but never to gate on:
 
 - `start`: a prompt was sent and the coding agent's [8] loop is starting; carries the prompt.
 - `session`: the coding agent announced its session id at the start of the turn [3]. The final result repeats it, but a turn that never settles, because the user stopped it, it failed, or its process died, would otherwise take the id down with it, and with it the handle to resume the driver session [2]. A caller records this one rather than showing it: the id is plumbing, not conversation.
@@ -127,6 +127,7 @@ A driver [1] reports progress events [4] of eight kinds, for a caller to show bu
 - `result`: the turn settled with this final text, plus the session id and the usage [5] when known. Two optional extras exist for drivers whose work leaves this machine: the session link, the real URL of the driver session, so a caller can link to a cloud session [14] instead of a generic entry point; and the cloud anchor [15], for a driver whose work lands on a branch of its own naming that this machine can only recognize later by ancestry. Drivers whose work stays on the designated branch omit both.
 - `rate-limit`: a rate limit [6] reading.
 - `error`: the coding agent, or the transport to it, failed; carries the message.
+- `question`: the turn ended on a question the agent will not decide alone, its `await-choices` block parsed (`question.ts`).
 - `notice`: something the driver worked around that is worth telling the user, such as a driver session that could not be resumed.
 
 ### Usage: what one turn spent

@@ -24,7 +24,7 @@ Drives Claude Code as a driver [1]: each turn [2] is one non-interactive invocat
 [10] framing: the standing instructions a caller gives a driver session, plus any extra instructions for one turn; the driver delivers them as the coding agent's system prompt, or ahead of the prompt when the coding agent has no system prompt flag.
 [11] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [12] stop request: the caller's signal that a driver session, or one turn of it, must end now; the product raises one when the user stops the agent.
-[13] progress event: what a driver reports while a turn runs, for a caller to show and never to decide on: the prompt sent, the session id, streamed text, a tool used, the final result, a rate limit reading, an error, a notice.
+[13] progress event: what a driver reports while a turn runs, for a caller to show and never to decide on: the prompt sent, the session id, streamed text, a tool used, the final result, a rate limit reading, an error, a notice, a question.
 [14] personal setup: the three parts of the person's own setup a coding agent loads when started by hand, by the names every adapter takes: `memory` (what the coding agent remembers across sessions on its own), `connectors` (the apps and accounts linked to the person's login), `skills` (the person's own instructions, skills and settings files).
 
 ## Business logic — TL;DR
@@ -178,9 +178,9 @@ A driver given a personal setup turns each part that is off into one switch, and
 
 - `memory` off: `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` in the environment, so no auto-memory (the notes Claude Code keeps for the project; not `~/.claude/CLAUDE.md`).
 - `connectors` off: `ENABLE_CLAUDEAI_MCP_SERVERS=false` in the environment, so no connectors of the claude.ai account.
-- `skills` off: `--setting-sources project,local` on the command line, ahead of any extra arguments the driver was configured with, so no user settings: no skills synced from the claude.ai account, no `~/.claude/CLAUDE.md` or `~/.claude/skills`, and no personal effort level, model, hooks, `apiKeyHelper` or `env` entries. Claude Code offers no switch for the skills alone, so these go together; a person who logs in through their user settings needs `skills` on. Whether MCP servers added for all projects (`claude mcp add -s user`) and `~/.claude/agents` go too was not tested.
+- `skills` off: `--setting-sources project,local` on the command line, ahead of any extra arguments the driver was configured with, so no user settings: no skills synced from the claude.ai account, no `~/.claude/CLAUDE.md` or `~/.claude/skills`, and no personal effort level, model, hooks, `apiKeyHelper` or `env` entries. Claude Code offers no switch for the skills alone, so these go together; a person who logs in through their user settings needs `skills` on, and the readiness check does not catch it: it asks `claude auth status` without this flag. Whether MCP servers added for all projects (`claude mcp add -s user`) and `~/.claude/agents` go too was not tested.
 
-A driver given no personal setup adds none of these, and Claude Code loads everything. With a personal setup, the environment is taken when a driver session starts (the driver's configured one, else this process's), so a later change to this process's environment does not reach that session's turns. The project's `CLAUDE.md`, its skills, its project and local settings, the MCP servers the driver was configured with, and Claude Code's built-in skills load either way.
+A driver given no personal setup adds none of these, and Claude Code loads everything. With a personal setup, the environment is taken when a driver session starts (the driver's configured one, else this process's), so a later change to this process's environment does not reach that session's turns; a quota read builds the environment again each time. The project's `CLAUDE.md`, its skills, its project and local settings, the MCP servers the driver was configured with, and Claude Code's built-in skills load either way.
 
 ### Can a session start here
 

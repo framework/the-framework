@@ -67,6 +67,11 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   it could not push. Picked over a restricted Codex with agent-runner pushing for it: a
   run would then end in two different ways, and agent-runner would do the agent's work.
 - A resumed run is on the coding agent its record names.
+- A run's Claude Code starts without the person's own setup: their auto-memory, their
+  claude.ai connectors, their user settings (with the skills synced from their claude.ai
+  account). A run does the same job on every machine. Each part comes back on one machine
+  with its own line under `personal:` in `.agent-runner/config.yml`. Picked over one line
+  for the whole setup, on by default or off by default.
 - A run with no model named starts on the coding agent's own default. Picked over the
   runner reading the scheduler's model: the runner reads no scheduler file, and the
   launcher already says "the CLI's own default".

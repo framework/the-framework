@@ -20,6 +20,7 @@ export {
   type Ticket,
   type TicketDetail,
   type TicketLink,
+  type PrLink,
   type TicketsFs,
   type TicketsMeta,
 } from './tickets.js'

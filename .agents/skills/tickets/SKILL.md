@@ -54,7 +54,7 @@ npx tickets release <file>       lift your own claim when the plan or the work i
 When the repository has the `queue` skill, a ticket goes on the agent queue as a link, its title as the label, at the ticket's own `Priority:` (5 when it has none):
 
 ```
-npx queue add "[<title>](tickets/<file>)" --priority <N>
+npx queue add '[<title>](tickets/<file>)' --priority <N>
 ```
 
 Once the work is committed and its pull request is open: `npx queue done` the entry, its exact text, write the pull request into the ticket as its `PR:` line (`put` the whole ticket, the line added above the title), and release your claim. The ticket is in review. Do not close it: it closes when the pull request merges, through the update from the issue tracker, which reads the line `Closes tickets/<file>` in the pull request's body; add `Closes #<number>` when the ticket has an issue.

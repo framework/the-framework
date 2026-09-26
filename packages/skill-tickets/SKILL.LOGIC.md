@@ -89,7 +89,7 @@ Before planning or working a ticket the agent runs `npx tickets claim <file>`: `
 
 #### Business logic
 
-When the repository has the `queue` skill [5], a ticket goes on the agent queue as a link, the ticket's title as the label, at the ticket's own `Priority:`, or 5 when it has none: `npx queue add "[<title>](tickets/<file>)" --priority <N>`. Once the work is committed and its pull request is open, the agent runs `npx queue done` with the entry's exact text, writes the pull request into the ticket as its `PR:` line by `put` of the whole ticket with the line added above the title, and releases its claim; the ticket is in review. The agent does not close it: the ticket closes when the pull request merges, through the update from the issue tracker, which reads the line `Closes tickets/<file>` in the pull request's body; the agent adds `Closes #<number>` when the ticket has an issue.
+When the repository has the `queue` skill [5], a ticket goes on the agent queue as a link, the ticket's title as the label, at the ticket's own `Priority:`, or 5 when it has none: `npx queue add '[<title>](tickets/<file>)' --priority <N>`. Once the work is committed and its pull request is open, the agent runs `npx queue done` with the entry's exact text, writes the pull request into the ticket as its `PR:` line by `put` of the whole ticket with the line added above the title, and releases its claim; the ticket is in review. The agent does not close it: the ticket closes when the pull request merges, through the update from the issue tracker, which reads the line `Closes tickets/<file>` in the pull request's body; the agent adds `Closes #<number>` when the ticket has an issue.
 
 ### The ticket format
 

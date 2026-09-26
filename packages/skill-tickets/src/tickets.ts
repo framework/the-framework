@@ -22,8 +22,8 @@ export interface Ticket {
   topics?: string[]
   /** The optional `Issue:` key, the tracker's issue this ticket tracks, split into the link text and the URL it points at. */
   issue?: TicketLink
-  /** The optional `PR:` key: the pull request that closes this ticket once merged, written by the agent that opened it. Same link shape. */
-  pr?: TicketLink
+  /** The optional `PR:` key: the pull request that closes this ticket once merged, written by the agent that opened it. Same link shape; a value without a link (`PR: #1790`) is kept as the label, with no URL, and the ticket is in review all the same. */
+  pr?: PrLink
   /** The optional `Waiting:` key: what the ticket waits on before anyone can work it, as written. Absent when the ticket is not waiting. */
   waiting?: string
   /**
@@ -55,6 +55,12 @@ export interface TicketLink {
   label: string
   /** The issue/PR URL the label links to. */
   url: string
+}
+
+/** A ticket's `PR:` value: a link, or the bare text written there. */
+export interface PrLink {
+  label: string
+  url?: string
 }
 
 /** One ticket with its entire markdown rather than just the head. */
@@ -104,7 +110,7 @@ function titleFromFile(file: string): string {
  * `Issue:`, `PR:`, `Waiting:` — all optional), the `# ` heading, and the `## TLDR`. Deliberately tolerant: a ticket
  * predating the format still lists, with whatever it has.
  */
-function describe(md: string): { title?: string; summary: string; priority?: string; topics?: string[]; issue?: TicketLink; pr?: TicketLink; waiting?: string } {
+function describe(md: string): { title?: string; summary: string; priority?: string; topics?: string[]; issue?: TicketLink; pr?: PrLink; waiting?: string } {
   const lines = md.split('\n')
   const headingAt = lines.findIndex(line => line.startsWith('# '))
   const heading = headingAt === -1 ? undefined : lines[headingAt]!.slice(2).trim()
@@ -127,10 +133,11 @@ function describe(md: string): { title?: string; summary: string; priority?: str
   const issueLine = preamble.find(line => line.toLowerCase().startsWith('issue:'))?.slice('issue:'.length).trim()
   const issueMatch = issueLine ? /\[([^\]]+)\]\(([^)]+)\)/.exec(issueLine) : null
   const issue = issueMatch ? { label: issueMatch[1]!, url: issueMatch[2]! } : undefined
-  // `PR: [#1790](https://example.com/org/repo/pull/1790)` — the same link shape: the ticket is in review.
+  // `PR: [#1790](https://example.com/org/repo/pull/1790)` — the same link shape: the ticket is in review. A person may
+  // write the pull request bare (`PR: #1790`); the ticket is in review all the same, so the text stands as the label.
   const prLine = preamble.find(line => line.toLowerCase().startsWith('pr:'))?.slice('pr:'.length).trim()
   const prMatch = prLine ? /\[([^\]]+)\]\(([^)]+)\)/.exec(prLine) : null
-  const pr = prMatch ? { label: prMatch[1]!, url: prMatch[2]! } : undefined
+  const pr = prMatch ? { label: prMatch[1]!, url: prMatch[2]! } : prLine ? { label: prLine } : undefined
   // `Waiting: web runs to come back` — free text; an empty value waits on nothing.
   const waiting = preamble.find(line => line.toLowerCase().startsWith('waiting:'))?.slice('waiting:'.length).trim()
   // The TLDR is the ticket in one line, which is exactly what a list row wants.

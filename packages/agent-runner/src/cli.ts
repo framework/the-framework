@@ -27,16 +27,17 @@ export const USAGE = `usage: agent-runner <command>
 When a run ends waiting on a question, or ends done with a pull request it did not have, the \`ended:\` line in the
 project's .agent-runner/config.yml runs, if there is one, in the project's root, with MESSAGE (one line for a person),
 RUN_ID, STATUS, QUESTION and PR_URL in its environment. The file is this machine's: keep it out of git (this tool hides
-.agent-runner/ from git once a run has started here). A run's coding agent leaves out the person's own setup so it
-does the same job on every machine; in the same file, each part comes back with its own line under \`personal:\`:
+.agent-runner/ from git once a run has started here). A run's coding agent loads the person's own setup, as when
+started by hand; in the same file, each part is left out with its own line under \`personal:\`, so a run does the same
+job on every machine:
   personal:
-    memory: on        Claude Code's auto-memory; Codex's memories
-    connectors: on    your claude.ai connectors; Codex's apps and plugins
-    skills: on        Claude Code: your user settings (effort, model, hooks, a login through apiKeyHelper or env), the skills
+    memory: off       Claude Code's auto-memory; Codex's memories
+    connectors: off   your claude.ai connectors; Codex's apps and plugins
+    skills: off       Claude Code: your user settings (effort, model, hooks, a login through apiKeyHelper or env), the skills
                       synced from your claude.ai account, ~/.claude/CLAUDE.md, ~/.claude/skills.
                       Codex: ~/.codex/AGENTS.md, ~/.codex/skills, ~/.codex/config.toml (with a model provider or
-                      login set there) and its memories, so Codex's memory: on needs skills: on too (\`check\` warns).
-                      Codex loads skills in ~/.agents/skills either way; \`check --driver codex\` warns about them.
+                      login set there) and its memories, so Codex's memory stays on only with skills on too (\`check\` warns).
+                      Codex loads skills in ~/.agents/skills either way; with skills off, \`check --driver codex\` warns about them.
 
 JSON on stdout. Exit code 1 for a refusal or a failure (the reason on stderr), 2 for a usage error.`
 

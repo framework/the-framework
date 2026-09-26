@@ -103,7 +103,7 @@ test('a resumed run continues on the tool its record names, and a Codex run with
     const asked: string[] = []
     const second = await resumeProject(repo, { id: first.id, text: 'And the tests?' }, { driverFor: (name, _id, setup) => { asked.push(`${name} ${JSON.stringify(setup)}`); return codex('Read too.') } })
     assert.equal(second.status, 'done')
-    assert.deepEqual(asked, ['codex {"memory":false,"connectors":false,"skills":false}'], 'no config on this machine: the run leaves the person\'s setup out')
+    assert.deepEqual(asked, ['codex {"memory":true,"connectors":true,"skills":true}'], 'no config on this machine: the run loads the person\'s setup')
     assert.deepEqual(startedWith, [{}, {}], 'no model named at the start nor at the resume: Codex runs on its own default')
   } finally {
     await removeRepo(repo)
@@ -136,18 +136,18 @@ test('ready to run: the coding agent\'s problems stop a run; nothing else is pro
   }
 })
 
-test('ready to run on Codex: skills in ~/.agents/skills are a warning while this machine leaves skills out, and not once it turns them on', async () => {
+test('ready to run on Codex: skills in ~/.agents/skills are no warning while runs load the person\'s skills, and a warning once this machine turns them off', async () => {
   const repo = await testRepo()
   try {
     const agentsSkills = join(repo, 'agents-skills')
     await mkdir(join(agentsSkills, 'my-skill'), { recursive: true })
     const deps = { probe: async (_bin: string, args: readonly string[]) => ({ ok: true, output: args[0] === '--version' ? '0.144.4' : 'Logged in' }), isRoot: () => false, agentsSkills }
+    assert.deepEqual(await readyToRun(repo, 'codex', deps), { problems: [], warnings: [] })
+    await mkdir(join(repo, '.agent-runner'), { recursive: true })
+    await writeFile(join(repo, '.agent-runner', 'config.yml'), 'personal:\n  skills: off\n')
     const out = await readyToRun(repo, 'codex', deps)
     assert.deepEqual(out.problems, [])
     assert.match(out.warnings[0]!, /no switch/)
-    await mkdir(join(repo, '.agent-runner'), { recursive: true })
-    await writeFile(join(repo, '.agent-runner', 'config.yml'), 'personal:\n  skills: on\n')
-    assert.deepEqual((await readyToRun(repo, 'codex', deps)).warnings, [])
   } finally {
     await removeRepo(repo)
   }

@@ -35,3 +35,21 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - Every diary line says when it was written, in `at`. Picked over the dashboard noting when
   a line reached the browser, which gave a reloaded page one time for every line and a
   finished run none.
+
+## The adapters
+- Each coding agent's driver is its own package, `@agent-driver/<agent>`, on the contract
+  `agent-driver` keeps: the types, the shared process core, the inbox, the question, the
+  log and the fake. A caller installs only the coding agents it drives. Picked over one
+  package holding every driver. Claude Code on a GitHub Actions runner lives in `@agent-
+  driver/claude` (same output, same parser); Claude Code in a cloud session stays in the
+  product until it has a seam apart from the browser bridge.
+- Every adapter takes the same three parts of the person's own setup, `memory`,
+  `connectors` and `skills`, and turns each off with its own coding agent's switches. A
+  part it cannot keep out is a warning in its readiness check, never a silent "off".
+  Picked over the runner knowing each coding agent's switches (every new adapter would
+  change the runner).
+- Codex keeps `skills` out by running from a Codex home of its own: one per machine, kept
+  (Codex saves conversations there, and a resume needs them), holding a link to the
+  person's login, made on the first run. Picked over leaving Codex's personal files in
+  with a warning. Skills in `~/.agents/skills` have no switch: a warning, not a changed
+  home directory, which would also move git's and gh's credentials.

@@ -337,10 +337,12 @@ test('a Codex home that is the person\'s own is left as it is', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'codex-home-'))
   try {
     await writeFile(join(dir, 'auth.json'), '{}')
-    const { env } = await spawnedWith({ env: { CODEX_HOME: dir }, codexHome: dir, personal: { memory: true, connectors: true, skills: false } })
-    assert.equal(env['CODEX_HOME'], dir)
+    await symlink(dir, `${dir}-alias`)
+    const { env } = await spawnedWith({ env: { CODEX_HOME: dir }, codexHome: `${dir}-alias`, personal: { memory: true, connectors: true, skills: false } })
+    assert.equal(env['CODEX_HOME'], `${dir}-alias`)
     assert.ok((await lstat(join(dir, 'auth.json'))).isFile())
   } finally {
+    await rm(`${dir}-alias`, { force: true })
     await rm(dir, { recursive: true, force: true })
   }
 })

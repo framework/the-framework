@@ -32,10 +32,10 @@ does the same job on every machine; in the same file, each part comes back with 
   personal:
     memory: on        Claude Code's auto-memory; Codex's memories
     connectors: on    your claude.ai connectors; Codex's apps and plugins
-    skills: on        Claude Code: your user settings (effort, model, hooks, a login through apiKeyHelper), the skills
+    skills: on        Claude Code: your user settings (effort, model, hooks, a login through apiKeyHelper or env), the skills
                       synced from your claude.ai account, ~/.claude/CLAUDE.md, ~/.claude/skills.
                       Codex: ~/.codex/AGENTS.md, ~/.codex/skills, ~/.codex/config.toml (with a model provider or
-                      login set there) and its memories, so Codex's memory: on needs skills: on too.
+                      login set there) and its memories, so Codex's memory: on needs skills: on too (\`check\` warns).
                       Skills in ~/.agents/skills load either way; \`check\` warns while skills is off.
 
 JSON on stdout. Exit code 1 for a refusal or a failure (the reason on stderr), 2 for a usage error.`

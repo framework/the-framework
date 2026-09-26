@@ -36,7 +36,7 @@ export function isDriverName(name: string): name is DriverName {
  * Whether a run on `driver` can start on this machine, asked before it spends a checkout: the
  * coding agent's CLI is installed and logged in (a problem when not: the session would die
  * before its first turn), and a part of the person's own setup this machine leaves out that the
- * coding agent cannot turn off (a warning). What a dashboard's check hook runs, and what a
+ * coding agent cannot honor (a warning: a part it cannot turn off, or one that cannot come back alone). What a dashboard's check hook runs, and what a
  * person's run and a scheduler's tick refuse on. The git host is not probed: a project with no
  * git host package runs fine, and one whose git host cannot answer says so in the run's own log.
  */

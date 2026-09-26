@@ -1,5 +1,5 @@
 import { execFile, spawn as nodeSpawn } from 'node:child_process'
-import { copyFile, lstat, mkdir, readlink, readdir, rename, rm, stat, symlink } from 'node:fs/promises'
+import { copyFile, lstat, mkdir, readlink, readdir, realpath, rename, rm, stat, symlink } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { runCliSession, finishTurn, agentEnv, attachLog, combineFraming, combineSignals, makeEmit, readWorkspaceFile, checkCliReady, type AgentCliParser, type CliSpec, type DriverReadiness, type DriverReadyOptions, type PersonalSetup, type SpawnLike, type SessionLog, type Driver, type DriverEvent, type DriverPromptOptions, type DriverSession, type DriverStartOptions, type DriverTurn, type DriverUsage } from 'agent-driver'
@@ -64,8 +64,9 @@ export function personalCodexHome(env: NodeJS.ProcessEnv = process.env): string 
 export async function prepareCodexHome(home: string, personal: string): Promise<void> {
   home = resolve(home)
   personal = resolve(personal)
-  if (home === personal) return
   await mkdir(home, { recursive: true })
+  // The same folder, by whatever path: nothing to link.
+  if ((await realpath(home)) === (await realpath(personal).catch(() => personal))) return
   const link = join(home, 'auth.json')
   const target = join(personal, 'auth.json')
   const found = await lstat(link).catch((err: NodeJS.ErrnoException) => {
@@ -90,8 +91,14 @@ export async function prepareCodexHome(home: string, personal: string): Promise<
       const saved = await lstat(aside)
       const theirs = await stat(target).catch(() => undefined)
       if (saved.isFile() && (!theirs || saved.mtimeMs > theirs.mtimeMs)) {
-        await mkdir(personal, { recursive: true })
-        await copyFile(aside, target)
+        try {
+          await mkdir(personal, { recursive: true })
+          await copyFile(aside, target)
+        } catch (err) {
+          // Put the saved login back where the next start finds it again.
+          await rename(aside, link).catch(() => {})
+          throw err
+        }
       }
       await rm(aside, { force: true })
     }

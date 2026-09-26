@@ -96,7 +96,7 @@ One line, `CLAIMED: <holder>`. Written by `claim`, removed by `release` or `clos
 ```md
 Effort: 0-10 [0: trivial, 10: takes months]
 Uncertainty: 0-10 [0: no meaningful alternatives, 10: highly uncertain how to implement]
-Outdated: yes [optional: the ticket changed in a way that makes the plan outdated]
+Outdated: yes [optional: the ticket changed in a way that makes the plan outdated; a plan written again leaves it out]
 
 # [Plan] Ticket title
 

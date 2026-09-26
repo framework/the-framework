@@ -20,8 +20,11 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - A command is marked `disable-model-invocation`: a person or a runner fires it, the
   agent never picks it on its own.
 - A runner fires a command by its name, `/plan-tickets`; the agent's harness expands the
-  skill. The command's words are the rules of the job — the ten most important tickets
-  that are neither planned nor held nor in review, one queue entry per ticket asking for its
-  plan, a priority picked after reading the ticket, no plan written by this agent — never a
-  skill's name or command. Picked over one agent per ticket with a claim: the queue is
-  the fan-out, and the queued work writes each plan one at a time.
+  skill. The command's words are the rules of the job, in numbers read off the ticket
+  listing — a ticket needs a plan when it has none or an outdated one, and is neither held
+  nor in review nor waiting nor on the queue; at most ten a run, highest priority first,
+  then oldest, then by file name; one entry per ticket, `Create tickets/<name>.plan.md`, at
+  the ticket's own priority; no plan written by this agent — never a skill's name or
+  command. Picked over the agent ranking the tickets and picking each priority after
+  reading them, which two runs never did the same way; and over one agent per ticket with
+  a claim: the queue is the fan-out, and the queued work writes each plan one at a time.

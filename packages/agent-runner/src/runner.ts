@@ -5,6 +5,7 @@ import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ClaudeCodeDriver, CodexDriver, checkDriverReady, probeCli, type CliProbe, type Driver, type DriverReadiness } from 'agent-driver'
 import { findRun } from '@gemstack/skill-logs'
+import { readPersonal, type PersonalSetup } from './config.js'
 import { markerCard, writeMarker } from './records.js'
 import { resumeRun, runCommand, runIdFrom, type RunOutcome } from './run.js'
 import { acquireRunLock, handOverRunLock, isPidAlive, releaseRunLock, runStderrPath } from './run-lock.js'
@@ -163,13 +164,14 @@ export async function detachResume(
 export async function runProject(repo: string, opts: { prompt: string; id?: string; model?: string; driver?: DriverName; then?: string; log?: (line: string) => void }): Promise<RunOutcome> {
   const id = opts.id ?? runIdFrom(new Date().toISOString())
   const driver = opts.driver ?? 'claude-code'
+  const setup = await readPersonal(repo, opts.log ?? (() => {}))
   return runCommand(repo, {
     prompt: opts.prompt,
     id,
     marked: opts.id !== undefined,
     ...(opts.model !== undefined ? { model: opts.model } : {}),
-    driver: driverFor(driver, id),
-    ...(opts.then !== undefined ? { then: opts.then, nextDriver: (next: string) => driverFor(driver, next) } : {}),
+    driver: driverFor(driver, id, setup),
+    ...(opts.then !== undefined ? { then: opts.then, nextDriver: (next: string) => driverFor(driver, next, setup) } : {}),
     ...(opts.log ? { log: opts.log } : {}),
   })
 }
@@ -187,13 +189,14 @@ export async function resumeProject(
   const card = await findRun(repo, opts.id)
   const recorded = card?.driver ?? 'claude-code'
   if (!isDriverName(recorded)) throw new Error(`run ${opts.id} is on ${recorded}, which agent-runner cannot start`)
+  const setup = await readPersonal(repo, opts.log ?? (() => {}))
   return resumeRun(repo, {
     id: opts.id,
     ...(opts.text !== undefined ? { text: opts.text } : {}),
     ...(opts.answer !== undefined ? { answer: opts.answer } : {}),
     ...(opts.model !== undefined ? { model: opts.model } : {}),
-    driver: (deps.driverFor ?? driverFor)(recorded, opts.id),
-    nextDriver: next => (deps.driverFor ?? driverFor)(recorded, next),
+    driver: (deps.driverFor ?? driverFor)(recorded, opts.id, setup),
+    nextDriver: next => (deps.driverFor ?? driverFor)(recorded, next, setup),
     ...(opts.log ? { log: opts.log } : {}),
   })
 }
@@ -203,12 +206,21 @@ export async function resumeProject(
  * with full access. The run's agent pushes its branch and opens its pull request itself, which
  * Codex's default sandbox (the workspace only) does not allow. The run's id is in the agent's
  * environment, so the claim it makes names the run (the tickets skill reads `AGENT_ID`).
+ *
+ * Claude Code starts without the person's own setup, so a run does the same job on every machine,
+ * each part loaded only when this machine's config turns it on (`personal:` in `config.ts`):
+ * `memory` (auto-memory), `connectors` (claude.ai connectors), `skills` (user settings, which carry
+ * the skills synced from the claude.ai account, with `~/.claude/CLAUDE.md` and `~/.claude/skills`).
+ * The project's own instructions, skills and settings always load. Codex is started as it is.
  */
-export function driverFor(name: DriverName, id: string): Driver {
-  const env = { ...process.env, [AGENT_ID_ENV]: id }
+export function driverFor(name: DriverName, id: string, setup: PersonalSetup): Driver {
+  const env: NodeJS.ProcessEnv = { ...process.env, [AGENT_ID_ENV]: id }
   switch (name) {
-    case 'claude-code':
-      return new ClaudeCodeDriver({ permissionMode: 'bypassPermissions', env })
+    case 'claude-code': {
+      if (!setup.memory) env['CLAUDE_CODE_DISABLE_AUTO_MEMORY'] = '1'
+      if (!setup.connectors) env['ENABLE_CLAUDEAI_MCP_SERVERS'] = 'false'
+      return new ClaudeCodeDriver({ permissionMode: 'bypassPermissions', env, ...(setup.skills ? {} : { extraArgs: ['--setting-sources', 'project,local'] }) })
+    }
     case 'codex':
       return new CodexDriver({ sandbox: 'danger-full-access', env })
   }

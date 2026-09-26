@@ -1,8 +1,6 @@
 import { spawn } from 'node:child_process'
-import { readFile } from 'node:fs/promises'
-import { basename, join } from 'node:path'
-import { parseDocument } from 'yaml'
-import { RUNNER_CONFIG, RUNNER_DIR } from './names.js'
+import { basename } from 'node:path'
+import { configFile, readConfig } from './config.js'
 
 /**
  * The line a person wrote to run when a run needs them: `ended:` in the project's
@@ -49,25 +47,8 @@ export function endedMessage(project: string, prompt: string, news: EndedNews): 
 
 /** The `ended:` line of this machine, or none. A file that cannot be read is said on `log`. */
 export async function readEndedLine(repo: string, log: (line: string) => void): Promise<string | undefined> {
-  const file = join(repo, RUNNER_DIR, RUNNER_CONFIG)
-  let raw: string
-  try {
-    raw = await readFile(file, 'utf8')
-  } catch {
-    return undefined
-  }
-  const doc = parseDocument(raw)
-  if (doc.errors.length > 0) {
-    log(`[agent-runner] ${file}: ${doc.errors[0]!.message.split('\n')[0]}`)
-    return undefined
-  }
-  const top: unknown = doc.toJS()
-  if (top !== null && (typeof top !== 'object' || Array.isArray(top))) {
-    log(`[agent-runner] ${file}: the file is not a YAML map`)
-    return undefined
-  }
-  const value = (top as Record<string, unknown> | null)?.['ended']
-  if (value !== undefined && value !== null && typeof value !== 'string') log(`[agent-runner] ${file}: \`ended\` is not a string`)
+  const value = (await readConfig(repo, log))['ended']
+  if (value !== undefined && value !== null && typeof value !== 'string') log(`[agent-runner] ${configFile(repo)}: \`ended\` is not a string`)
   return typeof value === 'string' && value.trim() ? value.trim() : undefined
 }
 

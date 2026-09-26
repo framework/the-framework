@@ -69,12 +69,37 @@ test('run --detach on Codex: the marker and the spawned run name Codex, and no m
 })
 
 test('a run\'s Codex has full access and the run\'s id in its environment, as its Claude Code has', () => {
-  const codex = driverFor('codex', 'run-1')
+  const codex = driverFor('codex', 'run-1', { memory: false, connectors: false, skills: false })
   assert.ok(codex instanceof CodexDriver)
   const opts = (codex as unknown as { opts: { sandbox?: string; env?: NodeJS.ProcessEnv } }).opts
   assert.equal(opts.sandbox, 'danger-full-access')
   assert.equal(opts.env?.['AGENT_ID'], 'run-1')
-  assert.equal(driverFor('claude-code', 'run-1').id, 'claude-code')
+  assert.equal(driverFor('claude-code', 'run-1', { memory: false, connectors: false, skills: false }).id, 'claude-code')
+})
+
+test('a run\'s Claude Code leaves each part of the person\'s own setup out, unless this machine turns it on', () => {
+  // A part turned on gives no switch; the variables must not come from the shell running the tests.
+  delete process.env['CLAUDE_CODE_DISABLE_AUTO_MEMORY']
+  delete process.env['ENABLE_CLAUDEAI_MCP_SERVERS']
+  const optsOf = (driver: Driver) => (driver as unknown as { opts: { permissionMode?: string; env?: NodeJS.ProcessEnv; extraArgs?: string[] } }).opts
+  const clean = optsOf(driverFor('claude-code', 'run-1', { memory: false, connectors: false, skills: false }))
+  assert.equal(clean.permissionMode, 'bypassPermissions')
+  assert.equal(clean.env?.['AGENT_ID'], 'run-1')
+  assert.equal(clean.env?.['CLAUDE_CODE_DISABLE_AUTO_MEMORY'], '1')
+  assert.equal(clean.env?.['ENABLE_CLAUDEAI_MCP_SERVERS'], 'false')
+  assert.deepEqual(clean.extraArgs, ['--setting-sources', 'project,local'])
+  const memory = optsOf(driverFor('claude-code', 'run-1', { memory: true, connectors: false, skills: false }))
+  assert.equal(memory.env?.['CLAUDE_CODE_DISABLE_AUTO_MEMORY'], undefined)
+  assert.equal(memory.env?.['ENABLE_CLAUDEAI_MCP_SERVERS'], 'false')
+  assert.deepEqual(memory.extraArgs, ['--setting-sources', 'project,local'])
+  const connectors = optsOf(driverFor('claude-code', 'run-1', { memory: false, connectors: true, skills: false }))
+  assert.equal(connectors.env?.['CLAUDE_CODE_DISABLE_AUTO_MEMORY'], '1')
+  assert.equal(connectors.env?.['ENABLE_CLAUDEAI_MCP_SERVERS'], undefined)
+  assert.deepEqual(connectors.extraArgs, ['--setting-sources', 'project,local'])
+  const skills = optsOf(driverFor('claude-code', 'run-1', { memory: false, connectors: false, skills: true }))
+  assert.equal(skills.env?.['CLAUDE_CODE_DISABLE_AUTO_MEMORY'], '1')
+  assert.equal(skills.env?.['ENABLE_CLAUDEAI_MCP_SERVERS'], 'false')
+  assert.equal(skills.extraArgs, undefined)
 })
 
 test('a resumed run continues on the tool its record names, and a Codex run with no model resumes with none', async () => {
@@ -91,9 +116,9 @@ test('a resumed run continues on the tool its record names, and a Codex run with
     const first = await runCommand(repo, { prompt: 'Read the docs', driver: codex('Read.'), host: 'this-box', pid: 4242, now: () => NOW, gitHost: { requestOfBranch: async () => undefined, mergeRequest: async () => ({ outcome: 'failed', error: 'none' }) } })
     assert.equal(first.status, 'done')
     const asked: string[] = []
-    const second = await resumeProject(repo, { id: first.id, text: 'And the tests?' }, { driverFor: name => { asked.push(name); return codex('Read too.') } })
+    const second = await resumeProject(repo, { id: first.id, text: 'And the tests?' }, { driverFor: (name, _id, setup) => { asked.push(`${name} ${JSON.stringify(setup)}`); return codex('Read too.') } })
     assert.equal(second.status, 'done')
-    assert.deepEqual(asked, ['codex'])
+    assert.deepEqual(asked, ['codex {"memory":false,"connectors":false,"skills":false}'], 'no config on this machine: the run leaves the person\'s setup out')
     assert.deepEqual(startedWith, [{}, {}], 'no model named at the start nor at the resume: Codex runs on its own default')
   } finally {
     await removeRepo(repo)

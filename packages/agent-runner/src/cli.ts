@@ -27,7 +27,13 @@ export const USAGE = `usage: agent-runner <command>
 When a run ends waiting on a question, or ends done with a pull request it did not have, the \`ended:\` line in the
 project's .agent-runner/config.yml runs, if there is one, in the project's root, with MESSAGE (one line for a person),
 RUN_ID, STATUS, QUESTION and PR_URL in its environment. The file is this machine's: keep it out of git (this tool hides
-.agent-runner/ from git once a run has started here).
+.agent-runner/ from git once a run has started here). A run's Claude Code leaves out the person's own setup so it does the
+same job on every machine; in the same file, each part comes back with its own line under \`personal:\`:
+  personal:
+    memory: on        your auto-memory (the notes Claude Code keeps for the project)
+    connectors: on    your claude.ai connectors
+    skills: on        your user settings (effort, model, a login through apiKeyHelper), the skills synced from
+                      your claude.ai account, ~/.claude/CLAUDE.md, ~/.claude/skills
 
 JSON on stdout. Exit code 1 for a refusal or a failure (the reason on stderr), 2 for a usage error.`
 

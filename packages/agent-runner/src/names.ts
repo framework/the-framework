@@ -12,5 +12,5 @@ export const DASHBOARD_DIR = '.the-framework'
 /** The dashboard's hooks file, the lines it runs for the project: where `init` writes this tool's. */
 export const DASHBOARD_HOOKS = `${DASHBOARD_DIR}/hooks.yml`
 
-/** Under the tool's directory: this machine's settings for the tool, the `ended:` line. */
+/** Under the tool's directory: this machine's settings for the tool, the `ended:` line and the `personal:` parts. */
 export const RUNNER_CONFIG = 'config.yml'

@@ -1,4 +1,4 @@
-The rules and the processes of `agent-runner`: run records [1] as markers, the live record [2] a run's session keeps for the dashboard, the run's lock [3] that keeps one process per run, one run's [4] life from checkout [5] to record and its resume, the person's `ended:` line [10] run when a run's end needs them, the follow-up [6], the sweep [7], the detached run and whether a run can start here, the dashboard's hooks, and the command line. Every file here has a `LOGIC.md` of its own.
+The rules and the processes of `agent-runner`: run records [1] as markers, the live record [2] a run's session keeps for the dashboard, the run's lock [3] that keeps one process per run, one run's [4] life from checkout [5] to record and its resume, the person's `ended:` line [10] run when a run's end needs them, the follow-up [6], the sweep [7], the detached run, whether a run can start here, the person's own setup left out of a run's Claude Code except the parts this machine turns on under `personal:`, the dashboard's hooks, and the command line. Every file here has a `LOGIC.md` of its own.
 
 ## Context
 
@@ -21,6 +21,7 @@ The rules and the processes of `agent-runner`: run records [1] as markers, the l
 
 ## Business logic — TL;DR
 
+- **This machine's settings** (`config.ts`, `config.test.ts`) - `.agent-runner/config.yml` read as a YAML map, a broken file one line on the log and no settings; `personal:` a map with one line per part of the person's own setup (`memory`, `connectors`, `skills`), a part on only for `on` or YAML true, anything else in the map one line on the log.
 - **The names** (`names.ts`) - the tool's directory `.agent-runner`, its `runs/` and its `config.yml`, the dashboard's directory and its hooks file.
 - **Run records as markers** (`records.ts`, `records.test.ts`) - a marker is a running card with the tool's mark [9]; withdrawn when a scheduler lost the cap; overwritten by the record at the end.
 - **The live record** (`live-card.ts`) - where the session's card, diary and inbox live in the checkout; a card read as this tool's only with the mark; closing a dead run's record from outside.

@@ -87,7 +87,7 @@ Waiting: what it waits on [optional: no agent is handed it until a person remove
 [optional: more, under any heading]
 ```
 
-A ticket with a `PR:` line, a link or not, is in review: skip it when choosing work, and never queue it while the line stands; remove the line to have it worked again. A `Waiting:` line names what the ticket waits on outside the work, and an empty one waits on nothing: skip the ticket when choosing work, and never queue it, nor a plan for it, while the line stands; only a person removes the line, when the wait is over. `Priority:` is a bare whole number from 0 to 10 above the `# ` title; anything else queues at 5.
+A ticket with a `PR:` line, a link or not, is in review: skip it when choosing work, and never queue it while the line stands; remove the line to have it worked again. A `Waiting:` line names what the ticket waits on outside the work: skip the ticket when choosing work, and never queue it, nor a plan for it, while the line stands; only a person removes the line, when the wait is over. A `Waiting:` line with nothing after the colon is no wait: the ticket is free to work. `Priority:` is a bare whole number from 0 to 10 above the `# ` title; anything else queues at 5.
 
 ### A claim: `tickets/<DATE>_<SLUG>.lock.md`
 

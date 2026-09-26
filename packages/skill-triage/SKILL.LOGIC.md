@@ -11,7 +11,7 @@ The `triage` command skill: the prompt of the agent a runner starts for putting 
 - **The mode** - the word after the command: `quick`, `consensual`, or nothing for both; any other word, the agent says so and stops, as its first step.
 - **Capabilities first** - with no ticketing system or no AI queue, it shows an error to the user saying which and stops, right after the mode word is read; in capability words, naming no skill.
 - **Nobody answers** - the agent never asks and decides by itself.
-- **The listing decides** - the agent reads the open tickets as listed, and the queue, and opens no ticket; what a ticket is, and in which order it goes, is read off its row.
+- **The listing decides** - the agent reads the open tickets as listed, and the queue, and opens no ticket; when either read fails, it shows an error to the user saying which and why, and stops, so a run never queues from a queue it could not read; what a ticket is, and in which order it goes, is read off its row.
 - **Only planned tickets with both numbers** - a ticket without a plan, or whose listing gives no effort or no uncertainty, qualifies for nothing, in either mode; a rating the listing could not read (`Effort: 2 (maybe 3)`) is no rating.
 - **A quick win** - effort 2 or less and uncertainty 2 or less.
 - **Consensual work** - uncertainty 3 or less and not a quick win.

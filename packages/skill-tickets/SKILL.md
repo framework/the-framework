@@ -54,8 +54,10 @@ npx tickets release <file>       lift your own claim when the plan or the work i
 When the repository has the `queue` skill, a ticket goes on the agent queue as a link, its title as the label, at the ticket's own `Priority:` (5 when it has none):
 
 ```
-npx queue add "[<title>](tickets/<file>)" --priority <N>
+npx queue add '[<title>](tickets/<file>)' --priority <N>
 ```
+
+Keep the single quotes, so the shell passes a title's backticks and `$` as written; a `'` in the title is written `'\''`.
 
 Once the work is committed and its pull request is open: `npx queue done` the entry, its exact text, write the pull request into the ticket as its `PR:` line (`put` the whole ticket, the line added above the title), and release your claim. The ticket is in review. Do not close it: it closes when the pull request merges, through the update from the issue tracker, which reads the line `Closes tickets/<file>` in the pull request's body; add `Closes #<number>` when the ticket has an issue.
 
@@ -85,7 +87,7 @@ Waiting: what it waits on [optional: no agent is handed it until a person remove
 [optional: more, under any heading]
 ```
 
-A ticket with a `PR:` line is in review: skip it when choosing work, and never queue it while the line stands; remove the line to have it worked again. A `Waiting:` line names what the ticket waits on outside the work: skip the ticket when choosing work, and never queue it, nor a plan for it, while the line stands; only a person removes the line, when the wait is over. `Priority:` is a bare whole number from 0 to 10 above the `# ` title; anything else queues at 5.
+A ticket with a `PR:` line, a link or not, is in review: skip it when choosing work, and never queue it while the line stands; remove the line to have it worked again. A `Waiting:` line names what the ticket waits on outside the work, and an empty one waits on nothing: skip the ticket when choosing work, and never queue it, nor a plan for it, while the line stands; only a person removes the line, when the wait is over. `Priority:` is a bare whole number from 0 to 10 above the `# ` title; anything else queues at 5.
 
 ### A claim: `tickets/<DATE>_<SLUG>.lock.md`
 

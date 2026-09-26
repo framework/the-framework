@@ -24,15 +24,15 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   line. Picked over two commands one sentence apart (the same job written twice), and
   over one line running both modes (significant work would then be queued wherever quick
   wins are, with no switch of its own).
-- The command's words are the rules of the job, in numbers two runs agree on: a quick
-  win is a planned ticket with effort 2 or less and uncertainty 2 or less; consensual
-  work is a planned ticket with uncertainty 3 or less that is no quick win; a plan
-  without both numbers qualifies for nothing; a ticket on the queue, held, in review or
-  whose plan is outdated is skipped; every pick goes on the queue at the ticket's
-  priority, lowest effort first; only queue, never do, so a human can still veto on the
-  queue. Picked over "low effort and no uncertainty" and "significant, consensual",
-  which one run read as uncertainty 0 (never met) and another as uncertainty 3; over
-  bumping quick wins one above their priority, which contradicted the rule every ticket
-  is queued by; and over skipping a ticket whose plan records a decision not to do the
-  work, which no plan key marks and two runs read differently (such a ticket is closed
+- The command's words are the rules of the job, in numbers two runs agree on, read off the
+  ticket listing: a quick win is a planned ticket with effort 2 or less and uncertainty 2
+  or less; consensual work is a planned ticket with uncertainty 3 or less that is no quick
+  win; a plan without both numbers qualifies for nothing; a ticket on the queue, held, in
+  review, waiting or whose plan is outdated is skipped; every pick goes on the queue at
+  the ticket's priority, lowest effort first; only queue, never do, so a human can still
+  veto on the queue. Picked over "low effort and no uncertainty" and "significant,
+  consensual", which one run read as uncertainty 0 (never met) and another as uncertainty
+  3; over bumping quick wins one above their priority, which contradicted the rule every
+  ticket is queued by; and over skipping a ticket whose plan records a decision not to do
+  the work, which no plan key marks and two runs read differently (such a ticket is closed
   by hand).

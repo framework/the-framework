@@ -23,8 +23,8 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   skill. The command's words are the rules of the job, in numbers read off the ticket
   listing — a ticket needs a plan when it has none or an outdated one, and is neither held
   nor in review nor waiting nor on the queue; at most ten a run, highest priority first,
-  then oldest, then by file name; one entry per ticket, `Create tickets/<name>.plan.md`, at
-  the ticket's own priority; no plan written by this agent — never a skill's name or
-  command. Picked over the agent ranking the tickets and picking each priority after
-  reading them, which two runs never did the same way; and over one agent per ticket with
-  a claim: the queue is the fan-out, and the queued work writes each plan one at a time.
+  then oldest; one entry per ticket, `Create tickets/<name>.plan.md`, at the ticket's own
+  priority; no plan written by this agent — never a skill's name or command. Picked over
+  the agent ranking the tickets and picking each priority after reading them, which two
+  runs never did the same way; and over one agent per ticket with a claim: the queue is
+  the fan-out, and the queued work writes each plan one at a time.

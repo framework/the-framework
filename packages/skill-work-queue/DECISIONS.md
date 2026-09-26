@@ -21,14 +21,13 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   never picks it on its own.
 - A runner fires a command by its name, `/work-queue`; the agent's harness expands the
   skill. The command's words are the rules of the job — one task, commit, publish as a
-  pull request that merges on green and names the ticket it closes, then mark done, the
-  pull request written on the ticket and the claim released so the ticket is in review,
-  closed only when the pull request merges; say so and stop when nothing is queued — never
-  a skill's name or command. Picked over the run that started the agent publishing for it:
-  the agent pushes through the branches skill and opens the pull request through the git
-  host's skill, both already in its checkout. Picked over marking done before the publish:
-  a publish that failed lost the task. Picked over closing the ticket at commit time: a
-  pull request closed unmerged lost the ticket.
+  pull request that merges on green; the pull request naming the ticket it closes, then
+  mark done, the `PR:` line and the release are the ticketing system's own rule for queued
+  work — never a skill's name or command. Picked over the run that started the agent
+  publishing for it: the agent pushes through the branches skill and opens the pull
+  request through the git host's skill, both already in its checkout. Picked over marking
+  done before the publish: a publish that failed lost the task. Picked over closing the
+  ticket at commit time: a pull request closed unmerged lost the ticket.
 - A ticket with nothing to do until something outside the work happens gets a `Waiting:`
   line, and its entry is marked done; the agent never closes it. Picked over closing the
   ticket to stop it coming back.

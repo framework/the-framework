@@ -23,7 +23,7 @@ Fixes the vocabulary of the driver [1] contract, in words: what every driver pro
 [15] cloud anchor: an empty commit a web agent pushes before its task leaves this machine, unique to the agent: the branch the cloud session later pushes descends from it.
 [16] quota boundary: the share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
 [17] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
-[18] personal setup: the three parts of the person's own setup a coding agent loads when started by hand: `memory` (what the coding agent remembers across sessions on its own), `connectors` (the apps and accounts linked to the person's login), `skills` (the person's own instructions, skills and settings files).
+[18] personal setup: the three parts of the person's own setup a coding agent loads when started by hand, by the names every adapter takes: `memory` (what the coding agent remembers across sessions on its own), `connectors` (the apps and accounts linked to the person's login), `skills` (the person's own instructions, skills and settings files).
 
 ## Business logic — TL;DR
 
@@ -61,7 +61,7 @@ A driver [1] has a stable implementation id (see "The implementation ids") and c
 
 #### Business logic
 
-The contract names the three parts of the personal setup [18]: `memory`, `connectors` and `skills`, each on (loaded) or off (kept out). Every adapter takes the same three as one of its options and turns each part that is off into its own coding agent's switches, which the caller never sees. An adapter given no personal setup loads everything, as its coding agent does when started by hand. A part an adapter cannot turn off is never reported as off in silence: its readiness check warns about it.
+The contract names the three parts of the personal setup [18]: `memory`, `connectors` and `skills`, each on (loaded) or off (kept out). Every adapter that starts a coding agent on this machine takes the same three as one of its options (the GitHub Actions driver's runner holds no personal setup, so it takes none) and turns each part that is off into its own coding agent's switches, which the caller never sees. An adapter given no personal setup loads everything, as its coding agent does when started by hand. A part an adapter cannot turn off is never reported as off in silence: its readiness check warns about it.
 
 ### How a driver session is started
 
@@ -92,7 +92,7 @@ A turn [3] sends one prompt to the coding agent [8], lets the coding agent's own
 
 - Extra framing [10] for this turn only, appended after the driver session's [2] framing.
 - A stop request [11] for this turn only.
-- A request to continue the coding agent's previous turn instead of starting fresh, so that a live chat [12] message lands in the ongoing conversation with its full context. It is best effort: a driver that cannot resume, or has no previous turn yet, runs a fresh turn, which is the normal case. The Claude Code, Codex and GitHub Actions drivers honor it (`claude-code.ts`, `codex.ts`, `actions.ts`); the fake does not.
+- A request to continue the coding agent's previous turn instead of starting fresh, so that a live chat [12] message lands in the ongoing conversation with its full context. It is best effort: a driver that cannot resume, or has no previous turn yet, runs a fresh turn, which is the normal case. The Claude Code, Codex and GitHub Actions drivers honor it (`@agent-driver/claude`'s `claude-code.ts`, `@agent-driver/codex`'s `codex.ts`, `@agent-driver/claude`'s `actions.ts`); the fake does not.
 
 A turn answers with the coding agent's final message as text, the coding agent's session id when it exposes one (the handle the dashboard links to and the driver later resumes), and the turn's usage [5] when the coding agent reports one. A driver's own id for the driver session is distinct from that session id.
 

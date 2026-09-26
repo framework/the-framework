@@ -40,7 +40,7 @@ Drives Claude Code as a driver [1]: each turn [2] is one non-interactive invocat
 - **What is read off the streamed output** - the session id on its first sighting, text and tool names as they stream, and the final result line as the turn's answer, with everything else ignored.
 - **Usage off the result line** - token counts, and the price only when Claude Code reports one, never zero.
 - **Rate limit telemetry** - each rate-limit line becomes a rate limit [6] reading with its status and window passed through verbatim and its reset time converted to milliseconds; a malformed line stays silent.
-- **Reading the account's quota** - the driver reads the quota [8] through `claude-code-quota.ts`, with the same command and environment it runs turns with.
+- **Reading the account's quota** - the driver reads the quota [8] through `claude-code-quota.ts`, with the same command and environment it runs turns with, the personal setup's environment switches included (the `skills` switch is a command-line flag and does not apply to the readout).
 - **The person's own setup** - each part of the personal setup [14] the caller turns off becomes Claude Code's own switch: `memory` off sets `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`, `connectors` off sets `ENABLE_CLAUDEAI_MCP_SERVERS=false`, `skills` off passes `--setting-sources project,local`; given none, Claude Code loads everything.
 - **Can a session start here** - `claude` asked `--version`, then `auth status`, whose JSON `loggedIn` flag is the answer; every part of the personal setup has a switch, so none is ever a warning.
 - **Ending the driver session** - only the temporary MCP configuration is freed; each turn's process is already gone when the turn ends.
@@ -162,7 +162,7 @@ A rate-limit line becomes a rate limit [6] reading carrying its status and its w
 
 #### Business logic
 
-On request, the driver [1] reads where the account's quota [8] stands through the reader in `claude-code-quota.ts`, with the same command, environment and process spawner it runs turns [2] with, and with the caller's stop request [12]. The reading is account-wide and needs no driver session [3].
+On request, the driver [1] reads where the account's quota [8] stands through the reader in `claude-code-quota.ts`, with the same command, environment and process spawner it runs turns [2] with (the personal setup's [14] environment switches included; the `skills` switch is a command-line flag and does not apply to the readout), and with the caller's stop request [12]. The reading is account-wide and needs no driver session [3].
 
 ### The person's own setup
 
@@ -180,7 +180,7 @@ A driver given a personal setup turns each part that is off into one switch, and
 - `connectors` off: `ENABLE_CLAUDEAI_MCP_SERVERS=false` in the environment, so no connectors of the claude.ai account.
 - `skills` off: `--setting-sources project,local` on the command line, ahead of any extra arguments the driver was configured with, so no user settings: no skills synced from the claude.ai account, no `~/.claude/CLAUDE.md` or `~/.claude/skills`, and no personal effort level, model, hooks, `apiKeyHelper` or `env` entries. Claude Code offers no switch for the skills alone, so these go together; a person who logs in through their user settings needs `skills` on. Whether MCP servers added for all projects (`claude mcp add -s user`) and `~/.claude/agents` go too was not tested.
 
-A driver given no personal setup adds none of these, and Claude Code loads everything. The project's `CLAUDE.md`, its skills, its project and local settings, the MCP servers the driver was configured with, and Claude Code's built-in skills load either way.
+A driver given no personal setup adds none of these, and Claude Code loads everything. With a personal setup, the environment is taken when a driver session starts (the driver's configured one, else this process's), so a later change to this process's environment does not reach that session's turns. The project's `CLAUDE.md`, its skills, its project and local settings, the MCP servers the driver was configured with, and Claude Code's built-in skills load either way.
 
 ### Can a session start here
 
@@ -190,7 +190,7 @@ A driver given no personal setup adds none of these, and Claude Code loads every
 
 #### Business logic
 
-The readiness check (`agent-driver`'s `ready.ts`) asks `claude --version`, then `claude auth status`. That prints JSON and exits 0 whether logged in or not, so its `loggedIn` flag is the answer and the exit code is not; output that is not JSON with a true/false `loggedIn` (an older CLI printing its usage) is "could not say" and passes. A missing CLI is "`claude` not found — install Claude Code and make sure `claude` is on your PATH: https://claude.com/claude-code"; a logged-out one is "`claude` is not logged in. Run `claude auth login`, then start again." Every part of the personal setup [14] has a switch, so this driver adds no warning of its own.
+The readiness check (`agent-driver`'s `ready.ts`) asks `claude --version`, then `claude auth status`. That prints JSON and exits 0 whether logged in or not, so its `loggedIn` flag is the answer and the exit code is not; the answer is read from standard output and standard error together, and output that is not JSON with a true/false `loggedIn` as a whole (an older CLI printing its usage, or a warning line beside the JSON) is "could not say" and passes. A missing CLI is "`claude` not found — install Claude Code and make sure `claude` is on your PATH: https://claude.com/claude-code"; a logged-out one is "`claude` is not logged in. Run `claude auth login`, then start again." Every part of the personal setup [14] has a switch, so this driver adds no warning of its own.
 
 ### Ending the driver session
 

@@ -20,7 +20,7 @@ export { SessionLog, attachLog, logCardFile, logDiaryFile, diaryLine, agentEnv, 
 export { checkCliReady, probeCli, type CliProbe, type CliSpec, type DriverReadiness, type DriverReadyOptions } from './ready.js'
 export { FakeDriver, FakeDriverSession, type FakeTurn, type FakeDriverOptions } from './fake.js'
 // What an adapter package builds its driver with: the event stream, the framing and stop
-// signals, reading a file back, the log, and the end of a turn.
+// signals, and reading a file back (the log and the end of a turn are exported above).
 export { makeEmit, combineFraming, combineSignals, readWorkspaceFile } from './session-support.js'
 export {
   runCliSession,

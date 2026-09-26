@@ -127,7 +127,7 @@ test('ready to run: the coding agent\'s problems stop a run; nothing else is pro
   try {
     assert.deepEqual(await readyToRun(repo, 'claude-code', { probe: answers(true), isRoot: notRoot }), { problems: [], warnings: [] })
     assert.deepEqual(await readyToRun(repo, 'codex', { probe: answers(true), isRoot: notRoot, agentsSkills: join(repo, 'no-such-dir') }), { problems: [], warnings: [] })
-  assert.ok(probed.every(bin => bin === 'claude' || bin === 'codex'), `only the coding agent's CLI is asked, not ${probed.join(', ')}`)
+    assert.ok(probed.every(bin => bin === 'claude' || bin === 'codex'), `only the coding agent's CLI is asked, not ${probed.join(', ')}`)
 
     const out = await readyToRun(repo, 'claude-code', { probe: answers(false), isRoot: notRoot })
     assert.match(out.problems[0]!, /claude auth login/)

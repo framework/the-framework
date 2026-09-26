@@ -69,9 +69,10 @@ export class ClaudeCodeDriver implements Driver {
 
   /** Where the account's subscription quota stands (#521). Account-wide, so no session. */
   readQuota(opts: { signal?: AbortSignal } = {}): Promise<DriverQuota> {
+    const env = withPersonal(this.opts).env
     return readClaudeQuota({
       ...(this.opts.bin !== undefined ? { bin: this.opts.bin } : {}),
-      ...(this.opts.env !== undefined ? { env: this.opts.env } : {}),
+      ...(env !== undefined ? { env } : {}),
       ...(this.opts.spawn !== undefined ? { spawn: this.opts.spawn } : {}),
       ...(opts.signal !== undefined ? { signal: opts.signal } : {}),
     })

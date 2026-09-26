@@ -55,8 +55,8 @@ export const PERSONAL_PARTS = ['memory', 'connectors', 'skills'] as const
  * Which parts of the person's own setup a coding agent loads: `true` loads the part, `false`
  * keeps it out. `memory` is what the agent remembers across sessions on its own; `connectors` are
  * the apps and accounts linked to the person's login; `skills` are the person's own instructions,
- * skills and settings files. Every adapter takes the same three and turns each off with its own
- * switches; a part an adapter cannot turn off is a warning in its readiness check, never a
+ * skills and settings files. Every adapter that starts a coding agent on this machine takes the same three and turns each
+ * off with its own switches; a part an adapter cannot turn off is a warning in its readiness check, never a
  * silent "off". An adapter given none loads everything, as its CLI does on its own.
  */
 export type PersonalSetup = Record<(typeof PERSONAL_PARTS)[number], boolean>

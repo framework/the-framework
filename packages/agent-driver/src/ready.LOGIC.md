@@ -30,7 +30,7 @@ See `## Context`: the answer is asked before a run spends a checkout.
 
 #### Business logic
 
-The CLI is asked `--version` first. When that fails (the binary is not on `PATH`, or exits non-zero), the answer has one problem, "`<bin>` not found — " followed by the adapter's install fix, and the login question is not asked: one "not found" beats two lines saying the same thing.
+The CLI is asked `--version` first. When that fails (the binary is not on `PATH`, exits non-zero, or does not answer within ten seconds), the answer has one problem, "`<bin>` not found — " followed by the adapter's install fix, and the login question is not asked: one "not found" beats two lines saying the same thing.
 
 When the CLI answers, it is asked the adapter's login question, and the adapter's reader turns the answer into yes, no, or could not say. Only a no is a problem: "`<bin>` is not logged in. Run `<login command>`, then start again." Yes and "could not say" add nothing. How Claude Code and Codex answer is told in each adapter's `LOGIC.md`.
 

@@ -1,7 +1,7 @@
 import { execFile, spawn as nodeSpawn } from 'node:child_process'
-import { lstat, mkdir, readlink, readdir, rm, symlink } from 'node:fs/promises'
+import { copyFile, lstat, mkdir, readlink, readdir, rm, stat, symlink } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { runCliSession, finishTurn, agentEnv, attachLog, combineFraming, combineSignals, makeEmit, readWorkspaceFile, checkCliReady, type AgentCliParser, type CliSpec, type DriverReadiness, type DriverReadyOptions, type PersonalSetup, type SpawnLike, type SessionLog, type Driver, type DriverEvent, type DriverPromptOptions, type DriverSession, type DriverStartOptions, type DriverTurn, type DriverUsage } from 'agent-driver'
 
 /**
@@ -34,8 +34,8 @@ export interface CodexDriverOptions {
    */
   personal?: PersonalSetup
   /**
-   * The Codex home a run with `skills` off uses in place of the person's own: a folder holding
-   * only a link to their login, so their `AGENTS.md`, skills and `config.toml` stay out. Kept,
+   * The Codex home a run with `skills` off uses in place of the person's own: a folder that starts
+   * with only a link to their login, so their `AGENTS.md`, skills and `config.toml` stay out. Kept,
    * not temporary: Codex saves its conversations there, and a resume must find them. Default
    * {@link defaultCodexHome}.
    */
@@ -44,7 +44,7 @@ export interface CodexDriverOptions {
   spawn?: SpawnLike
 }
 
-/** The clean Codex home kept on this machine: `$XDG_STATE_HOME/agent-driver/codex-home`, or under `~/.local/state`. */
+/** The Codex home kept on this machine for every project: `$XDG_STATE_HOME/agent-driver/codex-home`, or under `~/.local/state`. */
 export function defaultCodexHome(env: NodeJS.ProcessEnv = process.env): string {
   return join(env['XDG_STATE_HOME'] || join(homedir(), '.local', 'state'), 'agent-driver', 'codex-home')
 }
@@ -55,21 +55,37 @@ export function personalCodexHome(env: NodeJS.ProcessEnv = process.env): string 
 }
 
 /**
- * Make `home` a Codex home holding only a link to the login in `personal`, so a session started
- * there is logged in as the person and loads none of their files. Created on first use, the link
- * put back when it is missing or points elsewhere; the conversations Codex saves there are kept.
+ * Make `home` a Codex home that starts with only a link to the login in `personal`, so a session
+ * started there is logged in as the person and loads none of their files. Created on first use;
+ * the conversations Codex saves there are kept. A link that is missing or points elsewhere is put
+ * back. A plain file in its place is a login Codex saved over the link: when it is newer than the
+ * person's own, it is copied onto theirs first, so a refreshed login is never lost.
  */
 export async function prepareCodexHome(home: string, personal: string): Promise<void> {
+  home = resolve(home)
+  personal = resolve(personal)
+  if (home === personal) return
   await mkdir(home, { recursive: true })
   const link = join(home, 'auth.json')
   const target = join(personal, 'auth.json')
-  try {
-    if ((await lstat(link)).isSymbolicLink() && (await readlink(link)) === target) return
+  const found = await lstat(link).catch((err: NodeJS.ErrnoException) => {
+    if (err.code === 'ENOENT') return undefined
+    throw err
+  })
+  if (found?.isSymbolicLink()) {
+    if ((await readlink(link)) === target) return
     await rm(link)
-  } catch {
-    // No link yet.
+  } else if (found?.isFile()) {
+    const theirs = await stat(target).catch(() => undefined)
+    if (!theirs || found.mtimeMs > theirs.mtimeMs) await copyFile(link, target)
+    await rm(link)
+  } else if (found) {
+    throw new Error(`${link} is neither a file nor a link; remove it to let Codex runs use this home`)
   }
-  await symlink(target, link)
+  await symlink(target, link).catch(async (err: NodeJS.ErrnoException) => {
+    // Another session starting at the same moment made the same link.
+    if (err.code !== 'EEXIST' || (await readlink(link).catch(() => undefined)) !== target) throw err
+  })
 }
 
 /**

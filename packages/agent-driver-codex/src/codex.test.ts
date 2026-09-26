@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { execFileSync } from 'node:child_process'
-import { lstat, mkdir, mkdtemp, readFile, readlink, realpath, rm, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, mkdtemp, readFile, readlink, realpath, rm, symlink, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
@@ -290,17 +290,47 @@ test('CodexDriver with skills off runs from a kept home that holds only a link t
     const home = join(dir, 'state', 'codex-home')
     await mkdir(personal)
     await writeFile(join(personal, 'auth.json'), '{}')
-    const first = await spawnedWith({ env: { CODEX_HOME: personal }, codexHome: home, personal: { memory: true, connectors: true, skills: false } })
+    const skillsOff = { env: { CODEX_HOME: personal }, codexHome: home, personal: { memory: true, connectors: true, skills: false } }
+    const first = await spawnedWith(skillsOff)
     assert.equal(first.env['CODEX_HOME'], home)
     assert.ok((await lstat(join(home, 'auth.json'))).isSymbolicLink())
     assert.equal(await readlink(join(home, 'auth.json')), join(personal, 'auth.json'))
-    // What Codex saved there (its conversations) stays for the resume; a link pointing elsewhere is put back.
+    // What Codex saved there (its conversations) stays; a link pointing elsewhere is put back.
     await writeFile(join(home, 'session.jsonl'), 'kept')
     await rm(join(home, 'auth.json'))
-    await writeFile(join(home, 'auth.json'), 'a stale copy')
-    await spawnedWith({ env: { CODEX_HOME: personal }, codexHome: home, personal: { memory: true, connectors: true, skills: false } })
+    await symlink(join(dir, 'elsewhere.json'), join(home, 'auth.json'))
+    await spawnedWith(skillsOff)
     assert.equal(await readlink(join(home, 'auth.json')), join(personal, 'auth.json'))
     assert.equal(await readFile(join(home, 'session.jsonl'), 'utf8'), 'kept')
+    // A login Codex saved over the link, newer than the person's, reaches the person's file first.
+    await rm(join(home, 'auth.json'))
+    await writeFile(join(home, 'auth.json'), 'refreshed')
+    await utimes(join(personal, 'auth.json'), new Date(0), new Date(0))
+    await spawnedWith(skillsOff)
+    assert.equal(await readFile(join(personal, 'auth.json'), 'utf8'), 'refreshed')
+    assert.equal(await readlink(join(home, 'auth.json')), join(personal, 'auth.json'))
+    // An older one does not overwrite it.
+    await rm(join(home, 'auth.json'))
+    await writeFile(join(home, 'auth.json'), 'stale')
+    await utimes(join(home, 'auth.json'), new Date(0), new Date(0))
+    await spawnedWith(skillsOff)
+    assert.equal(await readFile(join(personal, 'auth.json'), 'utf8'), 'refreshed')
+    // Two sessions starting at once both start.
+    await rm(join(home, 'auth.json'))
+    await Promise.all([spawnedWith(skillsOff), spawnedWith(skillsOff)])
+    assert.equal(await readlink(join(home, 'auth.json')), join(personal, 'auth.json'))
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('a Codex home that is the person\'s own is left as it is', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'codex-home-'))
+  try {
+    await writeFile(join(dir, 'auth.json'), '{}')
+    const { env } = await spawnedWith({ env: { CODEX_HOME: dir }, codexHome: dir, personal: { memory: true, connectors: true, skills: false } })
+    assert.equal(env['CODEX_HOME'], dir)
+    assert.ok((await lstat(join(dir, 'auth.json'))).isFile())
   } finally {
     await rm(dir, { recursive: true, force: true })
   }

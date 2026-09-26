@@ -382,7 +382,7 @@ export interface CodexReadyOptions extends DriverReadyOptions {
 /**
  * Whether a Codex session can start here: the CLI installed and logged in. With `skills` off, a
  * `~/.agents/skills` that holds skills is a warning: Codex reads that folder from the person's
- * home whatever its own home is, and no switch keeps it out. With `skills` off, `memory: on` is a
+ * home whatever its own home is, and no switch keeps it out. With `skills` off, `memory` on is a
  * warning too: Codex keeps its memories in the person's own home, which the run does not use.
  */
 export async function codexReady(opts: CodexReadyOptions = {}): Promise<DriverReadiness> {
@@ -391,7 +391,7 @@ export async function codexReady(opts: CodexReadyOptions = {}): Promise<DriverRe
     const dir = opts.agentsSkills ?? join(homedir(), '.agents', 'skills')
     const skills = await readdir(dir).catch(() => [])
     if (skills.some(name => !name.startsWith('.'))) ready.warnings.push(`Codex loads your skills in ${dir} even with \`skills\` off: it has no switch for that folder. Move them out to keep them out of runs.`)
-    if (opts.personal.memory) ready.warnings.push('`memory: on` does nothing for Codex while `skills` is off: Codex keeps its memories in your own Codex home, which runs then do not use. Turn `skills` on too to bring them back.')
+    if (opts.personal.memory) ready.warnings.push('`memory` on does nothing for Codex while `skills` is off: Codex keeps its memories in your own Codex home, which runs then do not use. Turn `skills` on too to bring them back, or `memory` off.')
   }
   return ready
 }

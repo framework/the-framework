@@ -37,11 +37,12 @@ export function configFile(repo: string): string {
 
 /**
  * Which parts of the person's own setup this machine's runs load: the `personal:` map in the
- * config, one line per part (`memory: on`). A part is off unless its line says on, so a run does
- * the same job on every machine; anything else in the map is said on `log` and changes nothing.
+ * config, one line per part (`memory: off`). A part is on unless its line says off, so a run
+ * loads what the coding agent loads when started by hand; anything else in the map is said on
+ * `log` and changes nothing.
  */
 export async function readPersonal(repo: string, log: (line: string) => void): Promise<PersonalSetup> {
-  const setup: PersonalSetup = { memory: false, connectors: false, skills: false }
+  const setup: PersonalSetup = { memory: true, connectors: true, skills: true }
   const value = (await readConfig(repo, log))['personal']
   if (value === undefined || value === null) return setup
   const file = configFile(repo)
@@ -51,8 +52,8 @@ export async function readPersonal(repo: string, log: (line: string) => void): P
   }
   for (const [part, on] of Object.entries(value)) {
     if (!(PERSONAL_PARTS as readonly string[]).includes(part)) log(`[agent-runner] ${file}: \`personal\` has no part \`${part}\`; the parts are ${PERSONAL_PARTS.join(', ')}`)
-    else if (on === 'on' || on === true) setup[part as keyof PersonalSetup] = true
-    else if (on !== null && on !== 'off' && on !== false) log(`[agent-runner] ${file}: \`personal.${part}\` is not on or off`)
+    else if (on === 'off' || on === false) setup[part as keyof PersonalSetup] = false
+    else if (on !== null && on !== 'on' && on !== true) log(`[agent-runner] ${file}: \`personal.${part}\` is not on or off`)
   }
   return setup
 }

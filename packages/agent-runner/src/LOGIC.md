@@ -21,7 +21,7 @@ The rules and the processes of `agent-runner`: run records [1] as markers, the l
 
 ## Business logic — TL;DR
 
-- **This machine's settings** (`config.ts`, `config.test.ts`) - `.agent-runner/config.yml` read as a YAML map, a broken file one line on the log and no settings; `personal:` a map with one line per part of the person's own setup (`memory`, `connectors`, `skills`), a part on only for `on` or YAML true, anything else in the map one line on the log.
+- **This machine's settings** (`config.ts`, `config.test.ts`) - `.agent-runner/config.yml` read as a YAML map, a broken file one line on the log and no settings; `personal:` a map with one line per part of the person's own setup (`memory`, `connectors`, `skills`), a part off only for `off` or YAML false, anything else in the map one line on the log.
 - **The names** (`names.ts`) - the tool's directory `.agent-runner`, its `runs/` and its `config.yml`, the dashboard's directory and its hooks file.
 - **Run records as markers** (`records.ts`, `records.test.ts`) - a marker is a running card with the tool's mark [9]; withdrawn when a scheduler lost the cap; overwritten by the record at the end.
 - **The live record** (`live-card.ts`) - where the session's card, diary and inbox live in the checkout; a card read as this tool's only with the mark; closing a dead run's record from outside.

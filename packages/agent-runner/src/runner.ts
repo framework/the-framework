@@ -36,7 +36,7 @@ export function isDriverName(name: string): name is DriverName {
  * Whether a run on `driver` can start on this machine, asked before it spends a checkout: the
  * coding agent's CLI is installed and logged in (a problem when not: the session would die
  * before its first turn). Warnings: running as root, and on Codex, skills in `~/.agents/skills`
- * it cannot keep out and `memory: on` that does nothing while `skills` is off. What a dashboard's check hook runs, and what a
+ * it cannot keep out and `memory` on that does nothing while `skills` is off. What a dashboard's check hook runs, and what a
  * person's run and a scheduler's tick refuse on. The git host is not probed: a project with no
  * git host package runs fine, and one whose git host cannot answer says so in the run's own log.
  */
@@ -215,9 +215,9 @@ export async function resumeProject(
  * Codex's default sandbox (the workspace only) does not allow. The run's id is in the agent's
  * environment, so the claim it makes names the run (the tickets skill reads `AGENT_ID`).
  *
- * The coding agent starts with the parts of the person's own setup this machine's config turns
- * on (`personal:` in `config.ts`), and without the rest, so a run does the same job on every
- * machine. How a part is turned off is the adapter's own business.
+ * The coding agent starts with the person's own setup, as when started by hand, less the parts
+ * this machine's config turns off (`personal:` in `config.ts`). How a part is turned off is the
+ * adapter's own business.
  */
 export function driverFor(name: DriverName, id: string, personal: PersonalSetup): Driver {
   const env: NodeJS.ProcessEnv = { ...process.env, [AGENT_ID_ENV]: id }

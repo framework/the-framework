@@ -55,7 +55,7 @@ A driver [1] has a stable implementation id (see "The implementation ids") and c
 
 #### Context
 
-**User story**: the user's scheduled runs do the same job on every machine, whichever coding agent [8] they are on, because the runner starts it without the person's own setup unless this machine turns a part on.
+**User story**: a user who wants their scheduled runs to do the same job on every machine, whichever coding agent [8] they are on, turns parts of their own setup off for the runner, and each coding agent keeps them out.
 
 **Problem**: every coding agent loads the person's own setup its own way, from its own files and its own account, and turns each piece off with its own switches. A caller that knew those switches would have to learn them again for every coding agent.
 

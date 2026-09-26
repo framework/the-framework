@@ -368,7 +368,7 @@ test('codexReady asks codex, and warns about ~/.agents/skills only when skills a
     assert.deepEqual((await codexReady({ ...base, personal: { memory: false, connectors: false, skills: true } })).warnings, [], 'skills on: nothing to warn about')
     const memoryOn = await codexReady({ ...base, personal: { memory: true, connectors: false, skills: false } })
     assert.equal(memoryOn.warnings.length, 2)
-    assert.match(memoryOn.warnings[1]!, /`memory: on` does nothing for Codex while `skills` is off/)
+    assert.match(memoryOn.warnings[1]!, /`memory` on does nothing for Codex while `skills` is off/)
     assert.equal((await codexReady({ ...base, personal: { memory: true, connectors: false, skills: true } })).warnings.length, 0)
     assert.deepEqual((await codexReady(base)).warnings, [], 'no setup given: Codex as it is')
     assert.ok(probed.every(bin => bin === 'codex'))

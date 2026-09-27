@@ -1,7 +1,7 @@
 import { hostname } from 'node:os'
 import { mkdir, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { continuationPrompt, logDiaryFile, parseQuestion, promptOf, takeInbox, type Driver, type DriverSession, type LogEndStatus } from 'agent-driver'
+import { AgentExitError, continuationPrompt, logDiaryFile, parseQuestion, promptOf, takeInbox, type Driver, type DriverSession, type LogEndStatus } from 'agent-driver'
 import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
 import { agentBranchName, attachCheckout, createCheckout, reclaimWorktree, worktreeBranch, worktreePath } from '@gemstack/skill-branches'
 import { findRun, readDiary, type AnyDiaryLine, type LogsDeps, type RunCard, type RunStatus } from '@gemstack/skill-logs'
@@ -379,6 +379,7 @@ async function sessionToEnd(repo: string, run: SessionRun, dir: string, inbox: s
       status = 'done'
       detail = undefined
       question = undefined
+      let failure: unknown
       let lastText = ''
       try {
         for (const [i, prompt] of prompts.entries()) {
@@ -391,6 +392,7 @@ async function sessionToEnd(repo: string, run: SessionRun, dir: string, inbox: s
       } catch (err) {
         status = 'failed'
         detail = errorMessage(err)
+        failure = err
       }
       if (stopped.aborted) {
         status = 'stopped'
@@ -409,7 +411,9 @@ async function sessionToEnd(repo: string, run: SessionRun, dir: string, inbox: s
       const live = driverSession.log
       if (!live) break
       await live.patch({ branch, ...(pr ? { pr } : {}) })
-      await live.end(status, detail)
+      // The ended line leaves out a reason the diary already holds: the agent's error line, written
+      // just before its process exited, says it, so the ended line says only that the agent exited.
+      await live.end(status, status === 'failed' && failure instanceof AgentExitError ? failure.exit : detail)
       await live.settled()
 
       // The card says ended now, so a line written from here on goes to the project's resume

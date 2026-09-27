@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 import { Readable, Writable } from 'node:stream'
 import { CodexDriver, CodexJsonParser, codexReady, defaultCodexHome, parseCodexModels, parseCodexUsage } from './codex.js'
-import type { SpawnLike, SpawnedProcess, Driver, DriverEvent } from 'agent-driver'
+import { AgentExitError, type SpawnLike, type SpawnedProcess, type Driver, type DriverEvent } from 'agent-driver'
 
 /** A real codex-cli 0.144.4 run, verbatim: "Create a file hello.txt containing exactly: hi". */
 const REAL_RUN = [
@@ -294,6 +294,10 @@ test('a failed Codex turn says why it failed, not the stdin line Codex printed',
   const session = await new CodexDriver({ spawn: fakeSpawn(lines, undefined, 1, STDIN_BANNER) }).start({ cwd: '/ws' })
   await assert.rejects(() => session.prompt('go'), (err: Error) => {
     assert.equal(err.message, "codex exited (1): The 'gpt-5' model is not supported when using Codex with a ChatGPT account.")
+    // The parts apart, for a caller that already showed the reason from the error event.
+    assert.ok(err instanceof AgentExitError)
+    assert.equal(err.exit, 'codex exited (1)')
+    assert.equal(err.reason, "The 'gpt-5' model is not supported when using Codex with a ChatGPT account.")
     return true
   })
   // With no reason in its output, stderr is still what is said.

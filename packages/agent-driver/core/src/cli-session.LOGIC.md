@@ -21,7 +21,7 @@ Runs one turn [1] of a coding agent [2] as one operating-system process, whichev
 
 - **One turn is one process** - the coding agent [2] is spawned as its own process-group leader in the driver session's [3] directory, the prompt goes in over standard input, and a `start` progress event [5] announces the turn [1].
 - **Output streams through the driver's parser** - each output line is handed to the driver's [4] parser, and whatever progress events it yields are forwarded as they come.
-- **The exit code decides the turn** - exit code zero resolves the turn with the parser's final result and a `result` progress event; any other exit fails the turn with an `error` progress event, even when text streamed first.
+- **The exit code decides the turn** - exit code zero resolves the turn with the parser's final result and a `result` progress event; any other exit fails the turn with an `error` progress event, even when text streamed first; the failure keeps the driver id, the exit code and the reason apart, so a caller that showed the reason from the event need not say it twice.
 - **A stop request kills the whole process tree** - a stop request [7] sends the whole process group a termination signal, then a forced kill 5 seconds later, and fails the turn as stopped; a stop request already raised before the turn starts fails it without spawning anything.
 - **Nothing is reported twice** - once a turn has been settled by a stop request or a spawn failure, the process's later exit produces no further progress event.
 - **A process that cannot start fails the turn** - a coding agent that cannot be started at all, because it is not installed, fails the turn with that error.
@@ -58,7 +58,7 @@ The process's standard output is read one line at a time and each line is handed
 
 #### Business logic
 
-When the process exits with code zero, the turn [1] resolves with the parser's result (the final message, the session id and the usage when known), and a `result` progress event [5] carries the same. When the process exits with any other code, or dies from a signal, the turn fails even if text was streamed first: an `error` progress event is reported with the failure detail, and the turn fails with "<driver id> exited (<exit code>): <detail>". The detail is, in order of preference, the reason the coding agent's [2] output gave for the failure, when the driver's parser read one, else what the coding agent wrote to standard error, else the text it streamed so far, else "exit code <code>" (with `null` for a death by signal).
+When the process exits with code zero, the turn [1] resolves with the parser's result (the final message, the session id and the usage when known), and a `result` progress event [5] carries the same. When the process exits with any other code, or dies from a signal, the turn fails even if text was streamed first: an `error` progress event is reported with the failure detail, and the turn fails with "<driver id> exited (<exit code>): <detail>". That failure keeps its parts apart too — the driver id, the exit code and the detail — so a caller that already showed the detail from the `error` progress event can say only "<driver id> exited (<exit code>)". The detail is, in order of preference, the reason the coding agent's [2] output gave for the failure, when the driver's parser read one, else what the coding agent wrote to standard error, else the text it streamed so far, else "exit code <code>" (with `null` for a death by signal).
 
 ### A stop request kills the whole process tree
 

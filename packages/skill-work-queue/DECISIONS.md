@@ -34,6 +34,8 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - The agent takes the first open entry and claims its ticket first; an entry whose ticket
   someone else holds is left for them, and the agent takes the next one. Picked over
   stopping at a held claim.
+- The schedule starts `work-queue` only while an entry names no claimed ticket. Picked
+  over a run on every tick that finds every entry held and stops.
 - A task whose whole work is changing other tickets closes its own ticket; a plan leaves
   its ticket open. Picked over leaving every ticket without a pull request open: a
   finished ticket left open is queued again.

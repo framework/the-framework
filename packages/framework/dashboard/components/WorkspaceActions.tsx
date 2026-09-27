@@ -33,7 +33,7 @@ export function WorkspaceActions({
   // branch may not be pushed anywhere yet. Its PR, when there is one, shows in the git status.
   // keepPrevious: hold the git host icon while a new project's page loads, so it does not pop out and
   // back and shove the icon row (within a project it is already stable, keyed on projectId).
-  const home = useLoaded<GitHostHome | null>(() => onGitHostHome(projectId), null, [projectId], true)
+  const home = useLoaded<GitHostHome | null>(() => onGitHostHome(projectId), null, [projectId], 'previous')
   const { busy, error, reset, run } = useAction()
 
   // `error` belongs to open(), not to the read, so clearing it on a switch is its own effect:

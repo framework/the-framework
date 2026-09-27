@@ -51,6 +51,31 @@ describe('GitStatusBar (#809)', () => {
     expect(screen.getByTitle(long).className).toContain('truncate')
   })
 
+  test('the session name shows from the first frame; its facts wait for its own read, and for ready', async () => {
+    let answer: (v: unknown) => void = () => {}
+    onAgentWorktree.mockReturnValue(new Promise(resolve => (answer = resolve)))
+    const { rerender } = render(<GitStatusBar projectId="p1" agentId="run-1" inline label="Fix the header" projectName="gemstack" ready={false} />)
+    expect(screen.getByText('Fix the header')).toBeTruthy()
+    expect(screen.queryByText('clean')).toBeNull()
+    answer({ path: '/repo/.branches/run-1', own: true, dirty: false, branch: 'agent-run-1' })
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(screen.queryByText('clean')).toBeNull() // read, but the caller's facts are not in yet
+    rerender(<GitStatusBar projectId="p1" agentId="run-1" inline label="Fix the header" projectName="gemstack" ready />)
+    await waitFor(() => expect(screen.getByText('clean')).toBeTruthy())
+  })
+
+  test("switching sessions never shows the previous session's facts; going back shows its own at once", async () => {
+    onAgentWorktree.mockImplementation(async (_p: unknown, id: unknown) => ({ path: `/repo/.branches/${id}`, own: true, dirty: id === 'run-1', branch: `agent-${id}` }))
+    const { rerender } = render(<GitStatusBar projectId="p1" agentId="run-1" inline label="One" />)
+    await waitFor(() => expect(screen.getByText('dirty')).toBeTruthy())
+    onAgentWorktree.mockImplementation(() => new Promise(() => {}))
+    rerender(<GitStatusBar projectId="p1" agentId="run-2" inline label="Two" />)
+    expect(screen.getByText('Two')).toBeTruthy()
+    expect(screen.queryByText('dirty')).toBeNull() // run-1's fact, not shown as run-2's
+    rerender(<GitStatusBar projectId="p1" agentId="run-1" inline label="One" />)
+    expect(screen.getByText('dirty')).toBeTruthy() // remembered, from the first frame
+  })
+
   test("a session's PR shows, the way the project's does", async () => {
     // A session's branch is exactly the thing that has a PR, so hiding it there made the one
     // page where it matters most the page without it.

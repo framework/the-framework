@@ -31,9 +31,10 @@ export function useAgentHandoff(projectId: string, agentId: string | null | unde
     null,
     everyMs,
     [projectId, agentId, enabled, everyMs],
-    // Keep the last answer while the cadence flips (prPending 15s↔1s), or the summary blanks and
-    // the action bar falls back to the live counts for a beat — the same reason GitStatusBar does.
-    true,
+    // Remembered per run: going back to a run shows its last answer at once while it is read
+    // again, and a cadence flip (prPending 15s↔1s) keeps the answer rather than blanking the
+    // summary for a beat. Another run's answer is never shown.
+    agentId ? { remember: `handoff:${projectId}:${agentId}` } : undefined,
   )
   useEffect(() => setEveryMs(handoff?.prPending ? 1_000 : 15_000), [handoff?.prPending])
   const { busy, error, run } = useAction()

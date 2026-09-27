@@ -6,6 +6,35 @@ import { useCallback, useEffect, useRef, useState, type DependencyList } from 'r
 // rejection. These two hooks are that pattern, once.
 
 /**
+ * What a read shows when its deps change, until the new answer lands. By default, nothing: the
+ * `initial` value, so one target's data is never shown as another's.
+ *
+ * - `'previous'`: the last answer, whatever it was for. For a read whose target barely matters
+ *   to the eye (the git host page of a project), where blanking would only flicker.
+ * - `{ remember: key }`: the last answer read under this key, marked loaded, or nothing when no
+ *   answer was. For a page a person goes back and forth between (a run's facts): going back shows
+ *   what was read last time at once, and the read is made again all the same, so it is replaced
+ *   the moment the fresh answer lands. The key names the target, so no other target's answer is
+ *   ever shown.
+ */
+export type Keep = 'previous' | { remember: string }
+
+/** The answers kept under their keys, for the page's life. Capped: the oldest goes first. */
+const remembered = new Map<string, unknown>()
+const REMEMBERED_MAX = 500
+
+function remember(key: string, value: unknown): void {
+  remembered.delete(key)
+  remembered.set(key, value)
+  if (remembered.size > REMEMBERED_MAX) remembered.delete(remembered.keys().next().value!)
+}
+
+/** Forget every remembered answer. For tests. */
+export function forgetRemembered(): void {
+  remembered.clear()
+}
+
+/**
  * A rejected read keeps the last value rather than blanking it, which is what the usage
  * panel already did deliberately: an empty bar reads as "nothing used" rather than "no
  * answer". The next tick usually succeeds.
@@ -15,7 +44,7 @@ function useAsyncValue<T>(
   initial: T,
   everyMs: number | null,
   deps: DependencyList,
-  keepPrevious = false,
+  keep?: Keep,
 ): { value: T; reload: () => void; loaded: boolean } {
   const [value, setValue] = useState<T>(initial)
   // Whether `value` is an answer rather than the initial. Only a successful read sets it, so a
@@ -27,12 +56,13 @@ function useAsyncValue<T>(
   const initialRef = useRef(initial)
   // A dep change and an unmount both retire the in-flight read. `reload` reads the same
   // token, so an imperative refetch can't write back after either.
-  const liveRef = useRef({ live: false })
+  const liveRef = useRef<{ live: boolean; key?: string }>({ live: false })
 
-  const apply = useCallback((token: { live: boolean }, agent: () => Promise<T>) => {
+  const apply = useCallback((token: { live: boolean; key?: string }, agent: () => Promise<T>) => {
     void agent()
       .then(next => {
         if (!token.live) return
+        if (token.key !== undefined) remember(token.key, next)
         setValue(next)
         setLoaded(true)
       })
@@ -42,13 +72,19 @@ function useAsyncValue<T>(
   }, [])
 
   useEffect(() => {
-    const token = { live: true }
+    // Nothing to read, nothing remembered shown: a remembered answer stands in only for a read
+    // that is being made again.
+    const key = load && typeof keep === 'object' ? keep.remember : undefined
+    const token = { live: true, ...(key !== undefined ? { key } : {}) }
     liveRef.current = token
-    // A switch normally shows nothing rather than the last target's data. `keepPrevious` opts out:
-    // the toolbar keeps its resolved header (branch/PR/git host) visible while the next one loads, so
-    // navigating between sessions updates it in place instead of blanking and popping (the flicker).
-    if (!keepPrevious) setValue(initialRef.current)
-    setLoaded(false)
+    // A switch shows nothing rather than the last target's data, unless `keep` says otherwise.
+    if (key !== undefined && remembered.has(key)) {
+      setValue(remembered.get(key) as T)
+      setLoaded(true)
+    } else {
+      if (keep !== 'previous') setValue(initialRef.current)
+      setLoaded(false)
+    }
     if (!load) return () => void (token.live = false)
     const agent = (): void => apply(token, load)
     agent()
@@ -81,9 +117,9 @@ export function useLoaded<T>(
   load: (() => Promise<T>) | null,
   initial: T,
   deps: DependencyList,
-  keepPrevious = false,
+  keep?: Keep,
 ): T {
-  return useAsyncValue(load, initial, null, deps, keepPrevious).value
+  return useAsyncValue(load, initial, null, deps, keep).value
 }
 
 /**
@@ -100,7 +136,7 @@ export function usePolled<T>(
   initial: T,
   everyMs: number,
   deps: DependencyList,
-  keepPrevious = false,
+  keep?: Keep,
 ): { value: T; reload: () => void; loaded: boolean } {
-  return useAsyncValue(load, initial, everyMs, deps, keepPrevious)
+  return useAsyncValue(load, initial, everyMs, deps, keep)
 }

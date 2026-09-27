@@ -30,6 +30,7 @@ export function GitStatusBar({
   agentState,
   expanded = false,
   onToggle,
+  ready = true,
 }: {
   projectId: string
   /** The session whose worktree to report; absent reports the project's checkout. */
@@ -50,6 +51,8 @@ export function GitStatusBar({
   expanded?: boolean
   /** Given, the branch reads as a disclosure for the detail the caller renders below. */
   onToggle?: (() => void) | undefined
+  /** False while the caller's own facts are still being read: the label shows alone until then. */
+  ready?: boolean
 }) {
   // Two reads, one shape: both carry branch/dirty/PR, because the server resolves them from
   // whichever checkout it was asked about, and the session read adds what only a worktree has.
@@ -61,13 +64,45 @@ export function GitStatusBar({
     null,
     everyMs,
     [projectId, agentId, everyMs],
-    // Keep the previous status visible while the next session's loads, so the whole left cluster
-    // (branch/dirty/PR/chevron) updates in place instead of vanishing to null and popping back.
-    true,
+    // A checkout seen before shows what was read last time at once, while it is read again. One
+    // never seen shows no facts until its own answer: never the previous session's, which read as
+    // this one's for the beat the read took.
+    { remember: agentId ? `worktree:${projectId}:${agentId}` : `git-status:${projectId}` },
   )
   useEffect(() => setEveryMs(status?.prPending ? 1_000 : 10_000), [status?.prPending])
 
-  if (!status) return null
+  // The session's name, with its project as a breadcrumb: shown from the first frame, alone until
+  // the facts beside it are there to show.
+  const title = label && (
+    <span className="flex min-w-0 items-center gap-1.5 overflow-hidden">
+      {/* The project, as a breadcrumb parent: muted, and always there. It keeps its width and is
+          capped, so a long project name is cut at the cap and a long session name gives up the
+          rest. Letting it give up width first squeezed it, slash and all, to nothing beside a
+          long session name. */}
+      {projectName && (
+        <span data-testid="project-crumb" className="flex max-w-32 shrink-0 items-center gap-1.5 text-muted-foreground">
+          <span className="min-w-0 truncate" title={projectName}>
+            {projectName}
+          </span>
+          <span className="shrink-0 text-muted-foreground/60" aria-hidden>
+            /
+          </span>
+        </span>
+      )}
+      <span className="min-w-0 truncate font-medium text-foreground" title={label}>
+        {label}
+      </span>
+    </span>
+  )
+
+  if (!status || !ready) {
+    if (!title) return null
+    return inline ? (
+      <span className="flex min-w-0 items-center gap-2 overflow-hidden text-xs">{title}</span>
+    ) : (
+      <div className="flex items-center gap-2 border-b border-border px-4 py-2 text-xs">{title}</div>
+    )
+  }
 
   const worktree = 'path' in status ? status : undefined
   const branch = status.branch
@@ -93,27 +128,7 @@ export function GitStatusBar({
       {/* The session's name leads (#1030): it is what the rail calls this run and it does not
           change under you, unlike the branch, which the agent renames near the end (#736). It is
           the one element that shrinks, so it truncates last and the identity never disappears. */}
-      {label && (
-        <span className="flex min-w-0 items-center gap-1.5 overflow-hidden">
-          {/* The project, as a breadcrumb parent: muted, and always there. It keeps its width and is
-              capped, so a long project name is cut at the cap and a long session name gives up the
-              rest. Letting it give up width first squeezed it, slash and all, to nothing beside a
-              long session name. */}
-          {projectName && (
-            <span data-testid="project-crumb" className="flex max-w-32 shrink-0 items-center gap-1.5 text-muted-foreground">
-              <span className="min-w-0 truncate" title={projectName}>
-                {projectName}
-              </span>
-              <span className="shrink-0 text-muted-foreground/60" aria-hidden>
-                /
-              </span>
-            </span>
-          )}
-          <span className="min-w-0 truncate font-medium text-foreground" title={label}>
-            {label}
-          </span>
-        </span>
-      )}
+      {title}
       {/* The branch: the identity when there is no session label (the project home), otherwise
           muted git context. Beside a label it yields width first — a high shrink factor means it
           truncates to make room for the name long before the name has to give any up (#1030). */}

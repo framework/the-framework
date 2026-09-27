@@ -27,6 +27,9 @@ import { AgentDetails, type AgentDetailsCard } from './AgentDetails.js'
 // mounted, and `live` decides what they say. The log is the same log — while the agent is live it
 // arrives over the channel, and once it ends the archived copy is read and swapped in behind the
 // events already on screen.
+/** How long the bar waits for the run's own reads before it shows the facts that are in. */
+const READY_WAIT_MS = 1_000
+
 export function AgentView({
   projectId,
   agentId: agentId,
@@ -84,11 +87,13 @@ export function AgentView({
     !live ? () => onAgent(projectId, agentId) : null,
     null,
     [projectId, agentId, live, archiveBehind],
+    // Going back to an ended run shows its log at once, as last read, while it is read again.
+    { remember: `agent-log:${projectId}:${agentId}` },
   )
   // Whether this agent kept its worktree (#737): a failed/stopped run does, a clean one had it
   // removed when it finished. Drives the Remove button, and is cleared locally once removed so
   // the button goes without waiting for a refetch.
-  const retained = useLoaded<string[]>(!live ? () => onRetainedWorktrees(projectId) : null, [], [projectId, agentId, live])
+  const retained = useLoaded<string[]>(!live ? () => onRetainedWorktrees(projectId) : null, [], [projectId, agentId, live], { remember: `retained:${projectId}` })
   const [removed, setRemoved] = useState(false)
   const onWorktreeRemoved = useCallback(() => setRemoved(true), [])
   // The view is mounted un-keyed, so switching agents only swaps props: per-agent latches must
@@ -154,6 +159,18 @@ export function AgentView({
   // ended with (#1030): the summary swaps once, from the live counts to the handoff, instead of
   // blanking for the beat the handoff read takes.
   const showHandoff = !working && handoff.loaded
+  // Whether this run's own facts are in, so the bar shows them together: its log (for an ended
+  // run; a running one streams it) and what its branch holds (when that is read at all). Before
+  // then the bar names the run and nothing else, never facts left from the run before. A run
+  // seen before is ready at once, from what was read last time. A read that has not answered
+  // within a second holds the bar back no longer: the facts that are in show then.
+  const [waited, setWaited] = useState(false)
+  useEffect(() => {
+    setWaited(false)
+    const timer = setTimeout(() => setWaited(true), READY_WAIT_MS)
+    return () => clearTimeout(timer)
+  }, [agentId])
+  const ready = working || waited || (archived !== null && (card?.saving === true || handoff.loaded))
 
   return (
     <>
@@ -179,6 +196,7 @@ export function AgentView({
         }
         expanded={open}
         onToggle={toggle}
+        ready={ready}
         actions={
           // A run that is working publishes its own work; the next step is offered once it has ended.
           !working ? <HandoffActions projectId={projectId} agentId={agentId} state={handoff} /> : undefined

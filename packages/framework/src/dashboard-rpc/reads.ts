@@ -1,5 +1,5 @@
 import type { BridgeBrowserStatus } from '../bridge-browser.js'
-import { findAgent, readLiveMetas, readAllAgents, loadAgentEvents, startedAtFromAgentId, isPidAlive, type AgentMeta, type AgentStatus, isRunId, projectBranches } from '../store/index.js'
+import { findAgent, findCheckout, readLiveMetas, readAllAgents, loadAgentEvents, startedAtFromAgentId, isPidAlive, type AgentMeta, type AgentStatus, isRunId, projectBranches } from '../store/index.js'
 import { listProjectWorktrees } from '../worktrees.js'
 import { projectGitHost, type GitHostHome } from '../store/git-host.js'
 import { readDocs, type WorkspaceDoc } from '../dashboard/docs.js'
@@ -163,50 +163,47 @@ export async function onRetainedWorktrees(projectId: string): Promise<string[]> 
  * *project*, so a session's own branch was visible nowhere, and a worktree an agent kept (#737) was
  * a name in a list with no size and no way in.
  *
- * `own` separates an agent with its own worktree from one that fell back to the main checkout (a
- * project with no git repo): "uncommitted changes" means something different there, since that
- * working tree is the user's, not the agent's.
+ * Every run works in a checkout of its own, so once that checkout is gone there is no tree left to
+ * be clean or dirty: the answer is then only what the run recorded, its branch and its pull
+ * request. It used to fall back to the project's root and report the user's own checkout (their
+ * branch, their "clean") as the run's.
  */
 export async function onAgentWorktree(projectId: string, agentId: string): Promise<AgentWorktree | null> {
   return relayOr(agentId, 'onAgentWorktree', [projectId, agentId], async () => {
     const root = await resolveProjectPath(projectId)
     if (!root || !isRunId(agentId)) return null
-    const path = await resolveAgentPath(projectId, agentId)
-    if (!path) return null
-    const own = path !== root
-    // Since-filtered like every run-scoped PR read (#1255): in the agent's own worktree the
-    // checkout's branch is the agent's, but a reused pinned branch has a predecessor's PR history.
+    const checkout = await findCheckout(root, agentId, projectBranches)
+    if (!checkout) {
+      // The checkout's branch was the agent's; with no checkout the record is the only witness.
+      const agent = await findAgent(root, agentId).catch(() => undefined)
+      if (!agent) return null
+      const pr = await resolveAgentPr(root, agent).catch(() => ({ value: undefined, pending: false }))
+      return {
+        ...(agent.branch ? { branch: agent.branch } : {}),
+        ...(pr.value ? { pr: pr.value } : {}),
+        ...(pr.pending ? { prPending: true } : {}),
+      }
+    }
+    // Since-filtered like every run-scoped PR read (#1255): the checkout's branch is the agent's,
+    // but a reused pinned branch has a predecessor's PR history.
     const since = startedAtFromAgentId(agentId)
     const [status, live] = await Promise.all([
-      readGitStatus(path, since !== undefined ? { since } : {}).catch(() => undefined),
+      readGitStatus(checkout.path, since !== undefined ? { since } : {}).catch(() => undefined),
       readLiveMetas(root).catch(() => []),
     ])
     // Size is only read for a checkout nothing is writing to: a live agent's tree changes under the
     // poll, and a size over a build directory mid-build is a cost with no answer worth having. The
     // provider's sized listing is where a checkout's size comes from (#1774).
     const running = live.some(agent => agent.id === agentId && agent.status === 'running')
-    const size = own && !running ? (await (await projectBranches(root).catch(() => undefined))?.list({ sizes: true }).catch(() => []))?.find(checkout => checkout.id === agentId)?.sizeBytes : undefined
-    // In the agent's own worktree, the checkout's branch is the agent's, so the (since-filtered)
-    // status read's PR is right. Once the worktree is gone the checkout is the project root, and
-    // its current branch has nothing to do with this agent (#1255) — resolve by the agent's own
-    // branch names instead.
-    const agent = own ? undefined : await findAgent(root, agentId).catch(() => undefined)
-    const pr = own
-      ? { value: status?.pr, pending: status?.prPending ?? false }
-      : agent
-        ? await resolveAgentPr(root, agent).catch(() => ({ value: undefined, pending: false }))
-        : { value: undefined, pending: false }
+    const size = running ? undefined : (await (await projectBranches(root).catch(() => undefined))?.list({ sizes: true }).catch(() => []))?.find(row => row.id === agentId)?.sizeBytes
     return {
-      path,
-      own,
-      dirty: status?.dirty ?? false,
+      checkout: { path: checkout.path, dirty: status?.dirty ?? false, ...(size !== undefined ? { sizeBytes: size } : {}) },
       ...(status?.branch ? { branch: status.branch } : {}),
-      ...(size !== undefined ? { sizeBytes: size } : {}),
       // A session's branch is exactly the thing that has a PR (#809), so the bar can show it
       // like the project's does.
-      ...(pr.value ? { pr: pr.value } : {}),
+      ...(status?.pr ? { pr: status.pr } : {}),
       // Still being looked up rather than absent (#1028), so the bar can ask again shortly.
-      ...(pr.pending ? { prPending: true } : {}),
+      ...(status?.prPending ? { prPending: true } : {}),
     }
   }, null)
 }

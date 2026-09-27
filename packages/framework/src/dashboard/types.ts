@@ -60,22 +60,26 @@ export interface StartAgentOptions {
 export type StartAgentResult = { ok: true; agentId: string } | { ok: false; error: string }
 
 /**
- * Where a session is working (#798): the checkout, its branch, and what it is holding. Read by
+ * Where a session is working (#798): its checkout, its branch, and what it is holding. Read by
  * the dashboard so a session's action bar can say which worktree it has, rather than leaving the
  * user to infer it from an agent id.
+ *
+ * Only what is true of the run: once its checkout is gone there is no tree to be clean or dirty,
+ * so {@link checkout} is absent and the branch is the one the run recorded.
  */
 export interface AgentWorktree {
-  /** Absolute path of the checkout this agent works in. */
-  path: string
-  /** True when it is the agent's own worktree; false when it fell back to the project's checkout. */
-  own: boolean
-  /** Uncommitted changes present in that checkout. */
-  dirty: boolean
-  /** The branch it is on, absent when the path is not a git repo. */
+  /** The run's own checkout while it exists. */
+  checkout?: {
+    /** Absolute path of the checkout. */
+    path: string
+    /** Uncommitted changes present in it. */
+    dirty: boolean
+    /** Size on disk, bytes. Only read once nothing is writing to it, and best-effort even then. */
+    sizeBytes?: number
+  }
+  /** The branch the run's work is on: its checkout's while it has one, else the one it recorded. */
   branch?: string
-  /** Size on disk, bytes. Only read once nothing is writing to it, and best-effort even then. */
-  sizeBytes?: number
-  /** The PR opened for this checkout's branch (#809), when there is one. */
+  /** The PR opened for this run's branch (#809), when there is one. */
   pr?: LinkedPr
   /** The PR is not known yet, rather than absent (#1028): the lookup is still running. */
   prPending?: boolean

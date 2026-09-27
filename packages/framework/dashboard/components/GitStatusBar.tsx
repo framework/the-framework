@@ -55,8 +55,8 @@ export function GitStatusBar({
   /** False while the caller's own facts are still being read: the label shows alone until then. */
   ready?: boolean
 }) {
-  // Two reads, one shape: both carry branch/dirty/PR, because the server resolves them from
-  // whichever checkout it was asked about, and the session read adds what only a worktree has.
+  // Two reads: both carry the branch and its PR; the project's also its clean/dirty, the session's
+  // its checkout (path, clean/dirty, size) while it still has one.
   // Resting cadence is ten seconds, but a PR lookup still in flight (#1028) is an answer that
   // lands in under a second — worth asking again for rather than showing a gap for ten.
   const [everyMs, setEveryMs] = useState(10_000)
@@ -128,14 +128,17 @@ export function GitStatusBar({
     )
   }
 
-  const worktree = 'path' in status ? status : undefined
+  // A session's facts are its own checkout's while it has one; once that is gone, only its
+  // recorded branch and PR, and no tree to be clean or dirty.
+  const checkout = agentId ? (status as AgentWorktree).checkout : undefined
+  const dirty = agentId ? checkout?.dirty : (status as GitStatus).dirty
   const branch = status.branch
-  const size = formatBytes(worktree?.sizeBytes, '')
-  // A session's worktree is the agent's tree, so uncommitted work there is the agent's; on the
+  const size = formatBytes(checkout?.sizeBytes, '')
+  // A session's checkout is the agent's tree, so uncommitted work there is the agent's; on the
   // project's own checkout it is the user's. Same dot, honest wording.
-  const dirtyLabel = worktree?.own ? 'Uncommitted changes in this agent' : 'Uncommitted changes'
+  const dirtyLabel = agentId ? 'Uncommitted changes in this agent' : 'Uncommitted changes'
 
-  const branchTitle = worktree ? `${branch ?? 'no branch'}\n${worktree.path}` : `branch ${branch}`
+  const branchTitle = agentId ? [branch ?? 'no branch', checkout?.path].filter(Boolean).join('\n') : `branch ${branch}`
   // Beside a session label the `the-framework/` prefix is 14 characters of noise every session
   // branch shares (#1030); the short name reads, and the tooltip and copy keep the real thing.
   const branchText = label && branch ? branch.replace(/^the-framework\//, '') : (branch ?? 'no branch')
@@ -178,13 +181,16 @@ export function GitStatusBar({
           green dot for "nothing changed" sat one pane away from the file tree's green dot for
           "this folder HAS changes": the same colour for opposite facts. A clean tree is the
           unremarkable default and has nothing to announce. */}
-      <Tooltip>
-        <TooltipTrigger render={<span className="flex shrink-0 items-center gap-1.5" />}>
-          <span className={cn('h-2 w-2 rounded-full', status.dirty ? 'bg-warning' : 'bg-muted-foreground')} />
-          <span className="text-muted-foreground">{status.dirty ? 'dirty' : 'clean'}</span>
-        </TooltipTrigger>
-        <TooltipContent>{status.dirty ? dirtyLabel : 'Clean'}</TooltipContent>
-      </Tooltip>
+      {/* A session whose checkout is gone has no tree to be either. */}
+      {dirty !== undefined && (
+        <Tooltip>
+          <TooltipTrigger render={<span className="flex shrink-0 items-center gap-1.5" />}>
+            <span className={cn('h-2 w-2 rounded-full', dirty ? 'bg-warning' : 'bg-muted-foreground')} />
+            <span className="text-muted-foreground">{dirty ? 'dirty' : 'clean'}</span>
+          </TooltipTrigger>
+          <TooltipContent>{dirty ? dirtyLabel : 'Clean'}</TooltipContent>
+        </Tooltip>
+      )}
       {agentState}
       {/* Only a worktree has a size worth showing, and only once nothing is writing to it (#798). */}
       {size && (

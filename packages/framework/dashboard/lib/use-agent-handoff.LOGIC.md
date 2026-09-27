@@ -16,8 +16,8 @@ Reads what an agent's [1] branch holds once its work has stopped — the commits
 ## Business logic — TL;DR
 
 - **Only read once the agent's work has stopped** - a branch still being written to has nothing to hand off.
-- **Polled, because the branch changes behind the dashboard's back** - every 15 seconds at rest, every second while the pull request lookup has not answered.
-- **The last answer stays on screen** - a failed read, and the change of polling cadence, never blank the summary.
+- **Polled, because the branch changes behind the dashboard's back** - every 15 seconds at rest, every 0.3 seconds while the pull request lookup has not answered.
+- **The last answer stays on screen** - a failed read, and the change of polling cadence, never blank the summary; each agent's last answer is remembered, so going back to an agent shows it at once while it is read again.
 - **One step at a time, and it says which one** - the step in flight is named, so the button reads as opening or merging rather than silently greying out.
 - **A step that succeeds re-reads the branch at once** - the offer becomes the next step without waiting for the next poll.
 - **A step that fails reports why** - the reason from the daemon, or the wording the button supplies.
@@ -43,7 +43,7 @@ The branch is read only while the agent is not running: an agent that has ended 
 
 #### Business logic
 
-The branch state is re-read every 15 seconds. While the answer says the pull request lookup has not finished — which is what holds the "Open PR" offer back — it is re-read every second instead, so the offer appears as soon as the lookup lands. The cadence returns to 15 seconds once the lookup has answered.
+The branch state is re-read every 15 seconds. While the answer says the pull request lookup has not finished — which is what holds the "Open PR" offer back — it is re-read every 0.3 seconds instead, so the offer appears as soon as the lookup lands. The cadence returns to 15 seconds once the lookup has answered.
 
 ### The last answer stays on screen
 
@@ -53,7 +53,7 @@ The branch state is re-read every 15 seconds. While the answer says the pull req
 
 #### Business logic
 
-A read that fails leaves the last answer in place; the next read usually succeeds. Changing the polling cadence likewise keeps the last answer rather than starting from nothing. Switching to another agent [1] or another project [4] does clear it, so one agent's branch is never shown under another's.
+A read that fails leaves the last answer in place; the next read usually succeeds. Changing the polling cadence likewise keeps the last answer rather than starting from nothing. Switching to another agent [1] or another project [4] never shows the previous agent's answer, so one agent's branch is never shown under another's. Each agent's last answer is remembered for as long as the page is open: going back to an agent seen before shows its answer from the first frame, counted as read, and the branch is read again at once, the fresh answer replacing it when it lands. An agent never seen shows no answer until its own read lands.
 
 ### One step at a time, and it says which one
 

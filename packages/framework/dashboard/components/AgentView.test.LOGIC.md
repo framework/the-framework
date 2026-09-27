@@ -11,4 +11,10 @@ It also covers when the view reads what the agent's branch holds:
 
 - **Not while saving** - while the agent's card is marked saving, the branch is not read; once the mark is gone, it is.
 
+And when the action bar is told its facts are ready:
+
+- **Once its own reads are in** - a finished agent's bar is not ready while its archive is unanswered, still not once the archive has answered, and ready once the read of what its branch holds has answered too.
+- **A second at most** - with an archive read that never answers, the bar becomes ready after a second.
+- **A running agent at once** - a running agent's bar is ready from the first frame.
+
 The rules for when a resume is offered belong to the composer and are covered by its own tests; the view only hands it how the agent ended.

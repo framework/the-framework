@@ -2,6 +2,8 @@ What the tests cover, for the line of git facts about the checkout [1] in play:
 
 - **Whose checkout** - on the project home the project's own checkout is read, showing its branch and "clean", and no agent's [2] checkout is asked for; with an agent selected that agent's checkout is read instead, showing its branch, "dirty", and what only an agent's checkout has, such as its size on disk ("5 MB").
 - **The project beside a long name** - beside an agent name too long for the row, the "<project> /" breadcrumb keeps its width up to its cap and cuts a longer project name, and the agent name is the one that truncates. The test DOM has no layout, so this is checked on the elements' styling.
+- **The name first, the facts together** - the agent's name shows while its checkout is still being read and no fact does; once read, the facts still wait until the caller says it is ready, then show.
+- **Switching agents** - after switching from an agent to one whose read has not answered, the first agent's "dirty" is not shown under the second's name; switching back shows the first agent's "dirty" from the first frame, remembered. The test fails when the line keeps the previous agent's facts instead.
 - **The pull request** - an agent's branch's pull request shows as "PR #42" with its state "open", the way the project's does.
 - **No size while unmeasured** - when the daemon has not measured the checkout's size, no placeholder appears where the number would go.
 - **Nothing to report** - when the daemon has no checkout to report, the line renders nothing.

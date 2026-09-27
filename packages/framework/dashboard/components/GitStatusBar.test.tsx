@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 
 const onGitStatus = vi.fn(async () => null as unknown)
-const onAgentWorktree = vi.fn(async () => null as unknown)
+const onAgentWorktree = vi.fn(async (..._args: unknown[]) => null as unknown)
 vi.mock('../rpc/reads.js', () => ({ onGitStatus, onAgentWorktree }))
 
 const { GitStatusBar } = await import('./GitStatusBar.js')

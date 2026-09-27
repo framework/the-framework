@@ -164,13 +164,13 @@ export function AgentView({
   // then the bar names the run and nothing else, never facts left from the run before. A run
   // seen before is ready at once, from what was read last time. A read that has not answered
   // within a second holds the bar back no longer: the facts that are in show then.
-  const [waited, setWaited] = useState(false)
+  // Which run the second has passed for: a flag would still be the last run's for a frame.
+  const [waitedFor, setWaitedFor] = useState<string | null>(null)
   useEffect(() => {
-    setWaited(false)
-    const timer = setTimeout(() => setWaited(true), READY_WAIT_MS)
+    const timer = setTimeout(() => setWaitedFor(agentId), READY_WAIT_MS)
     return () => clearTimeout(timer)
   }, [agentId])
-  const ready = working || waited || (archived !== null && (card?.saving === true || handoff.loaded))
+  const ready = working || waitedFor === agentId || (archived !== null && (card?.saving === true || handoff.loaded))
 
   return (
     <>

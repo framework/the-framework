@@ -3,6 +3,7 @@ import type { GitStatus, AgentWorktree } from '../../src/index.js'
 import { ChevronRight, GitBranch } from 'lucide-react'
 import { onGitStatus, onAgentWorktree } from '../rpc/reads.js'
 import { usePolled } from '../lib/use-async.js'
+import { PR_PENDING_MS } from '../lib/use-agent-handoff.js'
 import { formatBytes } from '../../src/client.js'
 import { cn } from '../lib/utils.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
@@ -69,7 +70,7 @@ export function GitStatusBar({
     // this one's for the beat the read took.
     { remember: agentId ? `worktree:${projectId}:${agentId}` : `git-status:${projectId}` },
   )
-  useEffect(() => setEveryMs(status?.prPending ? 1_000 : 10_000), [status?.prPending])
+  useEffect(() => setEveryMs(status?.prPending ? PR_PENDING_MS : 10_000), [status?.prPending])
 
   // The session's name, with its project as a breadcrumb: shown from the first frame, alone until
   // the facts beside it are there to show.

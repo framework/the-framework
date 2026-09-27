@@ -57,6 +57,10 @@ function useAsyncValue<T>(
   // A dep change and an unmount both retire the in-flight read. `reload` reads the same
   // token, so an imperative refetch can't write back after either.
   const liveRef = useRef<{ live: boolean; key?: string }>({ live: false })
+  // The deps the state above was set for. The effect that switches it runs after the frame is
+  // painted, so for one frame after a switch the state still holds the last target's answer:
+  // the render below answers for the new deps itself in that frame.
+  const shownFor = useRef<DependencyList>(deps)
 
   const apply = useCallback((token: { live: boolean; key?: string }, agent: () => Promise<T>) => {
     void agent()
@@ -85,6 +89,7 @@ function useAsyncValue<T>(
       if (keep !== 'previous') setValue(initialRef.current)
       setLoaded(false)
     }
+    shownFor.current = deps
     if (!load) return () => void (token.live = false)
     const agent = (): void => apply(token, load)
     agent()
@@ -104,7 +109,16 @@ function useAsyncValue<T>(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps)
 
+  if (!sameDeps(shownFor.current, deps)) {
+    const key = load && typeof keep === 'object' ? keep.remember : undefined
+    if (key !== undefined && remembered.has(key)) return { value: remembered.get(key) as T, reload, loaded: true }
+    return { value: keep === 'previous' ? value : initialRef.current, reload, loaded: false }
+  }
   return { value, reload, loaded }
+}
+
+function sameDeps(a: DependencyList, b: DependencyList): boolean {
+  return a.length === b.length && a.every((dep, i) => Object.is(dep, b[i]))
 }
 
 /**

@@ -32,6 +32,7 @@ Shows one agent [1] on its own page, the agent view [2], in one frame that stays
 - **Working means running** - the agent counts as working exactly while the daemon's list says it runs; everything that asks "is there more coming?" asks this, so an agent that is not working gets its next step offered.
 - **Live as the feed knows it** - the feed follows new output, and the composer offers Stop, as soon as new events stream in, even during the seconds before the daemon's list of agents notices a resumed agent.
 - **What the action bar says** - the agent's name with its project as a breadcrumb; the one status word, from the events shown and the agent's card; while working, the counts of what the checkout has changed; once not working, the verdict on what the branch holds and the offered next step.
+- **Switching between agents** - the bar names the agent at once and shows its facts together once its own reads are in (at most a second later); an agent seen before shows its archive, its branch verdict and its facts at once, as last read, while they are read again.
 - **The disclosure** - opening the bar's disclosure adds the agent's details strip and, while working, the changes in its checkout, or, once stopped, the commits and files its branch holds.
 - **Removing a kept checkout** - a finished agent that kept its checkout (it failed or was stopped) is offered a Remove, which disappears at once when used.
 - **Notices for work that runs elsewhere** - an agent whose turns run on GitHub Actions, in a cloud session, or on a device gets a notice explaining what the feed can and cannot show.
@@ -100,6 +101,24 @@ An agent [1] counts as working exactly while the daemon's list of agents says it
 #### Business logic
 
 The feed and the composer [5] are told the agent [1] is live when either the daemon's list says it is running, or the stream on screen is ahead of the archive [8] and has not ended (its current segment carries no end event). That verdict decides whether the feed follows new output and whether the composer offers Stop instead of a resume, so both switch the moment the first new event lands rather than when the daemon's list catches up.
+
+### Switching between agents
+
+#### Context
+
+**User story**: switching between agents in the left rail, the user used to see the bar fill in over several steps, with facts left from the previous agent under the new agent's name for a moment. Now the bar shows the name at once and the facts together, and an agent seen before shows at once while it is read again.
+
+#### Business logic
+
+The bar is told its facts are ready when any of these holds:
+
+- the agent [1] is working: its live event stream is its record, nothing more to wait for;
+- its archive [8] has answered, and so has the read of what its branch holds, unless its card [3] is marked saving, when that read is not made;
+- one second has passed since this agent was selected: a read that has not answered by then holds the bar back no longer, and the facts that are in show.
+
+Until then the bar shows the agent's name and project only (see `AgentActionBar.tsx`).
+
+The archive, the read of what the branch holds (`lib/use-agent-handoff.ts`), the project's list of kept checkouts and the branch facts (`GitStatusBar.tsx`) are remembered per agent for as long as the page is open (`lib/use-async.ts`). Going back to an agent seen before shows them from the first frame, so the bar is ready at once, and each is read again all the same, its fresh answer replacing the remembered one as soon as it lands.
 
 ### What the action bar says
 

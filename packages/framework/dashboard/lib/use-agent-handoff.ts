@@ -19,6 +19,12 @@ export type AgentHandoffState = {
 // The handoff read lifted out of its panel: the same answer now feeds two places — the summary and
 // the actions in the agent's action bar, and the commits/files detail the bar expands. Reading it
 // once keeps them from disagreeing and halves the polling.
+/**
+ * How soon to ask again while the daemon's pull request lookup is still out: the answer lands in
+ * well under a second, and the bar says nothing about the branch until it has.
+ */
+export const PR_PENDING_MS = 300
+
 export function useAgentHandoff(projectId: string, agentId: string | null | undefined, enabled = true): AgentHandoffState {
   // Polled rather than read once: a push or a PR opened from here (or from a terminal) changes
   // what to offer, and `reload` makes the bar's own actions land immediately. Not read while the
@@ -36,7 +42,7 @@ export function useAgentHandoff(projectId: string, agentId: string | null | unde
     // summary for a beat. Another run's answer is never shown.
     agentId ? { remember: `handoff:${projectId}:${agentId}` } : undefined,
   )
-  useEffect(() => setEveryMs(handoff?.prPending ? 1_000 : 15_000), [handoff?.prPending])
+  useEffect(() => setEveryMs(handoff?.prPending ? PR_PENDING_MS : 15_000), [handoff?.prPending])
   const { busy, error, run } = useAction()
   const [pending, setPending] = useState<'pr' | 'merge' | 'push' | null>(null)
 

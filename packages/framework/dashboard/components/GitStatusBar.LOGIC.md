@@ -18,7 +18,7 @@ The one line of git facts about the checkout [1] in play — its branch, whether
 - **Clean or dirty, neutrally** - a dot and the word "clean" in neutral gray or "dirty" in amber; the tooltip reads "Clean", "Uncommitted changes", or "Uncommitted changes in this agent" when the checkout is the agent's own.
 - **State, size and summary** - the agent's state sits beside the dot, the checkout's size on disk shows once the daemon could measure it, and the summary of what the branch holds comes last; the facts furthest from the branch drop out first as the bar narrows.
 - **The pull request link** - "PR #<number>" with its state in a pill, opening the pull request in a new tab, its title in the tooltip.
-- **A disclosure when there is detail below** - when the caller renders detail under the bar, the facts become a button with a chevron that turns when expanded.
+- **A disclosure when there is detail below** - when the caller renders detail under the bar, the facts become a button with a chevron that turns when expanded; the chevron is drawn, dimmed, even while the name shows alone, so the name never moves when the facts land.
 
 ## Business logic
 
@@ -92,4 +92,4 @@ When the branch has a pull request, a link reads "PR #<number>" followed by the 
 
 #### Business logic
 
-When the caller offers a toggle, the facts become a button, preceded by a chevron that points right while collapsed and down while expanded, and clicking it toggles the detail the caller renders below; the pull request link stays outside the button, being a link in its own right. Without a toggle no chevron shows, so the bar never advertises a disclosure it does not have. Inline, the bar renders as a compact span for an action bar; otherwise as a full-width row with a bottom border.
+When the caller offers a toggle, the facts become a button, preceded by a chevron that points right while collapsed and down while expanded, and clicking it toggles the detail the caller renders below; the pull request link stays outside the button, being a link in its own right. Without a toggle no chevron shows, so the bar never advertises a disclosure it does not have. Inline, the bar renders as a compact span for an action bar; otherwise as a full-width row with a bottom border. While the facts are not shown yet (not read, or the caller not ready), the chevron is still drawn in the same place, dimmed, before the name: the line is laid out the same way before and after, so the name keeps its position and only the facts appear beside it. It used to appear with the facts and shift the whole line.

@@ -320,10 +320,10 @@ export function App() {
     }
     if (!selectedAgent) {
       // Not in the list: either the run we just started (its card lands a beat later) or a
-      // list we have not read yet. Both are live views; only a session that is genuinely absent
-      // from a list we did read is gone.
+      // list we have not read yet, where whether the agent runs is not known. Only a session that
+      // is genuinely absent from a list we did read is gone.
       if (agentId === agentStart.id || !agentsLoaded)
-        return <AgentView projectId={projectId} agentId={agentId} events={events} live label={agentStart.intent || undefined} projectName={projectName} remoteLabel={agentId === agentStart.id ? agentStart.runsOn : undefined} files={files} lost={lost} onAgentStarted={onAgentStarted} />
+        return <AgentView projectId={projectId} agentId={agentId} events={events} live={agentId === agentStart.id ? true : null} label={agentStart.intent || undefined} projectName={projectName} remoteLabel={agentId === agentStart.id ? agentStart.runsOn : undefined} files={files} lost={lost} onAgentStarted={onAgentStarted} />
       return (
         <NotFound
           title="This agent is gone"

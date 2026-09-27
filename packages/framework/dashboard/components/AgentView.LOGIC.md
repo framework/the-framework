@@ -28,8 +28,8 @@ Shows one agent [1] on its own page, the agent view [2], in one frame that stays
 
 - **One frame for a running and a finished agent** - the same action bar, feed, notices and composer stay on screen for the agent's whole life; only their contents follow the agent's state.
 - **Which events are shown** - a running agent shows the live event stream; a finished one shows its archive, swapped in behind the events already on screen, and neither an empty nor a stale archive ever replaces what the stream shows.
-- **Loading and empty states** - a finished agent whose archive is still being read says "Loading agent…"; a finished agent with no events at all says "This agent has no events."; a running agent with nothing yet simply waits for its first event.
-- **Working means running** - the agent counts as working exactly while the daemon's list says it runs; everything that asks "is there more coming?" asks this, so an agent that is not working gets its next step offered.
+- **Loading and empty states** - on a first visit the feed stays blank until the agent's own events are in, then fills in one step; a finished agent whose archive is still being read after a second says "Loading agent…"; a finished agent with no events at all says "This agent has no events."; a running agent with nothing yet simply waits for its first event.
+- **Working means running** - the agent counts as working exactly while the daemon's list says it runs; everything that asks "is there more coming?" asks this, so an agent that is not working gets its next step offered. Before the list is read, whether the agent runs is not known, and nothing that depends on it is read or offered.
 - **Live as the feed knows it** - the feed follows new output, and the composer offers Stop, as soon as new events stream in, even during the seconds before the daemon's list of agents notices a resumed agent.
 - **What the action bar says** - the agent's name with its project as a breadcrumb; the one status word, from the events shown and the agent's card; while working, the counts of what the checkout has changed; once not working, the verdict on what the branch holds and the offered next step.
 - **Switching between agents** - the bar names the agent at once and shows its facts together once its own reads are in (at most a second later); an agent seen before shows its archive, its branch verdict and its facts at once, as last read, while they are read again.
@@ -72,9 +72,12 @@ The agent's name leads the bar: the label the caller passes, the same label the 
 
 **Problem**: "nothing to show yet" means different things for a running and a finished agent, and the two must not share one message.
 
+**User story**: the user opens an agent they have not opened before. The feed used to pass through what each read still out had to say before the agent's events landed: "Waiting for the session to start…" while the daemon's list of agents was not read yet, the live event stream's events (for an agent whose checkout is gone, the project root's event file, another agent's), then "Loading agent…", then the events. Now it stays blank for that moment and fills in once.
+
 #### Business logic
 
-- A finished agent [1] whose archive [8] has not answered yet, with no events on screen, shows "Loading agent…" centered in the page.
+- The feed shows nothing, no events and no message, until one of these holds for the selected agent [1]: it is known to be running; its archive [8] has answered; one second has passed since it was selected. Once the feed has shown an agent, it keeps showing it: an agent that stops while the user watches keeps its events on screen while its archive is read. An agent seen before, whose archive is remembered, shows at once.
+- A finished agent whose archive has not answered after that second, with no events on screen, shows "Loading agent…" centered in the page.
 - A finished agent whose archive has answered but holds nothing shows the feed's empty state with the label "This agent has no events.".
 - A running agent with nothing yet shows the feed waiting for its first event, with the feed's own default empty label.
 
@@ -91,6 +94,8 @@ An agent [1] counts as working exactly while the daemon's list of agents says it
 - what the branch holds (the read in `lib/use-agent-handoff.ts`) is only read once the agent is not working and its card [3] is not marked saving: a branch still being written to has nothing to offer yet, and while the agent is saving its checkout is being cleaned up, which deletes a branch that holds nothing, so a next step offered then would be gone moments later;
 - the bar's action slot is empty while working — an agent that is working publishes its own work — and holds the next step [9] once not working;
 - the changes panel reads the checkout [7] while working; the branch's commits and files replace it once not working.
+
+Until the daemon's list of agents has been read (an agent opened from the Overview, or from a link, before its project's list has answered), whether the agent runs is not known: it counts as neither working nor ended. Its archive, its branch and the project's kept checkouts are not read, the bar offers nothing and waits (see "Switching between agents"), and the feed stays blank until the list is read or a second has passed, then shows the live event stream's events.
 
 ### Live as the feed knows it
 

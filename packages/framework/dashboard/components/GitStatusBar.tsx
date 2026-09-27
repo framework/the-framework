@@ -96,12 +96,35 @@ export function GitStatusBar({
     </span>
   )
 
+  // The disclosure's chevron, where there is something to open. Drawn in the same place whether
+  // or not the facts are in yet (dimmed until they are), so the name beside it never moves: it used
+  // to appear with the facts and push the whole line over.
+  const chevron = (enabled: boolean) =>
+    onToggle && (
+      <ChevronRight
+        data-testid="disclosure-chevron"
+        className={cn(
+          'h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform',
+          expanded && 'rotate-90',
+          !enabled && 'opacity-40',
+        )}
+      />
+    )
+
   if (!status || !ready) {
     if (!title) return null
+    // Laid out as the disclosure below is (chevron, then name, same gap), so the facts landing
+    // beside the name is the only change.
+    const alone = (
+      <span className="flex min-w-0 items-center gap-2 overflow-hidden">
+        {chevron(false)}
+        {title}
+      </span>
+    )
     return inline ? (
-      <span className="flex min-w-0 items-center gap-2 overflow-hidden text-xs">{title}</span>
+      <span className="flex min-w-0 items-center gap-2 overflow-hidden text-xs">{alone}</span>
     ) : (
-      <div className="flex items-center gap-2 border-b border-border px-4 py-2 text-xs">{title}</div>
+      <div className="flex items-center gap-2 border-b border-border px-4 py-2 text-xs">{alone}</div>
     )
   }
 
@@ -123,9 +146,7 @@ export function GitStatusBar({
     <>
       {/* The chevron only appears where there is something to open, so a bar without a
           disclosure doesn't advertise one. */}
-      {onToggle && (
-        <ChevronRight className={cn('h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform', expanded && 'rotate-90')} />
-      )}
+      {chevron(true)}
       {/* The session's name leads (#1030): it is what the rail calls this run and it does not
           change under you, unlike the branch, which the agent renames near the end (#736). It is
           the one element that shrinks, so it truncates last and the identity never disappears. */}

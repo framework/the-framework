@@ -64,6 +64,18 @@ describe('GitStatusBar (#809)', () => {
     await waitFor(() => expect(screen.getByText('clean')).toBeTruthy())
   })
 
+  test('the disclosure chevron is there before the facts are, so the name never moves when they land', async () => {
+    onAgentWorktree.mockReturnValue(new Promise(() => {}))
+    render(<GitStatusBar projectId="p1" agentId="run-1" inline label="Fix the header" onToggle={() => {}} ready={false} />)
+    const chevron = screen.getByTestId('disclosure-chevron')
+    // Before the name, as in the disclosure the facts come in.
+    expect(chevron.compareDocumentPosition(screen.getByText('Fix the header')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    cleanup()
+    // Without a disclosure there is nothing to open, so no chevron either way.
+    render(<GitStatusBar projectId="p1" agentId="run-1" inline label="Fix the header" ready={false} />)
+    expect(screen.queryByTestId('disclosure-chevron')).toBeNull()
+  })
+
   test("switching sessions never shows the previous session's facts; going back shows its own at once", async () => {
     onAgentWorktree.mockImplementation(async (_p: unknown, id: unknown) => ({ path: `/repo/.branches/${id}`, own: true, dirty: id === 'run-1', branch: `agent-${id}` }))
     const { rerender } = render(<GitStatusBar projectId="p1" agentId="run-1" inline label="One" />)

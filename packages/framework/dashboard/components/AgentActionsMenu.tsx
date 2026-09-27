@@ -82,8 +82,8 @@ export function AgentActionsMenu({
       copiedTimer.current = setTimeout(() => setCopied(false), 1500)
     })
   }
-  // keepPrevious: hold the last git host page while a new project's loads, so the item does not flicker.
-  const home = useLoaded<GitHostHome | null>(() => onGitHostHome(projectId), null, [projectId], true)
+  // Hold the last git host page while a new project's loads, so the item does not flicker.
+  const home = useLoaded<GitHostHome | null>(() => onGitHostHome(projectId), null, [projectId], 'previous')
 
   const { busy, error, run } = useAction()
 

@@ -17,6 +17,7 @@ One agent's [1] action bar, one row that never wraps: at the start, what the age
 - **Facts at the start, controls at the end** - the row holds the agent's identity and branch facts first and its controls last, and only the facts give up width, so the controls never drop under them.
 - **One status word** - exactly one ranked status is shown beside the branch's clean/dirty dot, with a colored dot and a capped width; the full text is on hover.
 - **The controls cluster** - the error count, the next step [2] kept out as a visible button, and the "⋮" menu with every other action.
+- **Facts shown together** - until the caller says the agent's own facts have been read, the row names the agent and shows none of its facts: no status word, no summary, no error count, no next step; the "⋮" menu stays.
 - **What the menu is told** - a Delete is only offered for a finished agent; a Remove only while the agent's checkout is still kept; a Stop addresses the agent by its id.
 
 ## Business logic
@@ -54,6 +55,16 @@ At the end of the row, in order:
 - the count of errors the agent [1] hit (`AgentErrorCount.tsx`), kept here with the controls rather than among the branch facts because a count is only useful when it is whole and the facts give up width;
 - the next step [2], passed in by the caller once the agent has ended ("Open PR", or "Merge PR", or the reason there is nothing to press): the one control that moves the work forward, so it stays visible instead of going into the menu;
 - the "⋮" menu (`AgentActionsMenu.tsx`) with every other action.
+
+### Facts shown together
+
+#### Context
+
+**User story**: switching between agents in the left rail, the user used to see the bar fill in over several steps, with facts left from the previous agent under the new agent's name for a moment. Now the name shows at once and the facts appear together.
+
+#### Business logic
+
+The caller tells the bar whether the agent's [1] own facts have been read (the agent's page decides, see `AgentView.tsx`). Until they have, the bar shows the agent's name and project and holds back everything that describes the agent: the status word, the summary of what its branch holds, the branch facts (`GitStatusBar.tsx` is told the same), the error count and the next step [2]. The "⋮" menu stays, since it describes nothing. Once ready, they all show together. A caller that says nothing counts as ready.
 
 ### What the menu is told
 

@@ -133,3 +133,69 @@ describe('usePolled', () => {
     expect(result.current.value).toEqual([])
   })
 })
+
+describe('remembering answers per key', () => {
+  test('going back to a target shows its last answer at once, marked loaded, and reads it again', async () => {
+    let round = 0
+    const load = vi.fn((id: string) => Promise.resolve(`${id}-${++round}`))
+    const { result, rerender } = renderHook(
+      ({ id }) => usePolled(() => load(id), 'initial', 60_000, [id], { remember: `thing:${id}` }),
+      { initialProps: { id: 'a' } },
+    )
+    await settle()
+    expect(result.current).toMatchObject({ value: 'a-1', loaded: true })
+
+    rerender({ id: 'b' })
+    // Never seen: nothing, and never a's answer.
+    expect(result.current).toMatchObject({ value: 'initial', loaded: false })
+    await settle()
+    expect(result.current.value).toBe('b-2')
+
+    rerender({ id: 'a' })
+    // Seen before: a's last answer from the first frame, while it is read again.
+    expect(result.current).toMatchObject({ value: 'a-1', loaded: true })
+    await settle()
+    expect(result.current.value).toBe('a-3')
+    expect(load).toHaveBeenCalledTimes(3)
+  })
+
+  test('no frame after a switch shows the last target\'s answer, not even the first one', async () => {
+    const frames: string[] = []
+    const { rerender } = renderHook(
+      ({ id }) => {
+        const { value } = usePolled(() => Promise.resolve(`data-${id}`), 'initial', 60_000, [id], { remember: `thing:${id}` })
+        frames.push(`${id}:${value}`)
+        return value
+      },
+      { initialProps: { id: 'a' } },
+    )
+    await settle()
+    rerender({ id: 'b' })
+    await settle()
+    rerender({ id: 'a' })
+    await settle()
+    expect(frames.filter(f => f.startsWith('b:')).every(f => f === 'b:initial' || f === 'b:data-b')).toBe(true)
+    expect(frames.filter(f => f.startsWith('a:')).slice(-3).every(f => f === 'a:data-a')).toBe(true)
+  })
+
+  test('with nothing to read, nothing remembered is shown', async () => {
+    const { result, rerender } = renderHook(
+      ({ on }) => useLoaded(on ? () => Promise.resolve('answer') : null, 'initial', [on], { remember: 'thing' }),
+      { initialProps: { on: true } },
+    )
+    await settle()
+    expect(result.current).toBe('answer')
+    rerender({ on: false })
+    expect(result.current).toBe('initial')
+  })
+
+  test("'previous' keeps the last answer across a switch", async () => {
+    const { result, rerender } = renderHook(
+      ({ id }) => useLoaded(() => new Promise<string>(resolve => (id === 'a' ? resolve('data-a') : undefined)), 'initial', [id], 'previous'),
+      { initialProps: { id: 'a' } },
+    )
+    await settle()
+    rerender({ id: 'b' })
+    expect(result.current).toBe('data-a')
+  })
+})

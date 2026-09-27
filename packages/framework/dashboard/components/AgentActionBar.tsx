@@ -26,6 +26,7 @@ export function AgentActionBar({
   expanded = false,
   onToggle,
   actions,
+  ready = true,
 }: {
   projectId: string
   /** Which run Stop addresses (#749). */
@@ -51,6 +52,12 @@ export function AgentActionBar({
   onToggle?: (() => void) | undefined
   /** The session's next step (push, open PR), kept in the bar rather than in the ⋮ menu. */
   actions?: ReactNode
+  /**
+   * Whether this run's own reads have answered. Until they have, the bar names the run and shows
+   * none of its facts: shown one by one as each read landed, the bar filled in over several steps,
+   * and a fact still on screen from the run before read as this one's.
+   */
+  ready?: boolean
 }) {
   // What state the session is in, said once, here: it used to be a banner over the feed, which
   // spent a full row on one word and pushed the output down. Ranked in agentStatusPill, so exactly
@@ -69,7 +76,8 @@ export function AgentActionBar({
         inline
         label={label}
         projectName={projectName}
-        summary={summary}
+        summary={ready ? summary : undefined}
+        ready={ready}
         expanded={expanded}
         onToggle={onToggle}
         // Beside the tree's clean/dirty, not at the far end of the bar: "dirty · ready for merge"
@@ -77,7 +85,7 @@ export function AgentActionBar({
         // live. Capped, because one of these labels is not a word — a failure carries its reason,
         // which had a banner row to itself and would otherwise take the row from the branch.
         agentState={
-          status && (
+          ready && status && (
             <span className="flex shrink-0 items-center gap-1.5" title={status.label}>
               <span className={cn('h-2 w-2 shrink-0 rounded-full', status.dot)} aria-hidden />
               <span className={cn('max-w-40 truncate', status.tone)}>{status.label}</span>
@@ -92,10 +100,10 @@ export function AgentActionBar({
         {/* What the agent could not get past (#1500): the log scrolls, this row does not. It sits
             with the controls rather than among the branch facts, which give up width as the row
             fills — a count is only useful if it is whole. */}
-        <AgentErrorCount events={events} />
+        {ready && <AgentErrorCount events={events} />}
         {/* The handoff's next step stays visible — the one thing here that moves the session forward
             rather than just opening it somewhere. Everything else is in the ⋮ menu. */}
-        {actions}
+        {ready && actions}
         <AgentActionsMenu
           projectId={projectId}
           agentId={agentId}

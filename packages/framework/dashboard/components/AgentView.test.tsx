@@ -28,7 +28,14 @@ vi.mock('../lib/preferences.js', () => ({
 // The frame around the feed is not under test: the bar and composer reach for git and session
 // state of their own, and the swap decision this file cares about is visible in the feed alone.
 // The bar's `actions` slot IS rendered, so the handoff cluster stays reachable.
-vi.mock('./AgentActionBar.js', () => ({ AgentActionBar: ({ actions }: { actions?: unknown }) => <>{actions}</> }))
+vi.mock('./AgentActionBar.js', () => ({
+  AgentActionBar: ({ actions, ready }: { actions?: unknown; ready?: boolean }) => (
+    <>
+      <span data-testid="bar-ready">{String(ready)}</span>
+      {actions}
+    </>
+  ),
+}))
 vi.mock('./AgentComposer.js', () => ({ AgentComposer: () => null }))
 
 const { AgentView } = await import('./AgentView.js')
@@ -131,3 +138,43 @@ describe('AgentView branch read', () => {
 
 // The Resume offer (#1391) moved into the composer's submit slot (#1455): its when-offered rules
 // are AgentComposer's now, tested there — AgentView only hands `outcome` down.
+
+describe('the bar shows its facts together (run switch)', () => {
+  test("an ended run's bar is ready once its log and its branch are read, not before", async () => {
+    let log: (v: unknown) => void = () => {}
+    let branch: (v: unknown) => void = () => {}
+    onAgent.mockReturnValue(new Promise(resolve => (log = resolve)))
+    onAgentHandoff.mockReturnValue(new Promise(resolve => (branch = resolve)))
+    render(view())
+    expect(screen.getByTestId('bar-ready').textContent).toBe('false')
+    log(ARCHIVED)
+    await waitFor(() => expect(screen.getByText(/the archive delivered this line/)).toBeTruthy())
+    expect(screen.getByTestId('bar-ready').textContent).toBe('false')
+    branch(null)
+    await waitFor(() => expect(screen.getByTestId('bar-ready').textContent).toBe('true'))
+  })
+
+  test("the bar waits for the branch's pull request lookup too, so its facts land in one step", async () => {
+    onAgent.mockResolvedValue(ARCHIVED)
+    onAgentHandoff.mockResolvedValueOnce({ branch: 'b', exists: false, commits: [], files: [], prPending: true })
+    onAgentHandoff.mockResolvedValue({ branch: 'b', exists: false, commits: [], files: [] })
+    render(view())
+    await waitFor(() => expect(onAgentHandoff).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(screen.getByText(/the archive delivered this line/)).toBeTruthy())
+    expect(screen.getByTestId('bar-ready').textContent).toBe('false')
+    await waitFor(() => expect(screen.getByTestId('bar-ready').textContent).toBe('true'))
+    expect(onAgentHandoff).toHaveBeenCalledTimes(2)
+  })
+
+  test('a read that never answers holds the bar back one second, no longer', async () => {
+    onAgent.mockReturnValue(new Promise(() => {}))
+    render(view())
+    expect(screen.getByTestId('bar-ready').textContent).toBe('false')
+    await waitFor(() => expect(screen.getByTestId('bar-ready').textContent).toBe('true'), { timeout: 3000 })
+  })
+
+  test('a running run is ready at once: its channel is its log', () => {
+    render(view({ live: true }))
+    expect(screen.getByTestId('bar-ready').textContent).toBe('true')
+  })
+})

@@ -1,4 +1,6 @@
 import { configure } from '@testing-library/react'
+import { beforeEach } from 'vitest'
+import { forgetRemembered } from './lib/use-async.js'
 
 // Testing Library's async queries (`findBy*`, `waitFor`) give up after 1s by default, which is
 // not enough on a loaded machine (#886). Several components here assert through a Base UI menu,
@@ -10,3 +12,7 @@ import { configure } from '@testing-library/react'
 // The timeout is a ceiling, not a delay: a passing query still returns as soon as it matches, so
 // this costs nothing when things are healthy and only buys patience when the machine is starved.
 configure({ asyncUtilTimeout: 5000 })
+
+// The answers `use-async` remembers per key live for the page's life, which in a test run is the
+// whole file: forget them before each test, so one test's answer is never another's first frame.
+beforeEach(() => forgetRemembered())

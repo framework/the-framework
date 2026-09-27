@@ -1,4 +1,4 @@
-The one line of git facts about the checkout [1] in play — its branch, whether it is clean or dirty, the agent's [2] state, its size on disk, what the branch holds, and the linked pull request — shown on the project home for the project's own checkout and on an agent's page for that agent's checkout, re-read on a clock so it tracks an agent committing or branching. It renders nothing when there is no repository or checkout to report.
+The one line of git facts about the checkout [1] in play — its branch, whether it is clean or dirty, the agent's [2] state, its size on disk, what the branch holds, and the linked pull request — shown on the project home for the project's own checkout and on an agent's page for that agent's checkout, re-read on a clock so it tracks an agent committing or branching. It renders nothing when there is no repository or checkout to report, except the agent's name, which shows from the first frame.
 
 ## Context
 
@@ -12,7 +12,8 @@ The one line of git facts about the checkout [1] in play — its branch, whether
 ## Business logic — TL;DR
 
 - **Whose checkout** - with an agent selected the line reports that agent's checkout, which alone has a path, an owner and a size; otherwise the project's own checkout; nothing renders when there is no checkout to report.
-- **Kept current** - the facts are re-read every 10 seconds, or every second while the daemon's pull request lookup is still in flight; the previous facts stay on screen while the next agent's load.
+- **Kept current** - the facts are re-read every 10 seconds, or every 0.3 seconds while the daemon's pull request lookup is still in flight.
+- **Switching agents** - the facts are remembered per checkout for as long as the page is open: going back to an agent shows its facts from the first frame while they are read again; an agent never shown has no facts until its own are read, never the previous agent's. Until then, and while the caller says its own facts are not in yet, the agent's name and project show alone.
 - **Identity first, branch second** - given the agent's name it leads in bold, prefixed by "<project> /", which stays in view (capped) however long the name is, and the branch drops to muted context with its `the-framework/` prefix hidden; without a name the branch is the identity; the full branch and the checkout's path live in the branch's tooltip.
 - **Clean or dirty, neutrally** - a dot and the word "clean" in neutral gray or "dirty" in amber; the tooltip reads "Clean", "Uncommitted changes", or "Uncommitted changes in this agent" when the checkout is the agent's own.
 - **State, size and summary** - the agent's state sits beside the dot, the checkout's size on disk shows once the daemon could measure it, and the summary of what the branch holds comes last; the facts furthest from the branch drop out first as the bar narrows.
@@ -39,7 +40,9 @@ With an agent [2] selected, the line asks the daemon about that agent's checkout
 
 #### Business logic
 
-The facts are re-read every 10 seconds; while the daemon reports its pull request lookup as still pending, every second. When the selected agent changes, the previous facts stay visible until the new ones arrive, so the line updates in place instead of vanishing and popping back.
+The facts are re-read every 10 seconds; while the daemon reports its pull request lookup as still pending, every 0.3 seconds. When the selected agent changes, the line never shows the previous agent's facts under the new agent's name: that read as this agent's own for the moment the read took. Instead the facts are remembered per checkout (each agent's checkout, and the project's own checkout, under their own key) for as long as the page is open. Going back to an agent seen before shows its remembered facts from the first frame, and they are read again at once, so the fresh answer replaces them as soon as it lands. An agent never shown before shows only its name and its "<project> /" breadcrumb until its facts are read.
+
+The caller can also hold the facts back while its own facts about the agent are still being read (the agent's page does, see `AgentView.tsx`): until it says they are ready, the name and breadcrumb show alone, so the whole line of facts appears together rather than in pieces.
 
 ### Identity first, branch second
 

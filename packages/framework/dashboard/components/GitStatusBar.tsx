@@ -95,11 +95,13 @@ export function GitStatusBar({
           the one element that shrinks, so it truncates last and the identity never disappears. */}
       {label && (
         <span className="flex min-w-0 items-center gap-1.5 overflow-hidden">
-          {/* The project, as a breadcrumb parent: muted, and the first to give up width (shrink-999)
-              so a long project name truncates before the session name does. */}
+          {/* The project, as a breadcrumb parent: muted, and always there. It keeps its width and is
+              capped, so a long project name is cut at the cap and a long session name gives up the
+              rest. Letting it give up width first squeezed it, slash and all, to nothing beside a
+              long session name. */}
           {projectName && (
-            <span className="flex min-w-0 shrink-[999] items-center gap-1.5 overflow-hidden text-muted-foreground">
-              <span className="truncate" title={projectName}>
+            <span data-testid="project-crumb" className="flex max-w-32 shrink-0 items-center gap-1.5 text-muted-foreground">
+              <span className="min-w-0 truncate" title={projectName}>
                 {projectName}
               </span>
               <span className="shrink-0 text-muted-foreground/60" aria-hidden>

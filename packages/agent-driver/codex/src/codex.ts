@@ -2,7 +2,7 @@ import { execFile, spawn as nodeSpawn } from 'node:child_process'
 import { copyFile, lstat, mkdir, readlink, readdir, realpath, rename, rm, stat, symlink } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { runCliSession, finishTurn, agentEnv, attachLog, combineFraming, combineSignals, makeEmit, readWorkspaceFile, oneLine, checkCliReady, type AgentCliParser, type CliSpec, type DriverReadiness, type DriverReadyOptions, type PersonalSetup, type SpawnLike, type SessionLog, type Driver, type DriverEvent, type DriverPromptOptions, type DriverSession, type DriverStartOptions, type DriverTurn, type DriverUsage } from 'agent-driver'
+import { runCliSession, finishTurn, agentEnv, attachLog, combineFraming, combineSignals, makeEmit, readWorkspaceFile, oneLine, checkCliReady, type AgentCliParser, type CliSpec, type DriverReadiness, type DriverReadyOptions, type PersonalSetup, type SpawnLike, type SessionLog, type Driver, type DriverEvent, type DriverModel, type DriverPromptOptions, type DriverSession, type DriverStartOptions, type DriverTurn, type DriverUsage } from 'agent-driver'
 
 /**
  * Codex's sandbox policy for the shell commands the model writes.
@@ -149,6 +149,68 @@ export class CodexDriver implements Driver {
     const extraArgs = [...args, ...(this.opts.extraArgs ?? [])]
     return new CodexSession({ ...this.opts, env: sessionEnv, ...(extraArgs.length > 0 ? { extraArgs } : {}) }, opts)
   }
+
+  /**
+   * The models Codex's own picker offers: `codex debug models`, the catalog for the person's
+   * login, cut to the entries it lists (`visibility: list`) in its own order (`priority`). Asked
+   * from the person's own Codex home, where their login is. The catalog is Codex's word, not a
+   * guarantee: a listed model can still be refused when a turn runs.
+   */
+  listModels(opts: { signal?: AbortSignal } = {}): Promise<DriverModel[]> {
+    return new Promise<DriverModel[]>((resolvePromise, rejectPromise) => {
+      const bin = this.opts.bin ?? 'codex'
+      const spawn = this.opts.spawn ?? (nodeSpawn as unknown as SpawnLike)
+      const child = spawn(bin, ['debug', 'models'], { cwd: process.cwd(), env: this.opts.env ?? process.env })
+      let settled = false
+      const settle = (answer: { models: DriverModel[] } | { error: string }) => {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
+        opts.signal?.removeEventListener('abort', onAbort)
+        child.kill('SIGTERM')
+        if ('models' in answer) resolvePromise(answer.models)
+        else rejectPromise(new Error(answer.error))
+      }
+      const onAbort = () => settle({ error: 'Codex was not asked for its models: the read was stopped' })
+      if (opts.signal?.aborted) return onAbort()
+      opts.signal?.addEventListener('abort', onAbort)
+      const timer = setTimeout(() => settle({ error: `Codex did not list its models within ${MODELS_TIMEOUT_MS / 1000}s` }), MODELS_TIMEOUT_MS)
+      const out: Buffer[] = []
+      const err: Buffer[] = []
+      child.stdout?.on('data', (chunk: Buffer | string) => out.push(Buffer.from(chunk)))
+      child.stderr?.on('data', (chunk: Buffer | string) => err.push(Buffer.from(chunk)))
+      child.on('error', e => settle({ error: `\`${bin}\` could not start: ${e.message}` }))
+      child.on('close', code => {
+        const said = oneLine(Buffer.concat(err).toString('utf8'))
+        if (code !== 0) return settle({ error: `\`${bin} debug models\` failed (code ${code})${said ? `: ${said}` : ''}` })
+        settle(parseCodexModels(Buffer.concat(out).toString('utf8')))
+      })
+    })
+  }
+}
+
+/** How long {@link CodexDriver.listModels} waits for Codex's answer. */
+const MODELS_TIMEOUT_MS = 30_000
+
+/** Read `codex debug models`: the models Codex lists (`visibility: list`), by its `priority`. */
+export function parseCodexModels(stdout: string): { models: DriverModel[] } | { error: string } {
+  let catalog: unknown
+  try {
+    catalog = JSON.parse(stdout)
+  } catch {
+    return { error: 'Codex answered its model list in a shape this version cannot read' }
+  }
+  const entries = (catalog as { models?: unknown } | null)?.models
+  if (!Array.isArray(entries)) return { error: 'Codex answered without a model list' }
+  const listed: { model: DriverModel; priority: number }[] = []
+  for (const entry of entries as Record<string, unknown>[]) {
+    const id = entry?.['slug']
+    const name = entry?.['display_name']
+    if (entry?.['visibility'] !== 'list' || typeof id !== 'string') continue
+    const priority = typeof entry['priority'] === 'number' ? entry['priority'] : Number.MAX_SAFE_INTEGER
+    listed.push({ model: { id, name: typeof name === 'string' ? name : id }, priority })
+  }
+  return { models: listed.sort((a, b) => a.priority - b.priority).map(entry => entry.model) }
 }
 
 let sessionCounter = 0

@@ -27,7 +27,7 @@ Fixes the vocabulary of the driver [1] contract, in words: what every driver pro
 
 ## Business logic — TL;DR
 
-- **What a driver promises** - a stable implementation id, a way to start a driver session [2] bound to a directory, and optionally a way to read the account's quota [7].
+- **What a driver promises** - a stable implementation id, a way to start a driver session [2] bound to a directory, optionally a way to read the account's quota [7], and optionally a way to list the models the coding agent [8] offers, each as the id a driver session takes and the name the coding agent shows.
 - **The personal setup, one vocabulary for every adapter** - the three parts of the personal setup [18], each on or off; every adapter takes the same three and turns each off with its own switches, says in its readiness check a part it cannot turn off, and loads everything when given none.
 - **How a driver session is started** - with the directory the coding agent [8] reads and edits, the framing [10] every turn [3] carries, the model to pass through, a stop request [11] for the whole driver session, optionally the session id of an earlier driver session to continue, optionally a log (a directory and the card to start it with, exposed on the driver session for the caller to patch, end and reopen), and a listener for progress events [4] that can never break the coding agent.
 - **One turn, one final message** - a prompt goes in with optional extra framing, a stop request for this turn only, a best-effort request to continue the previous turn and optionally an inbox path, whose waiting lines become further turns before the prompt resolves; the final message, the session id and the usage [5] of the last turn come out.
@@ -50,6 +50,8 @@ See `## Context`.
 #### Business logic
 
 A driver [1] has a stable implementation id (see "The implementation ids") and can start a driver session [2] bound to a directory. It may also read where the account's quota [7] stands; that reading is account-wide and independent of any driver session, and an implementation that cannot report a quota omits the ability entirely rather than answering with a made-up number. Of the five implementations only `claude-code` reads a quota.
+
+A driver may also list the models its coding agent [8] offers, in the coding agent's own order: the same list its own model picker shows the person, for their login. Each model is the id a driver session is started with to run it (such as `opus` or `gpt-5.6-terra`) and its name as the coding agent shows it (such as "Opus 5.5"). Like the quota, the list is account-wide, needs no driver session and costs no prompt; when the coding agent cannot say, the list fails with the reason in words, and an implementation that cannot list its models omits the ability. Of the five implementations `claude-code` and `codex` list their models.
 
 ### The personal setup, one vocabulary for every adapter
 

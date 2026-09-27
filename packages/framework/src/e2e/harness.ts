@@ -174,6 +174,8 @@ export async function makeWorld(): Promise<StoryWorld> {
     // The story sets one view; both questions are answered off it, since a story that cares about
     // the model's own week states that window in the view it sets (#1619).
     quota: { read: async () => quota.view, stop: () => {} },
+    // No story reads the menu, and none may start a coding agent's CLI to ask.
+    models: { read: async () => ({ 'claude-code': { models: [] as [] }, codex: { models: [] as [] } }) },
     projectErrors: () => [],
     bridgeBrowser: { status: async () => ({ state: 'off' as const }), start: async () => {}, stop: async () => {}, act: async () => {} },
   }

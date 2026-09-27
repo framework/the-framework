@@ -1,4 +1,4 @@
-Drives Codex as a driver [1]: each turn [2] is one non-interactive invocation of the `codex` command in the driver session's [3] directory, whose streamed JSON output is read for the coding agent's [4] messages, the kinds of work items it starts, its thread id and its token usage [5], and whose last message is the turn's answer. Codex has no system prompt flag, prices nothing and reports no quota [6]; a turn asked to continue the driver session's conversation resumes it by its thread id. Its implementation id is `codex`.
+Drives Codex as a driver [1]: each turn [2] is one non-interactive invocation of the `codex` command in the driver session's [3] directory, whose streamed JSON output is read for the coding agent's [4] messages, the kinds of work items it starts, its thread id and its token usage [5], and whose last message is the turn's answer. Codex has no system prompt flag, prices nothing and reports no quota [6], and lists the models it offers through its own model catalog; a turn asked to continue the driver session's conversation resumes it by its thread id. Its implementation id is `codex`.
 
 ## Context
 
@@ -36,6 +36,7 @@ Drives Codex as a driver [1]: each turn [2] is one non-interactive invocation of
 - **What is read off the streamed output** - the thread id as the session id, announced at once as a `session` progress event, each completed message as streamed text with the last one as the turn's answer, and each started work item as a tool use named by its kind, and why a failed turn failed, with everything else ignored.
 - **Usage: tokens, never a price** - Codex's token counts are reported with the cached part split out of its inclusive input total, and no price, never zero.
 - **No quota reading** - the driver reports no quota [6] at all rather than a made-up number.
+- **Listing the models** - `codex debug models`, asked with the person's own Codex home, answers Codex's model catalog; the models it lists (visibility `list`) are kept, in Codex's own order (its priority), each by its slug and its display name; a failed or unreadable answer fails with the reason.
 - **The person's own setup** - each part of the personal setup [13] the caller turns off becomes Codex's own switch: `memory` off is `features.memories=false`, `connectors` off is `features.apps=false` and `features.plugins=false`, `skills` off runs Codex from a Codex home [14] of its own, kept on this machine and starting with only a link to the person's login; given none, Codex loads everything.
 - **Can a session start here** - `codex` asked `--version`, then `login status`, read as a sentence; with `skills` off, skills in `~/.agents/skills` are a warning, since Codex has no switch for that folder.
 - **Ending the driver session** - nothing is freed; each turn's process is already gone when the turn ends.
@@ -137,6 +138,18 @@ The usage [5] reported for a turn [2] carries token counts and no price. Codex's
 #### Business logic
 
 The Codex driver [1] offers no quota [6] reading at all. A caller that finds none does not gate Codex agents [7] on a quota.
+
+### Listing the models
+
+#### Context
+
+**User story**: the user picks the model for the next agent [7] from the models their own Codex offers, by the names Codex shows.
+
+**Problem**: the models a ChatGPT login may use change with Codex's releases and the person's plan, so no list written into The Framework stays right.
+
+#### Business logic
+
+On request, the driver [1] runs `codex debug models`, with the environment it was configured with and so the person's own Codex home, where their login is. Codex answers its whole model catalog as JSON. The models whose visibility is `list`, the ones Codex's own picker offers, are kept; hidden ones are left out. They are ordered by Codex's priority, lowest first, a model without one last. Each is its slug, the id a driver session takes, and its display name, or the slug when it has none. The catalog is Codex's word, not a guarantee: a listed model can still be refused when a turn [2] runs on it. A `codex` that cannot be started, a non-zero exit (with what Codex said on standard error), an answer that is not JSON, an answer without a model list, no answer within 30 seconds and the caller's stop request each fail the listing with the reason in words; the process is stopped either way.
 
 ### The person's own setup
 

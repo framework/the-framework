@@ -1,4 +1,4 @@
-The "about this agent [1]" strip behind the action bar's disclosure, always available: which coding agent [2] ran the agent and which model, read off the agent's card [5], and what it has spent so far, added up from the agent's events [3]. The branch, pull request and changes sit in the bar row right above and are not repeated here.
+The "about this agent [1]" strip behind the action bar's disclosure, always available: which coding agent [2] ran the agent and which model, read off the agent's card [5], the model by the name its coding agent gives it, and what it has spent so far, added up from the agent's events [3]. The branch, pull request and changes sit in the bar row right above and are not repeated here.
 
 ## Glossary
 
@@ -10,6 +10,6 @@ The "about this agent [1]" strip behind the action bar's disclosure, always avai
 
 ## Business logic — TL;DR
 
-- **Which coding agent and model** - "Agent" names the coding agent the card [5] records, as "Claude Code" or "Codex" (every surface Claude runs on counts as Claude Code), or the recorded implementation name when no driver claims it; "Model" is the model the card records, as recorded (such as `opus`). Each is shown only when the card records it, so neither is shown before the dashboard's list of agents holds the agent.
+- **Which coding agent and model** - "Agent" names the coding agent the card [5] records, as "Claude Code" or "Codex" (every surface Claude runs on counts as Claude Code), or the recorded implementation name when no driver claims it; "Model" is the model the card records, named as its coding agent names it in the list the daemon asked it for (`opus` reads "Opus 5.5", `lib/models.ts`); a model the list does not hold, or a list not answered yet, is shown by what the card records (`fable`). The card keeps what the run was given, such as the alias `opus`, so an old agent's model is named by what that alias means today. Each is shown only when the card records it, so neither is shown before the dashboard's list of agents holds the agent.
 - **What it has spent** - the diary keeps one usage event per turn [4] the coding agent priced and one result per turn it answered, and no token counts. "Spent" is every priced turn added up, as dollars with two decimals, shown once one turn was priced; "Turns" is the number of answered turns, shown once there is one. No token or cache count is shown, because the diary holds none.
 - **Nothing reported yet** - before the diary holds a priced or answered turn, the strip says "No spend reported yet".

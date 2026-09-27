@@ -21,7 +21,7 @@ import { useConnectionProfiles, connectLocal, removeProfile, type ConnectionProf
 import { useSelectedRemoteDeviceId, selectRemoteDevice } from '../lib/remote-target.js'
 import { useDeviceStatus } from '../lib/use-device-status.js'
 import { stashDraftFromUrl, takePendingDraft } from '../lib/draft-handoff.js'
-import { DRIVER_MODELS } from '../lib/agent-settings.js'
+import { useModels } from '../lib/models.js'
 import { useProjectLauncher } from '../lib/use-project-launcher.js'
 import { ClaudeLogo, CodexLogo } from './driver-logos.js'
 import { Button } from './ui/button.js'
@@ -34,22 +34,30 @@ import { cn } from '../lib/utils.js'
 // each list, and picking it stored nothing, so the menu's own answer to "which model" was "we do
 // not know" (#1143). Not choosing is still a state — it is just no longer something to pick, and
 // the trigger says so rather than naming the first model as if it had been chosen.
-// The names and labels are the framework's own vocabulary (browser-safe via /client), and the model
-// lists are shared UI data (`lib/agent-settings.ts`), since the Routine work card names a model too
-// (#1506) and the two must not drift. Only the icons are this component's own, and the
-// Record<DriverName, ...> shape means a new agent framework-side is a compile error here rather
-// than a silently missing menu entry.
+// The names and labels are the framework's own vocabulary (browser-safe via /client), and each
+// driver's models are what its coding agent answered when the daemon asked (`lib/models.ts`), so
+// the menu offers what the agent's own picker offers, by the agent's own names. Only the icons are
+// this component's own, and the Record<DriverName, ...> shape means a new agent framework-side is
+// a compile error here rather than a silently missing menu entry.
 const DRIVER_UI: Record<DriverName, { icon: DriverOption['icon'] }> = {
   'claude-code': { icon: <ClaudeLogo className="h-4 w-4" /> },
   codex: { icon: <CodexLogo className="h-4 w-4" /> },
 }
 
-const DRIVER_OPTIONS: DriverOption[] = DRIVERS.map(name => ({
-  value: name,
-  label: DRIVER_LABELS[name],
-  models: DRIVER_MODELS[name],
-  ...DRIVER_UI[name],
-}))
+/** The menu's drivers, each with the models its agent listed, or a line saying why there are none. */
+function driverOptions(models: ReturnType<typeof useModels>): DriverOption[] {
+  return DRIVERS.map(name => {
+    const answer = models?.[name]
+    const modelsNote = !answer ? `Asking ${DRIVER_LABELS[name]}…` : 'error' in answer ? answer.error : 'No models listed'
+    return {
+      value: name,
+      label: DRIVER_LABELS[name],
+      models: (answer?.models ?? []).map(m => ({ value: m.id, label: m.name })),
+      modelsNote,
+      ...DRIVER_UI[name],
+    }
+  })
+}
 
 export interface ComposerHandle {
   clear: () => void
@@ -124,6 +132,7 @@ export const Composer = forwardRef<ComposerHandle, {
   const preferences = usePreferences()
   const model = preferences.model ?? '' // #628: empty = the coding agent's own default model
   const driver = preferences.driver ?? 'claude-code' // which coding agent does the work (#650)
+  const models = useModels()
   const customPresets = preferences.customPresets ?? [] // #626: the user's own saved prompts
   const projectPresets = useProjectPresets() // #1025: saved prompts committed in the open project's repo
   const activeProjectId = useActiveProjectId() // the project whose commands the `/` list offers
@@ -209,7 +218,7 @@ export const Composer = forwardRef<ComposerHandle, {
   // controls in either place read and write the same state.
   const driverModelEl = showDriverModel && (
     <DriverModelMenu
-      drivers={DRIVER_OPTIONS}
+      drivers={driverOptions(models)}
       driver={driver}
       model={model}
       onChange={(a, m) => updatePreferences({ driver: a, model: m })}

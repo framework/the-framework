@@ -1,4 +1,4 @@
-Fixes what the dashboard calls the two picks an agent's [1] start carries — which coding agent [2] works it, and which model it runs on.
+Fixes the words a surface uses for the model when an agent's [1] start pins none: "the CLI's own default", meaning the coding agent [2] picks its own model. The models each coding agent offers come from the coding agents themselves (`models.ts`).
 
 ## Glossary
 
@@ -7,5 +7,4 @@ Fixes what the dashboard calls the two picks an agent's [1] start carries — wh
 
 ## Business logic — TL;DR
 
-- **The models each coding agent offers** - Claude Code offers "Fable", "Opus", "Sonnet" and "Haiku"; Codex offers "GPT-5.6 Terra" and "GPT-5.6 Luna". Every menu lists them in that order, and every entry is a model the coding agent [2] actually accepts.
-- **No model pinned, in words** - a surface that has no model to name says "the CLI's own default" rather than borrowing the first entry of the list, so it never promises a model that will not be passed.
+- **No model pinned, in words** - a surface that has no model to name says "the CLI's own default" rather than borrowing the first entry of a list, so it never promises a model that will not be passed.

@@ -166,6 +166,9 @@ importers:
       '@agent-driver/claude':
         specifier: workspace:*
         version: link:../agent-driver/claude
+      '@agent-driver/codex':
+        specifier: workspace:*
+        version: link:../agent-driver/codex
       '@base-ui-components/react':
         specifier: 1.0.0-rc.0
         version: 1.0.0-rc.0(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)

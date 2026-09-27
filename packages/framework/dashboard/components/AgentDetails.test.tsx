@@ -1,7 +1,12 @@
-import { afterEach, describe, expect, test } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, test, vi } from 'vitest'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import type { FrameworkEvent } from '../../src/index.js'
 import { AgentDetails } from './AgentDetails.js'
+
+const onModels = vi.hoisted(() =>
+  vi.fn(async () => ({ 'claude-code': { models: [{ id: 'opus', name: 'Opus 5.5' }] }, codex: { models: [] } })),
+)
+vi.mock('../rpc/models.js', () => ({ onModels }))
 
 afterEach(cleanup)
 
@@ -26,10 +31,10 @@ describe('AgentDetails', () => {
     expect(screen.queryByText(/No spend reported yet/)).toBeNull()
   })
 
-  test('the agent and model come off the run\'s card, the agent by the name a person picked it by', () => {
+  test('the agent and model come off the run\'s card, each by the name a person knows it by', async () => {
     render(<AgentDetails events={[]} card={{ driver: 'claude-code', model: 'opus' }} />)
     expect(shown('Agent')).toBe('Claude Code')
-    expect(shown('Model')).toBe('opus')
+    await waitFor(() => expect(shown('Model')).toBe('Opus 5.5'))
     cleanup()
     render(<AgentDetails events={[]} card={{ driver: 'codex' }} />)
     expect(shown('Agent')).toBe('Codex')

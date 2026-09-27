@@ -61,11 +61,18 @@ describe('DriverModelMenu tree (#658)', () => {
     expect((await hoverTooltip(trigger)).textContent).toContain("Model: the CLI's own default")
   })
 
-  test('a model belonging to the other driver is not claimed as this one (#1143)', async () => {
-    renderMenu({ driver: 'claude', model: 'gpt-5-codex' })
+  test('a model the driver does not list is named by its id, since the run is still given it', async () => {
+    renderMenu({ driver: 'claude', model: 'fable' })
     const trigger = screen.getByRole('button')
-    expect(trigger.textContent).not.toContain('GPT-5 Codex')
-    expect((await hoverTooltip(trigger)).textContent).toContain("Model: the CLI's own default")
+    expect(trigger.textContent).toContain('fable')
+    expect((await hoverTooltip(trigger)).textContent).toContain('Model: fable')
+  })
+
+  test('a driver with no models says why in its submenu', () => {
+    renderMenu({ drivers: [{ value: 'claude', label: 'Claude Code', models: [], modelsNote: 'Asking Claude Code…' }] })
+    fireEvent.click(screen.getByRole('button'))
+    fireEvent.click(screen.getByText('Claude Code'))
+    expect(screen.getByText('Asking Claude Code…')).toBeTruthy()
   })
 
   test('the trigger is named for assistive tech even with nothing but a logo on it (#1143)', () => {

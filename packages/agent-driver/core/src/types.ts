@@ -46,6 +46,22 @@ export interface Driver {
    * way {@link DriverRateLimit} is omitted by drivers that can't emit it.
    */
   readQuota?(opts?: { signal?: AbortSignal }): Promise<DriverQuota>
+  /**
+   * Ask the agent which models it offers, in the order it lists them: the same list its own model
+   * picker shows the person, for their login. Account-wide like {@link readQuota}, and costs no
+   * prompt. Rejects, with the reason in words, when the agent could not say.
+   *
+   * Optional: an agent that cannot list its models omits the method.
+   */
+  listModels?(opts?: { signal?: AbortSignal }): Promise<DriverModel[]>
+}
+
+/** One model a coding agent offers. */
+export interface DriverModel {
+  /** What {@link DriverStartOptions.model} takes to run it, e.g. `opus` or `gpt-5.6-terra`. */
+  id: string
+  /** Its name as the agent shows it, e.g. `Opus 5.5`. */
+  name: string
 }
 
 /** The parts of the person's own setup a coding agent can load, by the names every adapter takes. */

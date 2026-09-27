@@ -4,6 +4,7 @@ import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import { startDashboard, type Dashboard } from './dashboard/index.js'
 import { createProjectRuntime } from './daemon-runtime.js'
 import { defaultQuotaSource } from './dashboard/quota.js'
+import { defaultModelsSource } from './dashboard/models.js'
 import { loosestSpendOffset, readSchedulerState } from './dashboard/scheduler-state.js'
 import { startBackgroundServices } from './daemon-services.js'
 import { projectErrorStore } from './project-errors.js'
@@ -174,6 +175,8 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
     host,
     port,
     quota,
+    // Which models each coding agent offers: asked on the menu's first read, then kept.
+    models: defaultModelsSource(),
     onStart: runtime.onStart,
     onAddProject: runtime.onAddProject,
     // Relay an agent to/from a connected device (#1067): the events source streams an agent this daemon

@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { Readable, Writable } from 'node:stream'
-import { CodexDriver, CodexJsonParser, codexReady, defaultCodexHome, parseCodexUsage } from './codex.js'
+import { CodexDriver, CodexJsonParser, codexReady, defaultCodexHome, parseCodexModels, parseCodexUsage } from './codex.js'
 import type { SpawnLike, SpawnedProcess, Driver, DriverEvent } from 'agent-driver'
 
 /** A real codex-cli 0.144.4 run, verbatim: "Create a file hello.txt containing exactly: hi". */
@@ -428,4 +428,33 @@ test('codexReady reads "Not logged in" as no, also off stderr, and a missing cod
   assert.match(out.problems[0]!, /codex login/)
   const missing = await codexReady({ isRoot: () => false, probe: () => Promise.resolve({ ok: false, output: '' }) })
   assert.match(missing.problems[0]!, /`codex` not found.*openai\.com\/codex/)
+})
+
+/** `codex debug models` on codex-cli 0.144, cut to the fields read. */
+const CATALOG = JSON.stringify({
+  models: [
+    { slug: 'gpt-reserve', display_name: 'GPT-Reserve', visibility: 'hide', priority: 3 },
+    { slug: 'gpt-5.5', display_name: 'GPT-5.5', visibility: 'list', priority: 12 },
+    { slug: 'gpt-5.6-terra', display_name: 'GPT-5.6-Terra', visibility: 'list', priority: 7 },
+    { slug: 'gpt-5.6-luna', display_name: 'GPT-5.6-Luna', visibility: 'list', priority: 8 },
+  ],
+})
+
+test('parseCodexModels keeps the models Codex lists, in its own order', () => {
+  assert.deepEqual(parseCodexModels(CATALOG), {
+    models: [
+      { id: 'gpt-5.6-terra', name: 'GPT-5.6-Terra' },
+      { id: 'gpt-5.6-luna', name: 'GPT-5.6-Luna' },
+      { id: 'gpt-5.5', name: 'GPT-5.5' },
+    ],
+  })
+  assert.ok('error' in parseCodexModels('Reading config...'))
+})
+
+test('CodexDriver.listModels asks `codex debug models`, and says why when Codex fails', async () => {
+  let asked: readonly string[] = []
+  const models = await new CodexDriver({ spawn: fakeSpawn([CATALOG], args => (asked = args)) }).listModels()
+  assert.deepEqual(asked, ['debug', 'models'])
+  assert.equal(models.length, 3)
+  await assert.rejects(new CodexDriver({ spawn: fakeSpawn([], undefined, 1) }).listModels(), /`codex debug models` failed \(code 1\)/)
 })

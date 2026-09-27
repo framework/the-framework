@@ -5,6 +5,7 @@ What the tests cover, for the project panel's file tree:
 - **Where a finished agent's tree comes from** - an agent read from its branch is captioned "From branch <branch>", one read from its merge commit "From the merge of #<number>".
 - **Changed nothing says so** - an agent that changed nothing shows the project's files with nothing marked, captioned "This run changed no files", and not the "changes are gone" line.
 - **Gone says so** - an agent none of whose sources is left shows the "changes are gone" line, and not the project's files.
+- **Only open folders are built** - a closed folder's files and subfolders are not on the page; opening it shows its direct files but not a closed subfolder's, and closing it takes them off again.
 - **Clicking picks** - clicking a file reports its path to be toggled in the Context [3], and a file already in the Context shows tinted.
 
 ## Glossary

@@ -41,7 +41,7 @@ The sources are tried in this order, and the first one that exists answers:
 2. The branch the agent recorded: this machine's branch of that name, else origin's copy of it (`origin/<branch>`) as this machine last fetched it.
 3. The commit the agent's pull request merged as. The agent must have recorded a pull request. That pull request is found by its number among the branch's pull requests on the git host, and it must say which commit it merged as. That commit must be on this machine: a pull request merged on the git host after this machine last fetched is not read yet.
 4. The project's default branch [3], as its last commit on this machine, when the agent finished on this machine [4] and recorded no pull request: the agent changed nothing (see "An agent that changed nothing").
-5. Gone: an agent with no record; an agent that did not finish on this machine, including one `running`, `waiting`, `failed` or `stopped`, one from another machine and one whose record names no machine; an agent with a recorded pull request whose branch and merge commit are not on this machine; and an agent for which no default branch is found.
+5. Gone: an agent with no record; an agent that did not finish on this machine, including one `running`, `waiting` or `stopped`, one from another machine and one whose record names no machine; an agent with a recorded pull request whose branch and merge commit are not on this machine; and an agent for which no default branch is found.
 
 The daemon never fetches: the tab polls, and a fetch on every poll would be a network call. The git host's list of the branch's pull requests is read through the shared cache the other pull request reads use.
 

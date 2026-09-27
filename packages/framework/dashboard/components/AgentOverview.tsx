@@ -27,7 +27,8 @@ export function AgentOverview({ events }: { events: FrameworkEvent[] }) {
       {status && (
         <div className="flex items-center gap-2 text-sm md:col-span-2">
           <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', status.dot)} aria-hidden />
-          <span className={cn('text-xs', status.tone)}>{status.label}</span>
+          {/* The summary block has room for the whole reason, so it says it. */}
+          <span className={cn('text-xs', status.tone)}>{status.detail ? `${status.label} — ${status.detail}` : status.label}</span>
         </div>
       )}
       {/* What went wrong, kept where the log cannot scroll it away (#1500). The rows themselves

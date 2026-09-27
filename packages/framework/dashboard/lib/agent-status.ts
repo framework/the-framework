@@ -1,8 +1,12 @@
 import type { AgentMeta, FrameworkEvent } from '../../src/index.js'
 import { isAgentActive, agentOutcome, type AgentOutcome } from './live-state.js'
 
-/** How an agent's one status pill is drawn: its dot colour, its word, and the word's tone. */
-export type AgentStatusPill = { dot: string; label: string; tone: string }
+/**
+ * How an agent's one status pill is drawn: its dot colour, its word, the word's tone, and, for a
+ * failure, the reason apart from the word, so a tight row can show the word and keep the reason
+ * for its hover.
+ */
+export type AgentStatusPill = { dot: string; label: string; tone: string; detail?: string }
 
 /** What the pill reads off the run's card, as the daemon hands it over: its status, its pull request, and whether it is saving. */
 export type AgentCardFacts = Pick<AgentMeta, 'status' | 'pr' | 'saving'>
@@ -30,7 +34,7 @@ export function agentStatusPill(events: FrameworkEvent[], card?: AgentCardFacts)
   if (events.length === 0 && !card) return null
   const failed = outcome !== undefined && !outcome.ok && !outcome.stopped && !outcome.waiting
   if (failed) {
-    return { dot: 'bg-danger', label: outcome?.detail ? `failed — ${outcome.detail}` : 'failed', tone: 'text-danger' }
+    return { dot: 'bg-danger', label: 'failed', tone: 'text-danger', ...(outcome?.detail ? { detail: outcome.detail } : {}) }
   }
   if (outcome?.stopped) return { dot: 'bg-warning', label: 'stopped', tone: 'text-warning' }
   if (outcome?.waiting) return { dot: 'bg-warning', label: 'waiting for an answer', tone: 'text-warning' }

@@ -35,7 +35,8 @@ describe('agentStatusPill', () => {
 
   test('failed outranks a pull request, and carries the reason', () => {
     expect(agentStatusPill([said, ended({ ok: false, detail: 'exit 1' })], card({ status: 'failed', pr }))).toMatchObject({
-      label: 'failed — exit 1',
+      label: 'failed',
+      detail: 'exit 1',
     })
   })
 

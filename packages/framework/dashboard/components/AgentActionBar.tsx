@@ -5,6 +5,7 @@ import { AgentActionsMenu } from './AgentActionsMenu.js'
 import { AgentErrorCount } from './AgentErrorCount.js'
 import { agentStatusPill, type AgentCardFacts } from '../lib/agent-status.js'
 import { cn } from '../lib/utils.js'
+import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 
 // One agent's action bar: what the session IS (its branch / PR / summary, as a disclosure) on the
 // left, and what you can DO to it on the right. The doing is a single ⋮ overflow menu
@@ -82,14 +83,17 @@ export function AgentActionBar({
         onToggle={onToggle}
         // Beside the tree's clean/dirty, not at the far end of the bar: "dirty · ready for merge"
         // is one line of facts about the session, where the end of the row is where its controls
-        // live. Capped, because one of these labels is not a word — a failure carries its reason,
-        // which had a banner row to itself and would otherwise take the row from the branch.
+        // live. A failure's reason is only the word's hover: cut to fit the row it said nothing,
+        // and the feed's end line below says it whole.
         agentState={
           ready && status && (
-            <span className="flex shrink-0 items-center gap-1.5" title={status.label}>
-              <span className={cn('h-2 w-2 shrink-0 rounded-full', status.dot)} aria-hidden />
-              <span className={cn('max-w-40 truncate', status.tone)}>{status.label}</span>
-            </span>
+            <Tooltip>
+              <TooltipTrigger render={<span className="flex shrink-0 items-center gap-1.5" />}>
+                <span className={cn('h-2 w-2 shrink-0 rounded-full', status.dot)} aria-hidden />
+                <span className={status.tone}>{status.label}</span>
+              </TooltipTrigger>
+              {status.detail && <TooltipContent className="max-w-md whitespace-pre-line">{status.detail}</TooltipContent>}
+            </Tooltip>
           )
         }
       />

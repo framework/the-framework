@@ -36,8 +36,8 @@ export function AgentErrorCount({ events, headline = false }: { events: Framewor
 
 /**
  * The errors the count says: every error of the run but the one its failure already names. A run
- * that failed says why beside its name ("failed — codex exited (1): You've hit your usage
- * limit…"), and the error that ended it said again as "1 error" was the same fact twice. An error
+ * that failed says why on its "failed" (as its hover in the header, whole in the summary block
+ * and the feed's end line), and the error that ended it said again as "1 error" was the same fact twice. An error
  * the run went on from, or that its failure does not name, still counts.
  */
 export function errorsToCount(events: readonly FrameworkEvent[]): AgentError[] {

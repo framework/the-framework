@@ -8,6 +8,6 @@ A summary block for one agent [1], projected from its events [2], shown on the p
 
 ## Business logic — TL;DR
 
-- **The status line** - the agent's one ranked status, read off its events alone (the rules in `lib/agent-status.ts`: failed with its reason, stopped, waiting for an answer, building, finished; "saving…" and "ready for merge" need the agent's card, which this block is not handed), as a colored dot and the word; absent while there is no event.
+- **The status line** - the agent's one ranked status, read off its events alone (the rules in `lib/agent-status.ts`: failed with its reason, stopped, waiting for an answer, building, finished; "saving…" and "ready for merge" need the agent's card, which this block is not handed), as a colored dot and the word, a failure's reason following it as "failed — <reason>" since this block has room for it; absent while there is no event.
 - **The errors** - when the agent hit any errors other than the one its failure already names, their count and the latest headline (`AgentErrorCount.tsx`), kept where the feed cannot scroll them away; the error rows themselves stay in the feed at the point where the agent hit them.
 - **The session link** - "Open session (<session id>) ↗", opening in a new tab, only when the session link genuinely opens this driver session, that is when the link contains the session id (the rule in `lib/session-link.ts`); a generic product entry page is not offered as a link.

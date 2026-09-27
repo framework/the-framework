@@ -21,7 +21,7 @@ Picks the one word an agent's [1] status pill shows, out of its event stream [2]
 - **No pill with nothing to go on** - no event and no card means no pill; either one is enough for a pill.
 - **The ending: the event stream first, the card when the stream shows none** - how the current leg ended is read off the event stream; an agent whose stream shows no ending takes it from its card's status.
 - **One agent, one word, ranked** - the seven words sit on a fixed ladder and the first one that applies wins.
-- **"failed" says what failed** - a failure shows the reason the agent's ending carried, appended to the word.
+- **"failed" says what failed** - a failure carries the reason the agent's ending gave, apart from the word, so each place decides how much of it to show.
 - **"saving…" outranks "ready for merge"** - after a clean end, while the card is marked saving, the pill says the agent's record is being saved, not that it is merely ready.
 - **"building…" only while the agent is going** - the pulsing amber word is for an agent that may still stream something; the moment it ends the pill settles.
 
@@ -75,7 +75,7 @@ How the agent ended always outranks what it did on its way: a pull request the c
 
 #### Business logic
 
-When the agent's [1] ending carries a detail text, the word becomes "failed — " followed by that text. Without one it is just "failed". An ending read off the card [3] never carries a detail.
+The word is "failed". When the agent's [1] ending carries a detail text, that text comes with the word as its reason, kept apart from it: the agent's header shows the word and the reason on hover, and the project home's summary block, which has room, shows "failed — " followed by the reason. An ending read off the card [3] never carries a reason.
 
 ### "saving…" outranks "ready for merge"
 

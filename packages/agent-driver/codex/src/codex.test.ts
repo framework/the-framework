@@ -117,7 +117,7 @@ test('CodexJsonParser ignores noise that is not an event (#539)', () => {
 })
 
 /** A fake process that emits the given lines then closes. */
-function fakeSpawn(lines: string[], onSpawn?: (args: readonly string[], stdin: string) => void, code = 0): SpawnLike {
+function fakeSpawn(lines: string[], onSpawn?: (args: readonly string[], stdin: string) => void, code = 0, stderr = ''): SpawnLike {
   return (_command, args) => {
     const stdout = Readable.from([lines.map(l => l + '\n').join('')])
     let written = ''
@@ -129,7 +129,7 @@ function fakeSpawn(lines: string[], onSpawn?: (args: readonly string[], stdin: s
     })
     const proc: SpawnedProcess = {
       stdout,
-      stderr: Readable.from([]),
+      stderr: Readable.from(stderr ? [stderr] : []),
       stdin,
       on(event, listener) {
         if (event === 'close') stdout.on('end', () => (onSpawn?.(args, written), (listener as (c: number | null) => void)(code)))
@@ -271,6 +271,34 @@ test('CodexDriver fails the turn on a non-zero exit (#539)', async () => {
   const session = await driver.start({ cwd: '/ws' })
   // A crash mid-build must not pass as a result, even though text streamed first.
   await assert.rejects(() => session.prompt('go'), /codex exited \(1\)/)
+})
+
+// Two real failures from codex-cli 0.144.4 on a ChatGPT login: the API's refusal wrapped as JSON,
+// and a plain sentence. Codex exits 1 after either, with only this on stderr.
+const REFUSED = JSON.stringify({ type: 'turn.failed', error: { message: JSON.stringify({ type: 'error', status: 400, error: { type: 'invalid_request_error', message: "The 'gpt-5' model is not supported when using Codex with a ChatGPT account." } }) } })
+const NOT_FOUND = JSON.stringify({ type: 'turn.failed', error: { message: 'unexpected status 404 Not Found: The model `gpt-5.5` does not exist or you do not have access to it.' } })
+const STDIN_BANNER = 'Reading prompt from stdin...\n'
+
+test('CodexJsonParser keeps why a turn failed: the sentence inside an API refusal, or the message as it is', () => {
+  const refused = new CodexJsonParser()
+  assert.deepEqual(refused.push(REFUSED), [])
+  assert.equal(refused.failure(), "The 'gpt-5' model is not supported when using Codex with a ChatGPT account.")
+  const notFound = new CodexJsonParser()
+  notFound.push(NOT_FOUND)
+  assert.equal(notFound.failure(), 'unexpected status 404 Not Found: The model `gpt-5.5` does not exist or you do not have access to it.')
+  assert.equal(new CodexJsonParser().failure(), undefined)
+})
+
+test('a failed Codex turn says why it failed, not the stdin line Codex printed', async () => {
+  const lines = [JSON.stringify({ type: 'thread.started', thread_id: 't-1' }), JSON.stringify({ type: 'turn.started' }), REFUSED]
+  const session = await new CodexDriver({ spawn: fakeSpawn(lines, undefined, 1, STDIN_BANNER) }).start({ cwd: '/ws' })
+  await assert.rejects(() => session.prompt('go'), (err: Error) => {
+    assert.equal(err.message, "codex exited (1): The 'gpt-5' model is not supported when using Codex with a ChatGPT account.")
+    return true
+  })
+  // With no reason in its output, stderr is still what is said.
+  const bare = await new CodexDriver({ spawn: fakeSpawn([], undefined, 1, STDIN_BANNER) }).start({ cwd: '/ws' })
+  await assert.rejects(() => bare.prompt('go'), /codex exited \(1\): Reading prompt from stdin\.\.\./)
 })
 
 /** Runs one turn on a Codex driver with `opts`, and answers the arguments and the environment Codex was spawned with. */

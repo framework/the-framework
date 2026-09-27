@@ -279,12 +279,14 @@ export function codexDetail(item: Record<string, unknown>): string | undefined {
  * {"type":"item.started","item":{"type":"command_execution","command":"/bin/zsh -lc 'echo done'"}}
  * {"type":"item.started","item":{"type":"file_change","status":"in_progress"}}
  * {"type":"turn.completed","usage":{"input_tokens":12210,"output_tokens":5}}
+ * {"type":"turn.failed","error":{"message":"{\"type\":\"error\",\"status\":400,\"error\":{\"message\":\"The 'gpt-5' model is not supported when using Codex with a ChatGPT account.\"}}"}}
  * ```
  */
 export class CodexJsonParser implements AgentCliParser {
   private text = ''
   private sessionId: string | undefined
   private usage: DriverUsage | undefined
+  private failed: string | undefined
 
   push(line: string): DriverEvent[] {
     let obj: Record<string, unknown>
@@ -305,6 +307,15 @@ export class CodexJsonParser implements AgentCliParser {
       if (typeof id !== 'string') return []
       this.sessionId = id
       return [{ type: 'session', sessionId: id }]
+    }
+
+    // Why the turn failed, such as a model the account cannot use. Codex then exits 1 with only
+    // "Reading prompt from stdin..." on stderr, so this is the only place the reason is said.
+    if (type === 'turn.failed') {
+      const error = obj['error']
+      const message = typeof error === 'object' && error !== null ? (error as Record<string, unknown>)['message'] : undefined
+      if (typeof message === 'string' && message.trim() !== '') this.failed = codexErrorMessage(message.trim())
+      return []
     }
 
     if (type === 'turn.completed') {
@@ -340,6 +351,10 @@ export class CodexJsonParser implements AgentCliParser {
     return []
   }
 
+  failure(): string | undefined {
+    return this.failed
+  }
+
   result(): DriverTurn {
     // Tokens but no `costUsd`: Codex prices nothing, and a `$0` would read as free
     // rather than as "we don't know" (#540).
@@ -349,6 +364,22 @@ export class CodexJsonParser implements AgentCliParser {
       ...(this.usage ? { usage: this.usage } : {}),
     }
   }
+}
+
+/**
+ * The sentence inside a Codex failure message. An API refusal arrives as the API's own JSON body,
+ * `{"type":"error","status":400,"error":{"message":"..."}}`, whose inner message is the part a
+ * person reads; any other message is already that sentence.
+ */
+function codexErrorMessage(message: string): string {
+  try {
+    const body = JSON.parse(message) as { error?: { message?: unknown } } | null
+    const inner = body?.error?.message
+    if (typeof inner === 'string' && inner.trim() !== '') return inner.trim()
+  } catch {
+    // Not JSON: already the sentence.
+  }
+  return message
 }
 
 /**

@@ -58,7 +58,7 @@ The process's standard output is read one line at a time and each line is handed
 
 #### Business logic
 
-When the process exits with code zero, the turn [1] resolves with the parser's result (the final message, the session id and the usage when known), and a `result` progress event [5] carries the same. When the process exits with any other code, or dies from a signal, the turn fails even if text was streamed first: an `error` progress event is reported with the failure detail, and the turn fails with "<driver id> exited (<exit code>): <detail>". The detail is, in order of preference, what the coding agent [2] wrote to standard error, else the text it streamed so far, else "exit code <code>" (with `null` for a death by signal).
+When the process exits with code zero, the turn [1] resolves with the parser's result (the final message, the session id and the usage when known), and a `result` progress event [5] carries the same. When the process exits with any other code, or dies from a signal, the turn fails even if text was streamed first: an `error` progress event is reported with the failure detail, and the turn fails with "<driver id> exited (<exit code>): <detail>". The detail is, in order of preference, the reason the coding agent's [2] output gave for the failure, when the driver's parser read one, else what the coding agent wrote to standard error, else the text it streamed so far, else "exit code <code>" (with `null` for a death by signal).
 
 ### A stop request kills the whole process tree
 

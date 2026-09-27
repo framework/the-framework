@@ -33,7 +33,7 @@ Drives Codex as a driver [1]: each turn [2] is one non-interactive invocation of
 - **Framing rides ahead of the prompt** - Codex has no system prompt flag, so the driver session's framing [10] and the turn's extra framing are placed in front of the prompt, as their own block.
 - **Model pass-through** - the model the caller names is passed to Codex as is; without one, Codex's own default runs.
 - **Continuing the conversation** - a turn asked to continue resumes the driver session's [3] Codex conversation by its thread id: the one the driver session was started to continue, then the one the last turn reported; a turn not asked to, or with no conversation yet, starts fresh.
-- **What is read off the streamed output** - the thread id as the session id, announced at once as a `session` progress event, each completed message as streamed text with the last one as the turn's answer, and each started work item as a tool use named by its kind, with everything else ignored.
+- **What is read off the streamed output** - the thread id as the session id, announced at once as a `session` progress event, each completed message as streamed text with the last one as the turn's answer, and each started work item as a tool use named by its kind, and why a failed turn failed, with everything else ignored.
 - **Usage: tokens, never a price** - Codex's token counts are reported with the cached part split out of its inclusive input total, and no price, never zero.
 - **No quota reading** - the driver reports no quota [6] at all rather than a made-up number.
 - **The person's own setup** - each part of the personal setup [13] the caller turns off becomes Codex's own switch: `memory` off is `features.memories=false`, `connectors` off is `features.apps=false` and `features.plugins=false`, `skills` off runs Codex from a Codex home [14] of its own, kept on this machine and starting with only a link to the person's login; given none, Codex loads everything.
@@ -111,6 +111,7 @@ Codex streams one JSON object per line. A line that is not JSON, such as a banne
 - Each completed reasoning item with text yields one `thought` progress event carrying that text, Codex's one-line headline of what it is thinking.
 - Each other work item Codex starts yields one `action` progress event carrying the item's kind, such as `file_change`, and its detail when it has one, flattened to one line and cut to 200 characters: a command without the shell wrapper Codex puts around it (`/bin/zsh -lc '…'`), the paths a file change touches, joined by commas, an MCP tool as `<server>.<tool>`, or a web search's query.
 - The line closing the turn carries the usage [5] (see "Usage: tokens, never a price").
+- The line saying the turn failed carries the reason, such as a model the person's account cannot use. When the reason is the API's own error body (JSON with an inner error message), the inner message is the reason; otherwise the text is. Codex then exits with code 1 and writes only "Reading prompt from stdin..." to standard error, so this reason is the failed turn's detail, ahead of standard error.
 - Everything else, including the line that opens the turn and the completion of a work item, is ignored.
 
 The `result` progress event itself is reported by `agent-driver`'s `cli-session.ts` once the process has exited successfully, not by the parser.

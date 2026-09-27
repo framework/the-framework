@@ -41,6 +41,8 @@ export interface AgentCliParser {
   push(line: string): DriverEvent[]
   /** The turn the lines added up to. */
   result(): DriverTurn
+  /** Why the agent said its turn failed, when its output said so: a truer reason than whatever it printed to stderr. */
+  failure?(): string | undefined
 }
 
 /** How to run one agent-CLI invocation. */
@@ -154,9 +156,9 @@ export function runCliSession(opts: RunCliSessionOptions): Promise<DriverTurn> {
       const turn = parser.result()
       // A non-zero exit is a failed turn even when the agent streamed some text
       // first: the loop gates on the outcome, so a crash mid-build must not pass
-      // as a result. Surface stderr, else the partial text, as context.
+      // as a result. Surface the failure the agent reported, else stderr, else the partial text, as context.
       if (code !== 0) {
-        const detail = Buffer.concat(stderrChunks).toString('utf8').trim() || turn.text.trim() || `exit code ${code ?? 'null'}`
+        const detail = parser.failure?.() || Buffer.concat(stderrChunks).toString('utf8').trim() || turn.text.trim() || `exit code ${code ?? 'null'}`
         opts.emit({ type: 'error', message: detail })
         finish(() => rejectPromise(new Error(`${agent} exited (${code ?? 'null'}): ${detail}`)))
         return

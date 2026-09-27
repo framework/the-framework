@@ -15,9 +15,8 @@ export const DRIVER_MODELS: Record<DriverName, { value: string; label: string }[
     { value: 'haiku', label: 'Haiku' },
   ],
   codex: [
-    { value: 'gpt-5-codex', label: 'GPT-5 Codex' },
-    { value: 'gpt-5', label: 'GPT-5' },
-    { value: 'o3', label: 'o3' },
+    { value: 'gpt-5.6-terra', label: 'GPT-5.6 Terra' },
+    { value: 'gpt-5.6-luna', label: 'GPT-5.6 Luna' },
   ],
 }
 

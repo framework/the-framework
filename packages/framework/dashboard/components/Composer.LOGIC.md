@@ -84,7 +84,7 @@ The surface may hand the composer two edits of its Context: add a path, and remo
 
 #### Business logic
 
-The select is a tree: "Claude Code" with "Fable", "Opus", "Sonnet" and "Haiku"; "Codex" with "GPT-5 Codex", "GPT-5" and "o3". Picking a model sets the coding agent and the model together. Both are global preferences [7]: the select reads and writes the same values wherever it appears, and an agent [2] started anywhere uses them. Claude Code is shown when none was picked, and no model is pinned by default: the trigger then shows the coding agent's logo with no model name and reads "Driver: Claude Code · Model: the CLI's own default", never naming a model the agent would not be passed. The model lists are shared with the Settings page (`lib/agent-settings.ts`); the menu's own rules are in `DriverModelMenu.tsx`.
+The select is a tree: "Claude Code" with "Fable", "Opus", "Sonnet" and "Haiku"; "Codex" with "GPT-5.6 Terra" and "GPT-5.6 Luna". Picking a model sets the coding agent and the model together. Both are global preferences [7]: the select reads and writes the same values wherever it appears, and an agent [2] started anywhere uses them. Claude Code is shown when none was picked, and no model is pinned by default: the trigger then shows the coding agent's logo with no model name and reads "Driver: Claude Code · Model: the CLI's own default", never naming a model the agent would not be passed. The model lists are shared with the Settings page (`lib/agent-settings.ts`); the menu's own rules are in `DriverModelMenu.tsx`.
 
 ### "Run on": this machine or a device, and the offline rule
 

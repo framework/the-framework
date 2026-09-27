@@ -50,6 +50,8 @@ export interface RunCliSessionOptions {
   cwd: string
   env: NodeJS.ProcessEnv
   prompt: string
+  /** What goes to the CLI's stdin, for a CLI that reads the prompt wrapped. Default the prompt itself. */
+  stdin?: string
   spawn: SpawnLike
   emit: (event: DriverEvent) => void
   signals: AbortSignal[]
@@ -175,7 +177,7 @@ export function runCliSession(opts: RunCliSessionOptions): Promise<DriverTurn> {
       // (#943). The close handler already reports the failed turn, so the error carries
       // nothing the caller needs.
       child.stdin.on('error', () => {})
-      child.stdin.write(opts.prompt)
+      child.stdin.write(opts.stdin ?? opts.prompt)
       child.stdin.end()
     }
   })

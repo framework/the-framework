@@ -2,7 +2,7 @@ import { execFile, spawn as nodeSpawn } from 'node:child_process'
 import { copyFile, lstat, mkdir, readlink, readdir, realpath, rename, rm, stat, symlink } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { runCliSession, finishTurn, agentEnv, attachLog, combineFraming, combineSignals, makeEmit, readWorkspaceFile, checkCliReady, type AgentCliParser, type CliSpec, type DriverReadiness, type DriverReadyOptions, type PersonalSetup, type SpawnLike, type SessionLog, type Driver, type DriverEvent, type DriverPromptOptions, type DriverSession, type DriverStartOptions, type DriverTurn, type DriverUsage } from 'agent-driver'
+import { runCliSession, finishTurn, agentEnv, attachLog, combineFraming, combineSignals, makeEmit, readWorkspaceFile, oneLine, checkCliReady, type AgentCliParser, type CliSpec, type DriverReadiness, type DriverReadyOptions, type PersonalSetup, type SpawnLike, type SessionLog, type Driver, type DriverEvent, type DriverPromptOptions, type DriverSession, type DriverStartOptions, type DriverTurn, type DriverUsage } from 'agent-driver'
 
 /**
  * Codex's sandbox policy for the shell commands the model writes.
@@ -251,13 +251,32 @@ function gitCommonDir(cwd: string): Promise<string | undefined> {
 }
 
 /**
+ * What a Codex tool item did, on one line: the command without the shell wrapper Codex puts around
+ * it, the files a change touches, the MCP tool, or the web search.
+ */
+export function codexDetail(item: Record<string, unknown>): string | undefined {
+  const command = item['command']
+  if (typeof command === 'string') return oneLine(command.replace(/^\S*sh -lc (['"])([\s\S]*)\1$/, '$2'))
+  const changes = item['changes']
+  if (Array.isArray(changes)) {
+    const paths = changes.map(c => (typeof c === 'object' && c !== null ? (c as Record<string, unknown>)['path'] : undefined)).filter(p => typeof p === 'string')
+    return paths.length > 0 ? oneLine(paths.join(', ')) : undefined
+  }
+  if (typeof item['server'] === 'string' && typeof item['tool'] === 'string') return oneLine(`${item['server']}.${item['tool']}`)
+  if (typeof item['query'] === 'string') return oneLine(item['query'])
+  return undefined
+}
+
+/**
  * Parses Codex's `exec --json` output: one JSON event per line.
  *
  * The dialect, as observed on codex-cli 0.144.4:
  * ```
  * {"type":"thread.started","thread_id":"019f..."}
  * {"type":"turn.started"}
+ * {"type":"item.completed","item":{"type":"reasoning","text":"**Checking the tests**"}}
  * {"type":"item.completed","item":{"type":"agent_message","text":"..."}}
+ * {"type":"item.started","item":{"type":"command_execution","command":"/bin/zsh -lc 'echo done'"}}
  * {"type":"item.started","item":{"type":"file_change","status":"in_progress"}}
  * {"type":"turn.completed","usage":{"input_tokens":12210,"output_tokens":5}}
  * ```
@@ -308,10 +327,15 @@ export class CodexJsonParser implements AgentCliParser {
       return [{ type: 'text', text }]
     }
 
-    // Any other item is the agent using a tool. We surface the kind only, never
-    // the arguments: the seam is the code and the outcome, not the tool calls.
+    if (itemType === 'reasoning' && type === 'item.completed') {
+      const text = itemObj['text']
+      return typeof text === 'string' && text.trim() !== '' ? [{ type: 'thought', text: text.trim() }] : []
+    }
+
+    // Any other item is the agent using a tool: its kind, and what it did.
     if (type === 'item.started' && typeof itemType === 'string') {
-      return [{ type: 'action', label: itemType }]
+      const detail = codexDetail(itemObj)
+      return [{ type: 'action', label: itemType, ...(detail !== undefined ? { detail } : {}) }]
     }
     return []
   }

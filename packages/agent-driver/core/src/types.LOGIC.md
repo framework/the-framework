@@ -32,7 +32,7 @@ Fixes the vocabulary of the driver [1] contract, in words: what every driver pro
 - **How a driver session is started** - with the directory the coding agent [8] reads and edits, the framing [10] every turn [3] carries, the model to pass through, a stop request [11] for the whole driver session, optionally the session id of an earlier driver session to continue, optionally a log (a directory and the card to start it with, exposed on the driver session for the caller to patch, end and reopen), and a listener for progress events [4] that can never break the coding agent.
 - **One turn, one final message** - a prompt goes in with optional extra framing, a stop request for this turn only, a best-effort request to continue the previous turn and optionally an inbox path, whose waiting lines become further turns before the prompt resolves; the final message, the session id and the usage [5] of the last turn come out.
 - **Reading code and ending the driver session** - a driver [1] may let the caller read a file the coding agent produced; ending the driver session frees what it holds and may be repeated safely.
-- **Progress events are shown, never decided on** - nine kinds of progress event, each with what it carries, none of which a caller may gate on; the ninth is the question a turn ended on, parsed.
+- **Progress events are shown, never decided on** - ten kinds of progress event, each with what it carries, none of which a caller may gate on; one is the question a turn ended on, parsed.
 - **Usage: what one turn spent** - token counts always, a price only when the coding agent prices its turns and never as zero.
 - **Rate limit: the per-turn traffic light** - whether the account may still spend against one window and when it resets, with unknown statuses and windows passed through rather than dropped.
 - **Quota: the share of each window used** - a reading is either available with its windows or unavailable with a reason, never an empty list that reads as nothing used.
@@ -118,12 +118,13 @@ Ending a driver session frees whatever the driver holds for it, the coding agent
 
 #### Business logic
 
-A driver [1] reports progress events [4] of nine kinds, for a caller to show but never to gate on:
+A driver [1] reports progress events [4] of ten kinds, for a caller to show but never to gate on:
 
 - `start`: a prompt was sent and the coding agent's [8] loop is starting; carries the prompt.
 - `session`: the coding agent announced its session id at the start of the turn [3]. The final result repeats it, but a turn that never settles, because the user stopped it, it failed, or its process died, would otherwise take the id down with it, and with it the handle to resume the driver session [2]. A caller records this one rather than showing it: the id is plumbing, not conversation.
 - `text`: a chunk of the coding agent's own text.
-- `action`: the coding agent used a tool; the tool's name only, never its arguments.
+- `action`: the coding agent used a tool; the tool's name, and its detail when it has one: the one argument that says what the call did (the command, the file, the URL, the skill), on one line and cut short.
+- `thought`: what the coding agent thought before it acted, as its CLI summarizes it.
 - `result`: the turn settled with this final text, plus the session id and the usage [5] when known. Two optional extras exist for drivers whose work leaves this machine: the session link, the real URL of the driver session, so a caller can link to a cloud session [14] instead of a generic entry point; and the cloud anchor [15], for a driver whose work lands on a branch of its own naming that this machine can only recognize later by ancestry. Drivers whose work stays on the designated branch omit both.
 - `rate-limit`: a rate limit [6] reading.
 - `error`: the coding agent, or the transport to it, failed; carries the message.

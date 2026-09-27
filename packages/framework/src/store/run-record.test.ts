@@ -55,6 +55,8 @@ test('a diary reads as events: the skill\'s four kinds mapped, every other line 
 test('a diary agent-driver\'s own log wrote reads back as the framework\'s events: driver lines, the session id, the question as a gate, a waiting end (#1774)', () => {
   assert.deepEqual(fromDiaryLine({ kind: 'start', prompt: '/work-queue' }), { kind: 'driver', event: { type: 'start', prompt: '/work-queue' } })
   assert.deepEqual(fromDiaryLine({ kind: 'action', label: 'Bash' }), { kind: 'driver', event: { type: 'action', label: 'Bash' } })
+  assert.deepEqual(fromDiaryLine({ kind: 'action', label: 'Bash', detail: 'git status' }), { kind: 'driver', event: { type: 'action', label: 'Bash', detail: 'git status' } })
+  assert.deepEqual(fromDiaryLine({ kind: 'thought', text: 'Check the test first.' }), { kind: 'driver', event: { type: 'thought', text: 'Check the test first.' } })
   assert.deepEqual(fromDiaryLine({ kind: 'notice', message: 'retried' }), { kind: 'driver', event: { type: 'notice', message: 'retried' } })
   assert.deepEqual(fromDiaryLine({ kind: 'error', message: 'claude exited with code 1' }), { kind: 'driver', event: { type: 'error', message: 'claude exited with code 1' } })
   // An `error` block of a run recorded before the daemon stopped running agents is the agent's own report, not a driver's.

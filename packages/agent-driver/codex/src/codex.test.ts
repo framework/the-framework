@@ -28,7 +28,7 @@ test('CodexJsonParser takes the last message as the turn (#539)', () => {
   assert.equal(turn.sessionId, '019f660b-bf69-7d62-a96c-34aad1f083db')
 })
 
-test('CodexJsonParser announces the session at once, streams text and surfaces tool kinds only (#539)', () => {
+test('CodexJsonParser announces the session at once and streams text (#539)', () => {
   const p = new CodexJsonParser()
   const events = REAL_RUN.flatMap(line => p.push(line))
   assert.deepEqual(events, [
@@ -36,6 +36,24 @@ test('CodexJsonParser announces the session at once, streams text and surfaces t
     { type: 'text', text: 'I’ll create `hello.txt`.' },
     { type: 'action', label: 'file_change' },
     { type: 'text', text: 'Created hello.txt' },
+  ])
+})
+
+test('CodexJsonParser says what each tool call did, and passes its reasoning on as thoughts', () => {
+  // codex-cli 0.144.4 lines, verbatim but for the shortened paths.
+  const lines = [
+    JSON.stringify({ type: 'item.completed', item: { id: 'item_0', type: 'reasoning', text: '**Confirming Euler polynomial prime run ending at n=40**' } }),
+    JSON.stringify({ type: 'item.started', item: { id: 'item_1', type: 'command_execution', command: "/bin/zsh -lc 'od -An -t x1 hello.txt'", aggregated_output: '', exit_code: null, status: 'in_progress' } }),
+    JSON.stringify({ type: 'item.completed', item: { id: 'item_1', type: 'command_execution', command: "/bin/zsh -lc 'od -An -t x1 hello.txt'", aggregated_output: '68 69', exit_code: 0, status: 'completed' } }),
+    JSON.stringify({ type: 'item.started', item: { id: 'item_2', type: 'command_execution', command: `/bin/zsh -lc "pwd && rg --files -g 'hello.txt'"`, status: 'in_progress' } }),
+    JSON.stringify({ type: 'item.started', item: { id: 'item_3', type: 'file_change', changes: [{ path: '/tmp/cx/hello.txt', kind: 'add' }], status: 'in_progress' } }),
+  ]
+  const p = new CodexJsonParser()
+  assert.deepEqual(lines.flatMap(line => p.push(line)), [
+    { type: 'thought', text: '**Confirming Euler polynomial prime run ending at n=40**' },
+    { type: 'action', label: 'command_execution', detail: 'od -An -t x1 hello.txt' },
+    { type: 'action', label: 'command_execution', detail: "pwd && rg --files -g 'hello.txt'" },
+    { type: 'action', label: 'file_change', detail: '/tmp/cx/hello.txt' },
   ])
 })
 

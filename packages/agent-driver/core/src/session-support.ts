@@ -38,3 +38,12 @@ export function combineFraming(...parts: (string | undefined)[]): string {
 export function readWorkspaceFile(cwd: string, path: string): Promise<string> {
   return readFile(resolve(cwd, path), 'utf8')
 }
+
+/** How long a tool call's detail may be: enough for a long command, short enough to keep the diary lean. */
+const DETAIL_MAX = 200
+
+/** A tool call's detail as a driver emits it: flattened to one line and cut to 200 characters. */
+export function oneLine(text: string): string {
+  const flat = text.replace(/\s+/g, ' ').trim()
+  return flat.length > DETAIL_MAX ? flat.slice(0, DETAIL_MAX - 1) + '…' : flat
+}

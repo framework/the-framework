@@ -301,8 +301,14 @@ export type DriverEvent =
   | { type: 'session'; sessionId: string }
   /** An assistant text chunk streamed out. */
   | { type: 'text'; text: string }
-  /** The agent used a tool. We surface the name only, not the arguments. */
-  | { type: 'action'; label: string }
+  /**
+   * The agent used a tool: its name, and `detail`, the one argument that says what it did (the
+   * command, the file, the URL, the skill), on one line and cut short. A tool whose arguments hold
+   * none of those has no `detail`.
+   */
+  | { type: 'action'; label: string; detail?: string }
+  /** What the agent thought before it acted, as its CLI summarizes it. */
+  | { type: 'thought'; text: string }
   /**
    * The turn settled with this final text. `sessionLink` is the real URL of the session,
    * for a driver whose session has one of its own (#1317) — a cloud session, say — so a

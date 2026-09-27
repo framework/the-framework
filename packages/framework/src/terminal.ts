@@ -167,7 +167,9 @@ function formatDriverEvent(event: DriverEvent): string {
     case 'text':
       return `    ${truncate(event.text)}`
     case 'action':
-      return `    · ${event.label}`
+      return event.detail !== undefined ? `    · ${event.label}  ${truncate(event.detail, 140)}` : `    · ${event.label}`
+    case 'thought':
+      return `    💭 ${truncate(event.text, 140)}`
     case 'result':
       return `  ‹ turn complete`
     case 'rate-limit':

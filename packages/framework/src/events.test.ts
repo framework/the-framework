@@ -24,6 +24,12 @@ test('formatFrameworkEvent renders a multi-select choice as a checklist (#332)',
   assert.equal(line, '? Pick problems to deep-dive\n    [x] auth flow\n    [ ] routing')
 })
 
+test('formatFrameworkEvent shows what a tool call did beside its name, and a thought as its own line', () => {
+  assert.equal(formatFrameworkEvent({ kind: 'driver', event: { type: 'action', label: 'Bash', detail: 'git status --short' } }), '    · Bash  git status --short')
+  assert.equal(formatFrameworkEvent({ kind: 'driver', event: { type: 'action', label: 'Bash' } }), '    · Bash')
+  assert.equal(formatFrameworkEvent({ kind: 'driver', event: { type: 'thought', text: 'The test\nfails first.' } }), '    💭 The test fails first.')
+})
+
 test('formatFrameworkEvent says the armed line as what will happen, merge included (#1382)', () => {
   // A merge-armed agent opens a ready PR and lands it by itself — the line must own that, not say
   // "draft PR" about an agent that is configured to merge to main unattended.

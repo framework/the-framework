@@ -13,7 +13,7 @@ The one line of git facts about the checkout [1] in play — its branch, whether
 
 - **Whose checkout** - with an agent selected the line reports that agent's checkout, which alone has a path, an owner and a size; otherwise the project's own checkout; nothing renders when there is no checkout to report.
 - **Kept current** - the facts are re-read every 10 seconds, or every second while the daemon's pull request lookup is still in flight; the previous facts stay on screen while the next agent's load.
-- **Identity first, branch second** - given the agent's name it leads in bold, prefixed by "<project> /", and the branch drops to muted context with its `the-framework/` prefix hidden; without a name the branch is the identity; the full branch and the checkout's path live in the branch's tooltip.
+- **Identity first, branch second** - given the agent's name it leads in bold, prefixed by "<project> /", which stays in view (capped) however long the name is, and the branch drops to muted context with its `the-framework/` prefix hidden; without a name the branch is the identity; the full branch and the checkout's path live in the branch's tooltip.
 - **Clean or dirty, neutrally** - a dot and the word "clean" in neutral gray or "dirty" in amber; the tooltip reads "Clean", "Uncommitted changes", or "Uncommitted changes in this agent" when the checkout is the agent's own.
 - **State, size and summary** - the agent's state sits beside the dot, the checkout's size on disk shows once the daemon could measure it, and the summary of what the branch holds comes last; the facts furthest from the branch drop out first as the bar narrows.
 - **The pull request link** - "PR #<number>" with its state in a pill, opening the pull request in a new tab, its title in the tooltip.
@@ -49,7 +49,7 @@ The facts are re-read every 10 seconds; while the daemon reports its pull reques
 
 #### Business logic
 
-When the caller gives the agent's label, it leads in bold and is the last element to truncate, so the identity never disappears. A project name given with it is prefixed as a muted "<project> /" breadcrumb that gives up width first. The branch then reads as muted context beside the name: a leading `the-framework/` is stripped from the shown text, the text is capped at 14 rem before truncating, and on a narrow bar the branch is hidden altogether; its tooltip shows the full branch and, for an agent's checkout [1], the checkout's path on a second line. Without a label (the project home) the branch is the identity, in bold, capped at 16 rem, its tooltip reading "branch <branch>". A checkout on no branch reads "no branch".
+When the caller gives the agent's label, it leads in bold and is the last element to truncate, so the identity never disappears. A project name given with it is prefixed as a muted "<project> /" breadcrumb that is always shown: it keeps its width up to a cap of 8rem (about 16 characters), a longer project name is cut there with "…", and a long agent name is what gives up the rest of the row. The branch then reads as muted context beside the name: a leading `the-framework/` is stripped from the shown text, the text is capped at 14 rem before truncating, and on a narrow bar the branch is hidden altogether; its tooltip shows the full branch and, for an agent's checkout [1], the checkout's path on a second line. Without a label (the project home) the branch is the identity, in bold, capped at 16 rem, its tooltip reading "branch <branch>". A checkout on no branch reads "no branch".
 
 ### Clean or dirty, neutrally
 

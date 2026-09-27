@@ -37,6 +37,20 @@ describe('GitStatusBar (#809)', () => {
     expect(onGitStatus).not.toHaveBeenCalled()
   })
 
+  test('beside a long session name the project stays, capped, and the session name is what gets cut', async () => {
+    onAgentWorktree.mockResolvedValue({ path: '/repo/.branches/run-1', own: true, dirty: false, branch: 'agent-run-1' })
+    const long = "Read packages/framework/package.json and tell me the package's name and how it builds"
+    render(<GitStatusBar projectId="p1" agentId="run-1" inline label={long} projectName="gemstack" />)
+    await waitFor(() => expect(screen.getByText('gemstack')).toBeTruthy())
+    // No layout in the test DOM, so the rule is read off the classes: the project keeps its width
+    // up to a cap (it used to give up width first, and vanished beside a long name).
+    const crumb = screen.getByTestId('project-crumb')
+    expect(crumb.className).toContain('shrink-0')
+    expect(crumb.className).toContain('max-w-32')
+    expect(screen.getByText('gemstack').className).toContain('truncate')
+    expect(screen.getByTitle(long).className).toContain('truncate')
+  })
+
   test("a session's PR shows, the way the project's does", async () => {
     // A session's branch is exactly the thing that has a PR, so hiding it there made the one
     // page where it matters most the page without it.

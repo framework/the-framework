@@ -8,4 +8,4 @@ The `@agent-driver/codex` package: Codex behind the `agent-driver` contract (`..
 
 ## Business logic — TL;DR
 
-- **Codex on this machine** (`src/`) - one `codex` process per turn, its streamed output read, its conversation resumed; the person's own setup turned off part by part, the skills through a Codex home of its own; whether `codex` is installed and logged in, and which personal skills it cannot keep out; told in `src/LOGIC.md`.
+- **Codex on this machine** (`src/`) - one `codex` process per turn, its streamed output read, its conversation resumed; the models it offers; the person's own setup turned off part by part, the skills through a Codex home of its own; whether `codex` is installed and logged in, and which personal skills it cannot keep out; told in `src/LOGIC.md`.

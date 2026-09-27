@@ -9,6 +9,7 @@ export type {
   DriverUsage,
   DriverRateLimit,
   DriverQuota,
+  DriverModel,
   DriverQuotaWindow,
   DriverQuotaUnavailableReason,
   PersonalSetup,

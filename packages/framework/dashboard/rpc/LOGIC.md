@@ -33,6 +33,7 @@ The browser's side of the daemon's call surface: one module of typed stubs per g
 - **The live event stream** (`events.ts`) - the subscription to one agent's events [7] as they are written, re-exported from the transport because a stream is not a call.
 - **Actions** (`control.ts`) - everything the user does to an agent or a project: what the user says to an agent (stop, pick [8], message), the bridge's answer and its browser, starting an agent, pull request and merge, removing a checkout or deleting an agent, opening a checkout in an app, and the release of a ticket's claim.
 - **Preferences** (`preferences.ts`) - reading, replacing or patching the preferences [10], a project's shared saved prompts, and the installed editors.
+- **Models** (`models.ts`) - which models each coding agent offers, as the daemon asked them, or why one could not say.
 - **Quota** (`quota.ts`) - the quota [11] reading against the quota boundary [12], and setting the spend offset [14] through every project's offset hook.
 - **Devices** (`devices.ts`) - whether each saved device [13] answers, checked by the daemon with the token the browser holds and never keeps.
 - **Widgets** (`widgets.ts`) - which widgets [16] the registered projects bring, and a widget running one of its own package's commands in one project.

@@ -3,6 +3,7 @@ import { timingSafeEqual } from 'node:crypto'
 import type { AddressInfo } from 'node:net'
 import type { PreferencesStore } from '../registry.js'
 import type { QuotaSource } from './quota.js'
+import type { ModelsSource } from './models.js'
 import type { ProjectErrorsReader } from '../project-errors.js'
 import type { BridgeBrowserOwner } from '../bridge-browser.js'
 import { serveClientBundle } from './static.js'
@@ -44,6 +45,8 @@ export interface DashboardOptions {
   preferences: PreferencesStore
   /** Where the usage panel reads the quota from (#533). */
   quota: QuotaSource
+  /** Which models each coding agent offers, for the agent and model menu. */
+  models: ModelsSource
   /** What a project currently suffers from (#1500), for the project list to carry. */
   projectErrors: ProjectErrorsReader
   /** The daemon's own bridge browser (#1332): its status, and the show/hide/restart the settings page asks for. */
@@ -144,6 +147,7 @@ export function startDashboard(opts: DashboardOptions): Promise<Dashboard> {
       projectErrors: opts.projectErrors,
       bridgeBrowser: opts.bridgeBrowser,
       quota,
+      models: opts.models,
     },
     // The bound host, so the mount can reject a rebound `Host`: a page on evil.com whose DNS
     // answers 127.0.0.1 is same-origin to the browser, so the Origin check alone lets it in.

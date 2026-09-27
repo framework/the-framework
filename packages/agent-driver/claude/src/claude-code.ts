@@ -3,7 +3,8 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { readClaudeQuota } from './claude-code-quota.js'
-import { combineFraming, combineSignals, makeEmit, readWorkspaceFile, runCliSession, checkCliReady, type CliSpec, type DriverReadiness, type DriverReadyOptions, type PersonalSetup, finishTurn, agentEnv, oneLine, attachLog, type SpawnLike, type SessionLog, type Driver, type DriverEvent, type DriverPromptOptions, type DriverQuota, type DriverRateLimit, type DriverSession, type DriverStartOptions, type DriverTurn, type DriverUsage } from 'agent-driver'
+import { readClaudeModels } from './claude-code-models.js'
+import { combineFraming, combineSignals, makeEmit, readWorkspaceFile, runCliSession, checkCliReady, type CliSpec, type DriverReadiness, type DriverReadyOptions, type PersonalSetup, finishTurn, agentEnv, oneLine, attachLog, type SpawnLike, type SessionLog, type Driver, type DriverEvent, type DriverModel, type DriverPromptOptions, type DriverQuota, type DriverRateLimit, type DriverSession, type DriverStartOptions, type DriverTurn, type DriverUsage } from 'agent-driver'
 
 /** Claude Code permission modes we pass through to the CLI. */
 export type PermissionMode = 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan'
@@ -74,6 +75,18 @@ export class ClaudeCodeDriver implements Driver {
       ...(this.opts.bin !== undefined ? { bin: this.opts.bin } : {}),
       ...(env !== undefined ? { env } : {}),
       ...(this.opts.spawn !== undefined ? { spawn: this.opts.spawn } : {}),
+      ...(opts.signal !== undefined ? { signal: opts.signal } : {}),
+    })
+  }
+
+  /** The models Claude Code's own `/model` picker offers, with the person's setup parts as a session loads them. */
+  listModels(opts: { signal?: AbortSignal } = {}): Promise<DriverModel[]> {
+    const { bin, env, extraArgs, spawn } = withPersonal(this.opts)
+    return readClaudeModels({
+      ...(bin !== undefined ? { bin } : {}),
+      ...(env !== undefined ? { env } : {}),
+      ...(extraArgs !== undefined ? { extraArgs } : {}),
+      ...(spawn !== undefined ? { spawn } : {}),
       ...(opts.signal !== undefined ? { signal: opts.signal } : {}),
     })
   }

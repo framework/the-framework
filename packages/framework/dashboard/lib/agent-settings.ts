@@ -1,24 +1,5 @@
-import type { DriverName } from '../../src/client.js'
-
-// What the dashboard calls the two picks a start carries: which coding agent, and which model.
-//
-// The names and labels of the drivers themselves are the framework's own vocabulary (browser-safe
-// via /client); only the model lists are UI data, which is why they live here in the dashboard
-// rather than beside the drivers.
-
-/** The models each driver offers, in the order the menus list them. Every entry is a real model id. */
-export const DRIVER_MODELS: Record<DriverName, { value: string; label: string }[]> = {
-  'claude-code': [
-    { value: 'fable', label: 'Fable' },
-    { value: 'opus', label: 'Opus' },
-    { value: 'sonnet', label: 'Sonnet' },
-    { value: 'haiku', label: 'Haiku' },
-  ],
-  codex: [
-    { value: 'gpt-5.6-terra', label: 'GPT-5.6 Terra' },
-    { value: 'gpt-5.6-luna', label: 'GPT-5.6 Luna' },
-  ],
-}
+// What a surface says about the model when nothing is pinned. The models themselves come from the
+// coding agents (`lib/models.ts`).
 
 /** What a surface says when no model is pinned and the CLI picks for itself (#1143). */
 export const NO_MODEL_PINNED = "the CLI's own default"

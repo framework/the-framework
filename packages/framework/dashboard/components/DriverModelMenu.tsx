@@ -31,6 +31,8 @@ export interface DriverOption {
   icon?: ReactNode
   /** The models this driver offers. Every entry is a real model id — none of them means "unset". */
   models: ModelOption[]
+  /** Why {@link models} is empty, said in its place: the agent is still being asked, or could not say. */
+  modelsNote?: string
 }
 
 function driverOf(drivers: DriverOption[], value: string): DriverOption | undefined {
@@ -38,8 +40,9 @@ function driverOf(drivers: DriverOption[], value: string): DriverOption | undefi
 }
 
 /**
- * The label for the current model within a driver's own list, or `undefined` when nothing is
- * pinned — which is the state a preference set on the other driver, or never set at all, leaves.
+ * The label for the current model: its name in the driver's own list, the id itself for a model
+ * the list does not hold (the run is still given it, so the trigger says what is sent), or
+ * `undefined` when nothing is pinned.
  *
  * Deliberately *not* falling back to the first model (#1143). The list used to open with a
  * "Default" entry storing an empty value, and the fallback made that entry's label the answer to
@@ -47,7 +50,8 @@ function driverOf(drivers: DriverOption[], value: string): DriverOption | undefi
  * either: the trigger would name a model the agent does not actually pass.
  */
 function modelLabel(driver: DriverOption | undefined, model: string): string | undefined {
-  return driver?.models.find(m => m.value === model)?.label
+  if (!model) return undefined
+  return driver?.models.find(m => m.value === model)?.label ?? model
 }
 
 export function DriverModelMenu({
@@ -102,6 +106,7 @@ export function DriverModelMenu({
               <span className="flex-1">{a.label}</span>
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent>
+              {a.models.length === 0 && a.modelsNote && <DropdownMenuItem disabled>{a.modelsNote}</DropdownMenuItem>}
               {a.models.map(m => (
                 <DropdownMenuItem key={m.value} onClick={() => onChange(a.value, m.value)}>
                   <Check

@@ -6,6 +6,7 @@ import { errorMessage } from '../error-message.js'
 import type { FrameworkEvent } from '../events.js'
 import type { PreferencesStore } from '../registry.js'
 import type { QuotaSource } from './quota.js'
+import type { ModelsSource } from './models.js'
 import type { BridgeBrowserOwner } from '../bridge-browser.js'
 import type { ProjectErrorsReader } from '../project-errors.js'
 import type { AddProjectResult, StartAgentOptions, StartAgentResult } from './types.js'
@@ -55,6 +56,8 @@ export interface DashboardContext {
   preferences: PreferencesStore
   /** The quota source behind the usage panel (#533). */
   quota: QuotaSource
+  /** Which models each coding agent offers, for the agent and model menu. */
+  models: ModelsSource
   /** What a project currently suffers from (#1500): the daemon's error state, read per project. */
   projectErrors: ProjectErrorsReader
   /** The daemon's own bridge browser (#1332): status, and show/hide/restart on request. */

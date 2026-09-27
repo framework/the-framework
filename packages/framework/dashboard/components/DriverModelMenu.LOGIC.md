@@ -1,4 +1,4 @@
-Offers the driver [1] and model for the next agent [2] as one menu: a tree whose top level lists the drivers and whose submenus list each driver's own models, so picking a model always sets its driver with it and an incompatible pair, such as Codex with a Claude model, cannot be chosen. The menu's button shows the current driver's logo followed by the current model's name. Which drivers and models are offered is the caller's decision: the composer [3] builds the list (its rules in `Composer.tsx`) from the model catalog in `lib/agent-settings.ts`.
+Offers the driver [1] and model for the next agent [2] as one menu: a tree whose top level lists the drivers and whose submenus list each driver's own models, so picking a model always sets its driver with it and an incompatible pair, such as Codex with a Claude model, cannot be chosen. The menu's button shows the current driver's logo followed by the current model's name. Which drivers and models are offered is the caller's decision: the composer [3] builds the list (its rules in `Composer.tsx`) from the models each coding agent [4] listed when the daemon asked it (`lib/models.ts`).
 
 ## Glossary
 
@@ -10,7 +10,8 @@ Offers the driver [1] and model for the next agent [2] as one menu: a tree whose
 ## Business logic — TL;DR
 
 - **Choosing a model chooses its driver** - the menu is a tree of drivers with each driver's own models beneath it; picking a model reports both together, so a Claude model can never be paired with Codex.
-- **The button names only what is really set** - the button shows the current driver's logo and the current model's name; with no model pinned, or a model pinned on another driver, it names no model rather than the first one listed.
+- **The button names only what is really set** - the button shows the current driver's logo and the current model's name; a pinned model the driver's list does not hold is named by its id, since the agent is still passed it; with no model pinned it names no model rather than the first one listed.
+- **A driver with no models says why** - while its coding agent [4] is still being asked, or when it could not say, the driver's submenu holds one disabled line saying so instead of models.
 - **Spelled out for the tooltip and assistive technology** - the button's tooltip and its accessible name read "Driver: <driver> · Model: <model>", where an unpinned model reads "the CLI's own default".
 - **Disabled while busy** - the button is disabled while the caller reports a start in flight, so the driver and model cannot change under it.
 
@@ -32,11 +33,21 @@ The top level of the menu lists the drivers in the order given, each with its lo
 
 #### Context
 
-**Problem**: naming a model the agent [2] will not actually be passed is worse than naming none: a model pinned while the other driver [1] was selected, or never pinned at all, must not read as whichever model happens to be listed first.
+**Problem**: naming a model the agent [2] will not actually be passed is worse than naming none: a model never pinned must not read as whichever model happens to be listed first, and a pinned model missing from the list is still passed, so it must not read as unpinned.
 
 #### Business logic
 
-The button shows the current driver's logo, or its label when it has no logo, then the current model's label, then a chevron. The model's label is looked up only within the current driver's own list: when the pinned model is empty, or belongs to another driver, the button shows no model name at all. When the current driver is not among the drivers offered, the first driver offered stands in as current for what the button shows.
+The button shows the current driver's logo, or its label when it has no logo, then the current model's label, then a chevron. The model's label is looked up within the current driver's own list: a listed model shows its name as its coding agent [4] gives it ("Opus 5.5"); a pinned model the list does not hold, such as one saved before the list changed or one of the other driver's models, shows its id as it is passed ("fable"); an empty pinned model shows no model name at all. When the current driver is not among the drivers offered, the first driver offered stands in as current for what the button shows.
+
+### A driver with no models says why
+
+#### Context
+
+**Problem**: the models come from asking each coding agent [4], which takes a moment and can fail (the CLI missing or logged out); an empty submenu would say nothing about why.
+
+#### Business logic
+
+When a driver's list of models is empty and the caller gives a note for it, the driver's submenu shows that note as its one entry, disabled so it cannot be chosen. The composer [3] gives "Asking <driver label>…" while the daemon has not answered, and the coding agent's own reason when it could not list its models.
 
 ### Spelled out for the tooltip and assistive technology
 

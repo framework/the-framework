@@ -1,4 +1,4 @@
-Drives Claude Code as a driver [1]: each turn [2] is one non-interactive invocation of the `claude` command in the driver session's [3] directory, whose streamed JSON output is read for the coding agent's [4] text, thinking, tool calls, session id, usage [5] and rate limit [6] readings, and whose final message is the turn's answer. The driver session is continued across turns, and revived after the agent [7] ends, through Claude Code's own resume; the account's quota [8] is read through `claude-code-quota.ts`. Its implementation id is `claude-code`.
+Drives Claude Code as a driver [1]: each turn [2] is one non-interactive invocation of the `claude` command in the driver session's [3] directory, whose streamed JSON output is read for the coding agent's [4] text, thinking, tool calls, session id, usage [5] and rate limit [6] readings, and whose final message is the turn's answer. The driver session is continued across turns, and revived after the agent [7] ends, through Claude Code's own resume; the account's quota [8] is read through `claude-code-quota.ts`, and the models Claude Code offers are listed through `claude-code-models.ts`. Its implementation id is `claude-code`.
 
 ## Context
 
@@ -41,6 +41,7 @@ Drives Claude Code as a driver [1]: each turn [2] is one non-interactive invocat
 - **Usage off the result line** - token counts, and the price only when Claude Code reports one, never zero.
 - **Rate limit telemetry** - each rate-limit line becomes a rate limit [6] reading with its status and window passed through verbatim and its reset time converted to milliseconds; a malformed line stays silent.
 - **Reading the account's quota** - the driver reads the quota [8] through `claude-code-quota.ts`, with the same command and environment it runs turns with, the personal setup's environment switches included (the `skills` switch is a command-line flag and does not apply to the readout).
+- **Listing the models** - the driver lists the models Claude Code offers through `claude-code-models.ts`, with the same command, environment and personal setup switches it runs turns with, `--setting-sources project,local` included, since the person's settings can narrow Claude Code's list.
 - **The person's own setup** - each part of the personal setup [14] the caller turns off becomes Claude Code's own switch: `memory` off sets `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`, `connectors` off sets `ENABLE_CLAUDEAI_MCP_SERVERS=false`, `skills` off passes `--setting-sources project,local`; given none, Claude Code loads everything.
 - **Can a session start here** - `claude` asked `--version`, then `auth status`, whose JSON `loggedIn` flag is the answer; every part of the personal setup has a switch, so none is ever a warning.
 - **Ending the driver session** - only the temporary MCP configuration is freed; each turn's process is already gone when the turn ends.
@@ -163,6 +164,16 @@ A rate-limit line becomes a rate limit [6] reading carrying its status and its w
 #### Business logic
 
 On request, the driver [1] reads where the account's quota [8] stands through the reader in `claude-code-quota.ts`, with the same command, environment and process spawner it runs turns [2] with (the personal setup's [14] environment switches included; the `skills` switch is a command-line flag and does not apply to the readout), and with the caller's stop request [12]. The reading is account-wide and needs no driver session [3].
+
+### Listing the models
+
+#### Context
+
+**User story**: the user picks the model for the next agent [7] from the models their own Claude Code offers, by the names Claude Code shows.
+
+#### Business logic
+
+On request, the driver [1] lists the models Claude Code offers through the reader in `claude-code-models.ts`, with the same command, environment and process spawner it runs turns [2] with, and with every personal setup [14] switch, the `skills` switch's `--setting-sources project,local` included: the person's own settings can narrow the list Claude Code offers, so a run that leaves them out is offered the list without them. The caller's stop request [12] ends the listing. The listing is account-wide and needs no driver session [3].
 
 ### The person's own setup
 

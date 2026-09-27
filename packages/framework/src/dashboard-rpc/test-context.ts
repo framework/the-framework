@@ -19,6 +19,7 @@ export function testDashboardContext(over: Partial<DashboardContext> = {}): Dash
     remote: { target: () => undefined, list: () => [] },
     preferences: registryPreferencesStore(),
     quota: defaultQuotaSource(async () => undefined),
+    models: { read: async () => ({ 'claude-code': { models: [] }, codex: { models: [] } }) },
     projectErrors: () => [],
     bridgeBrowser: { status: async () => ({ state: 'off' }), start: async () => {}, stop: async () => {}, act: async () => {} },
     ...over,

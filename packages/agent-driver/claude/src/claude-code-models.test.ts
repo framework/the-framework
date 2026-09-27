@@ -1,0 +1,98 @@
+import { strict as assert } from 'node:assert'
+import { test } from 'node:test'
+import { Readable, Writable } from 'node:stream'
+import { parseInitializeLine, readClaudeModels } from './claude-code-models.js'
+import { ClaudeCodeDriver } from './claude-code.js'
+import type { SpawnLike, SpawnedProcess } from 'agent-driver'
+
+/** The CLI's answer to `initialize`, cut to the fields read and one field ignored, as a real one reads. */
+const ANSWER = JSON.stringify({
+  type: 'control_response',
+  response: {
+    subtype: 'success',
+    request_id: 'models',
+    response: {
+      commands: [],
+      models: [
+        { value: 'default', resolvedModel: 'claude-opus-5-5', displayName: 'Default (recommended)', description: 'Opus 5.5 · Best for everyday, complex tasks' },
+        { value: 'opus', resolvedModel: 'claude-opus-5-5', displayName: 'Opus 5.5', description: 'Most capable for ambitious work' },
+        { value: 'claude-fable-5-1', resolvedModel: 'claude-fable-5-1', displayName: 'Fable 5.1', description: 'For your toughest challenges' },
+        { value: 'haiku', resolvedModel: 'claude-haiku-4-5-20251001', displayName: 'Haiku 4.5', description: 'Fastest for quick answers' },
+      ],
+    },
+  },
+})
+
+test('parseInitializeLine reads the models in the CLI\'s order, leaving out "default"', () => {
+  assert.deepEqual(parseInitializeLine(ANSWER), {
+    models: [
+      { id: 'opus', name: 'Opus 5.5' },
+      { id: 'claude-fable-5-1', name: 'Fable 5.1' },
+      { id: 'haiku', name: 'Haiku 4.5' },
+    ],
+  })
+})
+
+test('parseInitializeLine skips every other line', () => {
+  assert.equal(parseInitializeLine('{"type":"system","subtype":"init"}'), undefined)
+  assert.equal(parseInitializeLine('not json'), undefined)
+  assert.equal(parseInitializeLine(JSON.stringify({ type: 'control_response', response: { request_id: 'other', subtype: 'success' } })), undefined)
+})
+
+test('parseInitializeLine says the CLI\'s own error', () => {
+  const line = JSON.stringify({ type: 'control_response', response: { subtype: 'error', request_id: 'models', error: 'not logged in' } })
+  assert.deepEqual(parseInitializeLine(line), { error: 'Claude Code could not list its models: not logged in' })
+})
+
+/** A CLI that prints `lines` once it is sent its request, and records what it was started with and sent. */
+interface Seen {
+  args?: readonly string[]
+  sent: string[]
+  killed: boolean
+}
+
+function fakeCli(lines: string[], seen: Seen): SpawnLike {
+  return (_command, args) => {
+    seen.args = args
+    const out = new Readable({ read: () => undefined })
+    const proc: SpawnedProcess = {
+      stdout: out,
+      stderr: Readable.from([]),
+      stdin: new Writable({
+        write: (chunk, _e, cb) => {
+          seen.sent.push(String(chunk))
+          for (const line of lines) out.push(`${line}\n`)
+          cb()
+        },
+      }),
+      on: () => proc,
+      kill: () => {
+        seen.killed = true
+        out.push(null)
+      },
+    }
+    return proc
+  }
+}
+
+test('readClaudeModels sends only the initialize request, answers the list, and stops the CLI', async () => {
+  const seen: Seen = { sent: [], killed: false }
+  const models = await readClaudeModels({ spawn: fakeCli(['{"type":"system"}', ANSWER], seen) })
+  assert.equal(models.length, 3)
+  assert.deepEqual(seen.sent.map(line => JSON.parse(line).request.subtype), ['initialize'])
+  assert.ok(seen.args?.includes('--input-format'))
+  assert.equal(seen.killed, true)
+})
+
+test('readClaudeModels rejects with the reason when the CLI never answers', async () => {
+  const seen: Seen = { sent: [], killed: false }
+  await assert.rejects(readClaudeModels({ spawn: fakeCli([], seen), timeoutMs: 20 }), /did not list its models within/)
+  assert.equal(seen.killed, true)
+})
+
+test('ClaudeCodeDriver.listModels starts the CLI with the switches that keep the person\'s settings out', async () => {
+  const seen: Seen = { sent: [], killed: false }
+  const driver = new ClaudeCodeDriver({ spawn: fakeCli([ANSWER], seen), personal: { memory: true, connectors: true, skills: false } })
+  await driver.listModels()
+  assert.ok(seen.args?.join(' ').includes('--setting-sources project,local'))
+})

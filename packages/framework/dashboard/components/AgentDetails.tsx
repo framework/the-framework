@@ -1,9 +1,11 @@
 import type { AgentMeta, FrameworkEvent } from '../../src/index.js'
 import { DRIVER_LABELS, driverFromImpl } from '../../src/client.js'
+import { modelName, useModels } from '../lib/models.js'
 
 // The session-details strip behind the action bar's disclosure (always available now, so the
 // chevron no longer pops in and out with the git/handoff data). It shows the "about this agent"
-// facts the wrapped agent's own chat does not: which agent and model ran it, off the run's card,
+// facts the wrapped agent's own chat does not: which agent and model ran it, off the run's card, the
+// model by the name its agent gives it ("Opus 5.5" for `opus`),
 // and what it has spent so far, added up from the run's record: one usage event per turn the coding agent priced (#322), one
 // result per turn it answered. The record keeps no token counts, so none are shown. The git
 // branch / PR / changes sit in the bar row right above this, so they are not repeated here.
@@ -34,12 +36,14 @@ function Fact({ label, value }: { label: string; value: string }) {
 export function AgentDetails({ events, card }: { events: FrameworkEvent[]; card?: AgentDetailsCard | undefined }) {
   const picked = driverFromImpl(card?.driver)
   const agent = picked ? DRIVER_LABELS[picked] : card?.driver
+  const models = useModels()
+  const model = card?.model && modelName(picked ? models?.[picked] : undefined, card.model)
   const { costUsd, turns } = spend(events)
 
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-border px-4 py-2 text-xs">
       {agent && <Fact label="Agent" value={agent} />}
-      {card?.model && <Fact label="Model" value={card.model} />}
+      {model && <Fact label="Model" value={model} />}
       {costUsd !== undefined && <Fact label="Spent" value={`$${costUsd.toFixed(2)}`} />}
       {turns > 0 && <Fact label="Turns" value={String(turns)} />}
       {costUsd === undefined && turns === 0 && <span className="text-muted-foreground/70">No spend reported yet</span>}

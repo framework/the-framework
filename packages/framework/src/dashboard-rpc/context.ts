@@ -3,6 +3,7 @@ import { defaultProjectsProvider, type ProjectsProvider } from '../dashboard/pro
 import type { DashboardContext, EventsSource, RemoteAgents } from '../dashboard/rpc-serve.js'
 import type { PreferencesStore } from '../registry.js'
 import type { QuotaSource } from '../dashboard/quota.js'
+import type { ModelsSource } from '../dashboard/models.js'
 import type { ProjectErrorsReader } from '../project-errors.js'
 import type { BridgeBrowserOwner } from '../bridge-browser.js'
 
@@ -93,6 +94,11 @@ export function contextPreferences(): PreferencesStore {
 /** The quota source behind the usage panel (#533). */
 export function contextQuota(): QuotaSource {
   return fromContext('quota')
+}
+
+/** Which models each coding agent offers. */
+export function contextModels(): ModelsSource {
+  return fromContext('models')
 }
 
 /** What a project currently suffers from (#1500), as the daemon's background jobs last recorded it. */

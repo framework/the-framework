@@ -56,18 +56,18 @@ describe('AgentHistory (#785)', () => {
     expect(container.querySelector('.rounded-full.bg-muted-foreground')).toBeTruthy()
   })
 
-  test('an ended run the daemon marks publishing reads as publishing… (#1455)', () => {
+  test('an ended run the daemon marks saving reads as saving… (#1455)', () => {
     const { container } = renderRail(
-      <AgentHistory projectId="p1" agents={[agent({ status: 'done', publishing: true })]} selectedAgentId={null} onSelect={() => {}} />,
+      <AgentHistory projectId="p1" agents={[agent({ status: 'done', saving: true })]} selectedAgentId={null} onSelect={() => {}} />,
     )
-    expect(screen.getByText('publishing…')).toBeTruthy()
+    expect(screen.getByText('saving…')).toBeTruthy()
     expect(screen.queryByText('done')).toBeNull()
     expect(container.querySelector('.animate-pulse')).toBeTruthy()
   })
 
   test('an ended run without the mark reads as plain done (#1455)', () => {
     renderRail(<AgentHistory projectId="p1" agents={[agent({ status: 'done' })]} selectedAgentId={null} onSelect={() => {}} />)
-    expect(screen.queryByText('publishing…')).toBeNull()
+    expect(screen.queryByText('saving…')).toBeNull()
     expect(screen.getByText('done')).toBeTruthy()
   })
 

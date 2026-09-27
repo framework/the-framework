@@ -248,7 +248,7 @@ export function AgentHistory({
                   <SidebarMenuItem key={row.key}>
                     <AgentHistoryRow
                       status={row.agent.status}
-                      publishing={row.agent.publishing === true}
+                      saving={row.agent.saving === true}
                       intent={agentLabel(row.agent)}
                       driver={row.agent.driver}
                       // On the Overview the project is what tells the rows apart, so it leads the meta
@@ -529,7 +529,7 @@ function AgentHistoryRow({
   onClick,
   driver,
   dim = false,
-  publishing = false,
+  saving = false,
   remote = false,
   cloud = false,
   cloudState,
@@ -544,9 +544,9 @@ function AgentHistoryRow({
   active: boolean
   onClick: () => void
   dim?: boolean
-  /** Ended clean, its process still recording the run and pushing its branch (#1455): the row must
-   *  not say "done" while the session's own pill says "publishing…". */
-  publishing?: boolean
+  /** Ended clean, its process still saving its record and cleaning up its checkout (#1455): the row must
+   *  not say "done" while the session's own pill says "saving…". */
+  saving?: boolean
   /** Runs on a connected device (#1067): the row gets a device glyph next to the agent logo. */
   remote?: boolean
   /** A Claude Code cloud session (#1263): the row gets a cloud glyph beside the agent logo. */
@@ -569,9 +569,9 @@ function AgentHistoryRow({
   // what is known of the session: waiting, in cloud, merged, or finally done.
   const inCloud = cloudState === 'in-cloud'
   const cloudWord = cloudState === 'merged' ? 'merged' : undefined
-  // "In cloud" outranks "publishing…": a web agent's local half is over either way, and the cloud
+  // "In cloud" outranks "saving…": a web agent's local half is over either way, and the cloud
   // side owns its own push/PR, so the cloud word is the truer one for that row.
-  const publishingNow = publishing && !cloud
+  const savingNow = saving && !cloud
   // The title only fades + carries a tooltip when it actually overflows the fixed-width rail; a
   // short one shows plainly. Measured here since CSS cannot tell. The rail width is fixed, so
   // intent is the only thing that changes the answer.
@@ -598,16 +598,16 @@ function AgentHistoryRow({
       <span className="flex w-full items-center gap-2 px-2">
         {/* The dot means "the agent is working", so a run parked on you gets a still one (#785):
             it used to pulse identically whether it was mid-edit or had been idle for an hour. */}
-        {/* The publishing dot pulses green like the session pill's (#1431), so the two surfaces
+        {/* The saving dot pulses green like the session pill's (#1431), so the two surfaces
             describe the same window the same way. */}
         {/* `parked` alone covers the cloud-side wait: its local status is done, but the SPEC's
             "waiting" always comes with the still dot, wherever the session is parked. */}
         {(status === 'running' || parked) && (
           <span className={cn('inline-block h-2 w-2 shrink-0 rounded-full', parked ? 'bg-muted-foreground' : 'animate-pulse bg-primary')} />
         )}
-        {publishingNow && <span className="inline-block h-2 w-2 shrink-0 animate-pulse rounded-full bg-success" />}
-        <Badge className={cn('shrink-0 border-transparent px-0 text-[10px] uppercase', parked || publishingNow ? 'text-muted-foreground' : inCloud ? 'text-primary' : cloudWord ? 'text-success' : STATUS_TONE[status])}>
-          {parked ? 'waiting' : inCloud ? 'in cloud' : cloudWord ? cloudWord : publishingNow ? 'publishing…' : status}
+        {savingNow && <span className="inline-block h-2 w-2 shrink-0 animate-pulse rounded-full bg-success" />}
+        <Badge className={cn('shrink-0 border-transparent px-0 text-[10px] uppercase', parked || savingNow ? 'text-muted-foreground' : inCloud ? 'text-primary' : cloudWord ? 'text-success' : STATUS_TONE[status])}>
+          {parked ? 'waiting' : inCloud ? 'in cloud' : cloudWord ? cloudWord : savingNow ? 'saving…' : status}
         </Badge>
         <span className="truncate text-xs font-normal text-muted-foreground">{subtitle}</span>
         {/* Right cluster: a device glyph when the run is relayed to a connected device (#1067),

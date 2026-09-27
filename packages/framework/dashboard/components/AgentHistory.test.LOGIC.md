@@ -2,7 +2,7 @@ What the tests cover, for the dashboard's left column and its list of agents:
 
 - **A working agent** - reads "running" with a pulsing dot.
 - **A waiting agent** - an agent that ended on its question reads "waiting", never "running", with a still dot and nothing pulsing.
-- **Publishing** - a done agent the daemon marks publishing reads "publishing…" with a pulsing dot and never "done"; a done agent without the mark reads plain "done".
+- **Saving** - a done agent the daemon marks saving reads "saving…" with a pulsing dot and never "done"; a done agent without the mark reads plain "done".
 - **The starting row is highlighted** - when the page selects an agent whose row has not landed yet, the "starting…" stand-in carries the highlight and the "New agent" button does not.
 - **The starting row retires on landing** - the stand-in goes as soon as an agent appears that was not listed when Start was clicked, even one that landed already "failed" without ever being seen running; an agent that was already listed when Start was clicked does not retire it.
 - **Where an agent runs** - a relayed agent shows a device glyph named "Runs on <device>"; an agent another machine's daemon started shows a glyph named "Started on <host>", while this daemon's own agents show none; a local agent shows no device glyph.

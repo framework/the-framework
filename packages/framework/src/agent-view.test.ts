@@ -9,7 +9,6 @@ test('sessionInfo merges the opening session with the latest session-update link
     { kind: 'session-update', sessionId: 'sess-1', sessionLink: 'https://claude.ai/code/sess-1' },
   ]
   const info = sessionInfo(events)
-  assert.equal(info?.driver, 'claude')
   assert.equal(info?.sessionId, 'sess-1')
   assert.equal(info?.sessionLink, 'https://claude.ai/code/sess-1')
   assert.equal(sessionInfo([{ kind: 'log', message: 'x' }]), null)
@@ -24,16 +23,6 @@ test('sessionInfo keeps the workspace the run used, so a removed worktree is sti
   // pair together that reopens the session in a terminal.
   assert.equal(sessionInfo(events)?.workspace, '/repo/.the-framework/worktrees/run-1')
   assert.equal(sessionInfo(events)?.sessionId, 'sess-1')
-})
-
-test('sessionInfo carries the model per leg — the latest session event wins, an unrecorded one clears it (#1438)', () => {
-  const one: FrameworkEvent[] = [{ kind: 'session', driver: 'claude', workspace: '/w', fake: false, model: 'fable' }]
-  assert.equal(sessionInfo(one)?.model, 'fable')
-  // A continuation leg re-emits session and may run a different model: the reader folds, not pins.
-  const two: FrameworkEvent[] = [...one, { kind: 'session', driver: 'claude', workspace: '/w', fake: false, model: 'sonnet' }]
-  assert.equal(sessionInfo(two)?.model, 'sonnet')
-  const bare: FrameworkEvent[] = [...two, { kind: 'session', driver: 'claude', workspace: '/w', fake: false }]
-  assert.equal(sessionInfo(bare)?.model, undefined)
 })
 
 test('agentErrors folds the errors the agent reported, oldest first (#1500)', () => {

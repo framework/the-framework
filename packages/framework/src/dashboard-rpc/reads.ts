@@ -129,18 +129,18 @@ export function markOtherHost(agent: AgentMeta, thisHost: string = hostname()): 
 
 /**
  * A run that ended clean while the process its card names is still alive on this host is marked
- * publishing: the tool that runs it records the run and pushes its branch after the card says
+ * saving: the tool that runs it saves the run's record and cleans up its checkout after the card says
  * done, and a row that said "done" through that window read as finished with nothing coming. A
  * run of another host, or with no recorded process, passes through untouched.
  */
-export function markPublishing(agent: AgentMeta, thisHost: string = hostname(), alive: (pid: number) => boolean = isPidAlive): AgentMeta {
+export function markSaving(agent: AgentMeta, thisHost: string = hostname(), alive: (pid: number) => boolean = isPidAlive): AgentMeta {
   if (agent.status !== 'done' || agent.pid === undefined || agent.host !== thisHost || !alive(agent.pid)) return agent
-  return { ...agent, publishing: true }
+  return { ...agent, saving: true }
 }
 
 /** Every annotation a run's record gets on its way to the dashboard: what the daemon knows and the disk cannot. */
 function forDashboard(agent: AgentMeta): AgentMeta {
-  return markPublishing(markOtherHost(markCloudWaiting(agent)))
+  return markSaving(markOtherHost(markCloudWaiting(agent)))
 }
 
 /**

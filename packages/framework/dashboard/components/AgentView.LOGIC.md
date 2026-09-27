@@ -10,7 +10,7 @@ Shows one agent [1] on its own page, the agent view [2], in one frame that stays
 
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] agent view: one agent's page.
-[3] card: an agent's record as the daemon hands it to the dashboard with the project's list of agents: its status, its branch, its pull request, and what only the daemon knows, such as whether the agent is publishing: ended clean while the tool that runs it still records it and pushes its branch.
+[3] card: an agent's record as the daemon hands it to the dashboard with the project's list of agents: its status, its branch, its pull request, the coding agent and model that ran it, and what only the daemon knows, such as whether the agent is saving: ended clean while the tool that runs it still saves its record and cleans up its checkout.
 [4] event / event stream: everything an agent does, in order, read off the agent's diary: the file its tool writes one line at a time, in the agent's checkout while it has one and on the data branch once it is recorded; every surface is a projection of it.
 [5] composer: the prompt editor, also used to say something to an agent.
 [6] message: the user's own words to an agent, the next prompt of the same conversation: an agent that is working takes it when its turn ends, an ended agent is resumed with it.
@@ -87,7 +87,7 @@ The agent's name leads the bar: the label the caller passes, the same label the 
 
 An agent [1] counts as working exactly while the daemon's list of agents says it is running. Everything that asks "is there anything more coming?" asks whether the agent is working:
 
-- what the branch holds (the read in `lib/use-agent-handoff.ts`) is only read once the agent is not working: a branch still being written to has nothing to offer yet;
+- what the branch holds (the read in `lib/use-agent-handoff.ts`) is only read once the agent is not working and its card [3] is not marked saving: a branch still being written to has nothing to offer yet, and while the agent is saving its checkout is being cleaned up, which deletes a branch that holds nothing, so a next step offered then would be gone moments later;
 - the bar's action slot is empty while working — an agent that is working publishes its own work — and holds the next step [9] once not working;
 - the changes panel reads the checkout [7] while working; the branch's commits and files replace it once not working.
 
@@ -115,7 +115,7 @@ The bar's summary line:
 - Once the agent is not working and the read of what its branch holds has answered: the one-line verdict on the branch (`AgentHandoff.tsx`), followed, in the danger color, by the error of the last next-step [9] action the user pressed in the bar, when one failed.
 - Until that read has answered, a just-stopped agent keeps showing the counts it ended with: the summary swaps once, from the live counts to the branch verdict, instead of going blank for the beat the read takes.
 
-The bar's status word, ranked in `lib/agent-status.ts`, is read off the events shown and the agent's card [3]: the caller hands over the agent's card as the daemon's list of agents last reported it, which is what the word needs for "publishing…" and "ready for merge"; before the list holds the agent there is no card, and the word is read off the events alone.
+The bar's status word, ranked in `lib/agent-status.ts`, is read off the events shown and the agent's card [3]: the caller hands over the agent's card as the daemon's list of agents last reported it, which is what the word needs for "saving…" and "ready for merge"; before the list holds the agent there is no card, and the word is read off the events alone. The same card is handed to the details strip, which names the coding agent and model off it.
 
 The bar's action slot:
 
@@ -132,7 +132,7 @@ The bar's action slot:
 
 The disclosure toggles open and closed from the bar. While open it shows, above the feed:
 
-- the details strip (`AgentDetails.tsx`) with the agent's session and spend facts, in every state;
+- the details strip (`AgentDetails.tsx`) with the coding agent and model off the agent's card [3] and the spend off its events, in every state;
 - while the agent is working: the changes in its checkout [7] (`AgentChanges.tsx`). The changes panel is only shown when the agent's id is known: a read without an id falls back to the project root and would report the user's own uncommitted files as the agent's. A relayed [13] agent's checkout lives on the device [12], and its changes are read there, so it is shown like a local agent's;
 - once the agent is not working: the commits and files its branch holds (`AgentHandoff.tsx`).
 

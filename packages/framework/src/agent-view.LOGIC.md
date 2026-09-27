@@ -1,4 +1,4 @@
-Derives what the dashboard shows about an agent [1] from its event stream [2]: the errors it hit and the driver session [5] behind it (driver, checkout [6], session id and link, model). Every derivation is a fold over the events, so the live agent view [7] and the replay of a finished agent show the identical summary.
+Derives what the dashboard shows about an agent [1] from its event stream [2]: the errors it hit and the driver session [5] behind it (checkout [6], session id and link). Every derivation is a fold over the events, so the live agent view [7] and the replay of a finished agent show the identical summary.
 
 ## Context
 
@@ -18,7 +18,7 @@ Derives what the dashboard shows about an agent [1] from its event stream [2]: t
 ## Business logic — TL;DR
 
 - **The errors the agent hit** - every error the agent reported and every error the tool that runs it wrote in its diary, oldest first, each with its headline and its detail when there is one.
-- **The driver session behind the agent** - nothing before the session opening; then the driver, the checkout, the link and the model of the latest leg, plus the id and link of the latest session update.
+- **The driver session behind the agent** - nothing before the session opening; then the checkout and the link of the latest leg, plus the id and link of the latest session update.
 
 ## Business logic
 
@@ -45,4 +45,4 @@ Nothing removes an entry: an error is something that happened.
 
 #### Business logic
 
-Nothing is known before the session opening event; a stream without one yields no driver session. The opening gives the driver [11], whether it is the fake demo driver, the checkout [6] the agent ran in, the session link when the opening had a literal one, and the model when one was recorded. Each session update then sets the session id and, when it carries one, the link, and keeps the rest. A continuation emits a new session opening, so the driver, the checkout and the model are the latest leg's: a leg that recorded no model clears the model rather than keeping the previous leg's. The checkout is taken from the event on purpose: a finished agent's checkout is removed, and the event is the only surviving record of where it lived.
+Nothing is known before the session opening event; a stream without one yields no driver session. The opening gives the checkout [6] the agent ran in and the session link when the opening had a literal one. Each session update then sets the session id and, when it carries one, the link, and keeps the rest. A continuation emits a new session opening, so the checkout is the latest leg's. Which driver [11] and model ran the agent are not derived here: the agent's card names them. The checkout is taken from the event on purpose: a finished agent's checkout is removed, and the event is the only surviving record of where it lived.

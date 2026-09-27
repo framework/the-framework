@@ -39,10 +39,10 @@ describe('agentStatusPill', () => {
     })
   })
 
-  test('publishing… while the daemon marks the ended run publishing, above ready for merge (#1431)', () => {
+  test('saving… while the daemon marks the ended run saving, above ready for merge (#1431)', () => {
     const endedClean = [said, ended({ ok: true })]
-    expect(agentStatusPill(endedClean, card({ publishing: true }))).toMatchObject({ label: 'publishing…' })
-    expect(agentStatusPill(endedClean, card({ publishing: true, pr }))).toMatchObject({ label: 'publishing…' })
+    expect(agentStatusPill(endedClean, card({ saving: true }))).toMatchObject({ label: 'saving…' })
+    expect(agentStatusPill(endedClean, card({ saving: true, pr }))).toMatchObject({ label: 'saving…' })
     expect(agentStatusPill(endedClean, card({ pr }))).toMatchObject({ label: 'ready for merge' })
     expect(agentStatusPill(endedClean, card())).toMatchObject({ label: 'finished' })
   })

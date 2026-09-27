@@ -39,8 +39,6 @@ export function agentErrors(events: readonly FrameworkEvent[]): AgentError[] {
 
 /** The wrapped agent session (#431): its id and a deep link, when one is known. */
 export interface SessionInfo {
-  driver?: string
-  fake?: boolean
   sessionId?: string
   sessionLink?: string
   /**
@@ -51,15 +49,10 @@ export interface SessionInfo {
    * the session lived — and that path is exactly what `claude --resume` needs to find it again.
    */
   workspace?: string
-  /**
-   * The model id the current leg's agent was started with (#1438). Folded per leg like the
-   * driver/workspace: the latest `session` event wins, and a leg that recorded none clears it.
-   */
-  model?: string
 }
 
 /**
- * The session behind the agent (#431): the driver + workspace from the opening `session`
+ * The session behind the agent (#431): the workspace from the opening `session`
  * event, then the id and any deep link from the latest `session-update`. Null before the
  * session opens. The link is what the old dashboard surfaced as "open session".
  */
@@ -68,11 +61,8 @@ export function sessionInfo(events: readonly FrameworkEvent[]): SessionInfo | nu
   for (const event of events) {
     if (event.kind === 'session') {
       info = {
-        driver: event.driver,
-        fake: event.fake,
         workspace: event.workspace,
         ...(event.sessionLink ? { sessionLink: event.sessionLink } : {}),
-        ...(event.model ? { model: event.model } : {}),
       }
     } else if (event.kind === 'session-update') {
       info = { ...(info ?? {}), sessionId: event.sessionId, ...(event.sessionLink ? { sessionLink: event.sessionLink } : {}) }

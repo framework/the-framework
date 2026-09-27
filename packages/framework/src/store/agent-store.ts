@@ -118,11 +118,11 @@ export interface AgentMeta {
   otherHost?: boolean
   /**
    * The run ended clean and its process is still alive on this host: the tool that runs it is
-   * still recording it and pushing its branch, the window every surface says "publishing…" for.
+   * still saving its record and cleaning up its checkout, the window every surface says "saving…" for.
    * Not stored: annotated on the way to the dashboard like {@link otherHost}, since only this
    * machine can ask whether the process is alive.
    */
-  publishing?: boolean
+  saving?: boolean
   /**
    * The loopback port the agent's browser preview is listening on (#813), or absent when the agent
    * has no browser. What lets the daemon proxy the pane: the port is allocated per agent and the

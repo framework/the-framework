@@ -13,7 +13,7 @@ import { CloudMirrorRow, CloudAgentNotice } from './CloudAgentNotice.js'
 import { RemoteAgentNotice } from './RemoteAgentNotice.js'
 import { ChangesSummary, AgentChanges } from './AgentChanges.js'
 import { HandoffActions, HandoffSummary, AgentHandoffDetails } from './AgentHandoff.js'
-import { AgentDetails } from './AgentDetails.js'
+import { AgentDetails, type AgentDetailsCard } from './AgentDetails.js'
 
 // One session's view, whether it is running or finished (#1026).
 //
@@ -49,8 +49,8 @@ export function AgentView({
   events: FrameworkEvent[]
   /** Whether the agent is still running. */
   live: boolean
-  /** What the run's card says, off the runs poll: the status pill's facts the feed cannot carry. Absent until the card is listed. */
-  card?: AgentCardFacts | undefined
+  /** What the run's card says, off the runs poll: the status pill's and the details strip's facts the feed cannot carry. Absent until the card is listed. */
+  card?: (AgentCardFacts & AgentDetailsCard) | undefined
   /** The session's own name — the same label the rail shows (#1030). It leads the action bar as
    * the stable identity, so the branch renaming itself near the end of an agent (#736) reads as a
    * detail changing rather than the whole view changing. */
@@ -106,8 +106,10 @@ export function AgentView({
 
   // What the branch holds (#1023), read once for both the bar and the detail it opens. Read once
   // the agent stops rather than once the process does: while it is still writing to the branch
-  // there is nothing to hand off yet, but a parked session's branch is finished work.
-  const handoff = useAgentHandoff(projectId, agentId, !working)
+  // there is nothing to hand off yet, but a parked session's branch is finished work. Not while
+  // the card says saving either: the checkout is being cleaned up then, and an empty branch is
+  // deleted with it, so an Open PR offered in that window turned into "Branch gone" moments later.
+  const handoff = useAgentHandoff(projectId, agentId, !working && !card?.saving)
   const [changes, setChanges] = useState({ count: 0, added: 0, removed: 0 })
   const [open, setOpen] = useState(false)
   const onChangesSummary = useCallback((count: number, added: number, removed: number) => {
@@ -184,7 +186,7 @@ export function AgentView({
       />
       {/* The always-available session-details strip: agent + spend (#322). Sits above the changes/
           handoff detail, so the disclosure holds the "about this run" facts plus what it touched. */}
-      {open && <AgentDetails events={shown} />}
+      {open && <AgentDetails events={shown} card={card} />}
       {/* What the session has touched, behind the branch row's disclosure. While it runs that is
           its worktree; once it ends, the branch it left behind. The live read needs the run's id:
           without one it falls back to the project root and would report the user's own dirty

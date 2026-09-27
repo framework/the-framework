@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { spawn } from 'node:child_process'
 import { Readable, Writable } from 'node:stream'
-import { runCliSession, type AgentCliParser, type SpawnLike, type SpawnedProcess } from './cli-session.js'
+import { AgentExitError, runCliSession, type AgentCliParser, type SpawnLike, type SpawnedProcess } from './cli-session.js'
 import type { DriverEvent } from './types.js'
 
 test('runCliSession streams the parser events and resolves the final turn', async () => {
@@ -134,4 +134,39 @@ test('runCliSession emits no telemetry when the process closes after an abort', 
   await assert.rejects(promise, /aborted/)
   assert.ok(!events.some(e => e.type === 'error'), 'no error event after abort')
   assert.ok(!events.some(e => e.type === 'result'), 'no result event after abort')
+})
+
+test('a non-zero exit sends the reason as an error event, and fails the turn with the same reason kept apart', async () => {
+  const stdout = Readable.from([])
+  const proc: SpawnedProcess = {
+    stdout,
+    stderr: Readable.from([]),
+    stdin: new Writable({ write: (_c, _e, cb) => cb() }),
+    on(event, listener) {
+      if (event === 'close') stdout.on('end', () => (listener as (c: number | null) => void)(1))
+      return proc
+    },
+    kill: () => undefined,
+  }
+  const events: DriverEvent[] = []
+  const promise = runCliSession({
+    bin: 'agent',
+    args: [],
+    cwd: '/ws',
+    env: {},
+    prompt: 'go',
+    spawn: () => proc,
+    emit: event => events.push(event),
+    signals: [],
+    driver: 'agent',
+    parser: { push: () => [], result: () => ({ text: '' }), failure: () => "You've hit your usage limit." },
+  })
+  await assert.rejects(promise, (err: unknown) => {
+    assert.ok(err instanceof AgentExitError)
+    assert.equal(err.message, "agent exited (1): You've hit your usage limit.")
+    assert.equal(err.exit, 'agent exited (1)')
+    assert.equal(err.reason, "You've hit your usage limit.")
+    return true
+  })
+  assert.deepEqual(events.at(-1), { type: 'error', message: "You've hit your usage limit." })
 })

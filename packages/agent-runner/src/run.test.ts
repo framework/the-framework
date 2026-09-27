@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { appendInbox, FakeDriver, type Driver, type DriverSession, type DriverStartOptions, type FakeDriverSession } from 'agent-driver'
+import { AgentExitError, appendInbox, FakeDriver, type Driver, type DriverSession, type DriverStartOptions, type FakeDriverSession } from 'agent-driver'
 import { worktreePath } from '@gemstack/skill-branches'
 import { findRun } from '@gemstack/skill-logs'
 import { inboxPath, readLiveCard } from './live-card.js'
@@ -645,6 +645,25 @@ test("a checkout whose project tracks its own .gitignore in the live directory k
     const outcome = await runCommand(repo, { prompt: '/work-queue', model: 'opus', driver: new FakeDriver({ turns: [{ text: 'Nothing to do.' }] }), now: () => NOW, gitHost: noGitHost })
     assert.equal(outcome.status, 'done')
     assert.deepEqual(outcome.checkout, { reclaimed: true }, 'the checkout stayed clean: its tracked .gitignore unchanged, the live files ignored')
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test("an agent whose process exits with an error: the ended line says it exited, since the agent's error line already says why", async () => {
+  const repo = await testRepo()
+  try {
+    const exiting: Driver = {
+      id: 'fake',
+      start: async opts => {
+        const session = await new FakeDriver().start(opts)
+        return Object.assign(session, { prompt: async () => Promise.reject(new AgentExitError('codex', 1, "You've hit your usage limit.")) })
+      },
+    }
+    const failed = await runCommand(repo, { prompt: 'say hi', driver: exiting, now: () => NOW, gitHost: noGitHost })
+    assert.equal(failed.status, 'failed')
+    assert.equal(failed.detail, "codex exited (1): You've hit your usage limit.")
+    assert.deepEqual((await readUntimedDiary(repo, failed.id)).at(-1), { kind: 'ended', status: 'failed', detail: 'codex exited (1)' })
   } finally {
     await removeRepo(repo)
   }

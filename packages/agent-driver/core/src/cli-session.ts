@@ -64,6 +64,31 @@ export interface RunCliSessionOptions {
 }
 
 /**
+ * A turn that failed because the coding agent's process exited with an error. The message says it
+ * all, `<driver> exited (<code>): <reason>`, for a caller that only prints it; the parts are kept
+ * apart for a caller that already showed the reason, from the `error` event sent just before, and
+ * wants to say only that the agent exited.
+ */
+export class AgentExitError extends Error {
+  override readonly name = 'AgentExitError'
+  constructor(
+    /** The driver's id, e.g. `"codex"`. */
+    readonly driver: string,
+    /** The exit code, `null` when the process was ended by a signal. */
+    readonly code: number | null,
+    /** What the agent said went wrong: the same text as the `error` event. */
+    readonly reason: string,
+  ) {
+    super(`${driver} exited (${code ?? 'null'}): ${reason}`)
+  }
+
+  /** The failure without the reason: `<driver> exited (<code>)`. */
+  get exit(): string {
+    return `${this.driver} exited (${this.code ?? 'null'})`
+  }
+}
+
+/**
  * Spawn one agent-CLI invocation and resolve with its final turn.
  *
  * Everything here is about the *process*, not the driver: its own process group
@@ -160,7 +185,7 @@ export function runCliSession(opts: RunCliSessionOptions): Promise<DriverTurn> {
       if (code !== 0) {
         const detail = parser.failure?.() || Buffer.concat(stderrChunks).toString('utf8').trim() || turn.text.trim() || `exit code ${code ?? 'null'}`
         opts.emit({ type: 'error', message: detail })
-        finish(() => rejectPromise(new Error(`${agent} exited (${code ?? 'null'}): ${detail}`)))
+        finish(() => rejectPromise(new AgentExitError(agent, code, detail)))
         return
       }
       opts.emit({

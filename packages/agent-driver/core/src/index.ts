@@ -25,6 +25,7 @@ export { FakeDriver, FakeDriverSession, type FakeTurn, type FakeDriverOptions } 
 export { makeEmit, combineFraming, combineSignals, readWorkspaceFile, oneLine } from './session-support.js'
 export {
   runCliSession,
+  AgentExitError,
   type AgentCliParser,
   type RunCliSessionOptions,
   type SpawnLike,

@@ -23,12 +23,12 @@ const ANSWER = JSON.stringify({
   },
 })
 
-test('parseInitializeLine reads the models in the CLI\'s order, leaving out "default"', () => {
+test('parseInitializeLine reads the models in the CLI\'s order, leaving out "default", each alias with the full id it runs', () => {
   assert.deepEqual(parseInitializeLine(ANSWER), {
     models: [
-      { id: 'opus', name: 'Opus 5.5' },
+      { id: 'opus', name: 'Opus 5.5', resolvedId: 'claude-opus-5-5' },
       { id: 'claude-fable-5-1', name: 'Fable 5.1' },
-      { id: 'haiku', name: 'Haiku 4.5' },
+      { id: 'haiku', name: 'Haiku 4.5', resolvedId: 'claude-haiku-4-5-20251001' },
     ],
   })
 })

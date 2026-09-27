@@ -69,6 +69,7 @@ function committingDriver(): Driver {
       const fake = await new FakeDriver({
         respond: () => ({ text: 'Fixed it and committed.', usage: { costUsd: 0.5, inputTokens: 10, outputTokens: 5, cacheReadTokens: 0, cacheCreationTokens: 0 } }),
         sessionId: 's-1',
+        model: 'claude-opus-5-5',
       }).start(opts)
       return wrap(fake, async () => {
         await git(['config', 'user.email', 'agent@example.com'], opts.cwd)
@@ -113,6 +114,7 @@ test('a run: marker, checkout, the live card, the prompt once, the record, the c
     assert.equal(seen.cwd, worktreePath(repo, outcome.id))
     assert.equal(card['status'], 'running')
     assert.equal(card['intent'], '/work-queue')
+    assert.equal(card['model'], 'opus', 'before the agent has run, the card holds the model it was given')
     assert.equal(card['branch'], 'agent-2026-09-16T14-01-00-000Z')
     assert.deepEqual(card['caller'], { runner: { host: 'this-box', pid: 4242 }, pid: 4242, host: 'this-box', kind: 'prompt', workspace: seen.cwd })
 
@@ -124,7 +126,7 @@ test('a run: marker, checkout, the live card, the prompt once, the record, the c
     assert.equal(recorded?.branch, 'agent-fix-it')
     assert.deepEqual(recorded?.pr, { number: 12, url: 'https://example.com/x/y/pull/12' })
     assert.equal(recorded?.cost, 0.5)
-    assert.equal(recorded?.model, 'opus')
+    assert.equal(recorded?.model, 'claude-opus-5-5', 'the record names the model the agent ran, not the alias it was given')
     assert.equal(recorded?.driver, 'fake')
     assert.equal(recorded?.caller?.['sessionId'], 's-1')
     assert.deepEqual(recorded?.caller?.['runner'], { host: 'this-box', pid: 4242 })

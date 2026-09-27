@@ -9,7 +9,7 @@ Fixes the vocabulary of the driver [1] contract, in words: what every driver pro
 [1] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later. The user's driver choice is `claude` or `codex`; the driver implementations are `claude-code`, `codex`, `github-actions`, `claude-web` and `fake`.
 [2] driver session: the coding agent's own conversation for one agent, which the driver can resume by its session id.
 [3] turn: one prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
-[4] progress event: what a driver reports while a turn runs, for a caller to show and never to decide on: the prompt sent, the session id, streamed text, a tool used, the final result, a rate limit reading, an error, a notice, a question.
+[4] progress event: what a driver reports while a turn runs, for a caller to show and never to decide on: the prompt sent, the session id, the model the turn runs on, streamed text, a tool used, the final result, a rate limit reading, an error, a notice, a question.
 [5] usage: what one turn spent, as the coding agent reports it: token counts, and a notional price in US dollars when the coding agent prices its turns.
 [6] rate limit: the coding agent's per-turn reading of whether the account may still spend against one quota window, and when that window resets.
 [7] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
@@ -27,12 +27,12 @@ Fixes the vocabulary of the driver [1] contract, in words: what every driver pro
 
 ## Business logic — TL;DR
 
-- **What a driver promises** - a stable implementation id, a way to start a driver session [2] bound to a directory, optionally a way to read the account's quota [7], and optionally a way to list the models the coding agent [8] offers, each as the id a driver session takes and the name the coding agent shows.
+- **What a driver promises** - a stable implementation id, a way to start a driver session [2] bound to a directory, optionally a way to read the account's quota [7], and optionally a way to list the models the coding agent [8] offers, each as the id a driver session takes, the name the coding agent shows and, for an alias, the full id it runs today.
 - **The personal setup, one vocabulary for every adapter** - the three parts of the personal setup [18], each on or off; every adapter takes the same three and turns each off with its own switches, says in its readiness check a part it cannot turn off, and loads everything when given none.
 - **How a driver session is started** - with the directory the coding agent [8] reads and edits, the framing [10] every turn [3] carries, the model to pass through, a stop request [11] for the whole driver session, optionally the session id of an earlier driver session to continue, optionally a log (a directory and the card to start it with, exposed on the driver session for the caller to patch, end and reopen), and a listener for progress events [4] that can never break the coding agent.
 - **One turn, one final message** - a prompt goes in with optional extra framing, a stop request for this turn only, a best-effort request to continue the previous turn and optionally an inbox path, whose waiting lines become further turns before the prompt resolves; the final message, the session id and the usage [5] of the last turn come out.
 - **Reading code and ending the driver session** - a driver [1] may let the caller read a file the coding agent produced; ending the driver session frees what it holds and may be repeated safely.
-- **Progress events are shown, never decided on** - ten kinds of progress event, each with what it carries, none of which a caller may gate on; one is the question a turn ended on, parsed.
+- **Progress events are shown, never decided on** - eleven kinds of progress event, each with what it carries, none of which a caller may gate on; one is the question a turn ended on, parsed.
 - **Usage: what one turn spent** - token counts always, a price only when the coding agent prices its turns and never as zero.
 - **Rate limit: the per-turn traffic light** - whether the account may still spend against one window and when it resets, with unknown statuses and windows passed through rather than dropped.
 - **Quota: the share of each window used** - a reading is either available with its windows or unavailable with a reason, never an empty list that reads as nothing used.
@@ -51,7 +51,7 @@ See `## Context`.
 
 A driver [1] has a stable implementation id (see "The implementation ids") and can start a driver session [2] bound to a directory. It may also read where the account's quota [7] stands; that reading is account-wide and independent of any driver session, and an implementation that cannot report a quota omits the ability entirely rather than answering with a made-up number. Of the five implementations only `claude-code` reads a quota.
 
-A driver may also list the models its coding agent [8] offers, in the coding agent's own order: the same list its own model picker shows the person, for their login. Each model is the id a driver session is started with to run it (such as `opus` or `gpt-5.6-terra`) and its name as the coding agent shows it (such as "Opus 5.5"). Like the quota, the list is account-wide, needs no driver session and costs no prompt; when the coding agent cannot say, the list fails with the reason in words, and an implementation that cannot list its models omits the ability. Of the five implementations `claude-code` and `codex` list their models.
+A driver may also list the models its coding agent [8] offers, in the coding agent's own order: the same list its own model picker shows the person, for their login. Each model is the id a driver session is started with to run it (such as `opus` or `gpt-5.6-terra`), its name as the coding agent shows it (such as "Opus 5.5") and, when the id is an alias, the full id it runs today (`claude-opus-5-5`), the one a `model` progress event names, so a caller finds a run's model in the list by either. Like the quota, the list is account-wide, needs no driver session and costs no prompt; when the coding agent cannot say, the list fails with the reason in words, and an implementation that cannot list its models omits the ability. Of the five implementations `claude-code` and `codex` list their models.
 
 ### The personal setup, one vocabulary for every adapter
 
@@ -120,10 +120,11 @@ Ending a driver session frees whatever the driver holds for it, the coding agent
 
 #### Business logic
 
-A driver [1] reports progress events [4] of ten kinds, for a caller to show but never to gate on:
+A driver [1] reports progress events [4] of eleven kinds, for a caller to show but never to gate on:
 
 - `start`: a prompt was sent and the coding agent's [8] loop is starting; carries the prompt.
 - `session`: the coding agent announced its session id at the start of the turn [3]. The final result repeats it, but a turn that never settles, because the user stopped it, it failed, or its process died, would otherwise take the id down with it, and with it the handle to resume the driver session [2]. A caller records this one rather than showing it: the id is plumbing, not conversation.
+- `model`: the model the turn runs on, as the coding agent names it once it has started: its full id (`claude-opus-5-5` for the alias `opus`, or for no model picked at all). An alias moves to newer models over time; the full id does not, so a record that keeps it still says which model ran. A driver whose coding agent does not say omits it. A caller records this one rather than showing it, like the session id.
 - `text`: a chunk of the coding agent's own text.
 - `action`: the coding agent used a tool; the tool's name, and its detail when it has one: the one argument that says what the call did (the command, the file, the URL, the skill), on one line and cut short.
 - `thought`: what the coding agent thought before it acted, as its CLI summarizes it.

@@ -4,7 +4,7 @@ import type { FrameworkEvent } from '../../src/index.js'
 import { AgentDetails } from './AgentDetails.js'
 
 const onModels = vi.hoisted(() =>
-  vi.fn(async () => ({ 'claude-code': { models: [{ id: 'opus', name: 'Opus 5.5' }] }, codex: { models: [] } })),
+  vi.fn(async () => ({ 'claude-code': { models: [{ id: 'opus', name: 'Opus 5.5', resolvedId: 'claude-opus-5-5' }] }, codex: { models: [] } })),
 )
 vi.mock('../rpc/models.js', () => ({ onModels }))
 
@@ -34,6 +34,10 @@ describe('AgentDetails', () => {
   test('the agent and model come off the run\'s card, each by the name a person knows it by', async () => {
     render(<AgentDetails events={[]} card={{ driver: 'claude-code', model: 'opus' }} />)
     expect(shown('Agent')).toBe('Claude Code')
+    await waitFor(() => expect(shown('Model')).toBe('Opus 5.5'))
+    cleanup()
+    // What a run's card holds once Claude Code named the model it ran.
+    render(<AgentDetails events={[]} card={{ driver: 'claude-code', model: 'claude-opus-5-5' }} />)
     await waitFor(() => expect(shown('Model')).toBe('Opus 5.5'))
     cleanup()
     render(<AgentDetails events={[]} card={{ driver: 'codex' }} />)

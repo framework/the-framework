@@ -62,6 +62,11 @@ export interface DriverModel {
   id: string
   /** Its name as the agent shows it, e.g. `Opus 5.5`. */
   name: string
+  /**
+   * The full id it runs today, when {@link id} is an alias: `claude-opus-5-5` for `opus`. The
+   * id a run's {@link DriverEvent} `model` names, so a reader finds the entry by either.
+   */
+  resolvedId?: string
 }
 
 /** The parts of the person's own setup a coding agent can load, by the names every adapter takes. */
@@ -315,6 +320,12 @@ export type DriverEvent =
    * than showing it: the id is plumbing, not conversation.
    */
   | { type: 'session'; sessionId: string }
+  /**
+   * The model the turn runs on, as the agent's CLI names it once it has started: its full id
+   * (`claude-opus-5-5` for `opus`, or for no model picked), so a run says which model ran even
+   * after the alias moves on. A driver whose CLI does not say omits it.
+   */
+  | { type: 'model'; model: string }
   /** An assistant text chunk streamed out. */
   | { type: 'text'; text: string }
   /**

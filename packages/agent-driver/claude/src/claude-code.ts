@@ -305,6 +305,11 @@ export class StreamJsonParser {
       announced.push({ type: 'session', sessionId: this.sessionId })
     }
     const type = obj['type']
+    // The CLI's first line names the model it resolved the pick to (`claude-opus-5-5` for `opus`),
+    // or the one it chose when none was picked: what the turn runs on, said before it runs.
+    if (type === 'system' && obj['subtype'] === 'init' && typeof obj['model'] === 'string' && obj['model'] !== '') {
+      announced.push({ type: 'model', model: obj['model'] })
+    }
 
     if (type === 'assistant') return [...announced, ...this.handleAssistant(obj)]
     if (type === 'rate_limit_event') {

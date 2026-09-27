@@ -125,6 +125,37 @@ test('StreamJsonParser announces the session id once, re-announcing only a chang
   assert.deepEqual(p.push(JSON.stringify({ type: 'system', subtype: 'other', session_id: 'b' })), [{ type: 'session', sessionId: 'b' }])
 })
 
+test('StreamJsonParser announces the model the CLI says the turn runs on, off its first line', () => {
+  const p = new StreamJsonParser()
+  assert.deepEqual(p.push(JSON.stringify({ type: 'system', subtype: 'init', session_id: 'a', model: 'claude-opus-5-5' })), [
+    { type: 'session', sessionId: 'a' },
+    { type: 'model', model: 'claude-opus-5-5' },
+  ])
+  // Only the init line says it; another line naming a model is not the turn's.
+  assert.deepEqual(p.push(JSON.stringify({ type: 'system', subtype: 'other', session_id: 'a', model: 'x' })), [])
+})
+
+test('a logged session\'s card names the model Claude Code ran, not the alias it was given; the diary has no line for it', async () => {
+  const { mkdtemp, readFile, rm } = await import('node:fs/promises')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const dir = await mkdtemp(join(tmpdir(), 'claude-model-card-'))
+  try {
+    const spawn: SpawnLike = fakeSpawn([
+      JSON.stringify({ type: 'system', subtype: 'init', session_id: 's1', model: 'claude-opus-5-5' }),
+      JSON.stringify({ type: 'result', result: 'ok', session_id: 's1' }),
+    ])
+    const session = await new ClaudeCodeDriver({ spawn }).start({ cwd: dir, model: 'opus', log: { dir, card: { id: 'r1', model: 'opus' } } })
+    await session.prompt('go')
+    await session.log!.settled()
+    assert.equal(JSON.parse(await readFile(join(dir, 'r1.json'), 'utf8')).model, 'claude-opus-5-5')
+    const kinds = (await readFile(join(dir, 'r1.jsonl'), 'utf8')).trim().split('\n').map(line => JSON.parse(line).kind)
+    assert.ok(!kinds.includes('model'), kinds.join(' '))
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
 test('StreamJsonParser ignores non-JSON noise and falls back to assistant text', () => {
   const p = new StreamJsonParser()
   assert.deepEqual(p.push('some banner line'), [])

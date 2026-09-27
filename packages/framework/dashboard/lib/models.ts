@@ -10,11 +10,12 @@ export function useModels(): ModelsView | undefined {
 }
 
 /**
- * A model's name as its agent shows it ("Opus 5.5" for `opus`). A model the agent does not list,
- * or a list not answered yet, is named by the id itself: that is what the run was given.
+ * A model's name as its agent shows it ("Opus 5.5" for `opus`, and for `claude-opus-5-5`, the full
+ * id `opus` runs today). A model the agent does not list, or a list not answered yet, is named by
+ * the id itself: that is what the run was given or ran.
  */
 export function modelName(models: DriverModels | undefined, id: string): string {
-  return models?.models.find(m => m.id === id)?.name ?? id
+  return (models?.models.find(m => m.id === id) ?? models?.models.find(m => m.resolvedId === id))?.name ?? id
 }
 
 export type { DriverModels, ModelsView }

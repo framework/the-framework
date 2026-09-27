@@ -61,9 +61,9 @@ function runsDir(checkout: string): string {
   return join(checkout, RUNS_DIR)
 }
 
-/** The persistent checkout's runs directory under a project. */
-export function runsPath(root: string): string {
-  return runsDir(fileBranchPath(root, DATA_BRANCH))
+/** The persistent checkout's runs directory, from anywhere in the project's clone. */
+export async function runsPath(root: string, git: GitRunner = nodeGitRunner()): Promise<string> {
+  return runsDir(await fileBranchPath(root, DATA_BRANCH, git))
 }
 
 /** The card and diary paths of one run inside a checkout, searched across every person's directory; `undefined` when it is nowhere. */
@@ -85,7 +85,7 @@ async function locate(checkout: string, id: string, r: Pick<LogsFiles, 'list'>):
  */
 export async function listRuns(root: string, opts: { since?: number } = {}, deps: LogsDeps = {}): Promise<RunCard[]> {
   const r = resolveLogsDeps(deps)
-  const dir = runsPath(root)
+  const dir = await runsPath(root, r.git)
   const cards: RunCard[] = []
   for (const person of await r.list(dir)) {
     for (const name of await r.list(join(dir, person))) {
@@ -101,7 +101,8 @@ export async function listRuns(root: string, opts: { since?: number } = {}, deps
 
 /** Where one run's two files sit on the persistent checkout, or `undefined` when the run is not there. */
 export async function runFiles(root: string, id: string, deps: LogsDeps = {}): Promise<{ card: string; diary: string } | undefined> {
-  return locate(fileBranchPath(root, DATA_BRANCH), id, resolveLogsDeps(deps))
+  const r = resolveLogsDeps(deps)
+  return locate(await fileBranchPath(root, DATA_BRANCH, r.git), id, r)
 }
 
 /** One run's card, or `undefined` when there is no such run or its card does not parse. */

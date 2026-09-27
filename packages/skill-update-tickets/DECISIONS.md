@@ -30,7 +30,8 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   again.
 - The project's schedule starts `update-tickets` only when an issue changed since the last
   import, or a pull request merged since then has a line `Closes tickets/` followed by a
-  file name. Picked over starting it on any merged pull request, which ran the job about
+  file name, or when no import time is recorded and there are no tickets: a first import.
+  Picked over starting it on any merged pull request, which ran the job about
   forty times a week to change nothing.
 - An open issue with no ticket gets one only when it was opened or reopened since the last
   import. Picked over giving one to every changed open issue with no ticket, which brings

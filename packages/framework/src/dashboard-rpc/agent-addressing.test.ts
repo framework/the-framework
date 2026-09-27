@@ -364,7 +364,7 @@ test('a resumed run reads as running, not as its recorded first leg (#768)', asy
   const ctx = await projectWithWorktreeAgent() // its checkout's card says `running`
   try {
     // Its first leg was recorded on the data branch when it ended.
-    const recorded = join(fileBranchPath(ctx.dir, DATA_BRANCH), 'agents', 'someone@example.com')
+    const recorded = join(await fileBranchPath(ctx.dir, DATA_BRANCH), 'agents', 'someone@example.com')
     await mkdir(recorded, { recursive: true })
     await writeFile(join(recorded, `${ctx.agentId}.json`), JSON.stringify({ id: ctx.agentId, startedAt: '2026-07-19T10:00:00.000Z', status: 'waiting' }))
     const agents = (await onAgents(ctx.projectId)) as { id: string; status: string }[]

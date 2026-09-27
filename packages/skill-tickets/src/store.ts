@@ -1,19 +1,19 @@
-import { join } from 'node:path'
-import { BRANCHES_DIR, DATA_BRANCH, excludeFromGit, fileBranchPath, nodeBranchFileFs, nodeGitRunner, pullFileBranch, withFileBranch, type BranchFileFs, type CommitMessage, type FileBranchSync, type FileBranchWrite, type GitRunner } from '@gemstack/agent-data'
+import { join, relative } from 'node:path'
+import { DATA_BRANCH, excludeFromGit, fileBranchPath, nodeBranchFileFs, nodeGitRunner, pullFileBranch, withFileBranch, type BranchFileFs, type CommitMessage, type FileBranchSync, type FileBranchWrite, type GitRunner } from '@gemstack/agent-data'
 import { TICKETS_DIR } from './names.js'
 
 // Where the tickets live, bound to the branch: the `agent-data` branch of the project's repository,
 // checked out under `.branches/agent-data` for a long-lived process, with a `tickets` link at the
 // repository root so the roadmap is one listing away for a person.
 
-/** The branch's persistent checkout under a project: `<root>/.branches/agent-data`. */
-export function ticketsCheckoutPath(root: string): string {
-  return fileBranchPath(root, DATA_BRANCH)
+/** The branch's persistent checkout, from anywhere in the project's clone: `<clone>/.branches/agent-data`. */
+export function ticketsCheckoutPath(root: string, git: GitRunner = nodeGitRunner()): Promise<string> {
+  return fileBranchPath(root, DATA_BRANCH, git)
 }
 
-/** The `tickets/` directory inside the persistent checkout: `<root>/.branches/agent-data/tickets`. */
-export function ticketsDir(root: string): string {
-  return join(ticketsCheckoutPath(root), TICKETS_DIR)
+/** The `tickets/` directory inside the persistent checkout: `<clone>/.branches/agent-data/tickets`. */
+export async function ticketsDir(root: string, git: GitRunner = nodeGitRunner()): Promise<string> {
+  return join(await ticketsCheckoutPath(root, git), TICKETS_DIR)
 }
 
 /** The plain-file seams an operation on the branch's files needs. */
@@ -85,7 +85,7 @@ export async function syncTickets(
   const linkFs = deps.linkFs ?? nodeLinkFs()
   const rootLink = join(root, TICKETS_DIR)
   if (!(await linkFs.lexists(rootLink))) {
-    await linkFs.symlink(join(BRANCHES_DIR, DATA_BRANCH, TICKETS_DIR), rootLink).catch(() => {})
+    await linkFs.symlink(relative(root, await ticketsDir(root, git)), rootLink).catch(() => {})
     await excludeFromGit(root, '/' + TICKETS_DIR, undefined, git).catch(() => {})
     await excludeFromGit(root, '!/' + TICKETS_DIR + '/', undefined, git).catch(() => {})
   }

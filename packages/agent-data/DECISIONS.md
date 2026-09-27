@@ -15,6 +15,8 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   `.branches/<branch>`: the agents' own (made by other packages) and the data branch's
   (made here). The directory name is exported. Dotted so a `*` glob skips it: each
   checkout is a full copy, so a tool that descends does N times the work.
+- A branch's persistent checkout is one per clone, in the clone's own directory, whichever
+  worktree asks. Picked over one per worktree, which git refuses.
 - `.branches/` is hidden through the common git dir's `info/exclude`, never a committed
   `.gitignore`: the library must not touch tracked files; a per-worktree `info/exclude` is
   never read, and one line there, written once, covers every checkout. Best-effort: the

@@ -8,6 +8,8 @@ vi.mock('../rpc/reads.js', () => ({ onProjectFileStatus, onAgentTree }))
 const { FileTree } = await import('./FileTree.js')
 
 const noop = () => {}
+/** A folder's clickable row (its name shows twice: the closed and the open icon's row). */
+const folder = (name: string) => screen.getAllByText(name)[0]!.closest('summary')!
 const files = ['src/app.ts', 'README.md']
 
 beforeEach(() => {
@@ -53,7 +55,8 @@ describe('FileTree (#815)', () => {
     })
     render(<FileTree projectId="p1" agentId="run-1" files={files} selected={new Set()} onToggle={noop} />)
     await waitFor(() => expect(screen.getByLabelText('modified, not committed')).toBeTruthy())
-    expect(screen.getByLabelText('added, committed').textContent).toBe('A')
+    fireEvent.click(folder('src'))
+    await waitFor(() => expect(screen.getByLabelText('added, committed').textContent).toBe('A'))
     expect(screen.getByText('From the run’s checkout')).toBeTruthy()
   })
 
@@ -80,6 +83,20 @@ describe('FileTree (#815)', () => {
     render(<FileTree projectId="p1" agentId="run-1" files={files} selected={new Set()} onToggle={noop} />)
     await waitFor(() => expect(screen.getByText(/This run’s changes are gone from this machine/)).toBeTruthy())
     expect(screen.queryByText('README.md')).toBeNull()
+  })
+
+  test('a folder’s contents are built only while it is open', async () => {
+    // A repository's whole tree was ~18,000 page elements, closed folders included: the tab was
+    // slow to open and every re-render of the page walked all of it.
+    render(<FileTree projectId="p1" files={['src/app.ts', 'src/lib/util.ts']} selected={new Set()} onToggle={noop} />)
+    expect(folder('src')).toBeTruthy()
+    expect(screen.queryByText('app.ts')).toBeNull()
+    expect(screen.queryByText('lib')).toBeNull()
+    fireEvent.click(folder('src'))
+    await waitFor(() => expect(screen.getByText('app.ts')).toBeTruthy())
+    expect(screen.queryByText('util.ts')).toBeNull()
+    fireEvent.click(folder('src'))
+    await waitFor(() => expect(screen.queryByText('app.ts')).toBeNull())
   })
 
   test('clicking a file ticks it into the Context; a picked file shows ticked', async () => {

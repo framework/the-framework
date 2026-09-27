@@ -56,6 +56,37 @@ function Row({ icon: Icon, gitStatus, mark, className, children }: {
   )
 }
 
+/**
+ * A folder row. Its contents are built only while it is open: a closed folder costs one row however
+ * much lies under it, so the tab opens as fast on a large repository as on a small one, and a
+ * re-render of the page does not walk every file of the repository.
+ */
+function Folder({ name, gitStatus, children }: {
+  name: string
+  gitStatus?: FileGitStatus | undefined
+  children: () => ReactNode
+}) {
+  const [open, setOpen] = useState(false)
+  return (
+    <details className="group" onToggle={e => setOpen(e.currentTarget.open)}>
+      <summary className="cursor-pointer list-none rounded-lg hover:bg-accent">
+        <Row icon={FolderIcon} gitStatus={gitStatus} className="group-open:hidden">
+          {name}
+        </Row>
+        <Row icon={FolderOpenIcon} gitStatus={gitStatus} className="hidden group-open:flex">
+          {name}
+        </Row>
+      </summary>
+      {/* The guide line down the left of a folder's contents. */}
+      {open && (
+        <div className="relative ml-6 before:absolute before:inset-y-0 before:-left-2 before:h-full before:w-px before:bg-border">
+          {children()}
+        </div>
+      )}
+    </details>
+  )
+}
+
 /** Stable, so the `useMemo` on the marks doesn't re-run for a fresh empty object. */
 const EMPTY_STATUS: Record<string, FileMark['status']> = {}
 
@@ -76,7 +107,7 @@ function sourceCaption(tree: AgentTree): string | undefined {
 // not an editor: hovering a file previews it. With no files, it renders nothing.
 //
 // Folders are native `<details>`: open/closed state, keyboard operation and the disclosure
-// semantics come from the browser. This used to be 1,225 lines of vendored animate-ui — a copied
+// semantics come from the browser; a folder's contents exist only while it is open (see Folder). This used to be 1,225 lines of vendored animate-ui — a copied
 // component registry, not a dependency, and `@ts-nocheck`'d so none of it was even typechecked —
 // whose contribution was an expand animation and a hover highlight on a file list in a side panel.
 
@@ -186,20 +217,9 @@ export function FileTree({
       {[...node.dirs.values()].sort(byName).map(dir => {
         const dirGit = folderStatus.get(dir.path)
         return (
-          <details key={dir.path} className="group">
-            <summary className="cursor-pointer list-none rounded-lg hover:bg-accent">
-              <Row icon={FolderIcon} gitStatus={dirGit} className="group-open:hidden">
-                {dir.name}
-              </Row>
-              <Row icon={FolderOpenIcon} gitStatus={dirGit} className="hidden group-open:flex">
-                {dir.name}
-              </Row>
-            </summary>
-            {/* The guide line down the left of a folder's contents. */}
-            <div className="relative ml-6 before:absolute before:inset-y-0 before:-left-2 before:h-full before:w-px before:bg-border">
-              {renderNode(dir)}
-            </div>
-          </details>
+          <Folder key={dir.path} name={dir.name} gitStatus={dirGit}>
+            {() => renderNode(dir)}
+          </Folder>
         )
       })}
       {[...node.files]

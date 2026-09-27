@@ -1,0 +1,13 @@
+{
+  "id": "2026-09-27T14-51-21-834Z",
+  "startedAt": "2026-09-27T14:51:21.846Z",
+  "status": "running",
+  "intent": "Read packages/framework/package.json and tell me the package's name and how many scripts it has.",
+  "driver": "claude-code",
+  "model": "opus",
+  "caller": {
+    "runner": {
+      "host": "Suleimans-MacBook-Pro.local"
+    }
+  }
+}

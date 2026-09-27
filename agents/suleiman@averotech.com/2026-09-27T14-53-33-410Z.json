@@ -1,0 +1,13 @@
+{
+  "id": "2026-09-27T14-53-33-410Z",
+  "startedAt": "2026-09-27T14:53:33.423Z",
+  "status": "running",
+  "intent": "http://127.0.0.1:4200/gemstack-st99l0/2026-09-27T14-52-15-315Z",
+  "driver": "codex",
+  "model": "gpt-5",
+  "caller": {
+    "runner": {
+      "host": "Suleimans-MacBook-Pro.local"
+    }
+  }
+}

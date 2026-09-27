@@ -31,7 +31,7 @@ export function AgentActionBar({
   /** Which run Stop addresses (#749). */
   agentId?: string | null | undefined
   events: FrameworkEvent[]
-  /** What the run's card says, for the status pill: its status, its pull request, whether it is publishing. */
+  /** What the run's card says, for the status pill: its status, its pull request, whether it is saving. */
   card?: AgentCardFacts | undefined
   /** The session's name — leads the bar, so the branch is git context, not the identity (#1030). */
   label?: string | undefined
@@ -54,7 +54,7 @@ export function AgentActionBar({
 }) {
   // What state the session is in, said once, here: it used to be a banner over the feed, which
   // spent a full row on one word and pushed the output down. Ranked in agentStatusPill, so exactly
-  // one of failed / stopped / waiting for an answer / publishing… / ready for merge / building… /
+  // one of failed / stopped / waiting for an answer / saving… / ready for merge / building… /
   // finished is ever shown.
   const status = agentStatusPill(events, card)
   return (

@@ -26,6 +26,22 @@ describe('AgentDetails', () => {
     expect(screen.queryByText(/No spend reported yet/)).toBeNull()
   })
 
+  test('the agent and model come off the run\'s card, the agent by the name a person picked it by', () => {
+    render(<AgentDetails events={[]} card={{ driver: 'claude-code', model: 'opus' }} />)
+    expect(shown('Agent')).toBe('Claude Code')
+    expect(shown('Model')).toBe('opus')
+    cleanup()
+    render(<AgentDetails events={[]} card={{ driver: 'codex' }} />)
+    expect(shown('Agent')).toBe('Codex')
+    expect(screen.queryByText('Model')).toBeNull()
+  })
+
+  test('before the card is listed, no agent or model is named', () => {
+    render(<AgentDetails events={[]} />)
+    expect(screen.queryByText('Agent')).toBeNull()
+    expect(screen.queryByText('Model')).toBeNull()
+  })
+
   test('an answered turn without a price shows the turn alone', () => {
     render(<AgentDetails events={[answered]} />)
     expect(screen.queryByText('Spent')).toBeNull()

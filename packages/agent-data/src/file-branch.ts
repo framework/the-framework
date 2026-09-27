@@ -30,9 +30,24 @@ function checkoutPath(home: string, branch: string): string {
   return join(home, BRANCHES_DIR, branch)
 }
 
-/** The clone's own directory, or `cwd` itself when git cannot say (not a repo). */
-async function cloneHome(cwd: string, git: GitRunner): Promise<string> {
-  return (await fileBranchRepo(cwd, git)) ?? cwd
+/**
+ * The clone's own directory, or `cwd` itself when git cannot say (not a repo). Asked of git once
+ * per `cwd`: every call from one `cwd` waits on the same answer and goes on in the order it was
+ * made, so writes join the one-at-a-time order in the order they were requested. An answer that
+ * fell back to `cwd` is not kept, since the directory may become a repository later.
+ */
+const homes = new Map<string, Promise<string>>()
+
+function cloneHome(cwd: string, git: GitRunner): Promise<string> {
+  let home = homes.get(cwd)
+  if (!home) {
+    home = fileBranchRepo(cwd, git).then(found => {
+      if (found === undefined) homes.delete(cwd)
+      return found ?? cwd
+    })
+    homes.set(cwd, home)
+  }
+  return home
 }
 
 /**

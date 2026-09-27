@@ -154,6 +154,18 @@ describe('the bar shows its facts together (run switch)', () => {
     await waitFor(() => expect(screen.getByTestId('bar-ready').textContent).toBe('true'))
   })
 
+  test("the bar waits for the branch's pull request lookup too, so its facts land in one step", async () => {
+    onAgent.mockResolvedValue(ARCHIVED)
+    onAgentHandoff.mockResolvedValueOnce({ branch: 'b', exists: false, commits: [], files: [], prPending: true })
+    onAgentHandoff.mockResolvedValue({ branch: 'b', exists: false, commits: [], files: [] })
+    render(view())
+    await waitFor(() => expect(onAgentHandoff).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(screen.getByText(/the archive delivered this line/)).toBeTruthy())
+    expect(screen.getByTestId('bar-ready').textContent).toBe('false')
+    await waitFor(() => expect(screen.getByTestId('bar-ready').textContent).toBe('true'))
+    expect(onAgentHandoff).toHaveBeenCalledTimes(2)
+  })
+
   test('a read that never answers holds the bar back one second, no longer', async () => {
     onAgent.mockReturnValue(new Promise(() => {}))
     render(view())

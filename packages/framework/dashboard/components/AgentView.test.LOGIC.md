@@ -18,3 +18,4 @@ And when the action bar is told its facts are ready:
 - **A running agent at once** - a running agent's bar is ready from the first frame.
 
 The rules for when a resume is offered belong to the composer and are covered by its own tests; the view only hands it how the agent ended.
+- **The pull request lookup is waited for** - while the branch's read says its pull request lookup is still out, the bar is not ready; once the next read has the answer, it is.

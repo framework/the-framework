@@ -113,7 +113,7 @@ The feed and the composer [5] are told the agent [1] is live when either the dae
 The bar is told its facts are ready when any of these holds:
 
 - the agent [1] is working: its live event stream is its record, nothing more to wait for;
-- its archive [8] has answered, and so has the read of what its branch holds, unless its card [3] is marked saving, when that read is not made;
+- its archive [8] has answered, and so has the read of what its branch holds, including its pull request lookup (while the daemon reports that lookup as still out, the bar would offer nothing, so the facts wait for it rather than land in two steps), unless its card [3] is marked saving, when that read is not made;
 - one second has passed since this agent was selected: a read that has not answered by then holds the bar back no longer, and the facts that are in show.
 
 Until then the bar shows the agent's name and project only (see `AgentActionBar.tsx`).

@@ -170,7 +170,10 @@ export function AgentView({
     const timer = setTimeout(() => setWaitedFor(agentId), READY_WAIT_MS)
     return () => clearTimeout(timer)
   }, [agentId])
-  const ready = working || waitedFor === agentId || (archived !== null && (card?.saving === true || handoff.loaded))
+  // The branch's answer counts once its pull request lookup is in too: the bar offers nothing
+  // while it is out, so showing the facts before it would add them in two steps.
+  const branchRead = card?.saving === true || (handoff.loaded && !handoff.handoff?.prPending)
+  const ready = working || waitedFor === agentId || (archived !== null && branchRead)
 
   return (
     <>

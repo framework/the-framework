@@ -398,6 +398,7 @@ export function App() {
           }}
           startTick={agentStart.tick}
           startIntent={agentStart.intent}
+          startId={agentStart.id}
           working={working}
           onDashboard={showDashboard}
           onSelectProject={selectProject}

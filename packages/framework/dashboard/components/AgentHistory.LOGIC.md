@@ -1,4 +1,4 @@
-The dashboard's left column, present on every page: the brand mark, the "New agent" button, the "Overview" destination, one row per page the installed widgets [15] add, the "Projects" destination, the "Recent agents" list, and a footer with the connection indicator, the theme toggle, the notifications menu and "Settings". The list shows a project's own agents [1] when a project is selected, and every project's agents pooled newest-first on the Overview [2]; each row says in one word what its agent is doing, when it started, where it runs and which coding agent [3] runs it, and a stand-in row says "starting…" the instant Start is clicked.
+The dashboard's left column, present on every page: the brand mark, the "New agent" button, the "Overview" destination, one row per page the installed widgets [15] add, the "Projects" destination, the "Recent agents" list, and a footer with the connection indicator, the theme toggle, the notifications menu and "Settings". The list shows a project's own agents [1] when a project is selected, and every project's agents pooled newest-first on the Overview [2]; each row says in one word what its agent is doing, when it started, where it runs and which coding agent [3] runs it, and a stand-in row says "starting…" for a just-started agent until its own row lands.
 
 ## Context
 
@@ -27,7 +27,7 @@ The dashboard's left column, present on every page: the brand mark, the "New age
 - **"Overview" and the widgets' pages** - the cross-project destinations, "Overview" carrying the count of items in the "Human Queue", then one row per page a widget [15] adds, labelled by the widget (the tickets' page among them, when a package brings one); only the current view carries the active fill, never two.
 - **"Projects"** - an expandable list of every registered project with a dot saying whether it is activated or in error, the error named on hover, and an "Add project" entry at its end.
 - **Which agents are listed** - a selected project's own agents, or on the Overview every project's recent agents pooled, each row naming its project; "No agents yet." when there is nothing.
-- **The starting row** - a dimmed "starting…" stand-in appears the instant Start is clicked and retires when the real agent lands, whatever its status, or after 20 seconds without one.
+- **The starting row** - a dimmed "starting…" stand-in appears once a start reports its agent's id, unless the list already holds that agent, and retires when that agent lands, whatever its status, or after 20 seconds without it.
 - **Which row is highlighted** - the selected agent's row, or the newest running agent's row while following a just-started agent, or the stand-in while the selected agent's row has not landed; nothing on the Overview.
 - **What a row shows** - one status word with a dot, the project and the relative start time, the agent's title, and a cluster of glyphs for another machine's daemon, a device, a cloud session and the coding agent.
 - **The status word** - "waiting", "in cloud", "merged", "saving…" or the stored status, ranked so a row never says "done" about work still moving and never says "in cloud" about work that landed.
@@ -101,13 +101,13 @@ With a project selected, the list holds that project's own agents [1], in the or
 
 #### Context
 
-**Problem**: an agent's [1] row exists only once the daemon has written its record, which lands a beat after Start is clicked, and the daemon's list of agents is polled every two seconds. Without a stand-in, Start looks like nothing happened; with a careless stand-in, a second agent appears to be starting beside the real one, or "starting…" stays for ever after a start that produced no agent.
+**Problem**: an agent's [1] row exists only once the daemon has written its record, which lands a beat after Start is clicked, and the daemon's list of agents is polled every two seconds. The start itself takes seconds to report the new agent's id, so the list may hold the agent's row before or after that report. Without a stand-in, Start looks like nothing happened; with a careless stand-in, a second agent appears to be starting beside the real one, or "starting…" stays for ever after a start that produced no agent.
 
 #### Business logic
 
-The instant Start is clicked, a dimmed stand-in row is shown at the top of the list: a pulsing dot, the badge "running", the subtitle "starting…", and as its title the prompt the user typed (or "New agent" when there was none). Clicking it goes to the project's launcher [5]. It is shown only within a project, never on the Overview [2], and never while an agent is already running.
+Once the start reports the new agent's id, a dimmed stand-in row is shown at the top of the list: a pulsing dot, the badge "running", the subtitle "starting…", and as its title the prompt the user typed (or "New agent" when there was none). Clicking it goes to the project's launcher [5]. It is shown only within a project, never on the Overview [2], and never while an agent is already running.
 
-The stand-in retires the moment an agent appears in the list that was not in it when Start was clicked, whatever status that agent landed in: an agent that starts and fails inside one polling interval is never once seen running, and it still counts as the handover. An agent that was already listed when Start was clicked never counts. A start that never produces any agent at all is swept after 20 seconds with no running agent, so the column stops pretending; the launcher shows the actual error. Switching project drops the stand-in.
+The stand-in retires the moment the list holds the agent with the id the start reported, whatever status that agent landed in: an agent that starts and fails inside one polling interval is never once seen running, and it still counts as the handover. When the list already holds that agent as the start reports it, no stand-in is shown at all, so the agent never appears twice, running or ended. Any other agent in the list never counts. A start whose agent never appears is swept after 20 seconds with no running agent, so the column stops pretending; the launcher shows the actual error. Switching project drops the stand-in.
 
 ### Which row is highlighted
 

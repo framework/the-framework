@@ -45,8 +45,8 @@ type Row = { key: string; agent: AgentMeta; project?: string; active: boolean; o
 // it sit the recent sessions: a project's own agents when one is selected, and — on the Overview,
 // where no project is — every project's sessions pooled newest-first (`recentAgents`), each row
 // naming its project and jumping into it when selected. `agents`/`recentAgents` are owned by the shell
-// so the rail and the main pane share one list. `startTick`/`startIntent` seed an optimistic
-// "starting…" row the instant Start is clicked, until the run's real card lands.
+// so the rail and the main pane share one list. `startTick`/`startIntent`/`startId` seed an optimistic
+// "starting…" row once a start reports its run, until that run's real card lands.
 export function AgentHistory({
   projectId,
   agents,
@@ -59,6 +59,7 @@ export function AgentHistory({
   onProjectAdded,
   startTick = 0,
   startIntent = '',
+  startId = null,
   working = false,
   onDashboard = () => {},
   onSelectProject = () => {},
@@ -101,29 +102,34 @@ export function AgentHistory({
   onProjectAdded?: () => void
   startTick?: number
   startIntent?: string
+  /** The id the start reported for its run: the row the stand-in waits for. */
+  startId?: string | null
   /** Just started an agent that reported no id, so there is nothing selected to highlight yet (#705):
    *  put the highlight on the running/optimistic row rather than the New row until the shell adopts
    *  the agent's real id. An agent that did report one is selected by URL instead (#784). */
 }) {
-  // The optimistic row, and the agents that already existed when Start was clicked. The two are one
-  // piece of state on purpose: the row stands in for a session that is not in `known` yet, so a
-  // snapshot taken at any other moment would be measuring against the wrong list.
-  const [optimistic, setOptimistic] = useState<{ intent: string; known: ReadonlySet<string> } | null>(null)
+  // The optimistic row, and the id of the run it stands in for.
+  const [optimistic, setOptimistic] = useState<{ intent: string; id: string | null } | null>(null)
 
   useEffect(() => {
-    if (startTick > 0) setOptimistic({ intent: startIntent, known: new Set(agents.map(agent => agent.id)) })
+    if (startTick > 0) setOptimistic({ intent: startIntent, id: startId })
   }, [startTick]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const hasRunning = agents.some(agent => agent.status === 'running')
-  // The handover: the row this one stands in for has landed once an agent appears that was not in the
-  // list when Start was clicked — whatever its status.
+  // The handover: the row this one stands in for has landed once the list holds the run the start
+  // reported — whatever its status.
+  //
+  // Waiting for a run that was not in the list when the start came back was wrong: the start hook
+  // takes seconds, so the list often held the new run already. It counted as an old run, the
+  // stand-in never handed over, and it showed again beside the run's own row once that stopped
+  // running, until the deadline below swept it.
   //
   // Watching `running` alone was too narrow. The agents list polls every 2s, so a session that starts
   // and finishes inside one interval is never once observed running, and the stand-in had nothing to
   // hand over to: it sat beside the finished session's own row, claiming a second session was
   // starting, until the deadline below swept it. That was hard to hit while a broken agent hung as
   // `running` forever; it stopped being hard once such agents began failing in milliseconds.
-  const landed = optimistic !== null && agents.some(agent => !optimistic.known.has(agent.id))
+  const landed = optimistic !== null && agents.some(agent => agent.id === optimistic.id)
   useEffect(() => {
     if (landed) setOptimistic(null)
   }, [landed])

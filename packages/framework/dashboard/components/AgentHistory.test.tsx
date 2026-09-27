@@ -99,7 +99,7 @@ describe('AgentHistory (#785)', () => {
     )
     rerender(
       <SidebarProvider>
-        <AgentHistory projectId="p1" agents={[]} selectedAgentId={null} onSelect={() => {}} startTick={1} startIntent="hi" />
+        <AgentHistory projectId="p1" agents={[]} selectedAgentId={null} onSelect={() => {}} startTick={1} startIntent="hi" startId="run-9" />
       </SidebarProvider>,
     )
     expect([...container.querySelectorAll('button')].some(row => row.textContent?.includes('starting…'))).toBe(true)
@@ -114,6 +114,7 @@ describe('AgentHistory (#785)', () => {
           onSelect={() => {}}
           startTick={1}
           startIntent="hi"
+          startId="run-9"
         />
       </SidebarProvider>,
     )
@@ -131,10 +132,32 @@ describe('AgentHistory (#785)', () => {
     )
     rerender(
       <SidebarProvider>
-        <AgentHistory projectId="p1" agents={[older]} selectedAgentId={null} onSelect={() => {}} startTick={1} startIntent="hi" />
+        <AgentHistory projectId="p1" agents={[older]} selectedAgentId={null} onSelect={() => {}} startTick={1} startIntent="hi" startId="run-new" />
       </SidebarProvider>,
     )
     expect([...container.querySelectorAll('button')].some(row => row.textContent?.includes('starting…'))).toBe(true)
+  })
+
+  test('a run the list already holds when its start comes back gets no starting row, running or ended', () => {
+    // The start hook takes seconds, and the list polls every 2s: the run's own row is often there
+    // before the start reports its id. That row is the run; a stand-in beside it would be a second one.
+    const running = agent({ id: 'run-7', status: 'running', intent: 'hi' })
+    const { container, rerender } = renderRail(
+      <AgentHistory projectId="p1" agents={[running]} selectedAgentId={null} onSelect={() => {}} startTick={0} startIntent="" />,
+    )
+    const standIn = () => [...container.querySelectorAll('button')].some(row => row.textContent?.includes('starting…'))
+    rerender(
+      <SidebarProvider>
+        <AgentHistory projectId="p1" agents={[running]} selectedAgentId="run-7" onSelect={() => {}} startTick={1} startIntent="hi" startId="run-7" />
+      </SidebarProvider>,
+    )
+    expect(standIn()).toBe(false)
+    rerender(
+      <SidebarProvider>
+        <AgentHistory projectId="p1" agents={[{ ...running, status: 'done' }]} selectedAgentId="run-7" onSelect={() => {}} startTick={1} startIntent="hi" startId="run-7" />
+      </SidebarProvider>,
+    )
+    expect(standIn()).toBe(false)
   })
 })
 

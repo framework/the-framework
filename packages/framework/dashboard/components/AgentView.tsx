@@ -50,8 +50,8 @@ export function AgentView({
   agentId: string
   /** The live channel's events for this agent — all there is while it runs. */
   events: FrameworkEvent[]
-  /** Whether the agent is still running. */
-  live: boolean
+  /** Whether the agent is still running; `null` while the daemon's list of agents has not been read, so it is not known yet. */
+  live: boolean | null
   /** What the run's card says, off the runs poll: the status pill's and the details strip's facts the feed cannot carry. Absent until the card is listed. */
   card?: (AgentCardFacts & AgentDetailsCard) | undefined
   /** The session's own name — the same label the rail shows (#1030). It leads the action bar as
@@ -84,7 +84,7 @@ export function AgentView({
   // with the worktree — so without this the PR line waited for a manual refresh.
   const [archiveBehind, setArchiveBehind] = useState(0)
   const archived = useLoaded<FrameworkEvent[] | null>(
-    !live ? () => onAgent(projectId, agentId) : null,
+    live === false ? () => onAgent(projectId, agentId) : null,
     null,
     [projectId, agentId, live, archiveBehind],
     // Going back to an ended run shows its log at once, as last read, while it is read again.
@@ -93,7 +93,7 @@ export function AgentView({
   // Whether this agent kept its worktree (#737): a failed/stopped run does, a clean one had it
   // removed when it finished. Drives the Remove button, and is cleared locally once removed so
   // the button goes without waiting for a refetch.
-  const retained = useLoaded<string[]>(!live ? () => onRetainedWorktrees(projectId) : null, [], [projectId, agentId, live], { remember: `retained:${projectId}` })
+  const retained = useLoaded<string[]>(live === false ? () => onRetainedWorktrees(projectId) : null, [], [projectId, agentId, live], { remember: `retained:${projectId}` })
   const [removed, setRemoved] = useState(false)
   const onWorktreeRemoved = useCallback(() => setRemoved(true), [])
   // The view is mounted un-keyed, so switching agents only swaps props: per-agent latches must
@@ -103,18 +103,19 @@ export function AgentView({
     setRemoved(false)
     setArchiveBehind(0)
   }, [agentId])
-  const hasWorktree = !live && !removed && retained.includes(agentId)
+  const hasWorktree = live === false && !removed && retained.includes(agentId)
 
   // Whether the agent is still working. A run that stops on a question ends `waiting` rather than
-  // staying up, so a live run is a working one.
-  const working = live
+  // staying up, so a live run is a working one. One not known yet is neither working nor ended:
+  // nothing is read for it and the bar waits.
+  const working = live === true
 
   // What the branch holds (#1023), read once for both the bar and the detail it opens. Read once
   // the agent stops rather than once the process does: while it is still writing to the branch
   // there is nothing to hand off yet, but a parked session's branch is finished work. Not while
   // the card says saving either: the checkout is being cleaned up then, and an empty branch is
   // deleted with it, so an Open PR offered in that window turned into "Branch gone" moments later.
-  const handoff = useAgentHandoff(projectId, agentId, !working && !card?.saving)
+  const handoff = useAgentHandoff(projectId, agentId, live === false && !card?.saving)
   const [changes, setChanges] = useState({ count: 0, added: 0, removed: 0 })
   const [open, setOpen] = useState(false)
   const onChangesSummary = useCallback((count: number, added: number, removed: number) => {
@@ -144,21 +145,21 @@ export function AgentView({
   const sameJournal =
     !archived?.length || events.length === 0 || JSON.stringify(events[0]) === JSON.stringify(archived[0])
   const feedAhead = sameJournal && events.length > (archived?.length ?? 0)
-  const shown = live ? events : archived?.length && !feedAhead ? archived : events
+  const shown = working ? events : archived?.length && !feedAhead ? archived : events
   useEffect(() => {
-    if (!live && archived !== null && feedAhead) setArchiveBehind(events.length)
+    if (live === false && archived !== null && feedAhead) setArchiveBehind(events.length)
   }, [live, archived, feedAhead, events.length])
   // Live as the FEED knows it (#1460): the agents poll takes up to 2s to notice a resumed session,
   // but its events are already streaming. The feed's own verdict drives the scroll contract and
   // the composer slot, so the continuation renders (and Stop takes over from Resume) the moment
   // the first event lands rather than when the poll does.
-  const feedLive = live || (feedAhead && isAgentActive(events))
+  const feedLive = working || (feedAhead && isAgentActive(events))
   // How the agent ended (#948) — read once for the composer's note and the Resume offer below.
-  const outcome = live ? undefined : agentOutcome(shown)
+  const outcome = working ? undefined : agentOutcome(shown)
   // Until the handoff has actually loaded, a just-stopped agent keeps showing the file counts it
   // ended with (#1030): the summary swaps once, from the live counts to the handoff, instead of
   // blanking for the beat the handoff read takes.
-  const showHandoff = !working && handoff.loaded
+  const showHandoff = live === false && handoff.loaded
   // Whether this run's own facts are in, so the bar shows them together: its log (for an ended
   // run; a running one streams it) and what its branch holds (when that is read at all). Before
   // then the bar names the run and nothing else, never facts left from the run before. A run
@@ -174,6 +175,18 @@ export function AgentView({
   // while it is out, so showing the facts before it would add them in two steps.
   const branchRead = card?.saving === true || (handoff.loaded && !handoff.handoff?.prPending)
   const ready = working || waitedFor === agentId || (archived !== null && branchRead)
+  // Whether the feed shows this agent yet. On a first visit it would otherwise pass through what
+  // each read still out has to say: "Waiting for the session to start…" while the list of agents
+  // is unread, the live channel's events (the project root's, for an agent whose checkout is
+  // gone), "Loading agent…" while the archive is out, and only then the agent's own events. It
+  // stays blank instead until the agent is known to run, its archive has answered, or the second
+  // has passed, so it fills in one step. Once it has shown this agent it keeps showing it: an
+  // agent that stops while watched keeps its events on screen while the archive is read.
+  const [settledFor, setSettledFor] = useState<string | null>(null)
+  const feedSettled = settledFor === agentId || working || archived !== null || waitedFor === agentId
+  useEffect(() => {
+    if (feedSettled) setSettledFor(agentId)
+  }, [feedSettled, agentId])
 
   return (
     <>
@@ -202,7 +215,7 @@ export function AgentView({
         ready={ready}
         actions={
           // A run that is working publishes its own work; the next step is offered once it has ended.
-          !working ? <HandoffActions projectId={projectId} agentId={agentId} state={handoff} /> : undefined
+          live === false ? <HandoffActions projectId={projectId} agentId={agentId} state={handoff} /> : undefined
         }
       />
       {/* The always-available session-details strip: agent + spend (#322). Sits above the changes/
@@ -214,10 +227,10 @@ export function AgentView({
           files as the run's. A remote run's worktree lives on the device, but the diff now relays
           there (#1067 slice 2), so it is shown like a local run's, not suppressed. */}
       {working && <AgentChanges projectId={projectId} agentId={agentId} open={open} onSummary={onChangesSummary} />}
-      {!working && open && <AgentHandoffDetails handoff={handoff.handoff} />}
+      {live === false && open && <AgentHandoffDetails handoff={handoff.handoff} />}
       {/* A GitHub Actions run replays in a burst at the end (#1053), so the live feed looks stalled:
           say the wait is expected and link through to the live Actions run. */}
-      <ActionsRunNotice target={target} events={shown} live={live} />
+      <ActionsRunNotice target={target} events={shown} live={working} />
       {/* A run handed to Claude Code on the web (#610): the work is happening in a cloud session
           this machine cannot stream, so point at where it is rather than show an empty feed. */}
       <CloudAgentNotice target={target} events={shown} projectId={projectId} agentId={agentId} />
@@ -226,7 +239,9 @@ export function AgentView({
       <RemoteAgentNotice device={remoteLabel} />
       {/* Nothing to show yet is not the same thing in both states: a live run is waiting for its
           first event, a finished one is still reading its log. */}
-      {!live && archived === null && shown.length === 0 ? (
+      {!feedSettled ? (
+        <div className="flex-1" />
+      ) : live !== true && archived === null && shown.length === 0 ? (
         <div className="grid flex-1 place-items-center text-sm text-muted-foreground">Loading agent…</div>
       ) : (
         // A finished log is static, so it does not follow new output; it opens at the end, where

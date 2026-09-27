@@ -69,8 +69,7 @@ describe('AgentView event source (#1026/#1383)', () => {
     // no events." until a manual refresh.
     onAgent.mockResolvedValue([])
     render(view())
-    await waitFor(() => expect(onAgent).toHaveBeenCalledWith('p1', 'run-1'))
-    expect(screen.getByText(/the channel delivered this line/)).toBeTruthy()
+    await waitFor(() => expect(screen.getByText(/the channel delivered this line/)).toBeTruthy())
     expect(screen.queryByText('This agent has no events.')).toBeNull()
   })
 
@@ -155,15 +154,19 @@ describe('the bar shows its facts together (run switch)', () => {
   })
 
   test("the bar waits for the branch's pull request lookup too, so its facts land in one step", async () => {
+    // The lookup's second answer is held until the bar has been seen waiting, so the quick re-ask
+    // (0.3s) cannot land first.
+    let lookup: (v: unknown) => void = () => {}
     onAgent.mockResolvedValue(ARCHIVED)
     onAgentHandoff.mockResolvedValueOnce({ branch: 'b', exists: false, commits: [], files: [], prPending: true })
+    onAgentHandoff.mockReturnValueOnce(new Promise(resolve => (lookup = resolve)))
     onAgentHandoff.mockResolvedValue({ branch: 'b', exists: false, commits: [], files: [] })
     render(view())
-    await waitFor(() => expect(onAgentHandoff).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(screen.getByText(/the archive delivered this line/)).toBeTruthy())
+    await waitFor(() => expect(onAgentHandoff).toHaveBeenCalledTimes(2))
     expect(screen.getByTestId('bar-ready').textContent).toBe('false')
+    lookup({ branch: 'b', exists: false, commits: [], files: [] })
     await waitFor(() => expect(screen.getByTestId('bar-ready').textContent).toBe('true'))
-    expect(onAgentHandoff).toHaveBeenCalledTimes(2)
   })
 
   test('a read that never answers holds the bar back one second, no longer', async () => {
@@ -176,5 +179,43 @@ describe('the bar shows its facts together (run switch)', () => {
   test('a running run is ready at once: its channel is its log', () => {
     render(view({ live: true }))
     expect(screen.getByTestId('bar-ready').textContent).toBe('true')
+  })
+})
+
+describe('the feed fills in one step (first visit)', () => {
+  test("an ended run's feed shows nothing until its archive answers, then the archive", async () => {
+    // The channel of an ended run whose checkout is gone is the project root's: shown first, it
+    // was a step of someone else's events before this run's own.
+    let log: (v: unknown) => void = () => {}
+    onAgent.mockReturnValue(new Promise(resolve => (log = resolve)))
+    render(view({ events: [{ kind: 'log', message: 'a different run wrote this line' }] as FrameworkEvent[] }))
+    expect(screen.queryByText(/a different run wrote this line/)).toBeNull()
+    expect(screen.queryByText('Loading agent…')).toBeNull()
+    log(ARCHIVED)
+    await waitFor(() => expect(screen.getByText(/the archive delivered this line/)).toBeTruthy())
+  })
+
+  test('an agent not known to run yet says nothing and reads nothing', () => {
+    render(view({ live: null, events: [] }))
+    expect(screen.queryByText('Waiting for the session to start…')).toBeNull()
+    expect(screen.queryByText('Loading agent…')).toBeNull()
+    expect(screen.getByTestId('bar-ready').textContent).toBe('false')
+    expect(onAgent).not.toHaveBeenCalled()
+    expect(onAgentHandoff).not.toHaveBeenCalled()
+  })
+
+  test('an archive that never answers holds the feed back one second, no longer', async () => {
+    onAgent.mockReturnValue(new Promise(() => {}))
+    render(view({ events: [] }))
+    expect(screen.queryByText('Loading agent…')).toBeNull()
+    await waitFor(() => expect(screen.getByText('Loading agent…')).toBeTruthy(), { timeout: 3000 })
+  })
+
+  test('an agent that stops while watched keeps its events on screen while the archive is read', () => {
+    onAgent.mockReturnValue(new Promise(() => {}))
+    const { rerender } = render(view({ live: true }))
+    expect(screen.getByText(/the channel delivered this line/)).toBeTruthy()
+    rerender(view({ live: false }))
+    expect(screen.getByText(/the channel delivered this line/)).toBeTruthy()
   })
 })

@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { readClaudeQuota } from './claude-code-quota.js'
-import { combineFraming, combineSignals, makeEmit, readWorkspaceFile, runCliSession, checkCliReady, type CliSpec, type DriverReadiness, type DriverReadyOptions, type PersonalSetup, finishTurn, agentEnv, attachLog, type SpawnLike, type SessionLog, type Driver, type DriverEvent, type DriverPromptOptions, type DriverQuota, type DriverRateLimit, type DriverSession, type DriverStartOptions, type DriverTurn, type DriverUsage } from 'agent-driver'
+import { combineFraming, combineSignals, makeEmit, readWorkspaceFile, runCliSession, checkCliReady, type CliSpec, type DriverReadiness, type DriverReadyOptions, type PersonalSetup, finishTurn, agentEnv, oneLine, attachLog, type SpawnLike, type SessionLog, type Driver, type DriverEvent, type DriverPromptOptions, type DriverQuota, type DriverRateLimit, type DriverSession, type DriverStartOptions, type DriverTurn, type DriverUsage } from 'agent-driver'
 
 /** Claude Code permission modes we pass through to the CLI. */
 export type PermissionMode = 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan'
@@ -133,6 +133,7 @@ export class ClaudeCodeSession implements DriverSession {
         cwd: this.cwd,
         env: agentEnv(this.config.env ?? process.env, this.log),
         prompt: text,
+        stdin: stdinLines(text),
         spawn: this.config.spawn ?? (nodeSpawn as unknown as SpawnLike),
         emit: emitFn,
         signals,
@@ -194,7 +195,7 @@ export class ClaudeCodeSession implements DriverSession {
   }
 
   private buildArgs(system: string, resumeId?: string): string[] {
-    const args = ['-p', '--output-format', 'stream-json', '--verbose']
+    const args = ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose']
     if (this.config.dangerouslySkipPermissions) args.push('--dangerously-skip-permissions')
     else args.push('--permission-mode', this.config.permissionMode ?? 'acceptEdits')
     // Resume the same conversation for a chat turn (#714). Skip the system append then:
@@ -226,6 +227,28 @@ export class ClaudeCodeSession implements DriverSession {
   }
 }
 
+/**
+ * The prompt as the CLI's stream-json input: first the request that turns thinking text on, then
+ * the user's message. A plain `-p` run sends thinking blocks with their text empty; asked for
+ * `summarized`, it fills them with its own short summary.
+ */
+function stdinLines(text: string): string {
+  const thinking = { type: 'control_request', request_id: 'thinking', request: { subtype: 'set_max_thinking_tokens', max_thinking_tokens: null, thinking_display: 'summarized' } }
+  const message = { type: 'user', message: { role: 'user', content: text } }
+  return `${JSON.stringify(thinking)}\n${JSON.stringify(message)}\n`
+}
+
+/** The input keys, in order, whose value says what a tool call did; the first one present is the call's detail. */
+const DETAIL_KEYS = ['skill', 'command', 'file_path', 'notebook_path', 'path', 'url', 'pattern', 'query', 'description', 'prompt']
+
+/** The one argument that says what a tool call did, on one line and cut short. */
+export function toolDetail(input: unknown): string | undefined {
+  if (typeof input !== 'object' || input === null) return undefined
+  const fields = input as Record<string, unknown>
+  const key = DETAIL_KEYS.find(k => typeof fields[k] === 'string' && (fields[k] as string).trim() !== '')
+  return key === undefined ? undefined : oneLine(fields[key] as string)
+}
+
 /** How the CLI reports that the session id we asked it to resume is gone from its history (#778). */
 const CONVERSATION_GONE = /No conversation found with session ID/i
 
@@ -236,7 +259,7 @@ function isConversationGone(err: unknown): boolean {
 
 /**
  * Incremental parser for Claude Code's `stream-json` output: newline-delimited
- * JSON, one object per line. We surface assistant text + tool names as
+ * JSON, one object per line. We surface assistant text, thinking and tool calls as
  * {@link DriverEvent}s and keep the final `result` line as the turn text.
  * Kept separate from the process plumbing so it is unit-testable in isolation.
  */
@@ -298,7 +321,10 @@ export class StreamJsonParser {
         this.assistantText += block['text']
         events.push({ type: 'text', text: block['text'] })
       } else if (block['type'] === 'tool_use' && typeof block['name'] === 'string') {
-        events.push({ type: 'action', label: block['name'] })
+        const detail = toolDetail(block['input'])
+        events.push({ type: 'action', label: block['name'], ...(detail !== undefined ? { detail } : {}) })
+      } else if (block['type'] === 'thinking' && typeof block['thinking'] === 'string' && block['thinking'].trim() !== '') {
+        events.push({ type: 'thought', text: block['thinking'].trim() })
       }
     }
     return events

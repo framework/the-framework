@@ -26,6 +26,7 @@ Renders an agent's [1] transcript: every event [2] the agent emitted, one row ea
 
 - **One row per event, as the terminal's line** - every event [2] is one row: a kind badge, the terminal's one-line text for that event, and, on a row that opens a group, the time its diary line was written.
 - **The conversation reads as messages** - the user's prompt and the agent's reply render as Markdown, clamped to one line beyond 100 characters and expanding in place on click.
+- **Thinking stays folded** - a thought of the coding agent renders as one muted "💭 Thinking" line; clicking it opens the thought in place, in italics, and clicking again folds it.
 - **The first prompt opens the transcript** - the first prompt is hoisted above the rows emitted before it, so the transcript starts with what the user asked.
 - **A gate is answered where it happened** - when the transcript knows its project, an open gate [4] renders as the interactive gate panel inline, an answered one as a collapsed card that replaces its "✓ chose" line, and a gate whose agent ended unanswered stays text.
 - **A screen is live where the agent used it** - the newest `screen` line at an address, on this machine's loopback and with neither an `ended` line for that address nor the agent's end after it (an end waiting on an answer does not count), is the live page itself, framed in the transcript; an earlier or ended one stays its one line, and every `ended` line is hidden.
@@ -55,6 +56,16 @@ Each event [2] is one row with three columns: a fixed-width badge column, the ro
 #### Business logic
 
 Two events carry conversation text: the prompt that opens a turn [7] (the user's prompt, or a live chat [9] message) and the agent's reply. Both render as compact Markdown (the rendering rules in `Markdown.tsx`) instead of the terminal's truncated line. A message whose text, with runs of whitespace collapsed to one space, is at most 100 characters renders whole. A longer message is clamped to its first line with a chevron ("›") in front of it; clicking either the chevron or the clamped text expands the same rendered Markdown in place, so the opening is never shown twice, and the chevron turns to point down and folds it back on click. The chevron's accessible name is "Expand message" while folded and "Collapse message" while expanded.
+
+### Thinking stays folded
+
+#### Context
+
+**User story**: the user watching an agent sees what it thought before each step, without the thinking drowning the steps themselves.
+
+#### Business logic
+
+A `thought` event renders as one muted line, a chevron ("›") and "💭 Thinking", instead of the terminal's line. Clicking the line opens the thought below it, as compact Markdown in italics, and turns the chevron to point down; clicking again folds it. Every thought starts folded, however short.
 
 ### The first prompt opens the transcript
 

@@ -108,7 +108,8 @@ Codex streams one JSON object per line. A line that is not JSON, such as a banne
 
 - The line announcing the thread carries the thread id, which becomes the turn's [2] session id in the turn's answer. It is also reported at once as a `session` progress event [12], ahead of everything else the turn streams, as Claude Code's is: a turn that is stopped or fails before its result still leaves the id behind (on the log, when the caller asked for one), the handle a later resume of the conversation needs. The driver session [3] itself still takes the thread id to continue only from a turn that completed.
 - Each completed message from the coding agent [4] yields one `text` progress event. Codex narrates in several messages, the last of which is its answer, so every message is streamed and the last one stands as the turn's final message. A turn in which Codex sent no message answers with an empty final message.
-- Each work item Codex starts, of whatever kind, yields one `action` progress event carrying the item's kind only, such as `file_change`, never its arguments: the seam is the code and the outcome, not the tool calls.
+- Each completed reasoning item with text yields one `thought` progress event carrying that text, Codex's one-line headline of what it is thinking.
+- Each other work item Codex starts yields one `action` progress event carrying the item's kind, such as `file_change`, and its detail when it has one, flattened to one line and cut to 200 characters: a command without the shell wrapper Codex puts around it (`/bin/zsh -lc '…'`), the paths a file change touches, joined by commas, an MCP tool as `<server>.<tool>`, or a web search's query.
 - The line closing the turn carries the usage [5] (see "Usage: tokens, never a price").
 - Everything else, including the line that opens the turn and the completion of a work item, is ignored.
 

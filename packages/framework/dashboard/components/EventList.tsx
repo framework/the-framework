@@ -20,10 +20,11 @@ import {
 
 // Presentational event log, shared by the live stream and past-run replay. Most events render as
 // their human-readable line (the same formatter the terminal uses, so a `driver` turn reads
-// "· Read" / "‹ turn complete" rather than raw JSON). Two things get special rows:
+// "· Read  src/app.ts" / "‹ turn complete" rather than raw JSON). Some things get special rows:
 //   - The message text: the user's prompt (`driver` `start`) and the agent's reply (`driver` `text`)
 //     render their raw text inline, truncated to one line when long and expanding in place on click
 //     (#476/#520). The prompt carries its own YOU badge so the log reads like a conversation.
+//   - The agent's thinking (`driver` `thought`): one muted "Thinking" line that opens in place.
 //   - Choice gates, when the log knows its project (#1455 item 6): an open gate renders the same
 //     interactive ChoicePanel the rail used to hold, so the question is answered from the flow;
 //     a resolved one collapses to the AnsweredChoice ✓ card and hides its "✓ chose" line.
@@ -253,6 +254,24 @@ function Message({ text }: { text: string }) {
   )
 }
 
+// What the agent thought before it acted: folded to one muted "Thinking" line, opened in place on click.
+function Thought({ text }: { text: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="min-w-0 flex-1 text-muted-foreground">
+      <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open} className="flex items-center gap-1.5">
+        <span className={`select-none transition-transform ${open ? 'rotate-90' : ''}`}>›</span>
+        <span>💭 Thinking</span>
+      </button>
+      {open && (
+        <div className="pl-3.5 italic">
+          <Markdown text={text} compact />
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function EventList({
   events,
   stick = true,
@@ -302,6 +321,8 @@ export function EventList({
                   {message !== null ? (
                     // A prompt (YOU) or a reply (AGENT): compact Markdown, collapsed to its first line when long.
                     <Message text={message} />
+                  ) : e.kind === 'driver' && e.event.type === 'thought' ? (
+                    <Thought text={e.event.text} />
                   ) : choiceRow && projectId ? (
                     // The interaction itself, in the flow (#1455 item 6). font-sans: these are
                     // controls, not log text, so they drop the log's mono.

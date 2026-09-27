@@ -38,7 +38,7 @@ See `## Context`.
 
 #### Business logic
 
-A turn [1] spawns the coding agent [2] with the command line the driver [4] built, in the driver session's [3] directory (the agent's [6] checkout [8]) and with the environment the driver chose, as the leader of its own process group so that the whole subtree can be signaled at once. A `start` progress event [5] carrying the prompt announces the turn first. The prompt is written to the process's standard input, which is then closed, so a long prompt never hits the operating system's command-line length limit.
+A turn [1] spawns the coding agent [2] with the command line the driver [4] built, in the driver session's [3] directory (the agent's [6] checkout [8]) and with the environment the driver chose, as the leader of its own process group so that the whole subtree can be signaled at once. A `start` progress event [5] carrying the prompt announces the turn first. The prompt is written to the process's standard input, which is then closed, unless the driver wraps it in the form its coding agent reads (Claude Code's JSON lines), in which case the wrapped form is written instead; so a long prompt never hits the operating system's command-line length limit.
 
 ### Output streams through the driver's parser
 

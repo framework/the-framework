@@ -34,7 +34,7 @@ Renders an agent's [1] event stream [2] in a terminal, one human-readable line p
 - **Why a merge was withheld** - "the session never signalled ready-for-merge", the same words the CLI prints.
 - **Why a handoff or the extra turn was skipped** - every reason as a sentence in the reader's terms.
 - **Usage** - the price of one turn in dollars.
-- **The driver's own events** - the prompt, the text, the actions, the turn boundary, quota warnings only when the quota is tight, errors, notices, and the question a turn ended on.
+- **The driver's own events** - the prompt, the text, the thoughts, the actions, the turn boundary, quota warnings only when the quota is tight, errors, notices, and the question a turn ended on.
 - **The end** - "✓ finished", "■ stopped", "? waiting for an answer", or "✗ failed" with the detail.
 
 ## Business logic
@@ -122,7 +122,7 @@ Usage prints "spend: $<cost, four decimals>", the price of the one turn [4] the 
 
 #### Business logic
 
-A turn starts with "› prompt: <the prompt, flattened and cut to 140 characters>" and ends with "‹ turn complete". The coding agent's text prints flattened and cut to 100 characters, each action as "· <label>", an error as "! agent error: <message>", a notice as "~ <message>", and the question a turn ended on as "? <its title, cut to 140 characters>". A session id the driver reports mid-stream prints as "session <id>" so a stray one reads as what it is. The quota [14] is quiet on the happy path: "✗ quota exhausted (<window>), resets <time>" when a request was rejected, "! quota running low (<window>), resets <time>" when the coding agent warns, and otherwise "· quota <status> (<window>), resets <time>", the time as an ISO timestamp.
+A turn starts with "› prompt: <the prompt, flattened and cut to 140 characters>" and ends with "‹ turn complete". The coding agent's text prints flattened and cut to 100 characters, each action as "· <label>", followed by two spaces and its detail cut to 140 characters when it has one ("· Bash  git status"), each thought as "💭 <the thought, cut to 140 characters>", an error as "! agent error: <message>", a notice as "~ <message>", and the question a turn ended on as "? <its title, cut to 140 characters>". A session id the driver reports mid-stream prints as "session <id>" so a stray one reads as what it is. The quota [14] is quiet on the happy path: "✗ quota exhausted (<window>), resets <time>" when a request was rejected, "! quota running low (<window>), resets <time>" when the coding agent warns, and otherwise "· quota <status> (<window>), resets <time>", the time as an ISO timestamp.
 
 ### The end
 

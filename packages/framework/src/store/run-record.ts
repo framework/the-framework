@@ -58,6 +58,7 @@ function eventOf(line: AnyDiaryLine): FrameworkEvent {
     // agent's session id, and the question a turn ended on as the gate the dashboard shows.
     case 'start':
     case 'action':
+    case 'thought':
     case 'rate-limit':
     case 'notice': {
       const { kind, ...rest } = line

@@ -27,6 +27,53 @@ test('StreamJsonParser surfaces assistant text + tool names, keeps the result', 
   assert.deepEqual(p.result(), { text: 'All done', sessionId: 'sess-1' })
 })
 
+test('StreamJsonParser says what each tool call did, and passes thinking with text on as thoughts', () => {
+  const p = new StreamJsonParser()
+  const content = [
+    // A plain `-p` run sends thinking with its text empty: nothing to show.
+    { type: 'thinking', thinking: '', signature: 'x' },
+    { type: 'thinking', thinking: 'Checking 17*23 gives 391, so 19*21 is larger.\n\n', signature: 'x' },
+    { type: 'tool_use', name: 'Bash', input: { command: 'git status\n  --short', description: 'Show status' } },
+    { type: 'tool_use', name: 'Skill', input: { skill: 'tickets' } },
+    { type: 'tool_use', name: 'Read', input: { file_path: '/repo/src/app.ts', limit: 20 } },
+    { type: 'tool_use', name: 'WebFetch', input: { url: 'https://example.com', prompt: 'Summarize' } },
+    { type: 'tool_use', name: 'TodoWrite', input: { todos: [] } },
+    { type: 'tool_use', name: 'Bash', input: { command: 'x'.repeat(300) } },
+  ]
+  assert.deepEqual(p.push(JSON.stringify({ type: 'assistant', message: { role: 'assistant', content } })), [
+    { type: 'thought', text: 'Checking 17*23 gives 391, so 19*21 is larger.' },
+    { type: 'action', label: 'Bash', detail: 'git status --short' },
+    { type: 'action', label: 'Skill', detail: 'tickets' },
+    { type: 'action', label: 'Read', detail: '/repo/src/app.ts' },
+    { type: 'action', label: 'WebFetch', detail: 'https://example.com' },
+    { type: 'action', label: 'TodoWrite' },
+    { type: 'action', label: 'Bash', detail: 'x'.repeat(199) + '…' },
+  ])
+})
+
+test('ClaudeCodeDriver asks for thinking text, then sends the prompt, both as stream-json input', async () => {
+  let written = ''
+  const spawn: SpawnLike = () => {
+    const child = {
+      stdout: Readable.from([JSON.stringify({ type: 'result', subtype: 'success', result: 'ok' }) + '\n']),
+      stderr: Readable.from([]),
+      stdin: new Writable({ write: (c, _e, cb) => { written += String(c); cb() } }),
+      pid: 1,
+      kill: () => true,
+      on(event: string, cb: (...a: unknown[]) => void) {
+        if (event === 'close') setTimeout(() => cb(0, null), 5)
+        return child
+      },
+    }
+    return child as unknown as SpawnedProcess
+  }
+  const session = await new ClaudeCodeDriver({ spawn }).start({ cwd: process.cwd() })
+  await session.prompt('Fix the bug')
+  const [control, message] = written.trim().split('\n').map(l => JSON.parse(l))
+  assert.deepEqual(control.request, { subtype: 'set_max_thinking_tokens', max_thinking_tokens: null, thinking_display: 'summarized' })
+  assert.deepEqual(message, { type: 'user', message: { role: 'user', content: 'Fix the bug' } })
+})
+
 test('StreamJsonParser pulls token + cost usage off the result line (#322)', () => {
   const p = new StreamJsonParser()
   p.push(
@@ -184,7 +231,7 @@ test('ClaudeCodeDriver builds correct CLI args (permission mode, system, model)'
   const driver = new ClaudeCodeDriver({ spawn })
   const session = await driver.start({ cwd: '/ws', system: 'You are a Vike expert', model: 'claude-haiku-4-5-20251001' })
   await session.prompt('go')
-  assert.deepEqual(captured.slice(0, 4), ['-p', '--output-format', 'stream-json', '--verbose'])
+  assert.deepEqual(captured.slice(0, 6), ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose'])
   assert.ok(captured.includes('--permission-mode'))
   assert.ok(captured.includes('acceptEdits'))
   assert.ok(captured.includes('--append-system-prompt'))

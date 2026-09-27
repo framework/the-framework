@@ -11,11 +11,11 @@ The one line of git facts about the checkout [1] in play — its branch, whether
 
 ## Business logic — TL;DR
 
-- **Whose checkout** - with an agent selected the line reports that agent's checkout, which alone has a path, an owner and a size; otherwise the project's own checkout; nothing renders when there is no checkout to report.
+- **Whose checkout** - with an agent selected the line reports that agent's checkout, which alone has a path and a size while it exists; otherwise the project's own checkout; nothing renders when there is no checkout to report.
 - **Kept current** - the facts are re-read every 10 seconds, or every 0.3 seconds while the daemon's pull request lookup is still in flight.
 - **Switching agents** - the facts are remembered per checkout for as long as the page is open: going back to an agent shows its facts from the first frame while they are read again; an agent never shown has no facts until its own are read, never the previous agent's. Until then, and while the caller says its own facts are not in yet, the agent's name and project show alone.
 - **Identity first, branch second** - given the agent's name it leads in bold, prefixed by "<project> /", which stays in view (capped) however long the name is, and the branch drops to muted context with its `the-framework/` prefix hidden; without a name the branch is the identity; the full branch and the checkout's path live in the branch's tooltip.
-- **Clean or dirty, neutrally** - a dot and the word "clean" in neutral gray or "dirty" in amber; the tooltip reads "Clean", "Uncommitted changes", or "Uncommitted changes in this agent" when the checkout is the agent's own.
+- **Clean or dirty, neutrally** - a dot and the word "clean" in neutral gray or "dirty" in amber; the tooltip reads "Clean", "Uncommitted changes", or "Uncommitted changes in this agent" on an agent's checkout; an agent whose checkout is gone shows neither.
 - **State, size and summary** - the agent's state sits beside the dot, the checkout's size on disk shows once the daemon could measure it, and the summary of what the branch holds comes last; the facts furthest from the branch drop out first as the bar narrows.
 - **The pull request link** - "PR #<number>" with its state in a pill, opening the pull request in a new tab, its title in the tooltip.
 - **A disclosure when there is detail below** - when the caller renders detail under the bar, the facts become a button with a chevron that turns when expanded; the chevron is drawn, dimmed, even while the name shows alone, so the name never moves when the facts land.
@@ -30,7 +30,7 @@ See `## Context`.
 
 #### Business logic
 
-With an agent [2] selected, the line asks the daemon about that agent's checkout [1]: its branch, whether it is dirty, its pull request, and what only an agent's checkout has — the path it lives at, whether the checkout is the agent's own, and its size on disk. Without an agent, it asks about the project's own checkout: branch, dirty or clean, pull request. When the daemon has nothing to report, because there is no repository or the checkout is gone, the line renders nothing at all.
+With an agent [2] selected, the line asks the daemon about that agent's checkout [1]: its branch, whether it is dirty, its pull request, and what only an agent's checkout has — the path it lives at and its size on disk. Once the agent has ended and its checkout is gone, the daemon answers only the branch the agent recorded and its pull request, so the line shows those and no clean or dirty: the project's own checkout is the user's, and its facts are never shown as the agent's. Without an agent, it asks about the project's own checkout: branch, dirty or clean, pull request. When the daemon has nothing to report, because there is no repository or no such agent, the line renders nothing at all.
 
 ### Kept current
 
@@ -52,7 +52,7 @@ The caller can also hold the facts back while its own facts about the agent are 
 
 #### Business logic
 
-When the caller gives the agent's label, it leads in bold and is the last element to truncate, so the identity never disappears. A project name given with it is prefixed as a muted "<project> /" breadcrumb that is always shown: it keeps its width up to a cap of 8rem (about 16 characters), a longer project name is cut there with "…", and a long agent name is what gives up the rest of the row. The branch then reads as muted context beside the name: a leading `the-framework/` is stripped from the shown text, the text is capped at 14 rem before truncating, and on a narrow bar the branch is hidden altogether; its tooltip shows the full branch and, for an agent's checkout [1], the checkout's path on a second line. Without a label (the project home) the branch is the identity, in bold, capped at 16 rem, its tooltip reading "branch <branch>". A checkout on no branch reads "no branch".
+When the caller gives the agent's label, it leads in bold and is the last element to truncate, so the identity never disappears. A project name given with it is prefixed as a muted "<project> /" breadcrumb that is always shown: it keeps its width up to a cap of 8rem (about 16 characters), a longer project name is cut there with "…", and a long agent name is what gives up the rest of the row. The branch then reads as muted context beside the name: a leading `the-framework/` is stripped from the shown text, the text is capped at 14 rem before truncating, and on a narrow bar the branch is hidden altogether; its tooltip shows the full branch and, while the agent has its checkout [1], the checkout's path on a second line. Without a label (the project home) the branch is the identity, in bold, capped at 16 rem, its tooltip reading "branch <branch>". A checkout on no branch reads "no branch".
 
 ### Clean or dirty, neutrally
 
@@ -62,7 +62,7 @@ When the caller gives the agent's label, it leads in bold and is the last elemen
 
 #### Business logic
 
-A dot and a word: "clean" with a neutral gray dot, or "dirty" with an amber dot. The tooltip reads "Clean" when clean. When dirty it reads "Uncommitted changes in this agent" when the checkout [1] is the agent's [2] own, since the uncommitted work there is the agent's, and "Uncommitted changes" otherwise, on the project's checkout where the work is the user's.
+A dot and a word: "clean" with a neutral gray dot, or "dirty" with an amber dot. The tooltip reads "Clean" when clean. When dirty it reads "Uncommitted changes in this agent" on an agent's [2] checkout [1], since the uncommitted work there is the agent's, and "Uncommitted changes" on the project's checkout, where the work is the user's. An agent whose checkout is gone has no tree to be either, so neither the dot nor the word shows.
 
 ### State, size and summary
 

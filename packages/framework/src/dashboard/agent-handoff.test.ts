@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readAgentHandoff, resolveAgentPr, mergeAgentPr, agentBranchFor, openAgentPullRequest, openRemoteBranchPullRequest, pushAgentBranch, type HandoffAgent } from './agent-handoff.js'
+import { readAgentHandoff, leftNothing, resolveAgentPr, mergeAgentPr, agentBranchFor, openAgentPullRequest, openRemoteBranchPullRequest, pushAgentBranch, type HandoffAgent } from './agent-handoff.js'
 import { pickAgentPr, type LinkedPr } from './pull-requests.js'
 import type { BranchState, BranchesFor, BranchesSource } from '../store/branches.js'
 import type { GitHostFor, GitHostSource } from '../store/git-host.js'
@@ -351,4 +351,14 @@ test("the Open PR button titles the request by the name the provider answers for
   assert.equal((calls.at(-1)![2] as { title: string }).title, 'agent-r1', 'no name answered: the branch as it is')
   await openRemoteBranchPullRequest('/repo', { id: 'r1', branch: 'agent-fix-login', prTitle: 'Fix the login redirect' }, 'agent-fix-login', { branches, gitHost })
   assert.equal((calls.at(-1)![2] as { title: string }).title, 'Fix the login redirect')
+})
+
+test('a run changed nothing when its own tool ended it here, done or failed, with no pull request', () => {
+  assert.equal(leftNothing({ status: 'done', host: 'here' }, 'here'), true)
+  assert.equal(leftNothing({ status: 'failed', host: 'here' }, 'here'), true)
+  // The sweep marks a run whose process died `stopped`: its tool never recorded the branch's last name.
+  assert.equal(leftNothing({ status: 'stopped', host: 'here' }, 'here'), false)
+  assert.equal(leftNothing({ status: 'done', host: 'there' }, 'here'), false, 'another machine may hold its branch')
+  assert.equal(leftNothing({ status: 'done' }, 'here'), false, 'a record that names no machine')
+  assert.equal(leftNothing({ status: 'done', host: 'here', pr: { number: 7 } }, 'here'), false, 'its work is on a pull request')
 })

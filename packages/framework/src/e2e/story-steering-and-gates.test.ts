@@ -25,7 +25,7 @@ test('answer a waiting run’s question from the questions hub; the answer resum
     if (gate.kind !== 'choice') return
     assert.deepEqual(gate.options.map(o => o.label), ['Left', 'Right'])
     await world.waitAgent(project, agentId, 'waiting')
-    assert.equal((await rpc(onAgentWorktree)(project.id, agentId))?.own, true, 'a waiting run keeps its checkout')
+    assert.equal((await rpc(onAgentWorktree)(project.id, agentId))?.checkout !== undefined, true, 'a waiting run keeps its checkout')
     const question = await waitFor(
       async () => (await rpc(onOpenQuestions)()).find(q => q.agentId === agentId),
       'the questions hub to list the waiting run',
@@ -105,7 +105,7 @@ test('stop a run; its checkout is reclaimed once the work is on the remote, then
     // One rule (E5): the checkout goes once its work is on the remote, whatever the run did.
     await world.waitRetired(project, agentId)
     assert.deepEqual(await rpc(onRetainedWorktrees)(project.id), [])
-    assert.equal((await rpc(onAgentWorktree)(project.id, agentId))?.own, false, 'no checkout of its own is left')
+    assert.equal((await rpc(onAgentWorktree)(project.id, agentId))?.checkout, undefined, 'no checkout of its own is left')
     assert.ok((await rpc(onAgents)(project.id)).some(r => r.id === agentId && r.status === 'stopped'), 'the run\'s row survives')
 
     // Delete is the destructive sibling: the row itself disappears from the dashboard.

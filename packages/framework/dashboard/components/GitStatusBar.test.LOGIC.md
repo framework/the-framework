@@ -5,6 +5,7 @@ What the tests cover, for the line of git facts about the checkout [1] in play:
 - **The name first, the facts together** - the agent's name shows while its checkout is still being read and no fact does; once read, the facts still wait until the caller says it is ready, then show.
 - **Switching agents** - after switching from an agent to one whose read has not answered, the first agent's "dirty" is not shown under the second's name; switching back shows the first agent's "dirty" from the first frame, remembered. The test fails when the line keeps the previous agent's facts instead.
 - **The pull request** - an agent's branch's pull request shows as "PR #42" with its state "open", the way the project's does.
+- **An ended agent with no checkout** - an agent whose checkout is gone shows the branch it recorded and neither "clean" nor "dirty".
 - **No size while unmeasured** - when the daemon has not measured the checkout's size, no placeholder appears where the number would go.
 - **Nothing to report** - when the daemon has no checkout to report, the line renders nothing.
 

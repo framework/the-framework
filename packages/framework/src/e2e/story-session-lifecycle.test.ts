@@ -46,7 +46,9 @@ test('start a run through the project\'s start hook, watch it live, and read the
     await world.waitRetired(project, agentId)
     assert.deepEqual(await rpc(onRetainedWorktrees)(project.id), [])
     assert.ok((await git(project.cwd, 'ls-remote', '--heads', 'origin')).includes(`agent-${agentId}`), 'the run\'s branch is on origin')
-    assert.equal((await rpc(onAgentWorktree)(project.id, agentId))?.own, false)
+    // Its header then says only what is true of the run: the branch it recorded, and no checkout
+    // to be clean or dirty. Never the user's own checkout's branch and "clean".
+    assert.deepEqual(await rpc(onAgentWorktree)(project.id, agentId), { branch: `agent-${agentId}` })
 
     // The recorded run replays the story the live tail told, and the cross-project surfaces list it.
     const replay = await waitFor(async () => {
@@ -90,9 +92,9 @@ test('two runs at once, each in its own checkout (#736)', async () => {
     const agents = await rpc(onAgents)(project.id)
     assert.equal(agents.filter(r => [runA, runB].includes(r.id) && r.status === 'running').length, 2)
     const [wtA, wtB] = [await rpc(onAgentWorktree)(project.id, runA), await rpc(onAgentWorktree)(project.id, runB)]
-    assert.equal(wtA?.own, true)
-    assert.equal(wtB?.own, true)
-    assert.notEqual(wtA?.path, wtB?.path)
+    assert.ok(wtA?.checkout && wtB?.checkout, 'each run reports a checkout of its own')
+    assert.notEqual(wtA.checkout.path, wtB.checkout.path)
+    assert.notEqual(wtA.checkout.path, project.cwd)
 
     // Each goes on and finishes on its own.
     for (const agentId of [runA, runB]) {

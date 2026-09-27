@@ -135,6 +135,14 @@ describe('run handoff (#799)', () => {
     expect(screen.getByText('Branch gone — nothing to open a PR from.')).toBeTruthy()
   })
 
+  test('a branch gone because the run changed nothing reads as no changes, not as lost work', async () => {
+    onAgentHandoff.mockResolvedValue({ ...worked, exists: false, unchanged: true, commits: [], files: [], empty: true })
+    render(<Harness />)
+    await waitFor(() => expect(screen.getByText('no changes')).toBeTruthy())
+    expect(screen.getByText('No changes — nothing to open a PR from.')).toBeTruthy()
+    expect(screen.queryByText(/Branch gone/i)).toBeNull()
+  })
+
   test('push is offered only while the branch is unpushed', async () => {
     onAgentHandoff.mockResolvedValue({ ...worked, pushed: true })
     render(<Harness />)

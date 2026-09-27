@@ -36,14 +36,14 @@ Answers everything the dashboard reads about a project or an agent [1]: the agen
 - **What only the daemon knows about an agent** - a `web` agent whose cloud session is waiting on a human is marked waiting, an agent another machine's daemon started is marked as from another host, and an agent that ended clean while its process is still alive on this machine is marked saving.
 - **An agent's replay** - the agent's events, from the diary in its checkout while it has one, else from its run on the `agent-data` branch; nothing when it is in neither.
 - **Retained checkouts** - the ids of ended agents whose checkout is still on disk, live agents excluded.
-- **Where an agent is working** - its checkout's path, whether that checkout is its own, its branch, whether it holds uncommitted changes, its size once nothing writes to it, and the pull request that belongs to this agent and not a predecessor's.
+- **Where an agent is working** - while it has a checkout: the checkout's path, its branch, whether it holds uncommitted changes, its size once nothing writes to it, and the pull request that belongs to this agent and not a predecessor's; once the checkout is gone, only the branch and the pull request the agent recorded.
 - **Documents** - the surfaced documents at the project root.
 - **Cross-project rollups** - the aggregated agent queue, the Overview, recent agents, interventions, open questions, activity, the dashboard page and every project's scheduler state, each built over every project the registry lists.
 - **The files of a checkout and their status** - every file git sees (from the agent's own checkout when an agent id is given), and each file's untracked/modified/deleted status in the project's root.
 - **An agent's own files, for as long as git has them** - the agent's tree with what it changed marked, from its checkout, else its branch, else its merge commit; gone when none is left.
 - **One file's diff, one file's content, and what the agent changed** - the diff of a changed file and the content of an unchanged one, from the same source as the agent's own files; and every changed file with its line counts, read from the checkout's own git state.
 - **The project's page on its git host, and git status** - the project's page and the git host's name, as the git host provider answers them; the branch, dirty flag and linked pull request of the project or of one agent's checkout, filtered to that agent's lifetime.
-- **What an agent's handoff left behind** - the agent's own branch, as the project's branches provider answers it, plus the agent's pull request; an agent that recorded no branch has no handoff.
+- **What an agent's handoff left behind** - the agent's own branch, as the project's branches provider answers it, plus the agent's pull request; a gone branch of an agent that changed nothing is marked so; an agent that recorded no branch has no handoff.
 - **The bridge's state** - the question a cloud session is parked on, where the picked answer stands, what the session has said, whether anything reached the bridge and how, the bridge token while the bridge is on, and the bridge browser's state.
 - **Reads about a relayed agent go to the device** - the reads that are about one agent's checkout are answered by the device that runs the agent, and an unreachable device answers the read's empty shape.
 
@@ -57,7 +57,7 @@ Answers everything the dashboard reads about a project or an agent [1]: the agen
 
 #### Business logic
 
-A read about a project resolves the id through the registry and, when no project has that id, answers its empty shape at once; when the reader throws, the answer is the same empty shape. A read about one agent resolves the agent id [8] to the checkout [3] the agent works in (its own checkout while it exists, else the project's root, the rule being `context.ts`'s) and is just as forgiving. A read over every project treats a registry that cannot be read as an empty project list. The empty shapes are the natural ones: an empty list for a list, an empty map for a map, nothing for a single item.
+A read about a project resolves the id through the registry and, when no project has that id, answers its empty shape at once; when the reader throws, the answer is the same empty shape. A read about one agent resolves the agent id [8] to the checkout [3] the agent works in (its own checkout while it exists, else the project's root, the rule being `context.ts`'s) and is just as forgiving. The one exception is where an agent is working, which never falls back to the root (see below). A read over every project treats a registry that cannot be read as an empty project list. The empty shapes are the natural ones: an empty list for a list, an empty map for a map, nothing for a single item.
 
 ### The agent history
 
@@ -103,13 +103,19 @@ The answer is the ids of the checkouts the project's branches provider lists who
 
 #### Context
 
-**User story**: an agent's action bar says which checkout the agent has, on which branch, whether it holds uncommitted changes, how much disk the checkout takes once the agent is done, and which pull request its branch has.
+**User story**: an agent's action bar says which checkout the agent has, on which branch, whether it holds uncommitted changes, how much disk the checkout takes once the agent is done, and which pull request its branch has. Once the agent has ended and its checkout is gone, the bar says only its branch and its pull request.
 
-**Problem**: the git status bar reads the project, so without this an agent's own branch was visible nowhere, and a retained checkout was a name in a list with no size and no way in. And an agent on a branch name an earlier agent already used must not wear a predecessor's merged pull request as its own.
+**Problem**: the git status bar reads the project, so without this an agent's own branch was visible nowhere, and a retained checkout was a name in a list with no size and no way in. And an agent on a branch name an earlier agent already used must not wear a predecessor's merged pull request as its own. And an ended agent whose checkout is gone must not wear the user's own checkout's branch and "clean" as its own.
 
 #### Business logic
 
-The project must be known and the id safe for a path, else the answer is nothing. The path is the checkout the agent id resolves to; whether it is the agent's own is whether it differs from the project's root, because in the root the uncommitted changes are the user's, not the agent's. The git status read there gives the branch and the dirty flag, and the pull request is filtered to the agent's lifetime: the agent's start time is derived from its id, and only an open pull request, or a closed one no older than the agent, counts. The size is the branches provider's sized listing's, read only for the agent's own checkout and only once the agent is no longer running, because a tree being written to has no size worth reporting. When the checkout is not the agent's own (the agent's checkout is gone and the read fell back to the root), the root's current branch has nothing to do with this agent, so the pull request is instead resolved from the agent's own record. The pull request may be reported as still being looked up rather than absent, so the bar asks again shortly.
+The project must be known and the id safe for a path, else the answer is nothing. Every agent works in a checkout of its own, so the answer is about that checkout, as the project's branches provider lists it, and never about the project's root: the root is the user's checkout, and its branch and uncommitted changes are the user's.
+
+While the agent has a checkout, the answer is the checkout's path, and the git status read there gives the branch and the dirty flag. The pull request is filtered to the agent's lifetime: the agent's start time is derived from its id, and only an open pull request, or a closed one no older than the agent, counts. The size is the branches provider's sized listing's, read only once the agent is no longer running, because a tree being written to has no size worth reporting.
+
+Once the checkout is gone, there is no tree left to be clean or dirty, so the answer carries no path, no dirty flag and no size: only the branch the agent's record names and the pull request the agent recorded, read live for its state. An agent with neither a checkout nor a record answers nothing.
+
+In both cases the pull request may be reported as still being looked up rather than absent, so the bar asks again shortly.
 
 ### Documents
 
@@ -185,7 +191,7 @@ The project's page and the git host's name are what the project's git host provi
 
 #### Business logic
 
-The project must be known, the id safe, and the agent found in the project's records, else nothing. The handoff [4] is read for the branch the agent recorded, through the project's branches provider, with the agent's pull request picked from what happened since the agent started (`dashboard/agent-handoff.ts`); an agent whose record carries no branch, or a project with no branches provider, answers nothing.
+The project must be known, the id safe, and the agent found in the project's records, else nothing. The handoff [4] is read for the branch the agent recorded, through the project's branches provider, with the agent's pull request picked from what happened since the agent started (`dashboard/agent-handoff.ts`); an agent whose record carries no branch, or a project with no branches provider, answers nothing. When the branch is gone and the agent changed nothing (the rule is `dashboard/agent-handoff.ts`'s), the handoff is marked as unchanged, so the page says the agent made no changes rather than that its branch is gone.
 
 ### The bridge's state
 

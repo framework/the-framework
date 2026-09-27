@@ -31,8 +31,8 @@ export function handoffExpandable(handoff: AgentHandoff | null): boolean {
 export function HandoffSummary({ handoff }: { handoff: AgentHandoff | null }) {
   if (!handoff) return null
   // A branch that is gone and a branch that was never pushed are different facts, and the summary
-  // is only useful if it tells them apart.
-  if (!handoff.exists) return <span className="text-muted-foreground">branch gone</span>
+  // is only useful if it tells them apart. Gone because the run changed nothing is no changes.
+  if (!handoff.exists) return <span className="text-muted-foreground">{handoff.unchanged ? 'no changes' : 'branch gone'}</span>
   // A merged branch reads as empty too — its commits are all on the base, so `base..branch` lists
   // nothing — but "merged" and "no changes" are opposite verdicts, and only one of them is true.
   if (handoff.empty) return <span className="text-muted-foreground">{handoff.merged ? 'merged' : 'no changes'}</span>
@@ -93,7 +93,8 @@ export function HandoffActions({
   }
   // From here every branch says something. A session that has finished and shows no control at all
   // is #1173: the reason there is nothing to press is exactly what the reader came for.
-  if (!handoff.exists) return <Reason>Branch gone — nothing to open a PR from.</Reason>
+  // A branch the run's own tool deleted because it held nothing is no loss: said as no changes.
+  if (!handoff.exists) return <Reason>{handoff.unchanged ? 'No changes' : 'Branch gone'} — nothing to open a PR from.</Reason>
   // A branch with no diff never gets the button (#1173): there is nothing the git host would accept a PR
   // for, and offering one that fails with "No commits between main and <branch>" is the dead end
   // this bar exists to prevent. When the tree holds uncommitted work, that work is named — the

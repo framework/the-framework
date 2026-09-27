@@ -15,7 +15,7 @@ One agent's [1] action bar, one row that never wraps: at the start, what the age
 ## Business logic — TL;DR
 
 - **Facts at the start, controls at the end** - the row holds the agent's identity and branch facts first and its controls last, and only the facts give up width, so the controls never drop under them.
-- **One status word** - exactly one ranked status is shown beside the branch's clean/dirty dot, with a colored dot and a capped width; the full text is on hover.
+- **One status word** - exactly one ranked status is shown beside the branch's clean/dirty dot, with a colored dot; a failure shows just "failed", its reason on hover.
 - **The controls cluster** - the error count, the next step [2] kept out as a visible button, and the "⋮" menu with every other action.
 - **Facts shown together** - until the caller says the agent's own facts have been read, the row names the agent and shows none of its facts: no status word, no summary, no error count, no next step; the "⋮" menu stays.
 - **What the menu is told** - a Delete is only offered for a finished agent; a Remove only while the agent's checkout is still kept; a Stop addresses the agent by its id.
@@ -40,7 +40,7 @@ The row is always one line. Its start is the branch facts row (`GitStatusBar.tsx
 
 #### Business logic
 
-The bar shows at most one status, decided by the ranking in `lib/agent-status.ts` from the agent's events and, when the caller hands it over, the agent's card [6] (its status, its pull request, and whether the daemon marks it saving): how the agent [1] ended ("failed", or "failed — <reason>" when the end carried a reason, "stopped", or "waiting for an answer") outranks what it did on the way ("saving…" while the daemon marks a cleanly ended agent saving, "ready for merge" once it ended clean with a pull request on its card, "building…" while it runs, "finished" otherwise). Nothing is shown while the agent has no event and no card. The status sits beside the branch's clean/dirty dot as one line of facts, drawn as a colored dot and the word in its tone. The word's width is capped and truncated with an ellipsis, because a failure carries its reason and must not take the row from the branch; hovering the status shows the full text.
+The bar shows at most one status, decided by the ranking in `lib/agent-status.ts` from the agent's events and, when the caller hands it over, the agent's card [6] (its status, its pull request, and whether the daemon marks it saving): how the agent [1] ended ("failed", "stopped", or "waiting for an answer") outranks what it did on the way ("saving…" while the daemon marks a cleanly ended agent saving, "ready for merge" once it ended clean with a pull request on its card, "building…" while it runs, "finished" otherwise). Nothing is shown while the agent has no event and no card. The status sits beside the branch's clean/dirty dot as one line of facts, drawn as a colored dot and the word in its tone. A failure shows the word "failed" alone, and hovering it shows the reason its end carried, whole: cut to fit the row, the reason read as "codex exited (1): Y…" and said nothing, and the feed's end line below says it whole anyway.
 
 ### The controls cluster
 

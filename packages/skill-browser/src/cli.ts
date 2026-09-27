@@ -145,6 +145,9 @@ async function ownDirectory(dir: string): Promise<boolean> {
   return true
 }
 
+/** How long `open` waits for the browser's process: past Chrome's own launch wait, so its error is what is said. */
+const START_MS = 75_000
+
 /**
  * Start the browser's process, detached so it outlives this command, and wait for its state file.
  * A lock file lets only one command start it: a second `open` meanwhile waits for the first's.
@@ -155,7 +158,7 @@ async function startHost(file: string, chromePath: string, env: NodeJS.ProcessEn
   if (!held) {
     // A lock older than the wait below was left by a command that died while starting.
     const age = Date.now() - ((await stat(lock).catch(() => undefined))?.mtimeMs ?? 0)
-    if (age > 35_000) {
+    if (age > START_MS + 5_000) {
       await rm(lock, { force: true })
       return startHost(file, chromePath, env)
     }
@@ -173,13 +176,13 @@ async function startHost(file: string, chromePath: string, env: NodeJS.ProcessEn
 }
 
 async function waitForState(file: string): Promise<HostState | { error: string }> {
-  const deadline = Date.now() + 30_000
+  const deadline = Date.now() + START_MS
   while (Date.now() < deadline) {
     const state = await readState(file)
     if (state) return state
     await new Promise(r => setTimeout(r, 100))
   }
-  return { error: 'it did not answer within 30s' }
+  return { error: `it did not answer within ${START_MS / 1000}s` }
 }
 
 async function send(state: HostState, command: HostCommand): Promise<HostAnswer> {

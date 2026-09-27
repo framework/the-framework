@@ -3,6 +3,7 @@ import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { QueueCard } from './QueueCard.js'
 import { fakeHost, renderWithHost, type FakeHost } from './test-host.js'
 import { workOnEntryPrompt } from '../src/widget.js'
+import { configureFirst } from '../../framework/dashboard/test-utils.js'
 
 // The card on the Overview, rendered from nothing but this package: a host answering the queue
 // command, and no other widget mounted. A queued ticket is a link into a repository the card has
@@ -85,8 +86,7 @@ describe('QueueCard', () => {
   test('"Configure first, then run" hands the entry\'s prompt to the project\'s launcher', async () => {
     render({ p1: [LOGIN] })
     await screen.findByText('Login page')
-    fireEvent.click(screen.getByRole('button', { name: 'Other ways to run Login page' }))
-    fireEvent.click(await screen.findByText('Configure first, then run'))
+    await configureFirst('Other ways to run Login page')
     expect(host.configureRun).toHaveBeenCalledWith('p1', workOnEntryPrompt(LOGIN))
     expect(started()).toEqual([])
   })

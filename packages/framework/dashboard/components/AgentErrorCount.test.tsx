@@ -25,6 +25,20 @@ describe('AgentErrorCount', () => {
     expect(screen.queryByText(/gh is not logged in/)).toBeNull()
   })
 
+  test("the error a failed run's state already names is not counted again", () => {
+    const usage = "You've hit your usage limit."
+    const failed: FrameworkEvent[] = [
+      { kind: 'driver', event: { type: 'error', message: usage } },
+      { kind: 'end', ok: false, detail: `codex exited (1): ${usage}` },
+    ]
+    const { container } = render(<AgentErrorCount events={failed} />)
+    expect(container.textContent).toBe('')
+    cleanup()
+    // An error the run went on from is another fact, and still counts beside the failure.
+    render(<AgentErrorCount events={[{ kind: 'error', headline: 'gh is not logged in' }, ...failed]} />)
+    expect(screen.getByText('1 error')).toBeTruthy()
+  })
+
   test('several errors read plural, and the LATEST headline is the one shown', () => {
     const events: FrameworkEvent[] = [
       { kind: 'error', headline: 'first thing broke' },

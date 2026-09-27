@@ -1,6 +1,7 @@
 import { TriangleAlert } from 'lucide-react'
 import type { FrameworkEvent } from '../../src/index.js'
-import { agentErrors } from '../../src/client.js'
+import { agentErrors, type AgentError } from '../../src/client.js'
+import { agentOutcome } from '../lib/live-state.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 
 // How many errors the agent reported, said in the session's header (#1500) — on the run page's
@@ -8,7 +9,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 // scrolls. The errors themselves stay in the log, at the point in the run where they happened;
 // this is only the count, plus the last headline so it says *what* without being opened.
 export function AgentErrorCount({ events, headline = false }: { events: FrameworkEvent[]; headline?: boolean }) {
-  const errors = agentErrors(events)
+  const errors = errorsToCount(events)
   if (errors.length === 0) return null
   const latest = errors[errors.length - 1]!
   return (
@@ -31,4 +32,17 @@ export function AgentErrorCount({ events, headline = false }: { events: Framewor
       <TooltipContent className="whitespace-pre-line">{errors.map(e => e.headline).join('\n')}</TooltipContent>
     </Tooltip>
   )
+}
+
+/**
+ * The errors the count says: every error of the run but the one its failure already names. A run
+ * that failed says why beside its name ("failed — codex exited (1): You've hit your usage
+ * limit…"), and the error that ended it said again as "1 error" was the same fact twice. An error
+ * the run went on from, or that its failure does not name, still counts.
+ */
+export function errorsToCount(events: readonly FrameworkEvent[]): AgentError[] {
+  const errors = agentErrors(events)
+  const outcome = agentOutcome(events)
+  const failure = outcome && !outcome.ok && !outcome.stopped && !outcome.waiting ? outcome.detail : undefined
+  return failure ? errors.filter(error => !failure.includes(error.headline)) : errors
 }

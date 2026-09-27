@@ -1,8 +1,7 @@
-import { hostname } from 'node:os'
 import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
 import { findAgent, findCheckout, projectBranches, type BranchesFor } from '../store/index.js'
 import { crawlRepoFiles } from '../project.js'
-import { agentBranchFor } from './agent-handoff.js'
+import { agentBranchFor, leftNothing } from './agent-handoff.js'
 import type { Cached } from './cache.js'
 import { readFileStatuses, type FileGitStatus } from './file-status.js'
 import { readFileDiff, type FileDiff } from './file-diff.js'
@@ -124,11 +123,8 @@ export async function resolveAgentFiles(root: string, agentId: string, deps: Age
     }
   }
   if (onBranch) return onBranch
-  // A run that finished `done` recorded its branch's last name as it ended; on this machine that
-  // branch is gone only when the branches rule deleted it with the checkout, which it does when
-  // the remote already has everything on it. With no pull request either, it changed nothing.
-  const doneHere = agent.status === 'done' && agent.host === (deps.host ?? hostname())
-  if (!agent.pr && doneHere) {
+  // Its branch is gone and nothing else holds its work: the one rule for a run that changed nothing.
+  if (leftNothing(agent, deps.host)) {
     const main = await defaultBranch(ask)
     const ref = main && (await commitOf(ask, main))
     if (ref) return { source: 'unchanged', ref }

@@ -1,3 +1,4 @@
+import { hostname } from 'node:os'
 import { cachedPrView, cachedPrsForBranch, forgetBranchPrs, forgetPr, pickAgentPr, type LinkedPr, type BranchPrLookup } from './pull-requests.js'
 import type { Cached } from './cache.js'
 import type { AgentMeta } from '../store/index.js'
@@ -51,6 +52,8 @@ export interface AgentHandoff {
   name?: string
   /** The branch still exists in the repo (a deleted or never-created one does not). */
   exists: boolean
+  /** The branch is gone because the run changed nothing ({@link leftNothing}), not because work went. */
+  unchanged?: boolean
   /** What the branch is measured against (the repo's default branch), when one was found. */
   base?: string
   commits: HandoffCommit[]
@@ -117,6 +120,17 @@ export interface AgentHandoffDeps {
  */
 export function agentBranchFor(agent: { id: string; branch?: string }): string | undefined {
   return agent.branch
+}
+
+/**
+ * Whether a run whose branch is gone changed nothing (#1850): it ended `done` or `failed` on this
+ * machine, and has no pull request. Such a run's own tool recorded the branch's last name as it
+ * ended and then reclaimed the checkout, and the branches rule deletes a branch with the checkout
+ * only when it holds nothing. A run another machine ran, or one whose process died before its tool
+ * could record the end (the sweep marks that one `stopped`), leaves no such proof.
+ */
+export function leftNothing(agent: { status?: string; host?: string; pr?: unknown }, host: string = hostname()): boolean {
+  return !agent.pr && (agent.status === 'done' || agent.status === 'failed') && agent.host === host
 }
 
 /**

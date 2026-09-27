@@ -13,7 +13,7 @@ Reads an agent's [1] files for the agent page's Files tab, for as long as git st
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory. The user's own working copy is the project's checkout.
 [3] fork point: the commit where an agent's branch left the project's default branch: the default branch is origin's `HEAD`, else a local `main`, else a local `master`. An agent's changes are what differs between the fork point and the agent's last commit.
-[4] finished on this machine: said of an agent whose record names this machine's hostname as its `host` and whose status is `done`. A record with any other status, or with no status or no `host`, has not.
+[4] finished on this machine: said of an agent whose record names this machine's hostname as its `host` and whose status is `done` or `failed`, the two endings its own tool records. A record with any other status, or with no status or no `host`, has not.
 
 ## Business logic — TL;DR
 
@@ -21,7 +21,7 @@ Reads an agent's [1] files for the agent page's Files tab, for as long as git st
 - **A branch already merged into the default branch** - it shows no change against the default branch, so the merge commit is read instead when this machine has it.
 - **What is marked** - in a checkout, what the agent committed since the fork point [3] and what is on disk uncommitted, apart; on a branch, what changed since the fork point; at a merge commit, that commit's own change.
 - **What is listed** - every file at the source's last state, plus the files the agent deleted.
-- **An agent that changed nothing** - an agent that finished on this machine [4] with no checkout, no branch and no pull request left nothing to lose, so the default branch's files are listed, nothing marked, with no diff for any file; an agent from another machine, or one with any status but `done`, is never judged so.
+- **An agent that changed nothing** - an agent that finished on this machine [4] with no checkout, no branch and no pull request left nothing to lose, so the default branch's files are listed, nothing marked, with no diff for any file; an agent from another machine, or one with any status but `done` or `failed`, is never judged so.
 - **One file's diff and content** - read from the same source as the tree, so the preview shows the change the tree marked.
 - **Still looking** - while the agent's pull request is still being looked up and there is no branch to show, the answer is that it is not known yet.
 
@@ -85,7 +85,7 @@ A checkout lists every file git sees in it, tracked and untracked, honoring the 
 
 #### Context
 
-**Problem**: an agent that finished `done` recorded its branch's last name as it ended. On this machine, the branches rule deletes an ended agent's branch together with its checkout only when the remote already has everything on it: the branch's last commit is contained in another of origin's branches. So an agent that finished on this machine [4] with no checkout, no branch and no pull request left nothing it changed to lose, and saying its changes are gone would suggest work was lost. An agent from another machine may simply have a branch this machine never saw, and a `failed` or `stopped` agent (such as one the sweep recorded after a crash) may have renamed its branch without its record learning the new name, so for them the answer stays gone.
+**Problem**: an agent that ended `done` or `failed` through its own tool recorded its branch's last name as it ended. On this machine, the branches rule deletes an ended agent's branch together with its checkout only when the remote already has everything on it: the branch's last commit is contained in another of origin's branches. So an agent that finished on this machine [4] with no checkout, no branch and no pull request left nothing it changed to lose, and saying its changes are gone would suggest work was lost. An agent from another machine may simply have a branch this machine never saw, and a `stopped` agent (such as one the sweep recorded after a crash) may have renamed its branch without its record learning the new name, so for them the answer stays gone. The rule is shared with the handoff read (`agent-handoff.ts`, "An agent that changed nothing").
 
 #### Business logic
 

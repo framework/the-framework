@@ -154,11 +154,13 @@ test('a run that finished here with no checkout, no branch and no pull request c
   assert.deepEqual(tree, { source: 'unchanged', files: git(root, 'ls-tree', '-r', '--name-only', 'main').split('\n'), changes: {} })
   assert.equal((await readAgentFileContent(root, at, 'a.txt'))?.text, git(root, 'show', 'main:a.txt'), 'a file reads as the default branch has it')
   assert.equal(await readAgentFileDiff(root, at, 'a.txt'), null, 'nothing changed, so nothing diffs')
+  // A run that failed here was ended by its own tool too: its branch went with its checkout only because it held nothing.
+  assert.deepEqual(await resolveAgentFiles(root, 'run-x', deps({ status: 'failed', host: 'this-machine', branch: 'agent-failed-before-work' })), at)
 })
 
 test('no checkout, no branch and no merge commit on this machine: gone', async () => {
   assert.deepEqual(await resolveAgentFiles(root, 'run-x', deps({ status: 'done', host: 'other-machine', branch: 'agent-never-pushed' })), { source: 'gone' }, 'a run from another machine: its branch may just not be here')
-  for (const status of ['running', 'waiting', 'failed', 'stopped']) {
+  for (const status of ['running', 'waiting', 'stopped']) {
     assert.deepEqual(await resolveAgentFiles(root, 'run-x', deps({ status, host: 'this-machine', branch: 'agent-renamed-away' })), { source: 'gone' }, `a ${status} run: its record may not name its branch's last name`)
   }
   assert.deepEqual(await resolveAgentFiles(root, 'run-x', deps({ status: 'done' })), { source: 'gone' }, 'a run that names no machine')

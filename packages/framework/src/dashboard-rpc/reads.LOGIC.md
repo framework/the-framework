@@ -43,7 +43,7 @@ Answers everything the dashboard reads about a project or an agent [1]: the agen
 - **An agent's own files, for as long as git has them** - the agent's tree with what it changed marked, from its checkout, else its branch, else its merge commit; gone when none is left.
 - **One file's diff, one file's content, and what the agent changed** - the diff of a changed file and the content of an unchanged one, from the same source as the agent's own files; and every changed file with its line counts, read from the checkout's own git state.
 - **The project's page on its git host, and git status** - the project's page and the git host's name, as the git host provider answers them; the branch, dirty flag and linked pull request of the project or of one agent's checkout, filtered to that agent's lifetime.
-- **What an agent's handoff left behind** - the agent's own branch, as the project's branches provider answers it, plus the agent's pull request; an agent that recorded no branch has no handoff.
+- **What an agent's handoff left behind** - the agent's own branch, as the project's branches provider answers it, plus the agent's pull request; a gone branch of an agent that changed nothing is marked so; an agent that recorded no branch has no handoff.
 - **The bridge's state** - the question a cloud session is parked on, where the picked answer stands, what the session has said, whether anything reached the bridge and how, the bridge token while the bridge is on, and the bridge browser's state.
 - **Reads about a relayed agent go to the device** - the reads that are about one agent's checkout are answered by the device that runs the agent, and an unreachable device answers the read's empty shape.
 
@@ -191,7 +191,7 @@ The project's page and the git host's name are what the project's git host provi
 
 #### Business logic
 
-The project must be known, the id safe, and the agent found in the project's records, else nothing. The handoff [4] is read for the branch the agent recorded, through the project's branches provider, with the agent's pull request picked from what happened since the agent started (`dashboard/agent-handoff.ts`); an agent whose record carries no branch, or a project with no branches provider, answers nothing.
+The project must be known, the id safe, and the agent found in the project's records, else nothing. The handoff [4] is read for the branch the agent recorded, through the project's branches provider, with the agent's pull request picked from what happened since the agent started (`dashboard/agent-handoff.ts`); an agent whose record carries no branch, or a project with no branches provider, answers nothing. When the branch is gone and the agent changed nothing (the rule is `dashboard/agent-handoff.ts`'s), the handoff is marked as unchanged, so the page says the agent made no changes rather than that its branch is gone.
 
 ### The bridge's state
 

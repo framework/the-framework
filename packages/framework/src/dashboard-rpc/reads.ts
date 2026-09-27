@@ -12,7 +12,7 @@ import { buildOpenQuestions, type OpenQuestion } from '../dashboard/open-questio
 import { buildActivity, type Activity } from '../dashboard/activity.js'
 import { buildDashboard, type DashboardData } from '../dashboard/dashboard.js'
 import { readGitStatus, type GitStatus } from '../dashboard/git-status.js'
-import { readAgentHandoff, resolveAgentPr, agentBranchFor, type AgentHandoff } from '../dashboard/agent-handoff.js'
+import { readAgentHandoff, resolveAgentPr, agentBranchFor, leftNothing, type AgentHandoff } from '../dashboard/agent-handoff.js'
 import type { AgentWorktree } from '../dashboard/types.js'
 import { crawlRepoFiles } from '../project.js'
 import { readFileStatuses, type FileGitStatus } from '../dashboard/file-status.js'
@@ -411,7 +411,10 @@ export async function onAgentHandoff(projectId: string, agentId: string): Promis
     const agent = await findAgent(cwd, agentId).catch(() => undefined)
     const branch = agent && agentBranchFor(agent)
     if (!agent || branch === undefined) return null
-    return (await readAgentHandoff(cwd, branch, { since: agent.startedAt }).catch(() => undefined)) ?? null
+    const handoff = await readAgentHandoff(cwd, branch, { since: agent.startedAt }).catch(() => undefined)
+    if (!handoff) return null
+    // A branch that is gone because the run changed nothing is said as that, not as lost work.
+    return !handoff.exists && leftNothing(agent) ? { ...handoff, unchanged: true } : handoff
   }, null)
 }
 

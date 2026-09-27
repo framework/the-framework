@@ -25,6 +25,7 @@ Decides what becomes of an agent's [1] work once the agent has ended, its handof
 ## Business logic — TL;DR
 
 - **The branch an agent's work is on** - the branch recorded on the agent, because the agent renames its branch itself; an agent that recorded none has no branch to hand off.
+- **An agent that changed nothing** - an agent that ended `done` or `failed` on this machine and recorded no pull request, once its branch is gone: its branch went only because it held nothing.
 - **What a finished agent left behind** - the branch's git facts as the branches provider answers them, so the read is the same whether or not the checkout still exists: the base, the branch's own commits, the change since the branch point, whether the branch is pushed and merged, the uncommitted work in the checkout on that branch, and a gone branch as a fact rather than an error; plus whether the project has a git host provider at all, and the agent's pull request from the dashboard's own lookup.
 - **Nothing to hand off** - a branch with no commit the base lacks, or whose commits change no file, is empty, and every step that would publish it refuses.
 - **Uncommitted work is named, never committed** - what the agent left uncommitted in the checkout on its branch is listed by path, as the provider names it, and nothing commits it on the agent's behalf.
@@ -50,6 +51,16 @@ Decides what becomes of an agent's [1] work once the agent has ended, its handof
 #### Business logic
 
 The branch is the one recorded on the agent's [1] record while it ran. An agent whose record carries no branch has no branch: nothing is guessed, and every read and action below that needs the branch answers nothing or refuses ("this session recorded no branch to open a PR from").
+
+### An agent that changed nothing
+
+#### Context
+
+**Problem**: an agent's [1] branch is gone for two very different reasons: it held nothing, or its work went somewhere this machine cannot see. Saying "branch gone" for the first reads as lost work. The Files tab (`agent-tree.ts`) and the handoff read (`../dashboard-rpc/reads.ts`) ask the same question, so it is one rule.
+
+#### Business logic
+
+An agent changed nothing when its record names this machine's hostname as its `host`, its status is `done` or `failed`, and it recorded no pull request. Such an agent's own tool recorded its branch's last name as it ended and then reclaimed its checkout [3], and the branches rule deletes a branch together with its checkout only when the branch holds nothing; a branch with work is kept. An agent from another machine may have a branch this machine never saw, an agent with a pull request has its work there, and an agent the sweep marked `stopped` after its process died never had its end recorded by its tool, so none of them is judged to have changed nothing. The rule is only asked once the agent's branch is known to be gone.
 
 ### What a finished agent left behind
 

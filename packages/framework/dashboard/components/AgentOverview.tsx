@@ -1,6 +1,6 @@
 import type { FrameworkEvent } from '../../src/index.js'
-import { sessionInfo, agentErrors } from '../../src/client.js'
-import { AgentErrorCount } from './AgentErrorCount.js'
+import { sessionInfo } from '../../src/client.js'
+import { AgentErrorCount, errorsToCount } from './AgentErrorCount.js'
 import { agentStatusPill } from '../lib/agent-status.js'
 import { describeSessionLink } from '../lib/session-link.js'
 import { cn } from '../lib/utils.js'
@@ -13,7 +13,7 @@ import { cn } from '../lib/utils.js'
 export function AgentOverview({ events }: { events: FrameworkEvent[] }) {
   const session = sessionInfo(events)
   const status = agentStatusPill(events)
-  const errors = agentErrors(events)
+  const errors = errorsToCount(events)
 
   // The "Open session" link, labeled honestly: a headless Claude Code run has no per-session
   // URL, so the generic app entry (claude.ai/code) is shown as "Open Claude Code" with the id

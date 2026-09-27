@@ -61,8 +61,12 @@ export interface Chrome {
   close(): Promise<void>
 }
 
-/** Launch Chrome and wait until its debugging port answers. Throws with a sentence when it cannot. */
-export async function launchChrome(chromePath: string, timeoutMs = 20_000): Promise<Chrome> {
+/**
+ * Launch Chrome and wait until its debugging port answers. Throws with a sentence when it cannot.
+ * A first start on a busy machine can take past 20 seconds (seen on a CI runner), so the wait is a
+ * minute: a slow start still succeeds, and a healthy one answers as soon as the port does.
+ */
+export async function launchChrome(chromePath: string, timeoutMs = 60_000): Promise<Chrome> {
   const profile = await mkdtemp(join(tmpdir(), PROFILE_PREFIX))
   const child = spawn(chromePath, chromeArgs(profile), { stdio: 'ignore' })
   let closed = false

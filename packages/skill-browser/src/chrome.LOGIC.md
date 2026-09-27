@@ -8,7 +8,7 @@ The browser's Chrome: which Chrome executable to run, how it is launched (headle
 
 - **Which Chrome** - `CHROME_PATH` when it names an existing file, else the first well-known install path of the platform that exists, else the first of four Chrome and Chromium names found on `PATH`; none means the machine has no Chrome.
 - **How it is launched** - headless, debugging on `127.0.0.1` at a port Chrome picks, on a fresh profile directory `skill-browser-…` under the temporary directory, 1280×800, opening a blank page, with the first-run and default-browser prompts off.
-- **Waiting until it answers** - the port Chrome writes into the profile is read and its version endpoint polled every 100 ms, up to 20 seconds; Chrome failing to start, exiting as it starts, or not answering in time fails the launch with a sentence, and Chrome is closed.
+- **Waiting until it answers** - the port Chrome writes into the profile is read and its version endpoint polled every 100 ms, up to 60 seconds, since a first start on a busy machine can take past 20; Chrome failing to start, exiting as it starts, or not answering in time fails the launch with a sentence, and Chrome is closed.
 - **Closing** - Chrome is asked to exit, killed outright when it has not within 5 seconds, and its profile directory is removed once it has exited; closing twice does nothing more.
 
 ## Business logic
@@ -41,7 +41,7 @@ Chrome runs headless, with its debugging interface bound to `127.0.0.1` on a por
 
 #### Business logic
 
-Every 100 ms the port is read from the profile's `DevToolsActivePort` file and, once there, Chrome's version endpoint on `127.0.0.1` at that port is asked; the first successful answer ends the wait, and the launch answers that debugging address. The launch fails with a sentence when Chrome could not start ("Chrome could not start: …"), when it exits during the wait ("Chrome exited as it started (code …)"), or when 20 seconds pass without an answer ("Chrome did not open its debugging port within 20s"); a failed launch closes Chrome and removes its profile.
+Every 100 ms the port is read from the profile's `DevToolsActivePort` file and, once there, Chrome's version endpoint on `127.0.0.1` at that port is asked; the first successful answer ends the wait, and the launch answers that debugging address. The launch fails with a sentence when Chrome could not start ("Chrome could not start: …"), when it exits during the wait ("Chrome exited as it started (code …)"), or when 60 seconds pass without an answer ("Chrome did not open its debugging port within 60s"); a failed launch closes Chrome and removes its profile.
 
 ### Closing
 

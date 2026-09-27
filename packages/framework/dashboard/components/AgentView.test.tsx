@@ -116,5 +116,18 @@ describe('AgentView event source (#1026/#1383)', () => {
   })
 })
 
+describe('AgentView branch read', () => {
+  test('what the branch holds is not read while the card says saving, and is read once it stops', async () => {
+    // The checkout is cleaned up while saving, and an empty branch is deleted with it: an Open PR
+    // offered in that window turned into "Branch gone" moments later.
+    onAgent.mockResolvedValue(ARCHIVED)
+    const { rerender } = render(view({ card: { status: 'done', saving: true } }))
+    await waitFor(() => expect(onAgent).toHaveBeenCalled())
+    expect(onAgentHandoff).not.toHaveBeenCalled()
+    rerender(view({ card: { status: 'done' } }))
+    await waitFor(() => expect(onAgentHandoff).toHaveBeenCalledWith('p1', 'run-1'))
+  })
+})
+
 // The Resume offer (#1391) moved into the composer's submit slot (#1455): its when-offered rules
 // are AgentComposer's now, tested there — AgentView only hands `outcome` down.

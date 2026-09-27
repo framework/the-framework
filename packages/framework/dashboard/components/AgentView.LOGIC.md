@@ -87,7 +87,7 @@ The agent's name leads the bar: the label the caller passes, the same label the 
 
 An agent [1] counts as working exactly while the daemon's list of agents says it is running. Everything that asks "is there anything more coming?" asks whether the agent is working:
 
-- what the branch holds (the read in `lib/use-agent-handoff.ts`) is only read once the agent is not working: a branch still being written to has nothing to offer yet;
+- what the branch holds (the read in `lib/use-agent-handoff.ts`) is only read once the agent is not working and its card [3] is not marked saving: a branch still being written to has nothing to offer yet, and while the agent is saving its checkout is being cleaned up, which deletes a branch that holds nothing, so a next step offered then would be gone moments later;
 - the bar's action slot is empty while working — an agent that is working publishes its own work — and holds the next step [9] once not working;
 - the changes panel reads the checkout [7] while working; the branch's commits and files replace it once not working.
 

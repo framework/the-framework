@@ -106,8 +106,10 @@ export function AgentView({
 
   // What the branch holds (#1023), read once for both the bar and the detail it opens. Read once
   // the agent stops rather than once the process does: while it is still writing to the branch
-  // there is nothing to hand off yet, but a parked session's branch is finished work.
-  const handoff = useAgentHandoff(projectId, agentId, !working)
+  // there is nothing to hand off yet, but a parked session's branch is finished work. Not while
+  // the card says saving either: the checkout is being cleaned up then, and an empty branch is
+  // deleted with it, so an Open PR offered in that window turned into "Branch gone" moments later.
+  const handoff = useAgentHandoff(projectId, agentId, !working && !card?.saving)
   const [changes, setChanges] = useState({ count: 0, added: 0, removed: 0 })
   const [open, setOpen] = useState(false)
   const onChangesSummary = useCallback((count: number, added: number, removed: number) => {

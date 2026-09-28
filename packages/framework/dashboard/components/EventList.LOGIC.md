@@ -11,7 +11,6 @@ Renders an agent's [1] transcript: every event [2] the agent emitted, one row ea
 [3] archive: the transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
 [4] gate: a question with options an agent's turn ended on: the agent ends waiting for the answer, the dashboard shows the question as a card, and the answer resumes the agent.
 [5] coding agent: the CLI doing the actual work: Claude Code or Codex.
-[6] ready for merge: the signal an agent emits when it believes its work is complete: it flips the agent's badge from building to ready and authorizes the handoff.
 [7] turn: one prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
 [8] settled: said of an agent whose work has stopped and which is waiting for the user: it is alive, takes messages, and does nothing until told.
 [9] live chat: the user's own messages to a running agent, each continuing the same driver session.
@@ -31,7 +30,7 @@ Renders an agent's [1] transcript: every event [2] the agent emitted, one row ea
 - **A gate is answered where it happened** - when the transcript knows its project, an open gate [4] renders as the interactive gate panel inline, an answered one as a collapsed card that replaces its "✓ chose" line, and a gate whose agent ended unanswered stays text.
 - **A screen is live where the agent used it** - the newest `screen` line at an address, on this machine's loopback and with neither an `ended` line for that address nor the agent's end after it (an end waiting on an answer does not count), is the live page itself, framed in the transcript; an earlier or ended one stays its one line, and every `ended` line is hidden.
 - **Badges once per group, colored as a scanning aid** - the kind badge shows on the first of consecutive rows of one group, "YOU" for the user's prompt; only failures, the user's turn, gates, milestones and pushed surfaces get a color.
-- **Failures read red, the user's turn blue** - a failed row is red on a red wash, the user's prompt blue on a blue wash, a clean finish and the ready-for-merge [6] signal on a green wash; a stopped agent stays neutral.
+- **Failures read red, the user's turn blue** - a failed row is red on a red wash, the user's prompt blue on a blue wash, a clean finish on a green wash; a stopped agent stays neutral.
 - **The time each line was written** - a row that opens a group shows the time its diary line was written, the same live, after a reload and once the agent has ended; a line with no time shows none.
 - **Following the newest row** - a live transcript keeps the newest row in view until the reader scrolls up and offers "Jump to latest"; a replay opens at its end or its start as the caller decides.
 
@@ -115,9 +114,9 @@ Every `screen` line of the transcript is sorted, in order, by address. A line wi
 
 #### Business logic
 
-Consecutive rows of the same group share one badge, shown on the group's first row. The group is the event's kind, except that the user's prompt forms its own group apart from the rest of the coding agent's events, so each of the user's turns opens a new group. The badge word is "you" for the prompt, and otherwise the kind's plain-language label (the label rules in `lib/event-labels.ts`: "agent" for the coding agent's own events, "waiting" for the agent settling [8], "cost" for a usage report, "resume" for a session id update, and every other kind's name with hyphens turned to spaces, such as "ready for merge"); the badge is shown uppercased. The badge column is wide enough for "ready for merge" on one line, and the body column aligns whether or not the row shows a badge.
+Consecutive rows of the same group share one badge, shown on the group's first row. The group is the event's kind, except that the user's prompt forms its own group apart from the rest of the coding agent's events, so each of the user's turns opens a new group. The badge word is "you" for the prompt, and otherwise the kind's plain-language label (the label rules in `lib/event-labels.ts`: "agent" for the coding agent's own events, "waiting" for the agent settling [8], "cost" for a usage report, "resume" for a session id update, and every other kind's name with hyphens turned to spaces, such as "choice resolved"); the badge is shown uppercased. The badge column is wide enough for "choice resolved" on one line, and the body column aligns whether or not the row shows a badge.
 
-The badge's color is a navigation aid: a failing row's badge is red and the user's prompt's badge is blue (those two win over everything below); a gate [4] and its resolution are amber, the rows the reader most wants to find; a clean end and the ready-for-merge [6] signal are green, as milestones; a pushed surface (a view [11] or a screen [15]) takes the dashboard's primary accent, as the agent showing the user something; every other badge is muted. A stopped or failed end is not a milestone and stays out of green, and the handoff [12] report stays muted because its body may report mixed outcomes.
+The badge's color is a navigation aid: a failing row's badge is red and the user's prompt's badge is blue (those two win over everything below); a gate [4] and its resolution are amber, the rows the reader most wants to find; a clean end is green, as a milestone; a pushed surface (a view [11] or a screen [15]) takes the dashboard's primary accent, as the agent showing the user something; every other badge is muted. A stopped or failed end is not a milestone and stays out of green, and the handoff [12] report stays muted because its body may report mixed outcomes.
 
 ### Failures read red, the user's turn blue
 
@@ -127,7 +126,7 @@ See `## Context`.
 
 #### Business logic
 
-A row reports a failure when it is the coding agent [5] (or its transport) erroring mid-run, an error the agent reported itself, or an end that is neither successful nor a stop. A failing row's text is red and its whole line is washed with a faint red tint, findable from the scrollbar's distance. The user's prompt is blue on a faint blue wash. A clean end and the ready-for-merge [6] signal keep their text tone on a faint green wash. A stopped agent's end is neither a failure nor a milestone: it keeps the neutral tone, since the user asked for the stop. Every other row keeps the muted transcript tone with no wash.
+A row reports a failure when it is the coding agent [5] (or its transport) erroring mid-run, an error the agent reported itself, or an end that is neither successful nor a stop. A failing row's text is red and its whole line is washed with a faint red tint, findable from the scrollbar's distance. The user's prompt is blue on a faint blue wash. A clean end keeps its text tone on a faint green wash. A stopped agent's end is neither a failure nor a milestone: it keeps the neutral tone, since the user asked for the stop. Every other row keeps the muted transcript tone with no wash.
 
 ### The time each line was written
 

@@ -100,16 +100,15 @@ function rowTone(e: FrameworkEvent): string {
  * none do. The body keeps rowTone: colour the *marker*, not the text.
  *
  *   - your decisions (`choice`/`choice-resolved`) — amber, the rows the log most wants found
- *   - milestones (a CLEAN `end`, `ready-for-merge`) — green, how far the agent got; a stopped or
- *     failed end is not a milestone (failure is already red, stopped stays neutral), and
- *     `handoff` stays muted because its body reports per-rung outcomes that may be mixed
+ *   - milestones (a CLEAN `end`) — green, how far the agent got; a stopped or failed end is not
+ *     a milestone (failure is already red, stopped stays neutral)
  *   - pushed surfaces (`view`, `screen`) — primary, the agent showing you something
  */
 function badgeTone(e: FrameworkEvent): string {
   const semantic = rowTone(e)
   if (semantic) return semantic
   if (e.kind === 'choice' || e.kind === 'choice-resolved') return 'text-warning'
-  if ((e.kind === 'end' && e.ok) || e.kind === 'ready-for-merge') return 'text-success'
+  if (e.kind === 'end' && e.ok) return 'text-success'
   if (e.kind === 'view' || e.kind === 'screen') return 'text-primary'
   return ''
 }
@@ -124,7 +123,7 @@ function badgeTone(e: FrameworkEvent): string {
 function rowWash(e: FrameworkEvent): string {
   if (isFailure(e)) return 'bg-danger/10'
   if (e.kind === 'driver' && e.event.type === 'start') return 'bg-info/10'
-  if ((e.kind === 'end' && e.ok) || e.kind === 'ready-for-merge') return 'bg-success/10'
+  if (e.kind === 'end' && e.ok) return 'bg-success/10'
   return ''
 }
 
@@ -312,7 +311,7 @@ export function EventList({
                 // Every row carries the same -mx/px pair so a washed row's band and a plain row's
                 // text share the exact same columns; only the background differs.
                 <MessageScrollerItem key={i} messageId={String(i)} scrollAnchor={isTurnBoundary(e)} className={`-mx-1.5 flex items-start gap-2 rounded-sm px-1.5 ${rowWash(e)}`}>
-                  {/* Fixed-width badge column so the text lines up whether or not this row repeats the badge. Wide enough for the longest common label ("ready for merge") to sit on one line. */}
+                  {/* Fixed-width badge column so the text lines up whether or not this row repeats the badge. Wide enough for the longest common label ("choice resolved") to sit on one line. */}
                   <span className="w-28 shrink-0">
                     {chunkHead && (
                       <Badge className={`mt-0.5 text-[10px] uppercase ${badgeTone(e) || 'text-muted-foreground'}`}>{rowLabel(e)}</Badge>

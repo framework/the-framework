@@ -10,7 +10,7 @@ describe('eventKindLabel', () => {
   })
 
   it('de-hyphenates the kinds that are already clear', () => {
-    expect(eventKindLabel('ready-for-merge')).toBe('ready for merge')
+    expect(eventKindLabel('choice-resolved')).toBe('choice resolved')
   })
 
   it('leaves a plain single-word kind untouched', () => {

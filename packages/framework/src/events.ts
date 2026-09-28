@@ -119,20 +119,6 @@ export type FrameworkEvent = { at?: string } & (
    */
   | { kind: 'view'; id: string; title: string; markdown: string }
   /**
-   * The agent signalled `setReadyForMerge()` (#326): it believes the work is complete
-   * and ready for human review. Non-blocking — it flips the agent's dashboard status from
-   * building (orange) to ready (green).
-   */
-  | { kind: 'ready-for-merge' }
-  /**
-   * The pull request the agent asked for (#1567/#1618), via an `open-pr` block: how an agent
-   * opens a PR *through* the framework instead of opening it itself, so the ticket's
-   * issue reference and recording the number still apply. The title is the agent's name for the
-   * work and the description is what changed; either may be absent when the agent wrote only the
-   * other. Non-blocking; the end-of-agent handoff uses the latest one.
-   */
-  | { kind: 'open-pr'; title?: string; description?: string }
-  /**
    * The pull request this session's work is on (E6), the moment one is opened for it.
    *
    * An event for the same reason `branch` is: only an event reaches the agent's meta,

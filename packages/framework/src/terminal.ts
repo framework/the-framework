@@ -23,10 +23,6 @@ export function formatFrameworkEvent(event: FrameworkEvent): string {
       return `✗ ${event.headline}${event.detail ? `\n    ${event.detail.replace(/\n/g, '\n    ')}` : ''}`
     case 'view':
       return `▶ view: ${event.title}`
-    case 'ready-for-merge':
-      return `✓ ready for merge`
-    case 'open-pr':
-      return `  pull request written${event.title ? `: ${event.title}` : ''}`
     case 'settled':
       return `◆ done for now — waiting for your next message`
     case 'branch':

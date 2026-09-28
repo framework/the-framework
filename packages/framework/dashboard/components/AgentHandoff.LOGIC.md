@@ -39,7 +39,7 @@ Nothing is shown until the read of the branch has answered. Then, in the bar, mu
 
 #### Context
 
-**User story**: an agent [2] has ended without publishing its own work, because its command did not say to or because the attempt failed; publishing the work to a shared remote under the user's name should be one deliberate click, offered without being looked for. And an agent that shows no control must say why, since "what should I do now?" is exactly what the user came for.
+**User story**: an agent [2] has ended without publishing its own work, because its command did not say to or because the attempt failed; publishing the work to a shared remote under the user's name should be one deliberate click, offered without being looked for. And an agent that shows no control says why only when it left something the user may act on; an agent that changed nothing shows nothing, since an agent with work always shows its button.
 
 **Problem**: opening a second pull request for a branch that already has one is the one mistake this must not make. Once a pull request exists, the bar links it and the interventions [4] feed has picked it up.
 
@@ -48,8 +48,8 @@ Nothing is shown until the read of the branch has answered. Then, in the bar, mu
 Shown once the agent has ended (the caller's decision, in `AgentView.tsx`); an agent that is still working offers no next step [1], since it publishes its own work. Nothing is rendered until the read of the branch has answered, and nothing while the pull request lookup is still running: acting on "not known yet" is how a second pull request gets opened. Then, the first rule that applies:
 
 - The branch has a pull request: when it is open and the branch is not merged, a "Merge PR" button, reading "Merging…" while the merge is in flight; a merged or closed pull request, or a merged branch, offers nothing, because landed is an answer, not an action. An agent opens its pull request and leaves the merge to a person: it takes one click to land.
-- The branch is gone: "Branch gone — nothing to open a PR from.", or "No changes — nothing to open a PR from." when the daemon marks it as belonging to an agent that changed nothing.
-- The branch carries no commit beyond the base: "Nothing committed — no PR to open." when the checkout [3] holds no uncommitted files; otherwise "Nothing committed — <files> left uncommitted.", where <files> names the first two paths, joined by a comma, followed by "and <N> more" for the rest; hovering the sentence shows every path, one per line. No button: GitHub would refuse a pull request with no commits, and the named work is what the user's next message to the agent should have it commit.
+- The branch is gone: "Branch gone — nothing to open a PR from.", or nothing when the daemon marks it as belonging to an agent that changed nothing.
+- The branch carries no commit beyond the base: nothing when the checkout [3] holds no uncommitted files; otherwise "Nothing committed — <files> left uncommitted.", where <files> names the first two paths, joined by a comma, followed by "and <N> more" for the rest; hovering the sentence shows every path, one per line. No button: GitHub would refuse a pull request with no commits, and the named work is what the user's next message to the agent should have it commit.
 - The repository has no remote: "No remote to push to."
 - The project has no git host package: nothing can open a pull request for it, so the last step is the push. A branch not yet on the remote gets one button, "Push", reading "Pushing…" while it is in flight; a branch already pushed gets "Pushed — no git host package to open a pull request with." and no button.
 - Otherwise one button, "Open PR", reading "Opening PR…" while it is in flight. Opening a pull request pushes the branch on the way, so no separate push button competes with it.

@@ -91,17 +91,18 @@ export function HandoffActions({
       </Button>
     )
   }
-  // From here every branch says something. A session that has finished and shows no control at all
-  // is #1173: the reason there is nothing to press is exactly what the reader came for.
-  // A branch the run's own tool deleted because it held nothing is no loss: said as no changes.
-  if (!handoff.exists) return <Reason>{handoff.unchanged ? 'No changes' : 'Branch gone'} — nothing to open a PR from.</Reason>
+  // A run that changed nothing shows nothing here: there is nothing to do, and a finished run with
+  // work always shows its button, so silence already says it. A reason is written only where
+  // something was left behind the user may act on.
+  // A branch the run's own tool deleted because it held nothing is no loss, so it too is silent.
+  if (!handoff.exists) return handoff.unchanged ? null : <Reason>Branch gone — nothing to open a PR from.</Reason>
   // A branch with no diff never gets the button (#1173): there is nothing the git host would accept a PR
   // for, and offering one that fails with "No commits between main and <branch>" is the dead end
   // this bar exists to prevent. When the tree holds uncommitted work, that work is named — the
   // reader's next step is to have the session commit it (the composer is right below).
   if (handoff.empty) {
     const pending = handoff.pendingFiles ?? []
-    if (pending.length === 0) return <Reason>Nothing committed — no PR to open.</Reason>
+    if (pending.length === 0) return null
     return <Reason title={pending.join('\n')}>Nothing committed — {namePending(pending)} left uncommitted.</Reason>
   }
   if (!handoff.hasRemote) return <Reason>No remote to push to.</Reason>

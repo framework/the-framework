@@ -78,15 +78,16 @@ export function GitStatusBar({
     <span className="flex min-w-0 items-center gap-1.5 overflow-hidden">
       {/* The project, as a breadcrumb parent: muted, and always there. It keeps its width and is
           capped, so a long project name is cut at the cap and a long session name gives up the
-          rest. Letting it give up width first squeezed it, slash and all, to nothing beside a
-          long session name. */}
+          rest. Letting it give up width first squeezed it, separator and all, to nothing beside a
+          long session name. The separator is `›`, not `/`: a run started by a command is named
+          by it (`/update-tickets`), and `gemstack / /update-tickets` read as a doubled slash. */}
       {projectName && (
         <span data-testid="project-crumb" className="flex max-w-32 shrink-0 items-center gap-1.5 text-muted-foreground">
           <span className="min-w-0 truncate" title={projectName}>
             {projectName}
           </span>
           <span className="shrink-0 text-muted-foreground/60" aria-hidden>
-            /
+            ›
           </span>
         </span>
       )}

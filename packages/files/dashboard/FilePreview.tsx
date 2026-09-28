@@ -1,8 +1,8 @@
-import { PreviewCard } from '@base-ui-components/react/preview-card'
-import type { FileContent, FileDiff } from '../../src/index.js'
-import { onFileContent, onFileDiff } from '../rpc/reads.js'
-import { usePolled } from '../lib/use-async.js'
-import { ContentView, DiffStat, DiffView } from './DiffView.js'
+import { DiffStat, PreviewCard, useModuleHost, usePolled } from 'framework/module'
+import type { FileContent } from '../src/read.js'
+import type { FileDiff } from '../src/diff.js'
+import { readContent, readDiff } from './reads.js'
+import { ContentView, DiffView } from './DiffView.js'
 
 // Hover a file in the tree, see what is in it. Clicking is already taken — it toggles the path in
 // the agent Context (#504) — so hover is the free gesture. Base UI's PreviewCard is the hover-card
@@ -35,11 +35,12 @@ export function FilePreviewCard({
 }) {
   // Polled, not read once: the card is open over a session that is still editing, so what is under
   // the pointer keeps up rather than freezing at whatever it was when you hovered.
+  const host = useModuleHost()
   const { value, loaded } = usePolled<FileDiff | FileContent | null>(
     () =>
       changed
-        ? onFileDiff(projectId, path, agentId ?? undefined)
-        : onFileContent(projectId, path, agentId ?? undefined),
+        ? readDiff(host, projectId, path, agentId ?? undefined)
+        : readContent(host, projectId, path, agentId ?? undefined),
     null,
     5_000,
     [projectId, agentId, path, changed],

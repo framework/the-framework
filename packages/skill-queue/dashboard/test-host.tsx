@@ -29,6 +29,7 @@ export function fakeHost(answers: Answers = {}): FakeHost {
     package: '@gemstack/skill-queue',
     runCommand: vi.fn(answer),
     act: vi.fn(answer),
+    read: vi.fn(async () => ({ ok: false as const, error: 'this module has no server part' })),
     openAgent: vi.fn(),
     openPage: vi.fn(),
     startRun: vi.fn(async () => ({ ok: true as const, agentId: `run-${++runs}` })),
@@ -38,7 +39,7 @@ export function fakeHost(answers: Answers = {}): FakeHost {
 }
 
 /** No other module is installed: the card is rendered with nothing but its own package. */
-export const NO_MODULES: MountedModules = { pages: [], cards: [], linkActions: [], loaded: true }
+export const NO_MODULES: MountedModules = { pages: [], cards: [], linkActions: [], panels: [], runSlots: [], loaded: true }
 
 /** Render the card inside the fake host, with no other module mounted. */
 export function renderWithHost(ui: ReactElement, host: ModuleHost): RenderResult {

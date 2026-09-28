@@ -3,7 +3,8 @@ import { test } from 'node:test'
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { readFileChanges, readFileDiff, safeRepoPath } from './file-diff.js'
+import { readFileChanges, readFileDiff } from './diff.js'
+import { safeRepoPath } from './read.js'
 
 const PATCH = [
   'diff --git a/src/a.ts b/src/a.ts',

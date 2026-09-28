@@ -1,5 +1,5 @@
 // Reading one file out of a checkout, for the panel's hover card: the diff of a changed file
-// (#816, file-diff.ts) and the contents of an unchanged one (#828). Both take a path from the
+// (#816, diff.ts) and the contents of an unchanged one (#828). Both take a path from the
 // client, so the guard and the confined read live here, once, and every caller goes through them.
 
 /** Cap what a hover card renders, whether it is a patch or a file. */

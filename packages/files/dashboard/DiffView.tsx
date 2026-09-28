@@ -1,5 +1,6 @@
-import type { FileContent, FileDiff } from '../../src/index.js'
-import { cn } from '../lib/utils.js'
+import { cn } from 'framework/module'
+import type { FileContent } from '../src/read.js'
+import type { FileDiff } from '../src/diff.js'
 
 // What a file looks like in a card: its diff from git's unified output (#816), shared by the
 // tree's hover card and the agent view's Changes section (#817) so a change reads the same wherever
@@ -17,17 +18,6 @@ function Cut() {
 /** Said once: a file we cannot render as text. */
 function Binary() {
   return <p className="p-2 text-xs text-muted-foreground">Binary file, nothing to show.</p>
-}
-
-/** Added/removed counts as the `+12 −3` pair the tree and the agent view both show. */
-export function DiffStat({ added, removed, className }: { added: number; removed: number; className?: string }) {
-  return (
-    <span className={cn('shrink-0 font-mono text-[10px] tabular-nums', className)}>
-      {added > 0 && <span className="text-success">+{added}</span>}
-      {added > 0 && removed > 0 && ' '}
-      {removed > 0 && <span className="text-danger">−{removed}</span>}
-    </span>
-  )
 }
 
 function lineClass(line: string): string {

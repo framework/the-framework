@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { mkdtemp, mkdir, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { MAX_PREVIEW_LINES, readFileContent, safeRepoPath } from './file-read.js'
+import { MAX_PREVIEW_LINES, readFileContent, safeRepoPath } from './read.js'
 
 const scratch = () => mkdtemp(join(tmpdir(), 'file-read-'))
 

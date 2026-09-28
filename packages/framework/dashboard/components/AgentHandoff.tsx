@@ -4,7 +4,7 @@ import { GitMerge, GitPullRequest, Upload } from 'lucide-react'
 import { sendMerge, sendOpenPullRequest, sendPush } from '../rpc/control.js'
 import type { AgentHandoffState } from '../lib/use-agent-handoff.js'
 import { cn } from '../lib/utils.js'
-import { DiffStat } from './DiffView.js'
+import { DiffStat } from './DiffStat.js'
 import { Button } from './ui/button.js'
 
 // The end-of-session handoff (#799): what this session produced, and the next step offered rather

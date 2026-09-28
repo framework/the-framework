@@ -1,0 +1,50 @@
+// `framework/module-server`: what the daemon offers a module's server part.
+//
+// A module's server part is the file its package exports as `./server`. The daemon imports it once,
+// in its own process, and calls one of its reads when the module's browser part asks for it
+// (`host.read(name, input)` there). The server part imports nothing from the framework at run time:
+// these are types only, and its default export is a plain object that satisfies `ModuleServer`.
+
+/** What the core knows about one run: facts, never a verdict about what the run's files are. */
+export interface RunFacts {
+  /** The run's own checkout while it has one: an absolute path. */
+  checkout?: string
+  /** The run's record, when the project keeps one for it. */
+  record?: {
+    status?: string
+    /** The machine the run ran on. */
+    host?: string
+    /** The branch the run left its work on, by its last recorded name. */
+    branch?: string
+    pr?: { number: number }
+  }
+  /** The run ended on this machine without a pull request, so a branch it no longer has held nothing. */
+  changedNothing: boolean
+}
+
+/** Where a pull request stands on the git host: still being asked, or answered (with its merge commit when merged). */
+export type MergeLookup = { pending: true } | { pending: false; commit?: string }
+
+/** What a read is given: the project it reads, and what the core knows about the project's runs. */
+export interface ModuleServerHost {
+  /** The project's folder: an absolute path. */
+  root: string
+  /** The facts about one run of the project, or undefined when the id names no run. */
+  run(agentId: string): Promise<RunFacts | undefined>
+  /** The commit pull request `number` of `branch` merged as, as the project's git host says. */
+  mergeCommit(branch: string, number: number): Promise<MergeLookup>
+}
+
+/**
+ * What a module's browser part sent with a read: JSON, bounded in size. `agentId`, when present,
+ * names the run the read is about; a run relayed to a connected device is read over there.
+ */
+export type ModuleReadInput = { agentId?: string } & Record<string, unknown>
+
+/** One read of a module's server part: its answer must be JSON. */
+export type ModuleRead = (host: ModuleServerHost, input: ModuleReadInput) => Promise<unknown>
+
+/** What a module's `./server` file default-exports. */
+export interface ModuleServer {
+  reads: Record<string, ModuleRead>
+}

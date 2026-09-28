@@ -37,18 +37,21 @@
       "types": "./dist/module-types/dashboard/module/index.d.ts"
     },
     "./module.css": "./dist/module.css",
+    "./module-server": {
+      "types": "./dist/module-server.d.ts"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {
-    "build": "pnpm -C ../agent-data build && pnpm -C ../agent-driver/core build && pnpm -C ../agent-driver/claude build && pnpm -C ../agent-driver/codex build && tsc -p tsconfig.build.json && tsc -p dashboard/tsconfig.module.json && cp dashboard/module/theme.css dist/module.css && node scripts/copy-extension.mjs && cd dashboard && vite build",
+    "build": "pnpm -C ../agent-data build && pnpm -C ../files build && pnpm -C ../agent-driver/core build && pnpm -C ../agent-driver/claude build && pnpm -C ../agent-driver/codex build && tsc -p tsconfig.build.json && tsc -p dashboard/tsconfig.module.json && cp dashboard/module/theme.css dist/module.css && cp src/module-server.d.ts dist/module-server.d.ts && node scripts/copy-extension.mjs && cd dashboard && vite build",
     "prepack": "node -e \"if(!process.env.npm_config_user_agent?.startsWith('pnpm/')){console.error('Pack and publish with pnpm: it replaces workspace:* with the real version, npm does not');process.exit(1)}\"",
     "preview": "pnpm build && node dist/bin.js",
     "dev": "pnpm -C ../agent-data build && pnpm -C ../agent-driver/core build && pnpm -C ../agent-driver/claude build && pnpm -C ../agent-driver/codex build && tsc -p tsconfig.build.json --watch",
     "dev:dashboard": "cd dashboard && vite",
     "dev:daemon": "cd dashboard && FRAMEWORK_DEV_DAEMON=1 vite",
     "design:build": "tsx dashboard/design/build.mts",
-    "typecheck": "pnpm -C ../skill-branches build && pnpm -C ../skill-tickets build && pnpm -C ../skill-queue build && pnpm -C ../skill-logs build && pnpm -C ../agent-driver/core build && pnpm -C ../agent-driver/claude build && pnpm -C ../agent-driver/codex build && tsc --noEmit && tsc --noEmit -p dashboard/tsconfig.json",
-    "test": "pnpm -C ../skill-branches build && pnpm -C ../skill-tickets build && pnpm -C ../skill-queue build && pnpm -C ../skill-logs build && pnpm -C ../agent-driver/core build && pnpm -C ../agent-driver/claude build && pnpm -C ../agent-driver/codex build && tsc -p tsconfig.test.json && node scripts/run-tests.mjs && cd dashboard && vitest run",
+    "typecheck": "pnpm -C ../files build && pnpm -C ../skill-branches build && pnpm -C ../skill-tickets build && pnpm -C ../skill-queue build && pnpm -C ../skill-logs build && pnpm -C ../agent-driver/core build && pnpm -C ../agent-driver/claude build && pnpm -C ../agent-driver/codex build && tsc --noEmit && tsc --noEmit -p dashboard/tsconfig.json",
+    "test": "pnpm -C ../files build && pnpm -C ../skill-branches build && pnpm -C ../skill-tickets build && pnpm -C ../skill-queue build && pnpm -C ../skill-logs build && pnpm -C ../agent-driver/core build && pnpm -C ../agent-driver/claude build && pnpm -C ../agent-driver/codex build && tsc -p tsconfig.test.json && node scripts/run-tests.mjs && cd dashboard && vitest run",
     "clean": "rm -rf dist dist-test"
   },
   "dependencies": {
@@ -56,6 +59,7 @@
     "@agent-driver/codex": "workspace:*",
     "@base-ui-components/react": "1.0.0-rc.0",
     "@gemstack/agent-data": "workspace:*",
+    "@gemstack/files": "workspace:*",
     "@puppeteer/browsers": "3.2.1",
     "@shadcn/react": "^0.2.1",
     "@tiptap/core": "^2.10.0",

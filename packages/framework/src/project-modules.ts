@@ -1,11 +1,13 @@
 import { realpath, stat } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { dirname, join, normalize, sep } from 'node:path'
-import { packageBins, projectPackages, runPackageCommand, type PackageCommandResult, type ProjectPackage } from '@gemstack/agent-data'
+import { packageBins, projectPackages, readManifest, runPackageCommand, type PackageCommandResult, type ProjectPackage } from '@gemstack/agent-data'
 
 /**
- * A dashboard module one of a project's packages brings (#1774): the package's own browser module,
- * named by its `exports["./dashboard"]`. The framework names no package: any dependency of the
- * project that exports `./dashboard` is a module, whoever wrote it.
+ * A package that adds to the dashboard (#1774): its browser part, named by its
+ * `exports["./dashboard"]`, and optionally its server part, named by `exports["./server"]`. The
+ * framework names no package: any dependency of the project that exports `./dashboard` is a
+ * module, whoever wrote it, and the framework's own built-in modules come the same way.
  */
 export interface ProjectModule {
   /** The package's name, as the project's package.json lists it. */
@@ -18,15 +20,23 @@ export interface ProjectModule {
   entry: string
   /** The package's commands, by name, as absolute paths: what the module may run in this project. */
   bins: Record<string, string>
+  /** The module's server part, an absolute path inside the package, when it has one. */
+  server?: string
 }
 
-/** The file an `exports["./dashboard"]` entry names: a plain path, or the `browser`/`import`/`default` condition. */
-function dashboardExport(exports: unknown): string | undefined {
+/**
+ * The modules the framework ships and loads for every project, by package name: dependencies of
+ * the framework itself, resolved from its own install, so a project installs nothing for them.
+ */
+export const BUILT_IN_MODULES: readonly string[] = ['@gemstack/files']
+
+/** The file an `exports[key]` entry names: a plain path, or the first of `conditions` it has. */
+function exportedFile(exports: unknown, key: string, conditions: readonly string[]): string | undefined {
   if (!exports || typeof exports !== 'object' || Array.isArray(exports)) return undefined
-  const entry = (exports as Record<string, unknown>)['./dashboard']
+  const entry = (exports as Record<string, unknown>)[key]
   if (typeof entry === 'string') return entry
   if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return undefined
-  for (const condition of ['browser', 'import', 'default']) {
+  for (const condition of conditions) {
     const target = (entry as Record<string, unknown>)[condition]
     if (typeof target === 'string') return target
   }
@@ -38,9 +48,36 @@ function within(dir: string, path: string): boolean {
   return path === dir || path.startsWith(dir + sep)
 }
 
+/** The file `target` names inside the package at `pkgDir`, symlinks resolved; undefined when it is no file there. */
+async function fileInside(pkgDir: string, target: string | undefined): Promise<string | undefined> {
+  if (!target) return undefined
+  const file = await realpath(join(pkgDir, target)).catch(() => undefined)
+  if (!file || !within(pkgDir, file) || !(await stat(file).then(s => s.isFile()).catch(() => false))) return undefined
+  return file
+}
+
+/** The framework's built-in modules' packages, resolved from its own install; one that is not installed is skipped. */
+async function builtInPackages(): Promise<ProjectPackage[]> {
+  const require = createRequire(import.meta.url)
+  const packages: ProjectPackage[] = []
+  for (const name of BUILT_IN_MODULES) {
+    let manifestPath: string
+    try {
+      manifestPath = require.resolve(`${name}/package.json`)
+    } catch {
+      continue
+    }
+    const dir = await realpath(dirname(manifestPath)).catch(() => undefined)
+    const manifest = dir ? await readManifest(join(dir, 'package.json')) : undefined
+    if (dir && manifest) packages.push({ name, dir, manifest })
+  }
+  return packages
+}
+
 /**
- * The modules a project's packages bring: each of the project's dependencies whose package.json
- * exports `./dashboard` to a file that exists inside the package. Sorted by name.
+ * The modules a project has: each of its dependencies whose package.json exports `./dashboard` to
+ * a file that exists inside the package, plus the framework's built-in modules. A project that
+ * depends on a built-in module's package itself gets its own copy. Sorted by name.
  */
 export async function readProjectModules(root: string): Promise<ProjectModule[]> {
   const modules: ProjectModule[] = []
@@ -48,20 +85,25 @@ export async function readProjectModules(root: string): Promise<ProjectModule[]>
     const module = await readModule(pkg)
     if (module) modules.push(module)
   }
+  for (const pkg of await builtInPackages()) {
+    if (modules.some(module => module.package === pkg.name)) continue
+    const module = await readModule(pkg)
+    if (module) modules.push(module)
+  }
   return modules.sort((a, b) => a.package.localeCompare(b.package))
 }
 
 async function readModule({ name, dir: pkgDir, manifest: pkg }: ProjectPackage): Promise<ProjectModule | undefined> {
-  const target = dashboardExport(pkg.exports)
-  if (!target) return undefined
-  const file = await realpath(join(pkgDir, target)).catch(() => undefined)
-  if (!file || !within(pkgDir, file) || !(await stat(file).then(s => s.isFile()).catch(() => false))) return undefined
+  const file = await fileInside(pkgDir, exportedFile(pkg.exports, './dashboard', ['browser', 'import', 'default']))
+  if (!file) return undefined
+  const server = await fileInside(pkgDir, exportedFile(pkg.exports, './server', ['node', 'import', 'default']))
   return {
     package: name,
     ...(typeof pkg.version === 'string' ? { version: pkg.version } : {}),
     dir: dirname(file),
     entry: file.slice(dirname(file).length + 1),
     bins: packageBins(name, pkg.bin, pkgDir),
+    ...(server ? { server } : {}),
   }
 }
 

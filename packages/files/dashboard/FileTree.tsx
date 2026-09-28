@@ -1,9 +1,9 @@
 import { useMemo, useState, type ElementType, type ReactNode } from 'react'
 import { Check, FileIcon, FolderIcon, FolderOpenIcon } from 'lucide-react'
-import type { AgentTree, FileMark } from '../../src/index.js'
-import { onAgentTree, onProjectFileStatus } from '../rpc/reads.js'
-import { usePolled } from '../lib/use-async.js'
-import { cn } from '../lib/utils.js'
+import { cn, useModuleHost, usePolled, type ModulePanelProps } from 'framework/module'
+import type { ProjectTree } from '../src/server.js'
+import type { AgentTree, FileMark } from '../src/tree.js'
+import { readProject, readTree } from './reads.js'
 import { FilePreviewHover } from './FilePreview.js'
 
 type FileGitStatus = FileMark['status']
@@ -88,7 +88,7 @@ function Folder({ name, gitStatus, children }: {
 }
 
 /** Stable, so the `useMemo` on the marks doesn't re-run for a fresh empty object. */
-const EMPTY_STATUS: Record<string, FileMark['status']> = {}
+const EMPTY_PROJECT: ProjectTree = { files: [], changes: {} }
 
 /** Where a run's tree was read from, in the words the caption says it. */
 function sourceCaption(tree: AgentTree): string | undefined {
@@ -99,12 +99,12 @@ function sourceCaption(tree: AgentTree): string | undefined {
   return undefined
 }
 
-// The project panel's file tree (#492): a lazy, collapsible tree built from the flat
-// `git ls-files` list (onProjectFiles, shared with the `#` picker #504). A run's tree is its own
-// read (onAgentTree): its checkout, then its branch, then its merge commit, so a finished run keeps
+// The side rail's Files tab (#492): a lazy, collapsible tree built from the flat `git ls-files`
+// list, the project's own (the `project` read) on its page. A run's tree is its own read (the
+// `tree` read): its checkout, then its branch, then its merge commit, so a finished run keeps
 // showing what it changed; a run that changed nothing shows the project's files with nothing
 // marked, and a run whose changes none of those still holds says so in one line. It is a viewer,
-// not an editor: hovering a file previews it. With no files, it renders nothing.
+// not an editor: hovering a file previews it. With no files, it says so in one line.
 //
 // Folders are native `<details>`: open/closed state, keyboard operation and the disclosure
 // semantics come from the browser; a folder's contents exist only while it is open (see Folder). This used to be 1,225 lines of vendored animate-ui — a copied
@@ -155,51 +155,31 @@ function foldersFromMarks(marks: Record<string, FileMark>): Map<string, FileGitS
 }
 
 const EMPTY_FILES: string[] = []
+const EMPTY_MARKS: Record<string, FileMark> = {}
 
 const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name)
 
-export function FileTree({
-  projectId,
-  agentId: agentId,
-  files,
-  selected,
-  onToggle,
-}: {
-  projectId: string
-  /** The selected run: the tree is then the run's own (onAgentTree), not the project's (#815). */
-  agentId?: string | null | undefined
-  /** The project's files, shown when no run is selected. */
-  files: string[]
-  /** The Context set: a file in it shows ticked. */
-  selected: Set<string>
-  /** Tick or untick a file in the Context. */
-  onToggle: (path: string) => void
-}) {
+export function FileTree({ projectId, agentId, context }: ModulePanelProps) {
+  const host = useModuleHost()
   const [query, setQuery] = useState('')
 
-  // The project's per-file git status (#492), polled so it tracks edits; with a run selected, the
-  // run's own tree and marks instead (#815), polled so it tracks an agent editing files.
-  const { value: projectStatus } = usePolled<Record<string, FileGitStatus>>(
-    agentId ? null : () => onProjectFileStatus(projectId),
-    EMPTY_STATUS,
+  // The project's files and their on-disk marks (#492), polled so they track edits; with a run
+  // selected, the run's own tree and marks instead (#815), polled so they track an agent editing.
+  const { value: projectTree, loaded: projectLoaded } = usePolled<ProjectTree>(
+    agentId ? null : () => readProject(host, projectId),
+    EMPTY_PROJECT,
     8_000,
     [projectId, agentId],
   )
   const { value: runTree, loaded: treeLoaded } = usePolled<AgentTree | null>(
-    agentId ? () => onAgentTree(projectId, agentId) : null,
+    agentId ? () => readTree(host, projectId, agentId) : null,
     null,
     8_000,
     [projectId, agentId],
   )
   const runFiles = runTree && 'files' in runTree ? runTree : undefined
-  const shown = agentId ? (runFiles?.files ?? EMPTY_FILES) : files
-  const marks = useMemo<Record<string, FileMark>>(
-    () =>
-      agentId
-        ? (runFiles?.changes ?? {})
-        : Object.fromEntries(Object.entries(projectStatus).map(([path, status]) => [path, { status, committed: false }])),
-    [agentId, runFiles, projectStatus],
-  )
+  const shown = agentId ? (runFiles?.files ?? EMPTY_FILES) : projectTree.files
+  const marks = agentId ? (runFiles?.changes ?? EMPTY_MARKS) : projectTree.changes
 
   const folderStatus = useMemo(() => foldersFromMarks(marks), [marks])
 
@@ -226,14 +206,14 @@ export function FileTree({
         .sort((a, b) => a.localeCompare(b))
         .map(path => {
           const name = path.slice(path.lastIndexOf('/') + 1)
-          const isOn = selected.has(path)
+          const isOn = context.files.has(path)
           const git = marks[path]
           // No `title`: the hover preview card already leads with the full path, and a native
           // tooltip on top of it is the slow system one the dashboard no longer uses (#1149).
           const item = (
             <button
               type="button"
-              onClick={() => onToggle(path)}
+              onClick={() => context.toggle(path)}
               className={cn('w-full rounded-lg text-start hover:bg-accent', isOn && 'text-primary')}
             >
               <Row icon={isOn ? Check : FileIcon} mark={git}>
@@ -265,7 +245,8 @@ export function FileTree({
       </p>
     )
   }
-  if (shown.length === 0) return null
+  if (!agentId && !projectLoaded) return <p className="p-3 text-xs text-muted-foreground">Reading the project’s files…</p>
+  if (shown.length === 0) return <p className="p-3 text-xs text-muted-foreground">No files here.</p>
   const caption = runTree ? sourceCaption(runTree) : undefined
 
   return (

@@ -1,12 +1,9 @@
 import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
-import { findAgent, findCheckout, projectBranches, type BranchesFor } from '../store/index.js'
-import { crawlRepoFiles } from '../project.js'
-import { agentBranchFor, leftNothing } from './agent-handoff.js'
-import type { Cached } from './cache.js'
-import { readFileStatuses, type FileGitStatus } from './file-status.js'
-import { readFileDiff, type FileDiff } from './file-diff.js'
-import { cutToPreview, readFileContent, safeRepoPath, type FileContent } from './file-read.js'
-import { cachedPrsForBranch, type LinkedPr } from './pull-requests.js'
+import type { MergeLookup, ModuleServerHost } from 'framework/module-server'
+import { listFiles } from './list.js'
+import { readFileStatuses, type FileGitStatus } from './status.js'
+import { readFileDiff, type FileDiff } from './diff.js'
+import { cutToPreview, readFileContent, safeRepoPath, type FileContent } from './read.js'
 
 // A run's files, for the agent page's Files tab, for as long as git still has them. The run's
 // checkout while it exists; once it is reclaimed, the run's branch, local or on origin; once the
@@ -45,16 +42,6 @@ export type AgentTree =
   | { source: 'pending' }
   | { source: 'gone' }
 
-/** What {@link resolveAgentFiles} reads through; each defaults to the production reader. */
-export interface AgentFilesDeps {
-  git?: GitRunner
-  branches?: BranchesFor
-  agent?: (root: string, agentId: string) => Promise<{ id: string; status?: string; host?: string; branch?: string; pr?: { number: number } } | undefined>
-  /** This machine's name, against the run's `host`. */
-  host?: string
-  prs?: (root: string, branch: string) => Promise<Cached<LinkedPr[]>>
-}
-
 /** Ask git, answering `''` for a refusal: every read here is one where "no" is an answer. */
 function asker(git: GitRunner, cwd: string): (args: string[]) => Promise<string> {
   return async args => (await git(args, cwd).catch(() => '')).trim()
@@ -80,24 +67,25 @@ async function forkPoint(ask: (args: string[]) => Promise<string>, tip: string):
 }
 
 /**
- * Where the run `agentId` of the project at `root` has its files: its checkout, else its recorded
- * branch (local, then origin's copy), else the commit its recorded pull request merged as, else,
- * for a run that finished `done` on this machine with no pull request, the default branch as a
- * run that changed nothing, else gone. A branch the default branch already contains (a true merge) shows no change, so there
- * the merge commit is preferred when this machine has it.
+ * Where the run `agentId` of the project the host reads has its files: its checkout, else its
+ * recorded branch (local, then origin's copy), else the commit its recorded pull request merged
+ * as, else, for a run the host says changed nothing, the default branch, else gone. A branch the
+ * default branch already contains (a true merge) shows no change, so there the merge commit is
+ * preferred when this machine has it.
  */
-export async function resolveAgentFiles(root: string, agentId: string, deps: AgentFilesDeps = {}): Promise<AgentFilesAt> {
-  const git = deps.git ?? nodeGitRunner()
+export async function resolveAgentFiles(host: Pick<ModuleServerHost, 'root' | 'run' | 'mergeCommit'>, agentId: string, git: GitRunner = nodeGitRunner()): Promise<AgentFilesAt> {
+  const root = host.root
   const ask = asker(git, root)
-  const checkout = await findCheckout(root, agentId, deps.branches ?? projectBranches)
-  if (checkout) {
-    const base = await forkPoint(asker(git, checkout.path), 'HEAD')
-    return { source: 'checkout', path: checkout.path, ...(base ? { base } : {}) }
+  const run = await host.run(agentId).catch(() => undefined)
+  if (!run) return { source: 'gone' }
+  if (run.checkout) {
+    const base = await forkPoint(asker(git, run.checkout), 'HEAD')
+    return { source: 'checkout', path: run.checkout, ...(base ? { base } : {}) }
   }
 
-  const agent = await (deps.agent ?? findAgent)(root, agentId).catch(() => undefined)
-  if (!agent) return { source: 'gone' }
-  const branch = agentBranchFor(agent)
+  const record = run.record
+  if (!record) return { source: 'gone' }
+  const branch = record.branch
 
   let onBranch: AgentFilesAt | undefined
   if (branch !== undefined) {
@@ -111,12 +99,11 @@ export async function resolveAgentFiles(root: string, agentId: string, deps: Age
     }
   }
 
-  if (agent.pr && branch !== undefined) {
-    const number = agent.pr.number
-    const read = await (deps.prs ?? cachedPrsForBranch)(root, branch).catch((): Cached<LinkedPr[]> => ({ value: undefined, pending: false }))
-    if (read.pending && !onBranch) return { source: 'pending' }
-    const merged = read.value?.find(pr => pr.number === number)?.mergeCommit
-    const ref = merged && (await commitOf(ask, merged))
+  if (record.pr && branch !== undefined) {
+    const number = record.pr.number
+    const lookup: MergeLookup = await host.mergeCommit(branch, number).catch((): MergeLookup => ({ pending: false }))
+    if (lookup.pending && !onBranch) return { source: 'pending' }
+    const ref = !lookup.pending && lookup.commit ? await commitOf(ask, lookup.commit) : undefined
     if (ref) {
       const base = await commitOf(ask, `${ref}^1`)
       return { source: 'merge', number, ref, ...(base ? { base } : {}) }
@@ -124,7 +111,7 @@ export async function resolveAgentFiles(root: string, agentId: string, deps: Age
   }
   if (onBranch) return onBranch
   // Its branch is gone and nothing else holds its work: the one rule for a run that changed nothing.
-  if (leftNothing(agent, deps.host)) {
+  if (run.changedNothing) {
     const main = await defaultBranch(ask)
     const ref = main && (await commitOf(ask, main))
     if (ref) return { source: 'unchanged', ref }
@@ -170,7 +157,7 @@ export async function readAgentTree(root: string, at: AgentFilesAt, git: GitRunn
   if (at.source === 'pending' || at.source === 'gone') return at
   if (at.source === 'checkout') {
     const [files, committed, pending] = await Promise.all([
-      crawlRepoFiles(at.path, git),
+      listFiles(at.path, git),
       at.base ? committedChanges(git, at.path, at.base, 'HEAD') : {},
       readFileStatuses(at.path, git),
     ])

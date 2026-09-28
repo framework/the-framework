@@ -5,7 +5,7 @@ import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
 
 /**
  * The tree's per-file git state. `added` is a file a commit created (a run's committed change,
- * `agent-tree.ts`); the working tree's status here never says it, a new file there is `untracked`.
+ * `tree.ts`); the working tree's status here never says it, a new file there is `untracked`.
  */
 export type FileGitStatus = 'untracked' | 'added' | 'modified' | 'deleted'
 

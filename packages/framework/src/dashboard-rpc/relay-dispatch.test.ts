@@ -10,7 +10,7 @@ import { dispatchRelayRpc, RELAY_RPC_NAMES } from './relay-dispatch.js'
 
 test('RELAY_RPC_NAMES is the run-scoped read/steer/handoff surface and excludes start/delete (#1067 slice 2)', () => {
   for (const name of [
-    'onProjectFiles', 'onAgentTree', 'onFileDiff', 'onAgentChanges', 'onFileContent',
+    'onProjectFiles', 'readModule',
     'onGitStatus', 'onAgentWorktree', 'onAgentHandoff', 'onAgent',
     'sendStop', 'sendChoice', 'sendMessage', 'sendOpenPullRequest', 'sendMerge',
   ]) {
@@ -18,7 +18,8 @@ test('RELAY_RPC_NAMES is the run-scoped read/steer/handoff surface and excludes 
   }
   // Starting an agent, deleting a session, and removing a worktree are NOT relayable: a device runs its
   // own guarded start, and destroying history/checkouts is not something a relaying daemon may reach.
-  for (const off of ['sendStart', 'sendDeleteAgent', 'sendRemoveWorktree', 'sendPreview']) {
+  // A module's command may write the project's data, so only its reads are relayable (#1774).
+  for (const off of ['sendStart', 'sendDeleteAgent', 'sendRemoveWorktree', 'sendPreview', 'runModuleCommand']) {
     assert.ok(!RELAY_RPC_NAMES.includes(off), `${off} must not be relayable`)
   }
 })

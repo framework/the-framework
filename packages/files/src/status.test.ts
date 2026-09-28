@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { readFileStatuses } from './file-status.js'
+import { readFileStatuses } from './status.js'
 
 const fakeGit = (out: string) => async () => out
 

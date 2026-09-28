@@ -23,6 +23,8 @@ const modules = (projects: string[] = ['p1']): MountedModules => ({
   pages: [],
   cards: [],
   linkActions: [{ label: 'Add to queue', doneLabel: 'Queued', run: addToQueue, package: '@x/queue', projects }],
+  panels: [],
+  runSlots: [],
   loaded: true,
 })
 const render = (ui: ReactElement, mounted: MountedModules = modules()) => {

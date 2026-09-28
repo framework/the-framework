@@ -1,10 +1,6 @@
 import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
-import type { FileGitStatus } from './file-status.js'
-import { cutToPreview, readConfinedFile, safeRepoPath } from './file-read.js'
-
-// `safeRepoPath` moved to file-read.js with #828, where the unchanged-file preview shares it.
-// Re-exported so this stays the import site it has been.
-export { safeRepoPath }
+import type { FileGitStatus } from './status.js'
+import { cutToPreview, readConfinedFile, safeRepoPath } from './read.js'
 
 // One changed file's diff for the tree's hover card (#816) and the agent view's Changes section
 // (#817). The tree already says a file is M/U/D; this says what actually changed, without
@@ -75,7 +71,7 @@ function asAllAdded(text: string): string {
 
 /**
  * The diff for one changed file in the checkout at `cwd`, or, given a `range`, between two
- * commits of the repository at `cwd` (a run's committed change, `agent-tree.ts`).
+ * commits of the repository at `cwd` (a run's committed change, `tree.ts`).
  *
  * Tracked files diff against `HEAD`, not the index, so a change the agent staged still shows;
  * that also matches `git status --porcelain`, which is what dotted the file in the first place.

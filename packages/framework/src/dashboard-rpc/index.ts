@@ -2,7 +2,7 @@
 // the daemon's own `startAgent`. The browser calls these by name over `POST /_rpc/<name>`; the
 // dashboard's `rpc/` modules are typed stubs against these signatures, so a rename that misses
 // one is a type error rather than a 404 at runtime.
-export { onAgents, onAgent, onDocs, onQueue, onOverview, onRecentAgents, onInterventions, onOpenQuestions, onActivity, onDashboard, onGitHostHome, onGitStatus, onProjectFiles, onProjectFileStatus, onAgentTree, onFileDiff, onAgentChanges, onFileContent, onRetainedWorktrees, onAgentWorktree, onAgentHandoff, onBridgeQuestion, onBridgeStatus, onBridgeToken, onBridgeEvents, onBridgeAnswer, onBridgeBrowser } from './reads.js'
+export { onAgents, onAgent, onDocs, onQueue, onOverview, onRecentAgents, onInterventions, onOpenQuestions, onActivity, onDashboard, onGitHostHome, onGitStatus, onProjectFiles, onRetainedWorktrees, onAgentWorktree, onAgentHandoff, onBridgeQuestion, onBridgeStatus, onBridgeToken, onBridgeEvents, onBridgeAnswer, onBridgeBrowser } from './reads.js'
 export { sendStop, sendChoice, sendBridgeAnswer, sendBridgeAnswerCancel, sendBridgeBrowser, sendMessage, sendStart, sendOpenInApp, sendRemoveWorktree, sendDeleteAgent, sendOpenPullRequest, sendPush, sendMerge } from './control.js'
 export { streamAgentEvents, type LiveFeedEvent, type StreamSync } from './events.js'
 export { onProjects, sendAddProject, sendPickProjectDirectory, onOnboarding, onCommands, onStartCheck, sendScheduleSwitch, type ProjectLauncher } from './projects.js'
@@ -20,7 +20,7 @@ export { type EditorInfo } from '../dashboard/open-in-app.js'
 export { onQuota } from './quota.js'
 export { onModels } from './models.js'
 export { checkDevices, type DeviceCheck } from './devices.js'
-export { onModules, runModuleCommand, type DashboardModule, type ModuleCommandResult } from './modules.js'
+export { onModules, runModuleCommand, readModule, type DashboardModule, type ModuleCommandResult, type ModuleReadResult } from './modules.js'
 
 import * as reads from './reads.js'
 import * as control from './control.js'

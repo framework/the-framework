@@ -1,4 +1,4 @@
-Gives a fresh checkout [1] a working dependency tree without copying or installing anything: every `node_modules` directory of the user's checkout, from the project root down to two directory levels below it, is mirrored into the checkout as a real directory holding one link per entry, with the package manager's private state left out.
+Gives a fresh checkout [1] a working dependency tree without copying or installing anything: every `node_modules` directory of the user's checkout, from the project root down to two directory levels below it, is mirrored into the checkout as a real directory holding one link per entry, a scope directory such as `@acme` as a real directory holding one link per package, with the package manager's private state left out.
 
 ## Context
 
@@ -14,7 +14,7 @@ Gives a fresh checkout [1] a working dependency tree without copying or installi
 ## Business logic — TL;DR
 
 - **Which dependency trees are found** - every `node_modules` of the project root and of directories up to two levels below it, workspace packages included, never looking inside dependency, git, build or dot directories.
-- **How a tree is mirrored** - a real directory at the same relative path in the checkout, with one absolute link per entry of the user's tree.
+- **How a tree is mirrored** - a real directory at the same relative path in the checkout, with one absolute link per entry of the user's tree, and a real directory per scope, with one link per package in it.
 - **What is never linked** - the package manager's private state, every dot-entry except `.bin`.
 - **Best-effort, and repeatable** - a tree already present is left alone, a link or directory that cannot be made is skipped, and nothing here ever fails the agent's start.
 
@@ -38,7 +38,7 @@ See `## Context`.
 
 #### Business logic
 
-For each tree found, the checkout [1] gets a real directory at the same relative path, and inside it one symbolic link per entry of the user's tree, each pointing at the entry's absolute path in the user's checkout. A package's files are therefore read from the user's tree, while anything an install in the checkout writes replaces the checkout's own link and leaves the user's tree untouched. Two limits follow from linking entries one by one: a scope directory such as `@acme` is one entry, so a package installed under it from the checkout lands in the user's tree; and `.bin` is one entry, so an executable an install adds lands there too. On Windows the links are junctions, the one kind of directory link made without elevated rights.
+For each tree found, the checkout [1] gets a real directory at the same relative path, and inside it one symbolic link per entry of the user's tree, each pointing at the entry's absolute path in the user's checkout. A package's files are therefore read from the user's tree, while anything an install in the checkout writes replaces the checkout's own link and leaves the user's tree untouched. A scope directory such as `@acme` holds packages rather than being one, so it is mirrored the same way one level down: a real directory of the checkout's own, holding one link per package, and a new `@acme/<package>` installed in the checkout lands in the checkout. One limit follows from linking entries one by one: `.bin` is one entry, so an executable an install adds lands in the user's tree. On Windows the links are junctions, the one kind of directory link made without elevated rights.
 
 ### What is never linked
 

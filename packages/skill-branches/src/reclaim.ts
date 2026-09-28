@@ -32,8 +32,9 @@ export interface ReclaimOptions {
    */
   birthBranch?: string
   /**
-   * Whether the branch may be pushed to satisfy the rule. When not, only a clean tree on a tip the
-   * remote already has goes — removing what the remote holds publishes nothing (#1379).
+   * Whether an agent's branch may be pushed to satisfy the rule; any other branch never is. When
+   * not, only a clean tree on a tip the remote already has goes — removing what the remote holds
+   * publishes nothing (#1379).
    */
   mayPush: boolean
   /**
@@ -98,24 +99,23 @@ export async function reclaimWorktree(repo: string, path: string, opts: ReclaimO
   let emptyBranch = false
   if (opts.heldBy && (await coveredBy(path, branch, opts.heldBy, git))) {
     // A tip inside a commit the remote already has: nothing to push (#1601).
-  } else if (isAgentBranch(branch) && (await branchHoldsNothing(repo, branch, git))) {
+  } else if (await branchHoldsNothing(repo, branch, git)) {
     // A branch whose tip the remote already has under another name — an agent that committed
     // nothing (#1650). The rule is satisfied before any push: what the checkout holds *is* on
-    // the remote, so the branch goes with it; it is not the last copy of anything, by
-    // construction. Only a branch minted for an agent, though: a leftover checkout can sit on
-    // the user's own branch (one was found on `main`), and deleting that is not this code's call
-    // even when it holds nothing — git's refusal to delete a checked-out branch must never be
-    // the guard.
-    emptyBranch = true
-  } else {
-    if (!(await branchPushed(repo, branch, git))) {
-      if (!opts.mayPush) return { ok: false, reason: 'not-on-remote', branch }
-      // Pushing is what makes the removal recoverable, so it is attempted here rather than
-      // required of the caller. A repo with no remote never gets past this, which is the honest
-      // answer: there is nowhere for the work to be recoverable from.
-      const pushed = await pushBranch(repo, branch, git)
-      if (!pushed.ok) return { ok: false, reason: 'not-on-remote', branch, detail: pushed.error }
-    }
+    // the remote, so the checkout goes. The branch goes with it only when it was minted for an
+    // agent: a leftover checkout can sit on the user's own branch (one was found on `main`), and
+    // deleting that is not this code's call even when it holds nothing — git's refusal to delete
+    // a checked-out branch must never be the guard.
+    emptyBranch = isAgentBranch(branch)
+  } else if (!(await branchPushed(repo, branch, git))) {
+    // Pushing is what makes the removal recoverable, so it is attempted here rather than
+    // required of the caller. A repo with no remote never gets past this, which is the honest
+    // answer: there is nowhere for the work to be recoverable from. Only a branch minted for an
+    // agent, though: a checkout continued on the user's own branch (even `main`) is kept, since
+    // pushing that branch is the user's call, never a cleanup's.
+    if (!opts.mayPush || !isAgentBranch(branch)) return { ok: false, reason: 'not-on-remote', branch }
+    const pushed = await pushBranch(repo, branch, git)
+    if (!pushed.ok) return { ok: false, reason: 'not-on-remote', branch, detail: pushed.error }
   }
 
   // The birth branch (#1657) is judged before anything is deleted: the containment reads both refs.

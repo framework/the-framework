@@ -11,17 +11,18 @@ interface ProjectRead {
 
 const NOTHING_READ: ProjectRead[] = []
 
-/** The entries grouped by section, the highest priority first, the unranked last. */
+/**
+ * The entries as the file runs, each run of neighbours in one section under one header: the file's
+ * order is the order agents take them, so an entry above the first section shows first.
+ */
 function sections(entries: PlacedEntry[]): { priority: number | undefined; entries: string[] }[] {
-  const byPriority = new Map<number | undefined, string[]>()
+  const runs: { priority: number | undefined; entries: string[] }[] = []
   for (const { entry, priority } of entries) {
-    const list = byPriority.get(priority) ?? []
-    list.push(entry)
-    byPriority.set(priority, list)
+    const last = runs[runs.length - 1]
+    if (last && last.priority === priority) last.entries.push(entry)
+    else runs.push({ priority, entries: [entry] })
   }
-  return [...byPriority.entries()]
-    .map(([priority, list]) => ({ priority, entries: list }))
-    .sort((a, b) => (b.priority ?? -1) - (a.priority ?? -1))
+  return runs
 }
 
 /**
@@ -65,8 +66,8 @@ export function QueuePage({ projects }: WidgetPageProps) {
           ) : entries!.length === 0 ? (
             <p className="mt-2 text-sm text-muted-foreground">Nothing queued.</p>
           ) : (
-            sections(entries!).map(section => (
-              <div key={section.priority ?? 'none'} className="mt-3">
+            sections(entries!).map((section, index) => (
+              <div key={index} className="mt-3">
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   {section.priority === undefined ? 'No priority' : `Priority ${section.priority}`}
                 </h3>

@@ -16,8 +16,10 @@ not a decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   10` down to `## Priority 0`, any `## Priority N` with N of one or two digits counts, in
   any case; any `-`, `*` or `N.` list item with text is an entry, wherever it sits.
   Entries are placed to keep the file sorted high to low; the command never re-sorts, and
-  agents take file order. The Queue page groups the entries by priority, highest first,
-  unranked last.
+  agents take file order. The Queue page shows the entries in that order, under the
+  section each sits in: an entry above the first section shows first, as it is worked
+  first. Sorting the page by priority was the alternative and was not taken: the page
+  would show an order no agent follows.
 - An entry is plain trimmed text: the task a future agent is started with. The package
   does not know tickets: a caller that queues a ticket writes the entry itself as a
   markdown link to the ticket, and reads the link back to claim the ticket for the agent

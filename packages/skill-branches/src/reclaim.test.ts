@@ -116,6 +116,20 @@ test('a checkout that may not be pushed goes only from a clean tree on a tip the
   }
 })
 
+test('a checkout on the user\'s own unpushed branch is kept, and the branch is never pushed for them', async () => {
+  const { repo, path } = await repoWithDirtyWorktree()
+  const git = nodeGitRunner()
+  try {
+    await git(['checkout', '-q', '-b', 'release'], path)
+    await commitWork(path)
+    assert.deepEqual(await reclaimWorktree(repo, path, ORDINARY), { ok: false, reason: 'not-on-remote', branch: 'release' })
+    await assert.rejects(() => git(['rev-parse', '--verify', 'refs/remotes/origin/release'], repo), 'nothing reached the remote')
+    assert.equal((await stat(path)).isDirectory(), true, 'the checkout is still on disk')
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})
+
 test('a clean checkout whose tip is inside a pushed anchor goes without a push, and keeps its branch (#1601)', async () => {
   const { repo, path, branch } = await repoWithDirtyWorktree()
   const git = nodeGitRunner()

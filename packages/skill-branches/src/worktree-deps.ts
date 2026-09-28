@@ -21,6 +21,8 @@ import { join, relative } from 'node:path'
  * packages still resolve without it — a package entry in a pnpm tree is a relative
  * link into `.pnpm`, and a link to that link resolves where the target lives, in
  * the parent checkout. `.bin` is linked because an agent runs the project's tools.
+ * A scope directory is mirrored one level down the same way, a real directory
+ * holding a link per package, so a new scoped package lands in the worktree too.
  */
 
 /** The dependency directory mirrored into a worktree. */
@@ -38,6 +40,13 @@ const BIN = '.bin'
 
 /** The package manager's private state in a dependency directory: never linked (see above). */
 const isPrivate = (name: string): boolean => name.startsWith('.') && name !== BIN
+
+/**
+ * A scope (`@acme`) holds packages rather than being one. Linked whole, an install of a new
+ * `@acme/pkg` in the worktree would go through the link into the parent's tree, so a scope is a
+ * real directory of the worktree's own too, holding a link per package.
+ */
+const isScope = (name: string): boolean => name.startsWith('@')
 
 /** The filesystem this module needs. Injectable so the scan is testable. */
 export interface LinkFs {
@@ -118,7 +127,10 @@ export async function linkDependencies(repo: string, worktree: string, fs: LinkF
       await fs.mkdir(dir)
       for (const name of await fs.readdir(source)) {
         if (isPrivate(name)) continue
-        await fs.symlinkDir(join(source, name), join(dir, name)).catch(() => {})
+        if (isScope(name) && (await fs.isDirectory(join(source, name)))) {
+          await fs.mkdir(join(dir, name))
+          for (const pkg of await fs.readdir(join(source, name))) await fs.symlinkDir(join(source, name, pkg), join(dir, name, pkg)).catch(() => {})
+        } else await fs.symlinkDir(join(source, name), join(dir, name)).catch(() => {})
       }
       linked.push(rel)
     } catch {

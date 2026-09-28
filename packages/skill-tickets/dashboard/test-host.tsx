@@ -32,6 +32,7 @@ export function fakeHost(answers: Answers = {}, agents: Record<string, ModuleAge
     package: '@gemstack/skill-tickets',
     runCommand: vi.fn(answer),
     act: vi.fn(answer),
+    read: vi.fn(async () => ({ ok: false as const, error: 'this module has no server part' })),
     openAgent: vi.fn(),
     openPage: vi.fn(),
     startRun: vi.fn(async (_projectId: string, _prompt: string) => ({ ok: true as const, agentId: 'started' })),
@@ -41,7 +42,7 @@ export function fakeHost(answers: Answers = {}, agents: Record<string, ModuleAge
 }
 
 /** No module offers anything on links: the default for pages whose tests are not about the slot. */
-export const NO_MODULES: MountedModules = { pages: [], cards: [], linkActions: [], loaded: true }
+export const NO_MODULES: MountedModules = { pages: [], cards: [], linkActions: [], panels: [], runSlots: [], loaded: true }
 
 /** Render a page inside the fake host, and inside whatever link actions installed modules offer. */
 export function renderWithHost(ui: ReactElement, host: ModuleHost, modules: MountedModules = NO_MODULES): RenderResult {

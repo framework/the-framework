@@ -1,0 +1,1 @@
+The dashboard as the Files module's components see it in tests: a fake whose every service is a spy and whose server reads always refuse, since the tests stub the module's own reads (`reads.ts`) instead; and a render that wraps a component, and every re-render of it, in that fake.

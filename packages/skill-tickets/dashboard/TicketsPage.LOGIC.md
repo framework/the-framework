@@ -12,7 +12,7 @@ Shows the tickets of every project that has this package on one page, the module
 [2] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down. An item on it is a queue entry. The dashboard labels it "AI queue".
 [3] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [8] link: the name of some work and where it points, as a dashboard page shows it: a text, an optional target and a priority from 0 to 10.
-[9] module: a browser module one of a project's packages brings to the dashboard; it adds pages, offers actions on the links pages show, and acts through its own package's command.
+[9] module: a package that adds to the dashboard (pages, Overview cards, side-rail tabs, what an agent's page shows, actions on the links pages show): its browser part, named by the package's `exports["./dashboard"]`, reads its data through its own package's command, or through its own server part, named by `exports["./server"]`, which the daemon calls in its own process. A module comes from a project's dependencies, or is built into the dashboard and loaded for every project, as the Files module is.
 [4] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.
 [5] holder: who a claim names: the agent's id when the tool that started the agent put it in the agent's environment, else the branch the `tickets` command ran on.
 [6] plan: a ticket's `.plan.md`: effort and uncertainty ratings and how to implement it.

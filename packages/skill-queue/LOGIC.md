@@ -11,7 +11,7 @@ The `queue` skill [1]: the agent queue [2], `TODO_AGENTS.md` on the `agent-data`
 [3] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [4] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [5] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
-[6] module: one of a project's packages that adds to the dashboard, its browser part named by the package's `exports["./dashboard"]`; it adds pages to the dashboard, offers actions on the links its pages show, and reads and changes its data through its own package's command.
+[6] module: a package that adds to the dashboard (pages, Overview cards, side-rail tabs, what an agent's page shows, actions on the links pages show): its browser part, named by the package's `exports["./dashboard"]`, reads its data through its own package's command, or through its own server part, named by `exports["./server"]`, which the daemon calls in its own process. A module comes from a project's dependencies, or is built into the dashboard and loaded for every project, as the Files module is.
 
 ## Business logic — TL;DR
 

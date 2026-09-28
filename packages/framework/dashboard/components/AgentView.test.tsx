@@ -1,15 +1,17 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import type { ReactNode } from 'react'
 import type { FrameworkEvent } from '../../src/index.js'
+import { ModulesContext, type MountedModules } from '../lib/use-modules.js'
+import type { ModuleRunProps } from '../module/index.js'
 
 const onAgent = vi.fn(async () => [] as unknown)
 const onRetainedWorktrees = vi.fn(async () => [] as unknown)
 const onAgentHandoff = vi.fn(async () => null as unknown)
-const onAgentChanges = vi.fn(async () => [] as unknown)
 const onBridgeQuestion = vi.fn(async () => null as unknown)
 const onBridgeEvents = vi.fn(async () => [] as unknown)
 const onBridgeAnswer = vi.fn(async () => null as unknown)
-vi.mock('../rpc/reads.js', () => ({ onAgent, onRetainedWorktrees, onAgentHandoff, onAgentChanges, onBridgeQuestion, onBridgeEvents, onBridgeAnswer }))
+vi.mock('../rpc/reads.js', () => ({ onAgent, onRetainedWorktrees, onAgentHandoff, onBridgeQuestion, onBridgeEvents, onBridgeAnswer }))
 vi.mock('../rpc/control.js', () => ({
   sendOpenPullRequest: vi.fn(async () => null),
   sendSetHandoff: vi.fn(async () => null),
@@ -27,11 +29,13 @@ vi.mock('../lib/preferences.js', () => ({
 
 // The frame around the feed is not under test: the bar and composer reach for git and session
 // state of their own, and the swap decision this file cares about is visible in the feed alone.
-// The bar's `actions` slot IS rendered, so the handoff cluster stays reachable.
+// The bar's `actions` and `summary` slots ARE rendered, so the handoff cluster and the modules'
+// summaries stay reachable.
 vi.mock('./AgentActionBar.js', () => ({
-  AgentActionBar: ({ actions, ready }: { actions?: unknown; ready?: boolean }) => (
+  AgentActionBar: ({ actions, summary, ready }: { actions?: ReactNode; summary?: ReactNode; ready?: boolean }) => (
     <>
       <span data-testid="bar-ready">{String(ready)}</span>
+      {summary}
       {actions}
     </>
   ),
@@ -217,5 +221,32 @@ describe('the feed fills in one step (first visit)', () => {
     expect(screen.getByText(/the channel delivered this line/)).toBeTruthy()
     rerender(view({ live: false }))
     expect(screen.getByText(/the channel delivered this line/)).toBeTruthy()
+  })
+})
+
+describe('what the modules add to a run’s page (#817)', () => {
+  const Summary = ({ agentId, working, expanded }: ModuleRunProps) => <span>summary {agentId} {String(working)} {String(expanded)}</span>
+  const Details = ({ agentId, working }: ModuleRunProps) => <span>details {agentId} {String(working)}</span>
+  const withSlots = (ui: ReactNode, projects = ['p1']) => {
+    const modules: MountedModules = { pages: [], cards: [], linkActions: [], panels: [], runSlots: [{ summary: Summary, details: Details, package: '@gemstack/files', projects }], loaded: true }
+    return <ModulesContext.Provider value={modules}>{ui}</ModulesContext.Provider>
+  }
+
+  test('a working run shows the modules’ summary in its bar and their details under it', async () => {
+    render(withSlots(view({ live: true })))
+    expect(screen.getByText('summary run-1 true false')).toBeTruthy()
+    expect(screen.getByText('details run-1 true')).toBeTruthy()
+  })
+
+  test('once an ended run’s branch is read, the handoff replaces the summary; the details stay, told the run is not working', async () => {
+    onAgentHandoff.mockResolvedValue({ branch: 'agent-x', exists: true, commits: [], files: [], insertions: 0, deletions: 0, pushed: false })
+    render(withSlots(view({ live: false })))
+    await waitFor(() => expect(screen.queryByText(/^summary/)).toBeNull())
+    expect(screen.getByText('details run-1 false')).toBeTruthy()
+  })
+
+  test('a project without the module gets none of it', () => {
+    render(withSlots(view({ live: true }), ['p2']))
+    expect(screen.queryByText(/summary|details/)).toBeNull()
   })
 })

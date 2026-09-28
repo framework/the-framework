@@ -1,21 +1,16 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { onProjectFiles, onProjectFileStatus, onAgentWorktree, onSchedulers, markCloudWaiting, markOtherHost, markSaving } from './reads.js'
+import { onProjectFiles, onAgentWorktree, onSchedulers, markCloudWaiting, markOtherHost, markSaving } from './reads.js'
 import { bridgeQuestions, resetBridgeQuestions } from '../dashboard/bridge-store.js'
 import type { AgentMeta } from '../store/index.js'
 import { provideTestContext } from './test-context.js'
 
 // A project id nobody registered has no local path, so these reads have no checkout to answer
-// from. They must say so — an empty list, an empty map, null — rather than throwing.
+// from. They must say so — an empty list, null — rather than throwing.
 
 test('onProjectFiles for an unknown project returns an empty list', async () => {
   provideTestContext()
   assert.deepEqual(await onProjectFiles('project-that-does-not-exist'), [])
-})
-
-test('onProjectFileStatus for an unknown project returns an empty map', async () => {
-  provideTestContext()
-  assert.deepEqual(await onProjectFileStatus('project-that-does-not-exist'), {})
 })
 
 test('onAgentWorktree for an unknown project returns null', async () => {

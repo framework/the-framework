@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react'
+import type { ReactElement, ReactNode } from 'react'
 import type { AgentView } from '../lib/live-state.js'
+import { ModulesContext, type MountedModules, type MountedPanel } from '../lib/use-modules.js'
+import type { ModulePanelProps } from '../module/index.js'
 
 // The rail reads its content panels itself now (#1146), so it can tell an empty one from a full
 // one. Stub the reads: the default project has docs and a log, so every tab is earned and the
@@ -11,9 +14,31 @@ vi.mock('../rpc/reads.js', () => ({ onDocs }))
 
 // The panels themselves are rendered elsewhere; here they are stand-ins.
 vi.mock('./DocsPanel.js', () => ({ DocsPanel: () => <div>docs</div> }))
-vi.mock('./FileTree.js', () => ({ FileTree: () => <div>files</div> }))
 
 const { RightRail } = await import('./RightRail.js')
+
+// An installed module's tab, as the Files module brings one: it shows what it was given.
+const shown = vi.fn()
+const FILES: MountedPanel = {
+  id: 'files',
+  label: 'Files',
+  help: 'The project’s files',
+  count: ({ context }) => context.files.size,
+  Panel: (props: ModulePanelProps) => {
+    shown(props)
+    return <div>files</div>
+  },
+  package: '@gemstack/files',
+  projects: ['p1'],
+}
+const mounted = (panels: MountedPanel[]): MountedModules => ({ pages: [], cards: [], linkActions: [], panels, runSlots: [], loaded: true })
+
+/** Render with the given module tabs installed (the Files module's by default). */
+function render(ui: ReactElement, panels: MountedPanel[] = [FILES]) {
+  const wrap = (node: ReactNode) => <ModulesContext.Provider value={mounted(panels)}>{node}</ModulesContext.Provider>
+  const result = rtlRender(wrap(ui))
+  return { ...result, rerender: (next: ReactNode) => result.rerender(wrap(next)) }
+}
 
 beforeEach(() => {
   onDocs.mockReset().mockResolvedValue([{ name: 'PLAN.md', content: '# plan' }])
@@ -91,7 +116,7 @@ describe('RightRail docsInMain (#1455 items 2/3)', () => {
   })
 
   test('with only Docs to offer, the launcher shows no rail at all', async () => {
-    const { container } = render(<RightRail {...baseProps} agentId={null} docsInMain />)
+    const { container } = render(<RightRail {...baseProps} agentId={null} docsInMain />, [])
     await settle()
     expect(container.querySelector('aside')).toBeNull()
   })
@@ -111,7 +136,7 @@ describe('RightRail empty panels (#1146)', () => {
 
   test('no docs, no Docs tab — and with nothing else, no rail at all', async () => {
     onDocs.mockResolvedValue([])
-    const { container } = render(<RightRail {...baseProps} agentId={null} />)
+    const { container } = render(<RightRail {...baseProps} agentId={null} />, [])
     await settle()
     expect(screen.queryByRole('tab', { name: /docs/i })).toBeNull()
     expect(container.querySelector('aside')).toBeNull()
@@ -146,10 +171,38 @@ describe('RightRail empty panels (#1146)', () => {
     expect(screen.getByRole('tab', { name: /files/i }).getAttribute('aria-selected')).toBe('true')
   })
 
-  test("a session keeps its Files tab with nothing listed: the tree says where the run's changes went", async () => {
+  test("a module's tab is always offered: the tab itself says when it has nothing", async () => {
     onDocs.mockResolvedValue([])
     render(<RightRail {...baseProps} />)
     await settle()
     expect(screen.getByRole('tab', { name: /files/i })).toBeTruthy()
+  })
+})
+
+describe('RightRail module tabs (#492)', () => {
+  test('a module’s tab comes first and is open by default, given the project, the run and the Context’s files', async () => {
+    render(<RightRail {...baseProps} files={['a.ts', 'b.ts']} context={new Set(['a.ts', '/some/project'])} />)
+    const tabs = screen.getAllByRole('tab')
+    expect(tabs[0]!.textContent).toContain('Files')
+    expect(tabs[0]!.getAttribute('aria-selected')).toBe('true')
+    // The count is the Context's files only: a project path the launcher put there is no file.
+    expect(tabs[0]!.textContent).toContain('1')
+    const props = shown.mock.lastCall![0] as ModulePanelProps
+    expect(props.projectId).toBe('p1')
+    expect(props.agentId).toBe('r1')
+    expect([...props.context.files]).toEqual(['a.ts'])
+  })
+
+  test('a project without the module has no tab of it', () => {
+    render(<RightRail {...baseProps} projectId="p2" />)
+    expect(screen.queryByRole('tab', { name: /files/i })).toBeNull()
+  })
+
+  test('a module’s tab that throws breaks only itself', async () => {
+    const broken: MountedPanel = { ...FILES, Panel: () => { throw new Error('boom') } }
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    render(<RightRail {...baseProps} />, [broken])
+    expect(screen.getByRole('alert').textContent).toContain('boom')
+    expect(screen.getByRole('tab', { name: /docs/i })).toBeTruthy()
   })
 })

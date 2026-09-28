@@ -11,10 +11,10 @@
 // sharing every chunk with the dashboard itself. Nothing here names a skill.
 import { createContext, useContext, type ComponentType } from 'react'
 import type { AgentStatus } from '../../src/index.js'
-import { runModuleCommand } from '../rpc/modules.js'
-import type { ModuleCommandResult } from '../rpc/modules.js'
+import { readModule, runModuleCommand } from '../rpc/modules.js'
+import type { ModuleCommandResult, ModuleReadResult } from '../rpc/modules.js'
 
-export type { ModuleCommandResult, AgentStatus }
+export type { ModuleCommandResult, ModuleReadResult, AgentStatus }
 
 /** A registered project that has the module's package, as a page gets it. */
 export interface ModuleProject {
@@ -111,6 +111,64 @@ export interface ModuleCard {
   Card: ComponentType<ModuleCardProps>
 }
 
+/**
+ * The Context as a side-rail tab sees it (#504): the files the next run is pointed at. A tab may
+ * show which files are in it and add or remove one.
+ */
+export interface ModuleContext {
+  /** The Context's files, as repo-relative paths. */
+  files: ReadonlySet<string>
+  /** Add the path to the Context, or take it out when it is in. */
+  toggle(path: string): void
+}
+
+/** What a side-rail tab is rendered with: the project on screen, the run selected in it (if any), the Context. */
+export interface ModulePanelProps {
+  projectId: string
+  /** The run whose page this is; absent on the project's own page. */
+  agentId?: string
+  context: ModuleContext
+}
+
+/**
+ * A tab a module adds to the side rail (#492), shown on every project's page and every run's page
+ * of the projects that have the module, before the dashboard's own tabs. A tab with nothing to
+ * show says so inside it: the rail cannot know a module is empty without rendering it.
+ */
+export interface ModulePanel {
+  /** Which tab this is among the module's own, for the rail's key and its remembered pick. */
+  id: string
+  /** The tab's label. */
+  label: string
+  /** The tab's tooltip: one sentence on what it shows. */
+  help: string
+  /** A count shown on the tab beside its label; none when absent or 0. */
+  count?(props: ModulePanelProps): number
+  /** The tab's contents. */
+  Panel: ComponentType<ModulePanelProps>
+}
+
+/** What a run slot is rendered with: the run, and how the run's page shows it right now. */
+export interface ModuleRunProps {
+  projectId: string
+  agentId: string
+  /** The run's agent is still working: a run that ended, or stopped on a question, is not. */
+  working: boolean
+  /** The run's action bar is open, showing the run's details. */
+  expanded: boolean
+}
+
+/**
+ * What a module adds to a run's page, under the run's action bar. `summary` is a few words in the
+ * bar, shown until the run has ended and its branch has been read (the dashboard's own words about
+ * the branch take over then); `details` is a block under the bar, rendered on every run's page,
+ * which shows what it likes when the bar is open.
+ */
+export interface ModuleRunSlots {
+  summary?: ComponentType<ModuleRunProps>
+  details?: ComponentType<ModuleRunProps>
+}
+
 /** What a module's browser part default-exports. */
 export interface ModuleDefinition {
   /** The pages the module adds, each with a sidebar row. */
@@ -119,6 +177,10 @@ export interface ModuleDefinition {
   cards?: ModuleCard[]
   /** The actions the module offers on the links dashboard pages show, wherever the link's project has the module's package. */
   linkActions?: LinkAction[]
+  /** The tabs the module adds to the side rail. */
+  panels?: ModulePanel[]
+  /** What the module adds to a run's page. */
+  run?: ModuleRunSlots
   /** A stylesheet to load with the module, relative to the module's browser part's own URL. */
   stylesheet?: string
 }
@@ -162,6 +224,12 @@ export interface ModuleHost {
    * change shows at once instead of at the next sync. A link action's host runs every command so.
    */
   act(projectId: string, args: string[], command?: string): Promise<ModuleCommandResult>
+  /**
+   * Call one of the module's own server reads (its package's `./server`) in one project, with
+   * `input`, a JSON object; `input.agentId` names the run the read is about, when it is about one.
+   * Answered in the daemon's own process, so it suits a read made every few seconds.
+   */
+  read(projectId: string, name: string, input?: Record<string, unknown>): Promise<ModuleReadResult>
   /** Open one agent's page in the dashboard: its live feed while it runs, its record after. */
   openAgent(projectId: string, agentId: string): void
   /** Open a page a module adds (this one's or another's), at a sub-path: `openPage('tickets', [projectId, file])`. */
@@ -178,8 +246,8 @@ export interface ModuleHost {
   agents(projectId: string): Promise<ModuleAgent[]>
 }
 
-/** What the dashboard knows about the module it is serving: every service but the commands, which it binds to the package. */
-export type ModuleHostBase = Omit<ModuleHost, 'runCommand' | 'act'>
+/** What the dashboard knows about the module it is serving: every service but the commands and the reads, which it binds to the package. */
+export type ModuleHostBase = Omit<ModuleHost, 'runCommand' | 'act' | 'read'>
 
 /**
  * The host for one module: the dashboard's services, and its commands bound to the module's own
@@ -191,6 +259,7 @@ export function moduleHost(base: ModuleHostBase, opts: { acts?: boolean } = {}):
     ...base,
     runCommand: (projectId, args, command) => runModuleCommand(projectId, base.package, args, command, opts.acts ?? false),
     act: (projectId, args, command) => runModuleCommand(projectId, base.package, args, command, true),
+    read: (projectId, name, input = {}) => readModule(projectId, base.package, name, input),
   }
 }
 
@@ -218,6 +287,8 @@ export { Input } from '../components/ui/input.js'
 export { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js'
 export { RangeSlider } from '../components/ui/slider.js'
 export { Separator } from '../components/ui/separator.js'
+export { PreviewCard } from '@base-ui-components/react/preview-card'
+export { DiffStat } from '../components/DiffStat.js'
 export { ScrollArea } from '../components/ui/scroll-area.js'
 export { Tooltip, TooltipTrigger, TooltipContent } from '../components/ui/tooltip.js'
 export { DropdownMenu, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../components/ui/dropdown-menu.js'

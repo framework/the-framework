@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { onModules, type DashboardModule } from '../rpc/modules.js'
-import type { LinkAction, ModuleCard, ModuleDefinition, ModulePage } from '../module/index.js'
+import type { LinkAction, ModuleCard, ModuleDefinition, ModulePage, ModulePanel, ModuleRunSlots } from '../module/index.js'
 import { usePolled } from './use-async.js'
 import { isPageSegment } from './route.js'
 
@@ -22,6 +22,18 @@ export interface MountedCard extends ModuleCard {
   projects: string[]
 }
 
+/** A side-rail tab as the shell mounts it: the tab, plus the package it came from and the projects that have it. */
+export interface MountedPanel extends ModulePanel {
+  package: string
+  projects: string[]
+}
+
+/** A module's run slots as the shell mounts them: the slots, plus the package they came from and the projects that have it. */
+export interface MountedRunSlots extends ModuleRunSlots {
+  package: string
+  projects: string[]
+}
+
 /** The place of a card that names none. */
 const DEFAULT_CARD_ORDER = 50
 
@@ -31,11 +43,15 @@ export interface MountedModules {
   /** The Overview's cards, in the order they are drawn: by `order`, then by package name. */
   cards: MountedCard[]
   linkActions: MountedLinkAction[]
+  /** The side-rail tabs, in package order. */
+  panels: MountedPanel[]
+  /** The run slots, one entry per module that has any, in package order. */
+  runSlots: MountedRunSlots[]
   /** True once the module list was read and every module in it imported or skipped. */
   loaded: boolean
 }
 
-const NOTHING_MOUNTED: MountedModules = { pages: [], cards: [], linkActions: [], loaded: false }
+const NOTHING_MOUNTED: MountedModules = { pages: [], cards: [], linkActions: [], panels: [], runSlots: [], loaded: false }
 
 /** Each module's browser part, imported once per page load, by URL; a module that fails to load is skipped. */
 const imported = new Map<string, Promise<ModuleDefinition | undefined>>()
@@ -70,8 +86,8 @@ const NO_MODULES: DashboardModule[] = []
 
 /**
  * What the registered projects' modules add (#1774), in package order: the pages, a segment two
- * modules claim going to the first, the cards (#1818), sorted by their order then their package, and the link actions, every one of them, each carrying the
- * package it came from and the projects that have it. `loaded` is false until the module list has
+ * modules claim going to the first, the cards (#1818), sorted by their order then their package, the link actions, the side-rail tabs and the run slots,
+ * every one of them, each carrying the package it came from and the projects that have it. `loaded` is false until the module list has
  * been read and every module in it imported, so the shell can tell "no such page" from "not
  * loaded yet".
  */
@@ -86,6 +102,8 @@ export function useModules(): MountedModules {
       const pages: MountedPage[] = []
       const cards: MountedCard[] = []
       const linkActions: MountedLinkAction[] = []
+      const panels: MountedPanel[] = []
+      const runSlots: MountedRunSlots[] = []
       for (const { module, definition } of loadedModules) {
         for (const page of definition?.pages ?? []) {
           if (!isPageSegment(page.segment) || pages.some(p => p.segment === page.segment)) continue
@@ -97,10 +115,15 @@ export function useModules(): MountedModules {
         for (const action of definition?.linkActions ?? []) {
           linkActions.push({ ...action, package: module.package, projects: module.projects })
         }
+        for (const panel of definition?.panels ?? []) {
+          panels.push({ ...panel, package: module.package, projects: module.projects })
+        }
+        const run = definition?.run
+        if (run && (run.summary || run.details)) runSlots.push({ ...run, package: module.package, projects: module.projects })
       }
       // Numbers, not a list the shell keeps: a third package sits between two others without the shell knowing it exists.
       cards.sort((a, b) => (a.order ?? DEFAULT_CARD_ORDER) - (b.order ?? DEFAULT_CARD_ORDER) || a.package.localeCompare(b.package))
-      setState({ pages, cards, linkActions, loaded: true })
+      setState({ pages, cards, linkActions, panels, runSlots, loaded: true })
     })
     return () => {
       live = false

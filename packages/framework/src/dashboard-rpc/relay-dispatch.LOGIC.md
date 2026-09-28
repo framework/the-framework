@@ -2,7 +2,7 @@ The device [1] side of the relay [2]: the fixed set of calls a daemon that relay
 
 ## Context
 
-**User story**: the user starts an agent on a saved device from this dashboard and then reads its files, answers its question [5], messages it and publishes its work as if it ran locally; the device carries out each of those on its own checkout of the agent.
+**User story**: the user starts an agent on a saved device from this dashboard and then reads its files in the Files tab, answers its question [5], messages it and publishes its work as if it ran locally; the device carries out each of those on its own checkout of the agent.
 
 **Problem**: a relayed call arrives at the device with no browser behind it and with the relaying daemon's own project id, which means nothing here. The device must limit what such a call can reach — its own home project, and only the actions steering an agent needs — because anyone holding the device's token can send one.
 
@@ -20,7 +20,7 @@ The device [1] side of the relay [2]: the fixed set of calls a daemon that relay
 
 ## Business logic — TL;DR
 
-- **A whitelist, nothing else** - only the reads about an agent [3] and the steering of it can be relayed; starting an agent, deleting one and removing a checkout [4] cannot.
+- **A whitelist, nothing else** - only the reads about an agent [3], a module's reads among them, and the steering of it can be relayed; starting an agent, deleting one and removing a checkout [4] cannot.
 - **Only the device's home project** - the caller's project id is replaced with this device's [1] home project id, so a relayed call can never address another registered project.
 - **An unknown name is refused** - a call not on the list fails as an unknown relay call, and the list inherits nothing, so names every object carries are unknown too.
 - **No onward relay** - a relayed call runs as local on the device: the agent is local here, and forwarding it again would loop.
@@ -35,7 +35,7 @@ See `## Context`.
 
 #### Business logic
 
-The calls a relaying daemon may make here are exactly the reads about one agent [3] — the project's files, the agent's own files with what it changed, a file's diff and content, the agent's changes, the git status, the agent's checkout [4], its handoff [6] state and the agent itself (`reads.ts`) — and the steering of it: stopping [7], answering its question [5], sending a message, opening the pull request and merging it (`control.ts`). Starting an agent, deleting one, removing a retained checkout are not on the list: a Start reaches a device through its own relay endpoint, where the device runs its own project's start hook, and destroying history or checkouts is not something a relaying daemon may reach.
+The calls a relaying daemon may make here are exactly the reads about one agent [3] — the project's files, the git status, the agent's checkout [4], its handoff [6] state and the agent itself (`reads.ts`), and a module's read (`modules.ts`), which is how the Files tab reads a relayed agent's files, diffs and changes on the device — and the steering of it: stopping [7], answering its question [5], sending a message, opening the pull request and merging it (`control.ts`). Starting an agent, deleting one, removing a retained checkout are not on the list: a Start reaches a device through its own relay endpoint, where the device runs its own project's start hook, and destroying history or checkouts is not something a relaying daemon may reach. Neither is a module's command: unlike its reads, it may write the project's data.
 
 ### Only the device's home project
 

@@ -24,5 +24,11 @@ And when the feed fills in, on a first visit:
 - **A second at most** - with an archive read that never answers, "Loading agent…" shows after a second.
 - **A watched agent keeps its events** - an agent that stops while shown keeps the live event stream's events on screen while its archive is read.
 
+And what the installed modules add to an agent's page:
+
+- **A working agent** - shows each module's summary in the bar and its details under it, both told the agent and that it is working, the summary also that the bar is closed.
+- **An ended agent** - once the read of what its branch holds has answered, the modules' summary is gone from the bar, and the details stay, told the agent is not working.
+- **A project without the module** - gets neither.
+
 The rules for when a resume is offered belong to the composer and are covered by its own tests; the view only hands it how the agent ended.
 - **The pull request lookup is waited for** - while the branch's read says its pull request lookup is still out, and while the next read is unanswered, the bar is not ready; once the next read has the answer, it is.

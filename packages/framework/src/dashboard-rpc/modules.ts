@@ -2,9 +2,12 @@ import { contextProjects, resolveProjectPath } from './context.js'
 import { findProjectModule, readProjectModules, runModuleCommand as runCommand, type ModuleCommandResult } from '../project-modules.js'
 import { moduleUrl } from '../dashboard/module-serve.js'
 import { providedDataChanged } from '../store/provided.js'
+import { callModuleRead, serverHost, type ModuleReadResult } from '../dashboard/module-host.js'
+import { relayOr } from './relay-agent.js'
 import { DATA_BRANCH, pullFileBranch } from '@gemstack/agent-data'
 
 export type { ModuleCommandResult } from '../project-modules.js'
+export type { ModuleReadResult } from '../dashboard/module-host.js'
 
 /** One module as the dashboard loads it: where its module is, and which projects have it. */
 export interface DashboardModule {
@@ -58,4 +61,23 @@ export async function runModuleCommand(projectId: string, pkg: string, args: str
   if (acts) await pullFileBranch(root, DATA_BRANCH, { log: () => {} }).catch(() => {})
   providedDataChanged(root)
   return result
+}
+
+/**
+ * Call read `name` of a module's server part in one project: how a module's browser part reads
+ * what a command cannot answer fast enough. Refused for an unknown project, a package that is not
+ * a module of that project, and a module with no server part. A read whose input names a run this
+ * daemon relays to a connected device (`input.agentId`) is read over there, by that device's own
+ * copy of the module, since the run's checkout is there.
+ */
+export async function readModule(projectId: string, pkg: string, name: string, input: unknown): Promise<ModuleReadResult> {
+  const agentId = input && typeof input === 'object' && typeof (input as { agentId?: unknown }).agentId === 'string' ? (input as { agentId: string }).agentId : undefined
+  return relayOr<ModuleReadResult>(agentId, 'readModule', [projectId, pkg, name, input], async () => {
+    const root = await resolveProjectPath(projectId)
+    if (!root) return { ok: false, error: 'unknown project' }
+    const module = await findProjectModule(root, pkg).catch(() => undefined)
+    if (!module) return { ok: false, error: `${pkg} is no module of this project` }
+    if (!module.server) return { ok: false, error: `${pkg} has no server part` }
+    return callModuleRead(module.server, name, serverHost(root), input)
+  }, { ok: false, error: 'the device this run works on did not answer' })
 }

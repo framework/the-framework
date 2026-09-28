@@ -22,6 +22,8 @@ const modules = (projects: string[] = ['p1', 'p2']): MountedModules => ({
   pages: [],
   cards: [],
   linkActions: [{ label: 'Add to queue', doneLabel: 'Queued', run: addToQueue, package: '@x/queue', projects }],
+  panels: [],
+  runSlots: [],
   loaded: true,
 })
 const render = (mounted: MountedModules = modules()) => {

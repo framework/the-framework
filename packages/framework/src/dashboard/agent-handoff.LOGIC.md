@@ -56,7 +56,7 @@ The branch is the one recorded on the agent's [1] record while it ran. An agent 
 
 #### Context
 
-**Problem**: an agent's [1] branch is gone for two very different reasons: it held nothing, or its work went somewhere this machine cannot see. Saying "branch gone" for the first reads as lost work. The Files tab (`agent-tree.ts`) and the handoff read (`../dashboard-rpc/reads.ts`) ask the same question, so it is one rule.
+**Problem**: an agent's [1] branch is gone for two very different reasons: it held nothing, or its work went somewhere this machine cannot see. Saying "branch gone" for the first reads as lost work. The Files tab (the built-in Files module, told the answer as one of an agent's facts by `module-host.ts`) and the handoff read (`../dashboard-rpc/reads.ts`) ask the same question, so it is one rule.
 
 #### Business logic
 

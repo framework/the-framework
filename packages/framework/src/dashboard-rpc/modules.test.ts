@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { addProject, projectId } from '../registry.js'
 import { projectQueue } from '../store/queue.js'
-import { onModules, runModuleCommand } from './modules.js'
+import { onModules, readModule, runModuleCommand } from './modules.js'
 
 /** A project with a package.json and installed packages, each `{ exports, bin }` plus files. */
 async function project(dir: string, packages: Record<string, { manifest: Record<string, unknown>; files?: Record<string, string> }>): Promise<void> {
@@ -54,7 +54,9 @@ test('the dashboard\'s modules are every registered project\'s, one per package,
     await addProject(a, '2026-09-19T00:00:00.000Z')
     await addProject(b, '2026-09-19T00:00:01.000Z')
 
+    // The built-in Files module is every project's, from the first; then the projects' own.
     assert.deepEqual(await onModules(), [
+      { package: '@gemstack/files', url: `/_modules/${projectId(a)}/%40gemstack%2Ffiles/dashboard.js`, projects: [projectId(a), projectId(b)] },
       { package: 'logs', url: `/_modules/${projectId(a)}/logs/w.js`, projects: [projectId(a), projectId(b)] },
       { package: 'queue', url: `/_modules/${projectId(b)}/queue/w.js`, projects: [projectId(b)] },
     ])
@@ -84,6 +86,38 @@ test('a module\'s command may write what the framework reads through a provider:
     assert.deepEqual(await queue.list(), [], 'read once: cached for the window')
     assert.deepEqual(await runModuleCommand(projectId(a), 'queue', ['add', 'ship it']), { ok: true, output: { ok: true } })
     assert.deepEqual(await queue.list(), ['ship it'], 'the module wrote through its command, and the framework forgot its read')
+  } finally {
+    if (previous === undefined) delete process.env.XDG_CONFIG_HOME
+    else process.env.XDG_CONFIG_HOME = previous
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('a module reads through its own server part, in its own project; nothing else is read', async () => {
+  const dir = await realpath(await mkdtemp(join(tmpdir(), 'framework-modules-read-')))
+  const previous = process.env.XDG_CONFIG_HOME
+  process.env.XDG_CONFIG_HOME = join(dir, 'cfg')
+  try {
+    await mkdir(process.env.XDG_CONFIG_HOME, { recursive: true })
+    const a = join(dir, 'a')
+    await project(a, {
+      reader: {
+        manifest: { exports: { './dashboard': './w.js', './server': './s.mjs' } },
+        files: { 'w.js': 'export default {}', 's.mjs': 'export default { reads: { where: async (host, input) => ({ root: host.root, input }) } }' },
+      },
+      logs: module('logs'),
+    })
+    await addProject(a, '2026-09-19T00:00:00.000Z')
+
+    assert.deepEqual(await readModule(projectId(a), 'reader', 'where', { path: 'x' }), { ok: true, output: { root: a, input: { path: 'x' } } })
+    assert.deepEqual(await readModule(projectId(a), 'logs', 'where', {}), { ok: false, error: 'logs has no server part' })
+    assert.deepEqual(await readModule(projectId(a), 'nothing', 'where', {}), { ok: false, error: 'nothing is no module of this project' })
+    assert.deepEqual(await readModule('nowhere-1', 'reader', 'where', {}), { ok: false, error: 'unknown project' })
+    // The built-in Files module reads the project's own files.
+    await writeFile(join(a, 'hello.txt'), 'hi')
+    const files = await readModule(projectId(a), '@gemstack/files', 'project', {})
+    assert.equal(files.ok, true)
+    assert.ok(files.ok && (files.output as { files: string[] }).files !== undefined)
   } finally {
     if (previous === undefined) delete process.env.XDG_CONFIG_HOME
     else process.env.XDG_CONFIG_HOME = previous

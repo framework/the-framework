@@ -23,6 +23,8 @@ Shows one agent [1] on its own page, the agent view [2], in one frame that stays
 [14] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
 [15] stop: ending an agent before it finishes: the Stop button, Ctrl-C, or a pick marked to stop.
 [16] project home: a project's own page with the launcher (the Start form) and its composer.
+[17] module: a package that adds to the dashboard (pages, Overview cards, side-rail tabs, what an agent's page shows, actions on the links pages show): its browser part, named by the package's `exports["./dashboard"]`, reads its data through its own package's command, or through its own server part, named by `exports["./server"]`, which the daemon calls in its own process. A module comes from a project's dependencies, or is built into the dashboard and loaded for every project, as the Files module is.
+[18] run slot: a place on an agent's page a module fills: the summary, a few words in the action bar, shown until the agent has ended and its branch has been read (the handoff's own words take over then); and the details, a block under the bar. Each is told the agent, whether it is still working, and whether the bar is open.
 
 ## Business logic — TL;DR
 
@@ -31,9 +33,9 @@ Shows one agent [1] on its own page, the agent view [2], in one frame that stays
 - **Loading and empty states** - on a first visit the feed stays blank until the agent's own events are in, then fills in one step; a finished agent whose archive is still being read after a second says "Loading agent…"; a finished agent with no events at all says "This agent has no events."; a running agent with nothing yet simply waits for its first event.
 - **Working means running** - the agent counts as working exactly while the daemon's list says it runs; everything that asks "is there more coming?" asks this, so an agent that is not working gets its next step offered. Before the list is read, whether the agent runs is not known, and nothing that depends on it is read or offered.
 - **Live as the feed knows it** - the feed follows new output, and the composer offers Stop, as soon as new events stream in, even during the seconds before the daemon's list of agents notices a resumed agent.
-- **What the action bar says** - the agent's name with its project as a breadcrumb; the one status word, from the events shown and the agent's card; while working, the counts of what the checkout has changed; once not working, the verdict on what the branch holds and the offered next step.
+- **What the action bar says** - the agent's name with its project as a breadcrumb; the one status word, from the events shown and the agent's card; until the branch's verdict is read, the installed modules' summaries (the Files module's count of what the checkout has changed); once not working, the verdict on what the branch holds and the offered next step.
 - **Switching between agents** - the bar names the agent at once and shows its facts together once its own reads are in (at most a second later); an agent seen before shows its archive, its branch verdict and its facts at once, as last read, while they are read again.
-- **The disclosure** - opening the bar's disclosure adds the agent's details strip and, while working, the changes in its checkout, or, once stopped, the commits and files its branch holds.
+- **The disclosure** - opening the bar's disclosure adds the agent's details strip and, once stopped, the commits and files its branch holds; the installed modules' details sit under the bar in every state, told whether it is open (the Files module shows a working agent's changed files there).
 - **Removing a kept checkout** - a finished agent that kept its checkout (it failed or was stopped) is offered a Remove, which disappears at once when used.
 - **Notices for work that runs elsewhere** - an agent whose turns run on GitHub Actions, in a cloud session, or on a device gets a notice explaining what the feed can and cannot show.
 - **The feed and the composer** - a finished feed is static and opens at its end; the composer knows how the agent ended, so it can say what the next message will do and offer a resume.
@@ -93,7 +95,7 @@ An agent [1] counts as working exactly while the daemon's list of agents says it
 
 - what the branch holds (the read in `lib/use-agent-handoff.ts`) is only read once the agent is not working and its card [3] is not marked saving: a branch still being written to has nothing to offer yet, and while the agent is saving its checkout is being cleaned up, which deletes a branch that holds nothing, so a next step offered then would be gone moments later;
 - the bar's action slot is empty while working — an agent that is working publishes its own work — and holds the next step [9] once not working;
-- the changes panel reads the checkout [7] while working; the branch's commits and files replace it once not working.
+- the modules' run slots [18] are told whether the agent works: the Files module reads the checkout [7] only while it does; the branch's commits and files take over once not working.
 
 Until the daemon's list of agents has been read (an agent opened from the Overview, or from a link, before its project's list has answered), whether the agent runs is not known: it counts as neither working nor ended. Its archive, its branch and the project's kept checkouts are not read, the bar offers nothing and waits (see "Switching between agents"), and the feed stays blank until the list is read or a second has passed, then shows the live event stream's events.
 
@@ -135,9 +137,9 @@ The archive, the read of what the branch holds (`lib/use-agent-handoff.ts`), the
 
 The bar's summary line:
 
-- While the agent [1] is working: the counts of what its checkout [7] has changed (files changed, lines added, lines removed), reported by the changes panel (`AgentChanges.tsx`).
+- Until the agent is not working and the read of what its branch holds has answered: the summary run slot [18] of every installed module [17] the project has, each told the agent, whether it is working and whether the disclosure is open. The Files module's says what the agent's checkout [7] has changed (files changed, lines added, lines removed).
 - Once the agent is not working and the read of what its branch holds has answered: the one-line verdict on the branch (`AgentHandoff.tsx`), followed, in the danger color, by the error of the last next-step [9] action the user pressed in the bar, when one failed.
-- Until that read has answered, a just-stopped agent keeps showing the counts it ended with: the summary swaps once, from the live counts to the branch verdict, instead of going blank for the beat the read takes.
+- Until that read has answered, a just-stopped agent keeps showing the modules' summaries (the Files module keeps the counts the agent ended with): the summary swaps once, to the branch verdict, instead of going blank for the beat the read takes.
 
 The bar's status word, ranked in `lib/agent-status.ts`, is read off the events shown and the agent's card [3]: the caller hands over the agent's card as the daemon's list of agents last reported it, which is what the word needs for "saving…" and "ready for merge"; before the list holds the agent there is no card, and the word is read off the events alone. The same card is handed to the details strip, which names the coding agent and model off it.
 
@@ -157,10 +159,9 @@ The bar's action slot:
 The disclosure toggles open and closed from the bar. While open it shows, above the feed:
 
 - the details strip (`AgentDetails.tsx`) with the coding agent and model off the agent's card [3] and the spend off its events, in every state;
-- while the agent is working: the changes in its checkout [7] (`AgentChanges.tsx`). The changes panel is only shown when the agent's id is known: a read without an id falls back to the project root and would report the user's own uncommitted files as the agent's. A relayed [13] agent's checkout lives on the device [12], and its changes are read there, so it is shown like a local agent's;
 - once the agent is not working: the commits and files its branch holds (`AgentHandoff.tsx`).
 
-The changes panel also reports its counts to the bar's summary while the disclosure is closed.
+Under the bar, in every state and whether the disclosure is open or not, sits the details run slot [18] of every installed module [17] the project has, told the agent, whether it is working and whether the disclosure is open; each decides what it shows. The Files module's lists a working agent's changed files while the disclosure is open. A relayed [13] agent's checkout lives on the device [12], and a module's reads about it are made there, so it is shown like a local agent's. A module's slot that throws shows its own error line and leaves the rest of the page standing.
 
 ### Removing a kept checkout
 

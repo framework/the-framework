@@ -23,20 +23,20 @@ The browser's side of the daemon's call surface: one module of typed stubs per g
 [13] device: Another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 [14] spend offset: the user's adjustment of the quota boundary, in percentage points of the week: how far past it unattended work may start. Each project's scheduler holds its own, as `spendOffset` in its state file. The offset hook, under `offset:` in `.the-framework/hooks.yml`, sets it.
 [15] schedule switch: a person's choice, on one machine, whether a scheduled command (a line of the project's `agent-schedule.md`) runs there; the project's scheduler keeps it in its state file. The switch hook, under `switch:` in `.the-framework/hooks.yml`, sets it.
-[16] module: one of a project's packages that adds to the dashboard, its browser part named by the package's `exports["./dashboard"]`; it adds pages to the dashboard and reads its data through its own package's command.
+[16] module: a package that adds to the dashboard (pages, Overview cards, side-rail tabs, what an agent's page shows, actions on the links pages show): its browser part, named by the package's `exports["./dashboard"]`, reads its data through its own package's command, or through its own server part, named by `exports["./server"]`, which the daemon calls in its own process. A module comes from a project's dependencies, or is built into the dashboard and loaded for every project, as the Files module is.
 
 ## Business logic — TL;DR
 
 - **Typed against the daemon** - every stub is declared with the daemon's own signature for the call it makes, so a call renamed or re-shaped on the daemon's side is a type error in the dashboard's build rather than a broken page.
 - **Projects** (`projects.ts`) - the registered projects with what the daemon finds wrong with each, adding one, picking its directory on the daemon's machine, the onboarding suggestion, and what the launcher offers for a project: its commands [2] and whether it has a start hook [3]; and a scheduled command's schedule switch [15], set through the project's switch hook.
-- **Reads** (`reads.ts`) - everything the pages read about a project or an agent [1]: the agent history and one agent's replay, documents and tickets, the cross-project rollups, a checkout's [4] files and diffs, its git status and what the agent left behind, which decides its next step [5], and the Claude web bridge's [6] state.
+- **Reads** (`reads.ts`) - everything the pages read about a project or an agent [1]: the agent history and one agent's replay, documents and tickets, the cross-project rollups, a checkout's [4] file list, its git status and what the agent left behind, which decides its next step [5], and the Claude web bridge's [6] state.
 - **The live event stream** (`events.ts`) - the subscription to one agent's events [7] as they are written, re-exported from the transport because a stream is not a call.
 - **Actions** (`control.ts`) - everything the user does to an agent or a project: what the user says to an agent (stop, pick [8], message), the bridge's answer and its browser, starting an agent, pull request and merge, removing a checkout or deleting an agent, opening a checkout in an app, and the release of a ticket's claim.
 - **Preferences** (`preferences.ts`) - reading, replacing or patching the preferences [10], a project's shared saved prompts, and the installed editors.
 - **Models** (`models.ts`) - which models each coding agent offers, as the daemon asked them, or why one could not say.
 - **Quota** (`quota.ts`) - the quota [11] reading against the quota boundary [12], and setting the spend offset [14] through every project's offset hook.
 - **Devices** (`devices.ts`) - whether each saved device [13] answers, checked by the daemon with the token the browser holds and never keeps.
-- **Modules** (`modules.ts`) - which modules [16] the registered projects bring, and a module running one of its own package's commands in one project.
+- **Modules** (`modules.ts`) - which modules [16] the registered projects have, a module running one of its own package's commands in one project, and a module calling one of its own server part's reads.
 
 ## Business logic
 

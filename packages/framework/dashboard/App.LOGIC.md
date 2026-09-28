@@ -1,4 +1,4 @@
-Composes the dashboard: reads what is selected off the URL, keeps the sidebar, the main pane and the right rail around whichever page the URL names, including the pages the installed modules [19] add, provides the installed modules' pages and link actions to every page, runs the polls that every page shares, holds the selected agent's [1] live event stream [2] and the Context [18] the launcher and the file tree share, and turns two of the polled feeds into browser notifications.
+Composes the dashboard: reads what is selected off the URL, keeps the sidebar, the main pane and the right rail around whichever page the URL names, including the pages the installed modules [19] add, provides the installed modules' pages, side-rail tabs, run slots and link actions to every page, runs the polls that every page shares, holds the selected agent's [1] live event stream [2] and the Context [18] the launcher and the Files tab share, and turns two of the polled feeds into browser notifications.
 
 ## Context
 
@@ -25,7 +25,7 @@ Composes the dashboard: reads what is selected off the URL, keeps the sidebar, t
 [16] archive: the transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
 [17] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 [18] Context: the set of paths the user picked to focus an agent on: other registered projects, by their absolute path, and files of the current project, by their path relative to the repository's root. The agent can still reach everything; the Context only says where to look.
-[19] module: one of a project's packages that adds to the dashboard, its browser part named by the package's `exports["./dashboard"]`; it adds pages to the dashboard, offers actions on the links pages show, and reads and changes its data through its own package's command.
+[19] module: a package that adds to the dashboard (pages, Overview cards, side-rail tabs, what an agent's page shows, actions on the links pages show): its browser part, named by the package's `exports["./dashboard"]`, reads its data through its own package's command, or through its own server part, named by `exports["./server"]`, which the daemon calls in its own process. A module comes from a project's dependencies, or is built into the dashboard and loaded for every project, as the Files module is.
 
 ## Business logic — TL;DR
 
@@ -34,7 +34,7 @@ Composes the dashboard: reads what is selected off the URL, keeps the sidebar, t
 - **The frames around every page** - the sidebar is on every page, the right rail only while a project is selected and never beside a module's page, and a warning bar sits above everything while the daemon is not answering.
 - **What the main pane shows** - the URL resolves, in order, to Settings [3], a module's [19] page (or "No such page"), the Overview [4], "No such project", the project home [5], "This agent is gone", or the agent view [6], which is one and the same page for a running and a finished agent.
 - **Starting an agent from any page** - a start goes to the new agent at once, on the strength of the id the project's start hook answered, before the agent's record exists.
-- **One Context for the launcher and the file tree** - the Context [18] is held here and handed to the project home's [5] launcher and to the right rail's file tree; it is emptied when the project changes, when an agent starts or is continued, and on the sidebar's "New".
+- **One Context for the launcher and the Files tab** - the Context [18] is held here and handed to the project home's [5] launcher and to the right rail, which hands its files to the modules' tabs (the Files tab); it is emptied when the project changes, when an agent starts or is continued, and on the sidebar's "New".
 - **What is polled, and how often** - the polls that several pages share run once here: the project's agents every 2 seconds, its files every 10, the interventions [7] every 15, the registered projects every 30, the activity feed only while it can notify, the cross-project recents only on the Overview, and "is any agent working" and "is the daemon answering" every 5.
 - **The selected agent's live stream** - one live stream follows the agent in the URL and feeds both the agent view and the rail's views [8]; a new start empties it, a continuation keeps it.
 - **Browser notifications** - a new intervention notifies when its category (default on) and browser delivery (default on) are both on; a started or finished agent notifies only when the "New activity" category (default off) is on as well.
@@ -115,15 +115,15 @@ The first rule that matches decides the page:
 - A start always names the agent it began, so the selection is always read off the URL and never inferred from which agent happens to be running.
 - Every start and every continuation empties the Context [18]: what was picked went with that agent, and the next launch starts from a clean focus.
 
-### One Context for the launcher and the file tree
+### One Context for the launcher and the Files tab
 
 #### Context
 
-**User story**: the user ticks a file in the right rail's file tree, then opens the launcher's "Context" menu and finds it listed there; removing it in the menu unticks it in the tree.
+**User story**: the user ticks a file in the right rail's Files tab, then opens the launcher's "Context" menu and finds it listed there; removing it in the menu unticks it in the tree.
 
 #### Business logic
 
-The Context [18] (`lib/use-context-set.ts`) is held here, once, and handed to the project home's [5] launcher with its three edits (add, remove, toggle) and to the right rail with the toggle. It is emptied: whenever the selected project changes, by any route, Back and Forward included, since the files in it are paths of that project; on every start or continuation (see "Starting an agent from any page"); and when the user presses "New" in the sidebar, even for the project already selected, since staying in the same project does not change the project.
+The Context [18] (`lib/use-context-set.ts`) is held here, once, and handed to the project home's [5] launcher with its three edits (add, remove, toggle) and to the right rail with the toggle, together with the project's files, so the rail can tell the Context's files from its project paths. It is emptied: whenever the selected project changes, by any route, Back and Forward included, since the files in it are paths of that project; on every start or continuation (see "Starting an agent from any page"); and when the user presses "New" in the sidebar, even for the project already selected, since staying in the same project does not change the project.
 
 ### What is polled, and how often
 
@@ -141,7 +141,7 @@ The Context [18] (`lib/use-context-set.ts`) is held here, once, and handed to th
 - The recent agents pooled across every project every 10 seconds, only on the Overview: a selected project's own agents fill the sidebar otherwise.
 - Whether any agent in any project is running, every 5 seconds (`lib/use-working.ts`).
 - Whether the daemon answers at all, every 5 seconds (see "The daemon-unreachable banner").
-- The installed modules [19] every 30 seconds, each module's browser part imported once (`lib/use-modules.ts`): the sidebar's module rows, the module pages and the link actions every page may show read one list, which the shell provides around everything it renders.
+- The installed modules [19] every 30 seconds, each module's browser part imported once (`lib/use-modules.ts`): the sidebar's module rows, the module pages, the right rail's module tabs, an agent page's run slots and the link actions every page may show read one list, which the shell provides around everything it renders.
 - A poll that fails keeps what it last showed rather than blanking it, and a list counts as unread until its first answer after the selection changes (`lib/use-async.ts`); that is what lets the main pane tell "not there" from "not read yet".
 
 ### The selected agent's live stream

@@ -1,0 +1,13 @@
+{
+  "id": "2026-09-28T14-02-18-501Z",
+  "startedAt": "2026-09-28T14:02:18.501Z",
+  "status": "running",
+  "intent": "/update-tickets",
+  "driver": "claude-code",
+  "model": "opus",
+  "caller": {
+    "runner": {
+      "host": "Suleimans-MacBook-Pro.local"
+    }
+  }
+}

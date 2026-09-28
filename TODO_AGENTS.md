@@ -8,7 +8,6 @@
 
 
 ## Priority 5
-- Create tickets/2026-09-04_cold-read-follow-ups.plan.md
 
 
 ## Priority 4

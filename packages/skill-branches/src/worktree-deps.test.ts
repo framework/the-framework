@@ -82,6 +82,7 @@ test('linkDependencies mirrors each tree as a real directory of entry links, at 
     '/repo/packages/a',
     '/repo/packages/a/node_modules',
     '/repo/packages/a/node_modules/@scope',
+    '/repo/packages/a/node_modules/@scope/pkg',
     '/wt',
     '/wt/packages',
     '/wt/packages/a',
@@ -94,9 +95,10 @@ test('linkDependencies mirrors each tree as a real directory of entry links, at 
     [
       { target: '/repo/node_modules/.bin', path: '/wt/node_modules/.bin' },
       { target: '/repo/node_modules/dep', path: '/wt/node_modules/dep' },
-      { target: '/repo/packages/a/node_modules/@scope', path: '/wt/packages/a/node_modules/@scope' },
+      { target: '/repo/packages/a/node_modules/@scope/pkg', path: '/wt/packages/a/node_modules/@scope/pkg' },
     ],
   )
+  assert.equal(await fs.isDirectory('/wt/packages/a/node_modules/@scope'), true, 'a scope is a directory of the worktree\'s own, holding a link per package')
 })
 
 // The #1262 regression: linking the package manager's own state made the parent's tree the
@@ -164,7 +166,17 @@ test('linkDependencies gives a real worktree a working dependency tree, and an i
     assert.equal(await readlink(join(repo, 'node_modules', 'dep')), join('.pnpm', 'dep@1.0.0', 'node_modules', 'dep'))
     assert.equal(await readFile(join(repo, 'node_modules', 'dep', 'index.js'), 'utf8'), 'module.exports = 1\n')
 
-    // Idempotent: a second call over the same worktree links nothing new.
+    // A new scoped package installed in the worktree lands in the worktree's own scope directory,
+    // never in the parent's.
+    await mkdir(join(repo, 'node_modules', '@acme', 'old'), { recursive: true })
+    await rm(join(wt, 'node_modules'), { recursive: true })
+    await linkDependencies(repo, wt, nodeLinkFs())
+    assert.equal((await lstat(join(wt, 'node_modules', '@acme'))).isSymbolicLink(), false, 'the scope is a real directory')
+    assert.equal((await lstat(join(wt, 'node_modules', '@acme', 'old'))).isSymbolicLink(), true, 'its packages are links')
+    await mkdir(join(wt, 'node_modules', '@acme', 'new'))
+    assert.deepEqual(await readdir(join(repo, 'node_modules', '@acme')), ['old'], 'the parent\'s scope is untouched')
+
+        // Idempotent: a second call over the same worktree links nothing new.
     assert.deepEqual(await linkDependencies(repo, wt, nodeLinkFs()), [])
   } finally {
     await rm(root, { recursive: true, force: true })

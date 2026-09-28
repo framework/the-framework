@@ -47,8 +47,8 @@ not a decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   project's head: every branch the package deletes held nothing the remote lacked.
 - The user's installed dependencies are linked into the checkout, not copied or
   reinstalled: one link per entry of the folder, absolute, so an install in the checkout
-  writes into the checkout (a scope like `@acme` is one entry, so a scoped install still
-  writes into the user's folder: a known limit). Every dependency folder down to two
+  writes into the checkout. A scope like `@acme` is mirrored the same way one level down,
+  so a scoped install writes into the checkout too. Every dependency folder down to two
   levels under the root is linked, so a workspace package's own dependencies are there
   too. Of the dot-entries only `.bin` is linked, so the agent runs the project's tools, as
   one entry, so a bin an install adds lands in the user's folder too; the others (`.pnpm`,

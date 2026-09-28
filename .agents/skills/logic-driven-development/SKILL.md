@@ -72,7 +72,7 @@ The business logic that the code implements.
 
 Note:
 - The `[required]`/`[optional]` are labels to denote whether you can omit a section
-  - For example, for a small file, a short description can be enough
+  - For example, for a small file, just a single-line description might be enough
 - Every time you use jargon, refer to `## Glossary`: `some jargon [x]`
 - The `Context` sections:
   - Two goals — make it clear to the technical product manager:
@@ -94,10 +94,20 @@ Note:
 The file structure often represents levels of abstraction => mirror it:
 - Root `LOGIC.md`:
   - The highest-level answer to "what does this software do?" — the high-level product's story
-  - How the top-level subsystems relate (instead of a low-level repository overview)
+  - How the top-level subsystems relate
 - Deeper `LOGIC.md` files => each subsystem's story
+
+
+## After a change
+
+Always consider whether other `LOGIC.md` files must be updated as well, not only the ones next to the changed code. For example, when a change renames or removes something, search every `LOGIC.md` for its name and update each one that mentions it.
 
 
 ## Install
 
 When the user asks to install or set up LDD: generate a `LOGIC.md` for each file and directory containing software source code — the entire code base, in one go.
+
+
+## Reset
+
+When the user asks to reset LDD, remove all `LOGIC.md` files and recreate them as described in Install. Don't read the previous files; resetting starts with a brand-new suite of `LOGIC.md` files.

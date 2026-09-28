@@ -1,4 +1,4 @@
-The hover card over a file in the project panel's tree: pointing at a file opens a card that shows what is in it — the diff for a file the selected agent [1] changed, the contents for an unchanged one — read from the selected agent's checkout [2] and kept current while the card stays open. Nothing is read for a file the user never points at.
+The hover card over a file in the Files tab's tree and in a working agent's list of changed files: pointing at a file opens a card that shows what is in it — the diff for a file the selected agent [1] changed, the contents for an unchanged one — read from the selected agent's checkout [2] and kept current while the card stays open. Nothing is read for a file the user never points at.
 
 ## Context
 
@@ -13,8 +13,8 @@ The hover card over a file in the project panel's tree: pointing at a file opens
 
 - **Opening on hover** - the card opens after the pointer rests on a file row for 350 ms, stays open while the pointer travels into it, and closes 150 ms after the pointer leaves; it sits to the left of the row, bounded to 70% of the viewport's height, and scrolls.
 - **Diff or contents** - a file the tree marks as changed shows its diff, with a "+added −removed" count in the header; an unchanged file shows its contents; the header always leads with the file's full path.
-- **Read lazily, kept fresh** - the read happens only when the card opens, is scoped to the selected agent's checkout, and is repeated every 5 seconds while the card is open so a file the agent is still editing keeps up.
-- **Waiting and empty states** - "Reading the diff…" or "Reading the file…" while the first read is out; "No change to show." or "Nothing to show." when the daemon has nothing for the file.
+- **Read lazily, kept fresh** - the read happens only when the card opens, reads wherever the selected agent's files are now, and is repeated every 5 seconds while the card is open so a file the agent is still editing keeps up.
+- **Waiting and empty states** - "Reading the diff…" or "Reading the file…" while the first read is out; "No change to show." or "Nothing to show." when the server part has nothing for the file.
 
 ## Business logic
 
@@ -36,7 +36,7 @@ See `## Context`.
 
 #### Business logic
 
-Which read the card makes is decided by the tree: a file the tree saw a git status for is read as a diff, any other file as plain contents, so the daemon never looks the status up a second time. The header shows the file's full path in a monospaced line and, for a diff, the count of added and removed lines at the right (the count and the body's rendering rules are in `DiffView.tsx`; what a diff contains, how it is capped, and when a file counts as binary are the daemon's rules in `src/dashboard/file-diff.ts` and `src/dashboard/file-read.ts`). The body renders the diff or the contents accordingly.
+Which read the card makes is decided by the tree: a file the tree saw a git status for is read as a diff, any other file as plain contents, so the status is never looked up a second time. The header shows the file's full path in a monospaced line and, for a diff, the count of added and removed lines at the right (the count is the dashboard's own "+added −removed" pair; the body's rendering rules are in `DiffView.tsx`; what a diff contains, how it is capped, and when a file counts as binary are the server part's rules in `src/diff.ts` and `src/read.ts`). The body renders the diff or the contents accordingly.
 
 ### Read lazily, kept fresh
 
@@ -46,7 +46,7 @@ Which read the card makes is decided by the tree: a file the tree saw a git stat
 
 #### Business logic
 
-The read is scoped to the selected agent's checkout [2], or the project's own checkout when no agent is selected, and is repeated every 5 seconds while the card is open. Changing the project, the agent, the file or its changed state starts a fresh read.
+The read is made through the module's own server part, scoped to wherever the selected agent's files are now (its checkout [2] while it has one), or the project's own checkout when no agent is selected, and is repeated every 5 seconds while the card is open. Changing the project, the agent, the file or its changed state starts a fresh read.
 
 ### Waiting and empty states
 
@@ -56,4 +56,4 @@ See `## Context`.
 
 #### Business logic
 
-Until the first read answers, the body reads "Reading the diff…" for a changed file and "Reading the file…" for an unchanged one. When the daemon answers that there is nothing for the file (a path it refuses, a file it cannot read, or a changed file with no diff to show), the body reads "No change to show." for a changed file and "Nothing to show." for an unchanged one.
+Until the first read answers, the body reads "Reading the diff…" for a changed file and "Reading the file…" for an unchanged one. When the server part answers that there is nothing for the file (a path it refuses, a file it cannot read, or a changed file with no diff to show), the body reads "No change to show." for a changed file and "Nothing to show." for an unchanged one.

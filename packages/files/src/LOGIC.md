@@ -1,0 +1,17 @@
+The Files module's [4] server part: the reads its browser part makes, and the git readers behind them. The daemon imports `server.ts` once and calls one of its reads with the project and what the dashboard knows about the project's agents [1]; every read answers from git in the project's repository or in an agent's checkout [2], never over the network.
+
+## Glossary
+
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
+[2] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch. The user's own working copy is the project's checkout.
+[3] the agent's facts: what the dashboard tells a module's server part about one agent when asked: its checkout while it has one, its record (status, machine, branch, pull request number), and whether it finished on this machine having changed nothing; and, on request, the commit a pull request of a branch merged as, or that the git host is still being asked.
+[4] module: a package that adds to the dashboard (pages, Overview cards, side-rail tabs, what an agent's page shows, actions on the links pages show): its browser part, named by the package's `exports["./dashboard"]`, reads its data through its own package's command, or through its own server part, named by `exports["./server"]`, which the daemon calls in its own process. A module comes from a project's dependencies, or is built into the dashboard and loaded for every project, as the Files module is.
+
+## Business logic — TL;DR
+
+- **The reads** (`server.ts`) - the project's files with their on-disk marks, an agent's tree, one file's diff, one file's contents, and a working agent's changed files; a read about an agent takes its id and reads wherever its files are now.
+- **Where an agent's files are** (`tree.ts`) - from the agent's facts [3]: its checkout, else its branch, else its pull request's merge commit, else, for an agent that changed nothing, the default branch unmarked, else gone.
+- **The file list** (`list.ts`) - every file git sees in a checkout, tracked and untracked, honoring the ignore rules, sorted.
+- **Per-file status** (`status.ts`) - the working tree's state of each changed file.
+- **Diffs and changed files** (`diff.ts`) - one file's diff and the list of changed files with their line counts.
+- **Reading one file safely** (`read.ts`) - which browser-supplied paths may be read, the read confined to the checkout, and a file's contents for the hover card.

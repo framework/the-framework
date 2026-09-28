@@ -2,7 +2,7 @@ Two read-only facts about a repository on disk: whether it is activated as a pro
 
 ## Context
 
-**User story**: the user runs `the-framework` inside an activated repository and it appears in the Projects list on its own; the dashboard's file tree and the composer's `#` file picker offer the files of the project or of an agent's [2] checkout [3].
+**User story**: the user runs `the-framework` inside an activated repository and it appears in the Projects list on its own; the composer's `#` file picker offers the files of the project or of an agent's [2] checkout [3].
 
 ## Glossary
 

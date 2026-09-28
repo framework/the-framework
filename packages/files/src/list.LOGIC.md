@@ -1,0 +1,1 @@
+Lists every file git sees in a checkout: tracked files and untracked ones, honoring the repository's ignore rules, as paths relative to the repository's root, each once and sorted. A directory that is not a repository, or a git that fails, yields an empty list.

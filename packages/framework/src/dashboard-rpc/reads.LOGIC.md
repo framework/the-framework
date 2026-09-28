@@ -1,8 +1,8 @@
-Answers everything the dashboard reads about a project or an agent [1]: the agent history, one agent's replay, the project's surfaced documents, the cross-project rollups the Overview [2] and the launcher show, the files of a checkout [3] with their git status, an agent's own files with what it changed, one file's diff or content, where an agent is working and what its handoff [4] left behind, and the state of the Claude web bridge [5]. Every read is forgiving: an unknown project or a failing read answers the empty shape (an empty list, an empty map, nothing) rather than an error, and a read about an agent relayed [6] to a device [7] is answered by that device.
+Answers everything the dashboard reads about a project or an agent [1]: the agent history, one agent's replay, the project's surfaced documents, the cross-project rollups the Overview [2] and the launcher show, the files of a checkout [3] for the composer's picker, where an agent is working and what its handoff [4] left behind, and the state of the Claude web bridge [5]. Every read is forgiving: an unknown project or a failing read answers the empty shape (an empty list, an empty map, nothing) rather than an error, and a read about an agent relayed [6] to a device [7] is answered by that device.
 
 ## Context
 
-**User story**: the user opens a project and sees its agents, newest first, each with its status; opens an agent and sees its events replayed, the files it changed with their diffs, the checkout it is in, and, once it has ended, the branch, commits and pull request it left; opens the Overview and sees what is running everywhere, what needs a human, and what happened recently. Every one of those panels polls one of these reads.
+**User story**: the user opens a project and sees its agents, newest first, each with its status; opens an agent and sees its events replayed, the checkout it is in, and, once it has ended, the branch, commits and pull request it left; opens the Overview and sees what is running everywhere, what needs a human, and what happened recently. Every one of those panels polls one of these reads.
 
 **Business logic story**: the dashboard is a projection of the same files the daemon and the agents write. Each read resolves the project id to the project's path, then the agent id to the checkout that agent works in when the read is about one agent, and hands the path to the reader that owns those files (the readers live in `dashboard/`, `store/` and the skill packages). What the disk cannot know, the daemon adds on the way out.
 
@@ -39,9 +39,7 @@ Answers everything the dashboard reads about a project or an agent [1]: the agen
 - **Where an agent is working** - while it has a checkout: the checkout's path, its branch, whether it holds uncommitted changes, its size once nothing writes to it, and the pull request that belongs to this agent and not a predecessor's; once the checkout is gone, only the branch and the pull request the agent recorded.
 - **Documents** - the surfaced documents at the project root.
 - **Cross-project rollups** - the aggregated agent queue, the Overview, recent agents, interventions, open questions, activity, the dashboard page and every project's scheduler state, each built over every project the registry lists.
-- **The files of a checkout and their status** - every file git sees (from the agent's own checkout when an agent id is given), and each file's untracked/modified/deleted status in the project's root.
-- **An agent's own files, for as long as git has them** - the agent's tree with what it changed marked, from its checkout, else its branch, else its merge commit; gone when none is left.
-- **One file's diff, one file's content, and what the agent changed** - the diff of a changed file and the content of an unchanged one, from the same source as the agent's own files; and every changed file with its line counts, read from the checkout's own git state.
+- **The files of a checkout** - every file git sees (from the agent's own checkout when an agent id is given), for the composer's `#` picker and the count of the Context's files; the Files tab, the diffs and what an agent changed are the Files module's own reads, through the module calls (`modules.ts`).
 - **The project's page on its git host, and git status** - the project's page and the git host's name, as the git host provider answers them; the branch, dirty flag and linked pull request of the project or of one agent's checkout, filtered to that agent's lifetime.
 - **What an agent's handoff left behind** - the agent's own branch, as the project's branches provider answers it, plus the agent's pull request; a gone branch of an agent that changed nothing is marked so; an agent that recorded no branch has no handoff.
 - **The bridge's state** - the question a cloud session is parked on, where the picked answer stands, what the session has said, whether anything reached the bridge and how, the bridge token while the bridge is on, and the bridge browser's state.
@@ -137,39 +135,15 @@ The surfaced documents are read at the project root in sidebar order (`dashboard
 
 Each rollup is built over every project the registry lists (the builders are `dashboard/overview.ts`, `dashboard/queue.ts`, `dashboard/scheduler-state.ts`, `dashboard/interventions.ts`, `dashboard/open-questions.ts`, `dashboard/activity.ts` and `dashboard/dashboard.ts`), and a registry that cannot be read means no projects. Recent agents carry the same annotations as the agent history. The interventions [17] and the activity feed report, beside their items, which projects were read whole: a project whose sources could not be read contributes no items, exactly like a project with nothing waiting, and the browser's notifier needs the difference, because a queue that came back empty only because the git host was unreachable is not a baseline to announce the whole backlog against later.
 
-### The files of a checkout and their status
+### The files of a checkout
 
 #### Context
 
-**User story**: the context picker lists the checkout's files, and on a project's home the file tree lists them and marks each changed file with its git status.
+**User story**: the composer's `#` picker lists the checkout's files, and the right rail counts the ones picked into the Context. The Files tab lists and marks them itself, through its module's own server part.
 
 #### Business logic
 
-The files are every file git sees in the checkout, tracked and untracked, honoring the ignore rules, repository-relative and sorted. With an agent id the file list reads the agent's own checkout rather than the project's root, and the project's root once that checkout is gone. The statuses are always the project's root's: each changed file mapped to untracked, modified or deleted. An unknown project, or a relayed agent's unreachable device, answers an empty list and an empty map.
-
-### An agent's own files, for as long as git has them
-
-#### Context
-
-**User story**: on an agent's page the file tree shows the agent's files with what it changed marked, while it works and long after its checkout [3] was reclaimed; when nothing of it is left, the tree says so.
-
-**Problem**: once an agent's checkout is reclaimed, a read of "its checkout" falls back to the project's root and shows the project unmarked, which reads as "this agent touched nothing" while its change is still in git.
-
-#### Business logic
-
-The project must be known and the id an agent id [8], else the answer is that the agent's changes are gone. The source, the list and the marks are `dashboard/agent-tree.ts`'s: the agent's checkout while it exists, else its recorded branch, else the commit its pull request merged as; still being looked up while that pull request is; the project's default branch with nothing marked for an agent that finished `done` on this machine (its record names this machine and the status `done`) with no branch left and no pull request, which changed nothing; gone otherwise. The answer names the source (and the branch or the pull request's number), and carries the files with each changed one marked added, untracked, modified or deleted, committed or not. A relayed agent is answered by its device; an unreachable device, or a read that fails, answers gone.
-
-### One file's diff, one file's content, and what the agent changed
-
-#### Context
-
-**User story**: hovering a changed file in the tree shows its diff; hovering an unchanged one shows its content; the agent view lists every file the agent changed with line counts, refreshed each poll.
-
-**Problem**: what the agent changed is derived from its checkout's git state rather than from the agent's tool calls: the driver reports a tool's name but not its arguments, so git is both the honest source and the one that works for every agent.
-
-#### Business logic
-
-For an agent id [8], the diff and the content are read from the same source as that agent's own files (see above): the checkout, the branch, the merge commit or, for an agent that changed nothing, the default branch, which has no diff; nothing when the agent's changes are gone. Without one, they are read from the project's root. In a checkout, a file changed on disk diffs against its last commit, and a file changed only by the agent's commits diffs from where the agent's branch forked to its last commit; on a branch or a merge commit, the diff is that commit's own change to the file, and the content is the file as that commit holds it; on the default branch of an agent that changed nothing, the content is the file as that branch's last commit holds it. The file's status comes from git, never from the caller, so a browser that claims a file is untracked cannot make the daemon read it as one; a path that is not a changed file, or is unsafe, answers nothing (the path rule is `dashboard/file-read.ts`'s: repository-relative, no parent segments, never inside `.git`). The content of an unchanged file answers nothing when the path is unsafe, resolves outside the checkout, or cannot be read. What the agent changed is every changed file in its checkout with its line counts, an empty list when nothing changed or there is no checkout.
+The files are every file git sees in the checkout, tracked and untracked, honoring the ignore rules, repository-relative and sorted. With an agent id the file list reads the agent's own checkout rather than the project's root, and the project's root once that checkout is gone. An unknown project, or a relayed agent's unreachable device, answers an empty list.
 
 ### The project's page on its git host, and git status
 
@@ -213,4 +187,4 @@ A session id that does not look like a cloud session id (`session_` followed by 
 
 #### Business logic
 
-The replay, where the agent is working, the checkout's files and their statuses, one file's diff or content, what the agent changed, the git status and the handoff are forwarded to the device when the agent id names an agent this daemon relays, and the device's answer is returned (the forwarding is `relay-agent.ts`'s). A device that cannot be reached, or refuses, answers the read's own empty shape, so the dashboard never has to special-case a relayed agent. Reads about a project rather than an agent, and the bridge reads, are never forwarded.
+The replay, where the agent is working, the checkout's files, the git status and the handoff are forwarded to the device when the agent id names an agent this daemon relays, and the device's answer is returned (the forwarding is `relay-agent.ts`'s). A device that cannot be reached, or refuses, answers the read's own empty shape, so the dashboard never has to special-case a relayed agent. Reads about a project rather than an agent, and the bridge reads, are never forwarded.

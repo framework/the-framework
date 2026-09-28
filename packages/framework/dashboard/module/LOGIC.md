@@ -2,6 +2,6 @@ What the dashboard shares with a module [1]: the `framework/module` module (`ind
 
 ## Glossary
 
-[1] module: one of a project's packages that adds to the dashboard, its browser part named by the package's `exports["./dashboard"]`; it adds pages to the dashboard and reads its data through its own package's command.
+[1] module: a package that adds to the dashboard (pages, Overview cards, side-rail tabs, what an agent's page shows, actions on the links pages show): its browser part, named by the package's `exports["./dashboard"]`, reads its data through its own package's command, or through its own server part, named by `exports["./server"]`, which the daemon calls in its own process. A module comes from a project's dependencies, or is built into the dashboard and loaded for every project, as the Files module is.
 
 The framework package publishes both for module authors outside this repository: `framework/module` as types (its code is always the running dashboard's), and `framework/module.css` as the theme file.

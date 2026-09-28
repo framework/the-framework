@@ -1,8 +1,8 @@
-Reads one file out of a checkout [1] for the file tree's hover card, and holds the two safety rules every read of a browser-supplied path goes through, the diff in `file-diff.ts` included: which paths may be asked for at all, and the confined read that stays inside the checkout even when a symlink points out of it. The contents of an unchanged file come back cut at 500 lines, flagged when cut, or flagged as binary when they are not text, and always from the checkout the caller resolved, so an agent's [2] hover shows its own copy rather than the project's.
+Reads one file out of a checkout [1] for the Files tab's hover card, and holds the two safety rules every read of a browser-supplied path goes through, the diff in `diff.ts` included: which paths may be asked for at all, and the confined read that stays inside the checkout even when a symlink points out of it. The contents of an unchanged file come back cut at 500 lines, flagged when cut, or flagged as binary when they are not text, and always from the checkout the caller resolved, so an agent's [2] hover shows its own copy rather than the project's.
 
 ## Context
 
-**User story**: hovering a file in the dashboard's file tree shows its contents, whether or not the agent [2] changed it, without any way for the browser to read a file the checkout does not contain.
+**User story**: hovering a file in the Files tab's tree shows its contents, whether or not the agent [2] changed it, without any way for the browser to read a file the checkout does not contain.
 
 **Problem**: the path comes from the browser. Without a guard, a crafted path could read the machine's own files, a repository's `.git/config` with its credentials, or be read by git as a flag.
 

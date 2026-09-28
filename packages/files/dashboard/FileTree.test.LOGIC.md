@@ -1,12 +1,12 @@
-What the tests cover, for the project panel's file tree:
+What the tests cover, for the Files tab's tree, rendered inside a fake dashboard with the module's reads stubbed:
 
-- **Whose files the tree shows** - with no agent [1] selected the file statuses are read for the project's own checkout [2] and the agent's tree is not asked for; with an agent selected the tree is that agent's own, its files replacing the project's and the project's statuses not asked for; switching to another agent reads that agent's tree afresh instead of keeping the previous marks.
+- **Whose files the tree shows** - with no agent [1] selected the project's own files and statuses are read (its checkout [2]) and the agent's tree is not asked for; with an agent selected the tree is that agent's own, its files replacing the project's and the project's read not made; switching to another agent reads that agent's tree afresh instead of keeping the previous marks.
 - **A changed file is marked, committed and uncommitted apart** - a file modified only on disk reads "modified, not committed", a file a commit added carries "A" and reads "added, committed", and the caption says the tree is from the agent's checkout.
 - **Where a finished agent's tree comes from** - an agent read from its branch is captioned "From branch <branch>", one read from its merge commit "From the merge of #<number>".
 - **Changed nothing says so** - an agent that changed nothing shows the project's files with nothing marked, captioned "This run changed no files", and not the "changes are gone" line.
 - **Gone says so** - an agent none of whose sources is left shows the "changes are gone" line, and not the project's files.
 - **Only open folders are built** - a closed folder's files and subfolders are not on the page; opening it shows its direct files but not a closed subfolder's, and closing it takes them off again.
-- **Clicking picks** - clicking a file reports its path to be toggled in the Context [3], and a file already in the Context shows tinted.
+- **Clicking picks** - clicking a file asks for its path to be toggled in the Context [3], and a file already among the Context's files shows tinted.
 
 ## Glossary
 

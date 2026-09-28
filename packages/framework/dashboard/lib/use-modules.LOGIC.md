@@ -1,4 +1,4 @@
-Loads the modules [1] the registered projects bring and gives the shell their pages, their Overview cards and their link actions [2], and hands all three to every component of the shell.
+Loads the modules [1] the registered projects have and gives the shell their pages, their Overview cards, their link actions [2], their side-rail tabs and their run slots [3], and hands all of them to every component of the shell.
 
 ## Context
 
@@ -6,13 +6,16 @@ Loads the modules [1] the registered projects bring and gives the shell their pa
 
 ## Glossary
 
-[1] module: one of a project's packages that adds to the dashboard, its browser part named by the package's `exports["./dashboard"]`; it adds pages to the dashboard, offers link actions, and reads and changes its data through its own package's command.
+[1] module: a package that adds to the dashboard (pages, Overview cards, side-rail tabs, what an agent's page shows, actions on the links pages show): its browser part, named by the package's `exports["./dashboard"]`, reads its data through its own package's command, or through its own server part, named by `exports["./server"]`, which the daemon calls in its own process. A module comes from a project's dependencies, or is built into the dashboard and loaded for every project, as the Files module is.
 [2] link action: one verb a module offers on any link a dashboard page shows, done by the module package's own command.
+[3] run slot: a place on an agent's page a module fills: the summary, a few words in the action bar, shown until the agent has ended and its branch has been read (the handoff's own words take over then); and the details, a block under the bar. Each is told the agent, whether it is still working, and whether the bar is open.
 
 ## Business logic
 
 The list of modules is read from the daemon now and every 30 seconds. Each module's browser part is imported once per page load, by its URL; a module that fails to load is skipped with a console warning and adds nothing; a module whose default export is not an object adds nothing. When a module's definition names a stylesheet, it is linked into the page once, resolved against the module's URL. The pages are the definitions' pages in the order of the module list (package order), each carrying the package it came from and the projects that have it. A page whose segment is not a lowercase letter followed by lowercase letters and digits is dropped, and a segment already taken by an earlier page is dropped too: the first module to claim it keeps it. The link actions [2] are every definition's link actions in the same order, each carrying its package and its projects; none is dropped. The result says whether loading is complete, meaning the list was read and every module in it was imported or skipped, so the shell can tell "no such page" from "not loaded yet".
 
 The cards are the definitions' cards, each carrying the package it came from and the projects that have it, sorted by their `order` (50 when unsaid), then by package name: numbers rather than a list the shell keeps, so a third package's card sits between two others without the shell knowing it exists.
+
+The side-rail tabs are every definition's tabs, and the run slots one entry per module that brings a summary or details, both in package order, each carrying the package it came from and the projects that have it: the rail and an agent's page offer them only for a project among those.
 
 The shell reads all of this once and provides it to every component in it (`ModulesContext`, read with `useMountedModules`), so a page deep in the tree finds the link actions without being handed them; outside the shell, nothing is mounted and nothing is loaded.

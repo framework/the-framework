@@ -1,4 +1,4 @@
-What the tests cover, against a real git repository with worktrees, branches and merges made for the test:
+What the tests cover, against a real git repository with worktrees, branches and merges made for the test, with the agent's facts [3] the dashboard would give stood in for by the test:
 
 - **A live checkout** - the tree lists the checkout's files, a file the agent [1] deleted in a commit included; a file changed in a commit is marked committed, a file changed on disk is marked not committed, and a file changed in both keeps the uncommitted mark; a committed file's diff runs from the fork point [2], an uncommitted file's against the last commit, and an unchanged file has none.
 - **A local branch** - with no checkout, the agent's branch is read: its files at its last commit, what it added, modified and deleted marked committed, a file's diff and a file's content as the branch holds them; an unsafe path is refused.
@@ -14,3 +14,4 @@ What the tests cover, against a real git repository with worktrees, branches and
 
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch.
 [2] fork point: the commit where an agent's branch left the project's default branch.
+[3] the agent's facts: what the dashboard tells a module's server part about one agent: its checkout while it has one, its record, whether it finished on this machine having changed nothing, and the commit a pull request merged as.

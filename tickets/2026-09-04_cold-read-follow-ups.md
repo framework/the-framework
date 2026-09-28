@@ -5,17 +5,16 @@ Issue: [#1757](https://github.com/framework/the-framework/issues/1757)
 
 ## TLDR
 
-A list of code and design items found by the cold reads (#1755, #1756); none of them blocks anything. Status as of 2026-09-09:
+A list of code and design items found by the cold reads (#1755, #1756); none of them blocks anything. Status below.
 
-**Done or moot.** #1772 fixed four mechanical bugs: the git `branch` time budget, a failed forced worktree removal no longer swallowed, `branchesDeleted` naming only branches that really went, and `remove <name>` through a rename link. The dot-prefix name item went to #1761 (ticket `2026-09-05_ticket-name-forms-agree.md`). The `prune` item, the queue-edit `{ok:false}` item and the `--ticket` label item are moot (the queue moved to its own skill, with no `--ticket` flag).
+**Status on main as of 2026-09-28:** most items were fixed (#1761, #1772), kept on purpose in DECISIONS.md, or went stale. Five are still open:
+1. Packaging: `npm pack` keeps `workspace:*` dependencies in the skill tarballs, while `pnpm pack` rewrites them. It matters once a package is published.
+2. Undocumented: the tickets SKILL.md does not say what `tickets release` prints.
+3. Queue: an entry with no priority heading sorts first in the drain but last on the Queue page.
+4. Reclaim: reclaiming a checkout pushes whatever branch it is on, the user's own included.
+5. Installs: a scoped package installed in a checkout writes into the user's `node_modules`.
 
-**Kept as design questions, by decision:** `priority` returned as a string (`"10"` sorts below `"7"`), which is what the tickets DECISIONS.md says; the merged-branch rule counting any remote while "pushed" means `origin` only, which is what the branches DECISIONS.md says.
-
-**Still open:**
-- CI flake: the daemon test "a run loses its worktree once its work is on the remote" times out at 12s on markdown-only commits.
-- Packaging: `npm pack` leaves `"@gemstack/agent-data": "workspace:*"` in the skill tarballs, and `npm install` refuses that. Publish with `pnpm pack`, or add a prepack rewrite.
-- Undocumented: `tickets.ts` skips a leading `Source:` line when picking the summary; `release` prints the same shape as `claim`; `queue` prints a flat array with no priority although the skill says "in order of work".
-- Design: an unranked queue entry added before any `## ` section outranks Priority 10 forever; the reclaim pushes whatever branch a checkout ended on, the user's own included; `close` leaves the ticket's queue entry in place; a scoped package an agent installs in its checkout still writes into the user's `node_modules`.
+The CI flake and the other items from earlier lists are no longer open.
 
 ## Why it matters
 
@@ -23,4 +22,4 @@ Small correctness and packaging gaps in the published skills: the `workspace:*` 
 
 ## Source
 
-Imported from GitHub issue [framework/the-framework#1757](https://github.com/framework/the-framework/issues/1757), created 2026-09-04, no labels, 2 comments (last folded: 2026-09-09T22:38Z).
+Imported from GitHub issue [framework/the-framework#1757](https://github.com/framework/the-framework/issues/1757), created 2026-09-04, no labels, 3 comments (last folded: 2026-09-28T01:23Z).

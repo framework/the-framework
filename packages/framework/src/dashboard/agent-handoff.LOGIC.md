@@ -36,7 +36,7 @@ Decides what becomes of an agent's [1] work once the agent has ended, its handof
 - **The "Push" button** - the branches provider pushes the agent's recorded branch, nothing more: the last step where the project has no git host; refused for an agent with no branch or a project with no branches provider.
 - **A pull request for a branch only the remote has** - a cloud session's own branch is published as a draft, through the same two providers.
 - **The "Merge" button on a finished agent** - refused when the agent has no pull request or it is no longer open, or the project has no git host; otherwise the git host provider lands the pull request.
-- **The pull request's title** - the agent's own title, else the name the branches provider answers for its branch, else the branch, else "Session <agent id>"; never the prompt, and never a branch with its prefix cut off by the framework.
+- **The pull request's title** - the name the branches provider answers for its branch, else the branch, else "Session <agent id>"; never the prompt, and never a branch with its prefix cut off by the framework.
 - **The pull request's body** - what the agent said about the work, else what was asked for, then which agent did it.
 - **What a handoff reports** - a button answers with success (and the pull request's URL and number) or one error line, and the number rides along so it gets recorded on the agent.
 
@@ -176,7 +176,7 @@ The agent's [1] recorded pull request is resolved by the rule above. No pull req
 
 #### Business logic
 
-Three rungs, each a name for the work the agent [1] did: a title the caller hands over as the agent's own, else the agent's branch (the name the agent gave its work, as `branches name` spelled it), else "Session <agent id [9]>", which says little but says it honestly. The prompt the agent was given is never the title. When the caller hands over the GitHub issue the agent's ticket tracks, the reference rides along as "(fix #42)", so the squash-merge commit, which inherits the title, closes the issue. No caller hands over a title or an issue today: the "Open PR" button and cloud work adoption both pass the agent's record, which carries neither.
+Two rungs, each a name for the work the agent [1] did: the agent's branch (the name the agent gave its work, as `branches name` spelled it), else "Session <agent id [9]>", which says little but says it honestly. The prompt the agent was given is never the title. An agent that publishes its own work titles its own pull request; this is only the title of one opened for it.
 
 ### The pull request's body
 
@@ -186,7 +186,7 @@ See `## Context`.
 
 #### Business logic
 
-A description of the work the caller hands over as the agent's [1] own, because it describes what the change turned out to be; else what the agent was asked for at the start, which is all The Framework knows on its own. No caller hands over a description today. Then, after a blank line, "Opened from The Framework session `<agent id [9]>`." Nothing else.
+What the agent [1] was asked for at the start, which is all The Framework knows on its own. Then, after a blank line, "Opened from The Framework session `<agent id [9]>`." Nothing else.
 
 ### What a handoff reports
 

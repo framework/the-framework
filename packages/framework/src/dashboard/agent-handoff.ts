@@ -335,8 +335,7 @@ function movedPastPr(state: Pick<AgentHandoff, 'pr' | 'commits'>): boolean {
  * Open a PR for a finished session, deciding from what the agent recorded which cases should not
  * open one. Reads the branch's handoff first: a branch that no longer exists, or a session that
  * changed nothing, is a clear error rather than an empty PR, and a branch that already has a PR
- * returns that one. Title is the agent's own, else its branch, else the id; body is the agent's
- * description, else the intent, plus which session did it. This is the handoff decision the
+ * returns that one. Title is its branch, else the id; body is the intent, plus which session did it. This is the handoff decision the
  * dashboard's open-PR button offers; the RPC layer only resolves which run it is about, and the
  * two providers do the pushing and the opening.
  */
@@ -367,56 +366,34 @@ export async function openAgentPullRequest(
 /**
  * The little a handoff needs to know about the agent it is for: which branch, and what to say on
  * the PR. Narrower than {@link AgentMeta} so a caller cannot quietly start depending on the rest
- * of the agent's state. The optional fields below are honored when given; no caller gives them today.
+ * of the agent's state.
  */
-export type HandoffAgent = Pick<AgentMeta, 'id' | 'branch' | 'intent'> &
-  Partial<Pick<AgentMeta, 'startedAt'>> & {
-    /**
-     * The tracker's issue the agent's ticket tracks (`#42`), when it implements one (#1334). Carried
-     * into the PR title as `(fix #42)` so the squash-merge commit — which inherits the title —
-     * closes the issue; without it an auto-merged quick-win leaves its ticket open.
-     */
-    fixes?: string
-    /**
-     * The agent's own name for the work (#1618): the PR title when given. Absent, the title falls back to the branch.
-     */
-    prTitle?: string
-    /**
-     * The agent's own description of the work (#1567): the PR body when given. Absent, the body describes what was asked for instead — which is all
-     * the framework knows on its own.
-     */
-    description?: string
-  }
+export type HandoffAgent = Pick<AgentMeta, 'id' | 'branch' | 'intent'> & Partial<Pick<AgentMeta, 'startedAt'>>
 
 /**
- * The PR title for a session (#1102), with the ticket's issue reference riding along (#1334).
+ * The PR title for a session (#1102).
  *
- * Three rungs, each a name for the work the session did: what the agent called it (#1618), else
- * the branch the agent named its work with (#1725), else the session id — which says little, but
- * says it honestly.
+ * Two rungs, each a name for the work the session did: the branch the agent named its work with
+ * (#1725), else the session id — which says little, but says it honestly. An agent that publishes
+ * its own work titles its own PR; this is only the title of one a person opens for it.
  *
  * The prompt the session was given is not among them. It used to be, cut to 72 characters, and a
  * squash merge made that permanent: `main` ended up carrying instructions truncated mid-sentence
  * as commit subjects, which describe neither what changed nor even a whole thought (#1618).
  */
-function agentPrTitle(agent: Pick<HandoffAgent, 'id' | 'branch' | 'prTitle' | 'fixes'>, name?: string): string {
+function agentPrTitle(agent: Pick<HandoffAgent, 'id' | 'branch'>, name?: string): string {
   // The name the branches provider answers for the branch comes before the branch itself: the
   // framework draws the name it is given and never cuts the package's prefix off a branch.
-  const title = agent.prTitle ?? name ?? agent.branch ?? `Session ${agent.id}`
-  return agent.fixes ? `${title} (fix ${agent.fixes})` : title
+  return name ?? agent.branch ?? `Session ${agent.id}`
 }
 
 /**
- * The PR body: what the agent said about the work, else what was asked for — and which session
- * did it either way.
- *
- * The agent's own description wins where it wrote one (#1567), because it describes what the
- * change turned out to be; the intent only says what was asked at the start, which is the best
- * the framework can do by itself.
+ * The PR body: what was asked for, which is all the framework knows on its own, and which session
+ * did it.
  */
 function agentPrBody(agent: HandoffAgent): string {
   const lines: string[] = []
-  const opening = agent.description?.trim() || agent.intent?.trim()
+  const opening = agent.intent?.trim()
   if (opening) lines.push(opening, '')
   lines.push(`Opened from The Framework session \`${agent.id}\`.`)
   return lines.join('\n')

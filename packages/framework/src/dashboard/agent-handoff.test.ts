@@ -199,13 +199,11 @@ test("a provider's refusal is the button's answer, never a throw: a dirty checko
   assert.deepEqual(await openAgentPullRequest('/repo', agent(), { branches: refused.branches, gitHost: refused.gitHost }), { ok: false, error: 'gh: not logged in' })
 })
 
-test('a remote-only branch gets its draft PR through the two providers, and the body says what the agent said or what was asked (#1601/#1567)', async () => {
+test('a remote-only branch gets its draft PR through the two providers, and the body says what was asked (#1601)', async () => {
   const { branches, gitHost, calls } = fakeBranches({})
-  const result = await openRemoteBranchPullRequest('/repo', { id: 'r1', branch: 'agent-x', intent: 'fix it', description: 'What changed: the cart keeps its items.' }, 'claude/x', { branches, gitHost })
+  const result = await openRemoteBranchPullRequest('/repo', { id: 'r1', branch: 'agent-x', intent: 'fix it' }, 'claude/x', { branches, gitHost })
   assert.deepEqual(result, { ok: true, url: 'https://github.com/o/r/pull/9', number: 9 })
-  assert.deepEqual(calls, [['push', 'claude/x'], ['open', 'claude/x', { title: 'agent-x', body: 'What changed: the cart keeps its items.\n\nOpened from The Framework session `r1`.', draft: true }]])
-  await openRemoteBranchPullRequest('/repo', { id: 'r1', branch: 'agent-x', intent: 'fix it' }, 'claude/x', { branches, gitHost })
-  assert.equal((calls.at(-1)![2] as { body: string }).body, 'fix it\n\nOpened from The Framework session `r1`.')
+  assert.deepEqual(calls, [['push', 'claude/x'], ['open', 'claude/x', { title: 'agent-x', body: 'fix it\n\nOpened from The Framework session `r1`.', draft: true }]])
 })
 
 test('the Push button pushes a finished session\'s branch through the branches provider: the last step where the project has no git host (#1820)', async () => {
@@ -283,31 +281,12 @@ async function titleOf(handoffAgent: HandoffAgent): Promise<string | undefined> 
   return (calls.find(call => call[0] === 'open')?.[2] as { title: string } | undefined)?.title
 }
 
-test("a run implementing a ticket carries its issue as `(fix #42)` in the PR title (#1334)", async () => {
-  // The squash-merge subject inherits the title, so this is what closes the ticket's issue on
-  // merge; without it an auto-merged quick-win leaves its ticket open.
-  assert.equal(await titleOf({ id: 'r1', branch: 'agent-fix-login', fixes: '#42' }), 'agent-fix-login (fix #42)')
-})
-
-test("the PR is titled with the agent's own name for the work (#1618)", async () => {
-  // The first line of its `open-pr` block: the one rung that says what the change turned out to
-  // be, in a whole sentence, rather than the branch the session happens to be on.
-  const title = await titleOf({
-    id: 'r1',
-    branch: 'agent-queue-reader',
-    prTitle: 'Keep the queued state across a reload',
-    fixes: '#42',
-  })
-  assert.equal(title, 'Keep the queued state across a reload (fix #42)')
-})
-
 test('a session with no branch gets its id as the title, not the prompt it was given (#1618)', async () => {
   // The prompt used to be the middle rung, cut to 72 characters. The squash merge made that a
   // permanent commit subject: an instruction, truncated mid-sentence, standing in for a
   // description of the change. The session id says less and misleads nobody.
   const intent = 'Open TODO_AGENTS.md and work on the FIRST open entry only. When the work is done, close the ticket it links to.'
   assert.equal(await titleOf({ id: 'r1', intent }), 'Session r1')
-  assert.equal(await titleOf({ id: 'r1', intent, fixes: '#1' }), 'Session r1 (fix #1)')
 })
 
 test("the Merge action lands the session's open PR through the git host (#1391)", async () => {
@@ -343,14 +322,12 @@ test('a Merge the git host refuses comes back as the error, not a success (#1391
   assert.deepEqual(result, { ok: false, error: 'Pull request is not mergeable: the base branch requires review' })
 })
 
-test("the Open PR button titles the request by the name the provider answers for the branch, before the branch itself; the agent's own title still wins", async () => {
+test("the Open PR button titles the request by the name the provider answers for the branch, before the branch itself", async () => {
   const { branches, gitHost, calls } = fakeBranches({ 'agent-fix-login': state({ branch: 'agent-fix-login', name: 'fix-login' }), 'agent-r1': state({ branch: 'agent-r1' }) })
   await openAgentPullRequest('/repo', agent({ branch: 'agent-fix-login' }), { branches, gitHost })
   assert.equal((calls.at(-1)![2] as { title: string }).title, 'fix-login')
   await openAgentPullRequest('/repo', agent({ branch: 'agent-r1' }), { branches, gitHost })
   assert.equal((calls.at(-1)![2] as { title: string }).title, 'agent-r1', 'no name answered: the branch as it is')
-  await openRemoteBranchPullRequest('/repo', { id: 'r1', branch: 'agent-fix-login', prTitle: 'Fix the login redirect' }, 'agent-fix-login', { branches, gitHost })
-  assert.equal((calls.at(-1)![2] as { title: string }).title, 'Fix the login redirect')
 })
 
 test('a run changed nothing when its own tool ended it here, done or failed, with no pull request', () => {

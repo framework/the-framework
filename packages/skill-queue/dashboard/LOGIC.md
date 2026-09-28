@@ -15,7 +15,7 @@ The `queue` skill's widget [1] for the dashboard: one page, Queue, listing the o
 ## Business logic — TL;DR
 
 - **The widget's definition** (`index.tsx`) - one page at `/queue`, labelled Queue with a list icon, one Overview card, AI Queue, placed at order 10 (before the tickets package's card), the one link action "Add to queue", and the stylesheet beside the module.
-- **The Queue page** (`QueuePage.tsx`) - each project's open entries with their priorities from `queue --local --full`, read every 10 seconds, shown per project and per priority section, high to low, a failing project named with the command's reason; read-only.
+- **The Queue page** (`QueuePage.tsx`) - each project's open entries with their priorities from `queue --local --full`, read every 10 seconds, shown per project in the order agents take them, under their priority sections, a failing project named with the command's reason; read-only.
 - **The AI Queue card** (`QueueCard.tsx`) - every project's open entries from `queue --local`, read every 10 seconds and shown in full; a play button starts one agent on one entry and lands on it; a count and a fan-out button start that many agents on the top of a project's queue without leaving the Overview, stopping at the first refusal.
 - **The card under test** (`test-host.tsx`) - a fake host whose commands answer from a table and whose every service is a spy, so the card is tested without a dashboard.
 - **The "Add to queue" action** (`add-to-queue.ts`) - each link queued as one `queue add` of `[text](href)`, or the plain text when it points nowhere, in its priority's section; the batch stops at the first failure.

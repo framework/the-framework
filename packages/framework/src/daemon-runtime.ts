@@ -139,7 +139,10 @@ export function createProjectRuntime({ cwd, env }: ProjectRuntimeOptions): Proje
   // run's tool keeps, its lines turned into events. The relocating tail, for the same reason as
   // the dashboard's onEvents: the diary becomes the finished run's when the run ends.
   const tailRelayEvents = (agentId: string, onEvent: (event: FrameworkEvent) => void): (() => void) =>
-    tailAgentEvents<AnyDiaryLine>(() => resolveAgentDiary(cwd, agentId), line => onEvent(fromDiaryLine(line)))
+    tailAgentEvents<AnyDiaryLine>(() => resolveAgentDiary(cwd, agentId), line => {
+      const event = fromDiaryLine(line)
+      if (event) onEvent(event)
+    })
 
   const dispose = async (): Promise<void> => {
     relayedAgents.dispose()

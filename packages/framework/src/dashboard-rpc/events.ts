@@ -60,7 +60,10 @@ export async function streamAgentEvents(
   if ((await resolveEventsDiary(projectId, agentId)) === undefined) return undefined
   return tailAgentEvents<AnyDiaryLine>(
     () => resolveEventsDiary(projectId, agentId),
-    line => send(fromDiaryLine(line)),
+    line => {
+      const event = fromDiaryLine(line)
+      if (event) send(event)
+    },
     () => send({ kind: 'stream-sync' }),
   )
 }

@@ -299,7 +299,10 @@ export async function makeWorld(): Promise<StoryWorld> {
       // lines it had not sent, so the feed keeps the final lines even when their fs.watch signal was lost.
       const stop = tailAgentEvents<AnyDiaryLine>(
         () => resolveAgentDiary(project.cwd, agentId),
-        line => events.push(fromDiaryLine(line)),
+        line => {
+          const event = fromDiaryLine(line)
+          if (event) events.push(event)
+        },
       )
       const tail = { events, stop }
       tails.push(tail)

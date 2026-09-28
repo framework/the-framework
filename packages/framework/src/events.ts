@@ -40,81 +40,6 @@ export interface ChoiceRequest {
   file?: string
 }
 
-/**
- * Why the post-merge (#326) cleanup step declined to run (#835). Every decline carries one,
- * so "I turned it on and nothing happened" has an answer in the log.
- */
-export type OnBeforeMergeableSkip =
-  /** The agent never signalled `setReadyForMerge()`, so there is nothing to clean up after. */
-  | 'not-ready-for-merge'
-  /** The agent was stopped (the Stop button, Ctrl+C, an answer marked stop) rather than finished. */
-  | 'run-stopped'
-  /** A fake/offline run: no agent to hand the follow-up prompt to. */
-  | 'fake-run'
-  /** The agent never named its session — its branch is still the birth branch — and every line of the prompt names the session. */
-  | 'no-session-name'
-  /** `process.argv[1]` was empty, so there is no binary to spawn the follow-up with. */
-  | 'no-bin-path'
-
-/**
- * Why the end-of-session handoff (#1102) did nothing. Every one of these is a normal end rather
- * than a fault, and each is reported so that "it was ticked and nothing happened" has an answer.
- *
- * Lives here beside {@link OnBeforeMergeableSkip} rather than with the handoff logic, because the
- * event union is a leaf: the module that decides these imports the type, not the other way round.
- */
-export type AutoHandoffSkip =
-  /** Neither box was ticked, so there was nothing to do. */
-  | 'not-armed'
-  /** The branch no longer exists (deleted, or never created). */
-  | 'branch-gone'
-  /** The session committed nothing the base branch does not already have. */
-  | 'no-commits'
-  /** The repo has no remote to push to. */
-  | 'no-remote'
-  /** The branch already has a PR: opening a second one is the one mistake this must not make. */
-  | 'already-open'
-  /**
-   * The branch's PR is merged or closed and its head is still the branch tip (#1512): everything
-   * the session did already reached the human, so there is nothing left to publish. Only that
-   * exact case — a session that kept committing after its PR merged gets a fresh PR instead.
-   */
-  | 'already-landed'
-  /** The branch is already on the remote at this commit, and only the push was asked for. */
-  | 'already-pushed'
-  /** The agent was stopped (the Stop button, Ctrl+C, an answer marked stop) rather than finished. */
-  | 'run-stopped'
-  /** A fake/offline run: nothing real to publish. */
-  | 'fake-run'
-
-/**
- * Why an armed merge did not run (#1363). The agent's config arms the merge; the authorization is
- * the agent's, not the config's (rule settled on #1390): the agent must have declared the work
- * done, and the framework must not already know of work pending in this session. The global
- * `TODO_AGENTS.md` queue never withholds a merge — it is decoupled from sessions.
- */
-export type MergeWithheldReason =
-  /** The agent never called setReadyForMerge(): the work was never declared done. */
-  'not-ready-for-merge'
-
-/**
- * How the merge half of a handoff went (#1216), when the agent was armed for it. Lives here beside
- * {@link AutoHandoffSkip} for the same leaf-module reason.
- *
- * `auto-armed` is the preferred outcome: the git host's own auto-merge takes the PR, so it lands when
- * its checks pass rather than before them. `merged` is the fallback where the repo does not allow
- * auto-merge and the PR was merged directly. `watched` (#1418) is the auto path's answer where
- * the git host cannot arm the merge and the PR's checks have not passed yet: merging directly there is
- * exactly the lands-before-CI hazard (#1406), so the daemon's CI watch takes the PR instead and
- * merges it once its checks go green. `failed` never fails the handoff — the PR exists either
- * way, a human can still merge it by hand. `withheld` means the merge never ran at all (#1363):
- * it was armed but not authorized, and the PR opened as a draft for a human instead.
- */
-export type AutoMergeOutcome =
-  | { outcome: 'auto-armed' | 'merged' | 'watched' }
-  | { outcome: 'withheld'; reason: MergeWithheldReason }
-  | { outcome: 'failed'; error: string }
-
 /** Who resolved a {@link ChoiceRequest}: a human, or a headless auto-accept. */
 export type ChoiceBy = 'user' | 'auto'
 
@@ -196,7 +121,7 @@ export type FrameworkEvent = { at?: string } & (
   /**
    * The agent signalled `setReadyForMerge()` (#326): it believes the work is complete
    * and ready for human review. Non-blocking — it flips the agent's dashboard status from
-   * building (orange) to ready (green); the on-before-mergeable quality prompts hang off it.
+   * building (orange) to ready (green).
    */
   | { kind: 'ready-for-merge' }
   /**
@@ -207,29 +132,6 @@ export type FrameworkEvent = { at?: string } & (
    * other. Non-blocking; the end-of-agent handoff uses the latest one.
    */
   | { kind: 'open-pr'; title?: string; description?: string }
-  /**
-   * The #326 post-merge cleanup step settled (#835): it queued the quality follow-ups,
-   * queued them but did not finish cleanly, or declined with a {@link OnBeforeMergeableSkip}.
-   *
-   * An event rather than stdout because the surfaces that need it could not read stdout: a
-   * run started from the dashboard has none to read. Recorded only when the option was on, so
-   * a run that never asked for the step stays quiet.
-   */
-  | { kind: 'on-before-mergeable'; outcome: 'queued' | 'incomplete' }
-  | { kind: 'on-before-mergeable'; outcome: 'skipped'; reason: OnBeforeMergeableSkip }
-  /**
-   * What the end-of-session handoff is armed to do (#1102), emitted at the start and again
-   * whenever the dashboard's checkboxes change it.
-   *
-   * This is what makes the boxes survive a reload: the control channel carries the instruction,
-   * but only an event reaches the agent's meta, which is the one thing a tab opened later can read.
-   *
-   * `merge` carries the auto-merge arming (#1216) so the armed line can say the most consequential
-   * half of the plan (#1382): without it a merge-armed agent advertised "open a draft PR" and then
-   * merged to main. Optional because journals written before #1382 lack it; absent reads as off,
-   * the conservative display. It has no checkbox and never changes mid-run, so re-emits repeat it.
-   */
-  | { kind: 'handoff-armed'; push: boolean; pr: boolean; merge?: boolean }
   /**
    * The pull request this session's work is on (E6), the moment one is opened for it.
    *
@@ -257,16 +159,6 @@ export type FrameworkEvent = { at?: string } & (
    * against origin's `claude/*` heads once the session has pushed its work.
    */
   | { kind: 'cloud-anchor'; sha: string }
-  /**
-   * What the end-of-session handoff actually did (#1102): pushed and/or opened a draft PR,
-   * declined for a reason that is not a fault, or failed at one of the two steps.
-   *
-   * Same reason as on-before-mergeable above: a dashboard-started agent has no stdout anyone reads,
-   * so an outcome that is not an event is an outcome nobody learns.
-   */
-  | { kind: 'handoff'; outcome: 'skipped'; reason: AutoHandoffSkip; merge?: AutoMergeOutcome }
-  | { kind: 'handoff'; outcome: 'done'; pushed: boolean; url?: string; number?: number; merge?: AutoMergeOutcome }
-  | { kind: 'handoff'; outcome: 'failed'; step: 'push' | 'pr'; error: string }
   /**
    * The work has settled and the agent is parked on the user (#785): it stays open as a
    * conversation (#714), so its process is still alive and it still takes messages, but

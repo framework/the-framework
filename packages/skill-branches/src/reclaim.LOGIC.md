@@ -1,4 +1,4 @@
-Decides whether a finished agent's [1] checkout [2] may be removed, and removes it: the one implementation behind every surface that reclaims [3] a checkout (`agent-runner` at a run's end and in its sweep [4], the dashboard's "Remove" button, the `branches remove` and `branches prune` commands). One rule governs it: only what is on the remote may go, a clean tree whose tip the remote has, pushed here when the caller allows, so every deletion is recoverable and nothing local is ever the last copy of anything. Every refusal says why the checkout stays. Beside it, one way out for a person: discarding a checkout whatever it holds.
+Decides whether a finished agent's [1] checkout [2] may be removed, and removes it: the one implementation behind every surface that reclaims [3] a checkout (`agent-runner` at a run's end and in its sweep [4], the dashboard's "Remove" button, the `branches remove` and `branches prune` commands). One rule governs it: only what is on the remote may go, a clean tree whose tip the remote has, an agent branch [10] pushed here when the caller allows, so every deletion is recoverable and nothing local is ever the last copy of anything. Every refusal says why the checkout stays. Beside it, one way out for a person: discarding a checkout whatever it holds.
 
 ## Context
 
@@ -26,8 +26,8 @@ Decides whether a finished agent's [1] checkout [2] may be removed, and removes 
 - **A checkout on no branch is kept** - refusal `no-branch`.
 - **Uncommitted work is kept** - refusal `dirty`, for any modified, staged or untracked file, and for a tree git cannot read; the check is made once, before every way out.
 - **A tip inside a commit the caller vouches for goes without a push** - and keeps its branch.
-- **An agent branch that holds nothing goes with its checkout** - its tip is on the remote under another name, so the branch is deleted, not pushed; the user's own branch never is.
-- **Otherwise the branch must be on the remote** - pushed to `origin` here when the caller allows; refusal `not-on-remote` when it may not be pushed or the push did not land, with git's own words.
+- **A branch that holds nothing goes without a push** - its tip is on the remote under another name, so the checkout goes; an agent branch is deleted with it, the user's own branch stays.
+- **Otherwise the branch must be on the remote** - an agent branch is pushed to `origin` here when the caller allows, the user's own branch never; refusal `not-on-remote` when it may not be pushed or the push did not land, with git's own words.
 - **The birth branch goes when the branch that stays contains it** - an agent that branched away leaves `agent-<agent id>` behind, and it goes once judged, before anything is deleted.
 - **How the removal runs and what it reports** - hook, worktree, stale records, then the branches; success lists the branches that went, and only a git failure past the decision is raised.
 - **Discarding a checkout** - a person's call: the checkout goes whatever it holds, nothing pushed, no branch deleted; only a directory git does not know as a worktree is left alone.
@@ -101,15 +101,15 @@ The tree must be clean: no modified, staged or deleted tracked file and no untra
 
 When the caller names a commit the remote already has, and the checkout's [2] tip is that commit or an ancestor of it, the remote has the work: the checkout goes without a push and keeps its branch, even a branch the next rule would delete. When the tip is not inside that commit, or the commit cannot be resolved, the ordinary rules below apply.
 
-### An agent branch that holds nothing goes with its checkout
+### A branch that holds nothing goes without a push
 
 #### Context
 
-**Problem**: an agent [1] that committed nothing, or whose commits already reached the remote under another branch's name, leaves a branch whose every commit `origin` already has. Pushing it would publish an empty branch; keeping it would strand the checkout [2] behind a push that has nothing to push. Git's own "merged" test asks the wrong question, and its refusal to delete a checked-out branch must never be the guard.
+**Problem**: an agent [1] that committed nothing, or whose commits already reached the remote under another branch's name, leaves a branch whose every commit `origin` already has. Pushing it would publish an empty branch; keeping it would strand the checkout [2] behind a push that has nothing to push. The same holds for a leftover checkout on the user's own branch whose tip the remote already has. Git's own "merged" test asks the wrong question, and its refusal to delete a checked-out branch must never be the guard.
 
 #### Business logic
 
-A branch holds nothing of its own when its tip is reachable from a remote-tracking branch under another name, on any remote: the remote already has that commit under that other name, so nothing on the branch is unique to it. The branch's own copies do not count: every remote-tracking branch whose name ends in `/<branch>` on any remote (so `origin/feat/<branch>` is dropped too, on the safe side), and the branch it tracks as upstream (a branch renamed after it was pushed still tracks the remote copy under its old name, and that copy holding the tip proves nothing about another name having it). A pushed branch with a pull request contains its own tip and is exactly the branch that must stay. Only an agent branch [10] qualifies: a leftover checkout [2] can sit on the user's own branch, and deleting that is never this package's call, even when it holds nothing. Such a branch goes with its checkout, unpushed, deleted after the checkout is removed. The read takes the local remote-tracking refs, never a fetch, so it is at most behind the remote: a tip they do not cover yet reads as holding something, and the next rule applies.
+A branch holds nothing of its own when its tip is reachable from a remote-tracking branch under another name, on any remote: the remote already has that commit under that other name, so nothing on the branch is unique to it. The branch's own copies do not count: every remote-tracking branch whose name ends in `/<branch>` on any remote (so `origin/feat/<branch>` is dropped too, on the safe side), and the branch it tracks as upstream (a branch renamed after it was pushed still tracks the remote copy under its old name, and that copy holding the tip proves nothing about another name having it). A pushed branch with a pull request contains its own tip and is exactly the branch that must stay. Such a checkout goes, and nothing is pushed. Its branch goes with it, deleted after the checkout is removed, only when it is an agent branch [10]: a leftover checkout [2] can sit on the user's own branch, and deleting that is never this package's call, even when it holds nothing; that branch stays. The read takes the local remote-tracking refs, never a fetch, so it is at most behind the remote: a tip they do not cover yet reads as holding something, and the next rule applies.
 
 ### Otherwise the branch must be on the remote
 
@@ -121,8 +121,8 @@ See `## Context`.
 
 A branch is on the remote when its tip is the tip of `origin/<branch>` or an ancestor of it, read from the local remote-tracking refs (`worktree.ts`). When it is not:
 
-- If the caller allows no push, the checkout [2] stays, with the refusal `not-on-remote` naming the branch.
-- Otherwise the branch is pushed to `origin` here, the user's own branch included when the checkout ended on one, since the push is what makes the removal recoverable. A push that does not land is the refusal `not-on-remote`, naming the branch and carrying git's own words as `detail`; the checkout stays. A repository with no remote never gets past this, which is the honest answer: there is nowhere for the work to be recoverable from.
+- If the caller allows no push, or the branch is not an agent branch [10], the checkout [2] stays, with the refusal `not-on-remote` naming the branch. A checkout continued on the user's own branch, `main` included, is never pushed for the user: publishing that branch is the user's call, never a cleanup's.
+- Otherwise the agent branch is pushed to `origin` here, since the push is what makes the removal recoverable. A push that does not land is the refusal `not-on-remote`, naming the branch and carrying git's own words as `detail`; the checkout stays. A repository with no remote never gets past this, which is the honest answer: there is nowhere for the work to be recoverable from.
 
 A branch that is on the remote, or pushed here, stays: it may be the branch a pull request is open on.
 

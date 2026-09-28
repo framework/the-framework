@@ -59,8 +59,9 @@ not a decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 
 ## Flow: reclaim
 Deleting an agent's checkout to free disk, only after the remote has everything in it. It
-pushes the branch the checkout ended on, the user's own included, when the caller allows a
-push.
+pushes the agent's branch the checkout ended on when the caller allows a push. A checkout
+on the user's own branch the remote lacks is kept: pushing that branch is the user's call.
+Pushing it too was the earlier rule and was dropped: a cleanup could publish `main`.
 
 - Nothing is committed on the agent's behalf: a checkout with uncommitted work, untracked
   files included, is kept until a person commits or deletes it, and nothing of it is

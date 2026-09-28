@@ -15,7 +15,7 @@ const shown = () => [...document.querySelectorAll('h3, li')].map(node => node.te
 describe('QueuePage', () => {
   test('shows the entries in the order agents take them: an unranked entry above the sections shows first', async () => {
     const full = [{ entry: 'Hand-written on top' }, { entry: 'Urgent', priority: 8 }, { entry: 'Also urgent', priority: 8 }, { entry: 'Later', priority: 3 }]
-    renderWithHost(<QueuePage projects={[alpha]} />, fakeHost({ p1: { '--local --full': full } }))
+    renderWithHost(<QueuePage projects={[alpha]} path={[]} />, fakeHost({ p1: { '--local --full': full } }))
     await screen.findByText('Hand-written on top')
     expect(shown()).toEqual(['No priority', 'Hand-written on top', 'Priority 8', 'Urgent', 'Also urgent', 'Priority 3', 'Later'])
   })

@@ -1,49 +1,41 @@
 Effort: 3
-Uncertainty: 6
-Outdated: yes
+Uncertainty: 4
 
 # [Plan] Follow-ups from the DECISIONS.md and SKILL.md cold reads
 
-The status of each open item as of 2026-09-16 (main 9bb62321), and how to close each one.
+How to close each of the five items still open, checked against main 687ee8f0 on 2026-09-28.
 
 ## TLDR
 
-The list splits three ways. Two items are mechanical and ready to build as one PR: the pack rewrite and the undocumented `release` output. Two are already fixed: the queue's order and the queue entry that `close` leaves behind are now in the SKILL.md files. Four are design picks for a person: the unranked queue entry, the reclaim push, the `node_modules` writes, and whether the flake item stays open. Build the mechanical PR first, then ask about the four picks as one comment on #1757.
+Two items are mechanical: the tarball's `workspace:*`, and what `tickets release` prints. Two need a choice, and this plan makes it: an unranked queue entry, and the reclaim push. The fifth, a scoped install writing into the user's `node_modules`, gets a fix in code. Build all five as one PR, or as two PRs: the mechanical and queue items first, then reclaim and installs. Each item is small, and none depends on another.
 
 ## Status per item (verified against the code today)
 
-1. **CI flake, "a run loses its worktree once its work is on the remote"** (`packages/framework/src/daemon.test.ts:316`). The test is still there. The last 15 CI runs on main all passed (09-09 to 09-16), so there is no fresh evidence of the flake. Its wait loop polls 150 × 20 ms, about 3 s, per start. Status: not reproduced. Close the item unless it fails again.
-2. **Packaging, `workspace:*` in tarballs.** Still true. `skill-branches`, `skill-logs`, `skill-queue` and `skill-tickets` each depend on `"@gemstack/agent-data": "workspace:*"` (their `package.json`, `dependencies`). None of them has a `prepack` script, and CI does not pack. `pnpm pack` and `pnpm publish` rewrite `workspace:*` to the real version, but `npm pack` and `npm publish` do not. Status: open, mechanical.
-3. **Undocumented behaviour.**
-   - The `Source:` skip is now documented in `packages/skill-tickets/src/tickets.LOGIC.md:23,71`. The SKILL.md does not need it, because agents never write `Source:`. Status: done.
-   - `release` prints the same shape as `claim` (`packages/skill-tickets/src/cli.ts:188`). `SKILL.md:53` still does not show what `release` prints. Status: open, one line.
-   - The queue prints a flat array. `packages/skill-queue/SKILL.md:15` now says "the open entries, in order of work, as one JSON array", which matches the code: file order, with priority implied by the sections. Status: done.
-4. **Design questions.**
-   - *An unranked entry above the first `## ` section outranks Priority 10.* Still true. `parseQueueEntries` (`packages/skill-queue/src/queue.ts:17`) reads in file order. `npx queue add` never writes such an entry: without `--priority` it appends at the end, which is Priority 0 in a sectioned file (`appendQueueEntry`, `queue.ts:47`). Only a hand edit creates one. Status: design pick.
-   - *The reclaim pushes whatever branch the checkout ended on.* Still true. `reclaimWorktree` (`packages/skill-branches/src/reclaim.ts:110-117`) pushes the checkout's current branch whenever `mayPush` is set, whatever the branch is called. `agent-scheduler` passes `mayPush: true` (`packages/agent-scheduler/src/run.ts:148`, `sweep.ts:56`). Only the branch deletion is limited to `agent-*` branches. Status: design pick.
-   - *`close` leaves the ticket's queue entry.* This is now documented in `packages/skill-tickets/SKILL.md` (the `close` line and "Queue a ticket"): the agent runs `npx queue done` itself. The skills stay independent. Status: done, by decision.
-   - *A package installed in the checkout writes into the user's `node_modules`.* Still true. `linkDependencies` (`packages/skill-branches/src/checkout.ts:52`) links the checkout's `node_modules` to the user's copy. The branches SKILL.md says "never edit them", but `npm install <pkg>` inside the checkout goes through the link. Status: design pick.
+1. **`workspace:*` in tarballs.** Still true, and now five packages, not four: `skill-branches`, `skill-github`, `skill-logs`, `skill-queue` and `skill-tickets` each depend on `"@gemstack/agent-data": "workspace:*"`. None of them has a `prepack`. The repo pins `"packageManager": "pnpm@11.5.3"`, and `pnpm pack`/`pnpm publish` rewrite the range. Only `npm pack`/`npm publish` ship it as-is.
+2. **`release` output undocumented.** `packages/skill-tickets/src/cli.ts:194-210` prints `{"ok":true,"file":"tickets/<file>","holder":…}`, where `holder` is left out under `--force`. It refuses with `{"ok":false,"reason":"no-lock","file":…}` or `{"ok":false,"reason":"not-holder","file":…,"holder":…}`. The `release` line in `SKILL.md` gives none of this.
+3. **Unranked entry: order of work vs the Queue page.** `parseQueueEntries` (`packages/skill-queue/src/queue.ts`) drains in file order, so an entry above the first `## Priority` heading is taken first. An entry under a non-priority `## ` heading is taken where it sits. `QueuePage.tsx:14-24` groups such entries under "No priority" and sorts that group last. `QueuePage.LOGIC.md` claims both "in the order agents will take them" and "No priority … last", which contradict each other. `npx queue add` never writes an unranked entry: without `--priority` it appends at the end of the file. Only a hand edit makes one.
+4. **Reclaim pushes any branch.** `reclaimWorktree` (`packages/skill-branches/src/reclaim.ts:110-117`) pushes the checkout's current branch whenever `mayPush` is set, whatever the branch is called. `agent-runner` passes `mayPush: true` (`run.ts:448`, `sweep.ts:65`), and so does `fake-run-bin.ts`. The same function already refuses to *delete* a non-`agent-*` branch (the `isAgentBranch` guard, with its comment about a checkout found on `main`).
+5. **A scoped install writes into the user's `node_modules`.** `linkDependencies` (`packages/skill-branches/src/worktree-deps.ts`) gives the checkout a real `node_modules` directory holding one symlink per top-level entry. A new unscoped package lands in that real directory, so the user's copy is safe. A scope, though, is itself one of those entries: `node_modules/@gemstack` is a link to the user's `@gemstack`. So `npm install @gemstack/new` in a checkout writes into the user's tree. So does a reinstall of an existing linked package, which goes through its link.
 
-## Implementation (the mechanical PR)
+## Decisions (made here, since nobody answers the queue)
 
-1. Make the published tarballs installable with npm. Pick one:
-   - (a) Add `"prepack": "node -e \"process.exit(process.env.npm_config_user_agent?.startsWith('pnpm') ? 0 : 1)\""` or similar, so that `npm pack` and `npm publish` fail loudly. Recommended: it is the smallest change, and pnpm already does the rewrite.
-   - (b) Write a prepack script that rewrites `workspace:*` to `^<version of agent-data>`, and restore the file in `postpack`.
-   - (c) Only document "publish with `pnpm publish`" in each package.
+- **Item 1: fail loudly on `npm pack`.** Add a `prepack` to each of the five packages that exits non-zero unless `npm_config_user_agent` starts with `pnpm`. It is one line, and it adds no rewrite code. Publishing already goes through pnpm, as the repo's `packageManager` says. The alternative, a prepack that rewrites the version and a postpack that restores it, is code that exists only for a path nobody takes.
+- **Item 3: the Queue page follows the order of work.** The page lists the sections in file order, the order `parseQueueSections` returns, and no longer sorts them. A sectioned file is already written high to low, so a well-formed queue looks the same as today. A hand-edited entry above the sections shows first, which is where the drain takes it. The page no longer lies about what runs next. The alternative, making the drain sort unranked entries as Priority 5, adds a parser rule for a file shape the command never writes.
+- **Item 4: push only `agent-*` branches.** When the branch is not an agent branch and is not on the remote, `reclaimWorktree` returns `not-on-remote` and keeps the checkout, as it does with `mayPush: false`. This matches the existing deletion guard. Pushing a user's branch, `main` included, is not the reclaim's call. A kept checkout is legible and costs only disk.
+- **Item 5: a scope is a real directory too.** For an `@scope` entry, `linkDependencies` makes a real `node_modules/@scope` directory and links each package inside it, one level down. A new `@scope/pkg` then lands in the checkout. Reinstalling an existing package through its link can still write through to the user's copy. The branches SKILL.md already says the links are not to be edited, so one sentence there covers that: "install a new package; never reinstall or update a linked one."
 
-   Option (a) keeps one publish path and adds no rewrite code. Add a short DECISIONS.md bullet in each of the four packages, or one in `agent-data`, whichever the repo's DECISIONS.md style wants.
-2. In `packages/skill-tickets/SKILL.md`, add what `release` prints: `{"ok":true,"file":…}`, or `ok:false` with `reason` `no-lock` / `not-holder`. Check the exact shape in `cli.ts:188-200` first. Update `SKILL.LOGIC.md` to match.
-3. Verify: run `pnpm -C packages/skill-queue pack`, extract the tarball, and check that `package.json` has no `workspace:`. Then run `npm pack` in the same package and check that it now fails.
+## Implementation
 
-## Questions for a person (one comment on #1757)
-
-- **Unranked entries.** Should `parseQueueEntries` sort entries above the first `## Priority` heading as Priority 5 (the tickets default), or keep file order and document "put nothing above the sections"?
-- **Reclaim push.** Should `mayPush` push only `agent-*` branches, and keep the checkout with `not-on-remote` otherwise? Or is pushing a user's branch fine, because the checkout is under `.branches/`, which the agent was given?
-- **`node_modules`.** Should the branches SKILL.md forbid `npm install <pkg>` in a checkout? Or should a checkout get its own `node_modules` when the agent installs something, at the cost of disk and time?
-- **The flake.** Close it now (15 green runs), or keep it until someone runs the test in a loop?
+1. **Prepack.** In the `package.json` of `skill-branches`, `skill-github`, `skill-logs`, `skill-queue` and `skill-tickets`, add `"prepack": "node -e \"if(!process.env.npm_config_user_agent?.startsWith('pnpm')){console.error('publish with pnpm: npm keeps workspace:* in the tarball');process.exit(1)}\""`. Add one bullet to `packages/agent-data/DECISIONS.md`, the dependency they share, in its existing voice. Verify: `pnpm -C packages/skill-queue pack`, then extract the tarball and check that its `package.json` has no `workspace:`. `npm pack` in the same package must now fail with the message. Delete the tarballs afterwards.
+2. **`release` in SKILL.md.** Rewrite the `release` line of `packages/skill-tickets/SKILL.md` in the same shape as `claim`: `{"ok":true,"file":…,"holder":…}` when your claim is lifted; `{"ok":false,"reason":"no-lock"}` when nobody holds it; `{"ok":false,"reason":"not-holder","holder":…}` when someone else does. Leave `--force` out: it is a person's. Update `SKILL.LOGIC.md` to match.
+3. **Queue page order.** In `packages/skill-queue/dashboard/QueuePage.tsx`, `sections()` groups consecutive entries of the same priority in the order they arrive, with no sort. An unranked run is still headed "No priority". Rewrite the second paragraph of `QueuePage.LOGIC.md`: the sections appear in file order, which is the order of work. Add or adjust a test if `QueuePage` has one; otherwise test `sections()` by exporting it.
+4. **Reclaim push.** In `reclaim.ts`, change the `mayPush` check to `if (!opts.mayPush || !isAgentBranch(branch)) return { ok: false, reason: 'not-on-remote', branch }`, and say why in the comment. Add a test in `reclaim.test.ts`: a checkout on an unpushed non-agent branch, with `mayPush: true`, is kept and nothing is pushed. Check that the existing tests still pass, since some may reclaim a checkout on a non-agent branch. Update the `reclaim` paragraph of `skill-branches` `LOGIC.md` (or the `.LOGIC.md` next to `reclaim.ts`), and `DECISIONS.md` if it states the push rule.
+5. **Scoped links.** In `worktree-deps.ts` `linkDependencies`, for a `name` starting with `@` that is a directory: `mkdir` `dir/name`, then symlink each child inside it. Unit-test with the fake `LinkFs`: a checkout ends up with `node_modules/@scope` as a real directory and `@scope/pkg` as a link. Add the one sentence to `packages/skill-branches/SKILL.md` where it says to never edit the links, and update its LOGIC file.
+6. Run `pnpm -C packages/skill-branches test`, `pnpm -C packages/skill-queue test` and `pnpm -C packages/skill-tickets test`, then `pnpm typecheck`. The PR body gets `Closes tickets/2026-09-04_cold-read-follow-ups.md` and `Closes #1757`.
 
 ## Considerations
 
-- `parseQueueEntries` treats a line starting with `[x]` or `[ ]` as a task checkbox. A queue link whose label is exactly `x` or a space (`- [x](tickets/…)`) is therefore read as a done task and silently dropped. This is unlikely with real titles, but worth a test if the queue parser is touched.
-- Rom owns the DECISIONS.md voice: the no-names/no-dates style, flow sections, short bullets.
-- The four packages are published by hand. Nothing in CI catches a wrong tarball, so step 3 is a manual check.
+- `FEATURES-SPEC.md`: the Queue page's order is user-facing. Check whether it describes the grouping, and update it if so.
+- Item 4 changes what a user sees: a checkout left on the user's own unpushed branch now stays under `.branches/` instead of being pushed and removed. That is the intent, and `not-on-remote` is already a reported outcome.
+- Item 5: `isPrivate` entries (`.pnpm`, `.bin`, …) are still skipped. A scope directory never starts with `.`, so the new branch does not touch them. With pnpm, a scope's children are themselves links into `.pnpm`, so linking the link is fine.
+- Earlier plans raised a `parseQueueEntries` edge case: a link labelled exactly `x` or a space reads as a checked task. It is still unlikely, and out of scope here.

@@ -110,15 +110,15 @@ describe('AgentView event source (#1026/#1383)', () => {
   })
 
   test('an archive that catches up takes back over, bringing the epilogue events with it (#1460)', async () => {
-    // A clean agent's `handoff` only ever lands in the archive — the worktree journal dies with the
-    // teardown — so once the feed outgrows the copy on screen the archive is re-read, and the
-    // re-read is how the PR line reaches the screen without a manual refresh.
+    // A line written as the run is recorded only ever lands in the archive — the worktree journal
+    // dies with the teardown — so once the feed outgrows the copy on screen the archive is re-read,
+    // and the re-read is how the PR line reaches the screen without a manual refresh.
     const ahead = [...ARCHIVED, { kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'end', ok: true }] as FrameworkEvent[]
-    const full = [...ahead, { kind: 'handoff', outcome: 'done', pushed: true }] as FrameworkEvent[]
+    const full = [...ahead, { kind: 'pull-request', number: 7, url: 'https://x/pr/7' }] as FrameworkEvent[]
     onAgent.mockResolvedValueOnce(ARCHIVED).mockResolvedValue(full)
     render(view({ events: ahead }))
     await waitFor(() => expect(onAgent.mock.calls.length).toBeGreaterThanOrEqual(2))
-    await waitFor(() => expect(screen.getByText(/branch pushed/)).toBeTruthy())
+    await waitFor(() => expect(screen.getByText(/pull request: #7/)).toBeTruthy())
   })
 })
 

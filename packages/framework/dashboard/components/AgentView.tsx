@@ -80,8 +80,8 @@ export function AgentView({
   // The archived log, read only once the agent has ended: while it runs, the channel is the truth.
   // `archiveBehind` re-reads it whenever the live channel has outgrown the copy on screen (#1460):
   // a resumed session streams new events while `live` is still false for a poll round-trip, and a
-  // clean run's `handoff` event only ever lands in the archive — its worktree journal is torn down
-  // with the worktree — so without this the PR line waited for a manual refresh.
+  // line written as a clean run is recorded only ever lands in the archive — its worktree journal is
+  // torn down with the worktree — so without this the PR line waited for a manual refresh.
   const [archiveBehind, setArchiveBehind] = useState(0)
   const archived = useLoaded<FrameworkEvent[] | null>(
     live === false ? () => onAgent(projectId, agentId) : null,

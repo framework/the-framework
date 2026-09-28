@@ -19,17 +19,41 @@ export function fromRunCard(card: RunCard): AgentMeta {
 
 /**
  * One diary line as one framework event: what the agent said, its result, the run's end and its
- * cost are the shape's four kinds; a line of any other kind is a framework event as written. The
- * line's time, `at`, is the event's, whatever the kind.
+ * cost are the shape's four kinds; a line of any other kind is a framework event as written, and
+ * one whose kind is no longer an event (the kinds of runs recorded before The Framework stopped
+ * running agents) reads as nothing. The line's time, `at`, is the event's, whatever the kind.
  */
-export function fromDiaryLine(line: AnyDiaryLine): FrameworkEvent {
+export function fromDiaryLine(line: AnyDiaryLine): FrameworkEvent | undefined {
   const { at, ...rest } = line
   const event = eventOf(rest as AnyDiaryLine)
+  if (!event) return undefined
   return typeof at === 'string' ? { ...event, at } : event
 }
 
+/** Every kind of event there is: a line of another kind has nothing to show. */
+const EVENT_KINDS: Record<FrameworkEvent['kind'], true> = {
+  session: true,
+  'session-update': true,
+  screen: true,
+  log: true,
+  error: true,
+  view: true,
+  'ready-for-merge': true,
+  'open-pr': true,
+  'pull-request': true,
+  branch: true,
+  'cloud-anchor': true,
+  settled: true,
+  usage: true,
+  choice: true,
+  'choice-resolved': true,
+  driver: true,
+  intent: true,
+  end: true,
+}
+
 /** A diary line with no time on it, as the event it reads as. */
-function eventOf(line: AnyDiaryLine): FrameworkEvent {
+function eventOf(line: AnyDiaryLine): FrameworkEvent | undefined {
   switch (line.kind) {
     case 'said':
       return { kind: 'driver', event: { type: 'text', text: String(line['text']) } }
@@ -82,11 +106,11 @@ function eventOf(line: AnyDiaryLine): FrameworkEvent {
     case 'cost':
       return { kind: 'usage', costUsd: line['usd'] as number }
     default:
-      return line as unknown as FrameworkEvent
+      return Object.hasOwn(EVENT_KINDS, line.kind) ? (line as unknown as FrameworkEvent) : undefined
   }
 }
 
 /** A diary as the run's events, for a reader that replays them. */
 export function eventsOf(lines: readonly AnyDiaryLine[]): FrameworkEvent[] {
-  return lines.map(fromDiaryLine)
+  return lines.flatMap(line => fromDiaryLine(line) ?? [])
 }

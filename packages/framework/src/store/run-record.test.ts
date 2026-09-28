@@ -83,3 +83,13 @@ test('a line\'s time is its event\'s, on every kind; a line with none reads with
   assert.deepEqual(fromDiaryLine({ kind: 'screen', url: 'http://127.0.0.1:1/', label: 'browser', at }), { kind: 'screen', url: 'http://127.0.0.1:1/', label: 'browser', at })
   assert.deepEqual(fromDiaryLine({ kind: 'said', text: 'old' }), { kind: 'driver', event: { type: 'text', text: 'old' } })
 })
+
+test('a line whose kind is no longer an event reads as nothing, so an old run shows no empty rows', () => {
+  // Kinds runs wrote before The Framework stopped running agents: nothing reads them any more.
+  assert.equal(fromDiaryLine({ kind: 'handoff', outcome: 'done', pushed: true, url: 'https://x/pr/1' }), undefined)
+  assert.equal(fromDiaryLine({ kind: 'bootstrap', at: '2026-07-26T14:50:54.113Z' }), undefined)
+  assert.deepEqual(
+    eventsOf([{ kind: 'said', text: 'hi' }, { kind: 'handoff-armed', push: true, pr: true }, { kind: 'ready-for-merge' }]),
+    [{ kind: 'driver', event: { type: 'text', text: 'hi' } }, { kind: 'ready-for-merge' }] satisfies FrameworkEvent[],
+  )
+})

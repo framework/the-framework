@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { refreshPreferences } from '../lib/preferences.js'
 
 // The reads this page makes, answered as an empty machine: no devices, no editors detected, no
@@ -12,6 +12,14 @@ vi.mock('../rpc/preferences.js', async importOriginal => ({
   onPreferences: prefsRead,
 }))
 vi.mock('../rpc/devices.js', () => ({ checkDevices }))
+// The coding agents' own lists, as the daemon asked them: Claude Code answered, Codex could not.
+const onModels = vi.hoisted(() =>
+  vi.fn(async () => ({
+    'claude-code': { models: [{ id: 'opus', name: 'Opus 5.5' }, { id: 'claude-fable-5-1', name: 'Fable 5.1' }] },
+    codex: { models: [], error: 'not logged in' },
+  })),
+)
+vi.mock('../rpc/models.js', () => ({ onModels }))
 const schedulers = vi.hoisted(() => vi.fn(async (): Promise<unknown[]> => []))
 const sendScheduleSwitch = vi.hoisted(() => vi.fn(async (): Promise<{ ok: true } | { ok: false; error: string }> => ({ ok: true })))
 vi.mock('../rpc/projects.js', async importOriginal => ({
@@ -56,6 +64,53 @@ describe('SettingsPage dropdowns (#1172)', () => {
     render(<SettingsPage onAgentStarted={() => {}} onSelectProject={() => {}} />)
     const editor = screen.getByLabelText('Editor') as HTMLSelectElement
     expect([...editor.querySelectorAll('option')].map(o => o.textContent)).toEqual(['Auto-detect'])
+  })
+})
+
+describe('SettingsPage Agent and Model', () => {
+  const options = (label: string) =>
+    [...(screen.getByLabelText(label) as HTMLSelectElement).querySelectorAll('option')].map(o => [o.value, o.textContent, o.disabled])
+
+  test("the Model row offers the agent's own list, the start menu's, after the agent's own default", async () => {
+    prefsRead.mockResolvedValueOnce({})
+    refreshPreferences()
+    render(<SettingsPage onAgentStarted={() => {}} onSelectProject={() => {}} />)
+    await screen.findByText('Opus 5.5')
+    expect(options('Model')).toEqual([
+      ['', "the CLI's own default", false],
+      ['opus', 'Opus 5.5', false],
+      ['claude-fable-5-1', 'Fable 5.1', false],
+    ])
+    expect((screen.getByLabelText('Model') as HTMLSelectElement).value).toBe('')
+  })
+
+  test('a saved model the agent does not list is kept, by its id, since a start is still given it', async () => {
+    prefsRead.mockResolvedValueOnce({ model: 'fable' })
+    refreshPreferences()
+    render(<SettingsPage onAgentStarted={() => {}} onSelectProject={() => {}} />)
+    await screen.findByText('Opus 5.5')
+    await waitFor(() => expect((screen.getByLabelText('Model') as HTMLSelectElement).value).toBe('fable'))
+    expect(options('Model').at(-1)).toEqual(['fable', 'fable', false])
+  })
+
+  test('an agent that could not list its models says why, in a line that cannot be picked', async () => {
+    prefsRead.mockResolvedValueOnce({ driver: 'codex' })
+    refreshPreferences()
+    render(<SettingsPage onAgentStarted={() => {}} onSelectProject={() => {}} />)
+    await waitFor(() => expect(options('Model')).toEqual([
+      ['', "the CLI's own default", false],
+      ['not logged in', 'not logged in', true],
+    ]))
+  })
+
+  test("picking another agent leaves the model unpinned: a model is one agent's own", async () => {
+    prefsRead.mockResolvedValueOnce({ model: 'opus' })
+    refreshPreferences()
+    render(<SettingsPage onAgentStarted={() => {}} onSelectProject={() => {}} />)
+    await waitFor(() => expect((screen.getByLabelText('Model') as HTMLSelectElement).value).toBe('opus'))
+    fireEvent.change(screen.getByLabelText('Agent'), { target: { value: 'codex' } })
+    expect((screen.getByLabelText('Agent') as HTMLSelectElement).value).toBe('codex')
+    expect((screen.getByLabelText('Model') as HTMLSelectElement).value).toBe('')
   })
 })
 

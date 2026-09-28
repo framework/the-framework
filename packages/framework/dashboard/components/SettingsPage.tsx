@@ -1,5 +1,8 @@
 import { useState, type ReactNode } from 'react'
-import { DRIVERS, DRIVER_LABELS, MAX_SPEND_OFFSET } from '../../src/client.js'
+import { DRIVERS, MAX_SPEND_OFFSET } from '../../src/client.js'
+import { driverOptions, useModels } from '../lib/models.js'
+import { NO_MODEL_PINNED } from '../lib/agent-settings.js'
+import type { DriverOption } from './DriverModelMenu.js'
 import { useQuota } from '../lib/quota.js'
 import { useSpendOffset } from './Quota.js'
 import { onSchedulers } from '../rpc/reads.js'
@@ -42,6 +45,10 @@ export function SettingsPage({
   const preferences = usePreferences()
   const editors = useDetectedEditors()
   const theme = themePreference(preferences)
+  // The start menu's own list (#1874), so Settings offers exactly the picks the menu does.
+  const drivers = driverOptions(useModels())
+  const driver = preferences.driver ?? DRIVERS[0]
+  const model = preferences.model ?? ''
   // One shared table with the launcher (#958), rules already applied.
   // A notification toggle is a preference; whether it can deliver is the browser's permission
   // (#948). Both are shown, the same way the bell does, so the row cannot promise delivery that
@@ -89,15 +96,16 @@ export function SettingsPage({
           <SelectRow
             label="Agent"
             description="Which coding agent runs the work."
-            value={preferences.driver ?? DRIVERS[0]}
-            options={DRIVERS.map(a => ({ value: a, label: DRIVER_LABELS[a] }))}
-            onChange={value => updatePreferences({ driver: value })}
+            value={driver}
+            options={drivers}
+            // A model is always one agent's own (the start menu's rule), so a new agent starts unpinned.
+            onChange={value => updatePreferences({ driver: value, model: '' })}
           />
-          <TextRow
+          <SelectRow
             label="Model"
-            description="Passed through to the agent. Empty uses the agent's own default."
-            value={preferences.model ?? ''}
-            placeholder="the agent's default"
+            description="The models the agent lists. Its own default when none is picked."
+            value={model}
+            options={modelOptions(drivers.find(d => d.value === driver), model)}
             onChange={value => updatePreferences({ model: value })}
           />
           <ToggleRow
@@ -277,12 +285,36 @@ function ToggleRow({
 }
 
 /**
+ * The Model row's choices: the agent's own default first (the one pick the start menu has no entry
+ * for, since a menu entry is always a real model), then the models the agent listed. A saved model
+ * the list does not hold is kept, by its id, since that id is still what a start is given; a list
+ * not answered yet, or that could not be had, says why in a line that cannot be picked.
+ */
+function modelOptions(driver: DriverOption | undefined, model: string): SelectOption[] {
+  const listed = driver?.models ?? []
+  return [
+    { value: '', label: NO_MODEL_PINNED },
+    ...listed,
+    ...(model && !listed.some(m => m.value === model) ? [{ value: model, label: model }] : []),
+    ...(listed.length === 0 && driver?.modelsNote ? [{ value: driver.modelsNote, label: driver.modelsNote, disabled: true }] : []),
+  ]
+}
+
+interface SelectOption {
+  value: string
+  label: string
+  /** A line in the list that says something rather than being a choice. */
+  disabled?: boolean
+}
+
+/**
  * One setting picked from a list.
  *
  * A row with nothing to pick renders nothing at all (#1172). An empty `<select>` is a control that
  * cannot be operated — it reads as broken rather than as "no choices here", which is exactly the
- * paper cut this guard exists for. Every list on this page is static today, so nothing hits it;
- * it is here because the next dynamic one will be added without thinking about the empty case.
+ * paper cut this guard exists for. Every list on this page has a fixed first entry today ("Auto-detect",
+ * the agent's own default), so nothing hits it; it is here because the next list will be added
+ * without thinking about the empty case.
  */
 function SelectRow({
   label,
@@ -294,7 +326,7 @@ function SelectRow({
   label: string
   description: string
   value: string
-  options: { value: string; label: string }[]
+  options: SelectOption[]
   onChange: (next: string) => void
 }) {
   if (options.length === 0) return null
@@ -310,42 +342,11 @@ function SelectRow({
           className="rounded-md border border-border bg-background px-2 py-1 text-sm"
         >
           {options.map(o => (
-            <option key={o.value} value={o.value}>
+            <option key={o.value} value={o.value} disabled={o.disabled}>
               {o.label}
             </option>
           ))}
         </select>
-      }
-    />
-  )
-}
-
-function TextRow({
-  label,
-  description,
-  value,
-  placeholder,
-  onChange,
-}: {
-  label: string
-  description: string
-  value: string
-  placeholder?: string
-  onChange: (next: string) => void
-}) {
-  return (
-    <Row
-      label={label}
-      description={description}
-      control={
-        <input
-          type="text"
-          value={value}
-          placeholder={placeholder}
-          onChange={e => onChange(e.target.value)}
-          aria-label={label}
-          className="w-48 rounded-md border border-border bg-background px-2 py-1 text-sm"
-        />
       }
     />
   )

@@ -45,6 +45,10 @@ npx tickets claim <file>         {"ok":true,"file":…,"holder":…,"earlier":[�
                                  and never remove or overwrite their claim
 npx tickets release <file>       lift your own claim when the plan or the work is done, and before you
                                  stop unless you closed the ticket: nothing lifts a claim on a timeout
+                                 {"ok":true,"file":…,"holder":…}: your claim is lifted
+                                 {"ok":false,"reason":"no-lock"}: nobody holds it: nothing to lift
+                                 {"ok":false,"reason":"not-holder","holder":…}: someone else holds it:
+                                 leave their claim
 ```
 
 `put` ignores claims. You claim as `AGENT_ID` when it is set and not blank, else as your current branch: release from the branch you claimed on, or the claim stays until a person lifts it.

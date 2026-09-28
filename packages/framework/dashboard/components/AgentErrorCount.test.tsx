@@ -9,7 +9,7 @@ afterEach(cleanup)
 // errors themselves, this says how many there were without the reader scrolling for them.
 describe('AgentErrorCount', () => {
   test('a session that reported no errors shows nothing', () => {
-    const { container } = render(<AgentErrorCount events={[{ kind: 'ready-for-merge' }]} />)
+    const { container } = render(<AgentErrorCount events={[{ kind: 'settled' }]} />)
     expect(container.textContent).toBe('')
   })
 

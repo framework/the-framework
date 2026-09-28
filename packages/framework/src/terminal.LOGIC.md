@@ -2,7 +2,7 @@ Renders an agent's [1] event stream [2] in a terminal, one human-readable line p
 
 ## Context
 
-**User story**: the user runs an agent [1] from a terminal, or watches the daemon's output, and reads the agent's life as it happens: the prompt it was given, each turn's [4] text and actions, the question it stops at with the recommended option marked, "✓ ready for merge", the pull request, and how the agent ended.
+**User story**: the user runs an agent [1] from a terminal, or watches the daemon's output, and reads the agent's life as it happens: the prompt it was given, each turn's [4] text and actions, the question it stops at with the recommended option marked, the pull request, and how the agent ended.
 
 **Problem**: a reason is said in the reader's terms, never as an internal code.
 
@@ -15,7 +15,6 @@ Renders an agent's [1] event stream [2] in a terminal, one human-readable line p
 [6] driver session: the coding agent's own conversation for one agent, which the driver can resume by its session id. Say "session id" and "session link" for its id and URL.
 [7] cloud anchor: an empty commit a web agent pushes before its task leaves this machine, unique to the agent.
 [8] view: a markdown document an agent pushes to the dashboard's right rail while it works.
-[9] ready for merge: the signal an agent emits when it believes its work is complete: it flips the agent's badge from building to ready.
 [10] settled: said of an agent whose work has stopped and which is waiting for the user: it is alive, takes messages, and does nothing until told.
 [11] gate: a question with options an agent's turn ended on: the agent ends waiting for the answer, the dashboard shows the question as a card, and the answer resumes the agent.
 [12] pick: the answer to a gate: the option or options chosen, by the user or automatically.
@@ -26,7 +25,7 @@ Renders an agent's [1] event stream [2] in a terminal, one human-readable line p
 ## Business logic — TL;DR
 
 - **The agent's setup** - the driver and model in the checkout with the session link, the prompt, the branch, the cloud anchor, the pull request number, and a screen's label.
-- **What the agent signals** - its log lines, errors with their detail indented, views by title, "✓ ready for merge", the pull request it wrote, and "done for now" when it is settled.
+- **What the agent signals** - its log lines, errors with their detail indented, views by title, and "done for now" when it is settled.
 - **Gates and picks** - the question with one option per line, the recommended one marked, and the pick with who made it.
 - **Usage** - the price of one turn in dollars.
 - **The driver's own events** - the prompt, the text, the thoughts, the actions, the turn boundary, quota warnings only when the quota is tight, errors, notices, and the question a turn ended on.
@@ -53,7 +52,7 @@ See `## Context`.
 
 #### Business logic
 
-A log line is printed as is. A reported error is "✗ <headline>", with its detail, when there is one, indented on the lines below. A view [8] is "▶ view: <title>". The ready-for-merge [9] signal is "✓ ready for merge". The pull request the agent wrote is "pull request written", followed by ": <title>" when it has one. A settled [10] agent prints "◆ done for now — waiting for your next message".
+A log line is printed as is. A reported error is "✗ <headline>", with its detail, when there is one, indented on the lines below. A view [8] is "▶ view: <title>". A settled [10] agent prints "◆ done for now — waiting for your next message".
 
 ### Gates and picks
 

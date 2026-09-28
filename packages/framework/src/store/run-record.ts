@@ -38,8 +38,6 @@ const EVENT_KINDS: Record<FrameworkEvent['kind'], true> = {
   log: true,
   error: true,
   view: true,
-  'ready-for-merge': true,
-  'open-pr': true,
   'pull-request': true,
   branch: true,
   'cloud-anchor': true,

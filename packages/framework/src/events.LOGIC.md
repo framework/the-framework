@@ -2,7 +2,7 @@ Fixes the vocabulary of the event stream [1]: every kind of event an agent's [2]
 
 ## Context
 
-**User story**: the user watches an agent [2] in the agent view [6]: everything the coding agent [7] did, in order, the questions it stopped at, the views [8] it pushed, the badge flipping from building to ready, the spend so far, and finally the pull request the work is on. A tab opened while the agent runs, or after it ended, shows the same story. Everything on that page is read off the events described here; nothing about an agent is learned any other way.
+**User story**: the user watches an agent [2] in the agent view [6]: everything the coding agent [7] did, in order, the questions it stopped at, the views [8] it pushed, the spend so far, and finally the pull request the work is on. A tab opened while the agent runs, or after it ended, shows the same story. Everything on that page is read off the events described here; nothing about an agent is learned any other way.
 
 **Business logic story**: the tool that runs an agent appends every line to the agent's diary in the agent's checkout [9], and copies the diary onto the `agent-data` branch [10] when the agent ends. The dashboard and the terminal are each a projection of that file, read through this vocabulary. An agent the dashboard started has no terminal anyone reads, so anything the user is to learn about it has to be a line in the diary.
 
@@ -19,13 +19,12 @@ Fixes the vocabulary of the event stream [1]: every kind of event an agent's [2]
 [8] view: a markdown document an agent pushes to the dashboard's right rail while it works.
 [9] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [10] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, and the lasting record of every agent — the `logs` skill's card (what was asked, the branch, the pull request, how it ended, what it cost) and diary (what the agent said).
-[12] turn signals: what The Framework reads off a turn's final message: the ready-for-merge signal, the pull request title and body, markdown views, reported errors, and the gate it stops at.
+[12] turn signals: what The Framework reads off a turn's final message: markdown views, reported errors, and the gate it stops at.
 [13] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later. The user's driver choice is `claude-code` or `codex`; the driver implementations are `claude-code`, `codex`, `github-actions`, `claude-web` and `fake`.
 [14] turn: one prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
 [15] driver session: the coding agent's own conversation for one agent, which the driver can resume by its session id.
 [16] sweep: a background job the daemon runs on its clock: the CI watch, the sweep that reclaims checkouts, the branch-links sweep, the cloud scratch sweep, cloud work adoption.
 [17] unattended: said of an agent nobody is watching: one the scheduler started rather than a person. It is not answered any faster: a question it ends on waits for a human like any other.
-[18] ready for merge: the signal an agent emits when it believes its work is complete: it flips the agent's badge from building to ready.
 [19] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [20] the queued work: one agent started with `/work-queue`, which takes one task off the agent queue by composing the skills in its checkout.
 [22] location: where an agent's turns run: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session).
@@ -40,7 +39,6 @@ Fixes the vocabulary of the event stream [1]: every kind of event an agent's [2]
 - **The coding agent's progress, forwarded** - every progress event the coding agent reports is forwarded verbatim onto the stream and never decided on.
 - **What the agent shows the user** - a view updates in place by title, a reported error stays in the log as history, a log line narrates, and a screen a command the agent ran is showing travels as its address and a label only, never as frames.
 - **A gate and its pick** - a gate is a question, at least one option and, for a single-select gate, a recommended option; a checklist pre-checks options instead; the pick is one option id or the chosen subset, and says whether the user or nobody picked.
-- **Ready for merge and the pull request text** - the ready-for-merge signal flips the agent from building to ready without blocking it; the pull request title and description the agent wrote travel as an event.
 - **Facts that must survive a reload** - the branch, the pull request once opened, and the cloud anchor each travel as events because only an event reaches a tab opened later.
 - **Settled, spend and the end** - the agent says when it is parked on the user, reports the price of every turn it priced, and ends as done, stopped, failed, or waiting on an answer to the question it asked.
 - **When each event was written** - any event may carry the time its diary line was written; an event read from a line with no time carries none.
@@ -104,19 +102,6 @@ A gate [3], emitted when the agent [2] pauses on a question and waits for a pick
 The resolution of a gate is emitted as its own event: the gate's id, what was picked (one option id, or the subset for a checklist), and who picked: the user, or nobody, which is an unattended [17] agent taking the recommended option. A pick that arrives without saying who picked counts as the user's.
 
 A pick is normalized to a list of option ids wherever a list is needed: a subset is copied as it is, a single option id becomes a one-item list, and an empty id becomes an empty list.
-
-### Ready for merge and the pull request text
-
-#### Context
-
-**User story**: the agent view's [6] badge flips from building to ready when the agent [2] believes its work is complete, and the pull request carries the title and description the agent wrote.
-
-#### Business logic
-
-- Ready for merge [18]: the agent [2] signaled that it believes the work is complete and ready for human review. Non-blocking: it flips the agent's badge from building to ready.
-- The pull request text: the title and description the agent asked for through its `open-pr` signal. This is how an agent opens a pull request through The Framework instead of opening it itself, so the recording of the pull request number still applies. The title is the agent's name for the work and the description is what changed; either may be absent when the agent wrote only the other. Non-blocking.
-
-Both are read off a turn's [14] final message as turn signals [12]; the parsing rules are `turn-gate.ts`'s.
 
 ### Facts that must survive a reload
 

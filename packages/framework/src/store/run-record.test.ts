@@ -89,7 +89,7 @@ test('a line whose kind is no longer an event reads as nothing, so an old run sh
   assert.equal(fromDiaryLine({ kind: 'handoff', outcome: 'done', pushed: true, url: 'https://x/pr/1' }), undefined)
   assert.equal(fromDiaryLine({ kind: 'bootstrap', at: '2026-07-26T14:50:54.113Z' }), undefined)
   assert.deepEqual(
-    eventsOf([{ kind: 'said', text: 'hi' }, { kind: 'handoff-armed', push: true, pr: true }, { kind: 'ready-for-merge' }]),
-    [{ kind: 'driver', event: { type: 'text', text: 'hi' } }, { kind: 'ready-for-merge' }] satisfies FrameworkEvent[],
+    eventsOf([{ kind: 'said', text: 'hi' }, { kind: 'handoff-armed', push: true, pr: true }, { kind: 'open-pr', title: 't' }, { kind: 'ready-for-merge' }, { kind: 'settled' }]),
+    [{ kind: 'driver', event: { type: 'text', text: 'hi' } }, { kind: 'settled' }] satisfies FrameworkEvent[],
   )
 })

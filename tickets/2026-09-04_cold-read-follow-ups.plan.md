@@ -1,5 +1,6 @@
 Effort: 3
 Uncertainty: 6
+Outdated: yes
 
 # [Plan] Follow-ups from the DECISIONS.md and SKILL.md cold reads
 

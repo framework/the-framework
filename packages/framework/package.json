@@ -41,6 +41,7 @@
   },
   "scripts": {
     "build": "pnpm -C ../agent-data build && pnpm -C ../agent-driver/core build && pnpm -C ../agent-driver/claude build && pnpm -C ../agent-driver/codex build && tsc -p tsconfig.build.json && tsc -p dashboard/tsconfig.widget.json && cp dashboard/widget/theme.css dist/widget.css && node scripts/copy-extension.mjs && cd dashboard && vite build",
+    "prepack": "node -e \"if(!process.env.npm_config_user_agent?.startsWith('pnpm/')){console.error('Pack and publish with pnpm: it replaces workspace:* with the real version, npm does not');process.exit(1)}\"",
     "preview": "pnpm build && node dist/bin.js",
     "dev": "pnpm -C ../agent-data build && pnpm -C ../agent-driver/core build && pnpm -C ../agent-driver/claude build && pnpm -C ../agent-driver/codex build && tsc -p tsconfig.build.json --watch",
     "dev:dashboard": "cd dashboard && vite",

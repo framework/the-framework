@@ -31,7 +31,7 @@ The Settings page: every preference [1] the user can set, on one page, each chan
 - **One page, one destination** - every control but the spend offset and the schedule switches reads and writes the user's own preferences, applied at once and saved in the background.
 - **The Onboarding checklist stays on this page** - it sits above every section, cannot be dismissed here, and its two navigating steps lead to an agent's page or a project's launcher.
 - **Appearance: theme and editor** - "Theme" follows the system by default; "Editor" offers "Auto-detect" plus the editors found on the daemon's machine.
-- **Agent: which coding agent, which model, and post-merge cleanup** - "Agent" (Claude Code by default) and "Model" (empty means the coding agent's own default), both handed to a project's start hook [8] with every start; "Post-merge cleanup" (off by default), the default of the launcher's box of that name.
+- **Agent: which coding agent, which model, and post-merge cleanup** - "Agent" (Claude Code by default) and "Model", picked from the models that coding agent lists, the same list the launcher's select offers, or the coding agent's own default (the default); both handed to a project's start hook [8] with every start; picking another coding agent leaves no model picked; "Post-merge cleanup" (off by default), the default of the launcher's box of that name.
 - **Devices, after "Agent"** - the saved devices follow directly, because a device is the other place an agent can run.
 - **Notifications: how they reach you, and what about** - a delivery row ("Browser") showing both the preference and whether the browser lets it deliver, and two category rows ("Human Queue", "New activity").
 - **Automation: the spend offset** - "Spend offset" is the number the usage panel's handle moves, from −50 to 50 percentage points, read off the projects' schedulers and written through every project's offset hook [20]; a write that fails says why.
@@ -80,12 +80,14 @@ The "Appearance" section has two rows:
 
 **Business logic story**: a start carries two picks — which coding agent [7] does the work, and which model. The launcher's select sets the same two; the values here are what every start carries, from the launcher and from every button that starts an agent.
 
+**Problem**: a model is passed straight through to its coding agent, so a model typed by hand could be a name the coding agent does not know, or another coding agent's model, and the start would fail on it. Both surfaces offer one list, so they cannot disagree on what a pick may be.
+
 #### Business logic
 
 The "Agent" section has three rows:
 
-- "Agent" ("Which coding agent runs the work."): "Claude Code" or "Codex". With nothing stored the row shows "Claude Code", and a start sends no coding agent at all, so the project's start hook [8] applies its own default.
-- "Model" ("Passed through to the agent. Empty uses the agent's own default."): free text, with the placeholder "the agent's default". The value is handed to the start hook as the model to run on; left empty, nothing is handed over and the coding agent uses its own default.
+- "Agent" ("Which coding agent runs the work."): "Claude Code" or "Codex". With nothing stored the row shows "Claude Code", and a start sends no coding agent at all, so the project's start hook [8] applies its own default. Picking a coding agent also clears the model, since a model belongs to one coding agent: the next start uses the new coding agent's own default until a model is picked.
+- "Model" ("The models the agent lists. Its own default when none is picked."): a drop-down of the models the coding agent picked in "Agent" lists, as the coding agent itself listed them when the daemon asked it and by the names it gives them ("Opus 5.5", "Fable 5.1"): the same list, from the same place, as the launcher's select (`lib/models.ts`). The first entry, "the CLI's own default", picks no model: nothing is handed over and the coding agent uses its own default; it is what the row shows with nothing stored. A picked model is handed to the start hook as the model to run on. A stored model the list does not hold (typed before this row was a list, or no longer offered) stays in the list at the end, by its id, and stays picked, since that id is still what a start is given. While the daemon has not answered, or when the coding agent could not list its models, the list holds the default and a line that cannot be picked saying why ("Asking Claude Code…", or the coding agent's own reason).
 - "Post-merge cleanup" ("The launcher's box, ticked by default: once a run ends with a pull request, a fresh agent runs /post-merge-cleanup on its branch before it merges. In projects with that command."): a switch, off when nothing is stored. It is the same preference the launcher's "Post-merge cleanup" box shows and writes (`StartAgentForm.tsx`): flipping either changes the other. It changes a start only from the launcher, in a project that has the `post-merge-cleanup` command, with no device picked in "Run on".
 
 Where an agent runs is not a setting: it is picked per start in the launcher's "Run on" (`RunOnMenu.tsx`).
@@ -165,4 +167,4 @@ The "Claude web" section ("A Claude web agent hands off and ends, so the questio
 
 #### Business logic
 
-A row whose list of choices is empty is left out of the page entirely rather than shown as an empty drop-down. Every list on the page today has at least one entry ("Auto-detect" guarantees the editor list one), so the rule guards the next list assembled at run time.
+A row whose list of choices is empty is left out of the page entirely rather than shown as an empty drop-down. Every list on the page today has at least one entry ("Auto-detect" guarantees the editor list one, "the CLI's own default" the model list), so the rule guards the next list assembled at run time.

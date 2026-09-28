@@ -1,3 +1,5 @@
+import { DRIVERS, DRIVER_LABELS } from '../../src/client.js'
+import type { DriverOption } from '../components/DriverModelMenu.js'
 import { useLoaded } from './use-async.js'
 import { onModels, type DriverModels, type ModelsView } from '../rpc/models.js'
 
@@ -7,6 +9,24 @@ import { onModels, type DriverModels, type ModelsView } from '../rpc/models.js'
 /** The models each coding agent offers, `undefined` until the daemon has answered. */
 export function useModels(): ModelsView | undefined {
   return useLoaded<ModelsView | undefined>(onModels, undefined, [])
+}
+
+/**
+ * Every coding agent with the models it listed, by the names it gives them, or a line saying why
+ * there are none: the one list every surface that picks a model offers (the start menu, Settings),
+ * so the two can never disagree on what a pick may be. No icons: those are the menu's own.
+ */
+export function driverOptions(models: ModelsView | undefined): DriverOption[] {
+  return DRIVERS.map(name => {
+    const answer = models?.[name]
+    const modelsNote = !answer ? `Asking ${DRIVER_LABELS[name]}…` : 'error' in answer ? answer.error : 'No models listed'
+    return {
+      value: name,
+      label: DRIVER_LABELS[name],
+      models: (answer?.models ?? []).map(m => ({ value: m.id, label: m.name })),
+      modelsNote,
+    }
+  })
 }
 
 /**

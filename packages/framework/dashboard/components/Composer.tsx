@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { ArrowUp, Loader2 } from 'lucide-react'
 import type { ProjectSummary } from '../../src/index.js'
-import { DRIVERS, DRIVER_LABELS, type DriverName, isLoopbackHost } from '../../src/client.js'
+import { type DriverName, isLoopbackHost } from '../../src/client.js'
 import {
   usePreferences,
   updatePreferences,
@@ -21,7 +21,7 @@ import { useConnectionProfiles, connectLocal, removeProfile, type ConnectionProf
 import { useSelectedRemoteDeviceId, selectRemoteDevice } from '../lib/remote-target.js'
 import { useDeviceStatus } from '../lib/use-device-status.js'
 import { stashDraftFromUrl, takePendingDraft } from '../lib/draft-handoff.js'
-import { useModels } from '../lib/models.js'
+import { driverOptions, useModels } from '../lib/models.js'
 import { useProjectLauncher } from '../lib/use-project-launcher.js'
 import { ClaudeLogo, CodexLogo } from './driver-logos.js'
 import { Button } from './ui/button.js'
@@ -34,29 +34,13 @@ import { cn } from '../lib/utils.js'
 // each list, and picking it stored nothing, so the menu's own answer to "which model" was "we do
 // not know" (#1143). Not choosing is still a state — it is just no longer something to pick, and
 // the trigger says so rather than naming the first model as if it had been chosen.
-// The names and labels are the framework's own vocabulary (browser-safe via /client), and each
-// driver's models are what its coding agent answered when the daemon asked (`lib/models.ts`), so
-// the menu offers what the agent's own picker offers, by the agent's own names. Only the icons are
-// this component's own, and the Record<DriverName, ...> shape means a new agent framework-side is
+// The drivers and their models are the list Settings offers too (`lib/models.ts` driverOptions):
+// what each coding agent answered when the daemon asked, so the menu offers what the agent's own
+// picker offers, by the agent's own names. Only the icons are this component's own, and the Record<DriverName, ...> shape means a new agent framework-side is
 // a compile error here rather than a silently missing menu entry.
 const DRIVER_UI: Record<DriverName, { icon: DriverOption['icon'] }> = {
   'claude-code': { icon: <ClaudeLogo className="h-4 w-4" /> },
   codex: { icon: <CodexLogo className="h-4 w-4" /> },
-}
-
-/** The menu's drivers, each with the models its agent listed, or a line saying why there are none. */
-function driverOptions(models: ReturnType<typeof useModels>): DriverOption[] {
-  return DRIVERS.map(name => {
-    const answer = models?.[name]
-    const modelsNote = !answer ? `Asking ${DRIVER_LABELS[name]}…` : 'error' in answer ? answer.error : 'No models listed'
-    return {
-      value: name,
-      label: DRIVER_LABELS[name],
-      models: (answer?.models ?? []).map(m => ({ value: m.id, label: m.name })),
-      modelsNote,
-      ...DRIVER_UI[name],
-    }
-  })
 }
 
 export interface ComposerHandle {
@@ -218,7 +202,7 @@ export const Composer = forwardRef<ComposerHandle, {
   // controls in either place read and write the same state.
   const driverModelEl = showDriverModel && (
     <DriverModelMenu
-      drivers={driverOptions(models)}
+      drivers={driverOptions(models).map(d => ({ ...d, ...DRIVER_UI[d.value as DriverName] }))}
       driver={driver}
       model={model}
       onChange={(a, m) => updatePreferences({ driver: a, model: m })}

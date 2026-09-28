@@ -48,6 +48,13 @@ describe('GitStatusBar (#809)', () => {
     expect(screen.getByTitle(long).className).toContain('truncate')
   })
 
+  test('the project and a command-named session are separated by ›, never a doubled slash', async () => {
+    onAgentWorktree.mockResolvedValue({ checkout: { path: '/repo/.branches/run-1', dirty: false }, branch: 'agent-run-1' })
+    render(<GitStatusBar projectId="p1" agentId="run-1" inline label="/update-tickets" projectName="gemstack" />)
+    await waitFor(() => expect(screen.getByText('/update-tickets')).toBeTruthy())
+    expect(screen.getByTestId('project-crumb').textContent).toBe('gemstack›')
+  })
+
   test('the session name shows from the first frame; its facts wait for its own read, and for ready', async () => {
     let answer: (v: unknown) => void = () => {}
     onAgentWorktree.mockReturnValue(new Promise(resolve => (answer = resolve)))

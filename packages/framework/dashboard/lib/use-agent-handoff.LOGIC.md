@@ -89,8 +89,8 @@ A step the daemon refuses is reported with the daemon's own reason. A step that 
 
 #### Context
 
-**Problem**: an agent's [1] page opens before the branch has been read. Treating "not read yet" as "nothing on the branch" would flash "Nothing committed — no PR to open." at a user whose agent produced plenty.
+**Problem**: an agent's [1] page opens before the branch has been read. Treating "not read yet" as "nothing on the branch" would flash "Nothing committed — <files> left uncommitted." or nothing at all at a user whose agent produced plenty.
 
 #### Business logic
 
-The branch state carries whether a read has actually answered for the current agent. Until it has, the page shows nothing about the branch rather than an empty branch, and the reasons the branch offers no step — "Branch gone — nothing to open a PR from.", "Nothing committed — no PR to open.", "No remote to push to." — are only shown once there is a real answer behind them.
+The branch state carries whether a read has actually answered for the current agent. Until it has, the page shows nothing about the branch rather than an empty branch, and the reasons the branch offers no step — "Branch gone — nothing to open a PR from.", "Nothing committed — <files> left uncommitted.", "No remote to push to." — are only shown once there is a real answer behind them.

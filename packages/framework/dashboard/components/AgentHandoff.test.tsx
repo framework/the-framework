@@ -79,15 +79,15 @@ describe('run handoff (#799)', () => {
     expect(screen.queryByText('the-framework/dark-mode')).toBeNull()
   })
 
-  test('a session that changed nothing says so, and has nothing to expand', async () => {
+  test('a session that changed nothing reads no changes, says nothing more, and has nothing to expand', async () => {
     onAgentHandoff.mockResolvedValue({ ...worked, commits: [], files: [], insertions: 0, deletions: 0, empty: true })
     render(<Harness />)
     await waitFor(() => expect(screen.getByText('no changes')).toBeTruthy())
     expect(handoffExpandable({ ...worked, empty: true } as never)).toBe(false)
-    // Nothing to hand off, so no button — but it says why (#1173). A finished session showing no
-    // control and no sentence is exactly the dead end that made "what should I do now?" unanswerable.
+    // Nothing to hand off and nothing to do: no button and no sentence, since a run with work always
+    // shows its button.
     expect(screen.queryByText('Open PR')).toBeNull()
-    expect(screen.getByText('Nothing committed — no PR to open.')).toBeTruthy()
+    expect(screen.queryByText(/nothing to open|no PR to open/i)).toBeNull()
   })
 
   test('a merged branch says merged, not "no changes" — its commits are all on the base', async () => {
@@ -139,7 +139,7 @@ describe('run handoff (#799)', () => {
     onAgentHandoff.mockResolvedValue({ ...worked, exists: false, unchanged: true, commits: [], files: [], empty: true })
     render(<Harness />)
     await waitFor(() => expect(screen.getByText('no changes')).toBeTruthy())
-    expect(screen.getByText('No changes — nothing to open a PR from.')).toBeTruthy()
+    expect(screen.queryByText(/nothing to open|no PR to open/i)).toBeNull()
     expect(screen.queryByText(/Branch gone/i)).toBeNull()
   })
 

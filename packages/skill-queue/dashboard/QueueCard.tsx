@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { FastForward, ListTodo, Play } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle, StartAgentButton, Tooltip, TooltipContent, TooltipTrigger, usePolled, useWidgetHost, type WidgetCardProps, type WidgetProject } from 'framework/widget'
-import { DEFAULT_FAN_OUT_COUNT, entryLabel, fanOut, fanOutLabel, topEntries, workOnEntryPrompt } from '../src/widget.js'
+import { Card, CardContent, CardHeader, CardTitle, StartAgentButton, Tooltip, TooltipContent, TooltipTrigger, usePolled, useModuleHost, type ModuleCardProps, type ModuleProject } from 'framework/module'
+import { DEFAULT_FAN_OUT_COUNT, entryLabel, fanOut, fanOutLabel, topEntries, workOnEntryPrompt } from '../src/module.js'
 
 // The Overview's AI Queue card: every project's open entries, the work agents pick up on their own,
 // grouped by project and shown in full. No "+N more": this is the plan, and a collapsed plan is one
@@ -16,15 +16,15 @@ import { DEFAULT_FAN_OUT_COUNT, entryLabel, fanOut, fanOutLabel, topEntries, wor
 
 /** One project's open entries as read, or why the command failed. */
 interface ProjectRead {
-  project: WidgetProject
+  project: ModuleProject
   entries: string[]
   error?: string
 }
 
 const NOTHING_READ: ProjectRead[] = []
 
-export function QueueCard({ projects }: WidgetCardProps) {
-  const host = useWidgetHost()
+export function QueueCard({ projects }: ModuleCardProps) {
+  const host = useModuleHost()
   const key = projects.map(p => p.id).join(',')
   const { value: reads, loaded } = usePolled<ProjectRead[]>(
     () =>

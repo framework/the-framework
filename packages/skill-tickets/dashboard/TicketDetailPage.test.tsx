@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import type { ReactElement } from 'react'
-import type { WidgetAgent } from 'framework/widget'
-import type { MountedWidgets } from '../../framework/dashboard/lib/use-widgets.js'
+import type { ModuleAgent } from 'framework/module'
+import type { MountedModules } from '../../framework/dashboard/lib/use-modules.js'
 import { fakeHost, renderWithHost, type FakeHost } from './test-host.js'
 import { TicketDetailPage } from './TicketDetailPage.js'
 
@@ -10,22 +10,22 @@ import { TicketDetailPage } from './TicketDetailPage.js'
 // claim with `tickets release <file> --force` as an act. `onTicket` is what the command answers:
 // the ticket, or `null` for the command's refusal (no such ticket).
 let shown: Record<string, unknown> | null = null
-let agents: WidgetAgent[] = []
+let agents: ModuleAgent[] = []
 let released: { ok: true } | { ok: false; error: string } = { ok: true }
 let host: FakeHost
 const onTicket = { mockResolvedValue: (value: Record<string, unknown> | null) => (shown = value) }
 const sendReleaseTicketLock = { mockResolvedValue: (value: { ok: true } | { ok: false; error: string }) => (released = value) }
 
-// The one link action an installed widget offers here (#1774): a queue package's "Add to queue",
+// The one link action an installed module offers here (#1774): a queue package's "Add to queue",
 // present in project p1. Its `run` is the spy the queueing tests read.
 const addToQueue = vi.fn()
-const widgets = (projects: string[] = ['p1']): MountedWidgets => ({
+const modules = (projects: string[] = ['p1']): MountedModules => ({
   pages: [],
   cards: [],
   linkActions: [{ label: 'Add to queue', doneLabel: 'Queued', run: addToQueue, package: '@x/queue', projects }],
   loaded: true,
 })
-const render = (ui: ReactElement, mounted: MountedWidgets = widgets()) => {
+const render = (ui: ReactElement, mounted: MountedModules = modules()) => {
   const slug = (ui.props as { slug: string }).slug
   host = fakeHost({ p1: { [`show ${slug} --local`]: shown ? { ok: true, ticket: shown } : { ok: false, reason: 'no-ticket', file: slug } } }, { p1: agents })
   host.act.mockImplementation(async (_projectId, args) => {
@@ -113,7 +113,7 @@ describe('TicketDetailPage (#1144)', () => {
     expect(screen.getByText('Uncertainty: 0')).toBeTruthy()
   })
 
-  test('the ticket is handed as a link to the widget\'s action, at the priority its own says (#1164/#1774)', async () => {
+  test('the ticket is handed as a link to the module\'s action, at the priority its own says (#1164/#1774)', async () => {
     onTicket.mockResolvedValue(ticket({ priority: '8' }))
     addToQueue.mockResolvedValue({ ok: true })
     render(<TicketDetailPage projectId="p1" slug="2026-07-20_do-the-thing.md" />)
@@ -149,9 +149,9 @@ describe('TicketDetailPage (#1144)', () => {
     expect(screen.queryByRole('button', { name: 'Queued' })).toBeNull()
   })
 
-  test('no widget offering an action on links in this project, no button (#1774)', async () => {
+  test('no module offering an action on links in this project, no button (#1774)', async () => {
     onTicket.mockResolvedValue(ticket())
-    render(<TicketDetailPage projectId="p1" slug="2026-07-20_do-the-thing.md" />, widgets(['p2']))
+    render(<TicketDetailPage projectId="p1" slug="2026-07-20_do-the-thing.md" />, modules(['p2']))
     await screen.findByRole('heading', { name: 'Do the thing' })
     expect(screen.queryByRole('button', { name: /queue/i })).toBeNull()
   })
@@ -201,7 +201,7 @@ describe('TicketDetailPage (#1144)', () => {
     expect(screen.getByText('claimed')).toBeTruthy()
   })
 
-  test('Back returns to the list, the widget\'s own page', async () => {
+  test('Back returns to the list, the module\'s own page', async () => {
     onTicket.mockResolvedValue(ticket())
     render(<TicketDetailPage projectId="p1" slug="2026-07-20_do-the-thing.md" />)
     fireEvent.click(await screen.findByRole('button', { name: /tickets/i }))

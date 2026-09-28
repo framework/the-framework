@@ -1,6 +1,6 @@
 import { RefreshCw } from 'lucide-react'
-import { StartAgentButton } from 'framework/widget'
-import { UPDATE_TICKETS_PROMPT } from '../src/widget.js'
+import { StartAgentButton } from 'framework/module'
+import { UPDATE_TICKETS_PROMPT } from '../src/module.js'
 
 /**
  * "Update tickets", as one button both of the panel's surfaces render: its header and its

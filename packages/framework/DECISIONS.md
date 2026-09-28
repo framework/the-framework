@@ -17,7 +17,7 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - The tickets are a package's: The Framework reads them through the command the package
   declares (`framework.tickets`, `list --local`), and only for what it composes across
   skills, the onboarding step, a queued link's title. Showing,
-  planning, claiming and releasing a ticket is the package's own widget, through its
+  planning, claiming and releasing a ticket is the package's own module, through its
   command. Picked over the dashboard's own ticket pages fed by the provider, which would
   have kept a reserved route and a hand-written sidebar row.
 - The checkouts are a package's: The Framework finds a run's checkout, and pushes and
@@ -37,7 +37,7 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   as the value; several and no line means nothing provides it, and the project's banner
   says why. Picked over the first in dependency order, taken silently, and over routing by
   the remote's host.
-- An Overview card belongs to the package whose data it shows: a widget declares its cards
+- An Overview card belongs to the package whose data it shows: a module declares its cards
   and The Framework draws them, in the order the cards name, only where a project has the
   package. Picked over the framework's own cards fed by the providers, which showed an empty
   queue to a project with no queue package. The onboarding steps stay the framework's.

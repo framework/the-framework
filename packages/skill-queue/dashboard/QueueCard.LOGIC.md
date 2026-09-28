@@ -4,7 +4,7 @@ The AI Queue card on the dashboard's Overview: the open entries of the agent que
 
 **User story**: on the Overview the user sees, per project, every task agents will work on next, in order. Beside an entry, one click spins up an agent on that entry alone and lands on the run. Beside a project's name, a count and a fan-out button spin up that many agents, one per entry from the top of the queue, while the user stays on the Overview and the runs appear in the Agents card above. Each start has a "Configure first, then run" that opens the project's launcher with the same prompt instead.
 
-**Business logic story**: the card reads exactly what an agent reads with `npx queue --local`, and every start is the dashboard's own service, given the prompt `src/widget.ts` words for one entry. The card names no other skill: a queued ticket is a link into the repository the card has no page for, so it reads as its title and opens nothing.
+**Business logic story**: the card reads exactly what an agent reads with `npx queue --local`, and every start is the dashboard's own service, given the prompt `src/module.ts` words for one entry. The card names no other skill: a queued ticket is a link into the repository the card has no page for, so it reads as its title and opens nothing.
 
 ## Glossary
 
@@ -38,7 +38,7 @@ See `## Context`.
 
 #### Business logic
 
-A project with no open entry and no failed read is left off the card; when none remains the card says "Nothing queued.". A shown project has a header with its name and the number of its open entries, then every entry, never a "+N more": this is the plan, and a collapsed plan is one you cannot read. An entry reads as `src/widget.ts` labels it: a leading markdown link's text, else the whole entry; a leading link to an absolute http(s) URL opens in a new tab, anything else is plain text; the raw entry shows on hover.
+A project with no open entry and no failed read is left off the card; when none remains the card says "Nothing queued.". A shown project has a header with its name and the number of its open entries, then every entry, never a "+N more": this is the plan, and a collapsed plan is one you cannot read. An entry reads as `src/module.ts` labels it: a leading markdown link's text, else the whole entry; a leading link to an absolute http(s) URL opens in a new tab, anything else is plain text; the raw entry shows on hover.
 
 ### Starting one entry
 
@@ -48,7 +48,7 @@ A project with no open entry and no failed read is left off the card; when none 
 
 #### Business logic
 
-The play button beside an entry starts one run in the entry's project with the prompt `src/widget.ts` words for that entry (work this one entry, take it off the queue when published, start no other), through the dashboard, which starts it with the user's own picks and lands on the run. A refusal shows in red under the list. The button's chevron, "Configure first, then run", opens the project's launcher with the same prompt drafted in, starting nothing.
+The play button beside an entry starts one run in the entry's project with the prompt `src/module.ts` words for that entry (work this one entry, take it off the queue when published, start no other), through the dashboard, which starts it with the user's own picks and lands on the run. A refusal shows in red under the list. The button's chevron, "Configure first, then run", opens the project's launcher with the same prompt drafted in, starting nothing.
 
 ### The fan-out
 

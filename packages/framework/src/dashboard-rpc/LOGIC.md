@@ -2,7 +2,7 @@ Every call the dashboard makes to the daemon [1], as one table the daemon answer
 
 ## Context
 
-**User story**: everything the user does in the dashboard beyond scrolling is one of these calls — answering an agent's [4] question, chatting with it, stopping it, starting a new one, running a widget's command, changing a setting, saving a device [5] — and every one of them must either happen or say why it did not.
+**User story**: everything the user does in the dashboard beyond scrolling is one of these calls — answering an agent's [4] question, chatting with it, stopping it, starting a new one, running a module's command, changing a setting, saving a device [5] — and every one of them must either happen or say why it did not.
 
 **Problem**: an agent may be running on this machine or on a device the user saved. The same call must work either way, so a call names the agent and the surface decides where it goes; the browser never talks to another machine itself, and a device's token never reaches it.
 
@@ -16,7 +16,7 @@ Every call the dashboard makes to the daemon [1], as one table the daemon answer
 [6] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
 [7] spend offset: the user's adjustment of the quota boundary, in percentage points of the week: how far past it unattended work may start. Each project's scheduler holds its own, as `spendOffset` in its state file. The offset hook, the one shell line under `offset` in a project's `.the-framework/hooks.yml`, sets it.
 [8] schedule switch: a person's choice, on one machine, whether a scheduled command (a line of the project's `agent-schedule.md`) runs there; the project's scheduler keeps it in its state file. The switch hook, the one shell line under `switch` in a project's `.the-framework/hooks.yml`, sets it.
-[9] widget: a browser module one of a project's packages brings to the dashboard, named by the package's `exports["./dashboard"]`; it adds pages to the dashboard and reads its data through its own package's command.
+[9] module: one of a project's packages that adds to the dashboard, its browser part named by the package's `exports["./dashboard"]`; it adds pages to the dashboard and reads its data through its own package's command.
 
 ## Business logic — TL;DR
 
@@ -25,5 +25,5 @@ Every call the dashboard makes to the daemon [1], as one table the daemon answer
 - **Acting** (`control.ts`, `control.test.ts`, `agent-addressing.test.ts`) - every action on an agent or a project: stop, answer a gate, send a chat message, start an agent through the project's start hook with the user's picks, open a pull request, merge, remove a checkout, delete an agent, open something on this machine.
 - **Following an agent live** (`events.ts`, `events-tail.ts`, `events-tail.test.ts`) - one selected agent's event stream [2] served to the browser: what is already logged is replayed, the end of the replay is marked once, and everything new follows as it is written.
 - **Settings** (`preferences.ts`, `preferences.test.ts`, `projects.ts`, `projects.test.ts`, `quota.ts`, `quota.test.ts`, `models.ts`, `devices.ts`, `devices.test.ts`) - reading and saving the user's preferences without a stale tab reverting what it never touched, adding and removing projects, the quota reading behind the usage panel and the spend offset [7] it writes through every project's offset hook, the models each coding agent offers behind the agent and model menu, a scheduled command's schedule switch [8] written through its project's switch hook, and the health check behind each saved device's [5] status dot.
-- **Widgets** (`widgets.ts`, `widgets.test.ts`) - which widgets [9] the registered projects bring, one per package, and a widget running one of its own package's commands in one project, never any other program.
+- **Modules** (`modules.ts`, `modules.test.ts`) - which modules [9] the registered projects bring, one per package, and a module running one of its own package's commands in one project, never any other program.
 - **Calls about an agent elsewhere** (`relay-agent.ts`, `relay-dispatch.ts`, `relay-dispatch.test.ts`, `stream-forward.ts`, `stream-forward.test.ts`) - both ends of the relay [6]: the fixed set of calls a device will run on another daemon's behalf, and the forwarding that makes a remote agent's stream arrive like a local one.

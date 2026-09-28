@@ -41,7 +41,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from 'framework/widget'
+} from 'framework/module'
 
 // The /tickets toolbar (#1144): search, faceted filters, sort, grouping — the page's whole viewing
 // state in one row. All state lives in the caller's TicketsView (mirrored to the URL there); this

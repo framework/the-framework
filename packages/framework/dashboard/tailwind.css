@@ -1,15 +1,15 @@
 @import 'tailwindcss';
 
 /* The theme's Tailwind half — the dark variant, the fonts, the token utilities — lives in
-   widget/theme.css, which a widget's own stylesheet imports too, so its utilities read the same
+   module/theme.css, which a module's own stylesheet imports too, so its utilities read the same
    tokens (#1774). The token values stay here: the page defines them once, for everything on it. */
-@import './widget/theme.css';
+@import './module/theme.css';
 
 /* Design tokens, light + dark, on the landing page's Everforest identity (#1118) so the
    dashboard and the-framework.ai read as one product. The dark theme mirrors the page's exact
    palette (packages/the-framework.ai/pages/index/styles.css); the light theme is Everforest
    Light, so the theme toggle still works rather than dropping to a single dark mode. Components
-   read the `--color-*` tokens surfaced in `@theme inline` (widget/theme.css), so this is a
+   read the `--color-*` tokens surfaced in `@theme inline` (module/theme.css), so this is a
    palette swap only. */
 :root {
   /* Let the browser paint native theme-matched scrollbars + form controls (the shadcn way).

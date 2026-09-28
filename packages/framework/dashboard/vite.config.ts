@@ -57,8 +57,8 @@ function frameworkDevDaemon(): Plugin {
       // request waits on `ready` when it arrives before the daemon has come up.
       server.middlewares.use((req, res, next) => {
         const url = req.originalUrl ?? req.url ?? ''
-        // The widgets' files (#1774) are the daemon's too: it finds them in the projects' packages.
-        if (!url.startsWith('/_rpc') && !url.startsWith('/_widgets/')) return next()
+        // The modules' files (#1774) are the daemon's too: it finds them in the projects' packages.
+        if (!url.startsWith('/_rpc') && !url.startsWith('/_modules/')) return next()
         const forward = (dest: { hostname: string; port: string }): void => {
           // Host header left as the browser sent it (localhost:<devport>), so the daemon's same-origin
           // guard passes; the SSE stream just rides the piped response.
@@ -86,15 +86,15 @@ function frameworkDevDaemon(): Plugin {
   }
 }
 
-// The modules a widget shares with the dashboard (#1774). A widget is a browser module a project's
-// package brings; it imports these by bare name and bundles none of them, and the import map this
-// plugin writes into index.html points each name at the dashboard's own copy, so the widget renders
+// What the dashboard shares with a module (#1774). A module is a package of a project that adds to
+// the dashboard; it imports these by bare name and bundles none of them, and the import map this
+// plugin writes into index.html points each name at the dashboard's own copy, so the module renders
 // in the same React and uses the same components. Each is built as an entry of its own at a fixed
 // name (`/host/<name>.js`) that shares its chunks with the dashboard's main entry.
 //
 // React ships as CommonJS, and a re-export of CommonJS (`export * from 'react'`) keeps none of its
 // names, so each React entry is generated: its names are read off the very package the build uses,
-// here, so an upgrade that adds a name can never leave it out. `framework/widget` is a real file.
+// here, so an upgrade that adds a name can never leave it out. `framework/module` is a real file.
 const HOST_MODULES: Record<string, string> = {
   react: 'react',
   'react/jsx-runtime': 'react-jsx-runtime',
@@ -102,7 +102,7 @@ const HOST_MODULES: Record<string, string> = {
   'react-dom/client': 'react-dom-client',
 }
 const HOST_PREFIX = 'virtual:framework-host:'
-const WIDGET_API = fileURLToPath(new URL('./widget/index.ts', import.meta.url))
+const MODULE_API = fileURLToPath(new URL('./module/index.ts', import.meta.url))
 
 function frameworkHostModules(): Plugin {
   const require = createRequire(import.meta.url)
@@ -124,7 +124,7 @@ function frameworkHostModules(): Plugin {
     transformIndexHtml() {
       const imports: Record<string, string> = {}
       for (const [spec, file] of Object.entries(HOST_MODULES)) imports[spec] = serving ? `/@id/${HOST_PREFIX}${spec}` : `/host/${file}.js`
-      imports['framework/widget'] = serving ? '/widget/index.ts' : '/host/widget.js'
+      imports['framework/module'] = serving ? '/module/index.ts' : '/host/module.js'
       return [{ tag: 'script', attrs: { type: 'importmap' }, children: JSON.stringify({ imports }, null, 2), injectTo: 'head-prepend' }]
     },
   }
@@ -148,7 +148,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: fileURLToPath(new URL('./index.html', import.meta.url)),
-        'host/widget': WIDGET_API,
+        'host/module': MODULE_API,
         ...Object.fromEntries(Object.entries(HOST_MODULES).map(([spec, file]) => [`host/${file}`, `${HOST_PREFIX}${spec}`])),
       },
       // The host entries are imported by name from outside the bundle, so their exports must survive.

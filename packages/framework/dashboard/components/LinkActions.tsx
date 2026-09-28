@@ -1,21 +1,21 @@
 import { useContext, useEffect, useState, type ReactNode } from 'react'
 import { Check } from 'lucide-react'
-import { widgetHost, type LinkActionResult, type WidgetLink } from '../widget/index.js'
-import { useMountedWidgets, type MountedLinkAction } from '../lib/use-widgets.js'
+import { moduleHost, type LinkActionResult, type ModuleLink } from '../module/index.js'
+import { useMountedModules, type MountedLinkAction } from '../lib/use-modules.js'
 import { HostServicesContext, INERT_HOST_SERVICES } from '../lib/host-services.js'
 import { Button, type ButtonProps } from './ui/button.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 
-// The slot for the actions the installed widgets offer on links (#1774 Q3). A page that shows
-// something as a link — a ticket, a plan to write — renders this beside it, and every widget whose
-// package the link's project has puts its verb here: the queue widget's "Add to queue", say. The
-// page names no widget, the widget names no ticket; the dashboard, which installed both, puts the
+// The slot for the actions the installed modules offer on links (#1774 Q3). A page that shows
+// something as a link — a ticket, a plan to write — renders this beside it, and every module whose
+// package the link's project has puts its verb here: the queue module's "Add to queue", say. The
+// page names no module, the module names no ticket; the dashboard, which installed both, puts the
 // two together. A project without such a package shows nothing here at all.
 
 /** The links one project's worth of a click acts on. */
 export interface ProjectLinks {
   projectId: string
-  links: WidgetLink[]
+  links: ModuleLink[]
 }
 
 /** The links a click acts on: known up front, or resolved at click time (a page that first reads what is already there). */
@@ -45,7 +45,7 @@ export function LinkActions({
   size?: ButtonProps['size']
   variant?: ButtonProps['variant']
 }) {
-  const { linkActions } = useMountedWidgets()
+  const { linkActions } = useMountedModules()
   const services = useContext(HostServicesContext)
   const actions = linkActions.filter(action => projects.some(id => action.projects.includes(id)))
   const [running, setRunning] = useState<string | null>(null)
@@ -68,7 +68,7 @@ export function LinkActions({
     try {
       const groups = typeof targets === 'function' ? await targets() : targets
       // An action acts: its commands are marked so, and the dashboard reads back what they wrote at once.
-      const host = widgetHost({ ...(services ?? INERT_HOST_SERVICES), package: action.package }, { acts: true })
+      const host = moduleHost({ ...(services ?? INERT_HOST_SERVICES), package: action.package }, { acts: true })
       // One project at a time, in the order given, only those that have the action's package;
       // the first failure ends the batch with its reason.
       for (const { projectId, links } of groups) {

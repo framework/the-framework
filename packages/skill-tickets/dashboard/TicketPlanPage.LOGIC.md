@@ -27,7 +27,7 @@ One ticket's plan, rendered as markdown: the `.plan.md` file sitting beside the 
 
 #### Business logic
 
-The page is opened with a ticket's file name and reads the plan beside it: `tickets/<stem>.plan.md`, the ticket's name with its `.md` replaced, which the `tickets` command's `show <file> --local` answers with the ticket (this machine's copy of the branch, no fetch), run in the project by the dashboard. The plan is re-read every 10 seconds, so a plan being written appears as it grows. The plan's path is shown beside the way back, "Tickets", which opens the widget's list.
+The page is opened with a ticket's file name and reads the plan beside it: `tickets/<stem>.plan.md`, the ticket's name with its `.md` replaced, which the `tickets` command's `show <file> --local` answers with the ticket (this machine's copy of the branch, no fetch), run in the project by the dashboard. The plan is re-read every 10 seconds, so a plan being written appears as it grows. The plan's path is shown beside the way back, "Tickets", which opens the module's list.
 
 ### When there is no plan
 

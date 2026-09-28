@@ -2,14 +2,14 @@ import { fileURLToPath } from 'node:url'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vitest/config'
 
-// Unit tests for the widget's card: the JSX transform, a DOM, and `framework/widget` resolved to
+// Unit tests for the module's card: the JSX transform, a DOM, and `framework/module` resolved to
 // the framework's own source, since the tests render the pages inside a fake host and never
 // load the dashboard.
 export default defineConfig({
   root: fileURLToPath(new URL('.', import.meta.url)),
   plugins: [react()],
   resolve: {
-    alias: { 'framework/widget': fileURLToPath(new URL('../../framework/dashboard/widget/index.ts', import.meta.url)) },
+    alias: { 'framework/module': fileURLToPath(new URL('../../framework/dashboard/module/index.ts', import.meta.url)) },
   },
   test: {
     environment: 'jsdom',

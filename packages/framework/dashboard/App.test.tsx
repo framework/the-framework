@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { createElement } from 'react'
-import type { WidgetCardProps, WidgetDefinition, WidgetPageProps } from './widget/index.js'
+import type { ModuleCardProps, ModuleDefinition, ModulePageProps } from './module/index.js'
 
 // The whole transport, stubbed at its one seam: every RPC stub is `rpc(name)`, so a map by name
 // answers every read the shell makes, and the live feed never emits.
@@ -20,16 +20,16 @@ const { App } = await import('./App.js')
 
 const PROJECT = { id: 'app-abc', path: '/work/app', name: 'app', activated: true }
 
-/** A widget module the loader imports like a real one: a data URL whose default export is `definition`. */
-function widgetModule(key: string, definition: WidgetDefinition): string {
+/** A module's browser part the loader imports like a real one: a data URL whose default export is `definition`. */
+function moduleModule(key: string, definition: ModuleDefinition): string {
   ;(globalThis as Record<string, unknown>)[key] = definition
   return `data:text/javascript,export default globalThis[${JSON.stringify(key)}]`
 }
 
-function answerShell(widgets: unknown[]): void {
+function answerShell(modules: unknown[]): void {
   answers.clear()
   answers.set('onProjects', () => [PROJECT])
-  answers.set('onWidgets', () => widgets)
+  answers.set('onModules', () => modules)
   answers.set('onInterventions', () => ({ items: [], whole: [] }))
   answers.set('onRecentAgents', () => [])
   answers.set('onAgents', () => [])
@@ -42,13 +42,13 @@ afterEach(() => {
   calls.length = 0
 })
 
-describe('widget pages in the shell (#1774)', () => {
-  test('a widget\'s page gets a sidebar row and its own URL, where no project is selected', async () => {
-    function LogsPage({ projects }: WidgetPageProps) {
+describe('module pages in the shell (#1774)', () => {
+  test('a module\'s page gets a sidebar row and its own URL, where no project is selected', async () => {
+    function LogsPage({ projects }: ModulePageProps) {
       return createElement('p', null, `runs of ${projects.map(p => p.name).join(', ')}`)
     }
-    answerShell([{ package: '@acme/logs', url: widgetModule('__logsWidget', { pages: [{ segment: 'logs', label: 'Logs', Page: LogsPage }] }), projects: [PROJECT.id] }])
-    // A page no widget claims: its main pane reads nothing, so the stub needs no answers for it.
+    answerShell([{ package: '@acme/logs', url: moduleModule('__logsModule', { pages: [{ segment: 'logs', label: 'Logs', Page: LogsPage }] }), projects: [PROJECT.id] }])
+    // A page no module claims: its main pane reads nothing, so the stub needs no answers for it.
     window.history.replaceState(null, '', '/elsewhere')
     render(<App />)
 
@@ -61,7 +61,7 @@ describe('widget pages in the shell (#1774)', () => {
     expect(calls.filter(call => call.args[0] === 'logs' || call.args[0] === 'elsewhere').map(call => call.name)).toEqual([])
   })
 
-  test('a URL no installed widget claims says so once the widgets are loaded', async () => {
+  test('a URL no installed module claims says so once the modules are loaded', async () => {
     answerShell([])
     window.history.replaceState(null, '', '/nothing')
     render(<App />)
@@ -69,23 +69,23 @@ describe('widget pages in the shell (#1774)', () => {
   })
 
   test('the page talks to its own package\'s commands through the host', async () => {
-    const { useWidgetHost } = await import('./widget/index.js')
-    function Runs({ projects }: WidgetPageProps) {
-      const host = useWidgetHost()
+    const { useModuleHost } = await import('./module/index.js')
+    function Runs({ projects }: ModulePageProps) {
+      const host = useModuleHost()
       return createElement('button', { onClick: () => void host.runCommand(projects[0]!.id, ['--limit', '5']) }, 'read')
     }
-    answerShell([{ package: '@acme/logs', url: widgetModule('__runsWidget', { pages: [{ segment: 'runs', label: 'Runs', Page: Runs }] }), projects: [PROJECT.id] }])
+    answerShell([{ package: '@acme/logs', url: moduleModule('__runsModule', { pages: [{ segment: 'runs', label: 'Runs', Page: Runs }] }), projects: [PROJECT.id] }])
     window.history.replaceState(null, '', '/runs')
     render(<App />)
     fireEvent.click(await screen.findByText('read'))
-    await waitFor(() => expect(calls).toContainEqual({ name: 'runWidgetCommand', args: [PROJECT.id, '@acme/logs', ['--limit', '5'], undefined, false] }))
+    await waitFor(() => expect(calls).toContainEqual({ name: 'runModuleCommand', args: [PROJECT.id, '@acme/logs', ['--limit', '5'], undefined, false] }))
   })
 })
 
-describe('widget cards on the Overview (#1818)', () => {
+describe('module cards on the Overview (#1818)', () => {
   /** The Overview's own reads, answered empty: the shell's stub answers null otherwise, and a null list is not an empty one. */
-  function answerOverview(widgets: unknown[]): void {
-    answerShell(widgets)
+  function answerOverview(modules: unknown[]): void {
+    answerShell(modules)
     answers.set('onSchedulers', () => [])
     answers.set('onQuota', () => null)
     answers.set('onDashboard', () => null)
@@ -96,12 +96,12 @@ describe('widget cards on the Overview (#1818)', () => {
   }
 
   test("a package's card is drawn on the Overview, given the projects that have the package, inside its host", async () => {
-    const { useWidgetHost } = await import('./widget/index.js')
-    function QueueCard({ projects }: WidgetCardProps) {
-      const host = useWidgetHost()
+    const { useModuleHost } = await import('./module/index.js')
+    function QueueCard({ projects }: ModuleCardProps) {
+      const host = useModuleHost()
       return createElement('p', null, `${host.package} card for ${projects.map(p => p.name).join(', ')}`)
     }
-    answerOverview([{ package: '@acme/queue', url: widgetModule('__queueCard', { cards: [{ id: 'queue', Card: QueueCard }] }), projects: [PROJECT.id] }])
+    answerOverview([{ package: '@acme/queue', url: moduleModule('__queueCard', { cards: [{ id: 'queue', Card: QueueCard }] }), projects: [PROJECT.id] }])
     window.history.replaceState(null, '', '/')
     render(<App />)
     expect(await screen.findByText('@acme/queue card for app')).toBeTruthy()
@@ -113,9 +113,9 @@ describe('widget cards on the Overview (#1818)', () => {
       throw new Error('kaboom')
     }
     answerOverview([
-      { package: '@acme/tickets', url: widgetModule('__ticketsCard', { cards: [{ id: 'hot', order: 20, ...card('tickets card') }] }), projects: [PROJECT.id] },
-      { package: '@acme/queue', url: widgetModule('__queueCard2', { cards: [{ id: 'queue', order: 10, ...card('queue card') }, { id: 'boom', order: 10, Card: Boom }] }), projects: [PROJECT.id] },
-      { package: '@acme/audit', url: widgetModule('__auditCard', { cards: [{ id: 'audit', ...card('audit card') }] }), projects: [PROJECT.id] },
+      { package: '@acme/tickets', url: moduleModule('__ticketsCard', { cards: [{ id: 'hot', order: 20, ...card('tickets card') }] }), projects: [PROJECT.id] },
+      { package: '@acme/queue', url: moduleModule('__queueCard2', { cards: [{ id: 'queue', order: 10, ...card('queue card') }, { id: 'boom', order: 10, Card: Boom }] }), projects: [PROJECT.id] },
+      { package: '@acme/audit', url: moduleModule('__auditCard', { cards: [{ id: 'audit', ...card('audit card') }] }), projects: [PROJECT.id] },
     ])
     window.history.replaceState(null, '', '/')
     render(<App />)
@@ -129,9 +129,9 @@ describe('widget cards on the Overview (#1818)', () => {
   })
 
   test('a card may start a run without landing on it; by default the dashboard lands on the run', async () => {
-    const { useWidgetHost } = await import('./widget/index.js')
-    function Starter({ projects }: WidgetCardProps) {
-      const host = useWidgetHost()
+    const { useModuleHost } = await import('./module/index.js')
+    function Starter({ projects }: ModuleCardProps) {
+      const host = useModuleHost()
       return createElement(
         'div',
         null,
@@ -139,7 +139,7 @@ describe('widget cards on the Overview (#1818)', () => {
         createElement('button', { onClick: () => void host.startRun(projects[0]!.id, 'work the queue') }, 'start and go'),
       )
     }
-    answerOverview([{ package: '@acme/queue', url: widgetModule('__starterCard', { cards: [{ id: 'starter', Card: Starter }] }), projects: [PROJECT.id] }])
+    answerOverview([{ package: '@acme/queue', url: moduleModule('__starterCard', { cards: [{ id: 'starter', Card: Starter }] }), projects: [PROJECT.id] }])
     answers.set('sendStart', () => ({ ok: true, agentId: 'r9' }))
     window.history.replaceState(null, '', '/')
     render(<App />)

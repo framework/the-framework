@@ -28,7 +28,7 @@ describe('parseRoute', () => {
     expect(parseRoute('/%E0%A4%A')).toEqual({ projectId: '%E0%A4%A', agentId: null })
   })
 
-  it('reads no tickets view: `/tickets` is a widget page like any other bare word (#1774)', () => {
+  it('reads no tickets view: `/tickets` is a module page like any other bare word (#1774)', () => {
     expect(parseRoute('/tickets')).toEqual({ projectId: null, agentId: null, page: 'tickets', pagePath: [] })
     expect(parseRoute('/tickets/my-repo-a1b2/2026-07-20_do-the-thing.md/plan')).toEqual({
       projectId: null,
@@ -90,7 +90,7 @@ describe('formatRoute', () => {
     }
   })
 
-  it('a first segment with no dash names a widget\'s page, never a project (#1774)', () => {
+  it('a first segment with no dash names a module\'s page, never a project (#1774)', () => {
     expect(parseRoute('/logs')).toEqual({ projectId: null, agentId: null, page: 'logs', pagePath: [] })
     expect(parseRoute('/logs/run-1')).toEqual({ projectId: null, agentId: null, page: 'logs', pagePath: ['run-1'] })
     // A project id always has its `-<hash>`, and the one view word stays a view.

@@ -6,4 +6,4 @@ What the tests cover:
 - **The plan's author, finished** - a plan whose author is among the project's runs (the newest whose ask named the plan) offers "Resume agent", and it opens that run's page.
 - **The plan's author, still writing** - an author that is still running is offered as "Open agent" instead, never as "Resume agent".
 - **A plan nobody on record wrote** - a run whose ask named something else is not the author: the plan shows with no offer to open or resume any agent.
-- **Back** - "Tickets" opens the widget's list page.
+- **Back** - "Tickets" opens the module's list page.

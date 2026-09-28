@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
-import { Button, LinkActions, ScrollArea, usePolled, useAction, useWidgetHost, type ProjectLinks, type WidgetLink, type WidgetProject } from 'framework/widget'
-import { heldBack, holderAgent, planLink, planTicketPrompt, readListed, ticketLink, workOnTicketPrompt } from '../src/widget.js'
+import { Button, LinkActions, ScrollArea, usePolled, useAction, useModuleHost, type ProjectLinks, type ModuleLink, type ModuleProject } from 'framework/module'
+import { heldBack, holderAgent, planLink, planTicketPrompt, readListed, ticketLink, workOnTicketPrompt } from '../src/module.js'
 import type { ProjectTickets, WorkspaceTicket } from './lib/types.js'
 import {
   defaultView,
@@ -38,8 +38,8 @@ function initialView(): TicketsView {
 // cross-project list — the one view that can answer "what is the single highest-priority ticket
 // anywhere". Rows are selectable (the list idiom of issue trackers): while any shown row is ticked, the
 // heading's queue buttons narrow from the whole shown set to just the selected tickets.
-export function TicketsPage({ projects }: { projects: WidgetProject[] }) {
-  const host = useWidgetHost()
+export function TicketsPage({ projects }: { projects: ModuleProject[] }) {
+  const host = useModuleHost()
   const key = projects.map(p => p.id).join(',')
   // Every project's tickets from `tickets list --local` in each, with each claim's holder looked up
   // among the project's runs: a lock names a run's id, so a claim a run made links to its page
@@ -105,14 +105,14 @@ export function TicketsPage({ projects }: { projects: WidgetProject[] }) {
     await run(() => host.startRun(projectId, workOnTicketPrompt(file)), 'The work agent could not be started.')
   }
   // The page-wide adds: every unclaimed shown ticket handed, as a link, to the actions the
-  // installed widgets offer on links — "Add to queue" when a project has a queue package — as the
+  // installed modules offer on links — "Add to queue" when a project has a queue package — as the
   // ticket itself, or as the ask for its plan. Both walk the shown order, so within a priority
   // section entries keep the order the reader saw. What is already there is the action's own to
   // leave alone: this page knows nothing of a queue. No agent starts here. Each stops at the
   // first failure, whose reason lands under the buttons.
 
   /** The links grouped by project, in the shown order, one group per project in order of first appearance. */
-  const grouped = (rows: { projectId: string; link: WidgetLink }[]): ProjectLinks[] => {
+  const grouped = (rows: { projectId: string; link: ModuleLink }[]): ProjectLinks[] => {
     const groups: ProjectLinks[] = []
     for (const { projectId, link } of rows) {
       const group = groups.find(g => g.projectId === projectId)
@@ -173,7 +173,7 @@ export function TicketsPage({ projects }: { projects: WidgetProject[] }) {
   const planKey = planTargets.map(r => `${r.projectId}/${r.ticket.file}`).join('\n')
   // The labels count what the click adds — saying "selected" while a selection narrows the
   // buttons, and stopping saying "all" the moment their count differs from the set's tally,
-  // never promising a ticket they will skip. Each is the object of the widget's own verb:
+  // never promising a ticket they will skip. Each is the object of the module's own verb:
   // "Add to queue: all 5 tickets shown below".
   const queueObject = hasSelection
     ? targets.length === 1

@@ -105,7 +105,7 @@ export interface BranchesSource {
 /** The checkouts of the project at `root`, or `undefined` when none of its packages provides them. */
 export type BranchesFor = (root: string) => Promise<BranchesSource | undefined>
 
-/** A {@link BranchesFor} that also forgets what it read of one project, for when a widget or a run just wrote there. */
+/** A {@link BranchesFor} that also forgets what it read of one project, for when a module or a run just wrote there. */
 export type BranchesReader = BranchesFor & { changed(root: string): void }
 
 /** How long a read is reused: the dashboard polls several reads of every project's checkouts every few seconds, and each is a process. */
@@ -249,7 +249,7 @@ function commandBranches(root: string, command: ProvidedCommand, now: () => numb
  * one source per project kept while the same command provides — so the cache holds across the
  * many reads of one poll, and a project that installs, swaps or drops its provider is read the new
  * way within {@link CACHE_MS}. `changed(root)` forgets that project's reads, so the next read runs
- * the command again: a run just started there, or a widget's command just ran, and a checkout may
+ * the command again: a run just started there, or a module's command just ran, and a checkout may
  * have come or gone.
  */
 export function providedBranches(now: () => number = Date.now): BranchesReader {

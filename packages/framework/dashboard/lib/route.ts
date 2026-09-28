@@ -12,8 +12,8 @@
 
 /**
  * The one first segment that names a view rather than a project (#958): the dashboard's own
- * settings. Every other bare word is a widget's page (#1774): the dashboard reserves nothing else,
- * not even for the tickets, whose pages are their package's widget's.
+ * settings. Every other bare word is a module's page (#1774): the dashboard reserves nothing else,
+ * not even for the tickets, whose pages are their package's module's.
  *
  * Safe to reserve because a project id is never this word: the registry builds one as
  * `<slugified basename>-<hash in base36>`, so every real id carries a `-<hash>` suffix.
@@ -21,9 +21,9 @@
 const SETTINGS_SEGMENT = 'settings'
 
 /**
- * Whether a first segment names a page a widget adds (#1774) rather than a project: a lowercase
+ * Whether a first segment names a page a module adds (#1774) rather than a project: a lowercase
  * letter, then lowercase letters and digits. Never a project's id, which always carries a
- * `-<hash>` suffix, so the router reserves no widget's word: whichever widget claims the segment
+ * `-<hash>` suffix, so the router reserves no module's word: whichever module claims the segment
  * gets it, and the shell says "no such page" when none does.
  */
 export function isPageSegment(segment: string): boolean {
@@ -38,9 +38,9 @@ export interface Route {
   projectId: string | null
   /** The selected session (agent id), or null for the project's home/launcher. */
   agentId: string | null
-  /** A widget's page (#1774), by its segment; no project and no agent is selected there. */
+  /** A module's page (#1774), by its segment; no project and no agent is selected there. */
   page?: string
-  /** The segments after a widget page's own, decoded: `/logs/a` carries `['a']`. */
+  /** The segments after a module page's own, decoded: `/logs/a` carries `['a']`. */
   pagePath?: string[]
 }
 

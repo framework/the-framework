@@ -1,6 +1,6 @@
 import { ExternalLink, ClipboardPlus, ClipboardList, Hammer, Play } from 'lucide-react'
-import { Badge, Button, Checkbox, StartAgentButton, Tooltip, TooltipTrigger, TooltipContent, cn, formatRelative, formatAge, formatDateTime, useAction, useLoaded, useWidgetHost } from 'framework/widget'
-import { UPDATE_TICKETS_PROMPT, heldBack, planTicketPrompt, readMeta, workOnTicketPrompt, type TicketsMeta } from '../src/widget.js'
+import { Badge, Button, Checkbox, StartAgentButton, Tooltip, TooltipTrigger, TooltipContent, cn, formatRelative, formatAge, formatDateTime, useAction, useLoaded, useModuleHost } from 'framework/module'
+import { UPDATE_TICKETS_PROMPT, heldBack, planTicketPrompt, readMeta, workOnTicketPrompt, type TicketsMeta } from '../src/module.js'
 import type { WorkspaceTicket } from './lib/types.js'
 import { UpdateTicketsButton } from './UpdateTicketsButton.js'
 import { priorityTone } from './lib/ticket-priority.js'
@@ -320,7 +320,7 @@ export function TicketsPanel({
   onClearFilters?: (() => void) | undefined
 }) {
   const { busy, error, run } = useAction()
-  const host = useWidgetHost()
+  const host = useModuleHost()
   // When `tickets/` last caught up with the issue tracker, from `tickets meta --local`. Read here rather than
   // passed down: the cross-project page reads one ticket list per project, and this is the one
   // extra read a section adds.

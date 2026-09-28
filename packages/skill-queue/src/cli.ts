@@ -23,7 +23,7 @@ import { appendQueueEntry, insertQueueEntry, parseQueueEntries, parseQueueSectio
  * at `.branches/agent-data`, else the local branch) with no fetch, fast enough to poll, and `--full`
  * prints each entry with the priority section it sits in, so the dashboard can show the sections.
  * The package declares the command as the framework's queue provider (`"framework": { "queue":
- * "queue" }`), which reads `queue --local`; the package's own widget reads `queue --local --full`.
+ * "queue" }`), which reads `queue --local`; the package's own module reads `queue --local --full`.
  */
 
 export const USAGE = `usage: queue [command]

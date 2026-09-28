@@ -1,25 +1,25 @@
 import { vi } from 'vitest'
 import { render as rtlRender, type RenderResult } from '@testing-library/react'
 import type { ReactElement } from 'react'
-import { WidgetHostContext, type WidgetCommandResult, type WidgetHost } from 'framework/widget'
-import { WidgetsContext, type MountedWidgets } from '../../framework/dashboard/lib/use-widgets.js'
+import { ModuleHostContext, type ModuleCommandResult, type ModuleHost } from 'framework/module'
+import { ModulesContext, type MountedModules } from '../../framework/dashboard/lib/use-modules.js'
 
-// The dashboard as the widget's card sees it, faked: every service a spy, the widget's commands
-// answered by a table of the queue command's outputs. `useWidgetHost` hands a host that carries
+// The dashboard as the module's card sees it, faked: every service a spy, the module's commands
+// answered by a table of the queue command's outputs. `useModuleHost` hands a host that carries
 // its own `runCommand` back as it is, so the card under test never reaches a real dashboard.
 
 /** The `queue` command's answers, keyed by project then by the command line joined with spaces. */
 export type Answers = Record<string, Record<string, unknown>>
 
-export interface FakeHost extends WidgetHost {
-  runCommand: ReturnType<typeof vi.fn<WidgetHost['runCommand']>>
-  startRun: ReturnType<typeof vi.fn<WidgetHost['startRun']>>
-  configureRun: ReturnType<typeof vi.fn<WidgetHost['configureRun']>>
+export interface FakeHost extends ModuleHost {
+  runCommand: ReturnType<typeof vi.fn<ModuleHost['runCommand']>>
+  startRun: ReturnType<typeof vi.fn<ModuleHost['startRun']>>
+  configureRun: ReturnType<typeof vi.fn<ModuleHost['configureRun']>>
 }
 
 /** A host whose commands answer from `answers`; a command line with no answer fails, naming itself. */
 export function fakeHost(answers: Answers = {}): FakeHost {
-  const answer = async (projectId: string, args: string[]): Promise<WidgetCommandResult> => {
+  const answer = async (projectId: string, args: string[]): Promise<ModuleCommandResult> => {
     const line = args.join(' ')
     const known = answers[projectId]?.[line]
     return known === undefined ? { ok: false, error: `no answer for ${projectId}: queue ${line}` } : { ok: true, output: known }
@@ -37,14 +37,14 @@ export function fakeHost(answers: Answers = {}): FakeHost {
   }
 }
 
-/** No other widget is installed: the card is rendered with nothing but its own package. */
-export const NO_WIDGETS: MountedWidgets = { pages: [], cards: [], linkActions: [], loaded: true }
+/** No other module is installed: the card is rendered with nothing but its own package. */
+export const NO_MODULES: MountedModules = { pages: [], cards: [], linkActions: [], loaded: true }
 
-/** Render the card inside the fake host, with no other widget mounted. */
-export function renderWithHost(ui: ReactElement, host: WidgetHost): RenderResult {
+/** Render the card inside the fake host, with no other module mounted. */
+export function renderWithHost(ui: ReactElement, host: ModuleHost): RenderResult {
   return rtlRender(
-    <WidgetsContext.Provider value={NO_WIDGETS}>
-      <WidgetHostContext.Provider value={host}>{ui}</WidgetHostContext.Provider>
-    </WidgetsContext.Provider>,
+    <ModulesContext.Provider value={NO_MODULES}>
+      <ModuleHostContext.Provider value={host}>{ui}</ModuleHostContext.Provider>
+    </ModulesContext.Provider>,
   )
 }

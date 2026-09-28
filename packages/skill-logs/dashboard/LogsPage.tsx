@@ -1,4 +1,4 @@
-import { useWidgetHost, usePolled, formatRelative, cn, type WidgetPageProps, type WidgetProject } from 'framework/widget'
+import { useModuleHost, usePolled, formatRelative, cn, type ModulePageProps, type ModuleProject } from 'framework/module'
 import type { RunCard } from '../src/run.js'
 
 /** How many runs each project lists: the command's own default page is 20; the page shows more. */
@@ -6,14 +6,14 @@ const LIMIT = 50
 
 /** One run, with the project it was recorded in. */
 interface Row {
-  project: WidgetProject
+  project: ModuleProject
   card: Omit<RunCard, 'caller'>
 }
 
 /** What one read of every project gave: the runs, and the projects whose command failed, with why. */
 interface Read {
   rows: Row[]
-  failed: { project: WidgetProject; error: string }[]
+  failed: { project: ModuleProject; error: string }[]
 }
 
 const NOTHING_READ: Read = { rows: [], failed: [] }
@@ -31,8 +31,8 @@ const STATUS_CLASS: Record<string, string> = {
  * project. A row opens the run's own page in the dashboard. A project whose command fails is named
  * with the command's own reason, and the other projects still show.
  */
-export function LogsPage({ projects }: WidgetPageProps) {
-  const host = useWidgetHost()
+export function LogsPage({ projects }: ModulePageProps) {
+  const host = useModuleHost()
   const key = projects.map(p => p.id).join(',')
   const { value: read, loaded } = usePolled<Read>(
     async () => {

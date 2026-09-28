@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { ArrowLeft } from 'lucide-react'
-import { Button, ScrollArea } from 'framework/widget'
+import { Button, ScrollArea } from 'framework/module'
 
 // The frame both ticket pages sit in (#1144, #685): the way back to the list, then the ticket's
 // own content in one scrolling column. A page under a list needs the same way out and the same

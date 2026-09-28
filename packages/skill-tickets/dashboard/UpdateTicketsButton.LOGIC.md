@@ -1,4 +1,4 @@
-"Update tickets": the one button that starts an agent [1] bringing a project's `tickets/` up to date with the issues of its issue tracker, rendered identically wherever the widget offers it — a project's tickets list and that list's empty state (the dashboard's own onboarding checklist offers the same command with a button of its own). The label, the instruction sent, and what the tooltip promises all come from the one place, so pressing the same words on a different surface always sends the same ask.
+"Update tickets": the one button that starts an agent [1] bringing a project's `tickets/` up to date with the issues of its issue tracker, rendered identically wherever the module offers it — a project's tickets list and that list's empty state (the dashboard's own onboarding checklist offers the same command with a button of its own). The label, the instruction sent, and what the tooltip promises all come from the one place, so pressing the same words on a different surface always sends the same ask.
 
 ## Context
 

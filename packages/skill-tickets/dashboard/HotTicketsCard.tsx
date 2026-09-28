@@ -1,18 +1,18 @@
 import { Flame } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle, LinkActions, Tooltip, TooltipContent, TooltipTrigger, cn, usePolled, useWidgetHost, type WidgetCardProps, type WidgetProject } from 'framework/widget'
-import { heldBack, holderAgent, hotLane, readListed, ticketLink, type HotLane } from '../src/widget.js'
+import { Card, CardContent, CardHeader, CardTitle, LinkActions, Tooltip, TooltipContent, TooltipTrigger, cn, usePolled, useModuleHost, type ModuleCardProps, type ModuleProject } from 'framework/module'
+import { heldBack, holderAgent, hotLane, readListed, ticketLink, type HotLane } from '../src/module.js'
 import type { WorkspaceTicket } from './lib/types.js'
 
 // The Overview's hot-tickets card: a cross-project glance at what agents hold, what is flagged
 // high priority, and what waits on a person, nothing else. Its data is `tickets list --local` in each project, the list an
 // agent reads, with each claim's holder matched to the project's runs the dashboard knows. A row
 // opens the ticket's own page; a claim opens the run holding it; beside every row sit the actions
-// the installed widgets offer on a ticket as a link ("Add to queue" where the project has a queue
+// the installed modules offer on a ticket as a link ("Add to queue" where the project has a queue
 // package), so the card names no queue and still leads to one.
 
 /** One ticket on the card, tagged with its project and lane. */
 interface HotTicket {
-  project: WidgetProject
+  project: ModuleProject
   lane: HotLane
   ticket: WorkspaceTicket
 }
@@ -20,7 +20,7 @@ interface HotTicket {
 /** What one read of every project answered: the hot tickets, and the projects whose command failed. */
 interface Read {
   hot: HotTicket[]
-  errors: { project: WidgetProject; error: string }[]
+  errors: { project: ModuleProject; error: string }[]
 }
 
 const NOTHING_READ: Read = { hot: [], errors: [] }
@@ -32,8 +32,8 @@ const LANES: { key: HotLane; label: string; dot: string }[] = [
   { key: 'waiting', label: 'Waiting', dot: 'bg-muted-foreground' },
 ]
 
-export function HotTicketsCard({ projects }: WidgetCardProps) {
-  const host = useWidgetHost()
+export function HotTicketsCard({ projects }: ModuleCardProps) {
+  const host = useModuleHost()
   const key = projects.map(p => p.id).join(',')
   const { value: read, loaded } = usePolled<Read>(
     async () => {
@@ -97,7 +97,7 @@ export function HotTicketsCard({ projects }: WidgetCardProps) {
 }
 
 function Lane({ lane, tickets, showProject }: { lane: (typeof LANES)[number]; tickets: HotTicket[]; showProject: boolean }) {
-  const host = useWidgetHost()
+  const host = useModuleHost()
   const empty = tickets.length === 0
   return (
     <div>

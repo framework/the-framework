@@ -14,7 +14,7 @@ The Overview [1], the dashboard's landing page shown while no project is selecte
 
 ## Business logic — TL;DR
 
-- **The board's order** - onboarding checklist (until dismissed), the quota card, then the "Human Queue" beside the "Agents" card stacked on the cards the installed packages declare (`WidgetCards.tsx`, in their declared order) stacked on the "Scheduler" card.
+- **The board's order** - onboarding checklist (until dismissed), the quota card, then the "Human Queue" beside the "Agents" card stacked on the cards the installed packages declare (`ModuleCards.tsx`, in their declared order) stacked on the "Scheduler" card.
 - **The Human Queue** - the interventions across every project, three kinds of row: "Awaiting" opens the agent parked on a gate, "Unpushed" opens the agent whose commits never left the machine, and a pull request row opens it on the git host; "AI doesn't need you." when empty.
 - **Dismissing the checklist** - hides it on the Overview only; the Settings page keeps it.
 
@@ -28,7 +28,7 @@ See `## Context`.
 
 #### Business logic
 
-From top to bottom: the onboarding checklist while it is not dismissed (`OnboardingChecklist.tsx`); the quota [2] card, first because it is the one figure that governs everything an agent [4] may do next (`Quota.tsx`); then two columns: the "Human Queue" on the left, and on the right the "Agents" card (`Agents.tsx`) over the cards the installed packages declare (`WidgetCards.tsx`: each package's own card, drawn only where a project has the package, reading through the package's own command) over the "Scheduler" card of every project's scheduler (`SchedulerCard.tsx`, which reads on its own). The working agents come from one daemon read that is repeated every five seconds; until the first read answers, the "Agents" card shows its loading state. An agent started from the checklist lands the user on that agent.
+From top to bottom: the onboarding checklist while it is not dismissed (`OnboardingChecklist.tsx`); the quota [2] card, first because it is the one figure that governs everything an agent [4] may do next (`Quota.tsx`); then two columns: the "Human Queue" on the left, and on the right the "Agents" card (`Agents.tsx`) over the cards the installed packages declare (`ModuleCards.tsx`: each package's own card, drawn only where a project has the package, reading through the package's own command) over the "Scheduler" card of every project's scheduler (`SchedulerCard.tsx`, which reads on its own). The working agents come from one daemon read that is repeated every five seconds; until the first read answers, the "Agents" card shows its loading state. An agent started from the checklist lands the user on that agent.
 
 ### The Human Queue
 

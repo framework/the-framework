@@ -2,11 +2,11 @@ import { afterEach, describe, expect, test } from 'vitest'
 import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { QueueCard } from './QueueCard.js'
 import { fakeHost, renderWithHost, type FakeHost } from './test-host.js'
-import { workOnEntryPrompt } from '../src/widget.js'
+import { workOnEntryPrompt } from '../src/module.js'
 import { configureFirst } from '../../framework/dashboard/test-utils.js'
 
 // The card on the Overview, rendered from nothing but this package: a host answering the queue
-// command, and no other widget mounted. A queued ticket is a link into a repository the card has
+// command, and no other module mounted. A queued ticket is a link into a repository the card has
 // no page for, so it reads as text: the card names no tickets package.
 
 const alpha = { id: 'p1', name: 'alpha' }
@@ -35,7 +35,7 @@ describe('QueueCard', () => {
     expect(host.runCommand).toHaveBeenCalledWith('p2', ['--local'])
   })
 
-  test('with no other widget installed, a queued ticket reads as its title and points nowhere; an absolute URL opens', async () => {
+  test('with no other module installed, a queued ticket reads as its title and points nowhere; an absolute URL opens', async () => {
     render({ p1: [LOGIN, UPSTREAM] })
     const login = await screen.findByText('Login page')
     expect(login.tagName).toBe('SPAN')

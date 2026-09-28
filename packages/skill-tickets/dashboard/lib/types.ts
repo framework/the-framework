@@ -1,6 +1,6 @@
-import type { Ticket, TicketDetail } from '../../src/widget.js'
+import type { Ticket, TicketDetail } from '../../src/module.js'
 
-// The tickets as the widget's pages show them: the command's rows, with the holder of a claim
+// The tickets as the module's pages show them: the command's rows, with the holder of a claim
 // resolved against the project's runs the dashboard knows.
 
 /** A ticket as the pages show it: the `tickets` command's row, with the run behind its claim when the lock names one. */

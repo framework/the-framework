@@ -8,7 +8,7 @@ not a decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 
 ## The queue
 - Two callers: the command an agent runs, and a dashboard, which reads the queue through
-  the command (`--local`, `--full`) and adds to it through the command as its widget's
+  the command (`--local`, `--full`) and adds to it through the command as its module's
   action, found by the package's `framework.queue` declaration. A dashboard importing the
   package was the alternative and was not taken: the dashboard names no skill. The
   executable is `queue`. The package ships `SKILL.md`, the agent's instructions.
@@ -52,7 +52,7 @@ not a decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - `queue done` takes the entry as `queue` printed it, trimmed, removes the first such
   line, and refuses a line the queue does not have, an empty one included, decided inside
   the write.
-- "Add to queue", the widget's action, reads the open entries first and leaves a link
+- "Add to queue", the module's action, reads the open entries first and leaves a link
   already queued as it is: a link is queued when an open entry leads with a link to the
   same target, a plain text when an open entry is exactly that text. Picked over the
   caller deciding, since no page knows the queue: "add" means the set ends up queued,

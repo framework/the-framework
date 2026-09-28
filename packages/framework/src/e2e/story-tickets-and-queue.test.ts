@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { makeWorld } from './harness.js'
-import { runWidgetCommand } from '../dashboard-rpc/widgets.js'
+import { runModuleCommand } from '../dashboard-rpc/modules.js'
 import { DATA_BRANCH, pullFileBranch } from '@gemstack/agent-data'
 import { onDashboard, onQueue } from '../dashboard-rpc/reads.js'
 
@@ -9,12 +9,12 @@ import { onDashboard, onQueue } from '../dashboard-rpc/reads.js'
 // the propose -> decide half of the loop the Tickets page and the AI Queue card drive. Both are a
 // project package's (#1774): the framework reads each through the command that package declares,
 // for what it composes across them (the onboarding step, the queue total), and writes
-// neither; the packages' own widgets read and change them in the browser through the same
+// neither; the packages' own modules read and change them in the browser through the same
 // commands. Working the queue is the scheduler's: it starts an agent when the branch moves, and
 // that agent reads the skills itself.
 
 const TICKET_FILE = '2026-08-01_login-page.md'
-/** The fixture's provider packages: the widgets' commands are these packages' own. */
+/** The fixture's provider packages: the modules' commands are these packages' own. */
 const QUEUE_PACKAGE = '@gemstack/skill-queue'
 const TICKETS_PACKAGE = '@gemstack/skill-tickets'
 const TICKET = [
@@ -37,7 +37,7 @@ interface TicketRow {
   lockedBy?: string
 }
 
-test('browse the ticket backlog: the widget reads the list and one ticket through the tickets command, the framework reads the provider (#697/#1144/#1774)', async () => {
+test('browse the ticket backlog: the module reads the list and one ticket through the tickets command, the framework reads the provider (#697/#1144/#1774)', async () => {
   const world = await makeWorld()
   const rpc = world.rpc
   try {
@@ -47,9 +47,9 @@ test('browse the ticket backlog: the widget reads the list and one ticket throug
       'tickets/2026-08-02_dark-mode.md': '# Dark mode\n\n## TLDR\n\nHonor prefers-color-scheme.\n',
     })
 
-    // The Tickets page is the tickets package's widget: it lists through the package's own
+    // The Tickets page is the tickets package's module: it lists through the package's own
     // command, in this machine's copy of the branch.
-    const listed = await rpc(runWidgetCommand)(project.id, TICKETS_PACKAGE, ['list', '--local'])
+    const listed = await rpc(runModuleCommand)(project.id, TICKETS_PACKAGE, ['list', '--local'])
     assert.equal(listed.ok, true, `the list failed: ${listed.ok ? '' : listed.error}`)
     const tickets = listed.output as TicketRow[]
     assert.equal(tickets.length, 2)
@@ -59,11 +59,11 @@ test('browse the ticket backlog: the widget reads the list and one ticket throug
     assert.equal(login?.summary, 'Add a login page with session cookies.')
 
     // The ticket's own page carries the full text; a sibling/path name is refused by the command.
-    const shown = await rpc(runWidgetCommand)(project.id, TICKETS_PACKAGE, ['show', TICKET_FILE, '--local'])
+    const shown = await rpc(runModuleCommand)(project.id, TICKETS_PACKAGE, ['show', TICKET_FILE, '--local'])
     assert.equal(shown.ok, true)
     const detail = shown.output as { ok: boolean; ticket: { content: string } }
     assert.ok(detail.ticket.content.includes('session cookies'))
-    const escaped = await rpc(runWidgetCommand)(project.id, TICKETS_PACKAGE, ['show', '../escape.md', '--local'])
+    const escaped = await rpc(runModuleCommand)(project.id, TICKETS_PACKAGE, ['show', '../escape.md', '--local'])
     assert.equal(escaped.ok, false, 'a path that is no ticket filename is refused')
 
     // The framework itself reads only what it composes: the onboarding step sees the project
@@ -76,7 +76,7 @@ test('browse the ticket backlog: the widget reads the list and one ticket throug
   }
 })
 
-test("a claim released by hand from the widget is the tickets command's own act, and the next read shows it gone at once (#1420/#1774)", async () => {
+test("a claim released by hand from the module is the tickets command's own act, and the next read shows it gone at once (#1420/#1774)", async () => {
   const world = await makeWorld()
   const rpc = world.rpc
   try {
@@ -89,21 +89,21 @@ test("a claim released by hand from the widget is the tickets command's own act,
     assert.equal(synced.ok, true, `the fixture's data branch did not converge: ${synced.ok ? '' : synced.error}`)
 
     const holderOf = async (): Promise<string | undefined> => {
-      const shown = await rpc(runWidgetCommand)(project.id, TICKETS_PACKAGE, ['show', TICKET_FILE, '--local'])
+      const shown = await rpc(runModuleCommand)(project.id, TICKETS_PACKAGE, ['show', TICKET_FILE, '--local'])
       assert.equal(shown.ok, true, `the show failed: ${shown.ok ? '' : shown.error}`)
       return (shown.output as { holder?: string }).holder
     }
     assert.equal(await holderOf(), 'agent-2026-08-01T00-00-00-000Z')
 
-    // The release, as the widget runs it: the package's command with `--force` (a person's act on
+    // The release, as the module runs it: the package's command with `--force` (a person's act on
     // a claim nobody answers to), marked as an act so this machine's copy converges with origin
     // and the page's next read sees the lock gone, not the daemon's next sync.
-    const released = await rpc(runWidgetCommand)(project.id, TICKETS_PACKAGE, ['release', TICKET_FILE, '--force'], undefined, true)
+    const released = await rpc(runModuleCommand)(project.id, TICKETS_PACKAGE, ['release', TICKET_FILE, '--force'], undefined, true)
     assert.equal(released.ok, true, `the release failed: ${released.ok ? '' : released.error}`)
     assert.deepEqual(released.output, { ok: true, file: `tickets/${TICKET_FILE}` })
     assert.equal(await holderOf(), undefined, "the lock is gone from this machine's copy at once")
     // Released, the ticket still lists, unclaimed.
-    const listed = await rpc(runWidgetCommand)(project.id, TICKETS_PACKAGE, ['list', '--local'])
+    const listed = await rpc(runModuleCommand)(project.id, TICKETS_PACKAGE, ['list', '--local'])
     assert.equal(listed.ok, true)
     const row = (listed.output as { file: string; lockedBy?: string }[]).find(t => t.file === TICKET_FILE)
     assert.deepEqual({ listed: row !== undefined, holder: row?.lockedBy }, { listed: true, holder: undefined })
@@ -112,7 +112,7 @@ test("a claim released by hand from the widget is the tickets command's own act,
   }
 })
 
-test('the queue is read through the project\'s queue provider, the boards show a queued ticket, and the queue widget\'s action is seen at once (#1164/#1774)', async () => {
+test('the queue is read through the project\'s queue provider, the boards show a queued ticket, and the queue module\'s action is seen at once (#1164/#1774)', async () => {
   const world = await makeWorld()
   const rpc = world.rpc
   try {
@@ -136,7 +136,7 @@ test('the queue is read through the project\'s queue provider, the boards show a
     // command, marked as an act. The command writes as a remote writer, straight to origin; the
     // framework then converges this machine's copy and re-reads, so the boards show the entry at
     // once, in its own lower section, not at the daemon's next sync.
-    const added = await rpc(runWidgetCommand)(project.id, QUEUE_PACKAGE, ['add', '[Dark mode](tickets/2026-08-02_dark-mode.md)', '--priority', '3'], undefined, true)
+    const added = await rpc(runModuleCommand)(project.id, QUEUE_PACKAGE, ['add', '[Dark mode](tickets/2026-08-02_dark-mode.md)', '--priority', '3'], undefined, true)
     assert.equal(added.ok, true, `the add failed: ${added.ok ? '' : added.error}`)
     const after = await rpc(onQueue)()
     assert.deepEqual(after.find(q => q.projectId === project.id)?.entries, [`[Login page](tickets/${TICKET_FILE})`, '[Dark mode](tickets/2026-08-02_dark-mode.md)'])

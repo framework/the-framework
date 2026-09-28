@@ -82,11 +82,11 @@ export function AgentHistory({
   onSelectProject?: (projectId: string) => void
   /** Open Settings, from the sidebar footer where the navbar gear moved. */
   onSettings?: () => void
-  /** The pages the installed widgets add (#1774), one nav row each, below Overview. */
+  /** The pages the installed modules add (#1774), one nav row each, below Overview. */
   pages?: readonly { segment: string; label: string; icon?: ComponentType<{ className?: string; 'aria-hidden'?: boolean }> }[]
-  /** The widget page that is the current view, by its segment, or null. */
+  /** The module page that is the current view, by its segment, or null. */
   activePage?: string | null
-  /** Open a widget's page by its segment. */
+  /** Open a module's page by its segment. */
   onPage?: (segment: string) => void
   /** Human Queue count, shown on the Overview item and the picker (#632). */
   interventionCount?: number
@@ -209,8 +209,8 @@ export function AgentHistory({
         {/* Overview: the way home, its own nav item directly under New and above the session list,
             more prominent than a menu row. Only this — the current view — carries the active fill. */}
         <OverviewButton active={projectId === null && activePage === null} count={interventionCount} onClick={onDashboard} />
-        {/* The installed widgets' pages (#1774): cross-project destinations like the Overview, named
-            by the widget, never by the dashboard — the tickets' page among them, when a package
+        {/* The installed modules' pages (#1774): cross-project destinations like the Overview, named
+            by the module, never by the dashboard — the tickets' page among them, when a package
             brings one. */}
         {pages.map(page => (
           <NavRow key={page.segment} icon={page.icon ?? Blocks} label={page.label} active={activePage === page.segment} onClick={() => onPage(page.segment)} />
@@ -298,7 +298,7 @@ export function AgentHistory({
   )
 }
 
-// One rail destination — Overview, a widget's page. Same box as New (px-2 py-1.5 gap-2) so every row's
+// One rail destination — Overview, a module's page. Same box as New (px-2 py-1.5 gap-2) so every row's
 // icon and label line up exactly, and only the current view carries the active fill.
 function NavRow({
   icon: Icon,

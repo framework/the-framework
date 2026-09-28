@@ -1,10 +1,10 @@
-import { useWidgetHost, usePolled, type WidgetPageProps, type WidgetProject } from 'framework/widget'
+import { useModuleHost, usePolled, type ModulePageProps, type ModuleProject } from 'framework/module'
 import type { PlacedEntry } from '../src/queue.js'
-import { entryLabel } from '../src/widget.js'
+import { entryLabel } from '../src/module.js'
 
 /** One project's queue as read: its entries with their sections, or why the command failed. */
 interface ProjectRead {
-  project: WidgetProject
+  project: ModuleProject
   entries?: PlacedEntry[]
   error?: string
 }
@@ -32,8 +32,8 @@ function sections(entries: PlacedEntry[]): { priority: number | undefined; entri
  * Read-only: what is queued is changed by agents and by the "Add to queue" action on the pages
  * that show links.
  */
-export function QueuePage({ projects }: WidgetPageProps) {
-  const host = useWidgetHost()
+export function QueuePage({ projects }: ModulePageProps) {
+  const host = useModuleHost()
   const key = projects.map(p => p.id).join(',')
   const { value: reads, loaded } = usePolled<ProjectRead[]>(
     () =>

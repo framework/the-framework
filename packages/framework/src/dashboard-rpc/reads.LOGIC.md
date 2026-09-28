@@ -121,7 +121,7 @@ In both cases the pull request may be reported as still being looked up rather t
 
 #### Context
 
-**User story**: the project home lists the surfaced planning documents. (The project's tickets are no read of the daemon's any more: the tickets package's own widget reads them through its command, `widgets.ts`; the daemon reads tickets only for the rollups it composes, through the provider the package declares.)
+**User story**: the project home lists the surfaced planning documents. (The project's tickets are no read of the daemon's any more: the tickets package's own module reads them through its command, `modules.ts`; the daemon reads tickets only for the rollups it composes, through the provider the package declares.)
 
 #### Business logic
 

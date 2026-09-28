@@ -17,7 +17,7 @@
     "verbatimModuleSyntax": true,
     "allowImportingTsExtensions": true,
     "paths": {
-      "framework/widget": ["../../framework/dashboard/widget/index.ts"]
+      "framework/module": ["../../framework/dashboard/module/index.ts"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx"]

@@ -12,8 +12,8 @@ import { AgentView } from './components/AgentView.js'
 import { agentLabel } from './lib/agent-label.js'
 import { RightRail } from './components/RightRail.js'
 import { NotFound } from './components/NotFound.js'
-import { WidgetPageView } from './components/WidgetPageView.js'
-import { useWidgets, WidgetsContext } from './lib/use-widgets.js'
+import { ModulePageView } from './components/ModulePageView.js'
+import { useModules, ModulesContext } from './lib/use-modules.js'
 import { HostServicesContext, type HostServices } from './lib/host-services.js'
 import { startPicks } from './lib/use-start-agent.js'
 import { stashPendingDraft } from './lib/draft-handoff.js'
@@ -64,11 +64,11 @@ const EMPTY_RECENT: RecentAgent[] = []
 export function App() {
   const { route, go } = useRoute()
   const { view, projectId, agentId } = route
-  // A widget's page (#1774): the route names it by its segment, with no project selected.
+  // A module's page (#1774): the route names it by its segment, with no project selected.
   const pageSegment = route.page ?? null
-  const widgets = useWidgets()
-  const { pages: widgetPages, loaded: widgetsLoaded } = widgets
-  const widgetPage = pageSegment ? widgetPages.find(page => page.segment === pageSegment) : undefined
+  const modules = useModules()
+  const { pages: modulePages, loaded: modulesLoaded } = modules
+  const modulePage = pageSegment ? modulePages.find(page => page.segment === pageSegment) : undefined
 
   // A just-started run: bump the tick so the Sessions rail shows an optimistic "starting…" row
   // with the typed prompt at once, before the run's tool writes its card. `id` is the one the
@@ -176,7 +176,7 @@ export function App() {
   }
 
   // Naming a session in another project. The Overview's cross-project rows — the sidebar recents,
-  // the Agents view (#1139), and the widgets' cards — know which run they are about, and going through
+  // the Agents view (#1139), and the modules' cards — know which run they are about, and going through
   // selectProject drops that on the way, landing on the launcher instead of the session the row was
   // describing.
   const selectAgentInProject = (id: string, agentId: string) => {
@@ -202,28 +202,28 @@ export function App() {
     go({ view: 'settings', projectId: null, agentId: null })
   }
 
-  // A widget's page (#1774): its own segment, cross-project like the Overview.
+  // A module's page (#1774): its own segment, cross-project like the Overview.
   const showPage = (segment: string) => {
     go({ projectId: null, agentId: null, page: segment })
   }
 
-  // A link into a project's files (#1774) — `tickets/<file>` — opens the mounted widget page named
+  // A link into a project's files (#1774) — `tickets/<file>` — opens the mounted module page named
   // by its first segment, at `/<segment>/<projectId>/<rest>`; the dashboard has no page of its own
-  // for any such path and names no widget. Nothing opens when no page claims it.
+  // for any such path and names no module. Nothing opens when no page claims it.
   const openDataLink = (id: string, href: string) => {
-    const target = dataLinkRoute(id, href, widgetPages)
+    const target = dataLinkRoute(id, href, modulePages)
     if (target) go(target)
   }
 
-  // The shell's services for widgets (#1774): what a widget page or a link action may ask of the
-  // dashboard, none of it naming a skill. Bound to each widget's package where its host is built.
+  // The shell's services for modules (#1774): what a module page or a link action may ask of the
+  // dashboard, none of it naming a skill. Bound to each module's package where its host is built.
   const hostServices: HostServices = {
       openAgent: selectAgentInProject,
       openPage: (segment, path) => go({ projectId: null, agentId: null, page: segment, ...(path && path.length ? { pagePath: path } : {}) }),
       startRun: async (inProject, prompt, opts) => {
         const result = await sendStart(inProject, prompt, startPicks(preferences))
         if (!result.ok) return result
-        // A widget starting several runs in a row asks not to land (#1818): the rail still learns of the run.
+        // A module starting several runs in a row asks not to land (#1818): the rail still learns of the run.
         if (opts?.land ?? true) agentStarted(inProject, prompt, result.agentId)
         else reload()
         return result
@@ -270,10 +270,10 @@ export function App() {
     if (view === 'settings')
       return <SettingsPage onAgentStarted={agentStarted} onSelectProject={selectProject} onDone={showDashboard} />
     if (pageSegment) {
-      if (widgetPage)
-        return <WidgetPageView page={widgetPage} projects={projects} path={route.pagePath ?? []} />
-      // Not loaded yet is not "no such page": the widgets are imported after the first read.
-      if (!widgetsLoaded) return null
+      if (modulePage)
+        return <ModulePageView page={modulePage} projects={projects} path={route.pagePath ?? []} />
+      // Not loaded yet is not "no such page": the modules are imported after the first read.
+      if (!modulesLoaded) return null
       return (
         <NotFound
           title="No such page"
@@ -362,9 +362,9 @@ export function App() {
   return (
     // The whole shell lives inside the SidebarProvider so the sidebar's context (state + Cmd/Ctrl+B,
     // the `--sidebar-width` var) is available on every route, home and session alike. Its wrapper is
-    // the column that used to be a plain div. The installed widgets (#1774) are provided around it
+    // the column that used to be a plain div. The installed modules (#1774) are provided around it
     // all, so the link actions they offer reach any page that shows a link.
-    <WidgetsContext.Provider value={widgets}>
+    <ModulesContext.Provider value={modules}>
     <HostServicesContext.Provider value={hostServices}>
     <SidebarProvider className="h-screen flex-col overflow-hidden">
       {/* The top navbar is gone (#772 follow-up): its brand, global nav and utility controls moved
@@ -403,13 +403,13 @@ export function App() {
           onDashboard={showDashboard}
           onSelectProject={selectProject}
           onSettings={showSettings}
-          pages={widgetPages}
+          pages={modulePages}
           activePage={pageSegment}
           onPage={showPage}
           interventionCount={interventions.length}
         />
         <main className="flex min-w-0 flex-1 flex-col">{renderMain()}</main>
-        {/* A widget's page takes the full width itself (#1774): no rail beside it, the way Settings
+        {/* A module's page takes the full width itself (#1774): no rail beside it, the way Settings
             takes the whole main pane with none either. */}
         {!pageSegment && (
           <RightRail
@@ -428,6 +428,6 @@ export function App() {
       </div>
     </SidebarProvider>
     </HostServicesContext.Provider>
-    </WidgetsContext.Provider>
+    </ModulesContext.Provider>
   )
 }

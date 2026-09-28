@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { configureFirst } from '../../framework/dashboard/test-utils.js'
-import type { MountedWidgets } from '../../framework/dashboard/lib/use-widgets.js'
-import { workOnTicketPrompt } from '../src/widget.js'
+import type { MountedModules } from '../../framework/dashboard/lib/use-modules.js'
+import { workOnTicketPrompt } from '../src/module.js'
 import { fakeHost, renderWithHost, type Answers, type FakeHost } from './test-host.js'
 import { TicketsPage } from './TicketsPage.js'
 
@@ -14,17 +14,17 @@ let groups: Group[] = []
 let host: FakeHost
 const onAllTickets = { mockResolvedValue: (value: Group[]) => (groups = value) }
 
-// The one link action an installed widget offers here (#1774): a queue package's "Add to queue",
+// The one link action an installed module offers here (#1774): a queue package's "Add to queue",
 // present in every project of these stories. Its `run` is the spy the heading's adds are read by:
 // one call per project, the links in the shown order.
 const addToQueue = vi.fn()
-const widgets = (projects: string[] = ['p1', 'p2']): MountedWidgets => ({
+const modules = (projects: string[] = ['p1', 'p2']): MountedModules => ({
   pages: [],
   cards: [],
   linkActions: [{ label: 'Add to queue', doneLabel: 'Queued', run: addToQueue, package: '@x/queue', projects }],
   loaded: true,
 })
-const render = (mounted: MountedWidgets = widgets()) => {
+const render = (mounted: MountedModules = modules()) => {
   const answers: Answers = {}
   for (const g of groups) answers[g.projectId] = { 'list --local': g.tickets, 'meta --local': {} }
   host = fakeHost(answers)
@@ -49,7 +49,7 @@ beforeEach(() => {
   window.history.replaceState(null, '', '/tickets')
 })
 
-/** A fresh widget action for the tests that click the header's adds. */
+/** A fresh module action for the tests that click the header's adds. */
 const controls = async () => {
   addToQueue.mockReset().mockResolvedValue({ ok: true })
   return { addToQueue }
@@ -82,7 +82,7 @@ describe('TicketsPage (#1144)', () => {
     onAllTickets.mockResolvedValue([{ projectId: 'p1', projectName: 'Alpha', tickets: [ticket()] }])
     render()
     fireEvent.click(await screen.findByText('Do the thing'))
-    // The widget's own page for that ticket: where the dashboard's link convention sends a link to it.
+    // The module's own page for that ticket: where the dashboard's link convention sends a link to it.
     expect(host.openPage).toHaveBeenCalledWith('tickets', ['p1', 't.md'])
   })
 
@@ -120,7 +120,7 @@ describe('TicketsPage (#1144)', () => {
   test('a claim naming one of the project\'s runs reads as its session name and opens the run (#1748)', async () => {
     const run = { id: '2026-08-30T10-00-00-000Z', name: 'login-page', status: 'running' as const, startedAt: '2026-08-30T10:00:00.000Z' }
     host = fakeHost({ p1: { 'list --local': [ticket({ locked: true, lockedBy: run.id })], 'meta --local': {} } }, { p1: [run] })
-    renderWithHost(<TicketsPage projects={[{ id: 'p1', name: 'Alpha' }]} />, host, widgets())
+    renderWithHost(<TicketsPage projects={[{ id: 'p1', name: 'Alpha' }]} />, host, modules())
     fireEvent.click(await screen.findByText('login-page'))
     expect(host.openAgent).toHaveBeenCalledWith('p1', run.id)
   })
@@ -474,9 +474,9 @@ describe('TicketsPage queue plans for the shown set', () => {
     expect(screen.getByRole('button', { name: 'Add to queue: the ticket shown below' })).toBeTruthy()
   })
 
-  test('no widget offering an action on links, no add buttons at all (#1774)', async () => {
+  test('no module offering an action on links, no add buttons at all (#1774)', async () => {
     onAllTickets.mockResolvedValue([{ projectId: 'p1', projectName: 'Alpha', tickets: [ticket({ file: 'a.md', title: 'First' })] }])
-    render(widgets([]))
+    render(modules([]))
     await screen.findByText('First')
     expect(screen.queryByRole('button', { name: /add to queue/i })).toBeNull()
   })

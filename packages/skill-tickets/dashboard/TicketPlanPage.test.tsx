@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from 'vitest'
 import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
-import type { WidgetAgent } from 'framework/widget'
-import { planTicketPrompt } from '../src/widget.js'
+import type { ModuleAgent } from 'framework/module'
+import { planTicketPrompt } from '../src/module.js'
 import { fakeHost, renderWithHost, type FakeHost } from './test-host.js'
 import { TicketPlanPage } from './TicketPlanPage.js'
 
@@ -12,7 +12,7 @@ const TICKET = { file: SLUG, title: 'Do the thing', summary: '', date: '2026-01-
 const PLAN = '# The plan\n\nDo it in two steps.'
 
 /** The page over a `show` answer carrying `plan` (or not), and the project's runs. */
-const render = (plan: string | undefined, agents: WidgetAgent[] = []): FakeHost => {
+const render = (plan: string | undefined, agents: ModuleAgent[] = []): FakeHost => {
   const host = fakeHost({ p1: { [`show ${SLUG} --local`]: { ok: true, ticket: TICKET, ...(plan === undefined ? {} : { plan }) } } }, { p1: agents })
   renderWithHost(<TicketPlanPage projectId="p1" slug={SLUG} />, host)
   return host
@@ -51,7 +51,7 @@ describe('TicketPlanPage (#685)', () => {
     expect(screen.queryByRole('button', { name: /agent/ })).toBeNull()
   })
 
-  test('Back returns to the list, the widget\'s own page', async () => {
+  test('Back returns to the list, the module\'s own page', async () => {
     const host = render(PLAN)
     fireEvent.click(await screen.findByRole('button', { name: /tickets/i }))
     expect(host.openPage).toHaveBeenCalledWith('tickets')

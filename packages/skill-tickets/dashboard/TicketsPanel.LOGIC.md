@@ -76,7 +76,7 @@ The marker acts on click when the surrounding page offers it. When the claim nam
 
 A ticket that has a plan shows a clipboard in blue, drawn heavier than the column's other state, labeled "View the plan for <title>" with the tooltip "View the plan"; clicking opens the ticket's plan. Where the surrounding page has nowhere to open a plan, the icon is shown disabled. There is no "configure" offer beside it: reading a file spends no agent [1].
 
-A ticket with no plan shows a quieter clipboard, lighter than the row's own age column, labeled "Create a plan for <title>" with the tooltip "Plan this ticket — starts an agent to write its plan". Clicking starts a agent on this project asked to write the plan — "Create tickets/<stem>.plan.md", the one wording every surface asks for a plan with (`src/widget.ts`). A plan is written for a human to read: the user reviews it through the plan column's link. A refusal reads "The planning agent could not be started.".
+A ticket with no plan shows a quieter clipboard, lighter than the row's own age column, labeled "Create a plan for <title>" with the tooltip "Plan this ticket — starts an agent to write its plan". Clicking starts a agent on this project asked to write the plan — "Create tickets/<stem>.plan.md", the one wording every surface asks for a plan with (`src/module.ts`). A plan is written for a human to read: the user reviews it through the plan column's link. A refusal reads "The planning agent could not be started.".
 
 The two states are told apart by color and weight, not by the icon alone, so the planned rows are scannable down the column.
 
@@ -154,4 +154,4 @@ A refusal is shown as red text above the rows, or inside the empty state's card,
 
 #### Business logic
 
-A ticket in review (a `PR:` line) or waiting (a `Waiting:` line), by the rule in `src/widget.ts`, has an empty start column and, when it has no plan, an empty plan column; a plan that exists is still a link to read it. Among the row's tags, a ticket in review shows "In review <label>", a link to its pull request that opens in a new tab; a waiting one shows "Waiting", with "Waiting: <what it waits on>" on hover.
+A ticket in review (a `PR:` line) or waiting (a `Waiting:` line), by the rule in `src/module.ts`, has an empty start column and, when it has no plan, an empty plan column; a plan that exists is still a link to read it. Among the row's tags, a ticket in review shows "In review <label>", a link to its pull request that opens in a new tab; a waiting one shows "Waiting", with "Waiting: <what it waits on>" on hover.

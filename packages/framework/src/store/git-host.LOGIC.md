@@ -68,4 +68,4 @@ A pull request [2] is only a pull request with a number, a string link and a sta
 
 #### Business logic
 
-Per project, the provider found is kept for five seconds and asked again after; when the same command still provides, the same source is kept. Being told the project changed (`provided.ts` says it after any widget command ran there) forgets the project at once, so the next ask looks its provider up again. Each read and each action is one run of the command: nothing a provider answers is cached here.
+Per project, the provider found is kept for five seconds and asked again after; when the same command still provides, the same source is kept. Being told the project changed (`provided.ts` says it after any module command ran there) forgets the project at once, so the next ask looks its provider up again. Each read and each action is one run of the command: nothing a provider answers is cached here.

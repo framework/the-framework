@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ExternalLink, LockOpen } from 'lucide-react'
-import { Badge, Button, LinkActions, Markdown, cn, formatAge, formatDateTime, useAction, usePolled, useWidgetHost } from 'framework/widget'
-import { heldBack, holderAgent, readShown, ticketLink } from '../src/widget.js'
+import { Badge, Button, LinkActions, Markdown, cn, formatAge, formatDateTime, useAction, usePolled, useModuleHost } from 'framework/module'
+import { heldBack, holderAgent, readShown, ticketLink } from '../src/module.js'
 import type { WorkspaceTicketDetail } from './lib/types.js'
 import { TicketPageShell, TicketPageNote } from './TicketPageShell.js'
 import { priorityTone } from './lib/ticket-priority.js'
@@ -11,7 +11,7 @@ type Read = { ticket: WorkspaceTicketDetail | null } | { error: string }
 
 // One ticket's own page: its entire markdown, not just the head the list row reads — and where the
 // actions on the ticket live now that the list is one-liners: the ticket is shown as a link, and
-// the installed widgets' link actions ("Add to queue" when the project has a queue package) sit
+// the installed modules' link actions ("Add to queue" when the project has a queue package) sit
 // beside it. `slug` is the same filename the list row and the URL carry, so this is a direct read
 // by identity (`tickets show <file> --local`) rather than a search through the list.
 export function TicketDetailPage({
@@ -22,7 +22,7 @@ export function TicketDetailPage({
   /** The ticket's filename inside `tickets/`, same as `WorkspaceTicket.file`. */
   slug: string
 }) {
-  const host = useWidgetHost()
+  const host = useModuleHost()
   // The claim's holder resolved against the project's runs: a lock names a run's id, so a claim a
   // run made links to its page and reads as its session name; anyone else is shown as written.
   const { value: read, loaded } = usePolled<Read | null>(
@@ -87,7 +87,7 @@ export function TicketDetailPage({
                   <LockOpen className="h-3.5 w-3.5" /> Release lock
                 </Button>
               )}
-              {/* The ticket as a link, for whatever the installed widgets offer on one (#1774);
+              {/* The ticket as a link, for whatever the installed modules offer on one (#1774);
                   none for a ticket in review or waiting, which is never queued. */}
               {!heldBack(ticket) && <LinkActions projects={[projectId]} targets={[{ projectId, links: [ticketLink(ticket)] }]} resetKey={ticket.file} disabled={busy} />}
             </div>

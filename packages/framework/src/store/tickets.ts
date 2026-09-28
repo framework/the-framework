@@ -14,7 +14,7 @@ import { readProvidedCommand, runPackageCommand, type ProvidedCommand } from '@g
  *
  * That is the whole contract. The framework reads tickets for what it composes across skills: the
  * onboarding step, a queued link's title. Showing them, planning them, claiming and releasing them,
- * and the Overview's hot-tickets card, are the tickets package's own widget, through its own command.
+ * and the Overview's hot-tickets card, are the tickets package's own module, through its own command.
  *
  * The shape, owned here: {@link Ticket}, the row a ticket lists as.
  */
@@ -52,7 +52,7 @@ export interface TicketsSource {
 /** The tickets of the project at `root`, or `undefined` when none of its packages provides them. */
 export type TicketsFor = (root: string) => Promise<TicketsSource | undefined>
 
-/** A {@link TicketsFor} that also forgets what it read of one project, for when a widget just wrote there. */
+/** A {@link TicketsFor} that also forgets what it read of one project, for when a module just wrote there. */
 export type TicketsReader = TicketsFor & { changed(root: string): void }
 
 /** How long a read is reused: the dashboard polls several reads of every project's tickets every few seconds, and each is a process. */
@@ -99,7 +99,7 @@ function commandTickets(root: string, command: ProvidedCommand, now: () => numbe
  * source per project kept while the same command provides — so the cache holds across the many
  * reads of one poll, and a project that installs, swaps or drops its provider is read the new way
  * within {@link CACHE_MS}. `changed(root)` forgets that project's read, so the next read runs the
- * command again: a widget's command just ran there, and may have written.
+ * command again: a module's command just ran there, and may have written.
  */
 export function providedTickets(now: () => number = Date.now): TicketsReader {
   const sources = new Map<string, { at: number; command?: ProvidedCommand; source?: ReturnType<typeof commandTickets> }>()

@@ -8,7 +8,7 @@ import type { AddressInfo } from 'node:net'
 import { serveClientBundle } from './static.js'
 
 // The bundle's caching rule: only the fingerprinted files under `assets/` may be cached as
-// immutable. `index.html` and the host modules a widget imports at a stable path (`/host/*.js`)
+// immutable. `index.html` and the host files a module imports at a stable path (`/host/*.js`)
 // always revalidate, so a dashboard upgrade reaches a browser that kept the old ones.
 
 async function bundle(): Promise<string> {
@@ -17,7 +17,7 @@ async function bundle(): Promise<string> {
   await mkdir(join(dir, 'host'))
   await writeFile(join(dir, 'index.html'), '<html></html>')
   await writeFile(join(dir, 'assets', 'app-abc123.js'), 'export {}')
-  await writeFile(join(dir, 'host', 'widget.js'), 'export {}')
+  await writeFile(join(dir, 'host', 'module.js'), 'export {}')
   return dir
 }
 
@@ -29,7 +29,7 @@ test('only fingerprinted assets are immutable; index.html and the host modules a
   try {
     const cache = async (path: string) => (await fetch(base + path)).headers.get('cache-control')
     assert.equal(await cache('/assets/app-abc123.js'), 'public, max-age=31536000, immutable')
-    assert.equal(await cache('/host/widget.js'), 'no-cache')
+    assert.equal(await cache('/host/module.js'), 'no-cache')
     assert.equal(await cache('/index.html'), 'no-cache')
     assert.equal(await cache('/tickets/some-project/some-file'), 'no-cache', 'the app shell for a client route')
   } finally {

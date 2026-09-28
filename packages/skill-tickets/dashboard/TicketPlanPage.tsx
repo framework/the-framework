@@ -1,9 +1,9 @@
-import { Button, Markdown, Tooltip, TooltipTrigger, TooltipContent, usePolled, useWidgetHost, type WidgetAgent } from 'framework/widget'
-import { planAgentFor, planPath, readShown } from '../src/widget.js'
+import { Button, Markdown, Tooltip, TooltipTrigger, TooltipContent, usePolled, useModuleHost, type ModuleAgent } from 'framework/module'
+import { planAgentFor, planPath, readShown } from '../src/module.js'
 import { TicketPageShell, TicketPageNote } from './TicketPageShell.js'
 
 /** The page's read: the plan's text (none when the ticket has no plan, or no ticket), or why the command failed. */
-type Read = { plan: string | null; agent: WidgetAgent | undefined } | { error: string }
+type Read = { plan: string | null; agent: ModuleAgent | undefined } | { error: string }
 
 // One ticket's plan: its `<stem>.plan.md` rendered as markdown, the destination of the tickets
 // list's plan-column link. The plan comes with the ticket from `tickets show <file> --local`, and
@@ -18,7 +18,7 @@ export function TicketPlanPage({
   /** The ticket's filename inside `tickets/`, same as `WorkspaceTicket.file`. */
   slug: string
 }) {
-  const host = useWidgetHost()
+  const host = useModuleHost()
   const path = planPath(slug)
   const { value: read, loaded } = usePolled<Read | null>(
     async () => {
@@ -57,7 +57,7 @@ export function TicketPlanPage({
  * branch, same conversation — so the plan can be discussed with the agent that has it in context;
  * one still running is simply opened.
  */
-function PlanAgentRow({ agent, onOpen }: { agent: WidgetAgent; onOpen: () => void }) {
+function PlanAgentRow({ agent, onOpen }: { agent: ModuleAgent; onOpen: () => void }) {
   const running = agent.status === 'running'
   return (
     <div className="mb-4 flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2 text-xs text-muted-foreground">

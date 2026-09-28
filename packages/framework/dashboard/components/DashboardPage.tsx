@@ -9,7 +9,7 @@ import { usePolled } from '../lib/use-async.js'
 import { usePreferences } from '../lib/preferences.js'
 import { OnboardingChecklist } from './OnboardingChecklist.js'
 import { Agents } from './Agents.js'
-import { WidgetCards } from './WidgetCards.js'
+import { ModuleCards } from './ModuleCards.js'
 import type { ProjectSummary } from '../../src/index.js'
 import { SchedulerCard } from './SchedulerCard.js'
 import { ScrollArea } from './ui/scroll-area.js'
@@ -67,7 +67,7 @@ export function DashboardPage({
             <Agents working={data?.active ?? []} loading={loading} onSelectAgent={onSelectAgent} />
             {/* The cards the installed packages declare (#1818), under the agents at work: a package's own
                 summary of its data, only where a project has the package. */}
-            <WidgetCards projects={projects} />
+            <ModuleCards projects={projects} />
             {/* What runs while nobody is at the keyboard (#1774): each project's scheduler, below
                 the queue it works. */}
             <SchedulerCard onSelectAgent={onSelectAgent} />

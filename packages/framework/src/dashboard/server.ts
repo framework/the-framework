@@ -9,7 +9,7 @@ import type { BridgeBrowserOwner } from '../bridge-browser.js'
 import { serveClientBundle } from './static.js'
 import { makeRpcMount, RPC_PREFIX, isSameOriginRequest, isExpectedHost } from './rpc-serve.js'
 import { requestPathname } from '../request-path.js'
-import { WIDGETS_PREFIX, serveWidgetFile } from './widget-serve.js'
+import { MODULES_PREFIX, serveModuleFile } from './module-serve.js'
 import type { AddProjectResult, StartAgentOptions, StartAgentResult } from './types.js'
 import type { EventsSource, RemoteAgents } from './rpc-serve.js'
 import { handleRelayRequest, RELAY_PREFIX, type RelayHandlers } from './relay-endpoints.js'
@@ -237,11 +237,11 @@ export function startDashboard(opts: DashboardOptions): Promise<Dashboard> {
       void rpcMount(req, res)
       return
     }
-    // A project's dashboard widgets (#1774): only the files of a package the project brings as a widget.
-    if (pathname.startsWith(`${WIDGETS_PREFIX}/`)) {
+    // A project's dashboard modules (#1774): only the files of a package the project brings as a module.
+    if (pathname.startsWith(`${MODULES_PREFIX}/`)) {
       // Void-dispatched like the bundle: a throw here must answer, not take the daemon down (#938).
-      void serveWidgetFile(req, res, pathname).catch(() => {
-        if (!res.headersSent) res.writeHead(500, { 'content-type': 'text/plain' }).end('widget file unreadable')
+      void serveModuleFile(req, res, pathname).catch(() => {
+        if (!res.headersSent) res.writeHead(500, { 'content-type': 'text/plain' }).end('module file unreadable')
       })
       return
     }

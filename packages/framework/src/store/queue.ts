@@ -12,13 +12,13 @@ import { readProvidedCommand, runPackageCommand, type ProvidedCommand } from '@g
  *   `<command> --local`   the open entries, in order of work, as an array of strings
  * `--local` reads the copy on this machine, no network: the framework polls.
  *
- * That is the whole contract. Writing the queue is not the framework's: a widget the queue package
- * brings acts on it through its own command (`framework/widget`'s link actions), and the framework
+ * That is the whole contract. Writing the queue is not the framework's: a module the queue package
+ * brings acts on it through its own command (`framework/module`'s link actions), and the framework
  * only re-reads.
  *
  * The shape, owned here: an entry is one string, the task a future agent is started with, as the
  * queue's own command prints it. A markdown link at its start names the work and where it points;
- * how a dashboard reads that is the queue package's widget's.
+ * how a dashboard reads that is the queue package's module's.
  */
 
 /** A project's queue: what a provider answers, read by the framework. */
@@ -30,7 +30,7 @@ export interface QueueSource {
 /** The queue of the project at `root`, or `undefined` when none of its packages provides one. */
 export type QueueFor = (root: string) => Promise<QueueSource | undefined>
 
-/** A {@link QueueFor} that also forgets what it read of one project, for when a widget just wrote there. */
+/** A {@link QueueFor} that also forgets what it read of one project, for when a module just wrote there. */
 export type QueueReader = QueueFor & { changed(root: string): void }
 
 /** How long a read is reused: the dashboard polls several reads of every project's queue every few seconds, and each is a process. */
@@ -71,7 +71,7 @@ function commandQueue(root: string, command: ProvidedCommand, now: () => number)
  * source per project kept while the same command provides — so the cache holds across the many
  * reads of one poll, and a project that installs, swaps or drops its provider is read the new way
  * within {@link CACHE_MS}. `changed(root)` forgets that project's read, so the next read runs the
- * command again: a widget's command just ran there, and may have written.
+ * command again: a module's command just ran there, and may have written.
  */
 export function providedQueue(now: () => number = Date.now): QueueReader {
   const sources = new Map<string, { at: number; command?: ProvidedCommand; source?: ReturnType<typeof commandQueue> }>()

@@ -76,7 +76,8 @@ export function readClaudeModels(opts: ReadClaudeModelsOptions = {}): Promise<Dr
  * the CLI's own error when that request failed, `undefined` for any other line.
  *
  * The CLI's first entry, `default`, is not a model: it is "no pick", which a caller already has by
- * passing no model. It is left out, so every entry names one model.
+ * passing no model. It is left out, so every entry names one model. An alias carries the full id
+ * it runs today (`claude-opus-5-5` for `opus`), the id a run on it names.
  */
 export function parseInitializeLine(line: string): { models: DriverModel[] } | { error: string } | undefined {
   let message: unknown
@@ -97,8 +98,9 @@ export function parseInitializeLine(line: string): { models: DriverModel[] } | {
     const model = record(entry)
     const id = model?.['value']
     const name = model?.['displayName']
+    const resolved = model?.['resolvedModel']
     if (typeof id !== 'string' || typeof name !== 'string' || id === 'default') continue
-    models.push({ id, name })
+    models.push({ id, name, ...(typeof resolved === 'string' && resolved !== id ? { resolvedId: resolved } : {}) })
   }
   return { models }
 }

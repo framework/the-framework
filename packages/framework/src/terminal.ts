@@ -164,6 +164,8 @@ function formatDriverEvent(event: DriverEvent): string {
     // stray one reads as what it is rather than crashing the formatter.
     case 'session':
       return `  session ${event.sessionId}`
+    case 'model':
+      return `  model ${event.model}`
     case 'text':
       return `    ${truncate(event.text)}`
     case 'action':

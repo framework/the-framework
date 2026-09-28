@@ -14,6 +14,6 @@ Lists the models Claude Code offers: the same list its own `/model` picker shows
 ## Business logic — TL;DR
 
 - **Asking Claude Code** - the `claude` command runs in print mode with streamed JSON in and out, plus any extra arguments the driver [1] passes; it is sent Claude Code's `initialize` request and nothing else.
-- **Reading the answer** - the answer to that request carries the models in Claude Code's own order; each is its id (such as `opus` or `claude-fable-5-1`) and its display name (such as "Opus 5.5"). The "default" entry is left out: it means "no pick", which a caller already has by passing no model. Every other line Claude Code prints is ignored.
+- **Reading the answer** - the answer to that request carries the models in Claude Code's own order; each is its id (such as `opus` or `claude-fable-5-1`), its display name (such as "Opus 5.5") and, when the id is an alias, the full id Claude Code resolves it to today (`claude-opus-5-5`). The "default" entry is left out: it means "no pick", which a caller already has by passing no model. Every other line Claude Code prints is ignored.
 - **Stopped once answered** - the process is stopped as soon as the answer is read, and on every failure.
 - **Failures in words** - Claude Code's own error for the request, an answer without a model list, a `claude` command that cannot start, a process that exits before answering, no answer within 30 seconds and a stop request [2] each fail the listing with a sentence saying which.

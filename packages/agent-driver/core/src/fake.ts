@@ -27,6 +27,8 @@ export interface FakeDriverOptions {
   files?: Record<string, string>
   /** Session id to report (default `"fake-session"`). */
   sessionId?: string
+  /** The model each turn says it runs on, as a real coding agent names it once started; none said when absent. */
+  model?: string
 }
 
 function asTurn(value: FakeTurn | string): FakeTurn {
@@ -79,6 +81,7 @@ export class FakeDriverSession implements DriverSession {
     const turn = this.resolveTurn(text, i)
 
     this.emit({ type: 'start', prompt: text })
+    if (this.config.model !== undefined) this.emit({ type: 'model', model: this.config.model })
     for (const label of turn.actions ?? []) this.emit({ type: 'action', label })
     if (turn.text) this.emit({ type: 'text', text: turn.text })
     this.emit({ type: 'result', text: turn.text, sessionId: this.id, ...(turn.usage ? { usage: turn.usage } : {}) })

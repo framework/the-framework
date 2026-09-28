@@ -11,7 +11,7 @@ import type { DriverEvent } from './types.js'
  * importing the other.
  *
  * The card: `id`, `startedAt`, `status` (`running` until ended, then `done`, `stopped`, `failed` or `waiting`), `endedAt`, `intent`, `driver`,
- * `model`, `branch`, `pr`, `cost` (dollars, summed from the turns that priced themselves), and
+ * `model` (the one the caller asked for, until the agent names the one it runs: its full id), `branch`, `pr`, `cost` (dollars, summed from the turns that priced themselves), and
  * `caller`, one key for whatever the caller wants kept (its own mark, the pid, the session id).
  *
  * The diary: `said` (a text chunk), `result` (a turn's final text), `cost` (a turn's price,
@@ -108,8 +108,15 @@ export class SessionLog {
     })
   }
 
-  /** Fold one event in: a diary line, and the card's cost or session id when the event carries one. */
+  /**
+   * Fold one event in: a diary line, and the card's cost or session id when the event carries one.
+   * The model is a fact about the run, not something that happened in it: it goes on the card only.
+   */
   record(event: DriverEvent): Promise<void> {
+    if (event.type === 'model') {
+      this.card.model = event.model
+      return this.queue(() => this.writeCard())
+    }
     const line = { ...diaryLine(event), at: this.clock() }
     if (event.type === 'result' && event.usage?.costUsd !== undefined) this.card.cost = (this.card.cost ?? 0) + event.usage.costUsd
     if ((event.type === 'session' || event.type === 'result') && event.sessionId) {

@@ -22,7 +22,7 @@ The tool's process side: a run [1] in this process, the same run detached in its
 - **A run in this process** - the id given or minted now, marked already when the id was given, on Claude Code or, with `--driver codex`, on Codex; a follow-up it names runs on the same coding agent, made for the follow-up's own id; a resumed run, and the follow-up its record names, on the coding agent its record names.
 - **Either coding agent, unrestricted** - Claude Code with permissions bypassed, Codex with full access, `AGENT_ID` in the agent's environment: whichever coding agent runs, it pushes its branch and opens its pull request itself.
 - **The person's own setup** - either coding agent starts with the three parts of the person's own setup, `memory`, `connectors` and `skills`, as when started by hand; each part is left out when this machine's `.agent-runner/config.yml` turns it off under `personal:`; the project's own instructions and skills always load; how a part is turned off is the coding agent's driver's business, and a part Codex cannot turn off is a warning before the run.
-- **The model** - the one given, to either coding agent; none given, none is named, on the card or to the coding agent, which starts on its own default.
+- **The model** - the one given, to either coding agent; none given, none is named, on the marker or to the coding agent, which starts on its own default. Once the coding agent names the model it runs on, its full id takes the given one's place on the card (`run.ts`).
 
 ## Business logic
 

@@ -35,6 +35,9 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - Every diary line says when it was written, in `at`. Picked over the dashboard noting when
   a line reached the browser, which gave a reloaded page one time for every line and a
   finished run none.
+- A session that keeps a log names its diary in the agent's environment (`AGENT_DIARY`),
+  so a command the agent runs can add a line of its own to the run's chat. Picked over
+  the scheduler letting each package hook into a run's start.
 
 ## The adapters
 - Each driver is its own package, `@agent-driver/<name>`, on the contract `agent-driver`

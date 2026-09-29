@@ -65,6 +65,9 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   given the project's folder and the facts about a run, never a verdict about them. Picked
   over reading only through the package's command, a new process for every read of a tree
   that polls every 8 seconds and a preview on every hover.
+- The chat shows a `screen` line as the live page it names, on this machine's loopback
+  only, and knows nothing of what the page is. Picked over a `browser` kind the dashboard
+  renders itself, which the next package showing something would have had to repeat.
 
 ## Starting a run
 - A Start runs the project's own `start` line, in the project's hooks file, and the line

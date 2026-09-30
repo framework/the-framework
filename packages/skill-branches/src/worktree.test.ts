@@ -210,7 +210,7 @@ test('a new agent branch starts from origin’s latest, fetched: a commit pushed
   try {
     // Someone else pushes to main; this clone has not fetched it.
     const other = join(base, 'other')
-    await git(['clone', '-q', join(base, 'origin.git'), other], base)
+    await git(['clone', '-q', '-b', 'main', join(base, 'origin.git'), other], base)
     await git(['config', 'user.email', 't@t'], other)
     await git(['config', 'user.name', 't'], other)
     await git(['commit', '-q', '--allow-empty', '-m', 'from elsewhere'], other)
@@ -226,8 +226,10 @@ test('a new agent branch starts from origin’s latest, fetched: a commit pushed
 test('a fetch that hangs holds a new agent branch back 5 seconds at most, then it starts from the copy the clone has', async () => {
   const real = nodeGitRunner()
   const { repo, base, main } = await repoOnUnpushedFeature(real)
-  // The network hangs: the fetch never answers.
-  const git: GitRunner = (args, cwd) => (args[0] === 'fetch' ? new Promise<string>(() => {}) : real(args, cwd))
+  // The network hangs: the fetch answers only long after. A live timer, as a hung git process is
+  // live: a promise nothing holds would let the event loop end mid-test.
+  let hung: ReturnType<typeof setTimeout> | undefined
+  const git: GitRunner = (args, cwd) => (args[0] === 'fetch' ? new Promise<string>(resolve => (hung = setTimeout(() => resolve(''), 60_000))) : real(args, cwd))
   try {
     const started = Date.now()
     const { path } = await addWorktree(repo, { agentId: 'run1', branch: 'agent-run1' }, git)
@@ -235,6 +237,7 @@ test('a fetch that hangs holds a new agent branch back 5 seconds at most, then i
     assert.ok(waited >= FRESH_START_FETCH_MS - 100 && waited < FRESH_START_FETCH_MS + 3_000, `waited ${waited}ms`)
     assert.equal((await real(['rev-parse', 'HEAD'], path)).trim(), main)
   } finally {
+    clearTimeout(hung)
     await rm(base, { recursive: true, force: true })
   }
 })

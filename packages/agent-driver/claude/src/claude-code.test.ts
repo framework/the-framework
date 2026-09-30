@@ -51,6 +51,20 @@ test('StreamJsonParser says what each tool call did, and passes thinking with te
   ])
 })
 
+test('StreamJsonParser passes the message being written as the text so far, each text block from empty', () => {
+  const p = new StreamJsonParser()
+  const piece = (event: object): string => JSON.stringify({ type: 'stream_event', event })
+  const text = (t: string): object => ({ type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: t } })
+  assert.deepEqual(p.push(piece({ type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } })), [])
+  assert.deepEqual(p.push(piece(text('Rivers car'))), [{ type: 'partial', text: 'Rivers car' }])
+  assert.deepEqual(p.push(piece(text('ve valleys.'))), [{ type: 'partial', text: 'Rivers carve valleys.' }])
+  // Thinking and tool input come in pieces too; they are said once whole, not as they come.
+  assert.deepEqual(p.push(piece({ type: 'content_block_delta', index: 1, delta: { type: 'thinking_delta', thinking: 'hm' } })), [])
+  assert.deepEqual(p.push(piece({ type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: '{"a' } })), [])
+  assert.deepEqual(p.push(piece({ type: 'content_block_start', index: 2, content_block: { type: 'text', text: '' } })), [])
+  assert.deepEqual(p.push(piece(text('Next'))), [{ type: 'partial', text: 'Next' }])
+})
+
 test('ClaudeCodeDriver asks for thinking text, then sends the prompt, both as stream-json input', async () => {
   let written = ''
   const spawn: SpawnLike = () => {
@@ -262,7 +276,7 @@ test('ClaudeCodeDriver builds correct CLI args (permission mode, system, model)'
   const driver = new ClaudeCodeDriver({ spawn })
   const session = await driver.start({ cwd: '/ws', system: 'You are a Vike expert', model: 'claude-haiku-4-5-20251001' })
   await session.prompt('go')
-  assert.deepEqual(captured.slice(0, 6), ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose'])
+  assert.deepEqual(captured.slice(0, 7), ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--include-partial-messages'])
   assert.ok(captured.includes('--permission-mode'))
   assert.ok(captured.includes('acceptEdits'))
   assert.ok(captured.includes('--append-system-prompt'))

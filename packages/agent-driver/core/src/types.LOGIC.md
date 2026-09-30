@@ -9,7 +9,7 @@ Fixes the vocabulary of the driver [1] contract, in words: what every driver pro
 [1] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later. The user's driver choice is `claude` or `codex`; the driver implementations are `claude-code`, `codex`, `github-actions`, `claude-web` and `fake`.
 [2] driver session: the coding agent's own conversation for one agent, which the driver can resume by its session id.
 [3] turn: one prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
-[4] progress event: what a driver reports while a turn runs, for a caller to show and never to decide on: the prompt sent, the session id, the model the turn runs on, streamed text, a tool used, the final result, a rate limit reading, an error, a notice, a question.
+[4] progress event: what a driver reports while a turn runs, for a caller to show and never to decide on: the prompt sent, the session id, the model the turn runs on, streamed text, the message being written (its whole text so far, live only, never recorded in the diary), a tool used, the final result, a rate limit reading, an error, a notice, a question.
 [5] usage: what one turn spent, as the coding agent reports it: token counts, and a notional price in US dollars when the coding agent prices its turns.
 [6] rate limit: the coding agent's per-turn reading of whether the account may still spend against one quota window, and when that window resets.
 [7] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.

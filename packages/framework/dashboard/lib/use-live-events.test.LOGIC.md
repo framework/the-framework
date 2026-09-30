@@ -7,4 +7,5 @@ What the tests cover:
 - **Replay then live on the first subscription** - the first subscription's events render as they arrive, and the end-of-replay marker itself is never shown as an event.
 - **A reconnect never shows less than it already showed** - while a reconnected stream re-sends the recorded events, the feed on screen stays untouched, then the whole replay replaces it in one step at the end-of-replay marker, after which new events append again.
 - **A stream that reports no end of replay** - the held-back replay is swapped in at a deadline instead, so a relayed agent's feed never freezes.
+- **The message being written** - it is kept beside the events, never among them; the whole message replaces it, a late piece equal to the message just finished is not shown again, the next message's pieces show, and an agent that ends clears it.
 - **A reconnect that dies mid-replay** - the partial replay is discarded rather than swapped in, the feed on screen survives both drops, and the next attempt replays and swaps in full.

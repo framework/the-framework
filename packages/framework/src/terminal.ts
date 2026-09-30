@@ -63,6 +63,8 @@ function formatDriverEvent(event: DriverEvent): string {
       return `  session ${event.sessionId}`
     case 'model':
       return `  model ${event.model}`
+    // A message being written reads as the text it has so far; a diary never holds one.
+    case 'partial':
     case 'text':
       return `    ${truncate(event.text)}`
     case 'action':

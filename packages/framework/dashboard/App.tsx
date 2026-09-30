@@ -242,7 +242,7 @@ export function App() {
   // one shared event stream.
   // The agent whose feed and controls are in play is simply the one in the URL; in the no-id
   // fallback there is none yet, and a null id resolves to the project root, as before.
-  const { events, lost } = useLiveEvents(projectId, agentId, agentStart.tick)
+  const { events, lost, writing } = useLiveEvents(projectId, agentId, agentStart.tick)
   // The rail's views stay scoped to the newest `session` segment even though an agent's feed no
   // longer is (a resumed session appends a second segment to the same journal). Choice gates
   // are no longer folded here: they live inline in the transcript (#1455 items 6/7), where
@@ -323,7 +323,7 @@ export function App() {
       // list we have not read yet, where whether the agent runs is not known. Only a session that
       // is genuinely absent from a list we did read is gone.
       if (agentId === agentStart.id || !agentsLoaded)
-        return <AgentView projectId={projectId} agentId={agentId} events={events} live={agentId === agentStart.id ? true : null} label={agentStart.intent || undefined} projectName={projectName} remoteLabel={agentId === agentStart.id ? agentStart.runsOn : undefined} files={files} lost={lost} onAgentStarted={onAgentStarted} />
+        return <AgentView projectId={projectId} agentId={agentId} events={events} live={agentId === agentStart.id ? true : null} label={agentStart.intent || undefined} projectName={projectName} remoteLabel={agentId === agentStart.id ? agentStart.runsOn : undefined} files={files} lost={lost} writing={writing} onAgentStarted={onAgentStarted} />
       return (
         <NotFound
           title="This agent is gone"
@@ -346,6 +346,7 @@ export function App() {
         projectName={projectName}
         files={files}
         lost={lost}
+        writing={writing}
         target={selectedAgent.target}
         remoteLabel={selectedAgent.remoteLabel}
         onAgentStarted={onAgentStarted}

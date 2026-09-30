@@ -9,7 +9,7 @@ The rules and the processes of `agent-runner`: run records [1] as markers, the l
 ## Glossary
 
 [1] run record: the `logs` skill's record of a run on the `agent-data` branch: a card (`<id>.json`) and a diary (`<id>.jsonl`). Written twice, over the same file: as a marker before the agent exists, and with how it went when the run ends.
-[2] live record: the card `<id>.json` and the diary `<id>.jsonl` under `.the-framework/` in a run's checkout, the same two files as the run record, written by `agent-driver`'s session as the agent works; the inbox `inbox.jsonl` beside them carries what reaches the agent from outside.
+[2] live record: the card `<id>.json` and the diary `<id>.jsonl` under `.the-framework/` in a run's checkout, the same two files as the run record, written by `agent-driver`'s session as the agent works; the inbox `inbox.jsonl` beside them carries what reaches the agent from outside, and the live file `<id>.live`, present only while the agent writes a message, holds that message so far; it is never copied onto the record.
 [3] the run's lock: `.agent-runner/runs/<id>.lock` at the repository root, holding the pid of the one process of the run at work on it; a pid that is not a live process holds nothing.
 [4] run: one agent this tool starts: a process of the tool's own (`agent-runner run`), a checkout, one prompt to the coding agent, and a run record when it ends. Its id is its start time, `2026-09-16T14-01-00-000Z`.
 [5] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.

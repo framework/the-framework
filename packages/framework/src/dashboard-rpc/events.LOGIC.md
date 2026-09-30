@@ -15,13 +15,15 @@ Serves the live event stream [1] for one selected agent [2] to the browser: ever
 [5] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
 [7] runs provider: the command, among the commands of a project's dependencies, that a package declares as answering for the project's finished agents (`../store/runs.ts`).
 [8] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
-[9] end-of-replay marker: the one wire-only event the stream sends after the events already on disk have been delivered and before any live event; it is not an agent event, is never written to any file, and the browser swallows it.
+[9] end-of-replay marker: a wire-only event the stream sends after the events already on disk have been delivered and before any live event; it is not an agent event, is never written to any file, and the browser swallows it.
+[10] live file: `<id>.live` beside the diary, holding the message the coding agent is writing, as far as it has got; it exists only while a message is being written and is never recorded.
 
 ## Business logic — TL;DR
 
 - **Which agent's events, from where** - the agent's own diary, in its checkout while it has one and from the runs provider [7] once it is finished; an unknown project, or no agent id, has nothing to stream and the stream ends cleanly.
 - **A relayed agent streams from memory** - the in-memory stream the daemon receives from the device wins over any file: its buffered history is replayed, then it is followed, and the stream ends when the relayed agent ends.
 - **The end of the replay is marked once** - after the on-disk replay and before any live event, so a reconnecting browser can rebuild its feed atomically; only the on-disk stream sends it.
+- **The message being written** - a wire-only `partial` event carries the text of the live file [10] each time it changed, and an empty text once it is gone; it is not an agent event and is never written to any file, so the pieces reach only a browser that is watching.
 - **The stream follows the diary when it moves** - when the agent ends, its diary becomes the finished agent's, and the tail sends the lines it had not sent yet.
 
 ## Business logic

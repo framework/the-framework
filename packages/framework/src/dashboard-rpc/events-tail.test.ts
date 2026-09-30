@@ -4,7 +4,7 @@ import { appendFile, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { FrameworkEvent } from '../events.js'
-import { tailEvents, tailAgentEvents } from './events-tail.js'
+import { partialReader, tailEvents, tailAgentEvents } from './events-tail.js'
 
 const line = (message: string): string => JSON.stringify({ kind: 'log', message } satisfies FrameworkEvent) + '\n'
 const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms))
@@ -311,5 +311,29 @@ test('tailAgentEvents on a run already finished: every line, then the replay mar
     assert.equal(sync, 1)
   } finally {
     stop()
+  }
+})
+
+test('tailAgentEvents reads the message being written beside the diary: each change once, and empty once it is whole', async () => {
+  const cwd = await tmpWorkspace()
+  const diary = join(cwd, 'r1.jsonl')
+  const live = join(cwd, 'r1.live')
+  await writeFile(diary, line('one'))
+  const partials: string[] = []
+  const stop = tailAgentEvents<FrameworkEvent>(async () => ({ file: diary }), () => {}, undefined, partialReader(text => partials.push(text)))
+  try {
+    await sleep(200)
+    assert.deepEqual(partials, [])
+    // Only the live file changes, not the diary: its watch reads it all the same.
+    await writeFile(live, 'Rivers car')
+    await sleep(1400)
+    await writeFile(live, 'Rivers carve valleys.')
+    await sleep(1400)
+    await rm(live)
+    await sleep(1400)
+    assert.deepEqual(partials, ['Rivers car', 'Rivers carve valleys.', ''])
+  } finally {
+    stop()
+    await rm(cwd, { recursive: true, force: true })
   }
 })

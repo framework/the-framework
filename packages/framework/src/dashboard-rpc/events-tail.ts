@@ -1,5 +1,7 @@
 import { existsSync } from 'node:fs'
-import { dirname } from 'node:path'
+import { readFile } from 'node:fs/promises'
+import { basename, dirname, join } from 'node:path'
+import { logLiveFile } from 'agent-driver'
 import { JsonlTailer, followFile } from '../jsonl-tail.js'
 
 /** How often the poll backstop re-reads the log when `fs.watch` says nothing. */
@@ -40,6 +42,21 @@ export function tailEvents<T = unknown>(path: string, onEvent: (event: T) => voi
   }
 }
 
+/**
+ * Reads the message a run is writing, from the live file beside its diary, for
+ * {@link tailAgentEvents}' `afterPull`: the file changes in the diary's directory, so the diary's
+ * watch reads it too. `send` gets the text when it changed, and `''` once the file is gone.
+ */
+export function partialReader(send: (text: string) => void): (diary: string) => Promise<void> {
+  let sent = ''
+  return async diary => {
+    const text = await readFile(join(dirname(diary), logLiveFile(basename(diary, '.jsonl'))), 'utf8').catch(() => '')
+    if (text === sent) return
+    sent = text
+    send(text)
+  }
+}
+
 /** Where a relocating tail reads now: a file it follows, a finished run's lines, whole, or nowhere yet (`pending`: ask again shortly). */
 export type TailTarget<T> = { file: string } | { finished: T[] } | { pending: true }
 
@@ -66,11 +83,15 @@ export type TailTarget<T> = { file: string } | { finished: T[] } | { pending: tr
  *
  * `onReplayed` keeps {@link tailEvents}' once-per-subscription contract: a relocation is not a
  * new replay boundary, so it never fires twice.
+ *
+ * `afterPull` is told the diary's path after each read of it: the files beside the diary change
+ * with it, and a caller reads them there, on the same watch.
  */
 export function tailAgentEvents<T = unknown>(
   resolve: () => Promise<TailTarget<T> | undefined>,
   onEvent: (event: T) => void,
   onReplayed?: () => void,
+  afterPull?: (diary: string) => Promise<void>,
 ): () => void {
   let stopped = false
   let stopFollow: (() => void) | undefined
@@ -112,6 +133,7 @@ export function tailAgentEvents<T = unknown>(
     if (stopped || !tailer || path === undefined) return
     if (existsSync(path)) {
       await tailer.pull()
+      await afterPull?.(path)
       return
     }
     if (relocating) return

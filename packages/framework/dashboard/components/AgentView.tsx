@@ -43,6 +43,7 @@ export function AgentView({
   remoteLabel,
   files,
   lost = false,
+  writing = '',
   onAgentStarted,
   onDeleted,
 }: {
@@ -70,6 +71,8 @@ export function AgentView({
   files: string[]
   /** The live channel's health (#948) — surfaced as a banner over the feed. */
   lost?: boolean
+  /** The message the agent is writing, as far as it has got: shown after the feed while it runs. */
+  writing?: string
   /** Jump to the agent a preset or a continuation started (#959). */
   onAgentStarted?: ((intent: string, agentId: string) => void) | undefined
   /** Leave this session after it is deleted (#1032) — back to the project home. */
@@ -267,6 +270,7 @@ export function AgentView({
           projectId={projectId}
           agentId={agentId}
           lost={lost}
+          writing={feedLive ? writing : ''}
           {...(feedLive ? {} : { stick: false, openAt: 'end' as const, emptyLabel: 'This agent has no events.' })}
           // A web agent's log dead-ends at the hand-off (#1265): the mirror box rides the tail of
           // the scroller, where "and then…" belongs. Self-nulling for every other target.

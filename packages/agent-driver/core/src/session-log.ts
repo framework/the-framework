@@ -1,4 +1,4 @@
-import { appendFile, mkdir, writeFile } from 'node:fs/promises'
+import { appendFile, mkdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { DriverEvent } from './types.js'
 
@@ -21,6 +21,11 @@ import type { DriverEvent } from './types.js'
  * reader shows when each thing happened, whenever it reads the diary. The agent's environment
  * names the diary ({@link DIARY_ENV}), so a command it runs may append whole lines of its own
  * kinds there too, with an `at` of their own to be shown with a time.
+ *
+ * A third file, `<id>.live`, holds the message the agent is writing, as far as it has got, as
+ * plain text: rewritten as the pieces arrive, and removed once the message is whole in the diary.
+ * It is there only while a message is being written. A runner copies the card and the diary, never
+ * this file, so the pieces live only as long as the run's own directory.
  */
 
 /** How the run ended: finished, stopped, failed, or waiting on an answer to the question its last turn asked. */
@@ -72,12 +77,20 @@ export function logCardFile(id: string): string {
 export function logDiaryFile(id: string): string {
   return `${id}.jsonl`
 }
+/** The live file's name: the message being written. */
+export function logLiveFile(id: string): string {
+  return `${id}.live`
+}
 
 /** The session's log, kept current as events arrive. Writes stay ordered; a failed write never breaks the run. */
 export class SessionLog {
   card: WrittenCard
   private tail: Promise<void> = Promise.resolve()
   private opened = false
+  /** The newest partial text not yet written, when a write of it is queued. */
+  private partial: string | undefined
+  /** Whether the live file holds text that a whole message has not replaced yet. */
+  private liveWritten = false
 
   constructor(
     private readonly dir: string,
@@ -96,6 +109,11 @@ export class SessionLog {
   /** The diary's path. */
   get diaryPath(): string {
     return join(this.dir, logDiaryFile(this.card.id))
+  }
+
+  /** The live file's path. */
+  get livePath(): string {
+    return join(this.dir, logLiveFile(this.card.id))
   }
 
   /** Make the directory and write the card and, unless continuing an earlier session's log, an empty diary. Called by the driver when the session starts. */
@@ -117,6 +135,9 @@ export class SessionLog {
       this.card.model = event.model
       return this.queue(() => this.writeCard())
     }
+    if (event.type === 'partial') return this.writePartial(event.text)
+    // The whole message replaces its pieces: a write of them still queued is dropped.
+    if (event.type === 'text') this.partial = undefined
     const line = { ...diaryLine(event), at: this.clock() }
     if (event.type === 'result' && event.usage?.costUsd !== undefined) this.card.cost = (this.card.cost ?? 0) + event.usage.costUsd
     if ((event.type === 'session' || event.type === 'result') && event.sessionId) {
@@ -127,8 +148,32 @@ export class SessionLog {
       if (event.type === 'result' && line.kind === 'result' && event.usage?.costUsd !== undefined) {
         await appendFile(this.diaryPath, JSON.stringify({ kind: 'cost', usd: event.usage.costUsd, at: line.at }) + '\n')
       }
+      if (event.type === 'text') await this.clearLive()
       await this.writeCard()
     })
+  }
+
+  /**
+   * The live file, to the newest partial text. Pieces come faster than files are written, so a
+   * write already queued takes the newest text when its turn comes, and no second write is queued.
+   */
+  private writePartial(text: string): Promise<void> {
+    const queued = this.partial !== undefined
+    this.partial = text
+    if (queued) return this.tail
+    return this.queue(async () => {
+      const newest = this.partial
+      this.partial = undefined
+      if (newest === undefined) return
+      this.liveWritten = true
+      await writeFile(this.livePath, newest)
+    })
+  }
+
+  private async clearLive(): Promise<void> {
+    if (!this.liveWritten) return
+    this.liveWritten = false
+    await rm(this.livePath, { force: true })
   }
 
   /** Add or change card fields the caller learns later: the branch, the pull request, its own mark. */
@@ -142,7 +187,10 @@ export class SessionLog {
   end(status: LogEndStatus, detail?: string): Promise<void> {
     const at = this.clock()
     this.card = { ...this.card, status, endedAt: at }
+    // A run stopped mid-message leaves its pieces unfinished: they go, like the message.
+    this.partial = undefined
     return this.queue(async () => {
+      await this.clearLive()
       await appendFile(this.diaryPath, JSON.stringify({ kind: 'ended', status, ...(detail !== undefined ? { detail } : {}), at }) + '\n')
       await this.writeCard()
     })

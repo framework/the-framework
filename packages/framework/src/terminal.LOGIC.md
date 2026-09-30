@@ -28,7 +28,7 @@ Renders an agent's [1] event stream [2] in a terminal, one human-readable line p
 - **What the agent signals** - its log lines, errors with their detail indented, views by title, and "done for now" when it is settled.
 - **Gates and picks** - the question with one option per line, the recommended one marked, and the pick with who made it.
 - **Usage** - the price of one turn in dollars.
-- **The driver's own events** - the prompt, the text, the thoughts, the actions, the turn boundary, quota warnings only when the quota is tight, errors, notices, and the question a turn ended on.
+- **The driver's own events** - the prompt, the text (a message being written reads as its text so far, though no diary holds one), the thoughts, the actions, the turn boundary, quota warnings only when the quota is tight, errors, notices, and the question a turn ended on.
 - **The end** - "✓ finished", "■ stopped", "? waiting for an answer", or "✗ failed" with the detail.
 
 ## Business logic

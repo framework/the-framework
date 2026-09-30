@@ -10,11 +10,13 @@ Tails an agent's [1] diary [2] for the live stream: everything already written i
 [2] diary: what an agent said and did, one line per event: `<id>.jsonl`, written by the tool that runs the agent under the `.the-framework/` of the agent's checkout while it works, and answered whole by the project's runs provider [4] once it has ended.
 [3] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [4] runs provider: the command, among the commands of a project's dependencies, that a package declares as answering for the project's finished agents (`../store/runs.ts`).
+[5] live file: `<id>.live` beside the diary, holding the message the coding agent is writing, as far as it has got; it exists only while a message is being written and is never recorded.
 
 ## Business logic — TL;DR
 
 - **Read what is there, then follow** - the lines already logged are delivered first, then each new line as it lands; a malformed line is skipped; a file rewritten from scratch is re-read from the top; a stopped tail delivers nothing more.
 - **The replay boundary is reported once** - after the first read and before any followed line, even when the file does not exist yet or the first read fails, and never a second time.
+- **The message being written is read beside the diary** - after each read of the diary the caller may read the files beside it on the same watch; the live file reader sends the text of the live file [5] each time it changed, and an empty text once the file is gone.
 - **The tail follows a relocated diary** - whenever the file is not there, the tail asks where the diary is now: a new file, it moves there carrying its position; the finished agent's lines, it delivers the ones past what it already delivered and stops following; so the lines the move swallowed arrive exactly once and nothing already delivered is repeated; this holds even for an agent it never saw in its checkout.
 
 ## Business logic

@@ -1,0 +1,14 @@
+{
+  "id": "2026-09-30T07-26-38-745Z",
+  "startedAt": "2026-09-30T07:26:38.834Z",
+  "status": "running",
+  "intent": "Don't use any tools. Say hi in one sentence.",
+  "driver": "claude-code",
+  "model": "opus",
+  "caller": {
+    "runner": {
+      "host": "Suleimans-MacBook-Pro.local",
+      "pid": 68053
+    }
+  }
+}

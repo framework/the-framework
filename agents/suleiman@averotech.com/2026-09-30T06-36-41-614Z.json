@@ -1,13 +1,22 @@
 {
   "id": "2026-09-30T06-36-41-614Z",
-  "startedAt": "2026-09-30T06:36:41.628Z",
-  "status": "running",
+  "startedAt": "2026-09-30T06:36:44.781Z",
+  "endedAt": "2026-09-30T06:36:52.704Z",
+  "status": "waiting",
   "intent": "ask me some easy math question with choices",
   "driver": "claude-code",
-  "model": "opus",
+  "model": "claude-opus-5-5",
+  "branch": "agent-2026-09-30T06-36-41-614Z",
+  "cost": 0.06457660000000001,
   "caller": {
     "runner": {
-      "host": "Suleimans-MacBook-Pro.local"
-    }
+      "host": "Suleimans-MacBook-Pro.local",
+      "pid": 2539
+    },
+    "pid": 2539,
+    "host": "Suleimans-MacBook-Pro.local",
+    "kind": "prompt",
+    "workspace": "/Users/suleiman/Projects/gemstack/.branches/agent-2026-09-30T06-36-41-614Z",
+    "sessionId": "2772a798-60f9-4ff0-a108-cd37a3fc4b3c"
   }
 }

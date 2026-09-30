@@ -1,4 +1,4 @@
-Runs one turn [1] of a coding agent [2] as one operating-system process, whichever coding agent it is: the process is spawned in the driver session's [3] directory as the leader of its own process group, the prompt is fed to it over standard input, its output is streamed line by line through the driver's [4] own parser into progress events [5], and the turn succeeds or fails on the process's exit code. The Claude Code and Codex drivers supply only the command line and the parser; everything about the process lives here.
+Runs one turn [1] of a coding agent [2] as one operating-system process, whichever coding agent it is: the process is spawned in the driver session's [3] directory as the leader of its own process group, the prompt is fed to it over standard input, or the driver's [4] own parser talks to it there, its output is streamed line by line through that parser into progress events [5], and the turn succeeds or fails on the process's exit code and on what its output said. The Claude Code and Codex drivers supply only the command line and the parser; everything about the process lives here.
 
 ## Context
 
@@ -19,9 +19,9 @@ Runs one turn [1] of a coding agent [2] as one operating-system process, whichev
 
 ## Business logic — TL;DR
 
-- **One turn is one process** - the coding agent [2] is spawned as its own process-group leader in the driver session's [3] directory, the prompt goes in over standard input, and a `start` progress event [5] announces the turn [1].
+- **One turn is one process** - the coding agent [2] is spawned as its own process-group leader in the driver session's [3] directory, the prompt goes in over standard input, or the driver's parser holds a conversation with the coding agent there, and a `start` progress event [5] announces the turn [1].
 - **Output streams through the driver's parser** - each output line is handed to the driver's [4] parser, and whatever progress events it yields are forwarded as they come.
-- **The exit code decides the turn** - exit code zero resolves the turn with the parser's final result and a `result` progress event; any other exit fails the turn with an `error` progress event, even when text streamed first; the failure keeps the driver id, the exit code and the reason apart, so a caller that showed the reason from the event need not say it twice.
+- **The exit code and the output decide the turn** - exit code zero resolves the turn with the parser's final result and a `result` progress event, unless the output showed the turn failed; any other exit fails the turn with an `error` progress event, even when text streamed first; the failure keeps the driver id, the exit code and the reason apart, so a caller that showed the reason from the event need not say it twice.
 - **A stop request kills the whole process tree** - a stop request [7] sends the whole process group a termination signal, then a forced kill 5 seconds later, and fails the turn as stopped; a stop request already raised before the turn starts fails it without spawning anything.
 - **Nothing is reported twice** - once a turn has been settled by a stop request or a spawn failure, the process's later exit produces no further progress event.
 - **A process that cannot start fails the turn** - a coding agent that cannot be started at all, because it is not installed, fails the turn with that error.
@@ -40,6 +40,8 @@ See `## Context`.
 
 A turn [1] spawns the coding agent [2] with the command line the driver [4] built, in the driver session's [3] directory (the agent's [6] checkout [8]) and with the environment the driver chose, as the leader of its own process group so that the whole subtree can be signaled at once. A `start` progress event [5] carrying the prompt announces the turn first. The prompt is written to the process's standard input, which is then closed, unless the driver wraps it in the form its coding agent reads (Claude Code's JSON lines), in which case the wrapped form is written instead; so a long prompt never hits the operating system's command-line length limit.
 
+A coding agent that is talked to rather than handed its prompt (Codex's app server, which answers requests one JSON message per line) gets no prompt written for it: as soon as the process is spawned, the driver's parser is handed a way to write lines to its standard input and to close it, and it holds the whole exchange itself, answering what it reads. Standard input then stays open until the parser closes it; lines the parser writes after that are dropped.
+
 ### Output streams through the driver's parser
 
 #### Context
@@ -50,7 +52,7 @@ A turn [1] spawns the coding agent [2] with the command line the driver [4] buil
 
 The process's standard output is read one line at a time and each line is handed to the driver's [4] parser, which knows the coding agent's [2] own output format. Whatever progress events [5] the parser yields for a line are forwarded immediately. Standard error is collected and kept aside as the failure detail.
 
-### The exit code decides the turn
+### The exit code and the output decide the turn
 
 #### Context
 
@@ -58,7 +60,7 @@ The process's standard output is read one line at a time and each line is handed
 
 #### Business logic
 
-When the process exits with code zero, the turn [1] resolves with the parser's result (the final message, the session id and the usage when known), and a `result` progress event [5] carries the same. When the process exits with any other code, or dies from a signal, the turn fails even if text was streamed first: an `error` progress event is reported with the failure detail, and the turn fails with "<driver id> exited (<exit code>): <detail>". That failure keeps its parts apart too — the driver id, the exit code and the detail — so a caller that already showed the detail from the `error` progress event can say only "<driver id> exited (<exit code>)". The detail is, in order of preference, the reason the coding agent's [2] output gave for the failure, when the driver's parser read one, else what the coding agent wrote to standard error, else the text it streamed so far, else "exit code <code>" (with `null` for a death by signal).
+When the process exits with code zero and the driver's parser read no failure, the turn [1] resolves with the parser's result (the final message, the session id and the usage when known), and a `result` progress event [5] carries the same. When the process exits with any other code, or dies from a signal, the turn fails even if text was streamed first: an `error` progress event is reported with the failure detail, and the turn fails with "<driver id> exited (<exit code>): <detail>". When the process exits with code zero but the parser read a failure — the coding agent's [2] output said the turn failed, or stopped before the turn ended — the turn fails the same way, as "<driver id> failed: <detail>": a coding agent held in conversation (Codex's app server) exits cleanly whatever became of its turn. That failure keeps its parts apart too — the driver id, the exit code and the detail — so a caller that already showed the detail from the `error` progress event can say only "<driver id> exited (<exit code>)", or "<driver id> failed". The detail is, in order of preference, the reason the coding agent's output gave for the failure, when the driver's parser read one, else what the coding agent wrote to standard error, else, for a non-zero exit, the text it streamed so far, else "exit code <code>" (with `null` for a death by signal), and for exit code zero "the turn did not finish".
 
 ### A stop request kills the whole process tree
 

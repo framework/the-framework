@@ -27,6 +27,7 @@ export {
   runCliSession,
   AgentExitError,
   type AgentCliParser,
+  type CliIo,
   type RunCliSessionOptions,
   type SpawnLike,
   type SpawnedProcess,

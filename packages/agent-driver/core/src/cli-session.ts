@@ -41,8 +41,26 @@ export interface AgentCliParser {
   push(line: string): DriverEvent[]
   /** The turn the lines added up to. */
   result(): DriverTurn
-  /** Why the agent said its turn failed, when its output said so: a truer reason than whatever it printed to stderr. */
+  /**
+   * Why the turn failed, when the agent's output shows it did: the reason the agent gave, a truer
+   * one than whatever it printed to stderr, or `''` when its output stopped before the turn ended
+   * without saying why. A failure fails the turn even when the process exits 0.
+   */
   failure?(): string | undefined
+  /**
+   * For a CLI that is talked to rather than handed its prompt (a JSON-RPC server on stdio): called
+   * once, as soon as the process is spawned, with a way to write a line to its stdin and to close
+   * it. Without it, the prompt is written whole and stdin closed at once.
+   */
+  converse?(io: CliIo): void
+}
+
+/** Writing to the agent CLI's stdin, for a parser that converses with it. */
+export interface CliIo {
+  /** Write one line (the newline is added). */
+  write(line: string): void
+  /** Close stdin: the CLI's cue that nothing more is coming. */
+  end(): void
 }
 
 /** How to run one agent-CLI invocation. */
@@ -52,7 +70,7 @@ export interface RunCliSessionOptions {
   cwd: string
   env: NodeJS.ProcessEnv
   prompt: string
-  /** What goes to the CLI's stdin, for a CLI that reads the prompt wrapped. Default the prompt itself. */
+  /** What goes to the CLI's stdin, for a CLI that reads the prompt wrapped. Default the prompt itself. Unused when the parser converses. */
   stdin?: string
   spawn: SpawnLike
   emit: (event: DriverEvent) => void
@@ -64,8 +82,9 @@ export interface RunCliSessionOptions {
 }
 
 /**
- * A turn that failed because the coding agent's process exited with an error. The message says it
- * all, `<driver> exited (<code>): <reason>`, for a caller that only prints it; the parts are kept
+ * A turn that failed: the coding agent's process exited with an error, or exited cleanly after its
+ * output said the turn failed (code 0). The message says it all, `<driver> exited (<code>): <reason>`,
+ * or `<driver> failed: <reason>` for code 0, for a caller that only prints it; the parts are kept
  * apart for a caller that already showed the reason, from the `error` event sent just before, and
  * wants to say only that the agent exited.
  */
@@ -74,17 +93,17 @@ export class AgentExitError extends Error {
   constructor(
     /** The driver's id, e.g. `"codex"`. */
     readonly driver: string,
-    /** The exit code, `null` when the process was ended by a signal. */
+    /** The exit code, `null` when the process was ended by a signal, 0 when it exited cleanly on a failed turn. */
     readonly code: number | null,
     /** What the agent said went wrong: the same text as the `error` event. */
     readonly reason: string,
   ) {
-    super(`${driver} exited (${code ?? 'null'}): ${reason}`)
+    super(`${code === 0 ? `${driver} failed` : `${driver} exited (${code ?? 'null'})`}: ${reason}`)
   }
 
-  /** The failure without the reason: `<driver> exited (<code>)`. */
+  /** The failure without the reason: `<driver> exited (<code>)`, or `<driver> failed`. */
   get exit(): string {
-    return `${this.driver} exited (${this.code ?? 'null'})`
+    return this.code === 0 ? `${this.driver} failed` : `${this.driver} exited (${this.code ?? 'null'})`
   }
 }
 
@@ -179,11 +198,13 @@ export function runCliSession(opts: RunCliSessionOptions): Promise<DriverTurn> {
       // still closes afterward, but its late exit must not emit a second telemetry event.
       if (settled) return
       const turn = parser.result()
+      const failure = parser.failure?.()
       // A non-zero exit is a failed turn even when the agent streamed some text
       // first: the loop gates on the outcome, so a crash mid-build must not pass
-      // as a result. Surface the failure the agent reported, else stderr, else the partial text, as context.
-      if (code !== 0) {
-        const detail = parser.failure?.() || Buffer.concat(stderrChunks).toString('utf8').trim() || turn.text.trim() || `exit code ${code ?? 'null'}`
+      // as a result; so is a clean exit after output that says the turn failed.
+      // Surface the failure the agent reported, else stderr, else (for a crash) the partial text, as context.
+      if (code !== 0 || failure !== undefined) {
+        const detail = failure || Buffer.concat(stderrChunks).toString('utf8').trim() || (code === 0 ? 'the turn did not finish' : turn.text.trim() || `exit code ${code ?? 'null'}`)
         opts.emit({ type: 'error', message: detail })
         finish(() => rejectPromise(new AgentExitError(agent, code, detail)))
         return
@@ -198,14 +219,29 @@ export function runCliSession(opts: RunCliSessionOptions): Promise<DriverTurn> {
     })
 
     // Feed the prompt over stdin so long prompts never hit arg-length limits.
-    if (child.stdin) {
+    const stdin = child.stdin
+    if (stdin) {
       // A CLI that exits before reading stdin (bad flag, instant crash) surfaces an async
       // EPIPE on the stream; with no listener that is an uncaught exception in the calling process
       // (#943). The close handler already reports the failed turn, so the error carries
       // nothing the caller needs.
-      child.stdin.on('error', () => {})
-      child.stdin.write(opts.stdin ?? opts.prompt)
-      child.stdin.end()
+      stdin.on('error', () => {})
+      if (parser.converse) {
+        let ended = false
+        parser.converse({
+          write: line => {
+            if (!ended) stdin.write(line + '\n')
+          },
+          end: () => {
+            if (ended) return
+            ended = true
+            stdin.end()
+          },
+        })
+      } else {
+        stdin.write(opts.stdin ?? opts.prompt)
+        stdin.end()
+      }
     }
   })
 }

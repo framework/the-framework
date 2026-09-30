@@ -2,7 +2,7 @@ import { execFile, spawn as nodeSpawn } from 'node:child_process'
 import { copyFile, lstat, mkdir, readlink, readdir, realpath, rename, rm, stat, symlink } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { runCliSession, finishTurn, agentEnv, attachLog, combineFraming, combineSignals, makeEmit, readWorkspaceFile, oneLine, checkCliReady, type AgentCliParser, type CliSpec, type DriverReadiness, type DriverReadyOptions, type PersonalSetup, type SpawnLike, type SessionLog, type Driver, type DriverEvent, type DriverModel, type DriverPromptOptions, type DriverSession, type DriverStartOptions, type DriverTurn, type DriverUsage } from 'agent-driver'
+import { runCliSession, finishTurn, agentEnv, attachLog, combineFraming, combineSignals, makeEmit, readWorkspaceFile, oneLine, checkCliReady, type AgentCliParser, type CliIo, type CliSpec, type DriverReadiness, type DriverReadyOptions, type PersonalSetup, type SpawnLike, type SessionLog, type Driver, type DriverEvent, type DriverModel, type DriverPromptOptions, type DriverSession, type DriverStartOptions, type DriverTurn, type DriverUsage } from 'agent-driver'
 
 /**
  * Codex's sandbox policy for the shell commands the model writes.
@@ -112,18 +112,18 @@ export async function prepareCodexHome(home: string, personal: string): Promise<
 }
 
 /**
- * The second real {@link Driver} (#539): wraps the **Codex CLI** in its
- * non-interactive mode (`codex exec --json`), on the user's own ChatGPT
- * subscription — no API key (#495's "bring your own subscription").
+ * The second real {@link Driver} (#539): wraps the **Codex CLI** through its
+ * app server (`codex app-server`, JSON-RPC over stdio), on the user's own ChatGPT
+ * subscription — no API key (#495's "bring your own subscription"). The app server
+ * rather than `codex exec --json`, because only it sends the answer in pieces as
+ * it is written.
  *
  * The seam always said "Claude Code today, Codex later", and this is that. Same
  * black box: prompt it, let its own loop run, read the code it wrote.
  *
- * Three ways it differs from Claude Code, all of them the agent's business
+ * Two ways it differs from Claude Code, both of them the agent's business
  * rather than ours:
  *
- * - **No system-prompt flag.** Codex has no `--append-system-prompt`, so the
- *   framing is prepended to the prompt instead. Same words reach the agent.
  * - **Tokens, no price.** Codex reports token counts but never a price, so usage
  *   carries the counts and omits `costUsd` rather than claim a turn cost `$0`,
  *   which would read as free (#540).
@@ -216,9 +216,9 @@ export function parseCodexModels(stdout: string): { models: DriverModel[] } | { 
 let sessionCounter = 0
 
 /**
- * One workspace-bound Codex session. Every `prompt` is its own CLI invocation: a fresh
- * conversation (`codex exec`), or, for a `resume` prompt, the session's conversation continued
- * (`codex exec resume <id>`).
+ * One workspace-bound Codex session. Every `prompt` is its own `codex app-server` process, asked
+ * for one turn: on a fresh conversation, or, for a `resume` prompt, on the session's conversation
+ * continued.
  */
 export class CodexSession implements DriverSession {
   readonly id: string
@@ -245,25 +245,29 @@ export class CodexSession implements DriverSession {
   }
 
   async prompt(text: string, opts: DriverPromptOptions = {}): Promise<DriverTurn> {
-    // Codex takes no system-prompt flag, so the framing rides in front of the
-    // prompt. Blank-line separated, so it reads as its own block.
-    // A resumed conversation already carries its framing; sending it again only repeats it.
     const resumeId = opts.resume ? this.lastSessionId : undefined
+    // A resumed conversation already carries its framing; sending it again only repeats it.
     const framing = resumeId === undefined ? combineFraming(this.startOpts.system, opts.system) : ''
-    const prompt = framing ? `${framing}\n\n${text}` : text
     // Resolved every turn, not at start: the agent may `git init` in turn 1.
     const gitDir = await gitCommonDir(this.cwd)
     const emit = makeEmit(this.startOpts.onEvent, 'codex')
     const turn = await runCliSession({
       bin: this.config.bin ?? 'codex',
-      args: this.buildArgs(gitDir, resumeId),
+      args: this.buildArgs(gitDir),
       cwd: this.cwd,
       env: agentEnv(this.config.env ?? process.env, this.log),
-      prompt,
+      prompt: text,
       spawn: this.config.spawn ?? (nodeSpawn as unknown as SpawnLike),
       emit,
       signals: combineSignals(this.startOpts.signal, opts.signal),
-      parser: new CodexJsonParser(),
+      parser: new CodexAppServerParser({
+        text,
+        cwd: this.cwd,
+        sandbox: this.config.sandbox ?? 'workspace-write',
+        ...(framing ? { framing } : {}),
+        ...(this.startOpts.model ? { model: this.startOpts.model } : {}),
+        ...(resumeId !== undefined ? { resumeId } : {}),
+      }),
       driver: 'codex',
     })
     if (turn.sessionId) this.lastSessionId = turn.sessionId
@@ -279,24 +283,14 @@ export class CodexSession implements DriverSession {
     return Promise.resolve()
   }
 
-  private buildArgs(gitDir: string | undefined, resumeId?: string): string[] {
-    // No prompt argument: it goes over stdin, so a long one never hits the
-    // arg-length limit. `--skip-git-repo-check` because Codex otherwise refuses
-    // to run outside a git repo, and a workspace may legitimately not be one yet.
-    const sandbox = this.config.sandbox ?? 'workspace-write'
-    // `exec resume` takes neither `--sandbox` nor `-C` (codex-cli 0.144.4): the sandbox goes in
-    // as the config value the flag sets, the directory is the process's own, and `-` is the
-    // prompt read from stdin, which the id before it would otherwise be taken for.
-    const args = resumeId
-      ? ['exec', 'resume', resumeId, '-', '--json', '--skip-git-repo-check', '-c', `sandbox_mode=${JSON.stringify(sandbox)}`]
-      : ['exec', '--json', '--skip-git-repo-check', '--sandbox', sandbox, '-C', this.cwd]
+  private buildArgs(gitDir: string | undefined): string[] {
+    const args = ['app-server']
     // `workspace-write` keeps a `.git/` directory at the workspace root read-only,
     // so in a plain checkout (not a worktree) the agent's commit fails on
     // `.git/index.lock` (verified on codex-cli 0.144.4, #1747). The git dir is made
     // writable: committing is the agent's job, and a worktree's git dir already is.
     // The `-c` value is TOML; a JSON string array is a valid TOML array.
-    if (sandbox === 'workspace-write' && gitDir) args.push('-c', `sandbox_workspace_write.writable_roots=${JSON.stringify([gitDir])}`)
-    if (this.startOpts.model) args.push('-m', this.startOpts.model)
+    if ((this.config.sandbox ?? 'workspace-write') === 'workspace-write' && gitDir) args.push('-c', `sandbox_workspace_write.writable_roots=${JSON.stringify([gitDir])}`)
     if (this.config.extraArgs) args.push(...this.config.extraArgs)
     return args
   }
@@ -329,92 +323,106 @@ export function codexDetail(item: Record<string, unknown>): string | undefined {
   return undefined
 }
 
+/** The one turn a {@link CodexAppServerParser} asks for. */
+export interface CodexTurnRequest {
+  /** The prompt. */
+  text: string
+  /** The workspace. */
+  cwd: string
+  sandbox: CodexSandbox
+  /** The framing, given to a fresh conversation as Codex's developer instructions. */
+  framing?: string
+  model?: string
+  /** The conversation to continue; without it, a fresh one starts. */
+  resumeId?: string
+}
+
+/** Items that are the conversation itself, not the agent using a tool. */
+const NOT_TOOLS = new Set(['userMessage', 'agentMessage', 'reasoning'])
+
+/** A field of a JSON object, when `value` is one. */
+function field(value: unknown, key: string): unknown {
+  return typeof value === 'object' && value !== null ? (value as Record<string, unknown>)[key] : undefined
+}
+
 /**
- * Parses Codex's `exec --json` output: one JSON event per line.
- *
- * The dialect, as observed on codex-cli 0.144.4:
+ * Talks to `codex app-server` (JSON-RPC, one JSON message per line, over stdio) for one turn, and
+ * reads what it sends back. The exchange, as observed on codex-cli 0.144.4:
  * ```
- * {"type":"thread.started","thread_id":"019f..."}
- * {"type":"turn.started"}
- * {"type":"item.completed","item":{"type":"reasoning","text":"**Checking the tests**"}}
- * {"type":"item.completed","item":{"type":"agent_message","text":"..."}}
- * {"type":"item.started","item":{"type":"command_execution","command":"/bin/zsh -lc 'echo done'"}}
- * {"type":"item.started","item":{"type":"file_change","status":"in_progress"}}
- * {"type":"turn.completed","usage":{"input_tokens":12210,"output_tokens":5}}
- * {"type":"turn.failed","error":{"message":"{\"type\":\"error\",\"status\":400,\"error\":{\"message\":\"The 'gpt-5' model is not supported when using Codex with a ChatGPT account.\"}}"}}
+ * → {"id":1,"method":"initialize","params":{"clientInfo":{...}}}         ← {"id":1,"result":{...}}
+ * → {"method":"initialized"}
+ * → {"id":2,"method":"thread/start","params":{"cwd":...}}                ← {"id":2,"result":{"thread":{"id":"01a0..."},"model":"gpt-5.5",...}}
+ *   (or "thread/resume" with the threadId)
+ * → {"id":3,"method":"turn/start","params":{"threadId":...,"input":[...]}} ← {"id":3,"result":{"turn":{"id":"01a1..."}}}
+ * ← {"method":"item/started","params":{"item":{"type":"commandExecution","command":"/bin/zsh -lc 'ls'",...}}}
+ * ← {"method":"item/agentMessage/delta","params":{"itemId":"msg_1","delta":"Crea"}}
+ * ← {"method":"item/completed","params":{"item":{"type":"agentMessage","id":"msg_1","text":"Created hello.txt"}}}
+ * ← {"method":"thread/tokenUsage/updated","params":{"turnId":"01a1...","tokenUsage":{"last":{"inputTokens":13686,...}}}}
+ * ← {"method":"turn/completed","params":{"turn":{"status":"completed"|"failed"|"interrupted","error":{"message":...}}}}
  * ```
+ * Closing stdin ends the server at once, turn or no turn, so it is closed only once the turn has
+ * completed, or a request was refused.
  */
-export class CodexJsonParser implements AgentCliParser {
+export class CodexAppServerParser implements AgentCliParser {
+  private io: CliIo | undefined
+  private nextId = 0
+  private readonly pending = new Map<number, (result: Record<string, unknown>) => DriverEvent[]>()
   private text = ''
+  /** The message being written, as far as its pieces have got. */
+  private partial = ''
   private sessionId: string | undefined
+  private turnId: string | undefined
   private usage: DriverUsage | undefined
   private failed: string | undefined
+  private ended = false
+
+  constructor(private readonly turn: CodexTurnRequest) {}
+
+  converse(io: CliIo): void {
+    this.io = io
+    this.request('initialize', { clientInfo: { name: 'agent-driver', version: '1' } }, () => {
+      this.send({ method: 'initialized' })
+      // No approval is ever asked: a turn nobody watches could not answer one. The sandbox is what
+      // bounds the agent.
+      const thread = {
+        cwd: this.turn.cwd,
+        approvalPolicy: 'never',
+        sandbox: this.turn.sandbox,
+        ...(this.turn.model ? { model: this.turn.model } : {}),
+      }
+      const onThread = (result: Record<string, unknown>) => this.onThread(result)
+      if (this.turn.resumeId !== undefined) this.request('thread/resume', { ...thread, threadId: this.turn.resumeId }, onThread)
+      else this.request('thread/start', { ...thread, ...(this.turn.framing ? { developerInstructions: this.turn.framing } : {}) }, onThread)
+      return []
+    })
+  }
 
   push(line: string): DriverEvent[] {
-    let obj: Record<string, unknown>
+    let msg: Record<string, unknown>
     try {
-      obj = JSON.parse(line) as Record<string, unknown>
+      msg = JSON.parse(line) as Record<string, unknown>
     } catch {
-      return [] // Banners and other noise: not every line is an event.
+      return [] // Banners and other noise: not every line is a message.
     }
     // `null` parses, so the catch above lets it through and every field read below throws — from
     // inside a readline handler, where nothing catches it. Noise is noise whatever it parses to.
-    if (typeof obj !== 'object' || obj === null) return []
-    const type = obj['type']
-
-    // Announced at once, like Claude Code's: a turn that is stopped or fails before its result
-    // must not take the id, the handle a later `exec resume` needs, with it.
-    if (type === 'thread.started') {
-      const id = obj['thread_id']
-      if (typeof id !== 'string') return []
-      this.sessionId = id
-      return [{ type: 'session', sessionId: id }]
-    }
-
-    // Why the turn failed, such as a model the account cannot use. Codex then exits 1 with only
-    // "Reading prompt from stdin..." on stderr, so this is the only place the reason is said.
-    if (type === 'turn.failed') {
-      const error = obj['error']
-      const message = typeof error === 'object' && error !== null ? (error as Record<string, unknown>)['message'] : undefined
-      if (typeof message === 'string' && message.trim() !== '') this.failed = codexErrorMessage(message.trim())
+    if (typeof msg !== 'object' || msg === null) return []
+    const method = msg['method']
+    const id = msg['id']
+    if (typeof method !== 'string') return typeof id === 'number' ? this.onResponse(id, msg) : []
+    // A request of the server's own: an approval or a question nobody is there to answer.
+    if (id !== undefined) {
+      this.send({ id, error: { code: -32601, message: 'agent-driver answers no requests' } })
       return []
     }
-
-    if (type === 'turn.completed') {
-      const usage = parseCodexUsage(obj['usage'])
-      if (usage) this.usage = usage
-      return []
-    }
-
-    const item = obj['item']
-    if (typeof item !== 'object' || item === null) return []
-    const itemObj = item as Record<string, unknown>
-    const itemType = itemObj['type']
-
-    if (itemType === 'agent_message' && type === 'item.completed') {
-      const text = itemObj['text']
-      if (typeof text !== 'string') return []
-      // Codex narrates in several messages; the last is its answer, and the
-      // rest are progress. Keep the last as the turn, stream them all.
-      this.text = text
-      return [{ type: 'text', text }]
-    }
-
-    if (itemType === 'reasoning' && type === 'item.completed') {
-      const text = itemObj['text']
-      return typeof text === 'string' && text.trim() !== '' ? [{ type: 'thought', text: text.trim() }] : []
-    }
-
-    // Any other item is the agent using a tool: its kind, and what it did.
-    if (type === 'item.started' && typeof itemType === 'string') {
-      const detail = codexDetail(itemObj)
-      return [{ type: 'action', label: itemType, ...(detail !== undefined ? { detail } : {}) }]
-    }
-    return []
+    const params = msg['params']
+    return typeof params === 'object' && params !== null ? this.onNotification(method, params as Record<string, unknown>) : []
   }
 
   failure(): string | undefined {
-    return this.failed
+    if (this.failed !== undefined) return this.failed
+    // Output that stopped before the turn ended: failed, for a reason it never said.
+    return this.ended ? undefined : ''
   }
 
   result(): DriverTurn {
@@ -425,6 +433,127 @@ export class CodexJsonParser implements AgentCliParser {
       ...(this.sessionId ? { sessionId: this.sessionId } : {}),
       ...(this.usage ? { usage: this.usage } : {}),
     }
+  }
+
+  private onThread(result: Record<string, unknown>): DriverEvent[] {
+    const threadId = field(result['thread'], 'id')
+    if (typeof threadId !== 'string') return this.end('Codex started no conversation')
+    // Announced at once: a turn that is stopped or fails before its result must not take the id,
+    // the handle a later resume needs, with it.
+    this.sessionId = threadId
+    this.request('turn/start', { threadId, input: [{ type: 'text', text: this.turn.text, text_elements: [] }] }, started => this.onTurn(started['turn']))
+    const events: DriverEvent[] = [{ type: 'session', sessionId: threadId }]
+    // The model the conversation runs on, by Codex's own id, even when none was picked.
+    const model = result['model']
+    if (typeof model === 'string' && model !== '') events.push({ type: 'model', model })
+    return events
+  }
+
+  /** The turn this process runs, from whichever says it first: the answer to `turn/start`, or `turn/started`. */
+  private onTurn(turn: unknown): DriverEvent[] {
+    const turnId = field(turn, 'id')
+    if (typeof turnId === 'string') this.turnId ??= turnId
+    return []
+  }
+
+  private onNotification(method: string, params: Record<string, unknown>): DriverEvent[] {
+    switch (method) {
+      case 'turn/started':
+        return this.onTurn(params['turn'])
+      case 'item/agentMessage/delta': {
+        const delta = params['delta']
+        if (typeof delta !== 'string' || delta === '') return []
+        this.partial += delta
+        return [{ type: 'partial', text: this.partial }]
+      }
+      case 'thread/tokenUsage/updated': {
+        // A resumed conversation first repeats its last turn's reading: only this turn's count.
+        if (this.turnId === undefined || params['turnId'] !== this.turnId) return []
+        // `last` is one model call; a turn makes several, and its usage is their sum.
+        const last = parseCodexUsage(field(params['tokenUsage'], 'last'))
+        if (last) this.usage = addUsage(this.usage, last)
+        return []
+      }
+      case 'turn/completed': {
+        const status = field(params['turn'], 'status')
+        if (status === 'completed') return this.end()
+        const message = field(field(params['turn'], 'error'), 'message')
+        return this.end(typeof message === 'string' && message.trim() !== '' ? codexErrorMessage(message.trim()) : `Codex's turn ended ${typeof status === 'string' ? status : 'without finishing'}`)
+      }
+      case 'item/started':
+      case 'item/completed':
+        return this.onItem(method === 'item/completed', params['item'])
+      default:
+        return []
+    }
+  }
+
+  private onItem(completed: boolean, raw: unknown): DriverEvent[] {
+    if (typeof raw !== 'object' || raw === null) return []
+    const item = raw as Record<string, unknown>
+    const type = item['type']
+    if (typeof type !== 'string') return []
+    if (type === 'agentMessage') {
+      this.partial = ''
+      const text = item['text']
+      if (!completed || typeof text !== 'string') return []
+      // Codex narrates in several messages; the last is its answer, and the
+      // rest are progress. Keep the last as the turn, stream them all.
+      this.text = text
+      return [{ type: 'text', text }]
+    }
+    if (type === 'reasoning') {
+      // Codex's summary of its thinking: a one-line headline, sometimes a few.
+      const summary = item['summary']
+      const text = Array.isArray(summary) ? summary.filter(s => typeof s === 'string').join('\n').trim() : ''
+      return completed && text !== '' ? [{ type: 'thought', text }] : []
+    }
+    // Any other item is the agent using a tool: its kind, and what it did.
+    if (completed || NOT_TOOLS.has(type)) return []
+    const detail = codexDetail(item)
+    return [{ type: 'action', label: type, ...(detail !== undefined ? { detail } : {}) }]
+  }
+
+  private onResponse(id: number, msg: Record<string, unknown>): DriverEvent[] {
+    const then = this.pending.get(id)
+    if (!then) return []
+    this.pending.delete(id)
+    const error = msg['error']
+    if (typeof error === 'object' && error !== null) {
+      const message = field(error, 'message')
+      return this.end(typeof message === 'string' && message.trim() !== '' ? codexErrorMessage(message.trim()) : 'Codex refused the request')
+    }
+    const result = msg['result']
+    return then(typeof result === 'object' && result !== null ? (result as Record<string, unknown>) : {})
+  }
+
+  private request(method: string, params: Record<string, unknown>, then: (result: Record<string, unknown>) => DriverEvent[]): void {
+    const id = ++this.nextId
+    this.pending.set(id, then)
+    this.send({ id, method, params })
+  }
+
+  private send(msg: Record<string, unknown>): void {
+    this.io?.write(JSON.stringify(msg))
+  }
+
+  /** The turn is over, or failed with `reason`: stdin closes, and with it the server. */
+  private end(reason?: string): DriverEvent[] {
+    if (reason !== undefined) this.failed ??= reason
+    this.ended = true
+    this.io?.end()
+    return []
+  }
+}
+
+/** Two token readings added up. */
+function addUsage(a: DriverUsage | undefined, b: DriverUsage): DriverUsage {
+  if (!a) return b
+  return {
+    inputTokens: a.inputTokens + b.inputTokens,
+    outputTokens: a.outputTokens + b.outputTokens,
+    cacheReadTokens: a.cacheReadTokens + b.cacheReadTokens,
+    cacheCreationTokens: a.cacheCreationTokens + b.cacheCreationTokens,
   }
 }
 
@@ -445,18 +574,18 @@ function codexErrorMessage(message: string): string {
 }
 
 /**
- * Map Codex's `turn.completed` usage onto {@link DriverUsage}. The dialect is
+ * Map one Codex token reading (a `tokenUsage.last`) onto {@link DriverUsage}. The dialect is
  * OpenAI's Responses API shape, flattened:
- * `{input_tokens, cached_input_tokens, output_tokens, reasoning_output_tokens}`.
+ * `{inputTokens, cachedInputTokens, outputTokens, reasoningOutputTokens, totalTokens}`.
  *
  * Two things that shape the mapping, both verified against codex-cli 0.144.4:
  *
- * - `input_tokens` is the **total** input, cached included. Repeating one prompt
- *   held it at 12218 while `cached_input_tokens` rose 9984 -> 12032; a non-cached
+ * - `inputTokens` is the **total** input, cached included. Repeating one prompt
+ *   held it at 12218 while `cachedInputTokens` rose 9984 -> 12032; a non-cached
  *   count would have fallen. So the uncached part is the difference, which is what
- *   `inputTokens` means here.
- * - `reasoning_output_tokens` is a **subset** of `output_tokens` (as
- *   `cached_input_tokens` is of `input_tokens`), so adding it would double-count.
+ *   {@link DriverUsage.inputTokens} means here.
+ * - `reasoningOutputTokens` is a **subset** of `outputTokens` (as
+ *   `cachedInputTokens` is of `inputTokens`), so adding it would double-count.
  *
  * No price, and no cache-*write* count: OpenAI caches implicitly and bills no
  * separate write, so `cacheCreationTokens` is honestly 0 rather than a guess.
@@ -468,11 +597,11 @@ export function parseCodexUsage(raw: unknown): DriverUsage | undefined {
     const value = usage[key]
     return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : 0
   }
-  const input = num('input_tokens')
-  const cached = Math.min(num('cached_input_tokens'), input)
+  const input = num('inputTokens')
+  const cached = Math.min(num('cachedInputTokens'), input)
   return {
     inputTokens: input - cached,
-    outputTokens: num('output_tokens'),
+    outputTokens: num('outputTokens'),
     cacheReadTokens: cached,
     cacheCreationTokens: 0,
   }

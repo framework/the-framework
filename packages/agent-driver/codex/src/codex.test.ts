@@ -3,79 +3,179 @@ import { execFileSync } from 'node:child_process'
 import { lstat, mkdir, mkdtemp, readFile, readlink, realpath, rm, symlink, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { createInterface } from 'node:readline'
 import { test } from 'node:test'
-import { Readable, Writable } from 'node:stream'
-import { CodexDriver, CodexJsonParser, codexReady, defaultCodexHome, parseCodexModels, parseCodexUsage } from './codex.js'
+import { PassThrough, Readable } from 'node:stream'
+import { CodexDriver, codexReady, defaultCodexHome, parseCodexModels, parseCodexUsage } from './codex.js'
 import { AgentExitError, type SpawnLike, type SpawnedProcess, type Driver, type DriverEvent } from 'agent-driver'
 
-/** A real codex-cli 0.144.4 run, verbatim: "Create a file hello.txt containing exactly: hi". */
-const REAL_RUN = [
-  JSON.stringify({ type: 'thread.started', thread_id: '019f660b-bf69-7d62-a96c-34aad1f083db' }),
-  JSON.stringify({ type: 'turn.started' }),
-  JSON.stringify({ type: 'item.completed', item: { id: 'item_0', type: 'agent_message', text: 'I’ll create `hello.txt`.' } }),
-  JSON.stringify({ type: 'item.started', item: { id: 'item_1', type: 'file_change', status: 'in_progress' } }),
-  JSON.stringify({ type: 'item.completed', item: { id: 'item_1', type: 'file_change', status: 'completed' } }),
-  JSON.stringify({ type: 'item.completed', item: { id: 'item_2', type: 'agent_message', text: 'Created hello.txt' } }),
-  JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 12210, cached_input_tokens: 9984, output_tokens: 5 } }),
+type Message = { method: string; params: Record<string, unknown> }
+const note = (method: string, params: Record<string, unknown>): Message => ({ method, params })
+const item = (started: boolean, fields: Record<string, unknown>) => note(started ? 'item/started' : 'item/completed', { item: fields, threadId: 'thread-1', turnId: 'turn-1' })
+const delta = (itemId: string, text: string) => note('item/agentMessage/delta', { threadId: 'thread-1', turnId: 'turn-1', itemId, delta: text })
+const usage = (turnId: string, inputTokens: number, cachedInputTokens: number, outputTokens: number) =>
+  note('thread/tokenUsage/updated', { threadId: 'thread-1', turnId, tokenUsage: { last: { inputTokens, cachedInputTokens, outputTokens, reasoningOutputTokens: 0, totalTokens: inputTokens + outputTokens } } })
+const completed = (status: string, error: Record<string, unknown> | null = null) => note('turn/completed', { threadId: 'thread-1', turn: { id: 'turn-1', items: [], status, error } })
+
+/** A real codex-cli 0.144.4 turn, shortened: "Create a file hello.txt containing hi, using a shell command". */
+const REAL_TURN: Message[] = [
+  note('turn/started', { threadId: 'thread-1', turn: { id: 'turn-1', items: [], status: 'inProgress' } }),
+  item(true, { type: 'userMessage', id: 'u1', content: [{ type: 'text', text: 'go' }] }),
+  item(true, { type: 'agentMessage', id: 'msg_1', text: '', phase: 'commentary' }),
+  delta('msg_1', 'I’ll'),
+  delta('msg_1', ' create'),
+  delta('msg_1', ' it.'),
+  item(false, { type: 'agentMessage', id: 'msg_1', text: 'I’ll create it.', phase: 'commentary' }),
+  item(true, { type: 'commandExecution', id: 'exec-1', command: `/bin/zsh -lc "printf 'hi' > hello.txt"`, status: 'inProgress' }),
+  item(false, { type: 'commandExecution', id: 'exec-1', command: `/bin/zsh -lc "printf 'hi' > hello.txt"`, status: 'completed', exitCode: 0 }),
+  usage('turn-1', 13536, 9984, 127),
+  item(false, { type: 'reasoning', id: 'rs_1', summary: ['**Checking the file**'], content: [] }),
+  item(true, { type: 'fileChange', id: 'fc_1', changes: [{ path: '/tmp/cx/hello.txt', kind: 'add' }], status: 'inProgress' }),
+  item(true, { type: 'agentMessage', id: 'msg_2', text: '', phase: 'final_answer' }),
+  delta('msg_2', 'Created'),
+  delta('msg_2', ' hello.txt'),
+  item(false, { type: 'agentMessage', id: 'msg_2', text: 'Created hello.txt', phase: 'final_answer' }),
+  usage('turn-1', 13686, 13056, 25),
+  completed('completed'),
 ]
 
-test('CodexJsonParser takes the last message as the turn (#539)', () => {
-  const p = new CodexJsonParser()
-  for (const line of REAL_RUN) p.push(line)
-  // Codex narrates as it goes; the last message is its answer, not the first.
-  const turn = p.result()
-  assert.equal(turn.text, 'Created hello.txt')
-  assert.equal(turn.sessionId, '019f660b-bf69-7d62-a96c-34aad1f083db')
-})
+/** How a {@link fakeAppServer} behaves. */
+interface FakeServer {
+  /** What it sends once the turn has started. Default {@link REAL_TURN}. */
+  turn?: Message[]
+  /** What it sends right after answering `thread/resume`. */
+  afterResume?: Message[]
+  /** The method it refuses, with the message. */
+  refuse?: { method: string; message: string }
+  /** Exit on its own with this code once the turn has started, before the turn ends. */
+  exitEarly?: number
+  stderr?: string
+  /** Raw lines it writes before anything else. */
+  noise?: string[]
+}
 
-test('CodexJsonParser announces the session at once and streams text (#539)', () => {
-  const p = new CodexJsonParser()
-  const events = REAL_RUN.flatMap(line => p.push(line))
-  assert.deepEqual(events, [
-    { type: 'session', sessionId: '019f660b-bf69-7d62-a96c-34aad1f083db' },
-    { type: 'text', text: 'I’ll create `hello.txt`.' },
-    { type: 'action', label: 'file_change' },
+/** What a {@link fakeAppServer} was asked: the arguments, the environment, and every message it read. */
+interface Seen {
+  args: readonly string[]
+  env: NodeJS.ProcessEnv
+  messages: Record<string, unknown>[]
+}
+
+/** A fake `codex app-server`: answers the requests it reads on stdin, and exits once stdin closes. */
+function fakeAppServer(server: FakeServer = {}, seen?: (s: Seen) => void): SpawnLike {
+  return (_command, args, spawnOpts) => {
+    const record: Seen = { args, env: spawnOpts.env, messages: [] }
+    const stdin = new PassThrough()
+    const stdout = new PassThrough()
+    let closer: ((code: number | null) => void) | undefined
+    let exited = false
+    const exit = (code: number) => {
+      if (exited) return
+      exited = true
+      stdout.end()
+      stdout.on('end', () => setImmediate(() => (seen?.(record), closer?.(code))))
+      stdout.resume()
+    }
+    const send = (msg: unknown) => stdout.write(JSON.stringify(msg) + '\n')
+    for (const line of server.noise ?? []) stdout.write(line + '\n')
+    createInterface({ input: stdin }).on('line', line => {
+      const msg = JSON.parse(line) as { id?: number; method?: string; params?: Record<string, unknown> }
+      record.messages.push(msg)
+      if (msg.id === undefined || msg.method === undefined) return
+      if (server.refuse?.method === msg.method) return send({ id: msg.id, error: { code: -32600, message: server.refuse.message } })
+      if (msg.method === 'initialize') return send({ id: msg.id, result: { userAgent: 'fake' } })
+      if (msg.method === 'thread/start' || msg.method === 'thread/resume') {
+        const threadId = msg.method === 'thread/resume' ? msg.params?.['threadId'] : 'thread-1'
+        send({ id: msg.id, result: { thread: { id: threadId }, model: 'gpt-5.6-terra' } })
+        if (msg.method === 'thread/resume') for (const m of server.afterResume ?? []) send(m)
+        return
+      }
+      if (msg.method === 'turn/start') {
+        send({ id: msg.id, result: { turn: { id: 'turn-1', items: [], status: 'inProgress' } } })
+        for (const m of server.turn ?? REAL_TURN) send(m)
+        if (server.exitEarly !== undefined) exit(server.exitEarly)
+      }
+    })
+    stdin.on('finish', () => exit(0))
+    const proc: SpawnedProcess = {
+      stdout,
+      stderr: Readable.from(server.stderr ? [server.stderr] : []),
+      stdin,
+      on(event, listener) {
+        if (event === 'close') closer = listener as (code: number | null) => void
+        return proc
+      },
+      kill: () => undefined,
+    }
+    return proc
+  }
+}
+
+/** The requests (and the one notification) a fake server read, as `method` → `params`. */
+function requests(seen: Seen): { method: unknown; params: unknown }[] {
+  return seen.messages.map(m => ({ method: m['method'], params: m['params'] }))
+}
+
+/** Runs one turn on a Codex driver with `opts` against a fake server, and answers what the server saw. */
+async function spawnedWith(opts: ConstructorParameters<typeof CodexDriver>[0], start: { cwd?: string; system?: string; model?: string } = {}): Promise<Seen> {
+  let seen: Seen | undefined
+  const session = await new CodexDriver({ spawn: fakeAppServer({}, s => (seen = s)), ...opts }).start({ cwd: '/ws', ...start })
+  await session.prompt('go')
+  return seen!
+}
+
+test('a Codex turn streams its messages word by word, what each tool call did, and its thoughts', async () => {
+  const events: DriverEvent[] = []
+  const session = await new CodexDriver({ spawn: fakeAppServer() }).start({ cwd: '/ws', onEvent: e => events.push(e) })
+  const turn = await session.prompt('go')
+  // Codex narrates as it goes; the last message is its answer, not the first.
+  assert.equal(turn.text, 'Created hello.txt')
+  assert.equal(turn.sessionId, 'thread-1')
+  assert.deepEqual(events.filter(e => e.type !== 'result'), [
+    { type: 'start', prompt: 'go' },
+    // Announced before anything else the turn streams: a turn stopped midway still leaves it.
+    { type: 'session', sessionId: 'thread-1' },
+    { type: 'model', model: 'gpt-5.6-terra' },
+    // Each piece carries the message so far, not the newest piece alone.
+    { type: 'partial', text: 'I’ll' },
+    { type: 'partial', text: 'I’ll create' },
+    { type: 'partial', text: 'I’ll create it.' },
+    { type: 'text', text: 'I’ll create it.' },
+    { type: 'action', label: 'commandExecution', detail: "printf 'hi' > hello.txt" },
+    { type: 'thought', text: '**Checking the file**' },
+    { type: 'action', label: 'fileChange', detail: '/tmp/cx/hello.txt' },
+    // A new message starts from nothing.
+    { type: 'partial', text: 'Created' },
+    { type: 'partial', text: 'Created hello.txt' },
     { type: 'text', text: 'Created hello.txt' },
   ])
+  assert.ok(events.at(-1)?.type === 'result')
 })
 
-test('CodexJsonParser says what each tool call did, and passes its reasoning on as thoughts', () => {
-  // codex-cli 0.144.4 lines, verbatim but for the shortened paths.
-  const lines = [
-    JSON.stringify({ type: 'item.completed', item: { id: 'item_0', type: 'reasoning', text: '**Confirming Euler polynomial prime run ending at n=40**' } }),
-    JSON.stringify({ type: 'item.started', item: { id: 'item_1', type: 'command_execution', command: "/bin/zsh -lc 'od -An -t x1 hello.txt'", aggregated_output: '', exit_code: null, status: 'in_progress' } }),
-    JSON.stringify({ type: 'item.completed', item: { id: 'item_1', type: 'command_execution', command: "/bin/zsh -lc 'od -An -t x1 hello.txt'", aggregated_output: '68 69', exit_code: 0, status: 'completed' } }),
-    JSON.stringify({ type: 'item.started', item: { id: 'item_2', type: 'command_execution', command: `/bin/zsh -lc "pwd && rg --files -g 'hello.txt'"`, status: 'in_progress' } }),
-    JSON.stringify({ type: 'item.started', item: { id: 'item_3', type: 'file_change', changes: [{ path: '/tmp/cx/hello.txt', kind: 'add' }], status: 'in_progress' } }),
-  ]
-  const p = new CodexJsonParser()
-  assert.deepEqual(lines.flatMap(line => p.push(line)), [
-    { type: 'thought', text: '**Confirming Euler polynomial prime run ending at n=40**' },
-    { type: 'action', label: 'command_execution', detail: 'od -An -t x1 hello.txt' },
-    { type: 'action', label: 'command_execution', detail: "pwd && rg --files -g 'hello.txt'" },
-    { type: 'action', label: 'file_change', detail: '/tmp/cx/hello.txt' },
-  ])
-})
-
-test('CodexJsonParser reports the tokens but never a price (#540)', () => {
-  const p = new CodexJsonParser()
-  for (const line of REAL_RUN) p.push(line)
-  const usage = p.result().usage
-  // The tokens are real and reported; `costUsd: 0` would read as free, so it is absent.
+test('a Codex turn reports its tokens, summed over its model calls, but never a price (#540)', async () => {
+  const session = await new CodexDriver({ spawn: fakeAppServer() }).start({ cwd: '/ws' })
+  const { usage } = await session.prompt('go')
   assert.deepEqual(usage, {
-    inputTokens: 2226, // 12210 total - 9984 cached
-    outputTokens: 5,
-    cacheReadTokens: 9984,
+    inputTokens: 3552 + 630, // each call's input minus its cached part
+    outputTokens: 127 + 25,
+    cacheReadTokens: 9984 + 13056,
     cacheCreationTokens: 0,
   })
-  assert.equal(usage?.costUsd, undefined)
+  // The tokens are real and reported; `costUsd: 0` would read as free, so it is absent.
   assert.equal('costUsd' in usage!, false)
 })
 
+test('a resumed Codex conversation counts only its new turn\'s tokens', async () => {
+  // On resume, Codex first repeats the reading of the conversation's last turn.
+  const session = await new CodexDriver({ spawn: fakeAppServer({ afterResume: [usage('old-turn', 99999, 0, 999)] }) }).start({ cwd: '/ws', resumeSessionId: 'thread-0' })
+  const { usage: counted } = await session.prompt('go on', { resume: true })
+  assert.equal(counted?.outputTokens, 127 + 25)
+})
+
 test('parseCodexUsage splits the cached tokens out of the inclusive input total (#540)', () => {
-  // Verbatim from codex-cli 0.144.4. `input_tokens` is the whole input, cached
+  // Verbatim from codex-cli 0.144.4. `inputTokens` is the whole input, cached
   // included: repeating one prompt held it at 12218 while cached rose to 12032.
-  const usage = parseCodexUsage({ input_tokens: 12218, cached_input_tokens: 12032, output_tokens: 6, reasoning_output_tokens: 0 })
+  const usage = parseCodexUsage({ inputTokens: 12218, cachedInputTokens: 12032, outputTokens: 6, reasoningOutputTokens: 0 })
   assert.deepEqual(usage, {
     inputTokens: 186,
     outputTokens: 6,
@@ -85,9 +185,9 @@ test('parseCodexUsage splits the cached tokens out of the inclusive input total 
 })
 
 test('parseCodexUsage does not double-count reasoning tokens (#540)', () => {
-  // reasoning_output_tokens is a subset of output_tokens, as cached_input_tokens
-  // is of input_tokens — adding it would inflate the count.
-  const usage = parseCodexUsage({ input_tokens: 100, cached_input_tokens: 0, output_tokens: 500, reasoning_output_tokens: 400 })
+  // reasoningOutputTokens is a subset of outputTokens, as cachedInputTokens
+  // is of inputTokens — adding it would inflate the count.
+  const usage = parseCodexUsage({ inputTokens: 100, cachedInputTokens: 0, outputTokens: 500, reasoningOutputTokens: 400 })
   assert.equal(usage?.outputTokens, 500)
 })
 
@@ -97,7 +197,7 @@ test('parseCodexUsage survives a missing or malformed payload (#540)', () => {
   // Absent fields read as 0 rather than NaN, and a nonsense cache count can never
   // push the uncached input negative.
   assert.deepEqual(parseCodexUsage({}), { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 })
-  assert.deepEqual(parseCodexUsage({ input_tokens: 10, cached_input_tokens: 999 }), {
+  assert.deepEqual(parseCodexUsage({ inputTokens: 10, cachedInputTokens: 999 }), {
     inputTokens: 0,
     outputTokens: 0,
     cacheReadTokens: 10,
@@ -105,91 +205,32 @@ test('parseCodexUsage survives a missing or malformed payload (#540)', () => {
   })
 })
 
-test('CodexJsonParser ignores noise that is not an event (#539)', () => {
-  const p = new CodexJsonParser()
-  assert.deepEqual(p.push('Reading additional input from stdin...'), [])
-  assert.deepEqual(p.push(''), [])
+test('a Codex turn ignores noise that is not a message (#539)', async () => {
   // `null` is valid JSON, so it survives the parse and used to throw on the first field read —
   // inside a readline handler, which takes the daemon and every live agent with it.
-  assert.deepEqual(p.push('null'), [])
-  assert.deepEqual(p.push(JSON.stringify({ type: 'turn.started' })), [])
-  assert.deepEqual(p.result(), { text: '' })
+  const session = await new CodexDriver({ spawn: fakeAppServer({ noise: ['WARNING: banner', '', 'null', '42', JSON.stringify({ method: 'warning' })] }) }).start({ cwd: '/ws' })
+  assert.equal((await session.prompt('go')).text, 'Created hello.txt')
 })
 
-/** A fake process that emits the given lines then closes. */
-function fakeSpawn(lines: string[], onSpawn?: (args: readonly string[], stdin: string) => void, code = 0, stderr = ''): SpawnLike {
-  return (_command, args) => {
-    const stdout = Readable.from([lines.map(l => l + '\n').join('')])
-    let written = ''
-    const stdin = new Writable({
-      write: (chunk, _e, cb) => {
-        written += String(chunk)
-        cb()
-      },
-    })
-    const proc: SpawnedProcess = {
-      stdout,
-      stderr: Readable.from(stderr ? [stderr] : []),
-      stdin,
-      on(event, listener) {
-        if (event === 'close') stdout.on('end', () => (onSpawn?.(args, written), (listener as (c: number | null) => void)(code)))
-        return proc
-      },
-      kill: () => undefined,
-    }
-    return proc
-  }
-}
-
-test('CodexDriver runs a prompt through the CLI and returns the turn (#539)', async () => {
-  const events: DriverEvent[] = []
-  const driver = new CodexDriver({ spawn: fakeSpawn(REAL_RUN) })
-  const session = await driver.start({ cwd: '/ws', onEvent: e => events.push(e) })
-  const turn = await session.prompt('build it')
-  assert.equal(turn.text, 'Created hello.txt')
-  assert.equal(turn.sessionId, '019f660b-bf69-7d62-a96c-34aad1f083db')
-  assert.ok(events.some(e => e.type === 'action' && e.label === 'file_change'))
-  assert.ok(events.some(e => e.type === 'result'))
-})
-
-test('a Codex turn that fails keeps its session id on the log: a later resume continues the same thread', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'codex-log-'))
-  try {
-    const driver = new CodexDriver({ spawn: fakeSpawn(REAL_RUN.slice(0, 3), undefined, 1) })
-    const session = await driver.start({ cwd: dir, log: { dir, card: { id: 'r1' } } })
-    await assert.rejects(session.prompt('build it'), /exited \(1\)/)
-    await session.log!.settled()
-    assert.equal(session.log!.card.caller?.['sessionId'], '019f660b-bf69-7d62-a96c-34aad1f083db')
-  } finally {
-    await rm(dir, { recursive: true, force: true })
-  }
-})
-
-test('CodexDriver runs sandboxed in the workspace, never with the bypass (#539)', async () => {
-  let seen: readonly string[] = []
-  const driver = new CodexDriver({ spawn: fakeSpawn(REAL_RUN, args => (seen = args)) })
-  const session = await driver.start({ cwd: '/ws' })
-  await session.prompt('go')
-  assert.deepEqual([...seen], ['exec', '--json', '--skip-git-repo-check', '--sandbox', 'workspace-write', '-C', '/ws'])
-  // The agent may edit its workspace and nothing else.
-  assert.ok(!seen.includes('--dangerously-bypass-approvals-and-sandbox'))
-  // Codex refuses to run outside a git repo, and a fresh workspace isn't one yet.
-  assert.ok(seen.includes('--skip-git-repo-check'))
+test('a Codex turn asks the app server for a sandboxed conversation in the workspace, never asking approval', async () => {
+  const seen = await spawnedWith({}, { cwd: '/ws' })
+  // Only the app server: no bypass of the sandbox, and no prompt as an argument.
+  assert.deepEqual([...seen.args], ['app-server'])
+  assert.deepEqual(requests(seen), [
+    { method: 'initialize', params: { clientInfo: { name: 'agent-driver', version: '1' } } },
+    { method: 'initialized', params: undefined },
+    { method: 'thread/start', params: { cwd: '/ws', approvalPolicy: 'never', sandbox: 'workspace-write' } },
+    { method: 'turn/start', params: { threadId: 'thread-1', input: [{ type: 'text', text: 'go', text_elements: [] }] } },
+  ])
 })
 
 test('CodexDriver makes the git dir writable, so a plain checkout can commit (#1747)', async () => {
   const dir = await realpath(await mkdtemp(join(tmpdir(), 'codex-git-')))
   try {
     execFileSync('git', ['init', '-q'], { cwd: dir })
-    let seen: readonly string[] = []
-    const driver = new CodexDriver({ spawn: fakeSpawn(REAL_RUN, args => (seen = args)) })
-    const session = await driver.start({ cwd: dir })
-    await session.prompt('go')
+    const seen = await spawnedWith({}, { cwd: dir })
     // `workspace-write` keeps a root `.git/` read-only; without this the commit fails on `.git/index.lock`.
-    assert.deepEqual([...seen], [
-      'exec', '--json', '--skip-git-repo-check', '--sandbox', 'workspace-write', '-C', dir,
-      '-c', `sandbox_workspace_write.writable_roots=["${join(dir, '.git')}"]`,
-    ])
+    assert.deepEqual([...seen.args], ['app-server', '-c', `sandbox_workspace_write.writable_roots=["${join(dir, '.git')}"]`])
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
@@ -199,64 +240,44 @@ test('CodexDriver widens no read-only sandbox, even in a repository (#1747)', as
   const dir = await realpath(await mkdtemp(join(tmpdir(), 'codex-git-')))
   try {
     execFileSync('git', ['init', '-q'], { cwd: dir })
-    let seen: readonly string[] = []
-    const driver = new CodexDriver({ sandbox: 'read-only', spawn: fakeSpawn(REAL_RUN, args => (seen = args)) })
-    const session = await driver.start({ cwd: dir })
-    await session.prompt('go')
-    assert.ok(!seen.includes('-c'))
+    const seen = await spawnedWith({ sandbox: 'read-only' }, { cwd: dir })
+    assert.deepEqual([...seen.args], ['app-server'])
+    assert.equal(requests(seen)[2]!.params && (requests(seen)[2]!.params as Record<string, unknown>)['sandbox'], 'read-only')
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
 })
 
-test('CodexDriver sends the prompt over stdin, not as an argument (#539)', async () => {
-  let stdin = ''
-  let seen: readonly string[] = []
-  const driver = new CodexDriver({ spawn: fakeSpawn(REAL_RUN, (args, written) => ((seen = args), (stdin = written))) })
-  const session = await driver.start({ cwd: '/ws' })
-  await session.prompt('a very long prompt')
-  // Over stdin so a long prompt never hits the arg-length limit.
-  assert.equal(stdin, 'a very long prompt')
-  assert.ok(!seen.includes('a very long prompt'))
-})
-
-test('CodexDriver prepends the framing, since Codex has no system-prompt flag (#539)', async () => {
-  let stdin = ''
-  const driver = new CodexDriver({ spawn: fakeSpawn(REAL_RUN, (_a, written) => (stdin = written)) })
-  const session = await driver.start({ cwd: '/ws', system: 'You are careful.' })
+test('CodexDriver gives the framing as Codex\'s developer instructions, the prompt alone as the input', async () => {
+  let seen: Seen | undefined
+  const session = await new CodexDriver({ spawn: fakeAppServer({}, s => (seen = s)) }).start({ cwd: '/ws', system: 'You are careful.' })
   await session.prompt('do the thing', { system: 'Also: be brief.' })
-  assert.equal(stdin, 'You are careful.\n\nAlso: be brief.\n\ndo the thing')
+  const [, , thread, turn] = requests(seen!)
+  assert.equal((thread!.params as Record<string, unknown>)['developerInstructions'], 'You are careful.\n\nAlso: be brief.')
+  assert.deepEqual((turn!.params as Record<string, unknown>)['input'], [{ type: 'text', text: 'do the thing', text_elements: [] }])
 })
 
 test('CodexDriver continues its conversation on a resume prompt, and only then', async () => {
-  const seen: Array<{ args: readonly string[]; stdin: string }> = []
-  const driver = new CodexDriver({ spawn: fakeSpawn(REAL_RUN, (args, stdin) => seen.push({ args, stdin })) })
-  const session = await driver.start({ cwd: '/ws', system: 'FRAMING', model: 'gpt-5' })
+  const seen: Seen[] = []
+  const driver = new CodexDriver({ spawn: fakeAppServer({}, s => seen.push(s)) })
+  const session = await driver.start({ cwd: '/ws', system: 'FRAMING', model: 'gpt-5.5' })
   await session.prompt('build it', { resume: true })
   await session.prompt('and the tests?', { resume: true })
   await session.prompt('something new')
-  const id = '019f660b-bf69-7d62-a96c-34aad1f083db'
-  assert.deepEqual([...seen[0]!.args].slice(0, 2), ['exec', '--json'], 'no turn yet: nothing to resume, a fresh conversation')
-  assert.deepEqual([...seen[1]!.args], ['exec', 'resume', id, '-', '--json', '--skip-git-repo-check', '-c', 'sandbox_mode="workspace-write"', '-m', 'gpt-5'])
-  assert.equal(seen[1]!.stdin, 'and the tests?', 'the resumed conversation already carries its framing')
-  assert.equal(seen[0]!.stdin, 'FRAMING\n\nbuild it')
-  assert.deepEqual([...seen[2]!.args].slice(0, 2), ['exec', '--json'], 'a prompt that does not ask to resume starts fresh')
+  const thread = (s: Seen) => requests(s)[2]!
+  assert.deepEqual(thread(seen[0]!), { method: 'thread/start', params: { cwd: '/ws', approvalPolicy: 'never', sandbox: 'workspace-write', model: 'gpt-5.5', developerInstructions: 'FRAMING' } }, 'no turn yet: nothing to resume, a fresh conversation')
+  // The resumed conversation already carries its framing.
+  assert.deepEqual(thread(seen[1]!), { method: 'thread/resume', params: { cwd: '/ws', approvalPolicy: 'never', sandbox: 'workspace-write', model: 'gpt-5.5', threadId: 'thread-1' } })
+  assert.equal(thread(seen[2]!).method, 'thread/start', 'a prompt that does not ask to resume starts fresh')
 })
 
 test('CodexDriver resumes the conversation a session was started for, under the sandbox given', async () => {
-  let seen: readonly string[] = []
-  const driver = new CodexDriver({ sandbox: 'danger-full-access', spawn: fakeSpawn(REAL_RUN, args => (seen = args)) })
-  const session = await driver.start({ cwd: '/ws', resumeSessionId: 'thread-1' })
-  await session.prompt('go on', { resume: true })
-  assert.deepEqual([...seen], ['exec', 'resume', 'thread-1', '-', '--json', '--skip-git-repo-check', '-c', 'sandbox_mode="danger-full-access"'])
-})
-
-test('CodexDriver passes the model through (#539)', async () => {
-  let seen: readonly string[] = []
-  const driver = new CodexDriver({ spawn: fakeSpawn(REAL_RUN, args => (seen = args)) })
-  const session = await driver.start({ cwd: '/ws', model: 'gpt-5-codex' })
-  await session.prompt('go')
-  assert.ok(seen.includes('-m') && seen.includes('gpt-5-codex'))
+  let seen: Seen | undefined
+  const driver = new CodexDriver({ sandbox: 'danger-full-access', spawn: fakeAppServer({}, s => (seen = s)) })
+  const session = await driver.start({ cwd: '/ws', resumeSessionId: 'thread-0' })
+  const turn = await session.prompt('go on', { resume: true })
+  assert.deepEqual(requests(seen!)[2], { method: 'thread/resume', params: { cwd: '/ws', approvalPolicy: 'never', sandbox: 'danger-full-access', threadId: 'thread-0' } })
+  assert.equal(turn.sessionId, 'thread-0')
 })
 
 test('CodexDriver cannot report a quota, so it says so by omission (#539)', () => {
@@ -266,54 +287,66 @@ test('CodexDriver cannot report a quota, so it says so by omission (#539)', () =
   assert.equal(driver.readQuota, undefined)
 })
 
-test('CodexDriver fails the turn on a non-zero exit (#539)', async () => {
-  const driver = new CodexDriver({ spawn: fakeSpawn(REAL_RUN, undefined, 1) })
-  const session = await driver.start({ cwd: '/ws' })
-  // A crash mid-build must not pass as a result, even though text streamed first.
-  await assert.rejects(() => session.prompt('go'), /codex exited \(1\)/)
+test('a request the Codex app server makes of its own is answered with a refusal, and the turn goes on', async () => {
+  let seen: Seen | undefined
+  const approval = { id: 'req-1', method: 'item/commandExecution/requestApproval', params: { threadId: 'thread-1', turnId: 'turn-1', itemId: 'exec-1' } }
+  const session = await new CodexDriver({ spawn: fakeAppServer({ turn: [approval as unknown as Message, ...REAL_TURN] }, s => (seen = s)) }).start({ cwd: '/ws' })
+  assert.equal((await session.prompt('go')).text, 'Created hello.txt')
+  assert.deepEqual(seen!.messages.find(m => m['id'] === 'req-1'), { id: 'req-1', error: { code: -32601, message: 'agent-driver answers no requests' } })
 })
 
-// Two real failures from codex-cli 0.144.4 on a ChatGPT login: the API's refusal wrapped as JSON,
-// and a plain sentence. Codex exits 1 after either, with only this on stderr.
-const REFUSED = JSON.stringify({ type: 'turn.failed', error: { message: JSON.stringify({ type: 'error', status: 400, error: { type: 'invalid_request_error', message: "The 'gpt-5' model is not supported when using Codex with a ChatGPT account." } }) } })
-const NOT_FOUND = JSON.stringify({ type: 'turn.failed', error: { message: 'unexpected status 404 Not Found: The model `gpt-5.5` does not exist or you do not have access to it.' } })
-const STDIN_BANNER = 'Reading prompt from stdin...\n'
+// A real refusal from codex-cli 0.144.4 on a ChatGPT login: the API's error body, wrapped as JSON.
+const REFUSED = JSON.stringify({ type: 'error', status: 400, error: { type: 'invalid_request_error', message: "The 'gpt-5' model is not supported when using Codex with a ChatGPT account." } })
 
-test('CodexJsonParser keeps why a turn failed: the sentence inside an API refusal, or the message as it is', () => {
-  const refused = new CodexJsonParser()
-  assert.deepEqual(refused.push(REFUSED), [])
-  assert.equal(refused.failure(), "The 'gpt-5' model is not supported when using Codex with a ChatGPT account.")
-  const notFound = new CodexJsonParser()
-  notFound.push(NOT_FOUND)
-  assert.equal(notFound.failure(), 'unexpected status 404 Not Found: The model `gpt-5.5` does not exist or you do not have access to it.')
-  assert.equal(new CodexJsonParser().failure(), undefined)
-})
-
-test('a failed Codex turn says why it failed, not the stdin line Codex printed', async () => {
-  const lines = [JSON.stringify({ type: 'thread.started', thread_id: 't-1' }), JSON.stringify({ type: 'turn.started' }), REFUSED]
-  const session = await new CodexDriver({ spawn: fakeSpawn(lines, undefined, 1, STDIN_BANNER) }).start({ cwd: '/ws' })
+test('a Codex turn that failed fails with Codex\'s reason, though the app server exits cleanly', async () => {
+  const events: DriverEvent[] = []
+  const failed = [note('turn/started', { turn: { id: 'turn-1' } }), completed('failed', { message: REFUSED, codexErrorInfo: 'other', additionalDetails: null })]
+  const session = await new CodexDriver({ spawn: fakeAppServer({ turn: failed }) }).start({ cwd: '/ws', onEvent: e => events.push(e) })
   await assert.rejects(() => session.prompt('go'), (err: Error) => {
-    assert.equal(err.message, "codex exited (1): The 'gpt-5' model is not supported when using Codex with a ChatGPT account.")
+    // The sentence inside the API's refusal, and "failed", not "exited (0)".
+    assert.equal(err.message, "codex failed: The 'gpt-5' model is not supported when using Codex with a ChatGPT account.")
     // The parts apart, for a caller that already showed the reason from the error event.
     assert.ok(err instanceof AgentExitError)
-    assert.equal(err.exit, 'codex exited (1)')
+    assert.equal(err.exit, 'codex failed')
     assert.equal(err.reason, "The 'gpt-5' model is not supported when using Codex with a ChatGPT account.")
     return true
   })
-  // With no reason in its output, stderr is still what is said.
-  const bare = await new CodexDriver({ spawn: fakeSpawn([], undefined, 1, STDIN_BANNER) }).start({ cwd: '/ws' })
-  await assert.rejects(() => bare.prompt('go'), /codex exited \(1\): Reading prompt from stdin\.\.\./)
+  assert.deepEqual(events.at(-1), { type: 'error', message: "The 'gpt-5' model is not supported when using Codex with a ChatGPT account." })
+  // A message that is not the API's JSON is the reason as it is; a turn ended with no error says how it ended.
+  const plain = await new CodexDriver({ spawn: fakeAppServer({ turn: [completed('failed', { message: 'unexpected status 404 Not Found' })] }) }).start({ cwd: '/ws' })
+  await assert.rejects(() => plain.prompt('go'), /codex failed: unexpected status 404 Not Found/)
+  const interrupted = await new CodexDriver({ spawn: fakeAppServer({ turn: [completed('interrupted')] }) }).start({ cwd: '/ws' })
+  await assert.rejects(() => interrupted.prompt('go'), /codex failed: Codex's turn ended interrupted/)
 })
 
-/** Runs one turn on a Codex driver with `opts`, and answers the arguments and the environment Codex was spawned with. */
-async function spawnedWith(opts: ConstructorParameters<typeof CodexDriver>[0]): Promise<{ args: readonly string[]; env: NodeJS.ProcessEnv }> {
-  let seen: { args: readonly string[]; env: NodeJS.ProcessEnv } | undefined
-  const inner = fakeSpawn(REAL_RUN)
-  const spawn: SpawnLike = (command, args, spawnOpts) => ((seen = { args, env: spawnOpts.env ?? {} }), inner(command, args, spawnOpts))
-  const session = await new CodexDriver({ ...opts, spawn }).start({ cwd: '/ws' })
-  await session.prompt('go')
-  return seen!
-}
+test('a request Codex refuses fails the turn with its reason: a conversation it cannot resume', async () => {
+  const session = await new CodexDriver({ spawn: fakeAppServer({ refuse: { method: 'thread/resume', message: 'no rollout found for thread id thread-0' } }) }).start({ cwd: '/ws', resumeSessionId: 'thread-0' })
+  await assert.rejects(() => session.prompt('go on', { resume: true }), /codex failed: no rollout found for thread id thread-0/)
+})
+
+test('a Codex app server that exits before its turn ends fails the turn', async () => {
+  const unfinished = [note('turn/started', { turn: { id: 'turn-1' } }), item(false, { type: 'agentMessage', id: 'msg_1', text: 'Half' })]
+  // A crash: what it wrote on stderr is the reason.
+  const crashed = await new CodexDriver({ spawn: fakeAppServer({ turn: unfinished, exitEarly: 1, stderr: 'thread panicked' }) }).start({ cwd: '/ws' })
+  await assert.rejects(() => crashed.prompt('go'), /codex exited \(1\): thread panicked/)
+  // A clean exit with the turn unfinished is no answer either.
+  const quiet = await new CodexDriver({ spawn: fakeAppServer({ turn: unfinished, exitEarly: 0 }) }).start({ cwd: '/ws' })
+  await assert.rejects(() => quiet.prompt('go'), /codex failed: the turn did not finish/)
+})
+
+test('a Codex turn that fails keeps its session id on the log: a later resume continues the same thread', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'codex-log-'))
+  try {
+    const driver = new CodexDriver({ spawn: fakeAppServer({ turn: REAL_TURN.slice(0, 4), exitEarly: 1 }) })
+    const session = await driver.start({ cwd: dir, log: { dir, card: { id: 'r1' } } })
+    await assert.rejects(session.prompt('build it'), /exited \(1\)/)
+    await session.log!.settled()
+    assert.equal(session.log!.card.caller?.['sessionId'], 'thread-1')
+    assert.equal(session.log!.card.model, 'gpt-5.6-terra')
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
 
 test('CodexDriver given no setup parts runs Codex as it is, in the person\'s own home', async () => {
   const { args, env } = await spawnedWith({ env: { PATH: '/bin' } })
@@ -454,6 +487,24 @@ test('parseCodexModels keeps the models Codex lists, in its own order', () => {
   })
   assert.ok('error' in parseCodexModels('Reading config...'))
 })
+
+/** A fake process that prints the given lines then closes: a one-shot command, not the app server. */
+function fakeSpawn(lines: string[], onSpawn?: (args: readonly string[]) => void, code = 0): SpawnLike {
+  return (_command, args) => {
+    const stdout = Readable.from([lines.map(l => l + '\n').join('')])
+    const proc: SpawnedProcess = {
+      stdout,
+      stderr: Readable.from([]),
+      stdin: new PassThrough(),
+      on(event, listener) {
+        if (event === 'close') stdout.on('end', () => (onSpawn?.(args), (listener as (c: number | null) => void)(code)))
+        return proc
+      },
+      kill: () => undefined,
+    }
+    return proc
+  }
+}
 
 test('CodexDriver.listModels asks `codex debug models`, and says why when Codex fails', async () => {
   let asked: readonly string[] = []

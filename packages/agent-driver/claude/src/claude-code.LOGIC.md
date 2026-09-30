@@ -21,7 +21,7 @@ Drives Claude Code as a driver [1]: each turn [2] is one non-interactive invocat
 [7] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [8] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
 [9] live chat: the user's own messages to a running agent, each continuing the same driver session. One of them is a message.
-[10] framing: the standing instructions a caller gives a driver session, plus any extra instructions for one turn; the driver delivers them as the coding agent's system prompt, or ahead of the prompt when the coding agent has no system prompt flag.
+[10] framing: the standing instructions a caller gives a driver session, plus any extra instructions for one turn; the driver delivers them apart from the prompt when the coding agent takes such instructions (Claude Code's system prompt, Codex's developer instructions), or ahead of the prompt when it does not.
 [11] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [12] stop request: the caller's signal that a driver session, or one turn of it, must end now; the product raises one when the user stops the agent.
 [13] progress event: what a driver reports while a turn runs, for a caller to show and never to decide on: the prompt sent, the session id, the model the turn runs on, streamed text, a tool used, the final result, a rate limit reading, an error, a notice, a question.

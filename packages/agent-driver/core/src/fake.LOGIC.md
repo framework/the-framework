@@ -9,7 +9,7 @@ A driver [1] for tests and offline demos that never starts a process and never c
 [5] driver session: the coding agent's own conversation for one agent, which the driver can resume by its session id.
 [6] usage: what one turn spent, as the coding agent reports it: token counts, and a notional price in US dollars when the coding agent prices its turns.
 [7] stop request: the caller's signal that a driver session, or one turn of it, must end now; the product raises one when the user stops the agent.
-[8] framing: the standing instructions a caller gives a driver session, plus any extra instructions for one turn; the driver delivers them as the coding agent's system prompt, or ahead of the prompt when the coding agent has no system prompt flag.
+[8] framing: the standing instructions a caller gives a driver session, plus any extra instructions for one turn; the driver delivers them apart from the prompt when the coding agent takes such instructions (Claude Code's system prompt, Codex's developer instructions), or ahead of the prompt when it does not.
 
 ## Business logic — TL;DR
 

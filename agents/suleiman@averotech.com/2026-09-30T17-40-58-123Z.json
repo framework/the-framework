@@ -1,0 +1,15 @@
+{
+  "id": "2026-09-30T17-40-58-123Z",
+  "startedAt": "2026-09-30T17:40:58.215Z",
+  "status": "running",
+  "intent": "Write 200 words about rivers",
+  "driver": "claude-code",
+  "model": "opus",
+  "caller": {
+    "runner": {
+      "host": "Suleimans-MacBook-Pro.local",
+      "pid": 74360
+    },
+    "host": "Suleimans-MacBook-Pro.local"
+  }
+}

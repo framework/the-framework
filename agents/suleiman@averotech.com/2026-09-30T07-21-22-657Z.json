@@ -1,0 +1,12 @@
+{
+  "id": "2026-09-30T07-21-22-657Z",
+  "startedAt": "2026-09-30T07:21:22.671Z",
+  "status": "running",
+  "intent": "Don't use any tools. Say hi in one sentence.",
+  "driver": "claude-code",
+  "caller": {
+    "runner": {
+      "host": "Suleimans-MacBook-Pro.local"
+    }
+  }
+}

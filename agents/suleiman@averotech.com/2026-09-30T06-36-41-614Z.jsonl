@@ -17,3 +17,10 @@
 {"kind":"cost","usd":0.0723406,"at":"2026-09-30T06:37:07.395Z"}
 {"kind":"question","title":"What is 15 + 27?","options":[{"id":"opt:0","label":"32"},{"id":"opt:1","label":"42"},{"id":"opt:2","label":"43"},{"id":"opt:3","label":"52"}],"at":"2026-09-30T06:37:07.396Z"}
 {"kind":"ended","status":"waiting","at":"2026-09-30T06:37:08.247Z"}
+{"kind":"start","prompt":"stop here","at":"2026-09-30T06:37:54.942Z"}
+{"kind":"session","sessionId":"2772a798-60f9-4ff0-a108-cd37a3fc4b3c","at":"2026-09-30T06:37:55.705Z"}
+{"kind":"said","text":"OK, we'll stop here. For the last one, 15 + 27 = **42**.","at":"2026-09-30T06:37:57.505Z"}
+{"kind":"rate-limit","limit":{"status":"allowed","window":"five_hour","resetsAt":1790767800000},"at":"2026-09-30T06:37:57.510Z"}
+{"kind":"result","text":"OK, we'll stop here. For the last one, 15 + 27 = **42**.","sessionId":"2772a798-60f9-4ff0-a108-cd37a3fc4b3c","at":"2026-09-30T06:37:58.263Z"}
+{"kind":"cost","usd":0.0777308,"at":"2026-09-30T06:37:58.263Z"}
+{"kind":"ended","status":"done","at":"2026-09-30T06:37:58.966Z"}

@@ -136,7 +136,7 @@ const PUSHED = {
   gitHost: true,
   commits: [{ sha: 'abc1234', subject: 'Add hello2.txt' }],
   files: [],
-} as unknown
+} as Record<string, unknown>
 
 describe('AgentView branch read', () => {
   test('while the card says saving, an empty branch is not offered, and the branch is read again once it stops', async () => {

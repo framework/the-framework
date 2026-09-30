@@ -16,3 +16,4 @@ What the tests cover, against a real git repository with worktrees, branches and
 [2] fork point: the commit where an agent's branch left the project's default branch.
 [3] the agent's facts: what the dashboard tells a module's server part about one agent: its checkout while it has one, its record, whether it finished on this machine having changed nothing, and the commit a pull request merged as.
 - **Starting** - an agent the host does not know yet and one recorded `running` on this machine with no checkout read the project's HEAD, its tree listed and nothing marked; one running on another machine whose branch is not here answers pending.
+- **A checkout reclaimed since it was listed** - is no source: with no record, or a record still saying `running`, the answer is pending, not starting; once the record names a branch here, the branch is read.

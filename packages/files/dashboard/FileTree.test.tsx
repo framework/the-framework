@@ -106,6 +106,18 @@ describe('FileTree (#815)', () => {
     await waitFor(() => expect(screen.getByText('hello.txt')).toBeTruthy(), { timeout: 1_500 })
   })
 
+  test('a run whose files are moving (pending after a tree) keeps showing the tree it had, never a blank', async () => {
+    readTree.mockResolvedValue({ source: 'checkout', files: [...files, 'hello.txt'], changes: {} })
+    const { rerender } = render(<FileTree projectId="p1" agentId="run-1" activity={1} context={context()} />)
+    await waitFor(() => expect(screen.getByText('hello.txt')).toBeTruthy())
+    readTree.mockResolvedValue({ source: 'pending' })
+    rerender(<FileTree projectId="p1" agentId="run-1" activity={2} context={context()} />)
+    await waitFor(() => expect(readTree.mock.calls.length).toBeGreaterThan(1))
+    await new Promise(resolve => setTimeout(resolve, 400))
+    expect(screen.getByText('hello.txt')).toBeTruthy()
+    expect(screen.queryByText('Looking for this run’s changes…')).toBeNull()
+  })
+
   test('a run whose changes are gone says so, instead of showing the project unmarked', async () => {
     readTree.mockResolvedValue({ source: 'gone' })
     render(<FileTree projectId="p1" agentId="run-1" context={context()} />)

@@ -38,7 +38,7 @@ See `## Context`.
 
 The sources are tried in this order, and the first one that exists answers:
 
-1. The agent's checkout [2], as the agent's facts [5] name it. The project's root is never used in its place.
+1. The agent's checkout [2], as the agent's facts [5] name it, while its directory is there. The project's root is never used in its place. A checkout named a moment ago may have been reclaimed since, as the agent ended: it is then no source, and the agent is not starting either, so where nothing below answers, the answer is pending rather than starting, and never an empty tree.
 2. The branch the agent recorded: this machine's branch of that name, else origin's copy of it (`origin/<branch>`) as this machine last fetched it.
 3. The commit the agent's pull request merged as. The agent must have recorded a pull request. The dashboard is asked which commit that pull request, by its number, of the agent's branch merged as, and it must name one. That commit must be on this machine: a pull request merged on the git host after this machine last fetched is not read yet.
 4. The project's default branch [3], as its last commit on this machine, when the agent finished on this machine [4]: the agent changed nothing (see "An agent that changed nothing").

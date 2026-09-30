@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import { hostname } from 'node:os'
 import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
 import type { MergeLookup, ModuleServerHost } from 'framework/module-server'
@@ -81,14 +82,17 @@ export async function resolveAgentFiles(host: Pick<ModuleServerHost, 'root' | 'r
   const root = host.root
   const ask = asker(git, root)
   const run = await host.run(agentId).catch(() => undefined)
-  if (run?.checkout) {
+  // A checkout listed a moment ago may have been reclaimed since, as the run ended: then it is no
+  // source, and the run is not starting either: it just ended, and its record may not say so yet.
+  const reclaimed = run?.checkout !== undefined && !existsSync(run.checkout)
+  if (run?.checkout && !reclaimed) {
     const base = await forkPoint(asker(git, run.checkout), 'HEAD')
     return { source: 'checkout', path: run.checkout, ...(base ? { base } : {}) }
   }
   // Nothing known of the run yet: it is starting. A run writes its record, then makes its checkout
   // from the project's HEAD, seconds after the page that started it opened: those are its files.
   const record = run?.record
-  if (!record) return starting(ask)
+  if (!record) return reclaimed ? { source: 'pending' } : starting(ask)
   const branch = record.branch
 
   let onBranch: AgentFilesAt | undefined
@@ -122,7 +126,7 @@ export async function resolveAgentFiles(host: Pick<ModuleServerHost, 'root' | 'r
   }
   // Recorded running, with no checkout and no branch here yet: still starting, not gone. Here, its
   // checkout is being made from the project's HEAD; elsewhere, its branch is not here yet.
-  if (record.status === 'running') return record.host === thisHost ? starting(ask) : { source: 'pending' }
+  if (record.status === 'running') return record.host === thisHost && !reclaimed ? starting(ask) : { source: 'pending' }
   return { source: 'gone' }
 }
 

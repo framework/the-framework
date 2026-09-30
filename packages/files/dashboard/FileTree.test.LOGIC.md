@@ -15,3 +15,4 @@ What the tests cover, for the Files tab's tree, rendered inside a fake dashboard
 [3] Context: the set of paths the user picked to focus an agent on: other registered projects, by their absolute path, and files of the current project, by their path relative to the repository's root.
 - **Starting says so** - an agent still looked for shows "Looking for this run’s changes…", and one starting here shows the project's files captioned "Starting from the project’s files"; either shows the agent's own tree within seconds once it has one, well before the regular poll.
 - **The agent doing something** - a new event in the agent's feed reads the tree again at once, well before the regular poll.
+- **Files moving** - an agent whose tree was shown and which then answers pending keeps its tree on screen, with no "Looking…" line.

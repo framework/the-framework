@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ElementType, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ElementType, type ReactNode } from 'react'
 import { Check, FileIcon, FolderIcon, FolderOpenIcon } from 'lucide-react'
 import { cn, useModuleHost, usePolled, type ModulePanelProps } from 'framework/module'
 import type { ProjectTree } from '../src/server.js'
@@ -172,12 +172,17 @@ export function FileTree({ projectId, agentId, activity, context }: ModulePanelP
     8_000,
     [projectId, agentId],
   )
-  const { value: runTree, loaded: treeLoaded, reload: reloadTree } = usePolled<AgentTree | null>(
+  const { value: answer, loaded: treeLoaded, reload: reloadTree } = usePolled<AgentTree | null>(
     agentId ? () => readTree(host, projectId, agentId) : null,
     null,
     8_000,
     [projectId, agentId],
   )
+  // A run whose files move (its checkout reclaimed as it ends, its branch not read yet) answers
+  // pending for a moment: the tree it last showed stays until the new place answers, never a blank.
+  const lastTree = useRef<{ agentId: string; tree: AgentTree } | null>(null)
+  if (agentId && answer && 'files' in answer) lastTree.current = { agentId, tree: answer }
+  const runTree = answer?.source === 'pending' && lastTree.current?.agentId === agentId ? lastTree.current.tree : answer
   // The agent did something: its files may have changed, so they are read again now rather than on
   // the next poll. A burst of events is one read, a moment after the last.
   useEffect(() => {
@@ -186,7 +191,7 @@ export function FileTree({ projectId, agentId, activity, context }: ModulePanelP
     return () => clearTimeout(timer)
   }, [activity, reloadTree])
   // A run still starting has its checkout within seconds: asked again sooner than the poll.
-  const pending = runTree?.source === 'pending' || runTree?.source === 'starting'
+  const pending = answer?.source === 'pending' || answer?.source === 'starting'
   useEffect(() => {
     if (!pending) return
     const timer = setInterval(reloadTree, 2_000)

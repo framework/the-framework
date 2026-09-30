@@ -199,6 +199,21 @@ test('a run starting here reads the project HEAD its checkout is made from, noth
   assert.deepEqual(tree, { source: 'starting', files: git(root, 'ls-tree', '-r', '--name-only', head).split('\n'), changes: {} })
 })
 
+test('a checkout reclaimed since it was listed is no source: its branch is read, else pending, never an empty tree or a start', async () => {
+  const gone = join(dir, 'reclaimed-checkout')
+  const withGone = (record?: { status?: string; host?: string; branch?: string }): ModuleServerHost => ({
+    root,
+    run: async () => ({ checkout: gone, ...(record ? { record } : {}), changedNothing: false }),
+    mergeCommit: async () => ({ pending: false }),
+  })
+  assert.deepEqual(await resolve(withGone()), { source: 'pending' }, 'no record yet')
+  assert.deepEqual(await resolve(withGone({ status: 'running', host: 'this-machine' })), { source: 'pending' }, 'its record not caught up: it ended, it is not starting')
+  git(root, 'branch', '-f', 'agent-reclaimed', 'HEAD')
+  commit(root, 'on main after', { 'after.txt': 'x\n' })
+  git(root, 'branch', '-f', 'agent-reclaimed', 'HEAD~1')
+  assert.equal((await resolve(withGone({ status: 'running', host: 'this-machine', branch: 'agent-reclaimed' }))).source, 'branch', 'its branch, once named')
+})
+
 test('while the pull request is being looked up, the answer is pending', async () => {
   assert.deepEqual(await resolve(deps({ branch: 'agent-gone', pr: { number: 7 } }, { pending: true })), { source: 'pending' })
 })

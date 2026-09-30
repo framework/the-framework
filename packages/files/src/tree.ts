@@ -9,12 +9,11 @@ import { cutToPreview, readFileContent, safeRepoPath, type FileContent } from '.
 
 // A run's files, for the agent page's Files tab, for as long as git still has them. The run's
 // checkout while it exists; once it is reclaimed, the run's branch, local or on origin; once the
-// branch is gone too, the commit its pull request merged as. A run that finished `done` or
-// `failed` on this machine and left no checkout, no branch and no pull request changed nothing:
+// branch is gone too, the commit its pull request merged as. A run that ended `done`, `failed`
+// or `stopped` on this machine and left no checkout, no branch and no pull request changed nothing:
 // its branch went with its checkout because the remote already had everything on it, so the tab
 // shows the project as it is, nothing marked. Any other run is never judged so: one from another
-// machine may simply not have its branch here, and one that was stopped may have renamed its
-// branch without its record learning the new name. Every source is read through git by ref in the
+// machine may simply not have its branch here. Every source is read through git by ref in the
 // project's own repository, never copied, and never fetched: the tab polls, and a fetch on a poll
 // is a network call. A run none of them is left for is gone, and says so.
 

@@ -31,7 +31,7 @@ function deps(agent: { status?: string; host?: string; branch?: string; pr?: { n
     root,
     run: async () => ({
       record: agent,
-      changedNothing: !agent.pr && (agent.status === 'done' || agent.status === 'failed') && agent.host === 'this-machine',
+      changedNothing: !agent.pr && (agent.status === 'done' || agent.status === 'failed' || agent.status === 'stopped') && agent.host === 'this-machine',
     }),
     mergeCommit: async (_branch, number) => {
       if (prs.pending && prs.value === undefined) return { pending: true }
@@ -178,7 +178,7 @@ test('a run that finished here with no checkout, no branch and no pull request c
 
 test('no checkout, no branch and no merge commit on this machine: gone', async () => {
   assert.deepEqual(await resolve(deps({ status: 'done', host: 'other-machine', branch: 'agent-never-pushed' })), { source: 'gone' }, 'a run from another machine: its branch may just not be here')
-  for (const status of ['waiting', 'stopped']) {
+  for (const status of ['waiting']) {
     assert.deepEqual(await resolve(deps({ status, host: 'this-machine', branch: 'agent-renamed-away' })), { source: 'gone' }, `a ${status} run: its record may not name its branch's last name`)
   }
   assert.deepEqual(await resolve(deps({ status: 'done' })), { source: 'gone' }, 'a run that names no machine')

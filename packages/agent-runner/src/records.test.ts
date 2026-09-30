@@ -20,6 +20,7 @@ test('a marker is a running card on agent-data, pushed to origin, that the logs 
     assert.equal(found?.status, 'running')
     assert.equal(found?.intent, '/work-queue')
     assert.deepEqual(runnerMark(found!), mark)
+    assert.equal(found?.caller?.['host'], mark.host, 'the machine, where a reader looks for it on a live card too')
     assert.deepEqual(await readDiary(repo, card.id), [])
     assert.match(await git(['log', '-1', '--format=%s', `origin/${DATA_BRANCH}`], repo), /^logs: record run 2026-09-16T14-01-00-000Z/)
   } finally {

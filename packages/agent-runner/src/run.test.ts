@@ -154,6 +154,9 @@ test("an agent that commits nothing: done, no PR, its empty branch goes with the
     assert.equal(quiet.pr, undefined)
     assert.deepEqual(quiet.checkout, { reclaimed: true })
     assert.equal((await git(['branch', '--list', `agent-${quiet.id}`], repo)).trim(), '', 'a branch holding nothing goes with its checkout')
+    const quietRecord = await findRun(repo, quiet.id)
+    assert.equal(quietRecord?.status, 'done')
+    assert.equal(quietRecord?.branch, undefined, 'and the record names no branch that is gone')
 
     const dying: Driver = { id: 'fake', start: async () => { throw new Error('claude: not logged in') } }
     const failed = await runCommand(repo, { prompt: '/work-queue', model: 'opus', driver: dying, now: () => new Date(NOW.getTime() + 60_000), gitHost: noGitHost })

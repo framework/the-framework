@@ -8,7 +8,7 @@ A run in flight is a run record [1]: the `logs` skill's card on the project's `a
 
 ## Glossary
 
-[1] run record: the `logs` skill's record of a run on the `agent-data` branch: a card (`<id>.json`) and a diary (`<id>.jsonl`). Written twice, over the same file: as a marker before the agent exists, and with how it went when the run ends.
+[1] run record: the `logs` skill's record of a run on the `agent-data` branch: a card (`<id>.json`) and a diary (`<id>.jsonl`). Written over the same file: as a marker before the agent exists, with how it went when the run ends, and once more without its branch when the reclaim deleted that branch.
 [2] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [3] the tool's mark: `caller.runner` on a card: `host`, the machine that started it; `pid`, the run's process on that machine while it runs, when known; `then`, the follow-up's prompt, when the run names one (`run --then`: once the run ends done with a pull request, a fresh run on its branch gets that prompt and the run's id, `run.ts`).
 [4] cap: how many runs of one scheduled command may be in flight at once, across every machine that shares the repository.
@@ -20,6 +20,7 @@ A run in flight is a run record [1]: the `logs` skill's card on the project's `a
 - **Reading the mark** - a card carries the tool's mark when `caller.runner` is an object with a `host` string; `pid` is kept only when it is a number and `then` only when it is a string; a card without it is somebody else's run.
 - **Withdrawing** - a marker whose scheduler lost the cap is deleted from the branch, so no record says running for a run that never was.
 - **The record at the end** - the card and the diary written over the marker, same id, same file; the mark stays on the card.
+- **A branch that is gone** - when the reclaim deleted the branch the card names, the record is written again without the branch.
 
 ## Business logic
 
@@ -62,3 +63,13 @@ See `## Context`.
 #### Business logic
 
 When the run ends, its card and its diary are written to the branch over the marker: the same id, so the same file, now with the status, the end time, the branch, the pull request and the cost, and the tool's mark still under `caller.runner`. The diary replaces the marker's empty one.
+
+### A branch that is gone
+
+#### Context
+
+**Problem**: a run that changed nothing leaves a branch that holds nothing, and the reclaim deletes it with the checkout, after the record at the end was written. A record naming it points the user at a branch that no longer exists.
+
+#### Business logic
+
+Once the reclaim has deleted branches, the record is written again when one of them is the branch the card names: the same card and diary, without the branch. When the branch stayed, nothing is written. The record at the end is still written before the reclaim, so the record says the run ended while its checkout is still there.

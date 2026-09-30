@@ -39,7 +39,7 @@ For every checkout under `.branches/`, the live card [4] named for the checkout'
 
 #### Context
 
-**Problem**: a detached start and a scheduler's tick write the marker before they spawn; a spawn that never made a checkout, or a process that died before its live card, leaves a running card that no checkout explains.
+**Problem**: a scheduler's tick writes the marker before it spawns, and a run writes its own marker before its checkout; a spawn that never made a checkout, or a process that died before its live card, leaves a running card that no checkout explains.
 
 #### Business logic
 

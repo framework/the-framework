@@ -1,6 +1,5 @@
 import { spawn } from 'node:child_process'
 import { closeSync, mkdirSync, openSync } from 'node:fs'
-import { hostname } from 'node:os'
 import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { probeCli, type CliProbe, type Driver, type DriverReadiness, type PersonalSetup } from 'agent-driver'
@@ -8,7 +7,6 @@ import { ClaudeCodeDriver, claudeCodeReady } from '@agent-driver/claude'
 import { CodexDriver, codexReady } from '@agent-driver/codex'
 import { findRun } from '@gemstack/skill-logs'
 import { readPersonal } from './config.js'
-import { markerCard, writeMarker } from './records.js'
 import { resumeRun, runCommand, runIdFrom, type RunOutcome } from './run.js'
 import { acquireRunLock, handOverRunLock, isPidAlive, releaseRunLock, runStderrPath } from './run-lock.js'
 
@@ -53,16 +51,19 @@ export async function readyToRun(repo: string, driver: DriverName, deps: { probe
 /** The command line of a spawned run: the model, the coding agent and the follow-up named only when the run has them, so the run's own defaults apply otherwise. */
 export function runArgs(run: SpawnedRun): string[] {
   const args = ['run', run.prompt, '--id', run.id]
+  if (run.mark) args.push('--mark')
   if (run.model !== undefined) args.push('--model', run.model)
   if (run.driver !== undefined) args.push('--driver', run.driver)
   if (run.then !== undefined) args.push('--then', run.then)
   return args
 }
 
-/** A run spawned in its own process, its marker already on the branch. */
+/** A run spawned in its own process, its marker already on the branch unless it is to write it itself. */
 export interface SpawnedRun {
   id: string
   prompt: string
+  /** The run writes its own marker: a person's detached start, answered before the marker is pushed. */
+  mark?: boolean
   model?: string
   driver?: DriverName
   /** The follow-up's prompt (`run --then`); a person's start only. */
@@ -120,31 +121,21 @@ async function spawnDetached(repo: string, id: string, args: string[]): Promise<
 }
 
 /**
- * A run started the way a scheduler starts one, and answered at once: the marker written on the
- * branch, the run's process spawned detached, the id returned. What a dashboard's start hook
- * runs: it needs the id back now, not when the agent ends.
+ * A person's run, answered at once: the run's process spawned detached, the id returned. What a
+ * dashboard's start hook runs: it needs the id back now, not when the agent ends. The run's process
+ * writes its own marker: pushing it takes seconds, and the page waits on the id.
  */
 export async function detachRun(
   repo: string,
-  opts: { prompt: string; model?: string; driver?: DriverName; then?: string; now?: () => Date; log?: (line: string) => void },
-  deps: { spawn?: typeof spawnRun; host?: string } = {},
+  opts: { prompt: string; model?: string; driver?: DriverName; then?: string; now?: () => Date },
+  deps: { spawn?: typeof spawnRun } = {},
 ): Promise<{ id: string; driver: DriverName; model?: string }> {
   const now = opts.now ?? (() => new Date())
   const id = runIdFrom(now().toISOString())
   const driver = opts.driver ?? 'claude-code'
   const model = opts.model
-  // The lock before the marker: a scheduler's sweep that reads the marker in the moment before
-  // the run's process has its checkout sees the run held, not gone.
-  await acquireRunLock(repo, id, { pid: process.pid, isAlive: isPidAlive })
-  try {
-    const then = opts.then !== undefined ? { then: opts.then } : {}
-    const marked = await writeMarker(repo, markerCard({ id, startedAt: now().toISOString(), prompt: opts.prompt, driver, ...(model !== undefined ? { model } : {}), mark: { host: deps.host ?? hostname(), ...then } }))
-    if (!marked.ok && !marked.committed) opts.log?.(`[agent-runner] the run's record could not be written: ${marked.error}`)
-    await (deps.spawn ?? spawnRun)(repo, { id, prompt: opts.prompt, driver, ...(model !== undefined ? { model } : {}), ...then })
-  } catch (err) {
-    await releaseRunLock(repo, id, process.pid)
-    throw err
-  }
+  const then = opts.then !== undefined ? { then: opts.then } : {}
+  await (deps.spawn ?? spawnRun)(repo, { id, prompt: opts.prompt, mark: true, driver, ...(model !== undefined ? { model } : {}), ...then })
   return { id, driver, ...(model !== undefined ? { model } : {}) }
 }
 
@@ -169,14 +160,15 @@ export async function detachResume(
  * id here and marks itself. A follow-up it names runs on the same coding agent. The model is the
  * one given; none given, the coding agent starts on its own default.
  */
-export async function runProject(repo: string, opts: { prompt: string; id?: string; model?: string; driver?: DriverName; then?: string; log?: (line: string) => void }): Promise<RunOutcome> {
+export async function runProject(repo: string, opts: { prompt: string; id?: string; mark?: boolean; model?: string; driver?: DriverName; then?: string; log?: (line: string) => void }): Promise<RunOutcome> {
   const id = opts.id ?? runIdFrom(new Date().toISOString())
   const driver = opts.driver ?? 'claude-code'
   const setup = await readPersonal(repo, opts.log ?? (() => {}))
   return runCommand(repo, {
     prompt: opts.prompt,
     id,
-    marked: opts.id !== undefined,
+    // A run given its id was marked by whoever spawned it, unless it was told to mark itself.
+    marked: opts.id !== undefined && opts.mark !== true,
     ...(opts.model !== undefined ? { model: opts.model } : {}),
     driver: driverFor(driver, id, setup),
     ...(opts.then !== undefined ? { then: opts.then, nextDriver: (next: string) => driverFor(driver, next, setup) } : {}),
